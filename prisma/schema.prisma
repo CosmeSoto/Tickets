@@ -1,0 +1,752 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model accounts {
+  id                String  @id
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  users             users   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model attachments {
+  id           String   @id
+  filename     String
+  originalName String
+  mimeType     String
+  size         Int
+  path         String
+  ticketId     String
+  uploadedBy   String
+  createdAt    DateTime @default(now())
+  tickets      tickets  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  users        users    @relation(fields: [uploadedBy], references: [id])
+
+  @@index([ticketId, createdAt(sort: Desc)])
+  @@index([uploadedBy, createdAt(sort: Desc)])
+}
+
+model audit_logs {
+  id         String   @id
+  action     String
+  entityType String
+  entityId   String
+  userId     String?
+  userEmail  String?
+  ipAddress  String?
+  userAgent  String?
+  details    Json?
+  createdAt  DateTime @default(now())
+  users      users?   @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model backups {
+  id         String   @id
+  filename   String
+  filepath   String
+  size       Int
+  type       String
+  status     String
+  error      String?
+  checksum   String?
+  compressed Boolean  @default(false)
+  encrypted  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([type, status])
+}
+
+model categories {
+  id                     String                   @id
+  name                   String
+  description            String?
+  level                  Int
+  parentId               String?
+  departmentId           String?
+  order                  Int                      @default(0)
+  color                  String?                  @default("#6B7280")
+  isActive               Boolean                  @default(true)
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime
+  departments            departments?             @relation(fields: [departmentId], references: [id])
+  categories             categories?              @relation("categoriesTocategories", fields: [parentId], references: [id])
+  other_categories       categories[]             @relation("categoriesTocategories")
+  technician_assignments technician_assignments[]
+  tickets                tickets[]
+  knowledge_articles     knowledge_articles[]
+  sla_policies           sla_policies[]           @relation("SLAPolicyCategory")
+
+  @@index([departmentId])
+  @@index([parentId, level, isActive])
+}
+
+model comments {
+  id         String   @id
+  content    String
+  isInternal Boolean  @default(false)
+  ticketId   String
+  authorId   String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime
+  users      users    @relation(fields: [authorId], references: [id])
+  tickets    tickets  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
+}
+
+model departments {
+  id          String       @id
+  name        String       @unique
+  description String?
+  color       String?      @default("#3B82F6")
+  isActive    Boolean      @default(true)
+  order       Int          @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime
+  categories  categories[]
+  users       users[]
+
+  @@index([isActive, order])
+}
+
+model notification_preferences {
+  userId         String  @id
+  emailEnabled   Boolean @default(true)
+  teamsEnabled   Boolean @default(false)
+  inAppEnabled   Boolean @default(true)
+  ticketCreated  Boolean @default(true)
+  ticketUpdated  Boolean @default(true)
+  ticketAssigned Boolean @default(true)
+  ticketResolved Boolean @default(true)
+  commentAdded   Boolean @default(true)
+  users          users   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model notifications {
+  id        String           @id
+  title     String
+  message   String
+  type      NotificationType @default(INFO)
+  userId    String
+  ticketId  String?
+  isRead    Boolean          @default(false)
+  metadata  Json?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  tickets   tickets?         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  users     users            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@index([userId, isRead, createdAt(sort: Desc)])
+}
+
+model oauth_accounts {
+  id           String    @id
+  provider     String
+  providerId   String
+  accessToken  String
+  refreshToken String?
+  expiresAt    DateTime?
+  userId       String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime
+  users        users     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId])
+}
+
+model oauth_configs {
+  id           String   @id
+  provider     String   @unique
+  clientId     String
+  clientSecret String
+  tenantId     String?
+  isEnabled    Boolean  @default(false)
+  redirectUri  String?
+  scopes       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime
+}
+
+model pages {
+  id             String   @id
+  slug           String   @unique
+  title          String
+  content        String
+  isPublished    Boolean  @default(false)
+  seoTitle       String?
+  seoDescription String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime
+
+  @@index([isPublished, createdAt(sort: Desc)])
+}
+
+model sessions {
+  id           String   @id
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  users        users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expires])
+}
+
+model site_config {
+  id          String   @id
+  key         String   @unique
+  value       String
+  description String?
+  updatedAt   DateTime
+}
+
+model system_settings {
+  id          String   @id
+  key         String   @unique
+  value       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+}
+
+model technician_assignments {
+  id           String     @id
+  technicianId String
+  categoryId   String
+  priority     Int        @default(1)
+  maxTickets   Int?
+  autoAssign   Boolean    @default(true)
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime
+  categories   categories @relation(fields: [categoryId], references: [id])
+  users        users      @relation(fields: [technicianId], references: [id])
+
+  @@unique([technicianId, categoryId])
+  @@index([categoryId, isActive, autoAssign])
+  @@index([technicianId, isActive])
+}
+
+model ticket_history {
+  id        String   @id
+  action    String
+  field     String?
+  oldValue  String?
+  newValue  String?
+  comment   String?
+  ticketId  String
+  userId    String
+  createdAt DateTime @default(now())
+  tickets   tickets  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  users     users    @relation(fields: [userId], references: [id])
+
+  @@index([ticketId, createdAt(sort: Desc)])
+}
+
+model ticket_ratings {
+  id                                       String   @id
+  ticketId                                 String   @unique
+  clientId                                 String
+  technicianId                             String?
+  rating                                   Int
+  feedback                                 String?
+  responseTime                             Int
+  technicalSkill                           Int
+  communication                            Int
+  problemResolution                        Int
+  isPublic                                 Boolean  @default(true)
+  createdAt                                DateTime @default(now())
+  updatedAt                                DateTime
+  users_ticket_ratings_clientIdTousers     users    @relation("ticket_ratings_clientIdTousers", fields: [clientId], references: [id])
+  users_ticket_ratings_technicianIdTousers users?   @relation("ticket_ratings_technicianIdTousers", fields: [technicianId], references: [id])
+  tickets                                  tickets  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([rating, createdAt(sort: Desc)])
+  @@index([technicianId, createdAt(sort: Desc)])
+}
+
+model ticket_resolution_plans {
+  id                      String                    @id
+  ticketId                String                    @unique
+  title                   String
+  description             String?
+  diagnosis               String?
+  solution                String?
+  estimatedTime           Int?
+  actualTime              Int?
+  startedAt               DateTime?
+  completedAt             DateTime?
+  status                  ResolutionStatus          @default(PENDING)
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime
+  tickets                 tickets                   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  ticket_resolution_tasks ticket_resolution_tasks[]
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([ticketId])
+}
+
+model ticket_resolution_tasks {
+  id                      String                  @id
+  planId                  String
+  title                   String
+  description             String?
+  order                   Int
+  status                  TaskStatus              @default(PENDING)
+  startedAt               DateTime?
+  completedAt             DateTime?
+  notes                   String?
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime
+  ticket_resolution_plans ticket_resolution_plans @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId, order])
+  @@index([status])
+}
+
+model tickets {
+  id                               String                        @id
+  title                            String
+  description                      String
+  status                           TicketStatus                  @default(OPEN)
+  priority                         TicketPriority                @default(MEDIUM)
+  clientId                         String
+  assigneeId                       String?
+  categoryId                       String
+  createdById                      String?
+  resolvedAt                       DateTime?
+  closedAt                         DateTime?
+  firstResponseAt                  DateTime?
+  slaDeadline                      DateTime?
+  estimatedTime                    Int?
+  actualTime                       Int?
+  tags                             String[]
+  source                           TicketSource                  @default(WEB)
+  createdAt                        DateTime                      @default(now())
+  updatedAt                        DateTime
+  attachments                      attachments[]
+  comments                         comments[]
+  notifications                    notifications[]
+  ticket_history                   ticket_history[]
+  ticket_ratings                   ticket_ratings?
+  ticket_resolution_plans          ticket_resolution_plans?
+  knowledge_article                knowledge_articles?           @relation("knowledge_articles_source")
+  resolution_plans                 resolution_plans[]
+  ticket_knowledge_articles        ticket_knowledge_articles[]
+  sla_violations                   sla_violations[]
+  ticket_sla_metrics               ticket_sla_metrics?
+  users_tickets_assigneeIdTousers  users?                        @relation("tickets_assigneeIdTousers", fields: [assigneeId], references: [id])
+  categories                       categories                    @relation(fields: [categoryId], references: [id])
+  users_tickets_clientIdTousers    users                         @relation("tickets_clientIdTousers", fields: [clientId], references: [id])
+  users_tickets_createdByIdTousers users?                        @relation("tickets_createdByIdTousers", fields: [createdById], references: [id])
+
+  @@index([assigneeId, status])
+  @@index([categoryId, status])
+  @@index([clientId, createdAt(sort: Desc)])
+  @@index([createdById])
+  @@index([source, status])
+  @@index([status, priority])
+  @@index([title, description])
+}
+
+model user_preferences {
+  id              String   @id
+  userId          String   @unique
+  theme           String   @default("system")
+  timezone        String   @default("America/Guayaquil")
+  language        String   @default("es")
+  profileVisible  Boolean  @default(true)
+  activityVisible Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime
+  users           users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model user_settings {
+  id                   String   @id
+  userId               String   @unique
+  emailNotifications   Boolean  @default(true)
+  pushNotifications    Boolean  @default(true)
+  autoAssignEnabled    Boolean  @default(true)
+  maxConcurrentTickets Int      @default(10)
+  theme                String   @default("light")
+  language             String   @default("es")
+  timezone             String   @default("America/Guayaquil")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime
+  users                users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model email_queue {
+  id           String    @id
+  toEmail      String
+  subject      String
+  body         String    @db.Text
+  templateName String?
+  templateData String?   @db.Text
+  status       String    @default("pending")
+  attempts     Int       @default(0)
+  maxAttempts  Int       @default(3)
+  scheduledAt  DateTime  @default(now())
+  sentAt       DateTime?
+  errorMessage String?   @db.Text
+  createdAt    DateTime  @default(now())
+
+  @@index([status, scheduledAt])
+  @@index([createdAt(sort: Desc)])
+  @@index([toEmail])
+}
+
+model users {
+  id                                                String                      @id
+  email                                             String                      @unique
+  name                                              String
+  passwordHash                                      String?
+  role                                              UserRole                    @default(CLIENT)
+  departmentId                                      String?
+  phone                                             String?
+  avatar                                            String?
+  isActive                                          Boolean                     @default(true)
+  isEmailVerified                                   Boolean                     @default(false)
+  lastLogin                                         DateTime?
+  oauthProvider                                     String?
+  oauthId                                           String?
+  createdAt                                         DateTime                    @default(now())
+  updatedAt                                         DateTime
+  accounts                                          accounts[]
+  attachments                                       attachments[]
+  audit_logs                                        audit_logs[]
+  comments                                          comments[]
+  notification_preferences                          notification_preferences?
+  notifications                                     notifications[]
+  oauth_accounts                                    oauth_accounts[]
+  sessions                                          sessions[]
+  technician_assignments                            technician_assignments[]
+  ticket_history                                    ticket_history[]
+  ticket_ratings_ticket_ratings_clientIdTousers     ticket_ratings[]            @relation("ticket_ratings_clientIdTousers")
+  ticket_ratings_ticket_ratings_technicianIdTousers ticket_ratings[]            @relation("ticket_ratings_technicianIdTousers")
+  tickets_tickets_assigneeIdTousers                 tickets[]                   @relation("tickets_assigneeIdTousers")
+  tickets_tickets_clientIdTousers                   tickets[]                   @relation("tickets_clientIdTousers")
+  tickets_tickets_createdByIdTousers                tickets[]                   @relation("tickets_createdByIdTousers")
+  user_preferences                                  user_preferences?
+  user_settings                                     user_settings?
+  knowledge_articles                                knowledge_articles[]        @relation("knowledge_articles_author")
+  article_votes                                     article_votes[]
+  resolution_plans_created                          resolution_plans[]          @relation("ResolutionPlanCreator")
+  tasks_assigned                                    resolution_tasks[]          @relation("TaskAssignee")
+  articles_created                                  ticket_knowledge_articles[] @relation("ArticleCreator")
+  webhooks_created                                  webhooks[]                  @relation("WebhookCreator")
+  departments                                       departments?                @relation(fields: [departmentId], references: [id])
+
+  @@index([departmentId])
+  @@index([name, email])
+  @@index([role, isActive])
+}
+
+model verification_tokens {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model knowledge_articles {
+  id                        String                      @id @default(cuid())
+  title                     String
+  content                   String
+  summary                   String?
+  categoryId                String
+  tags                      String[]
+  sourceTicketId            String?                     @unique
+  authorId                  String
+  views                     Int                         @default(0)
+  helpfulVotes              Int                         @default(0)
+  notHelpfulVotes           Int                         @default(0)
+  isPublished               Boolean                     @default(true)
+  createdAt                 DateTime                    @default(now())
+  updatedAt                 DateTime                    @updatedAt
+  category                  categories                  @relation(fields: [categoryId], references: [id])
+  author                    users                       @relation("knowledge_articles_author", fields: [authorId], references: [id])
+  sourceTicket              tickets?                    @relation("knowledge_articles_source", fields: [sourceTicketId], references: [id])
+  votes                     article_votes[]
+  ticket_knowledge_articles ticket_knowledge_articles[]
+
+  @@index([categoryId, isPublished])
+  @@index([authorId, createdAt(sort: Desc)])
+  @@index([views(sort: Desc)])
+  @@index([helpfulVotes(sort: Desc)])
+  @@index([title, content])
+}
+
+model article_votes {
+  id        String             @id @default(cuid())
+  articleId String
+  userId    String
+  isHelpful Boolean
+  createdAt DateTime           @default(now())
+  article   knowledge_articles @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  user      users              @relation(fields: [userId], references: [id])
+
+  @@unique([articleId, userId])
+  @@index([articleId, isHelpful])
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+}
+
+enum ResolutionStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TicketSource {
+  WEB
+  EMAIL
+  PHONE
+  CHAT
+  API
+  ADMIN
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum UserRole {
+  ADMIN
+  TECHNICIAN
+  CLIENT
+}
+
+// ============================================
+// PLAN DE RESOLUCIÓN
+// ============================================
+
+model resolution_plans {
+  id              String   @id @default(uuid())
+  ticketId        String   @map("ticket_id")
+  title           String
+  description     String?  @db.Text
+  status          String   @default("draft") // 'draft', 'active', 'completed', 'cancelled'
+  totalTasks      Int      @default(0) @map("total_tasks")
+  completedTasks  Int      @default(0) @map("completed_tasks")
+  estimatedHours  Float    @default(0) @map("estimated_hours")
+  actualHours     Float    @default(0) @map("actual_hours")
+  startDate       DateTime? @map("start_date")
+  targetDate      DateTime? @map("target_date")
+  completedDate   DateTime? @map("completed_date")
+  createdBy       String   @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  ticket          tickets  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  creator         users    @relation("ResolutionPlanCreator", fields: [createdBy], references: [id])
+  tasks           resolution_tasks[]
+  
+  @@index([ticketId])
+  @@index([createdBy])
+  @@map("resolution_plans")
+}
+
+model resolution_tasks {
+  id              String   @id @default(uuid())
+  planId          String   @map("plan_id")
+  title           String
+  description     String?  @db.Text
+  status          String   @default("pending") // 'pending', 'in_progress', 'completed', 'blocked'
+  priority        String   @default("medium") // 'low', 'medium', 'high'
+  estimatedHours  Float?   @map("estimated_hours")
+  actualHours     Float?   @map("actual_hours")
+  assignedTo      String?  @map("assigned_to")
+  dueDate         DateTime? @map("due_date")
+  completedAt     DateTime? @map("completed_at")
+  notes           String?  @db.Text
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  plan            resolution_plans @relation(fields: [planId], references: [id], onDelete: Cascade)
+  assignee        users?   @relation("TaskAssignee", fields: [assignedTo], references: [id])
+  
+  @@index([planId])
+  @@index([assignedTo])
+  @@map("resolution_tasks")
+}
+
+// ============================================
+// VINCULACIÓN TICKETS - CONOCIMIENTOS
+// ============================================
+
+model ticket_knowledge_articles {
+  id          String   @id @default(uuid())
+  ticketId    String   @map("ticket_id")
+  articleId   String   @map("article_id")
+  createdBy   String   @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  ticket      tickets  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  article     knowledge_articles @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  creator     users    @relation("ArticleCreator", fields: [createdBy], references: [id])
+  
+  @@unique([ticketId, articleId])
+  @@index([ticketId])
+  @@index([articleId])
+  @@map("ticket_knowledge_articles")
+}
+
+// ============================================
+// WEBHOOKS SYSTEM
+// ============================================
+
+model webhooks {
+  id                String         @id @default(uuid())
+  name              String         @db.VarChar(100)
+  url               String         @db.VarChar(500)
+  events            String[]
+  secret            String         @db.VarChar(255)
+  isActive          Boolean        @default(true) @map("is_active")
+  headers           Json?
+  timeoutMs         Int            @default(30000) @map("timeout_ms")
+  retryCount        Int            @default(3) @map("retry_count")
+  createdBy         String?        @map("created_by")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @default(now()) @updatedAt @map("updated_at")
+  lastTriggeredAt   DateTime?      @map("last_triggered_at")
+  webhook_logs      webhook_logs[]
+  creator           users?         @relation("WebhookCreator", fields: [createdBy], references: [id])
+
+  @@index([isActive])
+  @@map("webhooks")
+}
+
+model webhook_logs {
+  id             String    @id @default(uuid())
+  webhookId      String    @map("webhook_id")
+  event          String    @db.VarChar(50)
+  payload        Json
+  responseStatus Int?      @map("response_status")
+  responseBody   String?   @db.Text @map("response_body")
+  errorMessage   String?   @db.Text @map("error_message")
+  durationMs     Int?      @map("duration_ms")
+  attempt        Int       @default(1)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  webhook        webhooks  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId, createdAt(sort: Desc)])
+  @@index([event, createdAt(sort: Desc)])
+  @@map("webhook_logs")
+}
+
+// ============================================
+// SLA SYSTEM
+// ============================================
+
+model sla_policies {
+  id                   String            @id @default(uuid())
+  name                 String            @db.VarChar(100)
+  description          String?           @db.Text
+  categoryId           String?           @map("category_id")
+  priority             String            @db.VarChar(20)
+  responseTimeHours    Int               @map("response_time_hours")
+  resolutionTimeHours  Int               @map("resolution_time_hours")
+  businessHoursOnly    Boolean           @default(false) @map("business_hours_only")
+  businessHoursStart   String            @default("09:00:00") @map("business_hours_start") @db.VarChar(8)
+  businessHoursEnd     String            @default("18:00:00") @map("business_hours_end") @db.VarChar(8)
+  businessDays         String            @default("MON,TUE,WED,THU,FRI") @map("business_days") @db.VarChar(50)
+  isActive             Boolean           @default(true) @map("is_active")
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @default(now()) @updatedAt @map("updated_at")
+  category             categories?       @relation("SLAPolicyCategory", fields: [categoryId], references: [id])
+  sla_violations       sla_violations[]
+  ticket_sla_metrics   ticket_sla_metrics[]
+
+  @@index([isActive, categoryId, priority])
+  @@map("sla_policies")
+}
+
+model sla_violations {
+  id            String       @id @default(uuid())
+  ticketId      String       @map("ticket_id")
+  slaPolicyId   String       @map("sla_policy_id")
+  violationType String       @db.VarChar(50) @map("violation_type")
+  expectedAt    DateTime     @map("expected_at")
+  actualAt      DateTime?    @map("actual_at")
+  isResolved    Boolean      @default(false) @map("is_resolved")
+  severity      String       @default("MEDIUM") @db.VarChar(20)
+  notifiedAt    DateTime?    @map("notified_at")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  ticket        tickets      @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  sla_policy    sla_policies @relation(fields: [slaPolicyId], references: [id])
+
+  @@index([ticketId, isResolved])
+  @@index([slaPolicyId, createdAt(sort: Desc)])
+  @@map("sla_violations")
+}
+
+model ticket_sla_metrics {
+  id                    String       @id @default(uuid())
+  ticketId              String       @unique @map("ticket_id")
+  slaPolicyId           String       @map("sla_policy_id")
+  responseDeadline      DateTime?    @map("response_deadline")
+  resolutionDeadline    DateTime?    @map("resolution_deadline")
+  firstResponseAt       DateTime?    @map("first_response_at")
+  resolvedAt            DateTime?    @map("resolved_at")
+  responseSLAMet        Boolean?     @map("response_sla_met")
+  resolutionSLAMet      Boolean?     @map("resolution_sla_met")
+  responseTimeMinutes   Int?         @map("response_time_minutes")
+  resolutionTimeMinutes Int?         @map("resolution_time_minutes")
+  businessHoursElapsed  Int?         @map("business_hours_elapsed")
+  createdAt             DateTime     @default(now()) @map("created_at")
+  updatedAt             DateTime     @default(now()) @updatedAt @map("updated_at")
+  ticket                tickets      @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  sla_policy            sla_policies @relation(fields: [slaPolicyId], references: [id])
+
+  @@index([ticketId])
+  @@index([responseDeadline, resolutionDeadline])
+  @@map("ticket_sla_metrics")
+}

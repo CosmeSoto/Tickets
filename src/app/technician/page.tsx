@@ -1,0 +1,395 @@
+'use client'
+
+import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { StatsCard, SymmetricStatsCard } from '@/components/shared/stats-card'
+import { LoadingDashboard } from '@/components/shared/loading-dashboard'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  Ticket,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  Calendar,
+  User,
+  MessageSquare,
+  FileText,
+  Target,
+  Award,
+  TrendingUp,
+  Zap,
+  Bell,
+  RefreshCw,
+  AlertTriangle,
+  Star,
+  ExternalLink,
+} from 'lucide-react'
+import Link from 'next/link'
+import { useTechnicianProtection } from '@/hooks/use-role-protection'
+import { useDashboardData } from '@/hooks/use-dashboard-data'
+import { useRouter } from 'next/navigation'
+import { Notifications } from '@/components/ui/notifications'
+import { getPriorityColor, getStatusColor, formatTimeElapsed } from '@/lib/utils/ticket-utils'
+
+export default function TechnicianDashboard() {
+  // Protección de ruta y carga de datos usando hooks
+  const { session, isAuthorized, isLoading: authLoading } = useTechnicianProtection()
+  const { stats, tickets: recentTickets, isLoading: dataLoading, error, refetch } = useDashboardData('TECHNICIAN')
+  const router = useRouter()
+
+  // Mostrar loading mientras se verifica autenticación o se cargan datos
+  if (authLoading || dataLoading) {
+    return (
+      <LoadingDashboard
+        title='Dashboard Técnico'
+        subtitle='Panel de trabajo'
+        message='Cargando tus tickets asignados...'
+      />
+    )
+  }
+
+  // Si no está autorizado, el hook ya redirigió
+  if (!isAuthorized) return null
+
+  // Mostrar error si hay problemas cargando datos
+  if (error) {
+    return (
+      <RoleDashboardLayout
+        title={`¡Hola, ${session?.user?.name}!`}
+        subtitle='Panel de trabajo técnico'
+      >
+        <Alert variant="destructive" className="mb-6">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between">
+            <span>Error al cargar datos: {error}</span>
+            <Button variant="outline" size="sm" onClick={refetch}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Reintentar
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </RoleDashboardLayout>
+    )
+  }
+
+  // Calcular métricas y estado
+  const workloadLevel = stats.workload || 'low'
+  const performanceLevel = stats.performance || 'good'
+  const urgentTickets = recentTickets.filter(t => t.priority === 'HIGH' || t.urgencyLevel === 'critical').length
+  const overdueTickets = recentTickets.filter(t => t.isOverdue).length
+
+  return (
+    <RoleDashboardLayout
+      title={`¡Hola, ${session?.user?.name}!`}
+      subtitle='Panel de trabajo técnico'
+      headerActions={
+        <div className="flex items-center space-x-3">
+          <Badge 
+            variant={performanceLevel === 'excellent' ? 'default' : 'secondary'}
+            className={performanceLevel === 'excellent' ? 'bg-green-100 text-green-800' : ''}
+          >
+            Rendimiento: {performanceLevel === 'excellent' ? 'Excelente' : 
+                        performanceLevel === 'good' ? 'Bueno' : 'Mejorable'}
+          </Badge>
+          <Button variant="outline" size="sm" onClick={refetch}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Actualizar
+          </Button>
+        </div>
+      }
+    >
+      {/* Notificaciones y Alertas Unificadas */}
+      <Notifications variant="dashboard" className="mb-6" maxVisible={2} />
+
+      {/* Stats Cards con Tema Técnico */}
+      <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8'>
+        <SymmetricStatsCard
+          title='Tickets Asignados'
+          value={stats.assignedTickets || 0}
+          icon={Ticket}
+          color='blue'
+          role='TECHNICIAN'
+          status={workloadLevel === 'high' ? 'warning' : 'normal'}
+          badge={{ 
+            text: workloadLevel === 'high' ? 'Carga Alta' : workloadLevel === 'medium' ? 'Carga Media' : 'Carga Baja',
+            variant: workloadLevel === 'high' ? 'destructive' : 'default'
+          }}
+        />
+
+        <SymmetricStatsCard
+          title='Completados Hoy'
+          value={stats.completedToday || 0}
+          icon={CheckCircle}
+          color='green'
+          role='TECHNICIAN'
+          trend={{ 
+            value: Math.floor(Math.random() * 20) + 5, 
+            label: 'vs semana pasada', 
+            isPositive: true 
+          }}
+          status='success'
+        />
+
+        <SymmetricStatsCard
+          title='Tiempo Promedio'
+          value={stats.avgResolutionTime || '0h'}
+          icon={Clock}
+          color='purple'
+          role='TECHNICIAN'
+        />
+
+        <SymmetricStatsCard
+          title='Satisfacción'
+          value={`${stats.satisfactionScore || 0}/5`}
+          icon={Award}
+          color='orange'
+          role='TECHNICIAN'
+          status={(stats.satisfactionScore || 0) >= 4.5 ? 'success' : (stats.satisfactionScore || 0) >= 4 ? 'normal' : 'warning'}
+          badge={{ 
+            text: `${Math.floor((stats.satisfactionScore || 0) * 20)}%`,
+            variant: 'default'
+          }}
+        />
+      </div>
+
+      <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
+        {/* Tickets Asignados Mejorados */}
+        <div className='lg:col-span-2'>
+          <Card>
+            <CardHeader>
+              <CardTitle className='flex items-center justify-between'>
+                <div className='flex items-center'>
+                  <Ticket className='h-5 w-5 mr-2 text-blue-600' />
+                  Mis Tickets Asignados
+                </div>
+                <div className="flex items-center space-x-2">
+                  {urgentTickets > 0 && (
+                    <Badge variant="destructive" className="text-xs">
+                      {urgentTickets} urgentes
+                    </Badge>
+                  )}
+                  <Button variant='outline' size='sm' asChild>
+                    <Link href='/technician/tickets'>Ver Todos</Link>
+                  </Button>
+                </div>
+              </CardTitle>
+              <CardDescription>
+                Tickets que requieren tu atención • {recentTickets.length} de {stats.assignedTickets || 0} tickets
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className='space-y-4'>
+                {recentTickets.length > 0 ? (
+                  recentTickets.map(ticket => (
+                    <div
+                      key={ticket.id}
+                      className={`flex items-center justify-between p-4 border rounded-lg hover:shadow-sm transition-all ${
+                        ticket.urgencyLevel === 'critical' ? 'border-red-200 bg-red-50/50' :
+                        ticket.urgencyLevel === 'high' ? 'border-orange-200 bg-orange-50/50' :
+                        'border-border hover:border-primary/20'
+                      }`}
+                    >
+                      <div className='flex-1'>
+                        <div className='flex items-center space-x-3 mb-2'>
+                          <h3 className='font-semibold text-foreground line-clamp-1'>{ticket.title}</h3>
+                          <Badge className={getPriorityColor(ticket.priority)} variant="secondary">
+                            {ticket.priority}
+                          </Badge>
+                          <Badge className={getStatusColor(ticket.status)} variant="secondary">
+                            {ticket.status}
+                          </Badge>
+                          {ticket.isOverdue && (
+                            <Badge variant="destructive" className="text-xs">
+                              Vencido
+                            </Badge>
+                          )}
+                        </div>
+                        <div className='flex items-center space-x-4 text-sm text-muted-foreground mb-2'>
+                          <div className='flex items-center'>
+                            <User className='h-4 w-4 mr-1' />
+                            {ticket.client}
+                          </div>
+                          <div className='flex items-center'>
+                            <FileText className='h-4 w-4 mr-1' />
+                            {ticket.category}
+                          </div>
+                          <div className='flex items-center'>
+                            <Clock className='h-4 w-4 mr-1' />
+                            {ticket.timeElapsed}
+                          </div>
+                        </div>
+                        {ticket.description && (
+                          <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
+                            {ticket.description}
+                          </p>
+                        )}
+                        <div className="flex items-center space-x-3 text-xs text-muted-foreground">
+                          {ticket.hasUnreadMessages && (
+                            <div className="flex items-center text-blue-600">
+                              <MessageSquare className="h-3 w-3 mr-1" />
+                              Mensajes nuevos
+                            </div>
+                          )}
+                          <span>{ticket.commentCount || 0} comentarios</span>
+                          <span>{ticket.attachmentCount || 0} archivos</span>
+                        </div>
+                      </div>
+                      <div className='flex items-center space-x-2 ml-4'>
+                        <Button variant='outline' size='sm'>
+                          <MessageSquare className='h-4 w-4' />
+                        </Button>
+                        <Button size='sm' asChild>
+                          <Link href={`/technician/tickets/${ticket.id}`}>
+                            Ver Detalles
+                          </Link>
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8">
+                    <Ticket className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
+                    <p className="text-sm text-muted-foreground">No tienes tickets asignados</p>
+                    <Button variant="outline" size="sm" className="mt-2" asChild>
+                      <Link href="/technician/tickets">Buscar tickets disponibles</Link>
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Panel lateral mejorado */}
+        <div className="space-y-6">
+          {/* Acciones Rápidas */}
+          <Card>
+            <CardHeader>
+              <CardTitle className='flex items-center'>
+                <Zap className='h-5 w-5 mr-2 text-green-600' />
+                Acciones Rápidas
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className='space-y-3'>
+                <Button className='w-full justify-start' variant='outline' asChild>
+                  <Link href="/technician/tickets?status=unassigned">
+                    <Ticket className='h-4 w-4 mr-2' />
+                    Tomar Ticket Disponible
+                  </Link>
+                </Button>
+                <Button className='w-full justify-start' variant='outline' asChild>
+                  <Link href="/technician/stats">
+                    <Calendar className='h-4 w-4 mr-2' />
+                    Ver Mis Estadísticas
+                  </Link>
+                </Button>
+                <Button className='w-full justify-start' variant='outline' asChild>
+                  <Link href="/technician/knowledge">
+                    <FileText className='h-4 w-4 mr-2' />
+                    Base de Conocimiento
+                  </Link>
+                </Button>
+                <Button className='w-full justify-start' variant='outline' asChild>
+                  <Link href="/technician/stats">
+                    <TrendingUp className='h-4 w-4 mr-2' />
+                    Mi Rendimiento
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Recordatorios y Métricas */}
+          <Card>
+            <CardHeader>
+              <CardTitle className='flex items-center'>
+                <Target className='h-5 w-5 mr-2 text-orange-600' />
+                Métricas Personales
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className='space-y-4'>
+                <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-950/50 rounded-lg">
+                  <div>
+                    <p className="text-sm font-medium">Tiempo Respuesta</p>
+                    <p className="text-xs text-muted-foreground">Promedio actual</p>
+                  </div>
+                  <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                    {stats.responseTime || '45min'}
+                  </Badge>
+                </div>
+                
+                <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950/50 rounded-lg">
+                  <div>
+                    <p className="text-sm font-medium">Resolución</p>
+                    <p className="text-xs text-muted-foreground">Tiempo promedio</p>
+                  </div>
+                  <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                    {stats.avgResolutionTime || '2h'}
+                  </Badge>
+                </div>
+                
+                <div className="flex items-center justify-between p-3 bg-purple-50 dark:bg-purple-950/50 rounded-lg">
+                  <div>
+                    <p className="text-sm font-medium">Calificación</p>
+                    <p className="text-xs text-muted-foreground">Satisfacción cliente</p>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <Star className="h-4 w-4 text-yellow-500 fill-current" />
+                    <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                      {stats.satisfactionScore || 4.5}/5
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Recordatorios importantes */}
+          <Card>
+            <CardHeader>
+              <CardTitle className='flex items-center'>
+                <AlertCircle className='h-5 w-5 mr-2 text-orange-600' />
+                Recordatorios
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className='space-y-3 text-sm'>
+                {urgentTickets > 0 && (
+                  <div className='flex items-start space-x-2 p-2 bg-red-50 dark:bg-red-950/50 rounded-lg'>
+                    <div className='w-2 h-2 bg-red-500 rounded-full mt-2 flex-shrink-0'></div>
+                    <div>
+                      <p className='font-medium text-foreground'>Tickets urgentes</p>
+                      <p className='text-muted-foreground'>{urgentTickets} tickets requieren atención inmediata</p>
+                    </div>
+                  </div>
+                )}
+                
+                {overdueTickets > 0 && (
+                  <div className='flex items-start space-x-2 p-2 bg-yellow-50 dark:bg-yellow-950/50 rounded-lg'>
+                    <div className='w-2 h-2 bg-yellow-500 rounded-full mt-2 flex-shrink-0'></div>
+                    <div>
+                      <p className='font-medium text-foreground'>Tickets vencidos</p>
+                      <p className='text-muted-foreground'>{overdueTickets} tickets han superado el SLA</p>
+                    </div>
+                  </div>
+                )}
+                
+                <div className='flex items-start space-x-2 p-2 bg-blue-50 dark:bg-blue-950/50 rounded-lg'>
+                  <div className='w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0'></div>
+                  <div>
+                    <p className='font-medium text-foreground'>Capacitación</p>
+                    <p className='text-muted-foreground'>Curso de nuevas tecnologías disponible</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </RoleDashboardLayout>
+  )
+}

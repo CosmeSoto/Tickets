@@ -1,0 +1,13 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Ejecutar lint-staged
+npx lint-staged
+
+# Ejecutar análisis de calidad rápido
+echo "🔍 Ejecutando análisis de calidad..."
+node scripts/detect-code-smells.js --quick || true
+
+# Verificar que el build funciona
+echo "🏗️  Verificando build..."
+npm run build

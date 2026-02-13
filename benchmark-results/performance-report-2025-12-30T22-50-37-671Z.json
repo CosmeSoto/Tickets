@@ -1,0 +1,97 @@
+{
+  "timestamp": "2025-12-30T22:50:37.671Z",
+  "config": {
+    "baseUrl": "http://localhost:3000",
+    "duration": "10s",
+    "connections": "5",
+    "pipelining": 1,
+    "outputDir": "/Users/santiagoberrazueta/Documents/Tickets/sistema-tickets-nextjs/benchmark-results"
+  },
+  "results": [
+    {
+      "endpoint": "Health Check",
+      "url": "http://localhost:3000/api/health/database",
+      "summary": {
+        "requestsPerSecond": 0,
+        "latencyAverage": 0,
+        "latencyP99": 0,
+        "throughputMBps": "0.00",
+        "errors": 107391,
+        "timeouts": 0,
+        "duration": 10.02,
+        "connections": 5
+      },
+      "performance": {
+        "fast": true,
+        "acceptable": true,
+        "slow": false
+      }
+    },
+    {
+      "endpoint": "Categories API",
+      "url": "http://localhost:3000/api/categories",
+      "summary": {
+        "requestsPerSecond": 0,
+        "latencyAverage": 0,
+        "latencyP99": 0,
+        "throughputMBps": "0.00",
+        "errors": 123325,
+        "timeouts": 0,
+        "duration": 11.01,
+        "connections": 5
+      },
+      "performance": {
+        "fast": true,
+        "acceptable": true,
+        "slow": false
+      }
+    },
+    {
+      "endpoint": "Tickets API",
+      "url": "http://localhost:3000/api/tickets?page=1&limit=10",
+      "summary": {
+        "requestsPerSecond": 0,
+        "latencyAverage": 0,
+        "latencyP99": 0,
+        "throughputMBps": "0.00",
+        "errors": 109918,
+        "timeouts": 0,
+        "duration": 10.01,
+        "connections": 5
+      },
+      "performance": {
+        "fast": true,
+        "acceptable": true,
+        "slow": false
+      }
+    },
+    {
+      "endpoint": "Dashboard Stats",
+      "url": "http://localhost:3000/api/dashboard/stats",
+      "summary": {
+        "requestsPerSecond": 0,
+        "latencyAverage": 0,
+        "latencyP99": 0,
+        "throughputMBps": "0.00",
+        "errors": 111811,
+        "timeouts": 0,
+        "duration": 10.02,
+        "connections": 5
+      },
+      "performance": {
+        "fast": true,
+        "acceptable": true,
+        "slow": false
+      }
+    }
+  ],
+  "summary": {
+    "totalEndpoints": 4,
+    "averageLatency": 0,
+    "totalRequests": 0,
+    "totalErrors": 452445,
+    "fastEndpoints": 4,
+    "acceptableEndpoints": 4,
+    "slowEndpoints": 0
+  }
+}

@@ -1,0 +1,45 @@
+// Database Performance Indexes
+// Add these to your Prisma schema for better query performance
+
+model Ticket {
+  // ... existing fields ...
+  
+  // Performance indexes
+  @@index([status, priority], name: "idx_ticket_status_priority")
+  @@index([userId], name: "idx_ticket_user_id")
+  @@index([assignedToId], name: "idx_ticket_assigned_to_id")
+  @@index([categoryId], name: "idx_ticket_category_id")
+  @@index([createdAt], name: "idx_ticket_created_at")
+  @@index([updatedAt], name: "idx_ticket_updated_at")
+  @@index([status, createdAt], name: "idx_ticket_status_created_at")
+}
+
+model Comment {
+  // ... existing fields ...
+  
+  // Performance indexes
+  @@index([ticketId], name: "idx_comment_ticket_id")
+  @@index([createdAt], name: "idx_comment_created_at")
+}
+
+model Attachment {
+  // ... existing fields ...
+  
+  // Performance indexes
+  @@index([ticketId], name: "idx_attachment_ticket_id")
+}
+
+model User {
+  // ... existing fields ...
+  
+  // Performance indexes
+  @@index([email], name: "idx_user_email")
+  @@index([role, active], name: "idx_user_role_active")
+}
+
+model Category {
+  // ... existing fields ...
+  
+  // Performance indexes
+  @@index([active], name: "idx_category_active")
+}
