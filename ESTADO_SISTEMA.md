@@ -78,7 +78,7 @@ Se eliminó completamente la redundancia entre configuraciones, estableciendo un
 
 **Arquitectura Final:**
 ```
-Admin Settings (Global)          User Settings (Personal)
+Admin Settings (Global)          User Settings (Personal - /settings)
        │                                  │
        ├─ Habilitar Módulo               ├─ NotificationSettingsCard
        │  (On/Off global)                 │  ├─ Básico (Clientes)
@@ -86,6 +86,11 @@ Admin Settings (Global)          User Settings (Personal)
        └─ Alertas informativas            │
                                           └─ NotificationSettingsDialog
                                              (Solo para acceso rápido desde lista de notificaciones)
+
+Rutas consolidadas:
+- /settings → Página unificada para TODOS los roles
+- /client/settings → Redirige a /settings
+- /technician/settings → Redirige a /settings
 ```
 
 **Cambios Realizados:**
@@ -95,12 +100,13 @@ Admin Settings (Global)          User Settings (Personal)
 - ✅ Creado componente base: `NotificationSettingsCard` (2 niveles: básico/avanzado)
 - ✅ Mantenido componente dialog: `NotificationSettingsDialog` (solo para acceso rápido)
 - ✅ Actualizada API `/api/user/settings` para soportar todos los campos
-- ✅ Refactorizado `/client/settings` (nivel básico)
-- ✅ Refactorizado `/settings` (nivel avanzado - todas las opciones directamente)
+- ✅ Consolidado `/client/settings` y `/technician/settings` → redirigen a `/settings`
+- ✅ Implementado nivel dinámico según rol en `/settings`
 - ✅ Simplificado `/admin/settings` (solo control global)
 - ✅ Eliminado componente redundante: `NotificationSettings`
 - ✅ Eliminado botón "Configuración Avanzada" y modal redundante de `/settings`
 - ✅ Eliminado nivel "intermediate" - ahora solo básico y avanzado
+- ✅ Actualizada navegación para apuntar a `/settings` unificado
 
 **Beneficios:**
 - ✅ Eliminada 100% de redundancia de código
@@ -110,6 +116,8 @@ Admin Settings (Global)          User Settings (Personal)
 - ✅ Simetría estética entre todos los roles
 - ✅ Todas las opciones en un solo lugar según el rol
 - ✅ Sin modales redundantes
+- ✅ Una sola página de configuración para todos los roles
+- ✅ Navegación simplificada
 - ✅ Fácil agregar nuevas opciones
 - ✅ Reducción de bugs por inconsistencias
 
@@ -172,10 +180,13 @@ npx prisma studio
 
 # 3. Probar en navegador
 npm run dev
-# Ir a /client/settings (nivel básico - clientes)
-# Ir a /settings (nivel avanzado - técnicos/admins)
+# Ir a /settings como cualquier rol
+# Clientes verán nivel básico (Email + Push)
+# Técnicos/Admins verán nivel avanzado (todas las opciones)
+# Verificar que /client/settings y /technician/settings redirigen a /settings
 # Verificar que timezone muestra Ecuador
 # Verificar que NO hay botón "Configuración Avanzada" redundante
+# Verificar que NO hay secciones duplicadas de preferencias
 ```
 
 ## 📚 Documentación Adicional
