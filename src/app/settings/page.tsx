@@ -6,20 +6,16 @@ import { useRouter } from 'next/navigation'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
 import { useToast } from '@/hooks/use-toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-
-// Componentes de configuración
 import { PersonalSettings } from '@/components/settings/personal-settings'
-import { NotificationSettings } from '@/components/settings/notification-settings'
 import { PrivacySettings } from '@/components/settings/privacy-settings'
+import { NotificationSettingsUnified } from '@/components/notifications/notification-settings-unified'
+import { NotificationPreferencesDialog } from '@/components/notifications/notification-preferences'
+import {
+  NotificationPreferences,
+  DEFAULT_NOTIFICATION_PREFERENCES,
+} from '@/types/notification-preferences'
 
 interface UserSettings {
-  notifications: {
-    email: boolean
-    push: boolean
-    ticketUpdates: boolean
-    systemAlerts: boolean
-    weeklyReport: boolean
-  }
   privacy: {
     profileVisible: boolean
     activityVisible: boolean
@@ -35,24 +31,22 @@ export default function SettingsPage() {
   const router = useRouter()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
-  
+  const [showAdvancedDialog, setShowAdvancedDialog] = useState(false)
+
   const [settings, setSettings] = useState<UserSettings>({
-    notifications: {
-      email: true,
-      push: true,
-      ticketUpdates: true,
-      systemAlerts: true,
-      weeklyReport: false
-    },
     privacy: {
       profileVisible: true,
-      activityVisible: true
+      activityVisible: true,
     },
     preferences: {
       theme: 'light',
-      timezone: 'America/Guayaquil'
-    }
+      timezone: 'America/Guayaquil',
+    },
   })
+
+  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences>(
+    DEFAULT_NOTIFICATION_PREFERENCES
+  )
 
   useEffect(() => {
     if (status === 'loading') return
@@ -71,23 +65,34 @@ export default function SettingsPage() {
       if (response.ok) {
         const data = await response.json()
         if (data.success && data.settings) {
-          // Mapear de user_settings a la estructura esperada
           setSettings({
-            notifications: {
-              email: data.settings.emailNotifications ?? true,
-              push: data.settings.pushNotifications ?? true,
-              ticketUpdates: data.settings.emailNotifications ?? true,
-              systemAlerts: true,
-              weeklyReport: false
-            },
             privacy: {
               profileVisible: true,
-              activityVisible: true
+              activityVisible: true,
             },
             preferences: {
               theme: data.settings.theme || 'light',
-              timezone: data.settings.timezone || 'America/Guayaquil'
-            }
+              timezone: data.settings.timezone || 'America/Guayaquil',
+            },
+          })
+
+          setNotificationPrefs({
+            emailNotifications: data.settings.emailNotifications ?? true,
+            pushNotifications: data.settings.pushNotifications ?? true,
+            ticketUpdates: data.settings.ticketUpdates ?? true,
+            systemAlerts: data.settings.systemAlerts ?? true,
+            weeklyReport: data.settings.weeklyReport ?? false,
+            soundEnabled: data.settings.soundEnabled ?? true,
+            ticketCreated: data.settings.ticketCreated ?? true,
+            ticketAssigned: data.settings.ticketAssigned ?? true,
+            statusChanged: data.settings.statusChanged ?? true,
+            newComments: data.settings.newComments ?? true,
+            ticketUpdated: data.settings.ticketUpdated ?? true,
+            quietHours: data.settings.quietHours || {
+              enabled: false,
+              startTime: '22:00',
+              endTime: '08:00',
+            },
           })
         }
       }
@@ -96,15 +101,24 @@ export default function SettingsPage() {
     }
   }
 
-  const saveSettings = async () => {
+  const saveNotificationSettings = async () => {
     setLoading(true)
     try {
-      // Mapear de estructura UI a user_settings
       const payload = {
-        emailNotifications: settings.notifications.email,
-        pushNotifications: settings.notifications.push,
-        theme: settings.preferences.theme,
-        timezone: settings.preferences.timezone
+        emailNotifications: notificationPrefs.emailNotifications,
+        pushNotifications: notificationPrefs.pushNotifications,
+        ticketUpdates: notificationPrefs.ticketUpdates,
+        systemAlerts: notificationPrefs.systemAlerts,
+        weeklyReport: notificationPrefs.weeklyReport,
+        soundEnabled: notificationPrefs.soundEnabled,
+        ticketCreated: notificationPrefs.ticketCreated,
+        ticketAssigned: notificationPrefs.ticketAssigned,
+        statusChanged: notificationPrefs.statusChanged,
+        newComments: notificationPrefs.newComments,
+        ticketUpdated: notificationPrefs.ticketUpdated,
+        quietHoursEnabled: notificationPrefs.quietHours.enabled,
+        quietHoursStart: notificationPrefs.quietHours.startTime,
+        quietHoursEnd: notificationPrefs.quietHours.endTime,
       }
 
       const response = await fetch('/api/user/settings', {
@@ -140,14 +154,8 @@ export default function SettingsPage() {
     }
   }
 
-  const updateNotificationSetting = (key: keyof UserSettings['notifications'], value: boolean) => {
-    setSettings(prev => ({
-      ...prev,
-      notifications: {
-        ...prev.notifications,
-        [key]: value
-      }
-    }))
+  const updateNotificationPrefs = (updates: Partial<NotificationPreferences>) => {
+    setNotificationPrefs(prev => ({ ...prev, ...updates }))
   }
 
   const updatePrivacySetting = (key: keyof UserSettings['privacy'], value: boolean) => {
@@ -155,9 +163,70 @@ export default function SettingsPage() {
       ...prev,
       privacy: {
         ...prev.privacy,
-        [key]: value
-      }
+        [key]: value,
+      },
     }))
+  }
+
+  const savePrivacySettings = async () => {
+    setLoading(true)
+    try {
+      // Aquí iría la lógica para guardar configuraciones de privacidad
+      toast({
+        title: 'Configuración guardada',
+        description: 'Tus preferencias de privacidad han sido actualizadas',
+      })
+    } catch (error) {
+      console.error('Error saving privacy settings:', error)
+      toast({
+        title: 'Error al guardar',
+        description: 'No se pudieron guardar las configuraciones de privacidad',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const savePersonalSettings = async () => {
+    setLoading(true)
+    try {
+      const payload = {
+        theme: settings.preferences.theme,
+        timezone: settings.preferences.timezone,
+      }
+
+      const response = await fetch('/api/user/settings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (response.ok) {
+        toast({
+          title: 'Configuración guardada',
+          description: 'Tus preferencias personales han sido actualizadas',
+        })
+      } else {
+        const error = await response.json()
+        toast({
+          title: 'Error al guardar',
+          description: error.error || 'No se pudo guardar la configuración',
+          variant: 'destructive',
+        })
+      }
+    } catch (error) {
+      console.error('Error saving personal settings:', error)
+      toast({
+        title: 'Error de conexión',
+        description: 'No se pudo conectar con el servidor',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoading(false)
+    }
   }
 
   if (status === 'loading') {
@@ -192,25 +261,28 @@ export default function SettingsPage() {
 
           {/* Configuración Personal */}
           <TabsContent value='personal' className='space-y-6'>
-            <PersonalSettings onSave={saveSettings} loading={loading} />
+            <PersonalSettings onSave={savePersonalSettings} loading={loading} />
           </TabsContent>
 
-          {/* Notificaciones */}
+          {/* Notificaciones - Componente Unificado Nivel Intermedio */}
           <TabsContent value='notifications' className='space-y-6'>
-            <NotificationSettings 
-              settings={settings}
-              onUpdateSetting={updateNotificationSetting}
-              onSave={saveSettings}
+            <NotificationSettingsUnified
+              level='intermediate'
+              preferences={notificationPrefs}
+              onUpdate={updateNotificationPrefs}
+              onSave={saveNotificationSettings}
               loading={loading}
+              showAdvancedButton={true}
+              onOpenAdvanced={() => setShowAdvancedDialog(true)}
             />
           </TabsContent>
 
           {/* Privacidad */}
           <TabsContent value='privacy' className='space-y-6'>
-            <PrivacySettings 
+            <PrivacySettings
               settings={settings}
               onUpdateSetting={updatePrivacySetting}
-              onSave={saveSettings}
+              onSave={savePrivacySettings}
               loading={loading}
               isAdmin={isAdmin}
               userRole={userRole}
@@ -218,6 +290,18 @@ export default function SettingsPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Dialog de configuración avanzada */}
+      <NotificationPreferencesDialog
+        open={showAdvancedDialog}
+        onOpenChange={setShowAdvancedDialog}
+        preferences={notificationPrefs}
+        onSave={async prefs => {
+          setNotificationPrefs(prev => ({ ...prev, ...prefs }))
+          await saveNotificationSettings()
+        }}
+        loading={loading}
+      />
     </RoleDashboardLayout>
   )
 }

@@ -385,13 +385,38 @@ model user_preferences {
 model user_settings {
   id                   String   @id
   userId               String   @unique
+  
+  // Notificaciones básicas
   emailNotifications   Boolean  @default(true)
   pushNotifications    Boolean  @default(true)
+  
+  // Notificaciones intermedias
+  ticketUpdates        Boolean  @default(true)
+  systemAlerts         Boolean  @default(true)
+  weeklyReport         Boolean  @default(false)
+  
+  // Notificaciones avanzadas
+  soundEnabled         Boolean  @default(true)
+  ticketCreated        Boolean  @default(true)
+  ticketAssigned       Boolean  @default(true)
+  statusChanged        Boolean  @default(true)
+  newComments          Boolean  @default(true)
+  ticketUpdated        Boolean  @default(true)
+  
+  // Horarios silenciosos
+  quietHoursEnabled    Boolean  @default(false)
+  quietHoursStart      String   @default("22:00")
+  quietHoursEnd        String   @default("08:00")
+  
+  // Configuraciones de técnico
   autoAssignEnabled    Boolean  @default(true)
   maxConcurrentTickets Int      @default(10)
+  
+  // Preferencias generales
   theme                String   @default("light")
   language             String   @default("es")
   timezone             String   @default("America/Guayaquil")
+  
   createdAt            DateTime @default(now())
   updatedAt            DateTime
   users                users    @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -2,40 +2,59 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { z } from 'zod'
 import { randomUUID } from 'crypto'
 
-// Schema de validación para configuraciones de usuario
+// Schema de validación extendido para todas las preferencias de notificaciones
 const userSettingsSchema = z.object({
+  // Notificaciones básicas
   emailNotifications: z.boolean().optional(),
   pushNotifications: z.boolean().optional(),
+
+  // Notificaciones intermedias
+  ticketUpdates: z.boolean().optional(),
+  systemAlerts: z.boolean().optional(),
+  weeklyReport: z.boolean().optional(),
+
+  // Notificaciones avanzadas
+  soundEnabled: z.boolean().optional(),
+  ticketCreated: z.boolean().optional(),
+  ticketAssigned: z.boolean().optional(),
+  statusChanged: z.boolean().optional(),
+  newComments: z.boolean().optional(),
+  ticketUpdated: z.boolean().optional(),
+
+  // Horarios silenciosos
+  quietHoursEnabled: z.boolean().optional(),
+  quietHoursStart: z.string().optional(),
+  quietHoursEnd: z.string().optional(),
+
+  // Configuraciones de técnico
   autoAssignEnabled: z.boolean().optional(),
   maxConcurrentTickets: z.number().min(1).max(50).optional(),
+
+  // Preferencias generales
   theme: z.enum(['light', 'dark', 'system']).optional(),
   language: z.enum(['es', 'en', 'fr', 'de']).optional(),
-  timezone: z.string().optional()
+  timezone: z.string().optional(),
 })
 
 /**
  * GET /api/user/settings
- * Obtiene la configuración del usuario actual
+ * Obtiene la configuración completa del usuario actual
  */
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
     }
 
     const userId = session.user.id
 
     // Buscar configuración existente
     let settings = await prisma.user_settings.findUnique({
-      where: { userId }
+      where: { userId },
     })
 
     // Si no existe, crear con valores por defecto
@@ -47,31 +66,67 @@ export async function GET(request: NextRequest) {
           userId,
           emailNotifications: true,
           pushNotifications: true,
+          ticketUpdates: true,
+          systemAlerts: true,
+          weeklyReport: false,
+          soundEnabled: true,
+          ticketCreated: true,
+          ticketAssigned: true,
+          statusChanged: true,
+          newComments: true,
+          ticketUpdated: true,
+          quietHoursEnabled: false,
+          quietHoursStart: '22:00',
+          quietHoursEnd: '08:00',
           autoAssignEnabled: true,
           maxConcurrentTickets: 10,
           theme: 'light',
           language: 'es',
           timezone: 'America/Guayaquil',
-          updatedAt: now
-        }
+          updatedAt: now,
+        },
       })
     }
 
     return NextResponse.json({
       success: true,
       settings: {
+        // Notificaciones básicas
         emailNotifications: settings.emailNotifications,
         pushNotifications: settings.pushNotifications,
+
+        // Notificaciones intermedias
+        ticketUpdates: settings.ticketUpdates,
+        systemAlerts: settings.systemAlerts,
+        weeklyReport: settings.weeklyReport,
+
+        // Notificaciones avanzadas
+        soundEnabled: settings.soundEnabled,
+        ticketCreated: settings.ticketCreated,
+        ticketAssigned: settings.ticketAssigned,
+        statusChanged: settings.statusChanged,
+        newComments: settings.newComments,
+        ticketUpdated: settings.ticketUpdated,
+
+        // Horarios silenciosos
+        quietHours: {
+          enabled: settings.quietHoursEnabled,
+          startTime: settings.quietHoursStart,
+          endTime: settings.quietHoursEnd,
+        },
+
+        // Configuraciones de técnico
         autoAssignEnabled: settings.autoAssignEnabled,
         maxConcurrentTickets: settings.maxConcurrentTickets,
+
+        // Preferencias generales
         theme: settings.theme,
         language: settings.language,
-        timezone: settings.timezone
-      }
+        timezone: settings.timezone,
+      },
     })
   } catch (error) {
     console.error('[API-USER-SETTINGS] GET Error:', error)
-    console.error('[API-USER-SETTINGS] Error details:', error instanceof Error ? error.message : String(error))
     return NextResponse.json(
       { success: false, error: 'Error al obtener configuración' },
       { status: 500 }
@@ -87,10 +142,7 @@ export async function PUT(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
     }
 
     const userId = session.user.id
@@ -100,10 +152,10 @@ export async function PUT(request: NextRequest) {
     const validation = userSettingsSchema.safeParse(body)
     if (!validation.success) {
       return NextResponse.json(
-        { 
-          success: false, 
+        {
+          success: false,
           error: 'Datos inválidos',
-          details: validation.error.errors 
+          details: validation.error.errors,
         },
         { status: 400 }
       )
@@ -111,31 +163,72 @@ export async function PUT(request: NextRequest) {
 
     const data = validation.data
 
+    // Preparar datos para actualización (solo campos definidos)
+    const updateData: any = {
+      updatedAt: new Date(),
+    }
+
+    // Notificaciones básicas
+    if (data.emailNotifications !== undefined)
+      updateData.emailNotifications = data.emailNotifications
+    if (data.pushNotifications !== undefined) updateData.pushNotifications = data.pushNotifications
+
+    // Notificaciones intermedias
+    if (data.ticketUpdates !== undefined) updateData.ticketUpdates = data.ticketUpdates
+    if (data.systemAlerts !== undefined) updateData.systemAlerts = data.systemAlerts
+    if (data.weeklyReport !== undefined) updateData.weeklyReport = data.weeklyReport
+
+    // Notificaciones avanzadas
+    if (data.soundEnabled !== undefined) updateData.soundEnabled = data.soundEnabled
+    if (data.ticketCreated !== undefined) updateData.ticketCreated = data.ticketCreated
+    if (data.ticketAssigned !== undefined) updateData.ticketAssigned = data.ticketAssigned
+    if (data.statusChanged !== undefined) updateData.statusChanged = data.statusChanged
+    if (data.newComments !== undefined) updateData.newComments = data.newComments
+    if (data.ticketUpdated !== undefined) updateData.ticketUpdated = data.ticketUpdated
+
+    // Horarios silenciosos
+    if (data.quietHoursEnabled !== undefined) updateData.quietHoursEnabled = data.quietHoursEnabled
+    if (data.quietHoursStart !== undefined) updateData.quietHoursStart = data.quietHoursStart
+    if (data.quietHoursEnd !== undefined) updateData.quietHoursEnd = data.quietHoursEnd
+
+    // Configuraciones de técnico
+    if (data.autoAssignEnabled !== undefined) updateData.autoAssignEnabled = data.autoAssignEnabled
+    if (data.maxConcurrentTickets !== undefined)
+      updateData.maxConcurrentTickets = data.maxConcurrentTickets
+
+    // Preferencias generales
+    if (data.theme !== undefined) updateData.theme = data.theme
+    if (data.language !== undefined) updateData.language = data.language
+    if (data.timezone !== undefined) updateData.timezone = data.timezone
+
     // Actualizar o crear configuración
     const settings = await prisma.user_settings.upsert({
       where: { userId },
-      update: {
-        emailNotifications: data.emailNotifications,
-        pushNotifications: data.pushNotifications,
-        autoAssignEnabled: data.autoAssignEnabled,
-        maxConcurrentTickets: data.maxConcurrentTickets,
-        theme: data.theme,
-        language: data.language,
-        timezone: data.timezone,
-        updatedAt: new Date()
-      },
+      update: updateData,
       create: {
         id: randomUUID(),
         userId,
         emailNotifications: data.emailNotifications ?? true,
         pushNotifications: data.pushNotifications ?? true,
+        ticketUpdates: data.ticketUpdates ?? true,
+        systemAlerts: data.systemAlerts ?? true,
+        weeklyReport: data.weeklyReport ?? false,
+        soundEnabled: data.soundEnabled ?? true,
+        ticketCreated: data.ticketCreated ?? true,
+        ticketAssigned: data.ticketAssigned ?? true,
+        statusChanged: data.statusChanged ?? true,
+        newComments: data.newComments ?? true,
+        ticketUpdated: data.ticketUpdated ?? true,
+        quietHoursEnabled: data.quietHoursEnabled ?? false,
+        quietHoursStart: data.quietHoursStart ?? '22:00',
+        quietHoursEnd: data.quietHoursEnd ?? '08:00',
         autoAssignEnabled: data.autoAssignEnabled ?? true,
         maxConcurrentTickets: data.maxConcurrentTickets ?? 10,
         theme: data.theme ?? 'light',
         language: 'es',
         timezone: 'America/Guayaquil',
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     })
 
     return NextResponse.json({
@@ -144,17 +237,30 @@ export async function PUT(request: NextRequest) {
       settings: {
         emailNotifications: settings.emailNotifications,
         pushNotifications: settings.pushNotifications,
+        ticketUpdates: settings.ticketUpdates,
+        systemAlerts: settings.systemAlerts,
+        weeklyReport: settings.weeklyReport,
+        soundEnabled: settings.soundEnabled,
+        ticketCreated: settings.ticketCreated,
+        ticketAssigned: settings.ticketAssigned,
+        statusChanged: settings.statusChanged,
+        newComments: settings.newComments,
+        ticketUpdated: settings.ticketUpdated,
+        quietHours: {
+          enabled: settings.quietHoursEnabled,
+          startTime: settings.quietHoursStart,
+          endTime: settings.quietHoursEnd,
+        },
         autoAssignEnabled: settings.autoAssignEnabled,
         maxConcurrentTickets: settings.maxConcurrentTickets,
         theme: settings.theme,
         language: settings.language,
-        timezone: settings.timezone
-      }
+        timezone: settings.timezone,
+      },
     })
   } catch (error) {
     console.error('[API-USER-SETTINGS] PUT Error:', error)
-    console.error('[API-USER-SETTINGS] Error details:', error instanceof Error ? error.message : String(error))
-    
+
     return NextResponse.json(
       { success: false, error: 'Error al actualizar configuración' },
       { status: 500 }
