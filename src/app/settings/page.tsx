@@ -12,6 +12,7 @@ import { NotificationSettingsCard } from '@/components/notifications/notificatio
 import {
   NotificationPreferences,
   DEFAULT_NOTIFICATION_PREFERENCES,
+  NotificationLevel,
 } from '@/types/notification-preferences'
 
 interface UserSettings {
@@ -243,6 +244,9 @@ export default function SettingsPage() {
 
   const isAdmin = session?.user?.role === 'ADMIN'
   const userRole = (session?.user?.role || 'CLIENT') as 'ADMIN' | 'TECHNICIAN' | 'CLIENT'
+  
+  // Determinar nivel de notificaciones según rol
+  const notificationLevel = userRole === 'CLIENT' ? 'basic' : 'advanced'
 
   return (
     <RoleDashboardLayout
@@ -262,10 +266,10 @@ export default function SettingsPage() {
             <PersonalSettings onSave={savePersonalSettings} loading={loading} />
           </TabsContent>
 
-          {/* Notificaciones - Nivel Avanzado para Técnicos/Admins */}
+          {/* Notificaciones - Nivel según rol del usuario */}
           <TabsContent value='notifications' className='space-y-6'>
             <NotificationSettingsCard
-              level='advanced'
+              level={notificationLevel}
               preferences={notificationPrefs}
               onUpdate={updateNotificationPrefs}
               onSave={saveNotificationSettings}

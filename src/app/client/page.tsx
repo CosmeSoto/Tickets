@@ -245,7 +245,7 @@ export default function ClientDashboard() {
                     badge: hasUnreadMessages ? 'Nuevas' : undefined
                   },
                   {
-                    href: '/client/settings',
+                    href: '/settings',
                     icon: Settings,
                     title: 'Configuración',
                     description: 'Preferencias de cuenta y privacidad',
