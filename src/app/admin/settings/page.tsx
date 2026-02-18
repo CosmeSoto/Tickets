@@ -49,10 +49,8 @@ interface SystemSettings {
   smtpSecure: boolean
   emailFrom: string
 
-  // Configuración de notificaciones
+  // Configuración de notificaciones (SOLO GLOBAL)
   notificationsEnabled: boolean
-  emailNotifications: boolean
-  browserNotifications: boolean
 
   // Configuración de seguridad
   sessionTimeout: number
@@ -437,13 +435,39 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle className='flex items-center'>
                 <Bell className='h-5 w-5 mr-2' />
-                Configuración de Notificaciones
+                Módulo de Notificaciones
               </CardTitle>
-              <CardDescription>Configuración de notificaciones del sistema</CardDescription>
+              <CardDescription>
+                Configuración global del sistema de notificaciones. 
+                Los usuarios pueden configurar sus preferencias personales en su perfil.
+              </CardDescription>
             </CardHeader>
-            <CardContent className='space-y-4'>
+            <CardContent className='space-y-6'>
+              <div className='rounded-lg border border-blue-200 bg-blue-50 p-4'>
+                <div className='flex items-start space-x-3'>
+                  <Bell className='h-5 w-5 text-blue-600 mt-0.5' />
+                  <div className='space-y-1'>
+                    <h4 className='text-sm font-medium text-blue-900'>
+                      Configuración Global
+                    </h4>
+                    <p className='text-sm text-blue-700'>
+                      Esta configuración habilita o deshabilita el módulo de notificaciones para todo el sistema.
+                      Cada usuario puede personalizar sus preferencias individuales en Configuración → Notificaciones.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div className='space-y-4'>
-                <div className='flex items-center space-x-2'>
+                <div className='flex items-center justify-between p-4 border rounded-lg'>
+                  <div className='space-y-0.5'>
+                    <Label htmlFor='notificationsEnabled' className='text-base font-medium'>
+                      Habilitar Sistema de Notificaciones
+                    </Label>
+                    <p className='text-sm text-muted-foreground'>
+                      Activa o desactiva el módulo de notificaciones para todos los usuarios
+                    </p>
+                  </div>
                   <Switch
                     id='notificationsEnabled'
                     checked={settings.notificationsEnabled}
@@ -451,32 +475,24 @@ export default function SettingsPage() {
                       setSettings({ ...settings, notificationsEnabled: checked })
                     }
                   />
-                  <Label htmlFor='notificationsEnabled'>Habilitar notificaciones</Label>
                 </div>
 
-                <div className='flex items-center space-x-2'>
-                  <Switch
-                    id='emailNotifications'
-                    checked={settings.emailNotifications}
-                    onCheckedChange={checked =>
-                      setSettings({ ...settings, emailNotifications: checked })
-                    }
-                    disabled={!settings.notificationsEnabled}
-                  />
-                  <Label htmlFor='emailNotifications'>Notificaciones por email</Label>
-                </div>
-
-                <div className='flex items-center space-x-2'>
-                  <Switch
-                    id='browserNotifications'
-                    checked={settings.browserNotifications}
-                    onCheckedChange={checked =>
-                      setSettings({ ...settings, browserNotifications: checked })
-                    }
-                    disabled={!settings.notificationsEnabled}
-                  />
-                  <Label htmlFor='browserNotifications'>Notificaciones del navegador</Label>
-                </div>
+                {!settings.notificationsEnabled && (
+                  <div className='rounded-lg border border-yellow-200 bg-yellow-50 p-4'>
+                    <div className='flex items-start space-x-3'>
+                      <AlertTriangle className='h-5 w-5 text-yellow-600 mt-0.5' />
+                      <div className='space-y-1'>
+                        <h4 className='text-sm font-medium text-yellow-900'>
+                          Notificaciones Deshabilitadas
+                        </h4>
+                        <p className='text-sm text-yellow-700'>
+                          Los usuarios no recibirán notificaciones del sistema. 
+                          Esto puede afectar la comunicación sobre tickets y actualizaciones importantes.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
