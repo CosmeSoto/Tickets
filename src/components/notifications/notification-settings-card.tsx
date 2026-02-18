@@ -31,7 +31,7 @@ import {
  * Componente unificado para configuración de notificaciones
  * Soporta 3 niveles: básico, intermedio y avanzado
  */
-export function NotificationSettingsUnified({
+export function NotificationSettingsCard({
   level,
   preferences,
   onUpdate,

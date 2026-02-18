@@ -8,8 +8,8 @@ import { useToast } from '@/hooks/use-toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PersonalSettings } from '@/components/settings/personal-settings'
 import { PrivacySettings } from '@/components/settings/privacy-settings'
-import { NotificationSettingsUnified } from '@/components/notifications/notification-settings-unified'
-import { NotificationPreferencesDialog } from '@/components/notifications/notification-preferences'
+import { NotificationSettingsCard } from '@/components/notifications/notification-settings-card'
+import { NotificationSettingsDialog } from '@/components/notifications/notification-settings-dialog'
 import {
   NotificationPreferences,
   DEFAULT_NOTIFICATION_PREFERENCES,
@@ -266,7 +266,7 @@ export default function SettingsPage() {
 
           {/* Notificaciones - Componente Unificado Nivel Intermedio */}
           <TabsContent value='notifications' className='space-y-6'>
-            <NotificationSettingsUnified
+            <NotificationSettingsCard
               level='intermediate'
               preferences={notificationPrefs}
               onUpdate={updateNotificationPrefs}
@@ -292,7 +292,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Dialog de configuración avanzada */}
-      <NotificationPreferencesDialog
+      <NotificationSettingsDialog
         open={showAdvancedDialog}
         onOpenChange={setShowAdvancedDialog}
         preferences={notificationPrefs}

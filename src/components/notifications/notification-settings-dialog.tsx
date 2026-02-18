@@ -38,7 +38,7 @@ interface NotificationPreferencesProps {
   loading: boolean
 }
 
-export function NotificationPreferencesDialog({
+export function NotificationSettingsDialog({
   open,
   onOpenChange,
   preferences,

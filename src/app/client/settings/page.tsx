@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { NotificationSettingsUnified } from '@/components/notifications/notification-settings-unified'
+import { NotificationSettingsCard } from '@/components/notifications/notification-settings-card'
 import {
   NotificationPreferences,
   DEFAULT_NOTIFICATION_PREFERENCES,
@@ -222,7 +222,7 @@ export default function ClientSettingsPage() {
         </Card>
 
         {/* Notificaciones - Componente Unificado Nivel Básico */}
-        <NotificationSettingsUnified
+        <NotificationSettingsCard
           level='basic'
           preferences={notificationPrefs}
           onUpdate={updateNotificationPrefs}

@@ -26,7 +26,7 @@ import {
 import { useNotifications } from '@/hooks/use-notifications'
 import { NotificationFilters } from './notification-filters'
 import { NotificationList } from './notification-list'
-import { NotificationPreferencesDialog } from './notification-preferences'
+import { NotificationSettingsDialog } from './notification-settings-dialog'
 import { SmartPagination } from '../categories/smart-pagination'
 import { useState } from 'react'
 
@@ -297,7 +297,7 @@ export default function NotificationsPage() {
       </div>
 
       {/* Dialog de preferencias */}
-      <NotificationPreferencesDialog
+      <NotificationSettingsDialog
         open={showPreferences}
         onOpenChange={setShowPreferences}
         preferences={preferences}
