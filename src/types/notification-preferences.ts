@@ -37,8 +37,6 @@ export interface NotificationSettingsProps {
   onUpdate: (preferences: Partial<NotificationPreferences>) => void
   onSave: () => Promise<void>
   loading?: boolean
-  showAdvancedButton?: boolean
-  onOpenAdvanced?: () => void
 }
 
 // Mapeo de campos por nivel

@@ -13,7 +13,6 @@ import {
   User,
   MessageCircle,
   AlertCircle,
-  Settings as SettingsIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -23,7 +22,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Separator } from '@/components/ui/separator'
 import {
   NotificationPreferences,
-  NotificationLevel,
   NotificationSettingsProps,
 } from '@/types/notification-preferences'
 
@@ -37,8 +35,6 @@ export function NotificationSettingsCard({
   onUpdate,
   onSave,
   loading = false,
-  showAdvancedButton = false,
-  onOpenAdvanced,
 }: NotificationSettingsProps) {
   const [saving, setSaving] = useState(false)
 
@@ -328,30 +324,20 @@ export function NotificationSettingsCard({
         )}
 
         {/* Botones de acción */}
-        <div className='flex items-center justify-between pt-6 border-t'>
-          {showAdvancedButton && level !== 'advanced' && onOpenAdvanced && (
-            <Button variant='outline' onClick={onOpenAdvanced} size='sm'>
-              <SettingsIcon className='h-4 w-4 mr-2' />
-              Configuración Avanzada
-            </Button>
-          )}
-          <div
-            className={`flex items-center space-x-2 ${!showAdvancedButton || level === 'advanced' ? 'ml-auto' : ''}`}
-          >
-            <Button onClick={handleSave} disabled={saving || loading} size='sm'>
-              {saving ? (
-                <>
-                  <RefreshCw className='h-4 w-4 mr-2 animate-spin' />
-                  Guardando...
-                </>
-              ) : (
-                <>
-                  <Save className='h-4 w-4 mr-2' />
-                  Guardar Notificaciones
-                </>
-              )}
-            </Button>
-          </div>
+        <div className='flex items-center justify-end pt-6 border-t'>
+          <Button onClick={handleSave} disabled={saving || loading} size='sm'>
+            {saving ? (
+              <>
+                <RefreshCw className='h-4 w-4 mr-2 animate-spin' />
+                Guardando...
+              </>
+            ) : (
+              <>
+                <Save className='h-4 w-4 mr-2' />
+                Guardar Notificaciones
+              </>
+            )}
+          </Button>
         </div>
       </CardContent>
     </Card>

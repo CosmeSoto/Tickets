@@ -9,7 +9,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PersonalSettings } from '@/components/settings/personal-settings'
 import { PrivacySettings } from '@/components/settings/privacy-settings'
 import { NotificationSettingsCard } from '@/components/notifications/notification-settings-card'
-import { NotificationSettingsDialog } from '@/components/notifications/notification-settings-dialog'
 import {
   NotificationPreferences,
   DEFAULT_NOTIFICATION_PREFERENCES,
@@ -31,7 +30,6 @@ export default function SettingsPage() {
   const router = useRouter()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
-  const [showAdvancedDialog, setShowAdvancedDialog] = useState(false)
 
   const [settings, setSettings] = useState<UserSettings>({
     privacy: {
@@ -264,16 +262,14 @@ export default function SettingsPage() {
             <PersonalSettings onSave={savePersonalSettings} loading={loading} />
           </TabsContent>
 
-          {/* Notificaciones - Componente Unificado Nivel Intermedio */}
+          {/* Notificaciones - Nivel Avanzado para Técnicos/Admins */}
           <TabsContent value='notifications' className='space-y-6'>
             <NotificationSettingsCard
-              level='intermediate'
+              level='advanced'
               preferences={notificationPrefs}
               onUpdate={updateNotificationPrefs}
               onSave={saveNotificationSettings}
               loading={loading}
-              showAdvancedButton={true}
-              onOpenAdvanced={() => setShowAdvancedDialog(true)}
             />
           </TabsContent>
 
@@ -290,18 +286,6 @@ export default function SettingsPage() {
           </TabsContent>
         </Tabs>
       </div>
-
-      {/* Dialog de configuración avanzada */}
-      <NotificationSettingsDialog
-        open={showAdvancedDialog}
-        onOpenChange={setShowAdvancedDialog}
-        preferences={notificationPrefs}
-        onSave={async prefs => {
-          setNotificationPrefs(prev => ({ ...prev, ...prefs }))
-          await saveNotificationSettings()
-        }}
-        loading={loading}
-      />
     </RoleDashboardLayout>
   )
 }
