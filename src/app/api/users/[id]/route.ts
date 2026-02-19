@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { UserService } from '@/lib/services/user-service'
-import { UserNotificationService } from '@/lib/services/user-notification-service'
-import { TechnicianNotificationService } from '@/lib/services/technician-notification-service'
 import { z } from 'zod'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 
@@ -109,18 +107,18 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       if (validatedData.phone !== undefined && validatedData.phone !== currentUser.phone) changes.phone = validatedData.phone
       if (validatedData.isActive !== undefined && validatedData.isActive !== currentUser.isActive) changes.isActive = validatedData.isActive
 
-      // Solo enviar notificaciones si hay cambios significativos
+      // Solo enviar notificaciones si hay cambios significativos (log para auditoría)
       if (Object.keys(changes).length > 0) {
-        await UserNotificationService.notifyUserUpdated((await params).id, changes, session.user.id)
+        console.log(`[INFO] User updated: ${(await params).id} by user ${session.user.id}`)
         
-        // Notificación especial para cambio de rol
+        // Log especial para cambio de rol
         if (changes.role && changes.role !== currentUser.role) {
-          await UserNotificationService.notifyRoleChanged((await params).id, currentUser.role, changes.role, session.user.id)
+          console.log(`[INFO] Role changed for user ${(await params).id}: ${currentUser.role} -> ${changes.role} by ${session.user.id}`)
         }
 
-        // Notificaciones específicas para técnicos
+        // Log específico para técnicos
         if (currentUser.role === 'TECHNICIAN' || validatedData.role === 'TECHNICIAN') {
-          await TechnicianNotificationService.notifyTechnicianUpdated((await params).id, changes, session.user.id)
+          console.log(`[INFO] Technician updated: ${(await params).id} by user ${session.user.id}`)
         }
       }
     } catch (notificationError) {
@@ -201,13 +199,13 @@ export async function DELETE(
 
     await UserService.deleteUser((await params).id)
 
-    // Enviar notificaciones de usuario eliminado
+    // Enviar notificaciones de usuario eliminado (log para auditoría)
     try {
-      await UserNotificationService.notifyUserDeleted((await params).id, session.user.id)
+      console.log(`[INFO] User deleted: ${(await params).id} by user ${session.user.id}`)
       
-      // Notificaciones específicas para técnicos
+      // Log específico para técnicos
       if (userToDelete.role === 'TECHNICIAN') {
-        await TechnicianNotificationService.notifyTechnicianDeleted((await params).id, session.user.id)
+        console.log(`[INFO] Technician deleted: ${(await params).id} by user ${session.user.id}`)
       }
     } catch (notificationError) {
       console.error('Error enviando notificaciones de usuario eliminado:', notificationError)

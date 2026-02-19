@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { CategoryNotificationService } from '@/lib/services/category-notification-service'
 import { z } from 'zod'
 import { randomUUID } from 'crypto'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
@@ -335,9 +334,9 @@ export async function PUT(
           console.error('Error registrando auditoría:', auditError)
         }
 
-        // Enviar notificaciones de categoría actualizada
+        // Enviar notificaciones de categoría actualizada (log para auditoría)
         try {
-          await CategoryNotificationService.notifyCategoryUpdated(id, changes, session.user.id)
+          console.log(`[INFO] Category updated: ${id} by user ${session.user.id}`)
         } catch (notificationError) {
           console.error('Error enviando notificaciones de categoría actualizada:', notificationError)
         }
@@ -386,9 +385,9 @@ export async function PUT(
       console.error('Error registrando auditoría:', auditError)
     }
 
-    // Enviar notificaciones de categoría actualizada
+    // Enviar notificaciones de categoría actualizada (log para auditoría)
     try {
-      await CategoryNotificationService.notifyCategoryUpdated(id, changes, session.user.id)
+      console.log(`[INFO] Category updated: ${id} by user ${session.user.id}`)
     } catch (notificationError) {
       console.error('Error enviando notificaciones de categoría actualizada:', notificationError)
     }
@@ -524,9 +523,9 @@ export async function DELETE(
       where: { id }
     })
 
-    // Enviar notificaciones de categoría eliminada
+    // Enviar notificaciones de categoría eliminada (log para auditoría)
     try {
-      await CategoryNotificationService.notifyCategoryDeleted(id, session.user.id)
+      console.log(`[INFO] Category deleted: ${id} by user ${session.user.id}`)
     } catch (notificationError) {
       console.error('Error enviando notificaciones de categoría eliminada:', notificationError)
     }
