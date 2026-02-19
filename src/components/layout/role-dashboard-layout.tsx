@@ -65,14 +65,12 @@ const navigationByRole = {
     { name: 'Estadísticas', href: '/technician/stats', icon: BarChart3 },
     { name: 'Mis Categorías', href: '/technician/categories', icon: FolderTree },
     { name: 'Base de Conocimientos', href: '/technician/knowledge', icon: BookOpen },
-    { name: 'Configuración', href: '/settings', icon: Settings },
   ],
   CLIENT: [
     { name: 'Dashboard', href: '/client', icon: LayoutDashboard },
     { name: 'Mis Tickets', href: '/client/tickets', icon: Ticket },
     { name: 'Crear Ticket', href: '/client/tickets/create', icon: Ticket },
     { name: 'Base de Conocimientos', href: '/knowledge', icon: BookOpen },
-    { name: 'Configuración', href: '/settings', icon: Settings },
     { name: 'Ayuda', href: '/client/help', icon: HelpCircle },
   ],
 }

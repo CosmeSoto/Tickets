@@ -140,16 +140,16 @@ export function NotificationSettingsCard({
               <div className='flex items-center justify-between'>
                 <div className='space-y-0.5'>
                   <Label className='text-base flex items-center space-x-2'>
-                    <AlertCircle className='h-4 w-4 text-orange-600' />
-                    <span>Alertas del sistema</span>
+                    <MessageCircle className='h-4 w-4 text-purple-600' />
+                    <span>Nuevos comentarios</span>
                   </Label>
                   <p className='text-sm text-muted-foreground'>
-                    Notificaciones sobre mantenimiento y actualizaciones
+                    Cuando alguien comenta en tus tickets
                   </p>
                 </div>
                 <Switch
-                  checked={preferences.systemAlerts}
-                  onCheckedChange={checked => updatePreference('systemAlerts', checked)}
+                  checked={preferences.newComments}
+                  onCheckedChange={checked => updatePreference('newComments', checked)}
                 />
               </div>
 
@@ -158,18 +158,58 @@ export function NotificationSettingsCard({
               <div className='flex items-center justify-between'>
                 <div className='space-y-0.5'>
                   <Label className='text-base flex items-center space-x-2'>
-                    <Clock className='h-4 w-4 text-green-600' />
-                    <span>Reporte semanal</span>
+                    <RefreshCw className='h-4 w-4 text-orange-600' />
+                    <span>Cambios de estado</span>
                   </Label>
                   <p className='text-sm text-muted-foreground'>
-                    Resumen semanal de tu actividad por email
+                    Cuando cambia el estado de tus tickets
                   </p>
                 </div>
                 <Switch
-                  checked={preferences.weeklyReport}
-                  onCheckedChange={checked => updatePreference('weeklyReport', checked)}
+                  checked={preferences.statusChanged}
+                  onCheckedChange={checked => updatePreference('statusChanged', checked)}
                 />
               </div>
+
+              {level === 'advanced' && (
+                <>
+                  <Separator />
+
+                  <div className='flex items-center justify-between'>
+                    <div className='space-y-0.5'>
+                      <Label className='text-base flex items-center space-x-2'>
+                        <AlertCircle className='h-4 w-4 text-orange-600' />
+                        <span>Alertas del sistema</span>
+                      </Label>
+                      <p className='text-sm text-muted-foreground'>
+                        Notificaciones sobre mantenimiento y actualizaciones
+                      </p>
+                    </div>
+                    <Switch
+                      checked={preferences.systemAlerts}
+                      onCheckedChange={checked => updatePreference('systemAlerts', checked)}
+                    />
+                  </div>
+
+                  <Separator />
+
+                  <div className='flex items-center justify-between'>
+                    <div className='space-y-0.5'>
+                      <Label className='text-base flex items-center space-x-2'>
+                        <Clock className='h-4 w-4 text-green-600' />
+                        <span>Reporte semanal</span>
+                      </Label>
+                      <p className='text-sm text-muted-foreground'>
+                        Resumen semanal de tu actividad por email
+                      </p>
+                    </div>
+                    <Switch
+                      checked={preferences.weeklyReport}
+                      onCheckedChange={checked => updatePreference('weeklyReport', checked)}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </>
         )}

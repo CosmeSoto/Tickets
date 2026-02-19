@@ -246,7 +246,9 @@ export default function SettingsPage() {
   const userRole = (session?.user?.role || 'CLIENT') as 'ADMIN' | 'TECHNICIAN' | 'CLIENT'
   
   // Determinar nivel de notificaciones según rol
-  const notificationLevel = userRole === 'CLIENT' ? 'basic' : 'advanced'
+  // CLIENT: intermediate (email, push, ticket updates, comments, status changes)
+  // TECHNICIAN/ADMIN: advanced (todas las opciones incluyendo granulares y horarios)
+  const notificationLevel = userRole === 'CLIENT' ? 'intermediate' : 'advanced'
 
   return (
     <RoleDashboardLayout
