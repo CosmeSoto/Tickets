@@ -71,21 +71,30 @@ Se eliminó completamente la redundancia entre configuraciones, estableciendo un
 **User Settings** (Configuración Personal):
 - **Propósito:** Preferencias PERSONALES de cada usuario
 - **Niveles según rol:**
-  - **Básico** (`/client/settings` - Clientes): Email + Push
+  - **Intermedio** (`/settings` - Clientes): Email, Push, Ticket Updates, Comments, Status Changes
   - **Avanzado** (`/settings` - Técnicos/Admins): Todas las opciones directamente en la página
 - **Acceso:** Todos los usuarios según su rol
 - **Implementación:** Un solo componente (`NotificationSettingsCard`) que muestra opciones según nivel
+- **Navegación:** Solo accesible desde menú del avatar (no en navbar para clientes/técnicos)
 
 **Arquitectura Final:**
 ```
 Admin Settings (Global)          User Settings (Personal - /settings)
        │                                  │
        ├─ Habilitar Módulo               ├─ NotificationSettingsCard
-       │  (On/Off global)                 │  ├─ Básico (Clientes)
+       │  (On/Off global)                 │  ├─ Intermedio (Clientes)
        │                                  │  └─ Avanzado (Téc/Adm)
        └─ Alertas informativas            │
                                           └─ NotificationSettingsDialog
                                              (Solo para acceso rápido desde lista de notificaciones)
+
+Navegación:
+- ADMIN: 
+  * Navbar: "Configuración Sistema" → /admin/settings (global)
+  * Avatar: "Configuración Personal" → /settings (personal)
+- TÉCNICO/CLIENTE:
+  * Navbar: SIN "Configuración" (eliminado redundancia)
+  * Avatar: "Configuración Personal" → /settings (personal)
 
 Rutas consolidadas:
 - /settings → Página unificada para TODOS los roles
@@ -97,7 +106,7 @@ Rutas consolidadas:
 - ✅ Extendido schema de `user_settings` con 13 campos nuevos
 - ✅ Migración aplicada: `20260218215734_add_notification_preferences`
 - ✅ Creado tipo TypeScript unificado: `NotificationPreferences`
-- ✅ Creado componente base: `NotificationSettingsCard` (2 niveles: básico/avanzado)
+- ✅ Creado componente base: `NotificationSettingsCard` (3 niveles: básico/intermedio/avanzado)
 - ✅ Mantenido componente dialog: `NotificationSettingsDialog` (solo para acceso rápido)
 - ✅ Actualizada API `/api/user/settings` para soportar todos los campos
 - ✅ Consolidado `/client/settings` y `/technician/settings` → redirigen a `/settings`
@@ -105,8 +114,9 @@ Rutas consolidadas:
 - ✅ Simplificado `/admin/settings` (solo control global)
 - ✅ Eliminado componente redundante: `NotificationSettings`
 - ✅ Eliminado botón "Configuración Avanzada" y modal redundante de `/settings`
-- ✅ Eliminado nivel "intermediate" - ahora solo básico y avanzado
 - ✅ Actualizada navegación para apuntar a `/settings` unificado
+- ✅ Eliminado "Configuración" del navbar para técnicos/clientes (solo en avatar)
+- ✅ Mejorado nivel de notificaciones para clientes (intermediate con opciones importantes)
 
 **Beneficios:**
 - ✅ Eliminada 100% de redundancia de código
@@ -117,7 +127,9 @@ Rutas consolidadas:
 - ✅ Todas las opciones en un solo lugar según el rol
 - ✅ Sin modales redundantes
 - ✅ Una sola página de configuración para todos los roles
-- ✅ Navegación simplificada
+- ✅ Navegación simplificada (sin duplicidad de accesos)
+- ✅ Sigue mejores prácticas de sistemas profesionales (Jira, Zendesk, GitHub)
+- ✅ Clientes tienen mejor control de notificaciones importantes
 - ✅ Fácil agregar nuevas opciones
 - ✅ Reducción de bugs por inconsistencias
 
@@ -144,7 +156,7 @@ Rutas consolidadas:
 - Seguimiento de tickets propios
 - Comunicación con técnicos
 - Historial de tickets
-- Notificaciones: Nivel básico
+- Notificaciones: Nivel intermedio (email, push, updates, comments, status changes)
 
 ## ⚙️ Configuraciones de Usuario
 
@@ -181,12 +193,13 @@ npx prisma studio
 # 3. Probar en navegador
 npm run dev
 # Ir a /settings como cualquier rol
-# Clientes verán nivel básico (Email + Push)
+# Clientes verán nivel intermedio (Email, Push, Updates, Comments, Status)
 # Técnicos/Admins verán nivel avanzado (todas las opciones)
 # Verificar que /client/settings y /technician/settings redirigen a /settings
+# Verificar que "Configuración" NO aparece en navbar de clientes/técnicos
+# Verificar que "Configuración Personal" SÍ aparece en menú del avatar
 # Verificar que timezone muestra Ecuador
-# Verificar que NO hay botón "Configuración Avanzada" redundante
-# Verificar que NO hay secciones duplicadas de preferencias
+# Verificar que NO hay secciones duplicadas
 ```
 
 ## 📚 Documentación Adicional
