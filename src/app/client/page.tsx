@@ -230,7 +230,7 @@ export default function ClientDashboard() {
                 columns={2}
                 actions={[
                   {
-                    href: '/client/profile',
+                    href: '/profile',
                     icon: User,
                     title: 'Mi Perfil',
                     description: 'Gestionar información personal y preferencias',
