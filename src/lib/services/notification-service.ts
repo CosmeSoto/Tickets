@@ -178,6 +178,181 @@ export class NotificationService {
           })
         }
 
+        // 4. Técnicos sobrecargados
+        const overloadedTechnicians = await prisma.users.findMany({
+          where: {
+            role: 'TECHNICIAN',
+            isActive: true,
+            tickets_tickets_assigneeIdTousers: {
+              some: {
+                status: { in: ['OPEN', 'IN_PROGRESS'] }
+              }
+            }
+          },
+          include: {
+            _count: {
+              select: {
+                tickets_tickets_assigneeIdTousers: {
+                  where: {
+                    status: { in: ['OPEN', 'IN_PROGRESS'] }
+                  }
+                }
+              }
+            }
+          }
+        })
+
+        const overloaded = overloadedTechnicians.filter(tech => 
+          tech._count.tickets_tickets_assigneeIdTousers >= 10
+        ).slice(0, 2)
+
+        overloaded.forEach((tech, index) => {
+          const ticketCount = tech._count.tickets_tickets_assigneeIdTousers
+          alerts.push({
+            id: `overloaded-tech-${tech.id}`,
+            type: 'WARNING',
+            category: 'SYSTEM_STATUS',
+            title: `👤 Técnico sobrecargado`,
+            message: `${tech.name} tiene ${ticketCount} tickets activos. Considera redistribuir la carga de trabajo.`,
+            actionText: 'Ver tickets',
+            actionUrl: `/admin/users/${tech.id}?view=tickets`,
+            priority: 25 + index,
+            isRead: false,
+            isDismissed: false,
+            createdAt: new Date(now.getTime() - 15 * 60 * 1000),
+            count: ticketCount
+          })
+        })
+
+        // 5. Resumen semanal (solo lunes)
+        const today = now.getDay()
+        const isMonday = today === 1
+        const isMorning = now.getHours() >= 8 && now.getHours() < 12
+
+        if (isMonday && isMorning) {
+          const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+          
+          const weeklyStats = await prisma.tickets.groupBy({
+            by: ['status'],
+            where: {
+              createdAt: {
+                gte: weekStart
+              }
+            },
+            _count: true
+          })
+
+          const totalWeekly = weeklyStats.reduce((sum, stat) => sum + stat._count, 0)
+          const resolved = weeklyStats.find(s => s.status === 'RESOLVED')?._count || 0
+          const resolutionRate = totalWeekly > 0 ? Math.round((resolved / totalWeekly) * 100) : 0
+
+          alerts.push({
+            id: `weekly-summary-${new Date().toISOString().split('T')[0]}`,
+            type: 'INFO',
+            category: 'SYSTEM_STATUS',
+            title: `📊 Resumen semanal`,
+            message: `Última semana: ${totalWeekly} tickets creados, ${resolved} resueltos (${resolutionRate}% tasa de resolución)`,
+            actionText: 'Ver reporte completo',
+            actionUrl: '/admin/reports?period=week',
+            priority: 50,
+            isRead: false,
+            isDismissed: false,
+            createdAt: new Date(now.getTime() - 10 * 60 * 1000),
+            count: totalWeekly
+          })
+        }
+
+        // 4. NUEVO: Técnicos sobrecargados
+        const overloadedTechnicians = await prisma.users.findMany({
+          where: {
+            role: 'TECHNICIAN',
+            isActive: true,
+            tickets_tickets_assigneeIdTousers: {
+              some: {
+                status: { in: ['OPEN', 'IN_PROGRESS'] }
+              }
+            }
+          },
+          include: {
+            _count: {
+              select: {
+                tickets_tickets_assigneeIdTousers: {
+                  where: {
+                    status: { in: ['OPEN', 'IN_PROGRESS'] }
+                  }
+                }
+              }
+            }
+          },
+          orderBy: {
+            tickets_tickets_assigneeIdTousers: {
+              _count: 'desc'
+            }
+          },
+          take: 3
+        })
+
+        overloadedTechnicians.forEach((tech, index) => {
+          const activeTickets = tech._count.tickets_tickets_assigneeIdTousers
+          if (activeTickets >= 10) {
+            alerts.push({
+              id: `overloaded-tech-${tech.id}-${new Date().toISOString().split('T')[0]}`,
+              type: 'WARNING',
+              category: 'SYSTEM_STATUS',
+              title: `👥 Técnico sobrecargado`,
+              message: `${tech.name} tiene ${activeTickets} tickets activos. Considera redistribuir la carga de trabajo.`,
+              actionText: 'Ver tickets',
+              actionUrl: `/admin/users/${tech.id}?view=tickets`,
+              priority: 25 + index,
+              isRead: false,
+              isDismissed: false,
+              createdAt: new Date(now.getTime() - 45 * 60 * 1000),
+              count: activeTickets
+            })
+          }
+        })
+
+        // 5. NUEVO: Resumen semanal (solo lunes)
+        const today = new Date()
+        const isMonday = today.getDay() === 1
+        const isMorning = today.getHours() >= 8 && today.getHours() < 12
+
+        if (isMonday && isMorning) {
+          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+          
+          const weeklyStats = {
+            created: await prisma.tickets.count({
+              where: { createdAt: { gte: weekAgo } }
+            }),
+            resolved: await prisma.tickets.count({
+              where: { 
+                status: 'RESOLVED',
+                resolvedAt: { gte: weekAgo }
+              }
+            }),
+            pending: await prisma.tickets.count({
+              where: { 
+                status: { in: ['OPEN', 'IN_PROGRESS'] }
+              }
+            })
+          }
+
+          alerts.push({
+            id: `weekly-summary-${today.toISOString().split('T')[0]}`,
+            type: 'INFO',
+            category: 'SYSTEM_STATUS',
+            title: `📊 Resumen semanal`,
+            message: `Última semana: ${weeklyStats.created} tickets creados, ${weeklyStats.resolved} resueltos. ${weeklyStats.pending} tickets pendientes.`,
+            actionText: 'Ver reporte completo',
+            actionUrl: '/admin/reports?period=week',
+            priority: 50,
+            isRead: false,
+            isDismissed: false,
+            createdAt: new Date(now.getTime() - 60 * 60 * 1000),
+            count: weeklyStats.created
+          })
+        }
+
       } else if (userRole === 'TECHNICIAN') {
         // 1. Tickets urgentes asignados próximos a vencer
         const urgentAssigned = await prisma.tickets.findMany({
@@ -262,6 +437,275 @@ export class NotificationService {
             })
           }
         }
+
+        // 3. Nuevos tickets asignados (últimas 2 horas)
+        const newlyAssigned = await prisma.tickets.findMany({
+          where: {
+            assigneeId: userId,
+            status: 'OPEN',
+            updatedAt: {
+              gte: new Date(now.getTime() - 2 * 60 * 60 * 1000) // Últimas 2h
+            }
+          },
+          take: 3,
+          orderBy: { updatedAt: 'desc' },
+          include: {
+            users_tickets_clientIdTousers: { select: { name: true } },
+            categories: { select: { name: true } }
+          }
+        })
+
+        newlyAssigned.forEach((ticket, index) => {
+          const minutesAgo = Math.floor((now.getTime() - ticket.updatedAt.getTime()) / (1000 * 60))
+          alerts.push({
+            id: `newly-assigned-${ticket.id}`,
+            type: 'INFO',
+            category: 'TICKET_UPDATE',
+            title: `🎫 Nuevo ticket asignado`,
+            message: `"${ticket.title}" de ${ticket.users_tickets_clientIdTousers?.name} te fue asignado hace ${minutesAgo}min. Categoría: ${ticket.categories?.name || 'Sin categoría'}`,
+            actionText: 'Ver ticket',
+            actionUrl: `/technician/tickets/${ticket.id}`,
+            priority: 18 + index,
+            isRead: false,
+            isDismissed: false,
+            createdAt: ticket.updatedAt,
+            relatedIds: [ticket.id],
+            ticket: { id: ticket.id, title: ticket.title }
+          })
+        })
+
+        // 4. Cliente respondió en tickets activos
+        const ticketsWithClientResponse = await prisma.tickets.findMany({
+          where: {
+            assigneeId: userId,
+            status: { in: ['OPEN', 'IN_PROGRESS'] }
+          },
+          take: 5,
+          include: {
+            users_tickets_clientIdTousers: { select: { name: true } },
+            comments: {
+              where: {
+                createdAt: {
+                  gte: new Date(now.getTime() - 4 * 60 * 60 * 1000) // Últimas 4h
+                },
+                users: {
+                  role: 'CLIENT'
+                }
+              },
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              include: {
+                users: { select: { name: true, role: true } }
+              }
+            }
+          }
+        })
+
+        ticketsWithClientResponse
+          .filter(ticket => ticket.comments.length > 0)
+          .slice(0, 2)
+          .forEach((ticket, index) => {
+            const comment = ticket.comments[0]
+            const hoursAgo = Math.floor((now.getTime() - comment.createdAt.getTime()) / (1000 * 60 * 60))
+            alerts.push({
+              id: `client-response-${ticket.id}-${comment.id}`,
+              type: 'INFO',
+              category: 'TICKET_UPDATE',
+              title: `💬 Cliente respondió`,
+              message: `${ticket.users_tickets_clientIdTousers?.name} respondió hace ${hoursAgo}h en "${ticket.title}"`,
+              actionText: 'Ver respuesta',
+              actionUrl: `/technician/tickets/${ticket.id}#comment-${comment.id}`,
+              priority: 22 + index,
+              isRead: false,
+              isDismissed: false,
+              createdAt: comment.createdAt,
+              relatedIds: [ticket.id, comment.id],
+              ticket: { id: ticket.id, title: ticket.title }
+            })
+          })
+
+        // 5. Nuevas calificaciones recibidas
+        const recentRatings = await prisma.ticket_ratings.findMany({
+          where: {
+            tickets: {
+              assigneeId: userId
+            },
+            createdAt: {
+              gte: new Date(now.getTime() - 24 * 60 * 60 * 1000) // Últimas 24h
+            }
+          },
+          take: 2,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            tickets: {
+              select: {
+                id: true,
+                title: true,
+                users_tickets_clientIdTousers: { select: { name: true } }
+              }
+            }
+          }
+        })
+
+        recentRatings.forEach((rating, index) => {
+          const hoursAgo = Math.floor((now.getTime() - rating.createdAt.getTime()) / (1000 * 60 * 60))
+          const ratingEmoji = rating.rating >= 4 ? '⭐⭐⭐⭐⭐' : rating.rating >= 3 ? '⭐⭐⭐' : '⭐⭐'
+          const ratingText = rating.rating >= 4 ? 'excelente' : rating.rating >= 3 ? 'buena' : 'necesita mejorar'
+          
+          alerts.push({
+            id: `rating-received-${rating.id}`,
+            type: rating.rating >= 4 ? 'SUCCESS' : rating.rating >= 3 ? 'INFO' : 'WARNING',
+            category: 'USER_ACTION',
+            title: `${ratingEmoji} Nueva calificación`,
+            message: `${rating.tickets.users_tickets_clientIdTousers?.name} calificó "${rating.tickets.title}" como ${ratingText} (${rating.rating}/5) hace ${hoursAgo}h`,
+            actionText: 'Ver detalles',
+            actionUrl: `/technician/tickets/${rating.ticketId}?view=rating`,
+            priority: 35 + index,
+            isRead: false,
+            isDismissed: false,
+            createdAt: rating.createdAt,
+            relatedIds: [rating.ticketId, rating.id]
+          })
+        })
+
+        // 3. NUEVO: Nuevo ticket asignado (últimas 2h)
+        const newlyAssigned = await prisma.tickets.findMany({
+          where: {
+            assigneeId: userId,
+            status: 'OPEN',
+            updatedAt: {
+              gte: new Date(now.getTime() - 2 * 60 * 60 * 1000), // Últimas 2h
+              gt: new Date(now.getTime() - 3 * 60 * 60 * 1000)   // Pero no muy recientes
+            }
+          },
+          take: 2,
+          orderBy: { updatedAt: 'desc' },
+          include: {
+            users_tickets_clientIdTousers: { select: { name: true } },
+            categories: { select: { name: true } }
+          }
+        })
+
+        newlyAssigned.forEach((ticket, index) => {
+          const hoursAgo = Math.floor((now.getTime() - ticket.updatedAt.getTime()) / (1000 * 60 * 60))
+          const priorityLabel = ticket.priority === 'URGENT' ? '🔴 Urgente' : 
+                               ticket.priority === 'HIGH' ? '🟠 Alta' : 
+                               ticket.priority === 'MEDIUM' ? '🟡 Media' : '🟢 Baja'
+          
+          alerts.push({
+            id: `newly-assigned-${ticket.id}`,
+            type: 'INFO',
+            category: 'TICKET_UPDATE',
+            title: `🔔 Nuevo ticket asignado`,
+            message: `"${ticket.title}" de ${ticket.users_tickets_clientIdTousers?.name}. Prioridad: ${priorityLabel}. Categoría: ${ticket.categories?.name || 'Sin categoría'}`,
+            actionText: 'Ver ticket',
+            actionUrl: `/technician/tickets/${ticket.id}`,
+            priority: 18 + index,
+            isRead: false,
+            isDismissed: false,
+            createdAt: ticket.updatedAt,
+            relatedIds: [ticket.id],
+            ticket: { id: ticket.id, title: ticket.title }
+          })
+        })
+
+        // 4. NUEVO: Cliente respondió (últimas 4h)
+        const clientResponses = await prisma.tickets.findMany({
+          where: {
+            assigneeId: userId,
+            status: { in: ['OPEN', 'IN_PROGRESS'] }
+          },
+          take: 5,
+          orderBy: { updatedAt: 'desc' },
+          include: {
+            users_tickets_clientIdTousers: { select: { name: true } },
+            comments: {
+              where: {
+                createdAt: {
+                  gte: new Date(now.getTime() - 4 * 60 * 60 * 1000)
+                },
+                users: {
+                  role: 'CLIENT'
+                }
+              },
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              include: {
+                users: { select: { name: true, role: true } }
+              }
+            }
+          }
+        })
+
+        clientResponses.forEach((ticket, index) => {
+          if (ticket.comments.length > 0) {
+            const comment = ticket.comments[0]
+            const hoursAgo = Math.floor((now.getTime() - comment.createdAt.getTime()) / (1000 * 60 * 60))
+            
+            alerts.push({
+              id: `client-response-${ticket.id}-${comment.id}`,
+              type: 'INFO',
+              category: 'TICKET_UPDATE',
+              title: `💬 Cliente respondió`,
+              message: `${ticket.users_tickets_clientIdTousers?.name} respondió hace ${hoursAgo}h en "${ticket.title}"`,
+              actionText: 'Ver respuesta',
+              actionUrl: `/technician/tickets/${ticket.id}#comment-${comment.id}`,
+              priority: 22 + index,
+              isRead: false,
+              isDismissed: false,
+              createdAt: comment.createdAt,
+              relatedIds: [ticket.id, comment.id],
+              ticket: { id: ticket.id, title: ticket.title }
+            })
+          }
+        })
+
+        // 5. NUEVO: Nueva calificación recibida (últimas 24h)
+        const recentRatings = await prisma.ticket_ratings.findMany({
+          where: {
+            createdAt: {
+              gte: new Date(now.getTime() - 24 * 60 * 60 * 1000)
+            },
+            tickets: {
+              assigneeId: userId
+            }
+          },
+          take: 2,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            tickets: {
+              select: {
+                id: true,
+                title: true,
+                users_tickets_clientIdTousers: { select: { name: true } }
+              }
+            }
+          }
+        })
+
+        recentRatings.forEach((rating, index) => {
+          const hoursAgo = Math.floor((now.getTime() - rating.createdAt.getTime()) / (1000 * 60 * 60))
+          const ratingEmoji = rating.rating >= 4 ? '⭐⭐⭐⭐⭐' : 
+                             rating.rating >= 3 ? '⭐⭐⭐' : '⭐⭐'
+          const ratingText = rating.rating >= 4 ? 'excelente' : 
+                            rating.rating >= 3 ? 'buena' : 'necesita mejora'
+          
+          alerts.push({
+            id: `new-rating-${rating.id}`,
+            type: rating.rating >= 4 ? 'SUCCESS' : rating.rating >= 3 ? 'INFO' : 'WARNING',
+            category: 'USER_ACTION',
+            title: `⭐ Nueva calificación recibida`,
+            message: `${rating.tickets.users_tickets_clientIdTousers?.name} calificó "${rating.tickets.title}" como ${ratingText} (${rating.rating}/5) ${ratingEmoji}`,
+            actionText: 'Ver detalles',
+            actionUrl: `/technician/tickets/${rating.tickets.id}?view=rating`,
+            priority: 35 + index,
+            isRead: false,
+            isDismissed: false,
+            createdAt: rating.createdAt,
+            relatedIds: [rating.tickets.id, rating.id],
+            ticket: { id: rating.tickets.id, title: rating.tickets.title }
+          })
+        })
 
       } else if (userRole === 'CLIENT') {
         // 1. Tickets resueltos pendientes de calificación
@@ -407,6 +851,254 @@ export class NotificationService {
             })
           }
         }
+
+        // 4. Ticket asignado a técnico (notificar quién)
+        const recentlyAssigned = await prisma.tickets.findMany({
+          where: {
+            clientId: userId,
+            status: { in: ['OPEN', 'IN_PROGRESS'] },
+            assigneeId: { not: null },
+            updatedAt: {
+              gte: new Date(now.getTime() - 6 * 60 * 60 * 1000) // Últimas 6h
+            }
+          },
+          take: 2,
+          orderBy: { updatedAt: 'desc' },
+          include: {
+            users_tickets_assigneeIdTousers: { 
+              select: { 
+                id: true,
+                name: true,
+                email: true
+              } 
+            }
+          }
+        })
+
+        recentlyAssigned.forEach((ticket, index) => {
+          const hoursAgo = Math.floor((now.getTime() - ticket.updatedAt.getTime()) / (1000 * 60 * 60))
+          alerts.push({
+            id: `ticket-assigned-${ticket.id}`,
+            type: 'SUCCESS',
+            category: 'TICKET_UPDATE',
+            title: `✅ Ticket asignado`,
+            message: `Tu ticket "${ticket.title}" fue asignado a ${ticket.users_tickets_assigneeIdTousers?.name} hace ${hoursAgo}h. Pronto recibirás una respuesta.`,
+            actionText: 'Ver ticket',
+            actionUrl: `/client/tickets/${ticket.id}`,
+            priority: 28 + index,
+            isRead: false,
+            isDismissed: false,
+            createdAt: ticket.updatedAt,
+            relatedIds: [ticket.id],
+            ticket: { id: ticket.id, title: ticket.title }
+          })
+        })
+
+        // 5. Cambio de estado del ticket
+        const statusChanged = await prisma.tickets.findMany({
+          where: {
+            clientId: userId,
+            status: { in: ['IN_PROGRESS', 'RESOLVED'] },
+            updatedAt: {
+              gte: new Date(now.getTime() - 12 * 60 * 60 * 1000) // Últimas 12h
+            }
+          },
+          take: 2,
+          orderBy: { updatedAt: 'desc' },
+          include: {
+            users_tickets_assigneeIdTousers: { select: { name: true } }
+          }
+        })
+
+        statusChanged.forEach((ticket, index) => {
+          const hoursAgo = Math.floor((now.getTime() - ticket.updatedAt.getTime()) / (1000 * 60 * 60))
+          const statusText = ticket.status === 'IN_PROGRESS' ? 'En Progreso' : 'Resuelto'
+          const statusEmoji = ticket.status === 'IN_PROGRESS' ? '🔧' : '✅'
+          
+          alerts.push({
+            id: `status-changed-${ticket.id}`,
+            type: ticket.status === 'RESOLVED' ? 'SUCCESS' : 'INFO',
+            category: 'TICKET_UPDATE',
+            title: `${statusEmoji} Estado actualizado`,
+            message: `Tu ticket "${ticket.title}" cambió a "${statusText}" hace ${hoursAgo}h${ticket.users_tickets_assigneeIdTousers ? ` por ${ticket.users_tickets_assigneeIdTousers.name}` : ''}`,
+            actionText: 'Ver ticket',
+            actionUrl: `/client/tickets/${ticket.id}`,
+            priority: 26 + index,
+            isRead: false,
+            isDismissed: false,
+            createdAt: ticket.updatedAt,
+            relatedIds: [ticket.id],
+            ticket: { id: ticket.id, title: ticket.title }
+          })
+        })
+
+        // 6. Ticket resuelto - pedir confirmación
+        const recentlyResolved = await prisma.tickets.findMany({
+          where: {
+            clientId: userId,
+            status: 'RESOLVED',
+            resolvedAt: {
+              gte: new Date(now.getTime() - 24 * 60 * 60 * 1000), // Últimas 24h
+              lt: new Date(now.getTime() - 2 * 60 * 60 * 1000) // Pero no muy reciente
+            }
+          },
+          take: 1,
+          orderBy: { resolvedAt: 'desc' },
+          include: {
+            users_tickets_assigneeIdTousers: { select: { name: true } }
+          }
+        })
+
+        recentlyResolved.forEach((ticket, index) => {
+          const hoursAgo = Math.floor((now.getTime() - (ticket.resolvedAt?.getTime() || 0)) / (1000 * 60 * 60))
+          alerts.push({
+            id: `ticket-resolved-${ticket.id}`,
+            type: 'SUCCESS',
+            category: 'USER_ACTION',
+            title: `✅ Ticket resuelto`,
+            message: `Tu ticket "${ticket.title}" fue marcado como resuelto hace ${hoursAgo}h por ${ticket.users_tickets_assigneeIdTousers?.name}. ¿El problema está solucionado?`,
+            actionText: 'Confirmar resolución',
+            actionUrl: `/client/tickets/${ticket.id}?action=confirm`,
+            priority: 32 + index,
+            isRead: false,
+            isDismissed: false,
+            createdAt: ticket.resolvedAt || ticket.updatedAt,
+            relatedIds: [ticket.id],
+            ticket: { id: ticket.id, title: ticket.title }
+          })
+        })
+
+        // 4. NUEVO: Ticket asignado a técnico (últimas 4h)
+        const recentlyAssigned = await prisma.tickets.findMany({
+          where: {
+            clientId: userId,
+            assigneeId: { not: null },
+            status: { in: ['OPEN', 'IN_PROGRESS'] },
+            updatedAt: {
+              gte: new Date(now.getTime() - 4 * 60 * 60 * 1000),
+              gt: new Date(now.getTime() - 5 * 60 * 60 * 1000)
+            }
+          },
+          take: 2,
+          orderBy: { updatedAt: 'desc' },
+          include: {
+            users_tickets_assigneeIdTousers: { 
+              select: { 
+                name: true, 
+                email: true,
+                departments: { select: { name: true } }
+              } 
+            }
+          }
+        })
+
+        recentlyAssigned.forEach((ticket, index) => {
+          const hoursAgo = Math.floor((now.getTime() - ticket.updatedAt.getTime()) / (1000 * 60 * 60))
+          const techName = ticket.users_tickets_assigneeIdTousers?.name || 'un técnico'
+          const deptName = ticket.users_tickets_assigneeIdTousers?.departments?.name || 'Soporte'
+          
+          alerts.push({
+            id: `ticket-assigned-${ticket.id}`,
+            type: 'SUCCESS',
+            category: 'TICKET_UPDATE',
+            title: `✅ Ticket asignado`,
+            message: `Tu ticket "${ticket.title}" fue asignado a ${techName} del departamento ${deptName} hace ${hoursAgo}h`,
+            actionText: 'Ver ticket',
+            actionUrl: `/client/tickets/${ticket.id}`,
+            priority: 20,
+            isRead: false,
+            isDismissed: false,
+            createdAt: ticket.updatedAt,
+            relatedIds: [ticket.id],
+            ticket: { id: ticket.id, title: ticket.title }
+          })
+        })
+
+        // 5. NUEVO: Cambio de estado (últimas 6h)
+        const statusChanges = await prisma.tickets.findMany({
+          where: {
+            clientId: userId,
+            updatedAt: {
+              gte: new Date(now.getTime() - 6 * 60 * 60 * 1000),
+              gt: new Date(now.getTime() - 7 * 60 * 60 * 1000)
+            }
+          },
+          take: 3,
+          orderBy: { updatedAt: 'desc' },
+          include: {
+            users_tickets_assigneeIdTousers: { select: { name: true } }
+          }
+        })
+
+        statusChanges.forEach((ticket, index) => {
+          const hoursAgo = Math.floor((now.getTime() - ticket.updatedAt.getTime()) / (1000 * 60 * 60))
+          const statusLabels: Record<string, { emoji: string, text: string, type: 'INFO' | 'SUCCESS' | 'WARNING' }> = {
+            'OPEN': { emoji: '🔵', text: 'Abierto', type: 'INFO' },
+            'IN_PROGRESS': { emoji: '🟡', text: 'En Progreso', type: 'INFO' },
+            'RESOLVED': { emoji: '🟢', text: 'Resuelto', type: 'SUCCESS' },
+            'CLOSED': { emoji: '⚫', text: 'Cerrado', type: 'INFO' }
+          }
+          
+          const statusInfo = statusLabels[ticket.status] || { emoji: '🔵', text: ticket.status, type: 'INFO' }
+          
+          alerts.push({
+            id: `status-change-${ticket.id}-${ticket.updatedAt.getTime()}`,
+            type: statusInfo.type,
+            category: 'TICKET_UPDATE',
+            title: `${statusInfo.emoji} Estado actualizado`,
+            message: `Tu ticket "${ticket.title}" cambió a ${statusInfo.text} hace ${hoursAgo}h${ticket.users_tickets_assigneeIdTousers ? ` por ${ticket.users_tickets_assigneeIdTousers.name}` : ''}`,
+            actionText: 'Ver ticket',
+            actionUrl: `/client/tickets/${ticket.id}`,
+            priority: 28 + index,
+            isRead: false,
+            isDismissed: false,
+            createdAt: ticket.updatedAt,
+            relatedIds: [ticket.id],
+            ticket: { id: ticket.id, title: ticket.title }
+          })
+        })
+
+        // 6. NUEVO: Ticket resuelto - pedir confirmación (últimas 12h)
+        const recentlyResolved = await prisma.tickets.findMany({
+          where: {
+            clientId: userId,
+            status: 'RESOLVED',
+            resolvedAt: {
+              gte: new Date(now.getTime() - 12 * 60 * 60 * 1000),
+              lt: new Date(now.getTime() - 1 * 60 * 60 * 1000)
+            }
+          },
+          take: 2,
+          orderBy: { resolvedAt: 'desc' },
+          include: {
+            users_tickets_assigneeIdTousers: { select: { name: true } }
+          }
+        })
+
+        for (const ticket of recentlyResolved) {
+          const hasRating = await prisma.ticket_ratings.findFirst({
+            where: { ticketId: ticket.id }
+          })
+
+          if (!hasRating) {
+            const hoursAgo = Math.floor((now.getTime() - (ticket.resolvedAt?.getTime() || 0)) / (1000 * 60 * 60))
+            alerts.push({
+              id: `resolved-confirm-${ticket.id}`,
+              type: 'SUCCESS',
+              category: 'USER_ACTION',
+              title: `✅ Ticket resuelto`,
+              message: `"${ticket.title}" fue marcado como resuelto hace ${hoursAgo}h por ${ticket.users_tickets_assigneeIdTousers?.name}. ¿Confirmas que tu problema fue solucionado?`,
+              actionText: 'Confirmar y calificar',
+              actionUrl: `/client/tickets/${ticket.id}?action=rate`,
+              priority: 23,
+              isRead: false,
+              isDismissed: false,
+              createdAt: ticket.resolvedAt || ticket.updatedAt,
+              relatedIds: [ticket.id],
+              ticket: { id: ticket.id, title: ticket.title }
+            })
+          }
+        }
       }
 
     } catch (error) {
@@ -440,6 +1132,16 @@ export class NotificationService {
         return ticket?.status === 'RESOLVED' || ticket?.status === 'CLOSED'
       }
 
+      if (notificationId.startsWith('overloaded-tech-')) {
+        // No ocultar automáticamente, requiere acción manual
+        return false
+      }
+
+      if (notificationId.startsWith('activity-spike-') || notificationId.startsWith('weekly-summary-')) {
+        // Notificaciones informativas, no se ocultan automáticamente
+        return false
+      }
+
       // Notificaciones de técnico
       if (notificationId.startsWith('urgent-assigned-')) {
         const ticketId = notificationId.replace('urgent-assigned-', '')
@@ -463,6 +1165,21 @@ export class NotificationService {
         return hasResponse !== null
       }
 
+      if (notificationId.startsWith('newly-assigned-')) {
+        // No ocultar automáticamente, el técnico debe verlo
+        return false
+      }
+
+      if (notificationId.startsWith('client-response-')) {
+        // No ocultar automáticamente, requiere atención del técnico
+        return false
+      }
+
+      if (notificationId.startsWith('rating-received-')) {
+        // No ocultar automáticamente, el técnico debe ver su calificación
+        return false
+      }
+
       // Notificaciones de cliente
       if (notificationId.startsWith('rating-pending-')) {
         const ticketId = notificationId.replace('rating-pending-', '')
@@ -474,7 +1191,6 @@ export class NotificationService {
 
       if (notificationId.startsWith('ticket-update-')) {
         // Las actualizaciones de tickets no se ocultan automáticamente
-        // El usuario debe marcarlas como leídas o descartarlas
         return false
       }
 
@@ -489,6 +1205,21 @@ export class NotificationService {
           }
         })
         return hasResponse !== null
+      }
+
+      if (notificationId.startsWith('ticket-assigned-')) {
+        // No ocultar automáticamente, el cliente debe saber quién lo atiende
+        return false
+      }
+
+      if (notificationId.startsWith('status-changed-')) {
+        // No ocultar automáticamente, el cliente debe ver los cambios
+        return false
+      }
+
+      if (notificationId.startsWith('ticket-resolved-')) {
+        // No ocultar automáticamente, requiere confirmación del cliente
+        return false
       }
 
     } catch (error) {
@@ -524,15 +1255,26 @@ export class NotificationService {
    */
   private static isDynamicNotification(notificationId: string): boolean {
     const dynamicPrefixes = [
+      // Admin
       'activity-spike-',
       'critical-unassigned-',
       'sla-warning-',
-      'urgent-assigned-',
       'overdue-sla-',
+      'overloaded-tech-',
+      'weekly-summary-',
+      // Technician
+      'urgent-assigned-',
       'no-response-',
+      'newly-assigned-',
+      'client-response-',
+      'rating-received-',
+      // Client
       'rating-pending-',
       'ticket-update-',
-      'stale-ticket-'
+      'stale-ticket-',
+      'ticket-assigned-',
+      'status-changed-',
+      'ticket-resolved-'
     ]
     
     return dynamicPrefixes.some(prefix => notificationId.includes(prefix))

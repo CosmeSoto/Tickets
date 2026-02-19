@@ -567,7 +567,16 @@ const isDynamicNotification = (notificationId: string): boolean => {
     'no-response-',
     'rating-pending-',
     'ticket-update-',
-    'stale-ticket-'
+    'stale-ticket-',
+    // Nuevos prefijos
+    'overloaded-tech-',
+    'weekly-summary-',
+    'newly-assigned-',
+    'client-response-',
+    'new-rating-',
+    'ticket-assigned-',
+    'status-change-',
+    'resolved-confirm-'
   ]
   
   return dynamicPrefixes.some(prefix => notificationId.includes(prefix))
