@@ -99,6 +99,18 @@ export async function PUT(
       }
     }
 
+    // Preparar oldValues y newValues para auditoría
+    const oldValues: any = {}
+    const newValues: any = {}
+    
+    Object.keys(validatedData).forEach(key => {
+      const typedKey = key as keyof typeof validatedData
+      if (validatedData[typedKey] !== undefined && validatedData[typedKey] !== existing[typedKey]) {
+        oldValues[key] = existing[typedKey]
+        newValues[key] = validatedData[typedKey]
+      }
+    })
+
     const department = await prisma.departments.update({
       where: { id },
       data: validatedData,
@@ -111,6 +123,22 @@ export async function PUT(
         }
       }
     })
+
+    // Registrar en auditoría
+    if (Object.keys(newValues).length > 0) {
+      await AuditServiceComplete.log({
+        action: AuditActionsComplete.DEPARTMENT_UPDATED,
+        entityType: 'department',
+        entityId: department.id,
+        userId: session.user.id,
+        details: {
+          departmentName: department.name
+        },
+        oldValues,
+        newValues,
+        request
+      })
+    }
 
     if (process.env.NODE_ENV === 'development') {
       console.log('✅ Departamento actualizado:', department.name)
@@ -186,6 +214,21 @@ export async function DELETE(
 
     await prisma.departments.delete({
       where: { id }
+    })
+
+    // Registrar en auditoría
+    await AuditServiceComplete.log({
+      action: AuditActionsComplete.DEPARTMENT_DELETED,
+      entityType: 'department',
+      entityId: department.id,
+      userId: session.user.id,
+      details: {
+        departmentName: department.name,
+        description: department.description,
+        usersCount: department._count.users,
+        categoriesCount: department._count.categories
+      },
+      request
     })
 
     if (process.env.NODE_ENV === 'development') {

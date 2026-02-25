@@ -184,6 +184,23 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    // Registrar en auditoría
+    await AuditServiceComplete.log({
+      action: AuditActionsComplete.CATEGORY_CREATED,
+      entityType: 'category',
+      entityId: category.id,
+      userId: session.user.id,
+      details: {
+        categoryName: category.name,
+        description: category.description,
+        level: category.level,
+        parentId: category.parentId,
+        departmentId: category.departmentId,
+        color: category.color
+      },
+      request
+    })
+
     return NextResponse.json({
       success: true,
       data: category,

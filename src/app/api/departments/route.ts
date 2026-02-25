@@ -116,6 +116,21 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    // Registrar en auditoría
+    await AuditServiceComplete.log({
+      action: AuditActionsComplete.DEPARTMENT_CREATED,
+      entityType: 'department',
+      entityId: department.id,
+      userId: session.user.id,
+      details: {
+        departmentName: department.name,
+        description: department.description,
+        color: department.color,
+        isActive: department.isActive
+      },
+      request
+    })
+
     if (process.env.NODE_ENV === 'development') {
       console.log('✅ Departamento creado:', department.name)
     }

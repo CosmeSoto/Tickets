@@ -521,6 +521,22 @@ export async function DELETE(
       where: { id }
     })
 
+    // Registrar en auditoría
+    await AuditServiceComplete.log({
+      action: AuditActionsComplete.CATEGORY_DELETED,
+      entityType: 'category',
+      entityId: id,
+      userId: session.user.id,
+      details: {
+        categoryName: category.name,
+        level: category.level,
+        ticketsCount: category._count.tickets,
+        subcategoriesCount: category._count.other_categories,
+        techniciansCount: category.technician_assignments.length
+      },
+      request
+    })
+
     // Enviar notificaciones de categoría eliminada (log para auditoría)
     try {
       console.log(`[INFO] Category deleted: ${id} by user ${session.user.id}`)
