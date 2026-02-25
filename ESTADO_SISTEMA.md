@@ -251,19 +251,26 @@ Sistema de notificaciones incompleto. Ahora cada rol recibe notificaciones espec
 
 ### 🎯 Próximos Pasos Opcionales
 
-1. **Optimizaciones Avanzadas**
+1. **Sistema de Email (Cuando se necesite)**
+   - 📚 **Guía completa:** [docs/GUIA_CONFIGURACION_EMAIL.md](docs/GUIA_CONFIGURACION_EMAIL.md)
+   - El código está completo, solo requiere configuración SMTP
+   - Incluye ejemplos para Gmail, SendGrid, AWS SES, Mailgun
+   - Documentación de cron job y troubleshooting
+   - **Recomendación:** Configurar cuando se vaya a producción
+
+2. **Optimizaciones Avanzadas**
    - Implementar React Query o SWR para cache más sofisticado
    - Service Worker para offline support
    - Virtual scrolling para listas largas
    - Optimización de imágenes con Next.js Image
    - Code splitting por rutas
 
-2. **Tiempo Real**
+3. **Tiempo Real**
    - Implementar WebSockets o SSE
    - Notificaciones push del navegador
    - Actualizaciones en tiempo real de tickets
 
-3. **Base de Datos**
+4. **Base de Datos**
    - Optimización de queries con índices
    - Paginación en servidor
    - Queries con JOIN optimizados
