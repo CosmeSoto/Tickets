@@ -86,7 +86,7 @@ function AuditDetailsResolver({ details }: { details: any }) {
 
   useEffect(() => {
     const resolveIds = async () => {
-      // PRIORIDAD 1: Si ya tiene cambios legibles, usarlos directamente
+      // PRIORIDAD 1: Si ya tiene cambios resueltos del servidor, usarlos directamente
       if (details.changes && typeof details.changes === 'object') {
         setResolvedDetails({ type: 'changes', data: details.changes })
         return
@@ -117,11 +117,12 @@ function AuditDetailsResolver({ details }: { details: any }) {
             const { resolved } = await response.json()
             
             // Reconstruir cambios con valores resueltos
-            const changes: Record<string, { old: string; new: string }> = {}
+            const changes: Record<string, { old: string; new: string; field: string }> = {}
             
             Object.keys(details.newValues).forEach(key => {
               if (details.oldValues[key] !== details.newValues[key]) {
                 changes[key] = {
+                  field: getFieldDisplayName(key),
                   old: resolved[`old_${key}`] || String(details.oldValues[key] || 'vacío'),
                   new: resolved[`new_${key}`] || String(details.newValues[key] || 'vacío')
                 }
@@ -131,10 +132,11 @@ function AuditDetailsResolver({ details }: { details: any }) {
             setResolvedDetails({ type: 'resolved', data: changes })
           } else {
             // Si falla, usar valores sin resolver
-            const changes: Record<string, { old: string; new: string }> = {}
+            const changes: Record<string, { old: string; new: string; field: string }> = {}
             Object.keys(details.newValues).forEach(key => {
               if (details.oldValues[key] !== details.newValues[key]) {
                 changes[key] = {
+                  field: getFieldDisplayName(key),
                   old: String(details.oldValues[key] || 'vacío'),
                   new: String(details.newValues[key] || 'vacío')
                 }
@@ -145,10 +147,11 @@ function AuditDetailsResolver({ details }: { details: any }) {
         } catch (error) {
           console.error('Error resolviendo IDs:', error)
           // Fallback: mostrar sin resolver
-          const changes: Record<string, { old: string; new: string }> = {}
+          const changes: Record<string, { old: string; new: string; field: string }> = {}
           Object.keys(details.newValues).forEach(key => {
             if (details.oldValues[key] !== details.newValues[key]) {
               changes[key] = {
+                field: getFieldDisplayName(key),
                 old: String(details.oldValues[key] || 'vacío'),
                 new: String(details.newValues[key] || 'vacío')
               }
@@ -230,7 +233,7 @@ function AuditDetailsResolver({ details }: { details: any }) {
   // Renderizar según el tipo
   if (resolvedDetails.type === 'changes' || resolvedDetails.type === 'resolved' || resolvedDetails.type === 'unresolved' || resolvedDetails.type === 'error') {
     const changesArray = Object.entries(resolvedDetails.data).map(([key, value]: [string, any]) => ({
-      campo: getFieldDisplayName(key),
+      campo: value.field || getFieldDisplayName(key),
       campoTecnico: key,
       anterior: value.old,
       nuevo: value.new
@@ -244,6 +247,11 @@ function AuditDetailsResolver({ details }: { details: any }) {
             {resolvedDetails.type === 'resolved' && (
               <span className="text-xs text-green-600 dark:text-green-400 font-normal">
                 ✓ IDs resueltos
+              </span>
+            )}
+            {resolvedDetails.type === 'changes' && (
+              <span className="text-xs text-green-600 dark:text-green-400 font-normal">
+                ✓ Resuelto automáticamente
               </span>
             )}
           </div>
@@ -1220,9 +1228,19 @@ export default function AuditPage() {
                 {selectedLog.entityId && (
                   <div>
                     <span className="font-semibold">
-                      {selectedLog.entityType === 'user' ? 'Usuario Afectado:' : 'ID de Entidad:'}
+                      {selectedLog.entityType === 'user' ? 'Usuario Afectado:' : 
+                       selectedLog.entityType === 'ticket' ? 'Ticket:' :
+                       selectedLog.entityType === 'category' ? 'Categoría:' :
+                       selectedLog.entityType === 'department' ? 'Departamento:' :
+                       'ID de Entidad:'}
                     </span>{' '}
-                    {selectedLog.entityType === 'user' && selectedLog.details?.userName ? (
+                    {/* PRIORIDAD 1: Usar entityName si está disponible (ya resuelto) */}
+                    {selectedLog.details?.entityName ? (
+                      <span className="text-muted-foreground font-medium text-blue-600">
+                        {selectedLog.details.entityName}
+                      </span>
+                    ) : /* PRIORIDAD 2: Usar nombres específicos del details */
+                      selectedLog.entityType === 'user' && selectedLog.details?.userName ? (
                       <span className="text-muted-foreground">
                         {selectedLog.details.userName}
                         {selectedLog.details.userEmail && (
@@ -1241,7 +1259,8 @@ export default function AuditPage() {
                       <span className="text-muted-foreground">
                         {selectedLog.details.departmentName}
                       </span>
-                    ) : (
+                    ) : /* FALLBACK: Mostrar UUID solo si no hay nada más */
+                    (
                       <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
                         {selectedLog.entityId}
                       </code>

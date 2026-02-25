@@ -126,6 +126,7 @@ export class AuditServiceComplete {
 
   /**
    * Obtener logs de auditoría con filtros avanzados
+   * MEJORADO: Resuelve IDs a nombres legibles automáticamente
    */
   static async getLogs(filter: AuditLogFilter = {}) {
     try {
@@ -181,11 +182,17 @@ export class AuditServiceComplete {
 
       const total = await prisma.audit_logs.count({ where })
 
-      return {
-        logs: logs.map(log => ({
+      // NUEVO: Resolver IDs a nombres legibles
+      const enrichedLogs = await Promise.all(logs.map(async (log) => {
+        const enrichedDetails = await this.enrichLogDetails(log)
+        return {
           ...log,
-          details: log.details || null // Ya es un objeto JSON, no necesita parse
-        })),
+          details: enrichedDetails
+        }
+      }))
+
+      return {
+        logs: enrichedLogs,
         total,
         hasMore: offset + limit < total
       }
@@ -193,6 +200,270 @@ export class AuditServiceComplete {
       console.error('[AUDIT SERVICE] Error in getLogs:', error)
       throw error
     }
+  }
+
+  /**
+   * NUEVO: Enriquece los detalles del log resolviendo IDs a nombres
+   */
+  private static async enrichLogDetails(log: any): Promise<any> {
+    const details = log.details || {}
+    const enriched: any = { ...details }
+
+    try {
+      // Resolver entityId según el tipo
+      if (log.entityId) {
+        enriched.entityName = await this.resolveEntityId(log.entityType, log.entityId)
+      }
+
+      // Resolver IDs en oldValues y newValues
+      if (details.oldValues && details.newValues) {
+        enriched.changes = await this.resolveChanges(details.oldValues, details.newValues)
+      }
+
+      // Resolver IDs comunes en details
+      if (details.userId) {
+        enriched.userName = await this.resolveUserId(details.userId)
+      }
+      if (details.assigneeId) {
+        enriched.assigneeName = await this.resolveUserId(details.assigneeId)
+      }
+      if (details.categoryId) {
+        enriched.categoryName = await this.resolveCategoryId(details.categoryId)
+      }
+      if (details.departmentId) {
+        enriched.departmentName = await this.resolveDepartmentId(details.departmentId)
+      }
+      if (details.ticketId) {
+        enriched.ticketTitle = await this.resolveTicketId(details.ticketId)
+      }
+
+      return enriched
+    } catch (error) {
+      console.error('[AUDIT] Error enriching log details:', error)
+      return details
+    }
+  }
+
+  /**
+   * Resuelve un entityId según su tipo
+   */
+  private static async resolveEntityId(entityType: string, entityId: string): Promise<string> {
+    try {
+      switch (entityType.toLowerCase()) {
+        case 'user':
+          return await this.resolveUserId(entityId)
+        case 'ticket':
+          return await this.resolveTicketId(entityId)
+        case 'category':
+          return await this.resolveCategoryId(entityId)
+        case 'department':
+          return await this.resolveDepartmentId(entityId)
+        default:
+          return entityId
+      }
+    } catch {
+      return entityId
+    }
+  }
+
+  /**
+   * Resuelve cambios (oldValues -> newValues) a nombres legibles
+   */
+  private static async resolveChanges(oldValues: any, newValues: any): Promise<Record<string, { old: string; new: string; field: string }>> {
+    const changes: Record<string, { old: string; new: string; field: string }> = {}
+
+    for (const key of Object.keys(newValues)) {
+      if (oldValues[key] !== newValues[key]) {
+        const oldResolved = await this.resolveFieldValue(key, oldValues[key])
+        const newResolved = await this.resolveFieldValue(key, newValues[key])
+        
+        changes[key] = {
+          field: this.getFieldDisplayName(key),
+          old: oldResolved,
+          new: newResolved
+        }
+      }
+    }
+
+    return changes
+  }
+
+  /**
+   * Resuelve un valor de campo según su nombre
+   */
+  private static async resolveFieldValue(fieldName: string, value: any): Promise<string> {
+    if (value === null || value === undefined) return 'vacío'
+    if (typeof value !== 'string') return String(value)
+    
+    // Si no parece un UUID, retornar como está
+    if (!value.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      // Traducir valores especiales
+      if (fieldName.toLowerCase().includes('role')) {
+        return this.getRoleDisplayName(value)
+      }
+      if (fieldName.toLowerCase().includes('status')) {
+        return this.getStatusDisplayName(value)
+      }
+      if (fieldName.toLowerCase().includes('priority')) {
+        return this.getPriorityDisplayName(value)
+      }
+      if (typeof value === 'boolean') {
+        return value ? 'Activo' : 'Inactivo'
+      }
+      return value
+    }
+    
+    // Resolver UUID según el tipo de campo
+    const fieldLower = fieldName.toLowerCase()
+    
+    if (fieldLower.includes('user') || fieldLower.includes('createdby') || fieldLower.includes('assignee')) {
+      return await this.resolveUserId(value)
+    }
+    if (fieldLower.includes('department')) {
+      return await this.resolveDepartmentId(value)
+    }
+    if (fieldLower.includes('category')) {
+      return await this.resolveCategoryId(value)
+    }
+    if (fieldLower.includes('ticket')) {
+      return await this.resolveTicketId(value)
+    }
+    
+    return value
+  }
+
+  /**
+   * Resuelve un ID de usuario a nombre legible
+   */
+  private static async resolveUserId(userId: string): Promise<string> {
+    try {
+      const user = await prisma.users.findUnique({
+        where: { id: userId },
+        select: { name: true, email: true }
+      })
+      return user ? `${user.name} (${user.email})` : userId
+    } catch {
+      return userId
+    }
+  }
+
+  /**
+   * Resuelve un ID de ticket a título legible
+   */
+  private static async resolveTicketId(ticketId: string): Promise<string> {
+    try {
+      const ticket = await prisma.tickets.findUnique({
+        where: { id: ticketId },
+        select: { title: true }
+      })
+      return ticket ? ticket.title : ticketId
+    } catch {
+      return ticketId
+    }
+  }
+
+  /**
+   * Resuelve un ID de categoría a nombre legible
+   */
+  private static async resolveCategoryId(categoryId: string): Promise<string> {
+    try {
+      const category = await prisma.categories.findUnique({
+        where: { id: categoryId },
+        select: { name: true }
+      })
+      return category ? category.name : categoryId
+    } catch {
+      return categoryId
+    }
+  }
+
+  /**
+   * Resuelve un ID de departamento a nombre legible
+   */
+  private static async resolveDepartmentId(departmentId: string): Promise<string> {
+    try {
+      const department = await prisma.departments.findUnique({
+        where: { id: departmentId },
+        select: { name: true }
+      })
+      return department ? department.name : departmentId
+    } catch {
+      return departmentId
+    }
+  }
+
+  /**
+   * Traduce nombres de campos técnicos a nombres amigables
+   */
+  private static getFieldDisplayName(fieldName: string): string {
+    const fieldNames: Record<string, string> = {
+      'name': 'Nombre',
+      'email': 'Correo Electrónico',
+      'role': 'Rol',
+      'departmentId': 'Departamento',
+      'phone': 'Teléfono',
+      'isActive': 'Estado',
+      'avatar': 'Avatar',
+      'password': 'Contraseña',
+      'createdById': 'Creado por',
+      'assigneeId': 'Asignado a',
+      'ticketId': 'Ticket',
+      'title': 'Título',
+      'description': 'Descripción',
+      'status': 'Estado',
+      'priority': 'Prioridad',
+      'categoryId': 'Categoría',
+      'ticketNumber': 'Número de Ticket',
+      'color': 'Color',
+      'parentId': 'Categoría Padre',
+      'level': 'Nivel',
+      'order': 'Orden',
+      'createdAt': 'Fecha de Creación',
+      'updatedAt': 'Última Actualización',
+      'isEmailVerified': 'Email Verificado',
+      'lastLogin': 'Último Acceso'
+    }
+    return fieldNames[fieldName] || fieldName
+  }
+
+  /**
+   * Traduce valores de roles a nombres amigables
+   */
+  private static getRoleDisplayName(role: string): string {
+    const roleNames: Record<string, string> = {
+      'ADMIN': 'Administrador',
+      'TECHNICIAN': 'Técnico',
+      'CLIENT': 'Cliente'
+    }
+    return roleNames[role] || role
+  }
+
+  /**
+   * Traduce valores de estado a nombres amigables
+   */
+  private static getStatusDisplayName(status: string): string {
+    const statusNames: Record<string, string> = {
+      'OPEN': 'Abierto',
+      'IN_PROGRESS': 'En Progreso',
+      'PENDING': 'Pendiente',
+      'RESOLVED': 'Resuelto',
+      'CLOSED': 'Cerrado',
+      'CANCELLED': 'Cancelado'
+    }
+    return statusNames[status] || status
+  }
+
+  /**
+   * Traduce valores de prioridad a nombres amigables
+   */
+  private static getPriorityDisplayName(priority: string): string {
+    const priorityNames: Record<string, string> = {
+      'LOW': 'Baja',
+      'MEDIUM': 'Media',
+      'HIGH': 'Alta',
+      'URGENT': 'Urgente'
+    }
+    return priorityNames[priority] || priority
   }
 
   /**
