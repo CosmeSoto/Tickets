@@ -69,7 +69,7 @@ export const filterTechnicians = (
     }
 
     // Filtro de departamento
-    if (filters.department !== 'all') {
+    if (filters.department && filters.department !== 'all') {
       if (filters.department === 'unassigned') {
         if (tech.departmentId) return false
       } else {
@@ -78,8 +78,8 @@ export const filterTechnicians = (
     }
 
     // Filtro de estado
-    if (filters.status !== 'all') {
-      const isActive = filters.status === 'active'
+    if (filters.status && filters.status !== 'all') {
+      const isActive = filters.status === 'true'
       if (tech.isActive !== isActive) return false
     }
 

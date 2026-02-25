@@ -2,11 +2,9 @@
 
 import { 
   Bell, 
-  BellOff, 
   RefreshCw, 
   Trash2, 
   CheckCheck,
-  Settings,
   AlertCircle
 } from 'lucide-react'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
@@ -26,24 +24,13 @@ import {
 import { useNotifications } from '@/hooks/use-notifications'
 import { NotificationFilters } from './notification-filters'
 import { NotificationList } from './notification-list'
-import { NotificationSettingsDialog } from './notification-settings-dialog'
-import { SmartPagination } from '../categories/smart-pagination'
 import { useState } from 'react'
 
 export default function NotificationsPage() {
   const {
     // Estados principales
     notifications,
-    preferences,
-    
-    // Estados de conexión
-    connected,
-    connecting,
-    connectionError,
-    
-    // Estados de carga
     loading,
-    loadingPreferences,
     error,
     
     // Estados de filtros
@@ -54,38 +41,20 @@ export default function NotificationsPage() {
     searchTerm,
     setSearchTerm,
     
-    // Estados de UI
-    showPreferences,
-    setShowPreferences,
-    
     // Datos procesados
     filteredNotifications,
     stats,
-    pagination,
     
     // Funciones principales
-    loadNotifications,
-    savePreferences,
     markAsRead,
     markAllAsRead,
     deleteNotification,
     clearAllNotifications,
     
-    // Funciones de conexión
-    connect,
-    disconnect,
-    
     // Funciones de utilidad
     refresh,
     isAuthenticated,
-  } = useNotifications({
-    cacheTTL: 5 * 60 * 1000, // 5 minutos
-    enableCache: true,
-    autoConnect: true,
-    enablePagination: true,
-    pageSize: 20,
-    enableSound: true,
-  })
+  } = useNotifications()
 
   const [showClearAllDialog, setShowClearAllDialog] = useState(false)
 
@@ -174,24 +143,12 @@ export default function NotificationsPage() {
         </Button>
       )}
       
-      <Button 
-        variant='outline' 
-        onClick={() => setShowPreferences(true)}
-        disabled={loadingPreferences}
-      >
-        <Settings className='h-4 w-4 mr-2' />
-        Preferencias
-      </Button>
-      
       <Button variant='outline' onClick={() => refresh()} disabled={loading}>
         <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
         Actualizar
       </Button>
     </div>
   )
-
-  // Obtener datos paginados
-  const paginatedNotifications = pagination ? pagination.currentItems : filteredNotifications
 
   return (
     <RoleDashboardLayout
@@ -200,41 +157,6 @@ export default function NotificationsPage() {
       headerActions={headerActions}
     >
       <div className='space-y-6'>
-        {/* Estado de conexión (solo si hay problemas) */}
-        {connectionError && (
-          <Card className="border-red-200 bg-red-50">
-            <CardContent className="pt-6">
-              <div className="flex items-center space-x-3">
-                <BellOff className="h-5 w-5 text-red-600" />
-                <div>
-                  <h4 className="font-medium text-red-900">
-                    Problema de conexión
-                  </h4>
-                  <p className="text-sm text-red-700">
-                    {connectionError}. Las notificaciones en tiempo real no están disponibles.
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={connect}
-                  disabled={connecting}
-                  className="ml-auto"
-                >
-                  {connecting ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
-                      Conectando...
-                    </>
-                  ) : (
-                    'Reconectar'
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Filtros */}
         <NotificationFilters
           filterType={filterType}
@@ -243,11 +165,8 @@ export default function NotificationsPage() {
           setFilterRead={setFilterRead}
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
-          onShowPreferences={() => setShowPreferences(true)}
           hasActiveFilters={stats.hasActiveFilters}
           stats={stats}
-          connected={connected}
-          connecting={connecting}
         />
 
         {/* Lista de notificaciones */}
@@ -263,18 +182,11 @@ export default function NotificationsPage() {
                   )}
                 </span>
               </div>
-              <div className="flex items-center space-x-2">
-                {pagination && (
-                  <Badge variant='secondary'>
-                    Página {pagination.currentPage} de {pagination.totalPages}
-                  </Badge>
-                )}
-              </div>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <NotificationList
-              notifications={paginatedNotifications}
+              notifications={filteredNotifications}
               onMarkAsRead={markAsRead}
               onDelete={deleteNotification}
               searchTerm={searchTerm}
@@ -282,28 +194,7 @@ export default function NotificationsPage() {
             />
           </CardContent>
         </Card>
-
-        {/* Paginación */}
-        {pagination && pagination.totalPages > 1 && (
-          <SmartPagination
-            pagination={pagination}
-            showPageSizeSelector={true}
-            showInfo={true}
-            showFirstLast={true}
-            maxVisiblePages={7}
-            pageSizeOptions={[10, 20, 50, 100]}
-          />
-        )}
       </div>
-
-      {/* Dialog de preferencias */}
-      <NotificationSettingsDialog
-        open={showPreferences}
-        onOpenChange={setShowPreferences}
-        preferences={preferences}
-        onSave={savePreferences}
-        loading={loadingPreferences}
-      />
 
       {/* Dialog de confirmación para limpiar todas */}
       <AlertDialog open={showClearAllDialog} onOpenChange={setShowClearAllDialog}>

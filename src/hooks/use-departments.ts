@@ -348,6 +348,19 @@ export function useDepartments(options: UseDepartmentsOptions = {}) {
     endIndex: pagination.endIndex,
   }), [departments, filteredDepartments, pagination])
 
+  // Manejar cierre de diálogo (DEBE estar ANTES de handleSubmit)
+  const handleCloseDialog = useCallback(() => {
+    setShowDialog(false)
+    setEditingDepartment(null)
+    setFormData({
+      name: '',
+      description: '',
+      color: '#3B82F6',
+      isActive: true,
+      order: 0,
+    })
+  }, [])
+
   // Manejar envío del formulario
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
@@ -490,19 +503,6 @@ export function useDepartments(options: UseDepartmentsOptions = {}) {
     }
     setShowDialog(true)
   }, [departments.length])
-
-  // Manejar cierre de diálogo
-  const handleCloseDialog = useCallback(() => {
-    setShowDialog(false)
-    setEditingDepartment(null)
-    setFormData({
-      name: '',
-      description: '',
-      color: '#3B82F6',
-      isActive: true,
-      order: 0,
-    })
-  }, [])
 
   // Manejar apertura de diálogo de eliminación
   const handleOpenDeleteDialog = useCallback((department: DepartmentData) => {

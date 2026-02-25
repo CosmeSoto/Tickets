@@ -61,6 +61,18 @@ export interface TicketReport {
     slaStatus: 'COMPLIANT' | 'BREACHED' | 'AT_RISK' | 'NO_SLA'
     slaTimeRemaining: string | null
     slaResponseTime: string | null
+    // Métricas SLA detalladas de la base de datos
+    slaMetrics?: {
+      policyName: string | null
+      responseDeadline: string | null
+      resolutionDeadline: string | null
+      responseSLAMet: boolean | null
+      resolutionSLAMet: boolean | null
+      responseTimeMinutes: number | null
+      resolutionTimeMinutes: number | null
+      hasViolations: boolean
+      violationsCount: number
+    }
     estimatedTime: number | null
     actualTime: number | null
     source: string
@@ -180,7 +192,7 @@ export class ReportService {
       ticketsByStatus,
       dailyTickets,
       avgResolutionTime,
-      detailedTickets,
+      detailedTicketsResult,
       slaMetrics,
     ] = await Promise.all([
       prisma.tickets.count({ where }),
@@ -197,15 +209,6 @@ export class ReportService {
       this.calculateSLAMetrics(where),
     ])
 
-    // Calcular métricas básicas
-    const metadata = {
-      totalRecords: totalTickets,
-      returnedRecords: detailedTickets.length,
-      hasMoreRecords: totalTickets > limit,
-      limitApplied: limit,
-      wasLimited: detailedTickets.length >= limit
-    }
-
     const result: TicketReport = {
       totalTickets,
       openTickets,
@@ -217,17 +220,10 @@ export class ReportService {
       ticketsByCategory,
       ticketsByStatus,
       dailyTickets,
-      detailedTickets,
+      detailedTickets: detailedTicketsResult.tickets,
       slaMetrics,
       // Metadatos de paginación y límites
-      metadata: {
-        totalRecords: totalTickets,
-        returnedRecords: detailedTickets.length,
-        limitApplied: limit,
-        wasLimited: detailedTickets.length >= limit,
-        hasMoreRecords: totalTickets > limit,
-        filtersApplied: Object.keys(filters).length > 0
-      }
+      metadata: detailedTicketsResult.metadata
     }
 
     return result
@@ -392,6 +388,118 @@ export class ReportService {
     }
 
     return reports.sort((a, b) => b.totalTickets - a.totalTickets)
+  }
+
+  /**
+   * Genera reporte de departamentos con análisis completo
+   */
+  static async generateDepartmentReport(filters: ReportFilters = {}, options: { limit?: number } = {}): Promise<any[]> {
+    console.log('🏢 ReportService - Generando reporte de departamentos con filtros:', filters)
+    
+    const { limit = 100 } = options
+    
+    const departments = await prisma.departments.findMany({
+      where: { 
+        isActive: true
+      },
+      include: {
+        categories: {
+          where: { isActive: true }
+        },
+        users: {
+          where: { 
+            role: 'TECHNICIAN',
+            isActive: true
+          }
+        }
+      },
+      take: limit
+    })
+
+    console.log(`🏢 ReportService - Procesando ${departments.length} departamentos`)
+
+    const reports = []
+
+    for (const dept of departments) {
+      // Construir where clause para tickets del departamento
+      const baseWhere = {
+        ...this.buildWhereClause(filters),
+        categories: {
+          departmentId: dept.id
+        }
+      }
+
+      const [
+        totalTickets,
+        openTickets,
+        inProgressTickets,
+        resolvedTickets,
+        closedTickets,
+        avgResolutionTime,
+        slaMetrics
+      ] = await Promise.all([
+        prisma.tickets.count({ where: baseWhere }),
+        prisma.tickets.count({ where: { ...baseWhere, status: 'OPEN' } }),
+        prisma.tickets.count({ where: { ...baseWhere, status: 'IN_PROGRESS' } }),
+        prisma.tickets.count({ where: { ...baseWhere, status: 'RESOLVED' } }),
+        prisma.tickets.count({ where: { ...baseWhere, status: 'CLOSED' } }),
+        this.calculateAverageResolutionTime(baseWhere),
+        this.calculateDepartmentSLA(dept.id, filters)
+      ])
+
+      const resolutionRate = totalTickets > 0 ? (resolvedTickets / totalTickets) * 100 : 0
+
+      reports.push({
+        id: dept.id,
+        name: dept.name,
+        description: dept.description,
+        color: dept.color,
+        totalTickets,
+        openTickets,
+        inProgressTickets,
+        resolvedTickets,
+        closedTickets,
+        avgResolutionTime,
+        resolutionRate,
+        slaCompliance: slaMetrics.complianceRate,
+        activeCategories: dept.categories.length,
+        activeTechnicians: dept.users.length
+      })
+    }
+
+    return reports.sort((a, b) => b.totalTickets - a.totalTickets)
+  }
+
+  /**
+   * Calcula métricas SLA para un departamento
+   */
+  private static async calculateDepartmentSLA(departmentId: string, filters: ReportFilters) {
+    const baseWhere = {
+      ...this.buildWhereClause(filters),
+      categories: {
+        departmentId
+      }
+    }
+
+    const ticketsWithSLA = await prisma.tickets.findMany({
+      where: baseWhere,
+      include: {
+        ticket_sla_metrics: true
+      }
+    })
+
+    const totalWithSLA = ticketsWithSLA.filter(t => t.ticket_sla_metrics).length
+    const slaCompliant = ticketsWithSLA.filter(t => 
+      t.ticket_sla_metrics && 
+      t.ticket_sla_metrics.responseSLAMet !== false && 
+      t.ticket_sla_metrics.resolutionSLAMet !== false
+    ).length
+
+    return {
+      totalWithSLA,
+      slaCompliant,
+      complianceRate: totalWithSLA > 0 ? (slaCompliant / totalWithSLA) * 100 : 0
+    }
   }
 
   /**
@@ -590,17 +698,15 @@ export class ReportService {
   }
 
   /**
-   * Calcula métricas completas de SLA
+   * Calcula métricas completas de SLA usando datos reales de la base de datos
+   * Usa ticket_sla_metrics, sla_policies y sla_violations
    */
   private static async calculateSLAMetrics(where: any) {
     const now = new Date()
     
-    // Obtener todos los tickets con SLA
+    // Obtener todos los tickets con métricas SLA reales
     const ticketsWithSLA = await prisma.tickets.findMany({
-      where: {
-        ...where,
-        slaDeadline: { not: null }
-      },
+      where,
       select: {
         id: true,
         priority: true,
@@ -609,10 +715,44 @@ export class ReportService {
         resolvedAt: true,
         firstResponseAt: true,
         slaDeadline: true,
+        ticket_sla_metrics: {
+          select: {
+            responseDeadline: true,
+            resolutionDeadline: true,
+            firstResponseAt: true,
+            resolvedAt: true,
+            responseSLAMet: true,
+            resolutionSLAMet: true,
+            responseTimeMinutes: true,
+            resolutionTimeMinutes: true,
+            sla_policy: {
+              select: {
+                name: true,
+                responseTimeHours: true,
+                resolutionTimeHours: true,
+                priority: true
+              }
+            }
+          }
+        },
+        sla_violations: {
+          select: {
+            violationType: true,
+            severity: true,
+            isResolved: true,
+            expectedAt: true,
+            actualAt: true
+          }
+        }
       }
     })
 
-    const totalWithSLA = ticketsWithSLA.length
+    // Filtrar solo tickets que tienen métricas SLA o slaDeadline
+    const ticketsWithSLAData = ticketsWithSLA.filter(
+      t => t.ticket_sla_metrics || t.slaDeadline
+    )
+
+    const totalWithSLA = ticketsWithSLAData.length
     let slaCompliant = 0
     let slaBreached = 0
     let criticalSlaBreaches = 0
@@ -627,47 +767,86 @@ export class ReportService {
       URGENT: { total: 0, compliant: 0, breached: 0, complianceRate: 0 }
     }
 
-    ticketsWithSLA.forEach(ticket => {
-      const slaDeadline = new Date(ticket.slaDeadline!)
+    ticketsWithSLAData.forEach(ticket => {
       const priority = ticket.priority as keyof typeof slaByPriority
-      
       slaByPriority[priority].total++
 
-      // Verificar cumplimiento de SLA
-      if (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') {
-        const resolvedAt = new Date(ticket.resolvedAt!)
-        if (resolvedAt <= slaDeadline) {
-          slaCompliant++
-          slaByPriority[priority].compliant++
-        } else {
-          slaBreached++
-          slaByPriority[priority].breached++
-          if (priority === 'URGENT' || priority === 'HIGH') {
-            criticalSlaBreaches++
+      // Usar métricas reales si existen
+      if (ticket.ticket_sla_metrics) {
+        const metrics = ticket.ticket_sla_metrics
+        
+        // Verificar cumplimiento de SLA de resolución
+        if (metrics.resolutionSLAMet !== null) {
+          if (metrics.resolutionSLAMet) {
+            slaCompliant++
+            slaByPriority[priority].compliant++
+          } else {
+            slaBreached++
+            slaByPriority[priority].breached++
+            if (priority === 'URGENT' || priority === 'HIGH') {
+              criticalSlaBreaches++
+            }
+          }
+        } else if (metrics.resolutionDeadline) {
+          // Ticket aún abierto - verificar deadline
+          const deadline = new Date(metrics.resolutionDeadline)
+          if (now > deadline) {
+            slaBreached++
+            slaByPriority[priority].breached++
+            if (priority === 'URGENT' || priority === 'HIGH') {
+              criticalSlaBreaches++
+            }
+          } else {
+            // Verificar si está próximo al vencimiento (próximas 4 horas)
+            const timeToDeadline = deadline.getTime() - now.getTime()
+            if (timeToDeadline <= 4 * 60 * 60 * 1000) {
+              upcomingSlaDeadlines++
+            }
           }
         }
-      } else {
-        // Ticket aún abierto
-        if (now > slaDeadline) {
-          slaBreached++
-          slaByPriority[priority].breached++
-          if (priority === 'URGENT' || priority === 'HIGH') {
-            criticalSlaBreaches++
-          }
-        } else {
-          // Verificar si está próximo al vencimiento (próximas 4 horas)
-          const timeToDeadline = slaDeadline.getTime() - now.getTime()
-          if (timeToDeadline <= 4 * 60 * 60 * 1000) { // 4 horas
-            upcomingSlaDeadlines++
-          }
-        }
-      }
 
-      // Calcular tiempo de primera respuesta para SLA
-      if (ticket.firstResponseAt) {
-        const responseTime = new Date(ticket.firstResponseAt).getTime() - new Date(ticket.createdAt).getTime()
-        totalResponseTime += responseTime / (1000 * 60) // en minutos
-        responseTimeCount++
+        // Usar tiempo de respuesta real de las métricas
+        if (metrics.responseTimeMinutes) {
+          totalResponseTime += metrics.responseTimeMinutes
+          responseTimeCount++
+        }
+      } else if (ticket.slaDeadline) {
+        // Fallback al método anterior si no hay métricas
+        const slaDeadline = new Date(ticket.slaDeadline)
+        
+        if (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') {
+          const resolvedAt = new Date(ticket.resolvedAt!)
+          if (resolvedAt <= slaDeadline) {
+            slaCompliant++
+            slaByPriority[priority].compliant++
+          } else {
+            slaBreached++
+            slaByPriority[priority].breached++
+            if (priority === 'URGENT' || priority === 'HIGH') {
+              criticalSlaBreaches++
+            }
+          }
+        } else {
+          if (now > slaDeadline) {
+            slaBreached++
+            slaByPriority[priority].breached++
+            if (priority === 'URGENT' || priority === 'HIGH') {
+              criticalSlaBreaches++
+            }
+          } else {
+            const timeToDeadline = slaDeadline.getTime() - now.getTime()
+            if (timeToDeadline <= 4 * 60 * 60 * 1000) {
+              upcomingSlaDeadlines++
+            }
+          }
+        }
+
+        // Calcular tiempo de respuesta
+        if (ticket.firstResponseAt) {
+          const responseTime = new Date(ticket.firstResponseAt).getTime() - new Date(ticket.createdAt).getTime()
+          totalResponseTime += responseTime / (1000 * 60)
+          responseTimeCount++
+        }
       }
     })
 
@@ -689,7 +868,7 @@ export class ReportService {
       totalWithSLA,
       slaCompliant,
       slaBreached,
-      slaComplianceRate: Math.round(slaComplianceRate * 10) / 10, // Redondear a 1 decimal
+      slaComplianceRate: Math.round(slaComplianceRate * 10) / 10,
       avgSlaResponseTime,
       criticalSlaBreaches,
       upcomingSlaDeadlines,
@@ -768,43 +947,77 @@ export class ReportService {
 
 
   /**
-   * Calcula el estado SLA de un ticket
+   * Calcula el estado SLA de un ticket usando métricas reales
    */
   private static calculateSLAStatus(ticket: any): 'COMPLIANT' | 'BREACHED' | 'AT_RISK' | 'NO_SLA' {
+    // Priorizar métricas reales de ticket_sla_metrics
+    if (ticket.ticket_sla_metrics) {
+      const metrics = ticket.ticket_sla_metrics
+      
+      // Si ya se resolvió, usar el resultado real
+      if (metrics.resolutionSLAMet !== null) {
+        return metrics.resolutionSLAMet ? 'COMPLIANT' : 'BREACHED'
+      }
+      
+      // Si está abierto, verificar deadline de resolución
+      if (metrics.resolutionDeadline) {
+        const now = new Date()
+        const deadline = new Date(metrics.resolutionDeadline)
+        
+        if (now > deadline) {
+          return 'BREACHED'
+        } else {
+          const timeToDeadline = deadline.getTime() - now.getTime()
+          const hoursToDeadline = timeToDeadline / (1000 * 60 * 60)
+          
+          // AT_RISK si queda menos de 4 horas
+          return hoursToDeadline <= 4 ? 'AT_RISK' : 'COMPLIANT'
+        }
+      }
+    }
+    
+    // Fallback al método anterior con slaDeadline
     if (!ticket.slaDeadline) return 'NO_SLA'
     
     const now = new Date()
     const slaDeadline = new Date(ticket.slaDeadline)
     
     if (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') {
-      // Ticket cerrado - verificar si cumplió SLA
       const resolvedAt = new Date(ticket.resolvedAt!)
       return resolvedAt <= slaDeadline ? 'COMPLIANT' : 'BREACHED'
     } else {
-      // Ticket abierto - verificar estado actual
       if (now > slaDeadline) {
         return 'BREACHED'
       } else {
         const timeToDeadline = slaDeadline.getTime() - now.getTime()
         const hoursToDeadline = timeToDeadline / (1000 * 60 * 60)
-        
-        // Considerar "AT_RISK" si queda menos del 25% del tiempo SLA o menos de 4 horas
         return hoursToDeadline <= 4 ? 'AT_RISK' : 'COMPLIANT'
       }
     }
   }
 
   /**
-   * Calcula el tiempo restante para SLA
+   * Calcula el tiempo restante para SLA usando métricas reales
    */
   private static calculateSLATimeRemaining(ticket: any): string | null {
-    if (!ticket.slaDeadline || ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') {
+    // Si el ticket está cerrado, no hay tiempo restante
+    if (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') {
       return null
     }
     
     const now = new Date()
-    const slaDeadline = new Date(ticket.slaDeadline)
-    const timeRemaining = slaDeadline.getTime() - now.getTime()
+    let deadline: Date | null = null
+    
+    // Priorizar deadline de métricas reales
+    if (ticket.ticket_sla_metrics?.resolutionDeadline) {
+      deadline = new Date(ticket.ticket_sla_metrics.resolutionDeadline)
+    } else if (ticket.slaDeadline) {
+      deadline = new Date(ticket.slaDeadline)
+    }
+    
+    if (!deadline) return null
+    
+    const timeRemaining = deadline.getTime() - now.getTime()
     
     if (timeRemaining <= 0) {
       const overdue = Math.abs(timeRemaining)
@@ -842,18 +1055,38 @@ export class ReportService {
     const where = {
       ...this.buildWhereClause(filters),
       assigneeId: technicianId,
-      slaDeadline: { not: null }
     }
 
+    // Obtener tickets con métricas SLA reales
     const tickets = await prisma.tickets.findMany({
       where,
       select: {
         id: true,
         status: true,
+        priority: true,
         createdAt: true,
         resolvedAt: true,
         firstResponseAt: true,
         slaDeadline: true,
+        ticket_sla_metrics: {
+          select: {
+            responseDeadline: true,
+            resolutionDeadline: true,
+            responseSLAMet: true,
+            resolutionSLAMet: true,
+            responseTimeMinutes: true,
+            resolutionTimeMinutes: true
+          }
+        },
+        sla_violations: {
+          where: {
+            isResolved: false
+          },
+          select: {
+            severity: true,
+            violationType: true
+          }
+        }
       }
     })
 
@@ -866,42 +1099,85 @@ export class ReportService {
     let responseTimeCount = 0
 
     tickets.forEach(ticket => {
-      const slaDeadline = new Date(ticket.slaDeadline!)
+      // Usar métricas reales si existen
+      if (ticket.ticket_sla_metrics) {
+        const metrics = ticket.ticket_sla_metrics
 
-      if (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') {
-        const resolvedAt = new Date(ticket.resolvedAt!)
-        if (resolvedAt <= slaDeadline) {
-          slaCompliant++
-        } else {
-          slaBreached++
-          const hoursOverdue = (resolvedAt.getTime() - slaDeadline.getTime()) / (1000 * 60 * 60)
-          if (hoursOverdue > 24) {
-            criticalSlaBreaches++
+        // Verificar cumplimiento de SLA de resolución
+        if (metrics.resolutionSLAMet !== null) {
+          if (metrics.resolutionSLAMet) {
+            slaCompliant++
+          } else {
+            slaBreached++
+            // Contar violaciones críticas
+            const criticalViolations = ticket.sla_violations.filter(
+              v => v.severity === 'HIGH' || v.severity === 'CRITICAL'
+            )
+            if (criticalViolations.length > 0) {
+              criticalSlaBreaches++
+            }
+          }
+        } else if (metrics.resolutionDeadline) {
+          // Ticket aún abierto
+          const deadline = new Date(metrics.resolutionDeadline)
+          if (now > deadline) {
+            slaBreached++
+            const hoursOverdue = (now.getTime() - deadline.getTime()) / (1000 * 60 * 60)
+            if (hoursOverdue > 24 || ticket.priority === 'URGENT') {
+              criticalSlaBreaches++
+            }
+          } else {
+            const hoursRemaining = (deadline.getTime() - now.getTime()) / (1000 * 60 * 60)
+            if (hoursRemaining <= 4 && hoursRemaining > 0) {
+              upcomingSlaDeadlines++
+            }
           }
         }
-      } else {
-        if (now > slaDeadline) {
-          slaBreached++
-          const hoursOverdue = (now.getTime() - slaDeadline.getTime()) / (1000 * 60 * 60)
-          if (hoursOverdue > 24) {
-            criticalSlaBreaches++
+
+        // Usar tiempo de respuesta real
+        if (metrics.responseTimeMinutes) {
+          totalResponseTime += metrics.responseTimeMinutes * 60 * 1000 // convertir a ms
+          responseTimeCount++
+        }
+      } else if (ticket.slaDeadline) {
+        // Fallback al método anterior
+        const slaDeadline = new Date(ticket.slaDeadline)
+
+        if (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') {
+          const resolvedAt = new Date(ticket.resolvedAt!)
+          if (resolvedAt <= slaDeadline) {
+            slaCompliant++
+          } else {
+            slaBreached++
+            const hoursOverdue = (resolvedAt.getTime() - slaDeadline.getTime()) / (1000 * 60 * 60)
+            if (hoursOverdue > 24) {
+              criticalSlaBreaches++
+            }
           }
         } else {
-          const hoursRemaining = (slaDeadline.getTime() - now.getTime()) / (1000 * 60 * 60)
-          if (hoursRemaining <= 4 && hoursRemaining > 0) {
-            upcomingSlaDeadlines++
+          if (now > slaDeadline) {
+            slaBreached++
+            const hoursOverdue = (now.getTime() - slaDeadline.getTime()) / (1000 * 60 * 60)
+            if (hoursOverdue > 24) {
+              criticalSlaBreaches++
+            }
+          } else {
+            const hoursRemaining = (slaDeadline.getTime() - now.getTime()) / (1000 * 60 * 60)
+            if (hoursRemaining <= 4 && hoursRemaining > 0) {
+              upcomingSlaDeadlines++
+            }
           }
         }
-      }
 
-      if (ticket.firstResponseAt) {
-        const responseTime = new Date(ticket.firstResponseAt).getTime() - new Date(ticket.createdAt).getTime()
-        totalResponseTime += responseTime
-        responseTimeCount++
+        if (ticket.firstResponseAt) {
+          const responseTime = new Date(ticket.firstResponseAt).getTime() - new Date(ticket.createdAt).getTime()
+          totalResponseTime += responseTime
+          responseTimeCount++
+        }
       }
     })
 
-    const totalWithSLA = tickets.length
+    const totalWithSLA = tickets.filter(t => t.ticket_sla_metrics || t.slaDeadline).length
     const slaComplianceRate = totalWithSLA > 0 ? (slaCompliant / totalWithSLA) * 100 : 0
     const avgSlaResponseTime = responseTimeCount > 0 
       ? this.formatDuration(totalResponseTime / responseTimeCount)
@@ -923,7 +1199,8 @@ export class ReportService {
     const totalCount = await prisma.tickets.count({ where })
     
     // Si hay demasiados registros, aplicar límite y advertir
-    if (totalCount > limit) {
+    const wasLimited = totalCount > limit
+    if (wasLimited) {
       console.warn(`⚠️ ReportService - Limitando resultados: ${totalCount} tickets encontrados, mostrando solo ${limit}`)
     }
     
@@ -963,6 +1240,35 @@ export class ReportService {
             feedback: true,
           },
         },
+        ticket_sla_metrics: {
+          select: {
+            responseDeadline: true,
+            resolutionDeadline: true,
+            firstResponseAt: true,
+            resolvedAt: true,
+            responseSLAMet: true,
+            resolutionSLAMet: true,
+            responseTimeMinutes: true,
+            resolutionTimeMinutes: true,
+            sla_policy: {
+              select: {
+                name: true,
+                responseTimeHours: true,
+                resolutionTimeHours: true
+              }
+            }
+          }
+        },
+        sla_violations: {
+          where: {
+            isResolved: false
+          },
+          select: {
+            violationType: true,
+            severity: true,
+            expectedAt: true
+          }
+        },
         _count: {
           select: {
             comments: true,
@@ -976,7 +1282,7 @@ export class ReportService {
       take: limit, // Límite configurable
     })
 
-    return tickets.map(ticket => {
+    const detailedTickets = tickets.map(ticket => {
       let resolutionTime: string | null = null
       if (ticket.resolvedAt) {
         const diff = new Date(ticket.resolvedAt).getTime() - new Date(ticket.createdAt).getTime()
@@ -992,6 +1298,22 @@ export class ReportService {
           resolutionTime = `${minutes}min`
         }
       }
+
+      // Obtener el rating (relación única)
+      const rating = ticket.ticket_ratings || null
+
+      // Construir métricas SLA detalladas si existen
+      const slaMetrics = ticket.ticket_sla_metrics ? {
+        policyName: ticket.ticket_sla_metrics.sla_policy?.name || null,
+        responseDeadline: ticket.ticket_sla_metrics.responseDeadline?.toISOString() || null,
+        resolutionDeadline: ticket.ticket_sla_metrics.resolutionDeadline?.toISOString() || null,
+        responseSLAMet: ticket.ticket_sla_metrics.responseSLAMet,
+        resolutionSLAMet: ticket.ticket_sla_metrics.resolutionSLAMet,
+        responseTimeMinutes: ticket.ticket_sla_metrics.responseTimeMinutes,
+        resolutionTimeMinutes: ticket.ticket_sla_metrics.resolutionTimeMinutes,
+        hasViolations: ticket.sla_violations.length > 0,
+        violationsCount: ticket.sla_violations.length
+      } : undefined
 
       return {
         id: ticket.id,
@@ -1010,6 +1332,7 @@ export class ReportService {
         slaResponseTime: ticket.firstResponseAt 
           ? this.formatDuration(new Date(ticket.firstResponseAt).getTime() - new Date(ticket.createdAt).getTime())
           : null,
+        slaMetrics, // Agregar métricas SLA detalladas
         estimatedTime: ticket.estimatedTime,
         actualTime: ticket.actualTime,
         source: ticket.source as string,
@@ -1022,13 +1345,25 @@ export class ReportService {
           color: ticket.categories.color || '#3B82F6'
         },
         department: ticket.categories.departments || null,
-        rating: ticket.ticket_ratings ? {
-          score: ticket.ticket_ratings.rating,
-          comment: ticket.ticket_ratings.feedback
+        rating: rating ? {
+          score: rating.rating,
+          comment: rating.feedback
         } : null,
         commentsCount: ticket._count.comments,
         attachmentsCount: ticket._count.attachments,
       }
     })
+
+    return {
+      tickets: detailedTickets,
+      metadata: {
+        totalRecords: totalCount,
+        returnedRecords: detailedTickets.length,
+        limitApplied: limit,
+        wasLimited,
+        hasMoreRecords: totalCount > limit,
+        filtersApplied: Object.keys(where).length > 0
+      }
+    }
   }
 }

@@ -139,16 +139,33 @@ export async function GET(request: NextRequest) {
       return user
     })
 
-    // Calcular si se puede eliminar (solo para técnicos)
+    // Calcular si se puede eliminar (solo para técnicos) y normalizar department
     const usersWithCanDelete = usersWithLevelNames.map(user => {
+      // Normalizar departments -> department para consistencia con el frontend
+      const normalizedUser: any = {
+        ...user,
+        department: user.departments // Cambiar departments a department
+      }
+      delete normalizedUser.departments // Eliminar departments
+      
       if (user.role === 'TECHNICIAN') {
         const canDelete = 
           (user._count.tickets_tickets_assigneeIdTousers === 0) && 
           (user._count.technician_assignments === 0)
-        return { ...user, canDelete }
+        return { ...normalizedUser, canDelete }
       }
-      return user
+      return normalizedUser
     })
+
+    console.log('📊 [API-USERS] Usuarios retornados:', usersWithCanDelete.length)
+    if (usersWithCanDelete.length > 0) {
+      console.log('📊 [API-USERS] Ejemplo de usuario:', {
+        id: usersWithCanDelete[0].id,
+        name: usersWithCanDelete[0].name,
+        departmentId: usersWithCanDelete[0].departmentId,
+        department: usersWithCanDelete[0].department
+      })
+    }
 
     return NextResponse.json({
       success: true,

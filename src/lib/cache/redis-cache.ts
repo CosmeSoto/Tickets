@@ -152,9 +152,10 @@ export class RedisCache {
   }> {
     try {
       const redis = this.getRedis()
-      const info = await redis.info()
+      // Note: Upstash Redis doesn't support info() command
+      // const info = await redis.info()
       
-      // Parsear info para obtener estadísticas
+      // Obtener número de claves
       const keys = await redis.dbsize()
       
       return {

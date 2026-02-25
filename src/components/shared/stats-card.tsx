@@ -1,10 +1,12 @@
 /**
  * Componente de tarjeta de estadísticas reutilizable
  * Usado en dashboards de todos los roles
+ * Optimizado con React.memo para prevenir re-renders innecesarios
  */
 
 'use client'
 
+import { memo } from 'react'
 import { LucideIcon, TrendingUp, TrendingDown, AlertTriangle, CheckCircle } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -97,7 +99,7 @@ const statusIndicators = {
   success: { icon: CheckCircle, color: 'text-green-500' },
 }
 
-export function StatsCard({
+export const StatsCard = memo(function StatsCard({
   title,
   value,
   description,
@@ -252,12 +254,12 @@ export function StatsCard({
       </CardContent>
     </Card>
   )
-}
+})
 
 /**
  * Componente de tarjeta de estadística para espacios pequeños
  */
-export function SmallStatsCard({
+export const SmallStatsCard = memo(function SmallStatsCard({
   title,
   value,
   icon: Icon,
@@ -289,13 +291,13 @@ export function SmallStatsCard({
       </CardContent>
     </Card>
   )
-}
+})
 
 /**
  * Componente de tarjeta de estadística simétrica
  * Diseño uniforme para todos los roles y módulos
  */
-export function SymmetricStatsCard({
+export const SymmetricStatsCard = memo(function SymmetricStatsCard({
   title,
   value,
   icon: Icon,
@@ -395,4 +397,4 @@ export function SymmetricStatsCard({
       </CardContent>
     </Card>
   )
-}
+})

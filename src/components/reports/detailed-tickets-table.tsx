@@ -22,11 +22,11 @@ import {
   User,
   MessageSquare,
   Paperclip,
-  ChevronLeft,
-  ChevronRight,
   Eye,
 } from 'lucide-react'
 import Link from 'next/link'
+import { useTablePagination } from '@/hooks/use-table-pagination'
+import { cn } from '@/lib/utils'
 
 interface DetailedTicket {
   id: string
@@ -83,8 +83,7 @@ const PRIORITY_CONFIG: Record<string, { label: string; color: string }> = {
 
 export function DetailedTicketsTable({ tickets, onExport }: DetailedTicketsTableProps) {
   const [searchTerm, setSearchTerm] = useState('')
-  const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage, setItemsPerPage] = useState(10)
+  const [pageSize, setPageSize] = useState(10)
 
   // Filtrar tickets solo por búsqueda (los filtros principales ya se aplicaron)
   const filteredTickets = tickets.filter(ticket => {
@@ -97,11 +96,8 @@ export function DetailedTicketsTable({ tickets, onExport }: DetailedTicketsTable
     return matchesSearch
   })
 
-  // Paginación
-  const totalPages = Math.ceil(filteredTickets.length / itemsPerPage)
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = startIndex + itemsPerPage
-  const paginatedTickets = filteredTickets.slice(startIndex, endIndex)
+  // Paginación profesional
+  const pagination = useTablePagination(filteredTickets, { pageSize })
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('es-ES', {
@@ -156,35 +152,18 @@ export function DetailedTicketsTable({ tickets, onExport }: DetailedTicketsTable
       </CardHeader>
       <CardContent>
         {/* Búsqueda */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          <div className="flex-1 relative">
+        <div className="mb-6">
+          <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Buscar por ID, título, cliente o técnico..."
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value)
-                setCurrentPage(1)
+                pagination.resetPage()
               }}
               className="pl-10"
             />
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Registros por página:</span>
-            <select
-              value={itemsPerPage}
-              onChange={(e) => {
-                setItemsPerPage(Number(e.target.value))
-                setCurrentPage(1)
-              }}
-              className="border rounded px-2 py-1 text-sm"
-            >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
           </div>
         </div>
 
@@ -234,14 +213,14 @@ export function DetailedTicketsTable({ tickets, onExport }: DetailedTicketsTable
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedTickets.length === 0 ? (
+                {pagination.paginatedData.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                       No se encontraron tickets con los filtros aplicados
                     </TableCell>
                   </TableRow>
                 ) : (
-                  paginatedTickets.map((ticket) => (
+                  pagination.paginatedData.map((ticket) => (
                     <TableRow key={ticket.id} className="hover:bg-muted">
                       <TableCell className="font-mono text-xs">
                         {ticket.id.substring(0, 8)}
@@ -333,34 +312,60 @@ export function DetailedTicketsTable({ tickets, onExport }: DetailedTicketsTable
         </div>
 
         {/* Paginación */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between mt-4">
-            <div className="text-sm text-muted-foreground">
-              Mostrando {startIndex + 1} a {Math.min(endIndex, filteredTickets.length)} de {filteredTickets.length} tickets
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-sm">
-                Página {currentPage} de {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
+        <div className="flex items-center justify-between mt-4">
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-muted-foreground">
+              Mostrando {pagination.startIndex} a {pagination.endIndex} de {pagination.totalItems} elementos
+            </span>
           </div>
-        )}
+          
+          <div className="flex items-center space-x-2">
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value))
+                pagination.resetPage()
+              }}
+              className="px-3 py-1 border border-border rounded text-sm bg-background"
+            >
+              {[10, 20, 50, 100].map(option => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+            
+            <button
+              onClick={pagination.previousPage}
+              disabled={!pagination.hasPreviousPage}
+              className={cn(
+                "px-3 py-1 border border-border rounded text-sm transition-colors",
+                !pagination.hasPreviousPage
+                  ? "bg-muted text-muted-foreground cursor-not-allowed"
+                  : "bg-background hover:bg-muted"
+              )}
+            >
+              Anterior
+            </button>
+            
+            <span className="text-sm">
+              Página {pagination.currentPage} de {pagination.totalPages}
+            </span>
+            
+            <button
+              onClick={pagination.nextPage}
+              disabled={!pagination.hasNextPage}
+              className={cn(
+                "px-3 py-1 border border-border rounded text-sm transition-colors",
+                !pagination.hasNextPage
+                  ? "bg-muted text-muted-foreground cursor-not-allowed"
+                  : "bg-background hover:bg-muted"
+              )}
+            >
+              Siguiente
+            </button>
+          </div>
+        </div>
       </CardContent>
     </Card>
   )

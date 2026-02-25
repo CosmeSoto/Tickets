@@ -5,6 +5,8 @@
 
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import { AuditContextEnricher, EnrichedContext } from './audit-context-enricher'
+import { NextRequest } from 'next/server'
 
 export interface AuditLogData {
   action: string
@@ -17,6 +19,13 @@ export interface AuditLogData {
   metadata?: Record<string, any>
   oldValues?: Record<string, any> // Para cambios
   newValues?: Record<string, any> // Para cambios
+  // NUEVO: Contexto enriquecido
+  request?: NextRequest
+  sessionId?: string
+  result?: 'SUCCESS' | 'ERROR' | 'PARTIAL'
+  errorCode?: string
+  errorMessage?: string
+  startTime?: number
 }
 
 export interface AuditLogFilter {
@@ -41,10 +50,25 @@ export interface AuditExportOptions {
 export class AuditServiceComplete {
   
   /**
-   * Registrar una acción de auditoría
+   * Registrar una acción de auditoría con contexto enriquecido
    */
   static async log(data: AuditLogData): Promise<void> {
     try {
+      // Enriquecer contexto automáticamente
+      const enrichedContext = data.request 
+        ? AuditContextEnricher.enrichContext(data.request, {
+            sessionId: data.sessionId,
+            startTime: data.startTime,
+            result: data.result,
+            errorCode: data.errorCode,
+            errorMessage: data.errorMessage
+          })
+        : AuditContextEnricher.createSystemContext({
+            result: data.result,
+            errorCode: data.errorCode,
+            errorMessage: data.errorMessage
+          })
+      
       await prisma.audit_logs.create({
         data: {
           id: randomUUID(),
@@ -52,12 +76,43 @@ export class AuditServiceComplete {
           entityType: data.entityType,
           entityId: data.entityId || '',
           userId: data.userId,
-          details: data.details ? JSON.stringify({
+          details: {
+            // Datos originales
             ...data.details,
             oldValues: data.oldValues,
             newValues: data.newValues,
-            metadata: data.metadata
-          }) : undefined,
+            metadata: data.metadata,
+            
+            // NUEVO: Contexto enriquecido
+            context: {
+              // Trazabilidad
+              sessionId: enrichedContext.sessionId,
+              requestId: enrichedContext.requestId,
+              correlationId: enrichedContext.correlationId,
+              
+              // Resultado
+              result: enrichedContext.result,
+              errorCode: enrichedContext.errorCode,
+              errorMessage: enrichedContext.errorMessage,
+              duration: enrichedContext.duration,
+              
+              // Contexto técnico
+              source: enrichedContext.source,
+              endpoint: enrichedContext.endpoint,
+              method: enrichedContext.method,
+              statusCode: enrichedContext.statusCode,
+              
+              // Dispositivo
+              deviceType: enrichedContext.deviceType,
+              browser: enrichedContext.browser,
+              browserVersion: enrichedContext.browserVersion,
+              os: enrichedContext.os,
+              osVersion: enrichedContext.osVersion,
+              
+              // Timestamp
+              timestamp: enrichedContext.timestamp
+            }
+          },
           ipAddress: data.ipAddress || null,
           userAgent: data.userAgent || null,
           createdAt: new Date()
@@ -73,65 +128,70 @@ export class AuditServiceComplete {
    * Obtener logs de auditoría con filtros avanzados
    */
   static async getLogs(filter: AuditLogFilter = {}) {
-    const {
-      userId,
-      entityType,
-      entityId,
-      action,
-      startDate,
-      endDate,
-      limit = 50,
-      offset = 0,
-      search
-    } = filter
+    try {
+      const {
+        userId,
+        entityType,
+        entityId,
+        action,
+        startDate,
+        endDate,
+        limit = 50,
+        offset = 0,
+        search
+      } = filter
 
-    const where: any = {}
+      const where: any = {}
 
-    if (userId) where.userId = userId
-    if (entityType) where.entityType = entityType
-    if (entityId) where.entityId = entityId
-    if (action) where.action = { contains: action, mode: 'insensitive' }
-    if (search) {
-      where.OR = [
-        { action: { contains: search, mode: 'insensitive' } },
-        { entityType: { contains: search, mode: 'insensitive' } },
-        { users: { name: { contains: search, mode: 'insensitive' } } },
-        { users: { email: { contains: search, mode: 'insensitive' } } }
-      ]
-    }
-    
-    if (startDate || endDate) {
-      where.createdAt = {}
-      if (startDate) where.createdAt.gte = startDate
-      if (endDate) where.createdAt.lte = endDate
-    }
+      if (userId) where.userId = userId
+      if (entityType) where.entityType = entityType
+      if (entityId) where.entityId = entityId
+      if (action) where.action = { contains: action, mode: 'insensitive' }
+      if (search) {
+        where.OR = [
+          { action: { contains: search, mode: 'insensitive' } },
+          { entityType: { contains: search, mode: 'insensitive' } },
+          { users: { name: { contains: search, mode: 'insensitive' } } },
+          { users: { email: { contains: search, mode: 'insensitive' } } }
+        ]
+      }
+      
+      if (startDate || endDate) {
+        where.createdAt = {}
+        if (startDate) where.createdAt.gte = startDate
+        if (endDate) where.createdAt.lte = endDate
+      }
 
-    const logs = await prisma.audit_logs.findMany({
-      where,
-      include: {
-        users: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true
+      const logs = await prisma.audit_logs.findMany({
+        where,
+        include: {
+          users: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true
+            }
           }
-        }
-      },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-      skip: offset
-    })
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: offset
+      })
 
-    const total = await prisma.audit_logs.count({ where })
+      const total = await prisma.audit_logs.count({ where })
 
-    return {
-      logs: logs.map(log => ({
-        ...log,
-        details: log.details ? JSON.parse(log.details as string) : null
-      })),
-      total,
-      hasMore: offset + limit < total
+      return {
+        logs: logs.map(log => ({
+          ...log,
+          details: log.details || null // Ya es un objeto JSON, no necesita parse
+        })),
+        total,
+        hasMore: offset + limit < total
+      }
+    } catch (error) {
+      console.error('[AUDIT SERVICE] Error in getLogs:', error)
+      throw error
     }
   }
 
@@ -290,7 +350,7 @@ export class AuditServiceComplete {
     const failedLogins = await prisma.audit_logs.groupBy({
       by: ['userId', 'ipAddress'],
       where: {
-        action: 'user_login_failed',
+        action: 'login_failed',
         createdAt: { gte: startDate }
       },
       _count: { id: true },
@@ -341,7 +401,7 @@ export const AuditActionsComplete = {
 
   // Usuarios
   USER_LOGIN: 'user_login',
-  USER_LOGIN_FAILED: 'user_login_failed',
+  USER_LOGIN_FAILED: 'login_failed', // Cambiado para coincidir con auth.ts
   USER_LOGOUT: 'user_logout',
   USER_CREATED: 'user_created',
   USER_UPDATED: 'user_updated',

@@ -37,6 +37,7 @@ export function SessionProviderWrapper({ children }: { children: React.ReactNode
         console.error = originalError
       }
     }
+    return undefined
   }, [])
 
   return (

@@ -30,6 +30,8 @@ export function useCategories(options: UseCategoriesOptions = {}) {
   // Estados de filtros
   const [searchTerm, setSearchTerm] = useState('')
   const [levelFilter, setLevelFilter] = useState<CategoryLevel>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
+  const [departmentFilter, setDepartmentFilter] = useState<string>('all')
   const [viewMode, setViewMode] = useState<'tree' | 'table'>('table')
   
   // Hook de datos
@@ -67,15 +69,28 @@ export function useCategories(options: UseCategoriesOptions = {}) {
   // Categorías filtradas
   const filteredCategories = useMemo(() => {
     return dataHook.categories.filter(category => {
+      // Filtro de búsqueda
       const matchesSearch = !searchTerm || 
         category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (category.description && category.description.toLowerCase().includes(searchTerm.toLowerCase()))
       
+      // Filtro de nivel
       const matchesLevel = levelFilter === 'all' || category.level.toString() === levelFilter
       
-      return matchesSearch && matchesLevel
+      // Filtro de estado
+      const matchesStatus = statusFilter === 'all' || 
+        (statusFilter === 'active' && category.isActive) ||
+        (statusFilter === 'inactive' && !category.isActive)
+      
+      // Filtro de departamento
+      const matchesDepartment = departmentFilter === 'all' || 
+        (category.technician_assignments && category.technician_assignments.some((ta: any) => 
+          ta.users?.departmentId === departmentFilter
+        ))
+      
+      return matchesSearch && matchesLevel && matchesStatus && matchesDepartment
     })
-  }, [dataHook.categories, searchTerm, levelFilter])
+  }, [dataHook.categories, searchTerm, levelFilter, statusFilter, departmentFilter])
   
   // Estadísticas
   const stats = useMemo(() => {
@@ -192,6 +207,10 @@ export function useCategories(options: UseCategoriesOptions = {}) {
     setSearchTerm,
     levelFilter,
     setLevelFilter,
+    statusFilter,
+    setStatusFilter,
+    departmentFilter,
+    setDepartmentFilter,
     viewMode,
     setViewMode,
     

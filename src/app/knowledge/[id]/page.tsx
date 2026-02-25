@@ -270,7 +270,7 @@ export default function KnowledgeDetailPage() {
                       <span>{article.notHelpfulVotes}</span>
                     </div>
                   </div>
-                  {article.helpfulPercentage > 0 && (
+                  {(article.helpfulPercentage ?? 0) > 0 && (
                     <Badge variant="secondary">
                       {article.helpfulPercentage}% útil
                     </Badge>

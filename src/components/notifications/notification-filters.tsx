@@ -1,6 +1,6 @@
 'use client'
 
-import { Search, Filter, RotateCcw, Bell, BellOff, Settings } from 'lucide-react'
+import { Search, Filter, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -21,7 +21,6 @@ interface NotificationFiltersProps {
   setFilterRead: (read: string) => void
   searchTerm: string
   setSearchTerm: (term: string) => void
-  onShowPreferences: () => void
   hasActiveFilters: boolean
   stats: {
     total: number
@@ -36,8 +35,6 @@ interface NotificationFiltersProps {
       TICKET_UPDATED: number
     }
   }
-  connected: boolean
-  connecting: boolean
 }
 
 const NOTIFICATION_TYPES = [
@@ -61,11 +58,8 @@ export function NotificationFilters({
   setFilterRead,
   searchTerm,
   setSearchTerm,
-  onShowPreferences,
   hasActiveFilters,
   stats,
-  connected,
-  connecting,
 }: NotificationFiltersProps) {
 
   const resetFilters = () => {
@@ -87,49 +81,17 @@ export function NotificationFilters({
               </Badge>
             )}
           </div>
-          <div className="flex items-center space-x-2">
-            {/* Estado de conexión */}
-            <div className="flex items-center space-x-1">
-              {connecting ? (
-                <div className="flex items-center space-x-1 text-yellow-600">
-                  <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
-                  <span className="text-xs">Conectando...</span>
-                </div>
-              ) : connected ? (
-                <div className="flex items-center space-x-1 text-green-600">
-                  <div className="w-2 h-2 bg-green-500 rounded-full" />
-                  <span className="text-xs">En línea</span>
-                </div>
-              ) : (
-                <div className="flex items-center space-x-1 text-red-600">
-                  <div className="w-2 h-2 bg-red-500 rounded-full" />
-                  <span className="text-xs">Desconectado</span>
-                </div>
-              )}
-            </div>
-            
-            {hasActiveFilters && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={resetFilters}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <RotateCcw className="h-4 w-4 mr-1" />
-                Limpiar
-              </Button>
-            )}
-            
+          {hasActiveFilters && (
             <Button
               variant="outline"
               size="sm"
-              onClick={onShowPreferences}
-              className="text-blue-600 hover:text-blue-800"
+              onClick={resetFilters}
+              className="text-muted-foreground hover:text-foreground"
             >
-              <Settings className="h-4 w-4 mr-1" />
-              Preferencias
+              <RotateCcw className="h-4 w-4 mr-1" />
+              Limpiar filtros
             </Button>
-          </div>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">

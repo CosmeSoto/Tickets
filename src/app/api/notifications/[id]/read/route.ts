@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -13,7 +13,7 @@ export async function POST(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const notificationId = params.id
+    const { id: notificationId } = await params
 
     // Las notificaciones dinámicas se manejan en el cliente con localStorage
     // Este endpoint es para notificaciones persistentes futuras

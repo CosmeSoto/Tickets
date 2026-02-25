@@ -1,10 +1,12 @@
 /**
  * Sistema de Auditoría
  * Registra todos los cambios importantes en el sistema
+ * ACTUALIZADO: Usa AuditServiceComplete con enriquecimiento automático
  */
 
 import prisma from './prisma'
 import { randomUUID } from 'crypto'
+import { AuditServiceComplete } from './services/audit-service-complete'
 
 export interface AuditLogInput {
   entityType: string
@@ -19,6 +21,7 @@ export interface AuditLogInput {
 
 /**
  * Crea un registro de auditoría
+ * ACTUALIZADO: Usa servicio enriquecido automáticamente
  */
 export async function createAuditLog({
   entityType,
@@ -31,30 +34,20 @@ export async function createAuditLog({
   userAgent
 }: AuditLogInput): Promise<void> {
   try {
-    // Obtener email del usuario
-    const user = await prisma.users.findUnique({
-      where: { id: userId },
-      select: { email: true }
-    })
-
-    // Combinar changes y metadata en details
-    const details: Record<string, any> = {}
-    if (changes) details.changes = changes
-    if (metadata) details.metadata = metadata
-
-    await prisma.audit_logs.create({
-      data: {
-        id: randomUUID(),
-        entityType,
-        entityId,
-        action,
-        userId,
-        userEmail: user?.email || null,
-        details: Object.keys(details).length > 0 ? details : null,
-        ipAddress: ipAddress || null,
-        userAgent: userAgent || null,
-        createdAt: new Date()
-      }
+    // Usar servicio enriquecido (sin request, pero con contexto del sistema)
+    await AuditServiceComplete.log({
+      action,
+      entityType: entityType as any,
+      entityId,
+      userId,
+      details: {
+        changes,
+        metadata
+      },
+      ipAddress,
+      userAgent,
+      result: 'SUCCESS'
+      // Sin request = contexto del sistema automáticamente
     })
   } catch (error) {
     console.error('[AUDIT] Error creating audit log:', error)

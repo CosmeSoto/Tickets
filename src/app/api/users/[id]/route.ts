@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth'
 import { UserService } from '@/lib/services/user-service'
 import { z } from 'zod'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
+import prisma from '@/lib/prisma'
+import { IdResolverService } from '@/lib/services/id-resolver-service'
 
 const updateUserSchema = z.object({
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').optional(),
@@ -96,24 +98,88 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // Actualizar el usuario
     const user = await UserService.updateUser((await params).id, validatedData)
 
-    // Enviar notificaciones de usuario actualizado
+    // Registrar auditoría de cambios
     try {
-      // Detectar cambios importantes
-      const changes: Record<string, any> = {}
-      if (validatedData.name && validatedData.name !== currentUser.name) changes.name = validatedData.name
-      if (validatedData.email && validatedData.email !== currentUser.email) changes.email = validatedData.email
-      if (validatedData.role && validatedData.role !== currentUser.role) changes.role = validatedData.role
-      if (validatedData.departmentId !== undefined) changes.departmentId = validatedData.departmentId
-      if (validatedData.phone !== undefined && validatedData.phone !== currentUser.phone) changes.phone = validatedData.phone
-      if (validatedData.isActive !== undefined && validatedData.isActive !== currentUser.isActive) changes.isActive = validatedData.isActive
+      // Detectar cambios importantes comparando valores anteriores con nuevos
+      const changes: Record<string, { old: any, new: any }> = {}
+      const oldValues: Record<string, any> = {}
+      const newValues: Record<string, any> = {}
 
-      // Solo enviar notificaciones si hay cambios significativos (log para auditoría)
+      if (validatedData.name && validatedData.name !== currentUser.name) {
+        changes.name = { old: currentUser.name, new: validatedData.name }
+        oldValues.name = currentUser.name
+        newValues.name = validatedData.name
+      }
+      
+      if (validatedData.email && validatedData.email !== currentUser.email) {
+        changes.email = { old: currentUser.email, new: validatedData.email }
+        oldValues.email = currentUser.email
+        newValues.email = validatedData.email
+      }
+      
+      if (validatedData.role && validatedData.role !== currentUser.role) {
+        changes.role = { 
+          old: IdResolverService.getRoleDisplayName(currentUser.role), 
+          new: IdResolverService.getRoleDisplayName(validatedData.role)
+        }
+        oldValues.role = currentUser.role
+        newValues.role = validatedData.role
+      }
+      
+      if (validatedData.departmentId !== undefined) {
+        const currentDeptId = currentUser.departmentId
+        if (validatedData.departmentId !== currentDeptId) {
+          // Obtener nombres de departamentos para auditoría legible
+          const oldDeptName = await IdResolverService.resolveDepartmentId(currentDeptId)
+          const newDeptName = await IdResolverService.resolveDepartmentId(validatedData.departmentId)
+          
+          changes.departmentId = { old: oldDeptName, new: newDeptName }
+          oldValues.departmentId = currentDeptId
+          newValues.departmentId = validatedData.departmentId
+        }
+      }
+      
+      if (validatedData.phone !== undefined && validatedData.phone !== currentUser.phone) {
+        changes.phone = { old: currentUser.phone || 'Sin teléfono', new: validatedData.phone || 'Sin teléfono' }
+        oldValues.phone = currentUser.phone
+        newValues.phone = validatedData.phone
+      }
+      
+      if (validatedData.isActive !== undefined && validatedData.isActive !== currentUser.isActive) {
+        changes.isActive = { 
+          old: IdResolverService.getBooleanDisplayName(currentUser.isActive), 
+          new: IdResolverService.getBooleanDisplayName(validatedData.isActive)
+        }
+        oldValues.isActive = currentUser.isActive
+        newValues.isActive = validatedData.isActive
+      }
+
+      // Registrar en auditoría si hay cambios
       if (Object.keys(changes).length > 0) {
+        await AuditServiceComplete.log({
+          userId: session.user.id,
+          action: AuditActionsComplete.USER_UPDATED,
+          entityType: 'user',
+          entityId: (await params).id,
+          details: {
+            userName: currentUser.name,
+            userEmail: currentUser.email,
+            changes
+          },
+          oldValues,
+          newValues,
+          metadata: {
+            userAgent: request.headers.get('user-agent') || 'Unknown',
+            ip: request.headers.get('x-forwarded-for') || 'Unknown'
+          }
+        })
+
         console.log(`[INFO] User updated: ${(await params).id} by user ${session.user.id}`)
+        console.log(`[INFO] Changes registered in audit:`, changes)
         
         // Log especial para cambio de rol
-        if (changes.role && changes.role !== currentUser.role) {
-          console.log(`[INFO] Role changed for user ${(await params).id}: ${currentUser.role} -> ${changes.role} by ${session.user.id}`)
+        if (changes.role) {
+          console.log(`[INFO] Role changed for user ${(await params).id}: ${changes.role.old} -> ${changes.role.new}`)
         }
 
         // Log específico para técnicos
@@ -121,9 +187,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           console.log(`[INFO] Technician updated: ${(await params).id} by user ${session.user.id}`)
         }
       }
-    } catch (notificationError) {
-      console.error('Error enviando notificaciones de usuario actualizado:', notificationError)
-      // No fallar la actualización por errores de notificación
+    } catch (auditError) {
+      console.error('Error registrando auditoría:', auditError)
+      // No fallar la actualización por errores de auditoría
     }
 
     return NextResponse.json({

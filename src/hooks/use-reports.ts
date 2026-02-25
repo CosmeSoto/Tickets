@@ -16,12 +16,30 @@ import {
 // Re-exportar para compatibilidad
 export type { ReportFilters, TicketReport, TechnicianReport, CategoryReport }
 
+// Tipo para reporte de departamentos
+export interface DepartmentReport {
+  id: string
+  name: string
+  description?: string
+  color?: string
+  totalTickets: number
+  openTickets: number
+  inProgressTickets: number
+  resolvedTickets: number
+  closedTickets: number
+  avgResolutionTime: string
+  resolutionRate: number
+  slaCompliance: number
+  activeCategories: number
+  activeTechnicians: number
+}
+
 // Interfaces para datos de referencia
 export interface ReferenceData {
-  categories: Array<{ id: string; name: string }>
+  categories: Array<{ id: string; name: string; description?: string; color?: string }>
   technicians: Array<{ id: string; name: string; email: string; department?: string }>
   clients: Array<{ id: string; name: string; email: string }>
-  departments: Array<{ id: string; name: string }>
+  departments: Array<{ id: string; name: string; description?: string; color?: string }>
 }
 
 // Configuración del hook
@@ -65,6 +83,7 @@ export function useReports(config: UseReportsConfig = {}) {
   const [ticketReport, setTicketReport] = useState<TicketReport | null>(null)
   const [technicianReport, setTechnicianReport] = useState<TechnicianReport[]>([])
   const [categoryReport, setCategoryReport] = useState<CategoryReport[]>([])
+  const [departmentReport, setDepartmentReport] = useState<DepartmentReport[]>([])
   const [referenceData, setReferenceData] = useState<ReferenceData>({
     categories: [],
     technicians: [],
@@ -95,6 +114,75 @@ export function useReports(config: UseReportsConfig = {}) {
     }
   )
 
+  // Función para cargar datos de referencia (departamentos, categorías, clientes, técnicos)
+  const loadReferenceData = useCallback(async () => {
+    try {
+      // Cargar todos los datos de referencia en paralelo
+      const [departmentsRes, categoriesRes, clientsRes, techniciansRes] = await Promise.all([
+        fetch('/api/departments?isActive=true'),
+        fetch('/api/categories?isActive=true'),
+        fetch('/api/users?role=CLIENT&isActive=true'),
+        fetch('/api/users?role=TECHNICIAN&isActive=true')
+      ])
+
+      // Procesar respuestas
+      const [departmentsData, categoriesData, clientsData, techniciansData] = await Promise.all([
+        departmentsRes.ok ? departmentsRes.json() : { data: [] },
+        categoriesRes.ok ? categoriesRes.json() : { data: [] },
+        clientsRes.ok ? clientsRes.json() : { data: [] },
+        techniciansRes.ok ? techniciansRes.json() : { data: [] }
+      ])
+
+      // Actualizar estado con datos de referencia
+      setReferenceData({
+        departments: Array.isArray(departmentsData.data) 
+          ? departmentsData.data.map((dept: any) => ({
+              id: dept.id,
+              name: dept.name,
+              description: dept.description,
+              color: dept.color
+            }))
+          : [],
+        categories: Array.isArray(categoriesData.data)
+          ? categoriesData.data.map((cat: any) => ({
+              id: cat.id,
+              name: cat.name,
+              description: cat.description,
+              color: cat.color
+            }))
+          : [],
+        clients: Array.isArray(clientsData.data)
+          ? clientsData.data.map((client: any) => ({
+              id: client.id,
+              name: client.name,
+              email: client.email
+            }))
+          : [],
+        technicians: Array.isArray(techniciansData.data)
+          ? techniciansData.data.map((tech: any) => ({
+              id: tech.id,
+              name: tech.name,
+              email: tech.email,
+              department: tech.departments?.name
+            }))
+          : []
+      })
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📊 Reference data loaded:', {
+          departments: departmentsData.data?.length || 0,
+          categories: categoriesData.data?.length || 0,
+          clients: clientsData.data?.length || 0,
+          technicians: techniciansData.data?.length || 0
+        })
+      }
+    } catch (error) {
+      console.error('Error loading reference data:', error)
+      // No mostrar error al usuario, solo log en consola
+      // Los filtros simplemente estarán vacíos si falla
+    }
+  }, [])
+
   // Función principal para cargar reportes
   const loadReports = useCallback(async (force = false) => {
     if (!session?.user || session.user.role !== 'ADMIN') {
@@ -115,28 +203,32 @@ export function useReports(config: UseReportsConfig = {}) {
           ticketReport: TicketReport | null
           technicianReport: TechnicianReport[]
           categoryReport: CategoryReport[]
+          departmentReport: DepartmentReport[]
         }>(cacheKey, cacheTTL)
 
         if (cached) {
           setTicketReport(cached.ticketReport)
           setTechnicianReport(Array.isArray(cached.technicianReport) ? cached.technicianReport : [])
           setCategoryReport(Array.isArray(cached.categoryReport) ? cached.categoryReport : [])
+          setDepartmentReport(Array.isArray(cached.departmentReport) ? cached.departmentReport : [])
           setLoading(false)
           return
         }
       }
 
       // Cargar datos frescos
-      const [ticketRes, technicianRes, categoryRes] = await Promise.all([
+      const [ticketRes, technicianRes, categoryRes, departmentRes] = await Promise.all([
         loadTicketReport(),
         loadTechnicianReport(),
-        loadCategoryReport()
+        loadCategoryReport(),
+        loadDepartmentReport()
       ])
 
       const reportData = {
         ticketReport: ticketRes,
         technicianReport: Array.isArray(technicianRes) ? technicianRes : [],
-        categoryReport: Array.isArray(categoryRes) ? categoryRes : []
+        categoryReport: Array.isArray(categoryRes) ? categoryRes : [],
+        departmentReport: Array.isArray(departmentRes) ? departmentRes : []
       }
 
       // Guardar en cache
@@ -147,6 +239,7 @@ export function useReports(config: UseReportsConfig = {}) {
       setTicketReport(ticketRes)
       setTechnicianReport(reportData.technicianReport)
       setCategoryReport(reportData.categoryReport)
+      setDepartmentReport(reportData.departmentReport)
       setLoading(false)
 
     } catch (err) {
@@ -258,6 +351,34 @@ export function useReports(config: UseReportsConfig = {}) {
     }
   }, [filters])
 
+  const loadDepartmentReport = useCallback(async (): Promise<DepartmentReport[]> => {
+    try {
+      const params = new URLSearchParams({
+        type: 'departments',
+        format: 'json',
+        ...Object.fromEntries(
+          Object.entries(filters).map(([key, value]) => [
+            key,
+            value instanceof Date ? value.toISOString().split('T')[0] : String(value || '')
+          ])
+        )
+      })
+
+      const response = await fetch(`/api/reports?${params}`)
+      if (response.ok) {
+        const data = await response.json()
+        // Asegurar que siempre retornemos un array
+        return Array.isArray(data) ? data : Array.isArray(data.data) ? data.data : []
+      } else {
+        throw new Error('Error al cargar reporte de departamentos')
+      }
+    } catch (error) {
+      console.error('Error loading department report:', error)
+      // Retornar array vacío en caso de error
+      return []
+    }
+  }, [filters])
+
   // Función de exportación
   const handleExport = useCallback(async (
     type: string, 
@@ -360,6 +481,7 @@ export function useReports(config: UseReportsConfig = {}) {
     // Asegurar que los arrays sean siempre arrays válidos
     const safeTechinicianReport = Array.isArray(technicianReport) ? technicianReport : []
     const safeCategoryReport = Array.isArray(categoryReport) ? categoryReport : []
+    const safeDepartmentReport = Array.isArray(departmentReport) ? departmentReport : []
     
     return {
       // Estadísticas de tickets
@@ -384,11 +506,18 @@ export function useReports(config: UseReportsConfig = {}) {
         ? (safeCategoryReport.reduce((acc, c) => acc + c.resolutionRate, 0) / safeCategoryReport.length).toFixed(1)
         : '0',
       
+      // Estadísticas de departamentos
+      totalDepartments: safeDepartmentReport.length,
+      activeDepartments: safeDepartmentReport.length,
+      avgDepartmentResolutionRate: safeDepartmentReport.length > 0
+        ? (safeDepartmentReport.reduce((acc, d) => acc + d.resolutionRate, 0) / safeDepartmentReport.length).toFixed(1)
+        : '0',
+      
       // Filtros
       hasActiveFilters: Object.values(filters).some(v => v && v !== filters.startDate && v !== filters.endDate),
       filterCount: Object.values(filters).filter(v => v && v !== filters.startDate && v !== filters.endDate).length,
     }
-  }, [ticketReport, technicianReport, categoryReport, filters])
+  }, [ticketReport, technicianReport, categoryReport, departmentReport, filters])
 
   // Verificación de autenticación
   const isAuthenticated = useMemo(() => {
@@ -404,9 +533,16 @@ export function useReports(config: UseReportsConfig = {}) {
 
   // Determinar si es el mount inicial
   const isInitialMount = useMemo(() => {
-    const initial = !ticketReport && !technicianReport.length && !categoryReport.length
+    const initial = !ticketReport && !technicianReport.length && !categoryReport.length && !departmentReport.length
     return initial
-  }, [ticketReport, technicianReport, categoryReport])
+  }, [ticketReport, technicianReport, categoryReport, departmentReport])
+
+  // Cargar datos de referencia al montar el componente
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadReferenceData()
+    }
+  }, [isAuthenticated, loadReferenceData])
 
   // Cargar reportes automáticamente en el mount inicial
   useEffect(() => {
@@ -445,6 +581,7 @@ export function useReports(config: UseReportsConfig = {}) {
     ticketReport,
     technicianReport,
     categoryReport,
+    departmentReport,
     referenceData,
     
     // Estados de carga
@@ -467,6 +604,7 @@ export function useReports(config: UseReportsConfig = {}) {
     
     // Funciones principales
     loadReports,
+    loadReferenceData,
     handleExport,
     refresh,
     

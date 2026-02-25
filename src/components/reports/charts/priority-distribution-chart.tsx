@@ -46,6 +46,7 @@ export function PriorityDistributionChart({
     }))
 
   const total = chartData.reduce((sum, item) => sum + item.value, 0)
+  const hasLimitedData = total < 10
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
@@ -70,6 +71,20 @@ export function PriorityDistributionChart({
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
+        {/* Advertencia de datos limitados */}
+        {hasLimitedData && (
+          <div className="mb-4 text-sm text-amber-700 bg-amber-50 p-3 rounded-lg border border-amber-200 flex items-start space-x-2">
+            <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="font-medium">Datos limitados</p>
+              <p className="text-xs text-amber-600 mt-1">
+                Solo {total} ticket{total !== 1 ? 's' : ''} en el período seleccionado. 
+                Los porcentajes pueden no ser representativos. Use filtros más amplios para obtener más datos.
+              </p>
+            </div>
+          </div>
+        )}
+        
         <div className="flex flex-col lg:flex-row items-center space-y-4 lg:space-y-0 lg:space-x-6">
           <div className="w-full lg:w-1/2">
             <ResponsiveContainer width="100%" height={250}>

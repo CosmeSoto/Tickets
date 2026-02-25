@@ -57,12 +57,7 @@ export default function AdminUsersPage() {
     clearFilters,
     activeFiltersCount,
     hasActiveFilters
-  } = useUserFilters({
-    onFiltersChange: (newFilters) => {
-      // Los filtros se aplicarán automáticamente a través del hook useUsers
-      setFilters(newFilters)
-    }
-  })
+  } = useUserFilters()
 
   // Hook de usuarios con filtros
   const {
@@ -142,13 +137,25 @@ export default function AdminUsersPage() {
 
   // Aplicar filtros cuando cambien los filtros debounced
   useEffect(() => {
+    console.log('🔄 [AdminUsersPage] Aplicando filtros:', debouncedFilters)
+    
     const apiFilters: any = {}
     
-    if (debouncedFilters.search) apiFilters.search = debouncedFilters.search
-    if (debouncedFilters.role !== 'all') apiFilters.role = debouncedFilters.role
-    if (debouncedFilters.status !== 'all') apiFilters.isActive = debouncedFilters.status
-    if (debouncedFilters.department !== 'all') apiFilters.departmentId = debouncedFilters.department
+    // Solo agregar filtros si tienen valores válidos (no 'all')
+    if (debouncedFilters.search && debouncedFilters.search.trim()) {
+      apiFilters.search = debouncedFilters.search
+    }
+    if (debouncedFilters.role && debouncedFilters.role !== 'all') {
+      apiFilters.role = debouncedFilters.role
+    }
+    if (debouncedFilters.status && debouncedFilters.status !== 'all') {
+      apiFilters.isActive = debouncedFilters.status
+    }
+    if (debouncedFilters.department && debouncedFilters.department !== 'all') {
+      apiFilters.departmentId = debouncedFilters.department
+    }
 
+    console.log('📤 [AdminUsersPage] Filtros enviados a setFilters:', apiFilters)
     setFilters(apiFilters)
   }, [debouncedFilters, setFilters])
 

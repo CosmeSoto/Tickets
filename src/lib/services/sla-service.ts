@@ -288,7 +288,7 @@ export class SLAService {
       const metrics = await prisma.ticket_sla_metrics.findUnique({
         where: { ticketId },
         include: {
-          tickets: {
+          ticket: {
             include: {
               users_tickets_clientIdTousers: true,
               users_tickets_assigneeIdTousers: true,
@@ -346,12 +346,12 @@ export class SLAService {
         actualAt,
         delayHours,
         ticket: {
-          id: metrics.tickets.id,
-          title: metrics.tickets.title,
-          priority: metrics.tickets.priority,
-          client: metrics.tickets.users_tickets_clientIdTousers?.name,
-          assignee: metrics.tickets.users_tickets_assigneeIdTousers?.name,
-          category: metrics.tickets.categories?.name
+          id: metrics.ticket.id,
+          title: metrics.ticket.title,
+          priority: metrics.ticket.priority,
+          client: metrics.ticket.users_tickets_clientIdTousers?.name,
+          assignee: metrics.ticket.users_tickets_assigneeIdTousers?.name,
+          category: metrics.ticket.categories?.name
         }
       })
 
@@ -394,7 +394,7 @@ export class SLAService {
           ]
         },
         include: {
-          tickets: {
+          ticket: {
             include: {
               users_tickets_assigneeIdTousers: true
             }
@@ -414,16 +414,16 @@ export class SLAService {
             (new Date(metrics.resolutionDeadline || now).getTime() - now.getTime()) / (1000 * 60)
           ),
           ticket: {
-            id: metrics.tickets.id,
-            title: metrics.tickets.title,
-            assignee: metrics.tickets.users_tickets_assigneeIdTousers?.name
+            id: metrics.ticket.id,
+            title: metrics.ticket.title,
+            assignee: metrics.ticket.users_tickets_assigneeIdTousers?.name
           }
         })
 
         // Enviar email al técnico asignado
-        if (metrics.tickets.users_tickets_assigneeIdTousers) {
+        if (metrics.ticket.users_tickets_assigneeIdTousers) {
           // TODO: Implementar template de email para advertencia SLA
-          console.log(`[SLA] Email de advertencia enviado a ${metrics.tickets.users_tickets_assigneeIdTousers.name}`)
+          console.log(`[SLA] Email de advertencia enviado a ${metrics.ticket.users_tickets_assigneeIdTousers.name}`)
         }
       }
     } catch (error) {
@@ -460,7 +460,7 @@ export class SLAService {
     const metrics = await prisma.ticket_sla_metrics.findMany({
       where,
       include: {
-        tickets: {
+        ticket: {
           select: {
             categoryId: true,
             priority: true
@@ -471,8 +471,8 @@ export class SLAService {
 
     // Filtrar por categoría y prioridad si se especifica
     const filteredMetrics = metrics.filter(m => {
-      if (filters?.categoryId && m.tickets.categoryId !== filters.categoryId) return false
-      if (filters?.priority && m.tickets.priority !== filters.priority) return false
+      if (filters?.categoryId && m.ticket.categoryId !== filters.categoryId) return false
+      if (filters?.priority && m.ticket.priority !== filters.priority) return false
       return true
     })
 

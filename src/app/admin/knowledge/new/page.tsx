@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useKnowledge } from '@/hooks/use-knowledge'
@@ -26,7 +26,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
-export default function NewArticlePage() {
+function NewArticleContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { data: session } = useSession()
@@ -423,5 +423,19 @@ export default function NewArticlePage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function NewArticlePage() {
+  return (
+    <Suspense fallback={
+      <div className="container mx-auto py-6">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </div>
+    }>
+      <NewArticleContent />
+    </Suspense>
   )
 }

@@ -34,21 +34,87 @@ export const authOptions: NextAuthOptions = {
             }
           })
 
+          // Usuario no encontrado
           if (!user || !user.passwordHash) {
+            // Registrar intento fallido en auditoría
+            try {
+              const { AuditServiceComplete } = await import('./services/audit-service-complete')
+              await AuditServiceComplete.log({
+                action: 'login_failed',
+                entityType: 'user',
+                entityId: 'unknown',
+                userId: 'system',
+                details: {
+                  email: credentials.email,
+                  reason: 'user_not_found',
+                  timestamp: new Date().toISOString()
+                },
+                result: 'ERROR',
+                errorCode: 'AUTH_USER_NOT_FOUND',
+                errorMessage: 'Usuario no encontrado o sin contraseña configurada'
+              })
+            } catch (auditError) {
+              console.error('[AUTH] Error registrando intento fallido:', auditError)
+            }
+            
             throw new Error('Credenciales inválidas')
           }
 
+          // Usuario desactivado
           if (!user.isActive) {
+            // Registrar intento de acceso a cuenta desactivada
+            try {
+              const { AuditServiceComplete } = await import('./services/audit-service-complete')
+              await AuditServiceComplete.log({
+                action: 'login_failed',
+                entityType: 'user',
+                entityId: user.id,
+                userId: user.id,
+                details: {
+                  email: credentials.email,
+                  reason: 'account_disabled',
+                  timestamp: new Date().toISOString()
+                },
+                result: 'ERROR',
+                errorCode: 'AUTH_ACCOUNT_DISABLED',
+                errorMessage: 'Intento de acceso a cuenta desactivada'
+              })
+            } catch (auditError) {
+              console.error('[AUTH] Error registrando intento fallido:', auditError)
+            }
+            
             throw new Error('Usuario desactivado')
           }
 
+          // Verificar contraseña
           const isPasswordValid = await bcrypt.compare(credentials.password, user.passwordHash)
 
           if (!isPasswordValid) {
+            // Registrar contraseña incorrecta
+            try {
+              const { AuditServiceComplete } = await import('./services/audit-service-complete')
+              await AuditServiceComplete.log({
+                action: 'login_failed',
+                entityType: 'user',
+                entityId: user.id,
+                userId: user.id,
+                details: {
+                  email: credentials.email,
+                  reason: 'invalid_password',
+                  timestamp: new Date().toISOString()
+                },
+                result: 'ERROR',
+                errorCode: 'AUTH_INVALID_PASSWORD',
+                errorMessage: 'Contraseña incorrecta'
+              })
+            } catch (auditError) {
+              console.error('[AUTH] Error registrando intento fallido:', auditError)
+            }
+            
             throw new Error('Credenciales inválidas')
           }
 
-          // Actualizar último login
+          // Login exitoso - actualizar último login
           await prisma.users.update({
             where: { id: user.id },
             data: { lastLogin: new Date() },
@@ -326,7 +392,60 @@ export const authOptions: NextAuthOptions = {
   },
   events: {
     async signIn({ user, account, isNewUser }) {
-      // Evento silencioso - solo para tracking interno si es necesario
+      // Registrar inicio de sesión en auditoría
+      try {
+        const { AuditServiceComplete } = await import('./services/audit-service-complete')
+        
+        await AuditServiceComplete.log({
+          action: isNewUser ? 'user_registered' : 'login',
+          entityType: 'user',
+          entityId: user.id,
+          userId: user.id,
+          details: {
+            provider: account?.provider || 'credentials',
+            isNewUser: isNewUser || false,
+            email: user.email,
+            name: user.name,
+            loginMethod: account?.type || 'credentials',
+            timestamp: new Date().toISOString()
+          },
+          result: 'SUCCESS'
+        })
+        
+        console.log(`[AUTH] Login registrado en auditoría: ${user.email}`)
+      } catch (error) {
+        console.error('[AUTH] Error registrando login en auditoría:', error)
+        // No bloquear el login si falla la auditoría
+      }
+    },
+    async signOut({ session, token }) {
+      // Registrar cierre de sesión en auditoría
+      try {
+        const { AuditServiceComplete } = await import('./services/audit-service-complete')
+        
+        const userId = (session?.user?.id || token?.sub) as string
+        
+        if (userId) {
+          await AuditServiceComplete.log({
+            action: 'logout',
+            entityType: 'user',
+            entityId: userId,
+            userId: userId,
+            details: {
+              timestamp: new Date().toISOString(),
+              sessionDuration: session?.expires ? 
+                Math.floor((new Date(session.expires).getTime() - Date.now()) / 1000) : 
+                undefined
+            },
+            result: 'SUCCESS'
+          })
+          
+          console.log(`[AUTH] Logout registrado en auditoría: ${userId}`)
+        }
+      } catch (error) {
+        console.error('[AUTH] Error registrando logout en auditoría:', error)
+        // No bloquear el logout si falla la auditoría
+      }
     },
   },
   secret: process.env.NEXTAUTH_SECRET,

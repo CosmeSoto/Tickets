@@ -14,6 +14,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select'
+import { UserCombobox } from '@/components/ui/user-combobox'
 import { type ReportFilters, ReferenceData } from '@/hooks/use-reports'
 
 interface ReportFiltersProps {
@@ -205,7 +207,7 @@ export function ReportFilters({
           
           {showAdvancedFilters && (
             <div className="space-y-4 border-t pt-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Estado */}
           <div className="space-y-2">
             <Label className="text-sm font-medium">Estado</Label>
@@ -256,98 +258,90 @@ export function ReportFilters({
             </Select>
           </div>
 
-          {/* Categoría */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Categoría</Label>
-            <Select
-              value={filters.categoryId || "all"}
-              onValueChange={(value) => handleFilterChange('categoryId', value)}
-              disabled={loading}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Todas las categorías" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas las categorías</SelectItem>
-                {referenceData.categories.map((category) => (
-                  <SelectItem key={category.id} value={category.id}>
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Departamento */}
+          {/* Departamento - CON BÚSQUEDA */}
           <div className="space-y-2">
             <Label className="text-sm font-medium">Departamento</Label>
-            <Select
+            <SearchableSelect
+              options={[
+                { value: 'all', label: 'Todos los departamentos' },
+                ...referenceData.departments.map(dept => ({
+                  value: dept.id,
+                  label: dept.name,
+                  description: dept.description
+                }))
+              ]}
               value={filters.departmentId || "all"}
               onValueChange={(value) => handleFilterChange('departmentId', value)}
+              placeholder="Seleccionar departamento"
+              searchPlaceholder="Buscar departamento..."
               disabled={loading}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Todos los departamentos" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los departamentos</SelectItem>
-                {referenceData.departments.map((department) => (
-                  <SelectItem key={department.id} value={department.id}>
-                    <div className="flex items-center space-x-2">
-                      <span>{department.name}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              allowClear={false}
+            />
           </div>
               </div>
 
-              {/* Filtros de personas */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Técnico asignado */}
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Técnico asignado</Label>
-                  <Select
-                    value={filters.assigneeId || "all"}
-                    onValueChange={(value) => handleFilterChange('assigneeId', value)}
-                    disabled={loading}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Todos los técnicos" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos los técnicos</SelectItem>
-                      {referenceData.technicians.map((technician) => (
-                        <SelectItem key={technician.id} value={technician.id}>
-                          {technician.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              {/* Segunda fila - Categoría y personas */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Categoría - CON BÚSQUEDA */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Categoría</Label>
+            <SearchableSelect
+              options={[
+                { value: 'all', label: 'Todas las categorías' },
+                ...referenceData.categories.map(cat => ({
+                  value: cat.id,
+                  label: cat.name,
+                  description: cat.description,
+                  icon: cat.color ? (
+                    <div 
+                      className="w-3 h-3 rounded-full" 
+                      style={{ backgroundColor: cat.color }}
+                    />
+                  ) : undefined
+                }))
+              ]}
+              value={filters.categoryId || "all"}
+              onValueChange={(value) => handleFilterChange('categoryId', value)}
+              placeholder="Seleccionar categoría"
+              searchPlaceholder="Buscar categoría..."
+              disabled={loading}
+              allowClear={false}
+            />
+          </div>
 
-                {/* Cliente */}
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Cliente</Label>
-                  <Select
-                    value={filters.clientId || "all"}
-                    onValueChange={(value) => handleFilterChange('clientId', value)}
-                    disabled={loading}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Todos los clientes" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos los clientes</SelectItem>
-                      {referenceData.clients.map((client) => (
-                        <SelectItem key={client.id} value={client.id}>
-                          {client.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+          {/* Técnico asignado - CON BÚSQUEDA */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Técnico asignado</Label>
+            <UserCombobox
+              value={filters.assigneeId || ''}
+              onValueChange={(value) => handleFilterChange('assigneeId', value || 'all')}
+              role="TECHNICIAN"
+              placeholder="Todos los técnicos"
+              allowClear
+              disabled={loading}
+            />
+          </div>
+
+          {/* Cliente - CON BÚSQUEDA */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Cliente</Label>
+            <SearchableSelect
+              options={[
+                { value: 'all', label: 'Todos los clientes' },
+                ...referenceData.clients.map(client => ({
+                  value: client.id,
+                  label: client.name,
+                  description: client.email
+                }))
+              ]}
+              value={filters.clientId || "all"}
+              onValueChange={(value) => handleFilterChange('clientId', value)}
+              placeholder="Seleccionar cliente"
+              searchPlaceholder="Buscar cliente..."
+              disabled={loading}
+              allowClear={false}
+            />
+          </div>
               </div>
             </div>
           )}

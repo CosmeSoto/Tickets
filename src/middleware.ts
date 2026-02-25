@@ -59,51 +59,67 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Para APIs básicas, solo aplicar rate limiting y headers de seguridad
+  // Para APIs, solo aplicar rate limiting y headers de seguridad
+  // NO aplicar autenticación aquí - cada API maneja su propia autenticación
   if (request.nextUrl.pathname.startsWith('/api/')) {
     const response = NextResponse.next()
     
     // Headers de seguridad básicos para APIs
     response.headers.set('X-Content-Type-Options', 'nosniff')
     response.headers.set('X-Frame-Options', 'DENY')
+    response.headers.set('X-Request-ID', requestId)
     
-    // Rate limiting para APIs
-    const rateLimitKey = getRateLimitKey(request)
-    const { allowed, remaining, resetTime } = checkRateLimit(rateLimitKey)
+    // Rate limiting para APIs (excepto auth endpoints)
+    if (!request.nextUrl.pathname.startsWith('/api/auth/')) {
+      const rateLimitKey = getRateLimitKey(request)
+      const { allowed, remaining, resetTime } = checkRateLimit(rateLimitKey)
 
-    response.headers.set('X-RateLimit-Limit', RATE_LIMIT_MAX_REQUESTS.toString())
-    response.headers.set('X-RateLimit-Remaining', remaining.toString())
-    response.headers.set('X-RateLimit-Reset', Math.ceil(resetTime / 1000).toString())
+      response.headers.set('X-RateLimit-Limit', RATE_LIMIT_MAX_REQUESTS.toString())
+      response.headers.set('X-RateLimit-Remaining', remaining.toString())
+      response.headers.set('X-RateLimit-Reset', Math.ceil(resetTime / 1000).toString())
 
-    if (!allowed) {
-      ApplicationLogger.securityEvent(
-        'rate_limit_exceeded',
-        'medium',
-        {
-          ip,
-          path,
-          method,
-          rateLimitKey,
-          maxRequests: RATE_LIMIT_MAX_REQUESTS,
-          windowMs: RATE_LIMIT_WINDOW,
-        },
-        { requestId }
-      )
-
-      return new NextResponse(
-        JSON.stringify({
-          error: 'Demasiadas solicitudes. Intenta de nuevo más tarde.',
-          retryAfter: Math.ceil((resetTime - Date.now()) / 1000),
-        }),
-        {
-          status: 429,
-          headers: {
-            'Content-Type': 'application/json',
-            'Retry-After': Math.ceil((resetTime - Date.now()) / 1000).toString(),
+      if (!allowed) {
+        ApplicationLogger.securityEvent(
+          'rate_limit_exceeded',
+          'medium',
+          {
+            ip,
+            path,
+            method,
+            rateLimitKey,
+            maxRequests: RATE_LIMIT_MAX_REQUESTS,
+            windowMs: RATE_LIMIT_WINDOW,
           },
-        }
-      )
+          { requestId }
+        )
+
+        return new NextResponse(
+          JSON.stringify({
+            error: 'Demasiadas solicitudes. Intenta de nuevo más tarde.',
+            retryAfter: Math.ceil((resetTime - Date.now()) / 1000),
+          }),
+          {
+            status: 429,
+            headers: {
+              'Content-Type': 'application/json',
+              'Retry-After': Math.ceil((resetTime - Date.now()) / 1000).toString(),
+              'X-Request-ID': requestId,
+            },
+          }
+        )
+      }
     }
+
+    // Log API request
+    ApplicationLogger.child({ requestId, component: 'api' }).debug(
+      `API request: ${method} ${path}`,
+      {
+        metadata: {
+          ip,
+          userAgent: request.headers.get('user-agent'),
+        },
+      }
+    )
 
     return response
   }

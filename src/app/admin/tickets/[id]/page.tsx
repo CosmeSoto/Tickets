@@ -343,8 +343,8 @@ export default function TicketDetailPage() {
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
-      {/* Botón Inteligente de Artículo (solo si ticket está RESOLVED) */}
-      {ticket.status === 'RESOLVED' && (
+      {/* Botón Inteligente de Artículo (solo si ticket está RESOLVED) - TEMPORALMENTE DESHABILITADO */}
+      {/* {ticket.status === 'RESOLVED' && (
         ticket.knowledge_article ? (
           <TooltipProvider>
             <Tooltip>
@@ -387,7 +387,7 @@ export default function TicketDetailPage() {
             </Tooltip>
           </TooltipProvider>
         )
-      )}
+      )} */}
       {getStatusBadge(ticket.status)}
       {getPriorityBadge(ticket.priority)}
       {session?.user?.role === 'ADMIN' && (

@@ -107,20 +107,23 @@ function filterUsers(users: UserData[], filters: UserFilters, currentUserId?: st
       if (!matchesSearch) return false
     }
 
-    // Rol
-    if (filters.role && filters.role !== 'all' && user.role !== filters.role) return false
+    // Rol - solo filtrar si hay un rol específico seleccionado
+    if (filters.role && filters.role !== 'all') {
+      if (user.role !== filters.role) return false
+    }
 
-    // Estado
+    // Estado - solo filtrar si hay un estado específico seleccionado
     if (filters.isActive && filters.isActive !== 'all') {
       const isActive = filters.isActive === 'true'
       if (user.isActive !== isActive) return false
     }
 
-    // Departamento
+    // Departamento - solo filtrar si hay un departamento específico seleccionado
     const departmentId = filters.departmentId || filters.department
     if (departmentId && departmentId !== 'all') {
       const userDeptId = typeof user.department === 'object' ? user.department?.id : user.department
-      if (userDeptId !== departmentId) return false
+      // Si el usuario no tiene departamento, no coincide con ningún filtro de departamento
+      if (!userDeptId || userDeptId !== departmentId) return false
     }
 
     return true
@@ -327,8 +330,23 @@ export function useUsers(options: UseUsersOptions = {}): UseUsersReturn {
 
   // Funciones de utilidad
   const setFilters = useCallback((newFilters: Partial<UserFilters>) => {
-    setFiltersState(prev => ({ ...prev, ...newFilters }))
-  }, [])
+    // Si newFilters está vacío o solo tiene valores 'all', limpiar todos los filtros
+    const hasOnlyDefaults = Object.keys(newFilters).length === 0 || 
+      Object.values(newFilters).every(v => !v || v === 'all' || v === '')
+    
+    if (hasOnlyDefaults) {
+      setFiltersState({})
+    } else {
+      // Crear nuevo estado de filtros, eliminando los que son 'all' o vacíos
+      const cleanedFilters: Partial<UserFilters> = {}
+      Object.entries(newFilters).forEach(([key, value]) => {
+        if (value && value !== 'all' && value !== '') {
+          cleanedFilters[key as keyof UserFilters] = value as any
+        }
+      })
+      setFiltersState(cleanedFilters)
+    }
+  }, []) // Sin dependencias para evitar loop infinito
 
   const clearFilters = useCallback(() => {
     setFiltersState({})

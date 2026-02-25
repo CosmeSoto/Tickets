@@ -60,6 +60,10 @@ export default function CategoriesPage() {
     setSearchTerm,
     levelFilter,
     setLevelFilter,
+    statusFilter,
+    setStatusFilter,
+    departmentFilter,
+    setDepartmentFilter,
     viewMode,
     setViewMode,
     
@@ -108,14 +112,14 @@ export default function CategoriesPage() {
   // Obtener datos paginados
   const paginatedCategories = pagination ? pagination.currentItems : filteredCategories
 
-  // Configuración de paginación para UnifiedDataTable
+  // Configuración de paginación para DataTableAdvanced
   const paginationConfig = pagination ? {
     page: pagination.currentPage,
     limit: pagination.pageSize,
     total: pagination.totalItems,
     totalPages: pagination.totalPages,
-    onPageChange: (page: number) => pagination.goToPage(page),
-    onLimitChange: (limit: number) => pagination.setPageSize(limit),
+    onPageChange: pagination.goToPage,
+    onLimitChange: pagination.setPageSize,
   } : undefined
 
   // Configuración de columnas para UnifiedDataTable
@@ -222,7 +226,6 @@ export default function CategoriesPage() {
       icon: Edit,
       onClick: (category) => handleEdit(category),
       variant: 'default',
-      description: 'Modifica el nombre, descripción y configuración de esta categoría'
     },
     {
       key: 'delete',
@@ -231,7 +234,6 @@ export default function CategoriesPage() {
       onClick: (category) => setDeletingCategory(category),
       variant: 'destructive',
       disabled: (category) => !category.canDelete,
-      description: 'Elimina permanentemente esta categoría del sistema'
     }
   ]
 
@@ -489,7 +491,7 @@ export default function CategoriesPage() {
                     <SelectItem value='4'>Nivel 4 - Específico</SelectItem>
                   </SelectContent>
                 </Select>
-                <Select value="all" onValueChange={() => {}}>
+                <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
                   <SelectTrigger className='w-full sm:w-[180px]'>
                     <SelectValue placeholder='Departamento' />
                   </SelectTrigger>
@@ -500,7 +502,7 @@ export default function CategoriesPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Select value="all" onValueChange={() => {}}>
+                <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as 'all' | 'active' | 'inactive')}>
                   <SelectTrigger className='w-full sm:w-[150px]'>
                     <SelectValue placeholder='Estado' />
                   </SelectTrigger>
@@ -520,16 +522,18 @@ export default function CategoriesPage() {
                   <div className='text-center py-8'>
                     <FolderTree className='h-12 w-12 text-muted-foreground mx-auto mb-4' />
                     <p className='text-muted-foreground'>
-                      {searchTerm || levelFilter !== 'all' 
+                      {searchTerm || levelFilter !== 'all' || statusFilter !== 'all' || departmentFilter !== 'all'
                         ? 'No se encontraron categorías que coincidan con los filtros' 
                         : 'No hay categorías disponibles'}
                     </p>
-                    {(searchTerm || levelFilter !== 'all') && (
+                    {(searchTerm || levelFilter !== 'all' || statusFilter !== 'all' || departmentFilter !== 'all') && (
                       <Button 
                         variant="outline" 
                         onClick={() => {
                           setSearchTerm('')
                           setLevelFilter('all')
+                          setStatusFilter('all')
+                          setDepartmentFilter('all')
                         }}
                         className='mt-2'
                       >

@@ -55,6 +55,26 @@ export default function TechnicianTicketDetailPage() {
   // Estados del formulario
   const [newStatus, setNewStatus] = useState<'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | 'ON_HOLD'>('OPEN')
 
+  // Variables derivadas
+  // TODO: Agregar knowledge_article al tipo Ticket cuando se implemente la funcionalidad
+  const canCreateArticle = false // ticket?.status === 'RESOLVED' && session?.user?.role === 'TECHNICIAN'
+  const hasArticle = false // !!ticket?.knowledge_article
+
+  const handleViewArticle = () => {
+    // TODO: Implementar cuando se agregue knowledge_article al tipo Ticket
+    // if (ticket?.knowledge_article) {
+    //   router.push(`/knowledge/${ticket.knowledge_article.id}`)
+    // }
+  }
+
+  const handleCreateArticle = () => {
+    // TODO: Implementar creación de artículo desde ticket
+    toast({
+      title: 'Funcionalidad en desarrollo',
+      description: 'La creación de artículos desde tickets estará disponible próximamente',
+    })
+  }
+
   useEffect(() => {
     if (status === 'loading') return
 
@@ -185,21 +205,21 @@ export default function TechnicianTicketDetailPage() {
   const statusConfig = getStatusConfig(ticket.status)
   const priorityConfig = getPriorityConfig(ticket.priority)
 
-  // Verificar si puede crear artículo (ticket resuelto y es el técnico asignado)
-  const canCreateArticle = ticket.status === 'RESOLVED' && ticket.assignee?.id === session?.user?.id
-  const hasArticle = ticket.knowledge_article !== null && ticket.knowledge_article !== undefined
+  // Verificar si puede crear artículo (ticket resuelto y es el técnico asignado) - TEMPORALMENTE DESHABILITADO
+  // const canCreateArticle = ticket.status === 'RESOLVED' && ticket.assignee?.id === session?.user?.id
+  // const hasArticle = ticket.knowledge_article !== null && ticket.knowledge_article !== undefined
 
-  const handleCreateArticle = () => {
-    // Redirigir a crear artículo con datos del ticket
-    router.push(`/technician/knowledge/new?fromTicket=${ticket.id}`)
-  }
+  // const handleCreateArticle = () => {
+  //   // Redirigir a crear artículo con datos del ticket
+  //   router.push(`/technician/knowledge/new?fromTicket=${ticket.id}`)
+  // }
 
-  const handleViewArticle = () => {
-    // Redirigir al artículo existente
-    if (ticket.knowledge_article?.id) {
-      router.push(`/technician/knowledge/${ticket.knowledge_article.id}`)
-    }
-  }
+  // const handleViewArticle = () => {
+  //   // Redirigir al artículo existente
+  //   if (ticket.knowledge_article?.id) {
+  //     router.push(`/technician/knowledge/${ticket.knowledge_article.id}`)
+  //   }
+  // }
 
   return (
     <ModuleLayout
@@ -239,9 +259,10 @@ export default function TechnicianTicketDetailPage() {
                         <BookOpen className='h-4 w-4 sm:mr-2' />
                         <span className='hidden sm:inline'>Ver Artículo</span>
                         <span className='sm:hidden'>Artículo</span>
-                        {ticket.knowledge_article && !ticket.knowledge_article.isPublished && (
+                        {/* TODO: Descomentar cuando se agregue knowledge_article al tipo Ticket */}
+                        {/* {ticket.knowledge_article && !ticket.knowledge_article.isPublished && (
                           <Badge variant='secondary' className='ml-2 text-xs'>Borrador</Badge>
-                        )}
+                        )} */}
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>

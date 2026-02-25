@@ -178,6 +178,111 @@ export class NotificationService {
           })
         }
 
+        // 4. Técnicos sobrecargados
+        const overloadedTechnicians = await prisma.users.findMany({
+          where: {
+            role: 'TECHNICIAN',
+            tickets_tickets_assigneeIdTousers: {
+              some: {
+                status: { in: ['OPEN', 'IN_PROGRESS'] }
+              }
+            }
+          },
+          include: {
+            _count: {
+              select: {
+                tickets_tickets_assigneeIdTousers: {
+                  where: {
+                    status: { in: ['OPEN', 'IN_PROGRESS'] }
+                  }
+                }
+              }
+            }
+          }
+        })
+
+        const overloaded = overloadedTechnicians.filter(tech => 
+          tech._count.tickets_tickets_assigneeIdTousers > 10
+        )
+
+        if (overloaded.length > 0) {
+          const techNames = overloaded.map(t => t.name).join(', ')
+          const maxLoad = Math.max(...overloaded.map(t => t._count.tickets_tickets_assigneeIdTousers))
+          
+          alerts.push({
+            id: `overloaded-techs-${new Date().toISOString().split('T')[0]}`,
+            type: 'WARNING',
+            category: 'SYSTEM_ALERT',
+            title: `⚠️ Técnicos sobrecargados`,
+            message: `${overloaded.length} técnico${overloaded.length > 1 ? 's' : ''} con más de 10 tickets: ${techNames}. Máximo: ${maxLoad} tickets.`,
+            actionText: 'Redistribuir carga',
+            actionUrl: '/admin/technicians?view=workload',
+            priority: 25,
+            isRead: false,
+            isDismissed: false,
+            createdAt: new Date(now.getTime() - 15 * 60 * 1000),
+            count: overloaded.length
+          })
+        }
+
+        // 5. Nuevos comentarios en tickets críticos (ADMIN debe estar al tanto)
+        const criticalTicketsWithComments = await prisma.tickets.findMany({
+          where: {
+            priority: 'HIGH',
+            status: { in: ['OPEN', 'IN_PROGRESS'] },
+            comments: {
+              some: {
+                createdAt: {
+                  gte: new Date(now.getTime() - 2 * 60 * 60 * 1000) // Últimas 2h
+                }
+              }
+            }
+          },
+          take: 2,
+          include: {
+            users_tickets_clientIdTousers: { select: { name: true } },
+            users_tickets_assigneeIdTousers: { select: { name: true } },
+            comments: {
+              where: {
+                createdAt: {
+                  gte: new Date(now.getTime() - 2 * 60 * 60 * 1000)
+                }
+              },
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              include: {
+                users: { select: { name: true, role: true } }
+              }
+            }
+          }
+        })
+
+        for (const ticket of criticalTicketsWithComments) {
+          if (ticket.comments.length > 0) {
+            const lastComment = ticket.comments[0]
+            const minutesAgo = Math.floor((now.getTime() - lastComment.createdAt.getTime()) / (1000 * 60))
+            const timeAgo = minutesAgo < 60 
+              ? `${minutesAgo} minuto${minutesAgo !== 1 ? 's' : ''}`
+              : `${Math.floor(minutesAgo / 60)} hora${Math.floor(minutesAgo / 60) !== 1 ? 's' : ''}`
+
+            alerts.push({
+              id: `critical-comment-${ticket.id}-${lastComment.id}`,
+              type: 'WARNING',
+              category: 'TICKET_UPDATE',
+              title: `🔥 Actividad en ticket crítico`,
+              message: `${lastComment.users.name} (${lastComment.users.role === 'CLIENT' ? 'Cliente' : 'Técnico'}) comentó hace ${timeAgo} en "${ticket.title}"`,
+              actionText: 'Supervisar',
+              actionUrl: `/admin/tickets/${ticket.id}`,
+              priority: 20,
+              isRead: false,
+              isDismissed: false,
+              createdAt: lastComment.createdAt,
+              relatedIds: [ticket.id, lastComment.id],
+              ticket: { id: ticket.id, title: ticket.title }
+            })
+          }
+        }
+
       } else if (userRole === 'TECHNICIAN') {
         // 1. Tickets urgentes asignados próximos a vencer
         const urgentAssigned = await prisma.tickets.findMany({
@@ -217,7 +322,59 @@ export class NotificationService {
           })
         })
 
-        // 2. Tickets sin respuesta inicial
+        // 2. Nuevos comentarios de clientes (PRIORIDAD ALTA)
+        const ticketsWithNewComments = await prisma.tickets.findMany({
+          where: {
+            assigneeId: userId,
+            status: { in: ['OPEN', 'IN_PROGRESS'] }
+          },
+          include: {
+            users_tickets_clientIdTousers: { select: { name: true } },
+            comments: {
+              where: {
+                createdAt: {
+                  gte: new Date(now.getTime() - 24 * 60 * 60 * 1000) // Últimas 24h
+                },
+                users: {
+                  role: 'CLIENT' // Solo comentarios de clientes
+                }
+              },
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              include: {
+                users: { select: { name: true, role: true } }
+              }
+            }
+          }
+        })
+
+        for (const ticket of ticketsWithNewComments) {
+          if (ticket.comments.length > 0) {
+            const lastComment = ticket.comments[0]
+            const minutesAgo = Math.floor((now.getTime() - lastComment.createdAt.getTime()) / (1000 * 60))
+            const timeAgo = minutesAgo < 60 
+              ? `${minutesAgo} minuto${minutesAgo !== 1 ? 's' : ''}`
+              : `${Math.floor(minutesAgo / 60)} hora${Math.floor(minutesAgo / 60) !== 1 ? 's' : ''}`
+
+            alerts.push({
+              id: `client-comment-${ticket.id}-${lastComment.id}`,
+              type: 'WARNING',
+              category: 'TICKET_UPDATE',
+              title: `💬 Cliente respondió`,
+              message: `${ticket.users_tickets_clientIdTousers?.name} comentó hace ${timeAgo} en "${ticket.title}"`,
+              actionText: 'Ver comentario',
+              actionUrl: `/technician/tickets/${ticket.id}#comment-${lastComment.id}`,
+              priority: 10, // Alta prioridad
+              isRead: false,
+              isDismissed: false,
+              createdAt: lastComment.createdAt,
+              relatedIds: [ticket.id, lastComment.id],
+              ticket: { id: ticket.id, title: ticket.title }
+            })
+          }
+        }
+
+        // 3. Tickets sin respuesta inicial
         const noResponseTickets = await prisma.tickets.findMany({
           where: {
             assigneeId: userId,
@@ -306,63 +463,145 @@ export class NotificationService {
           }
         }
 
-        // 2. Tickets con actualizaciones recientes
-        const recentUpdates = await prisma.tickets.findMany({
+        // 2. Nuevas respuestas de técnicos/admin (PRIORIDAD ALTA)
+        const ticketsWithNewResponses = await prisma.tickets.findMany({
           where: {
             clientId: userId,
-            status: { in: ['OPEN', 'IN_PROGRESS'] },
+            status: { in: ['OPEN', 'IN_PROGRESS', 'RESOLVED'] }
+          },
+          include: {
+            users_tickets_assigneeIdTousers: { select: { name: true } },
+            comments: {
+              where: {
+                createdAt: {
+                  gte: new Date(now.getTime() - 24 * 60 * 60 * 1000) // Últimas 24h
+                },
+                users: {
+                  role: { in: ['TECHNICIAN', 'ADMIN'] } // Solo respuestas del equipo
+                }
+              },
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              include: {
+                users: { select: { name: true, role: true } }
+              }
+            }
+          }
+        })
+
+        for (const ticket of ticketsWithNewResponses) {
+          if (ticket.comments.length > 0) {
+            const lastComment = ticket.comments[0]
+            const minutesAgo = Math.floor((now.getTime() - lastComment.createdAt.getTime()) / (1000 * 60))
+            const timeAgo = minutesAgo < 60 
+              ? `${minutesAgo} minuto${minutesAgo !== 1 ? 's' : ''}`
+              : `${Math.floor(minutesAgo / 60)} hora${Math.floor(minutesAgo / 60) !== 1 ? 's' : ''}`
+
+            alerts.push({
+              id: `tech-response-${ticket.id}-${lastComment.id}`,
+              type: 'INFO',
+              category: 'TICKET_UPDATE',
+              title: `💬 Nueva respuesta del equipo`,
+              message: `${lastComment.users.name} respondió hace ${timeAgo} en "${ticket.title}"`,
+              actionText: 'Ver respuesta',
+              actionUrl: `/client/tickets/${ticket.id}#comment-${lastComment.id}`,
+              priority: 15, // Alta prioridad para clientes
+              isRead: false,
+              isDismissed: false,
+              createdAt: lastComment.createdAt,
+              relatedIds: [ticket.id, lastComment.id],
+              ticket: { id: ticket.id, title: ticket.title }
+            })
+          }
+        }
+
+        // 3. Ticket asignado a técnico
+        const recentlyAssigned = await prisma.tickets.findMany({
+          where: {
+            clientId: userId,
+            status: 'OPEN',
+            assigneeId: { not: null },
             updatedAt: {
-              gte: new Date(now.getTime() - 24 * 60 * 60 * 1000), // Últimas 24h
-              gt: new Date(now.getTime() - 48 * 60 * 60 * 1000)   // Pero no muy antiguas
+              gte: new Date(now.getTime() - 6 * 60 * 60 * 1000) // Últimas 6h
             }
           },
           take: 2,
           orderBy: { updatedAt: 'desc' },
           include: {
-            users_tickets_assigneeIdTousers: { select: { name: true } },
-            _count: {
-              select: { comments: true }
-            }
+            users_tickets_assigneeIdTousers: { select: { name: true } }
           }
         })
 
-        for (const ticket of recentUpdates) {
-          // Verificar si hay comentarios nuevos del técnico
-          const recentComments = await prisma.comments.findMany({
+        for (const ticket of recentlyAssigned) {
+          // Verificar que no tenga comentarios del técnico aún (recién asignado)
+          const techComments = await prisma.comments.count({
             where: {
               ticketId: ticket.id,
-              createdAt: {
-                gte: new Date(now.getTime() - 24 * 60 * 60 * 1000)
-              },
               users: {
                 role: { in: ['TECHNICIAN', 'ADMIN'] }
               }
-            },
-            take: 1,
-            orderBy: { createdAt: 'desc' }
+            }
           })
 
-          if (recentComments.length > 0) {
-            const hoursAgo = Math.floor((now.getTime() - recentComments[0].createdAt.getTime()) / (1000 * 60 * 60))
+          if (techComments === 0) {
+            const hoursAgo = Math.floor((now.getTime() - ticket.updatedAt.getTime()) / (1000 * 60 * 60))
             alerts.push({
-              id: `ticket-update-${ticket.id}`,
-              type: 'INFO',
+              id: `ticket-assigned-${ticket.id}`,
+              type: 'SUCCESS',
               category: 'TICKET_UPDATE',
-              title: `💬 Nueva respuesta en tu ticket`,
-              message: `${ticket.users_tickets_assigneeIdTousers?.name || 'El equipo de soporte'} respondió hace ${hoursAgo}h en "${ticket.title}"`,
-              actionText: 'Ver respuesta',
+              title: `✅ Ticket asignado`,
+              message: `Tu ticket "${ticket.title}" fue asignado a ${ticket.users_tickets_assigneeIdTousers?.name} hace ${hoursAgo}h`,
+              actionText: 'Ver ticket',
               actionUrl: `/client/tickets/${ticket.id}`,
-              priority: 25,
+              priority: 30,
               isRead: false,
               isDismissed: false,
-              createdAt: recentComments[0].createdAt,
+              createdAt: ticket.updatedAt,
               relatedIds: [ticket.id],
               ticket: { id: ticket.id, title: ticket.title }
             })
           }
         }
 
-        // 3. Tickets sin respuesta por mucho tiempo
+        // 4. Cambio de estado del ticket
+        const statusChanged = await prisma.tickets.findMany({
+          where: {
+            clientId: userId,
+            status: { in: ['IN_PROGRESS', 'RESOLVED'] },
+            updatedAt: {
+              gte: new Date(now.getTime() - 12 * 60 * 60 * 1000) // Últimas 12h
+            }
+          },
+          take: 2,
+          orderBy: { updatedAt: 'desc' },
+          include: {
+            users_tickets_assigneeIdTousers: { select: { name: true } }
+          }
+        })
+
+        for (const ticket of statusChanged) {
+          const hoursAgo = Math.floor((now.getTime() - ticket.updatedAt.getTime()) / (1000 * 60 * 60))
+          const statusText = ticket.status === 'IN_PROGRESS' ? 'en progreso' : 'resuelto'
+          const icon = ticket.status === 'IN_PROGRESS' ? '🔧' : '✅'
+          
+          alerts.push({
+            id: `status-change-${ticket.id}-${ticket.status}`,
+            type: ticket.status === 'RESOLVED' ? 'SUCCESS' : 'INFO',
+            category: 'TICKET_UPDATE',
+            title: `${icon} Ticket ${statusText}`,
+            message: `Tu ticket "${ticket.title}" está ahora ${statusText}${ticket.users_tickets_assigneeIdTousers ? ` por ${ticket.users_tickets_assigneeIdTousers.name}` : ''}`,
+            actionText: 'Ver detalles',
+            actionUrl: `/client/tickets/${ticket.id}`,
+            priority: ticket.status === 'RESOLVED' ? 20 : 35,
+            isRead: false,
+            isDismissed: false,
+            createdAt: ticket.updatedAt,
+            relatedIds: [ticket.id],
+            ticket: { id: ticket.id, title: ticket.title }
+          })
+        }
+
+        // 5. Tickets sin respuesta por mucho tiempo
         const staleTickets = await prisma.tickets.findMany({
           where: {
             clientId: userId,
@@ -463,6 +702,46 @@ export class NotificationService {
         return hasResponse !== null
       }
 
+      if (notificationId.startsWith('client-comment-')) {
+        // Formato: client-comment-{ticketId}-{commentId}
+        // No se oculta automáticamente, el técnico debe marcarla como leída
+        return false
+      }
+
+      if (notificationId.startsWith('critical-comment-')) {
+        // No se oculta automáticamente, el admin debe marcarla como leída
+        return false
+      }
+
+      if (notificationId.startsWith('overloaded-techs-')) {
+        // Se oculta al día siguiente
+        return false
+      }
+
+      if (notificationId.startsWith('tech-response-')) {
+        // No se oculta automáticamente, el cliente debe marcarla como leída
+        return false
+      }
+
+      if (notificationId.startsWith('ticket-assigned-')) {
+        const ticketId = notificationId.replace('ticket-assigned-', '')
+        // Se oculta cuando el técnico hace el primer comentario
+        const hasResponse = await prisma.comments.findFirst({
+          where: { 
+            ticketId,
+            users: {
+              role: { in: ['TECHNICIAN', 'ADMIN'] }
+            }
+          }
+        })
+        return hasResponse !== null
+      }
+
+      if (notificationId.startsWith('status-change-')) {
+        // No se oculta automáticamente, el cliente debe marcarla como leída
+        return false
+      }
+
       // Notificaciones de cliente
       if (notificationId.startsWith('rating-pending-')) {
         const ticketId = notificationId.replace('rating-pending-', '')
@@ -530,6 +809,12 @@ export class NotificationService {
       'urgent-assigned-',
       'overdue-sla-',
       'no-response-',
+      'client-comment-',
+      'critical-comment-',
+      'overloaded-techs-',
+      'tech-response-',
+      'ticket-assigned-',
+      'status-change-',
       'rating-pending-',
       'ticket-update-',
       'stale-ticket-'

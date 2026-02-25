@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/select'
 import { Search, X, Filter, Loader2 } from 'lucide-react'
 import { ArticleCard } from './article-card'
-import { useCategories } from '@/hooks/use-categories'
+import { useCategoriesData } from '@/hooks/use-categories'
 
 interface KnowledgeSearchProps {
   onArticleSelect?: (article: Article) => void
@@ -32,7 +32,7 @@ export function KnowledgeSearch({
   placeholder = 'Buscar artículos...',
   maxResults = 10,
 }: KnowledgeSearchProps) {
-  const { categories } = useCategories()
+  const { categories } = useCategoriesData()
   const {
     query,
     setQuery,

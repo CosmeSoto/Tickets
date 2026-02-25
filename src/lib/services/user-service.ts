@@ -241,8 +241,8 @@ export class UserService {
           name: data.name,
           passwordHash,
           role: data.role,
-          ...(data.departmentId || data.department ? { departmentId: data.departmentId || data.department } : {}),
-          phone: data.phone,
+          departmentId: data.departmentId || data.department || null,
+          phone: data.phone || null,
           isActive: true,
           isEmailVerified: false,
           createdAt: new Date(),
@@ -330,20 +330,33 @@ export class UserService {
       }
     }
 
+    // Preparar datos de actualización
+    const updateData: any = {
+      updatedAt: new Date(),
+    }
+
+    if (data.name !== undefined) updateData.name = data.name
+    if (data.email !== undefined) updateData.email = data.email
+    if (data.role !== undefined) updateData.role = data.role
+    if (data.phone !== undefined) updateData.phone = data.phone
+    if (data.avatar !== undefined) updateData.avatar = data.avatar
+    if (data.isActive !== undefined) updateData.isActive = data.isActive
+    
+    // Manejar departmentId explícitamente
+    if (data.departmentId !== undefined) {
+      updateData.departmentId = data.departmentId || null
+    } else if (data.department !== undefined) {
+      // Soporte legacy para 'department'
+      updateData.departmentId = data.department || null
+    }
+
+    console.log('🔧 [UserService] Datos que se enviarán a Prisma:', updateData)
+
     // Actualizar usuario en una transacción para manejar las asignaciones de categorías
     const result = await prisma.$transaction(async (tx) => {
       const updatedUser = await tx.users.update({
         where: { id },
-        data: {
-          name: data.name,
-          email: data.email,
-          role: data.role,
-          departmentId: data.departmentId || data.department, // Compatibilidad con campo antiguo
-          phone: data.phone,
-          avatar: data.avatar,
-          isActive: data.isActive,
-          updatedAt: new Date(),
-        },
+        data: updateData,
         include: {
           departments: {
             select: {
@@ -382,6 +395,12 @@ export class UserService {
       }
 
       return updatedUser
+    })
+
+    console.log('✅ [UserService] Usuario actualizado en BD:', {
+      id: result.id,
+      departmentId: result.departmentId,
+      department: result.departments?.name
     })
 
     return {

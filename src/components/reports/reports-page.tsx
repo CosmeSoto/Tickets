@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { 
   BarChart3, 
   Download, 
@@ -25,6 +25,8 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { useReports } from '@/hooks/use-reports'
+import { useTablePagination } from '@/hooks/use-table-pagination'
+import { cn } from '@/lib/utils'
 
 // Componente estandarizado
 import { ModuleLayout } from '@/components/common/layout/module-layout'
@@ -39,6 +41,7 @@ import { PriorityDistributionChart } from './charts/priority-distribution-chart'
 import { CategoryPerformanceChart } from './charts/category-performance-chart'
 import { TechnicianPerformanceChart } from './charts/technician-performance-chart'
 import { DetailedTicketsTable } from './detailed-tickets-table'
+import { DepartmentPerformanceTable } from './department-performance-table'
 import { SLAMetricsCard } from './sla-metrics-card'
 
 export default function ReportsPage() {
@@ -49,6 +52,7 @@ export default function ReportsPage() {
     ticketReport,
     technicianReport,
     categoryReport,
+    departmentReport,
     referenceData,
     
     // Estados de carga
@@ -77,17 +81,24 @@ export default function ReportsPage() {
     // Estados de sesión
     isAuthenticated,
   } = useReports({
-    cacheTTL: 5 * 60 * 1000, // 5 minutos para mejor rendimiento
+    cacheTTL: 5 * 60 * 1000,
     enableCache: true,
     autoRefresh: false,
     enablePagination: true,
-    pageSize: 100, // Más registros para análisis
+    pageSize: 100,
   })
 
-  // Función de exportación unificada y funcional
+  // Función de exportación unificada
   const handleReportExport = useCallback((type: string, format: string = 'csv') => {
     return handleExport(type, format as 'csv' | 'excel' | 'pdf' | 'json')
   }, [handleExport])
+
+  // Paginación para tablas de técnicos y categorías
+  const [technicianPageSize, setTechnicianPageSize] = useState(10)
+  const [categoryPageSize, setCategoryPageSize] = useState(10)
+  
+  const technicianPagination = useTablePagination(technicianReport, { pageSize: technicianPageSize })
+  const categoryPagination = useTablePagination(categoryReport, { pageSize: categoryPageSize })
 
   // Renderizado de error de autenticación
   if (!isAuthenticated) {
@@ -606,7 +617,7 @@ export default function ReportsPage() {
                   </CardHeader>
                   <CardContent>
                     <Tabs defaultValue="tickets" className="space-y-4">
-                      <TabsList className="grid w-full grid-cols-3">
+                      <TabsList className="grid w-full grid-cols-4">
                         <TabsTrigger value="tickets" className="flex items-center space-x-2">
                           <Ticket className="h-4 w-4" />
                           <span>Tickets Detallados</span>
@@ -618,6 +629,10 @@ export default function ReportsPage() {
                         <TabsTrigger value="categories" className="flex items-center space-x-2">
                           <Activity className="h-4 w-4" />
                           <span>Rendimiento por Categorías</span>
+                        </TabsTrigger>
+                        <TabsTrigger value="departments" className="flex items-center space-x-2">
+                          <BarChart3 className="h-4 w-4" />
+                          <span>Análisis de Departamentos</span>
                         </TabsTrigger>
                       </TabsList>
 
@@ -680,7 +695,7 @@ export default function ReportsPage() {
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {technicianReport.map((tech, index) => (
+                                    {technicianPagination.paginatedData.map((tech, index) => (
                                       <tr key={tech.technicianId} className={`border-b hover:bg-muted/30 ${index % 2 === 0 ? 'bg-background' : 'bg-muted/10'}`}>
                                         <td className="p-4">
                                           <div className="flex items-center space-x-3">
@@ -742,8 +757,100 @@ export default function ReportsPage() {
                                         </td>
                                       </tr>
                                     ))}
+                                    
+                                    {/* Fila de totales/promedios */}
+                                    <tr className="bg-muted/50 font-semibold border-t-2">
+                                      <td className="p-4">TOTALES / PROMEDIOS</td>
+                                      <td className="p-4 text-center">-</td>
+                                      <td className="p-4 text-center">
+                                        {technicianReport.reduce((sum, t) => sum + t.totalAssigned, 0)}
+                                      </td>
+                                      <td className="p-4 text-center">
+                                        {technicianReport.reduce((sum, t) => sum + t.resolved, 0)}
+                                      </td>
+                                      <td className="p-4 text-center">
+                                        {technicianReport.reduce((sum, t) => sum + t.inProgress, 0)}
+                                      </td>
+                                      <td className="p-4 text-center">
+                                        {(technicianReport.reduce((sum, t) => sum + t.resolutionRate, 0) / technicianReport.length).toFixed(1)}%
+                                      </td>
+                                      <td className="p-4 text-center">-</td>
+                                      <td className="p-4 text-center">
+                                        {(() => {
+                                          const withSLA = technicianReport.filter(t => t.slaMetrics?.totalWithSLA > 0)
+                                          if (withSLA.length === 0) return '-'
+                                          const avgSLA = withSLA.reduce((sum, t) => sum + (t.slaMetrics?.slaComplianceRate || 0), 0) / withSLA.length
+                                          return `${avgSLA.toFixed(1)}%`
+                                        })()}
+                                      </td>
+                                      <td className="p-4 text-center">-</td>
+                                      <td className="p-4 text-center">
+                                        {(() => {
+                                          const withRating = technicianReport.filter(t => t.averageRating)
+                                          if (withRating.length === 0) return '-'
+                                          const avgRating = withRating.reduce((sum, t) => sum + (t.averageRating || 0), 0) / withRating.length
+                                          return `${avgRating.toFixed(1)}/5`
+                                        })()}
+                                      </td>
+                                    </tr>
                                   </tbody>
                                 </table>
+                              </div>
+                              
+                              {/* Paginación */}
+                              <div className="flex items-center justify-between mt-4">
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-sm text-muted-foreground">
+                                    Mostrando {technicianPagination.startIndex} a {technicianPagination.endIndex} de {technicianPagination.totalItems} elementos
+                                  </span>
+                                </div>
+                                
+                                <div className="flex items-center space-x-2">
+                                  <select
+                                    value={technicianPageSize}
+                                    onChange={(e) => {
+                                      setTechnicianPageSize(Number(e.target.value))
+                                      technicianPagination.resetPage()
+                                    }}
+                                    className="px-3 py-1 border border-border rounded text-sm bg-background"
+                                  >
+                                    {[10, 20, 50, 100].map(option => (
+                                      <option key={option} value={option}>
+                                        {option}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  
+                                  <button
+                                    onClick={technicianPagination.previousPage}
+                                    disabled={!technicianPagination.hasPreviousPage}
+                                    className={cn(
+                                      "px-3 py-1 border border-border rounded text-sm transition-colors",
+                                      !technicianPagination.hasPreviousPage
+                                        ? "bg-muted text-muted-foreground cursor-not-allowed"
+                                        : "bg-background hover:bg-muted"
+                                    )}
+                                  >
+                                    Anterior
+                                  </button>
+                                  
+                                  <span className="text-sm">
+                                    Página {technicianPagination.currentPage} de {technicianPagination.totalPages}
+                                  </span>
+                                  
+                                  <button
+                                    onClick={technicianPagination.nextPage}
+                                    disabled={!technicianPagination.hasNextPage}
+                                    className={cn(
+                                      "px-3 py-1 border border-border rounded text-sm transition-colors",
+                                      !technicianPagination.hasNextPage
+                                        ? "bg-muted text-muted-foreground cursor-not-allowed"
+                                        : "bg-background hover:bg-muted"
+                                    )}
+                                  >
+                                    Siguiente
+                                  </button>
+                                </div>
                               </div>
                             </CardContent>
                           </Card>
@@ -789,7 +896,7 @@ export default function ReportsPage() {
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {categoryReport.map((category, index) => (
+                                    {categoryPagination.paginatedData.map((category, index) => (
                                       <tr key={category.categoryId} className={`border-b hover:bg-muted/30 ${index % 2 === 0 ? 'bg-background' : 'bg-muted/10'}`}>
                                         <td className="p-4">
                                           <div className="flex items-center space-x-3">
@@ -836,8 +943,82 @@ export default function ReportsPage() {
                                         </td>
                                       </tr>
                                     ))}
+                                    
+                                    {/* Fila de totales/promedios */}
+                                    <tr className="bg-muted/50 font-semibold border-t-2">
+                                      <td className="p-4">TOTALES / PROMEDIOS</td>
+                                      <td className="p-4 text-center">-</td>
+                                      <td className="p-4 text-center">
+                                        {categoryReport.reduce((sum, c) => sum + c.totalTickets, 0)}
+                                      </td>
+                                      <td className="p-4 text-center">
+                                        {categoryReport.reduce((sum, c) => sum + c.resolvedTickets, 0)}
+                                      </td>
+                                      <td className="p-4 text-center">
+                                        {(categoryReport.reduce((sum, c) => sum + c.resolutionRate, 0) / categoryReport.length).toFixed(1)}%
+                                      </td>
+                                      <td className="p-4 text-center">-</td>
+                                      <td className="p-4 text-center">-</td>
+                                      <td className="p-4 text-center">-</td>
+                                    </tr>
                                   </tbody>
                                 </table>
+                              </div>
+                              
+                              {/* Paginación */}
+                              <div className="flex items-center justify-between mt-4">
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-sm text-muted-foreground">
+                                    Mostrando {categoryPagination.startIndex} a {categoryPagination.endIndex} de {categoryPagination.totalItems} elementos
+                                  </span>
+                                </div>
+                                
+                                <div className="flex items-center space-x-2">
+                                  <select
+                                    value={categoryPageSize}
+                                    onChange={(e) => {
+                                      setCategoryPageSize(Number(e.target.value))
+                                      categoryPagination.resetPage()
+                                    }}
+                                    className="px-3 py-1 border border-border rounded text-sm bg-background"
+                                  >
+                                    {[10, 20, 50, 100].map(option => (
+                                      <option key={option} value={option}>
+                                        {option}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  
+                                  <button
+                                    onClick={categoryPagination.previousPage}
+                                    disabled={!categoryPagination.hasPreviousPage}
+                                    className={cn(
+                                      "px-3 py-1 border border-border rounded text-sm transition-colors",
+                                      !categoryPagination.hasPreviousPage
+                                        ? "bg-muted text-muted-foreground cursor-not-allowed"
+                                        : "bg-background hover:bg-muted"
+                                    )}
+                                  >
+                                    Anterior
+                                  </button>
+                                  
+                                  <span className="text-sm">
+                                    Página {categoryPagination.currentPage} de {categoryPagination.totalPages}
+                                  </span>
+                                  
+                                  <button
+                                    onClick={categoryPagination.nextPage}
+                                    disabled={!categoryPagination.hasNextPage}
+                                    className={cn(
+                                      "px-3 py-1 border border-border rounded text-sm transition-colors",
+                                      !categoryPagination.hasNextPage
+                                        ? "bg-muted text-muted-foreground cursor-not-allowed"
+                                        : "bg-background hover:bg-muted"
+                                    )}
+                                  >
+                                    Siguiente
+                                  </button>
+                                </div>
                               </div>
                             </CardContent>
                           </Card>
@@ -852,6 +1033,23 @@ export default function ReportsPage() {
                             </CardContent>
                           </Card>
                         )}
+                      </TabsContent>
+
+                      {/* Tabla de Departamentos Detallados */}
+                      <TabsContent value="departments" className="space-y-4">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <h4 className="font-medium">Análisis Completo por Departamentos</h4>
+                            <p className="text-sm text-muted-foreground">
+                              {departmentReport.length} departamentos con análisis detallado
+                            </p>
+                          </div>
+                        </div>
+
+                        <DepartmentPerformanceTable
+                          departments={departmentReport}
+                          loading={loadingReports}
+                        />
                       </TabsContent>
                     </Tabs>
                   </CardContent>
@@ -968,6 +1166,38 @@ export default function ReportsPage() {
                         </TooltipTrigger>
                         <TooltipContent>
                           <p>Exporta el análisis de categorías con distribución de tickets y tiempos de resolución</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
+                    {/* Exportación de Departamentos */}
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                               onClick={() => handleReportExport('departments', 'csv')}>
+                            <div className="flex items-center space-x-4">
+                              <div className="h-12 w-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                                <BarChart3 className="h-6 w-6 text-orange-600" />
+                              </div>
+                              <div>
+                                <h4 className="font-medium">Reporte de Departamentos</h4>
+                                <p className="text-sm text-muted-foreground">
+                                  {departmentReport.length} departamentos con análisis detallado
+                                  {stats.hasActiveFilters && (
+                                    <span className="text-blue-600 font-medium"> • Filtrado</span>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Download className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm text-muted-foreground">Exportar CSV</span>
+                            </div>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Exporta el análisis de departamentos con métricas de rendimiento y cumplimiento SLA</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>

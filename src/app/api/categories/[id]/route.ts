@@ -155,8 +155,7 @@ export async function PUT(
             error: 'Datos inválidos', 
             details: validationError.errors.map(e => ({
               field: e.path.join('.'),
-              message: e.message,
-              received: e.received
+              message: e.message
             }))
           },
           { status: 400 }
@@ -318,9 +317,9 @@ export async function PUT(
           await AuditServiceComplete.logAction({
             userId: session.user.id,
             action: AuditActionsComplete.CATEGORY_UPDATED,
-            resource: 'categories',
-            resourceId: id,
+            entityType: 'category',
             details: {
+              categoryId: id,
               categoryName: validatedData.name,
               changes,
               assignedTechnicians: validatedData.assignedTechnicians.length
@@ -370,9 +369,9 @@ export async function PUT(
       await AuditServiceComplete.logAction({
         userId: session.user.id,
         action: AuditActionsComplete.CATEGORY_UPDATED,
-        resource: 'categories',
-        resourceId: id,
+        entityType: 'category',
         details: {
+          categoryId: id,
           categoryName: validatedData.name,
           changes
         },
@@ -424,8 +423,7 @@ export async function PUT(
           error: 'Datos inválidos', 
           details: error.errors.map(e => ({
             field: e.path.join('.'),
-            message: e.message,
-            received: e.received
+            message: e.message
           }))
         },
         { status: 400 }

@@ -44,5 +44,5 @@
     "**/*.mts",
     "src/__tests__/jest-dom.d.ts"
   ],
-  "exclude": ["node_modules", "backups", "archived-docs"]
+  "exclude": ["node_modules", "backups", "archived-docs", "scripts-obsoletos", "**/*.obsoleto.ts"]
 }

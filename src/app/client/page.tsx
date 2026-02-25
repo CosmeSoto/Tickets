@@ -1,9 +1,8 @@
 'use client'
 
-import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
-import { StatsCard, SymmetricStatsCard } from '@/components/shared/stats-card'
-import { ActionCard, ActionGrid } from '@/components/common/action-card'
-import { LoadingDashboard } from '@/components/shared/loading-dashboard'
+import { UnifiedDashboardBase } from '@/components/dashboard/unified-dashboard-base'
+import { SymmetricStatsCard } from '@/components/shared/stats-card'
+import { ActionGrid } from '@/components/common/action-card'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -23,84 +22,59 @@ import {
   Eye,
   Plus,
   MessageSquare,
-  RefreshCw,
-  AlertTriangle,
   Zap,
 } from 'lucide-react'
-import { Notifications } from '@/components/ui/notifications'
 import Link from 'next/link'
-import { useClientProtection } from '@/hooks/use-role-protection'
-import { useDashboardData } from '@/hooks/use-dashboard-data'
+import { useUnifiedDashboard } from '@/hooks/use-unified-dashboard'
 import { getPriorityColor, getStatusColor } from '@/lib/utils/ticket-utils'
 
 export default function ClientDashboard() {
-  // Protección de ruta y carga de datos usando hooks
-  const { session, isAuthorized, isLoading: authLoading } = useClientProtection()
-  const { stats, tickets: recentTickets, isLoading: dataLoading, error, refetch } = useDashboardData('CLIENT')
-
-  // Mostrar loading mientras se verifica autenticación o se cargan datos
-  if (authLoading || dataLoading) {
-    return (
-      <LoadingDashboard
-        title='Dashboard Cliente'
-        subtitle='Mi panel principal'
-        message='Cargando tus tickets...'
-      />
-    )
-  }
-
-  // Si no está autorizado, el hook ya redirigió
-  if (!isAuthorized) return null
-
-  // Mostrar error si hay problemas cargando datos
-  if (error) {
-    return (
-      <RoleDashboardLayout
-        title={`¡Bienvenido, ${session?.user?.name}!`}
-        subtitle='Panel de cliente'
-      >
-        <Alert variant="destructive" className="mb-6">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription className="flex items-center justify-between">
-            <span>Error al cargar datos: {error}</span>
-            <Button variant="outline" size="sm" onClick={refetch}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Reintentar
-            </Button>
-          </AlertDescription>
-        </Alert>
-      </RoleDashboardLayout>
-    )
-  }
+  const {
+    userName,
+    isLoading,
+    isAuthorized,
+    error,
+    stats,
+    tickets: recentTickets,
+    refetch
+  } = useUnifiedDashboard({ role: 'CLIENT' })
 
   // Calcular métricas
   const supportQuality = stats.supportQuality || 'good'
   const hasOpenTickets = (stats.openTickets || 0) > 0
   const hasUnreadMessages = recentTickets.some(t => t.hasUnreadMessages)
 
+  // Header actions personalizado para cliente
+  const clientHeaderActions = (
+    <Link href='/client/tickets/create'>
+      <Button size='lg' className='bg-primary hover:bg-primary/90'>
+        <Plus className='h-5 w-5 mr-2' />
+        Crear Ticket
+      </Button>
+    </Link>
+  )
+
   return (
-    <RoleDashboardLayout
-      title={`¡Bienvenido, ${session?.user?.name}!`}
-      subtitle='Panel de cliente'
-      headerActions={
-        <div className="flex items-center space-x-3">
-          <Badge 
-            variant={supportQuality === 'excellent' ? 'default' : 'secondary'}
-            className={supportQuality === 'excellent' ? 'bg-green-100 text-green-800' : ''}
-          >
-            Soporte: {supportQuality === 'excellent' ? 'Excelente' : 
-                     supportQuality === 'good' ? 'Bueno' : 'Regular'}
-          </Badge>
-          <Link href='/client/tickets/create'>
-            <Button size='lg' className='bg-primary hover:bg-primary/90'>
-              <Plus className='h-5 w-5 mr-2' />
-              Crear Ticket
-            </Button>
-          </Link>
-        </div>
-      }
+    <UnifiedDashboardBase
+      userName={userName}
+      userRole="CLIENT"
+      isLoading={isLoading}
+      isAuthorized={isAuthorized}
+      error={error}
+      title="Dashboard Cliente"
+      subtitle="Panel de cliente"
+      loadingMessage="Cargando tus tickets..."
+      onRefresh={refetch}
+      headerActions={clientHeaderActions}
+      notificationsMaxVisible={2}
+      statusBadge={{
+        text: `Soporte: ${supportQuality === 'excellent' ? 'Excelente' : 
+                         supportQuality === 'good' ? 'Bueno' : 'Regular'}`,
+        variant: supportQuality === 'excellent' ? 'default' : 'secondary',
+        className: supportQuality === 'excellent' ? 'bg-green-100 text-green-800' : ''
+      }}
     >
-      {/* Alertas importantes */}
+      {/* Alerta de mensajes sin leer */}
       {hasUnreadMessages && (
         <Alert className="mb-6 border-blue-200 bg-blue-50">
           <Bell className="h-4 w-4 text-blue-600" />
@@ -113,10 +87,7 @@ export default function ClientDashboard() {
         </Alert>
       )}
 
-      {/* Notificaciones y Alertas Unificadas */}
-      <Notifications variant="dashboard" className="mb-6" maxVisible={2} />
-
-      {/* Stats Cards con Tema Cliente */}
+      {/* Stats Cards */}
       <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8'>
         <SymmetricStatsCard
           title='Total Tickets'
@@ -163,7 +134,7 @@ export default function ClientDashboard() {
         />
       </div>
 
-      {/* Crear Ticket - Destacado y Mejorado */}
+      {/* Crear Ticket - Destacado */}
       <div className='mb-8'>
         <Card className='border-2 border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10 hover:shadow-lg transition-all'>
           <CardContent className='p-6'>
@@ -209,7 +180,7 @@ export default function ClientDashboard() {
       </div>
 
       <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
-        {/* Quick Actions Mejoradas */}
+        {/* Quick Actions */}
         <div className='lg:col-span-2'>
           <Card>
             <CardHeader>
@@ -264,7 +235,7 @@ export default function ClientDashboard() {
           </Card>
         </div>
 
-        {/* Recent Tickets Mejorados */}
+        {/* Recent Tickets */}
         <div>
           <Card>
             <CardHeader>
@@ -366,7 +337,7 @@ export default function ClientDashboard() {
         </div>
       </div>
 
-      {/* Support Status Mejorado - Layout Vertical para evitar overflow */}
+      {/* Support Status */}
       <div className='mt-6'>
         <Card>
           <CardHeader>
@@ -383,14 +354,10 @@ export default function ClientDashboard() {
                     minute: '2-digit' 
                   })}
                 </span>
-                <Button variant="outline" size="sm" onClick={refetch}>
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
               </div>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {/* Layout vertical en 2 columnas para evitar overflow */}
             <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
               <div className='flex flex-col space-y-3 p-4 bg-green-50 dark:bg-green-950/50 rounded-lg border border-green-200 dark:border-green-800'>
                 <div className="flex items-center justify-between">
@@ -459,6 +426,6 @@ export default function ClientDashboard() {
           </CardContent>
         </Card>
       </div>
-    </RoleDashboardLayout>
+    </UnifiedDashboardBase>
   )
 }

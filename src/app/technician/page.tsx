@@ -1,109 +1,66 @@
 'use client'
 
-import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
-import { StatsCard, SymmetricStatsCard } from '@/components/shared/stats-card'
-import { LoadingDashboard } from '@/components/shared/loading-dashboard'
+import { UnifiedDashboardBase } from '@/components/dashboard/unified-dashboard-base'
+import { SymmetricStatsCard } from '@/components/shared/stats-card'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   Ticket,
   Clock,
   CheckCircle,
-  AlertCircle,
+  Award,
   Calendar,
   User,
   MessageSquare,
   FileText,
   Target,
-  Award,
-  TrendingUp,
   Zap,
-  Bell,
-  RefreshCw,
-  AlertTriangle,
+  TrendingUp,
   Star,
-  ExternalLink,
+  AlertCircle,
 } from 'lucide-react'
 import Link from 'next/link'
-import { useTechnicianProtection } from '@/hooks/use-role-protection'
-import { useDashboardData } from '@/hooks/use-dashboard-data'
-import { useRouter } from 'next/navigation'
-import { Notifications } from '@/components/ui/notifications'
-import { getPriorityColor, getStatusColor, formatTimeElapsed } from '@/lib/utils/ticket-utils'
+import { useUnifiedDashboard } from '@/hooks/use-unified-dashboard'
+import { getPriorityColor, getStatusColor } from '@/lib/utils/ticket-utils'
 
 export default function TechnicianDashboard() {
-  // Protección de ruta y carga de datos usando hooks
-  const { session, isAuthorized, isLoading: authLoading } = useTechnicianProtection()
-  const { stats, tickets: recentTickets, isLoading: dataLoading, error, refetch } = useDashboardData('TECHNICIAN')
-  const router = useRouter()
+  const {
+    userName,
+    isLoading,
+    isAuthorized,
+    error,
+    stats,
+    tickets: recentTickets,
+    refetch
+  } = useUnifiedDashboard({ role: 'TECHNICIAN' })
 
-  // Mostrar loading mientras se verifica autenticación o se cargan datos
-  if (authLoading || dataLoading) {
-    return (
-      <LoadingDashboard
-        title='Dashboard Técnico'
-        subtitle='Panel de trabajo'
-        message='Cargando tus tickets asignados...'
-      />
-    )
-  }
-
-  // Si no está autorizado, el hook ya redirigió
-  if (!isAuthorized) return null
-
-  // Mostrar error si hay problemas cargando datos
-  if (error) {
-    return (
-      <RoleDashboardLayout
-        title={`¡Hola, ${session?.user?.name}!`}
-        subtitle='Panel de trabajo técnico'
-      >
-        <Alert variant="destructive" className="mb-6">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription className="flex items-center justify-between">
-            <span>Error al cargar datos: {error}</span>
-            <Button variant="outline" size="sm" onClick={refetch}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Reintentar
-            </Button>
-          </AlertDescription>
-        </Alert>
-      </RoleDashboardLayout>
-    )
-  }
-
-  // Calcular métricas y estado
+  // Calcular métricas
   const workloadLevel = stats.workload || 'low'
   const performanceLevel = stats.performance || 'good'
   const urgentTickets = recentTickets.filter(t => t.priority === 'HIGH' || t.urgencyLevel === 'critical').length
   const overdueTickets = recentTickets.filter(t => t.isOverdue).length
 
   return (
-    <RoleDashboardLayout
-      title={`¡Hola, ${session?.user?.name}!`}
-      subtitle='Panel de trabajo técnico'
-      headerActions={
-        <div className="flex items-center space-x-3">
-          <Badge 
-            variant={performanceLevel === 'excellent' ? 'default' : 'secondary'}
-            className={performanceLevel === 'excellent' ? 'bg-green-100 text-green-800' : ''}
-          >
-            Rendimiento: {performanceLevel === 'excellent' ? 'Excelente' : 
-                        performanceLevel === 'good' ? 'Bueno' : 'Mejorable'}
-          </Badge>
-          <Button variant="outline" size="sm" onClick={refetch}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Actualizar
-          </Button>
-        </div>
-      }
+    <UnifiedDashboardBase
+      userName={userName}
+      userRole="TECHNICIAN"
+      isLoading={isLoading}
+      isAuthorized={isAuthorized}
+      error={error}
+      title="Dashboard Técnico"
+      subtitle="Panel de trabajo técnico"
+      loadingMessage="Cargando tus tickets asignados..."
+      onRefresh={refetch}
+      notificationsMaxVisible={2}
+      statusBadge={{
+        text: `Rendimiento: ${performanceLevel === 'excellent' ? 'Excelente' : 
+                            performanceLevel === 'good' ? 'Bueno' : 'Mejorable'}`,
+        variant: performanceLevel === 'excellent' ? 'default' : 'secondary',
+        className: performanceLevel === 'excellent' ? 'bg-green-100 text-green-800' : ''
+      }}
     >
-      {/* Notificaciones y Alertas Unificadas */}
-      <Notifications variant="dashboard" className="mb-6" maxVisible={2} />
-
-      {/* Stats Cards con Tema Técnico */}
+      {/* Stats Cards */}
       <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8'>
         <SymmetricStatsCard
           title='Tickets Asignados'
@@ -155,7 +112,7 @@ export default function TechnicianDashboard() {
       </div>
 
       <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
-        {/* Tickets Asignados Mejorados */}
+        {/* Tickets Asignados */}
         <div className='lg:col-span-2'>
           <Card>
             <CardHeader>
@@ -262,7 +219,7 @@ export default function TechnicianDashboard() {
           </Card>
         </div>
 
-        {/* Panel lateral mejorado */}
+        {/* Panel lateral */}
         <div className="space-y-6">
           {/* Acciones Rápidas */}
           <Card>
@@ -302,7 +259,7 @@ export default function TechnicianDashboard() {
             </CardContent>
           </Card>
 
-          {/* Recordatorios y Métricas */}
+          {/* Métricas Personales */}
           <Card>
             <CardHeader>
               <CardTitle className='flex items-center'>
@@ -348,7 +305,7 @@ export default function TechnicianDashboard() {
             </CardContent>
           </Card>
 
-          {/* Recordatorios importantes */}
+          {/* Recordatorios */}
           <Card>
             <CardHeader>
               <CardTitle className='flex items-center'>
@@ -390,6 +347,6 @@ export default function TechnicianDashboard() {
           </Card>
         </div>
       </div>
-    </RoleDashboardLayout>
+    </UnifiedDashboardBase>
   )
 }

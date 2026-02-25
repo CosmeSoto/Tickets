@@ -15,7 +15,9 @@ import {
   Eye,
   AlertTriangle,
   CheckCircle,
-  Clock
+  Clock,
+  X,
+  Loader2
 } from 'lucide-react'
 
 // Componentes
@@ -33,6 +35,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
 
 interface AuditLog {
@@ -67,6 +76,260 @@ interface AuditStats {
   period: string
 }
 
+/**
+ * Componente para resolver IDs en detalles de auditoría
+ * Detecta registros antiguos con UUIDs y los resuelve en tiempo real
+ */
+function AuditDetailsResolver({ details }: { details: any }) {
+  const [resolvedDetails, setResolvedDetails] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const resolveIds = async () => {
+      // PRIORIDAD 1: Si ya tiene cambios legibles, usarlos directamente
+      if (details.changes && typeof details.changes === 'object') {
+        setResolvedDetails({ type: 'changes', data: details.changes })
+        return
+      }
+
+      // PRIORIDAD 2: Si tiene oldValues/newValues (registros antiguos), resolverlos
+      if (details.oldValues && details.newValues) {
+        setLoading(true)
+        try {
+          // Obtener todos los valores únicos que necesitan resolución
+          const allValues: Record<string, any> = {}
+          
+          Object.keys(details.newValues).forEach(key => {
+            if (details.oldValues[key] !== details.newValues[key]) {
+              allValues[`old_${key}`] = details.oldValues[key]
+              allValues[`new_${key}`] = details.newValues[key]
+            }
+          })
+
+          // Llamar al API para resolver IDs
+          const response = await fetch('/api/admin/audit/resolve-ids', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ values: allValues })
+          })
+
+          if (response.ok) {
+            const { resolved } = await response.json()
+            
+            // Reconstruir cambios con valores resueltos
+            const changes: Record<string, { old: string; new: string }> = {}
+            
+            Object.keys(details.newValues).forEach(key => {
+              if (details.oldValues[key] !== details.newValues[key]) {
+                changes[key] = {
+                  old: resolved[`old_${key}`] || String(details.oldValues[key] || 'vacío'),
+                  new: resolved[`new_${key}`] || String(details.newValues[key] || 'vacío')
+                }
+              }
+            })
+            
+            setResolvedDetails({ type: 'resolved', data: changes })
+          } else {
+            // Si falla, usar valores sin resolver
+            const changes: Record<string, { old: string; new: string }> = {}
+            Object.keys(details.newValues).forEach(key => {
+              if (details.oldValues[key] !== details.newValues[key]) {
+                changes[key] = {
+                  old: String(details.oldValues[key] || 'vacío'),
+                  new: String(details.newValues[key] || 'vacío')
+                }
+              }
+            })
+            setResolvedDetails({ type: 'unresolved', data: changes })
+          }
+        } catch (error) {
+          console.error('Error resolviendo IDs:', error)
+          // Fallback: mostrar sin resolver
+          const changes: Record<string, { old: string; new: string }> = {}
+          Object.keys(details.newValues).forEach(key => {
+            if (details.oldValues[key] !== details.newValues[key]) {
+              changes[key] = {
+                old: String(details.oldValues[key] || 'vacío'),
+                new: String(details.newValues[key] || 'vacío')
+              }
+            }
+          })
+          setResolvedDetails({ type: 'error', data: changes })
+        } finally {
+          setLoading(false)
+        }
+        return
+      }
+
+      // PRIORIDAD 3: Otros tipos de detalles
+      if (details.metadata) {
+        setResolvedDetails({ type: 'metadata', data: details.metadata })
+        return
+      }
+
+      // PRIORIDAD 4: Objeto genérico
+      if (typeof details === 'object' && details !== null) {
+        setResolvedDetails({ type: 'generic', data: details })
+        return
+      }
+
+      // Fallback
+      setResolvedDetails({ type: 'raw', data: details })
+    }
+
+    resolveIds()
+  }, [details])
+
+  // Función para obtener nombre amigable del campo
+  const getFieldDisplayName = (fieldName: string): string => {
+    const fieldNames: Record<string, string> = {
+      'name': 'Nombre',
+      'email': 'Correo Electrónico',
+      'role': 'Rol',
+      'departmentId': 'Departamento',
+      'phone': 'Teléfono',
+      'isActive': 'Estado',
+      'avatar': 'Avatar',
+      'password': 'Contraseña',
+      'createdById': 'Creado por',
+      'assigneeId': 'Asignado a',
+      'ticketId': 'Ticket',
+      'title': 'Título',
+      'description': 'Descripción',
+      'status': 'Estado',
+      'priority': 'Prioridad',
+      'categoryId': 'Categoría',
+      'ticketNumber': 'Número de Ticket',
+      'color': 'Color',
+      'parentId': 'Categoría Padre',
+      'level': 'Nivel',
+      'order': 'Orden',
+      'createdAt': 'Fecha de Creación',
+      'updatedAt': 'Última Actualización',
+      'isEmailVerified': 'Email Verificado',
+      'lastLogin': 'Último Acceso'
+    }
+    return fieldNames[fieldName] || fieldName
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+        <span className="ml-2 text-sm text-muted-foreground">Resolviendo información...</span>
+      </div>
+    )
+  }
+
+  if (!resolvedDetails) {
+    return (
+      <div className="text-sm text-muted-foreground">Cargando detalles...</div>
+    )
+  }
+
+  // Renderizar según el tipo
+  if (resolvedDetails.type === 'changes' || resolvedDetails.type === 'resolved' || resolvedDetails.type === 'unresolved' || resolvedDetails.type === 'error') {
+    const changesArray = Object.entries(resolvedDetails.data).map(([key, value]: [string, any]) => ({
+      campo: getFieldDisplayName(key),
+      campoTecnico: key,
+      anterior: value.old,
+      nuevo: value.new
+    }))
+
+    if (changesArray.length > 0) {
+      return (
+        <div className="space-y-2">
+          <div className="font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-2">
+            📝 Cambios Realizados ({changesArray.length})
+            {resolvedDetails.type === 'resolved' && (
+              <span className="text-xs text-green-600 dark:text-green-400 font-normal">
+                ✓ IDs resueltos
+              </span>
+            )}
+          </div>
+          {changesArray.map((change, idx) => (
+            <div key={idx} className="bg-muted/50 p-3 rounded text-sm space-y-1">
+              <div className="font-medium text-foreground">
+                Campo: <span className="text-blue-600">{change.campo}</span>
+              </div>
+              <div className="text-red-600 dark:text-red-400">
+                ❌ Anterior: {String(change.anterior || 'vacío')}
+              </div>
+              <div className="text-green-600 dark:text-green-400">
+                ✅ Nuevo: {String(change.nuevo || 'vacío')}
+              </div>
+            </div>
+          ))}
+        </div>
+      )
+    }
+  }
+
+  if (resolvedDetails.type === 'metadata') {
+    return (
+      <div className="space-y-2">
+        <div className="font-semibold text-purple-600 dark:text-purple-400">
+          📊 Metadatos
+        </div>
+        <div className="bg-muted/50 p-3 rounded text-sm space-y-1">
+          {Object.entries(resolvedDetails.data).map(([key, value]) => (
+            <div key={key}>
+              <span className="font-medium">{key}:</span>{' '}
+              <span className="text-muted-foreground">
+                {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (resolvedDetails.type === 'generic') {
+    const entries = Object.entries(resolvedDetails.data)
+    if (entries.length > 0) {
+      return (
+        <div className="space-y-2">
+          <div className="font-semibold text-gray-600 dark:text-gray-400">
+            📦 Información
+          </div>
+          <div className="bg-muted/50 p-3 rounded text-sm space-y-1">
+            {entries.map(([key, value]) => (
+              <div key={key}>
+                <span className="font-medium">{key}:</span>{' '}
+                <span className="text-muted-foreground">
+                  {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )
+    }
+  }
+
+  // Fallback: JSON formateado
+  return (
+    <pre className="text-xs bg-muted p-3 rounded overflow-auto max-h-60">
+      {JSON.stringify(resolvedDetails.data, null, 2)}
+    </pre>
+  )
+}
+
+interface AuditStats {
+  totalLogs: number
+  actionStats: Array<{
+    action: string
+    entityType: string
+    _count: { id: number }
+  }>
+  topUsers: Array<{
+    userId: string
+    _count: { id: number }
+  }>
+  period: string
+}
+
 export default function AuditPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -76,6 +339,8 @@ export default function AuditPage() {
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [stats, setStats] = useState<AuditStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 50,
@@ -149,48 +414,154 @@ export default function AuditPage() {
     }
   }
 
-  const exportAuditReport = async () => {
+  // Función auxiliar para traducir acciones
+  const translateAction = (action: string): string => {
+    const actionMap: Record<string, string> = {
+      'created': 'Creó',
+      'updated': 'Actualizó',
+      'deleted': 'Eliminó',
+      'login': 'Inició sesión',
+      'logout': 'Cerró sesión',
+      'assigned': 'Asignó',
+      'resolved': 'Resolvió',
+      'closed': 'Cerró',
+      'role_changed': 'Cambió rol'
+    }
+    
+    for (const [key, value] of Object.entries(actionMap)) {
+      if (action.toLowerCase().includes(key)) {
+        return value
+      }
+    }
+    
+    return action
+  }
+
+  // Función auxiliar para traducir tipos de entidad
+  const translateEntityType = (entityType: string): string => {
+    const entityMap: Record<string, string> = {
+      'ticket': 'Ticket',
+      'user': 'Usuario',
+      'category': 'Categoría',
+      'department': 'Departamento',
+      'comment': 'Comentario',
+      'system': 'Sistema'
+    }
+    return entityMap[entityType.toLowerCase()] || entityType
+  }
+
+  const exportAuditReport = async (format: 'csv' | 'json' = 'csv') => {
     try {
-      const response = await fetch('/api/admin/audit/export?' + new URLSearchParams(filters))
+      setLoading(true)
+      
+      toast({
+        title: '📤 Exportando...',
+        description: `Preparando archivo ${format.toUpperCase()}. Esto puede tomar unos momentos.`,
+      })
+
+      const response = await fetch('/api/admin/audit/export', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          format,
+          includeHeaders: true,
+          includeMetadata: true,
+          filters: {
+            ...filters,
+            limit: 50000, // Límite de seguridad
+            offset: 0
+          }
+        })
+      })
       
       if (response.ok) {
+        // Obtener advertencias del header
+        const warnings = response.headers.get('X-Warnings')
+        const totalRecords = response.headers.get('X-Total-Records')
+        const exportedRecords = response.headers.get('X-Exported-Records')
+        
         const blob = await response.blob()
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = `audit-report-${new Date().toISOString().split('T')[0]}.csv`
+        
+        // Obtener nombre del archivo del header Content-Disposition
+        const contentDisposition = response.headers.get('Content-Disposition')
+        const filenameMatch = contentDisposition?.match(/filename="(.+)"/)
+        const filename = filenameMatch ? filenameMatch[1] : `audit-logs-${new Date().toISOString().split('T')[0]}.${format}`
+        
+        a.download = filename
         document.body.appendChild(a)
         a.click()
         window.URL.revokeObjectURL(url)
         document.body.removeChild(a)
         
+        // Mostrar resultado con advertencias si existen
+        let description = `✅ ${exportedRecords || 0} registros exportados`
+        if (totalRecords && exportedRecords && totalRecords !== exportedRecords) {
+          description += ` de ${totalRecords} total`
+        }
+        
         toast({
-          title: 'Éxito',
-          description: 'Reporte de auditoría exportado correctamente'
+          title: '✅ Exportación Completada',
+          description: description + (warnings && JSON.parse(warnings).length > 0 
+            ? `\n⚠️ Advertencias: ${JSON.parse(warnings).join(', ')}` 
+            : ''),
+          duration: 10000
         })
+      } else {
+        const error = await response.json()
+        throw new Error(error.details || error.error || 'Error desconocido')
       }
     } catch (error) {
+      console.error('Error en exportación:', error)
       toast({
-        title: 'Error',
-        description: 'No se pudo exportar el reporte',
-        variant: 'destructive'
+        title: '❌ Error en Exportación',
+        description: error instanceof Error ? error.message : 'No se pudo exportar el reporte',
+        variant: 'destructive',
+        duration: 8000
       })
+    } finally {
+      setLoading(false)
     }
   }
 
   const auditColumns = [
     {
       key: 'createdAt',
-      label: 'Fecha',
-      accessorKey: 'createdAt',
-      header: 'Fecha',
-      cell: ({ row }: any) => {
-        const date = new Date(row.getValue('createdAt'))
+      label: 'Fecha y Hora',
+      render: (log: any) => {
+        const date = new Date(log.createdAt)
+        const now = new Date()
+        const diffMs = now.getTime() - date.getTime()
+        const diffMins = Math.floor(diffMs / 60000)
+        const diffHours = Math.floor(diffMs / 3600000)
+        const diffDays = Math.floor(diffMs / 86400000)
+        
+        let timeAgo = ''
+        if (diffMins < 1) timeAgo = 'Hace un momento'
+        else if (diffMins < 60) timeAgo = `Hace ${diffMins} min`
+        else if (diffHours < 24) timeAgo = `Hace ${diffHours}h`
+        else if (diffDays < 7) timeAgo = `Hace ${diffDays}d`
+        else timeAgo = date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })
+        
         return (
           <div className="text-sm">
-            <div>{date.toLocaleDateString()}</div>
+            <div className="font-medium">{date.toLocaleDateString('es-ES', { 
+              day: '2-digit', 
+              month: 'short',
+              year: 'numeric'
+            })}</div>
             <div className="text-muted-foreground text-xs">
-              {date.toLocaleTimeString()}
+              {date.toLocaleTimeString('es-ES', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+              })}
+            </div>
+            <div className="text-muted-foreground text-xs italic">
+              {timeAgo}
             </div>
           </div>
         )
@@ -199,27 +570,78 @@ export default function AuditPage() {
     {
       key: 'action',
       label: 'Acción',
-      accessorKey: 'action',
-      header: 'Acción',
-      cell: ({ row }: any) => {
-        const action = row.getValue('action')
-        const entityType = row.original.entityType
+      render: (log: any) => {
+        const action = log.action
+        const entityType = log.entityType
+        
+        // Traducir acciones a español
+        const actionTranslations: Record<string, string> = {
+          'created': 'Creado',
+          'updated': 'Actualizado',
+          'deleted': 'Eliminado',
+          'login': 'Inicio de sesión',
+          'logout': 'Cierre de sesión',
+          'login_failed': 'Intento de login fallido',
+          'assigned': 'Asignado',
+          'unassigned': 'Desasignado',
+          'status_changed': 'Estado cambiado',
+          'priority_changed': 'Prioridad cambiada',
+          'resolved': 'Resuelto',
+          'closed': 'Cerrado',
+          'role_changed': 'Rol cambiado',
+          'password_changed': 'Contraseña cambiada',
+          'promoted': 'Promovido',
+          'demoted': 'Degradado',
+          'uploaded': 'Subido',
+          'downloaded': 'Descargado',
+          'exported': 'Exportado',
+          'generated': 'Generado',
+          'backup': 'Respaldo',
+          'restore': 'Restauración',
+          'config_changed': 'Configuración cambiada',
+        }
+        
+        // Traducir tipos de entidad
+        const entityTranslations: Record<string, string> = {
+          'ticket': '🎫 Ticket',
+          'user': '👤 Usuario',
+          'category': '📂 Categoría',
+          'department': '🏢 Departamento',
+          'technician': '🔧 Técnico',
+          'comment': '💬 Comentario',
+          'attachment': '📎 Archivo',
+          'system': '⚙️ Sistema',
+          'report': '📊 Reporte',
+          'settings': '🛠️ Configuración',
+          'assignment': '📌 Asignación',
+        }
+        
+        // Obtener traducción de la acción
+        let translatedAction = action
+        for (const [key, value] of Object.entries(actionTranslations)) {
+          if (action.toLowerCase().includes(key)) {
+            translatedAction = value
+            break
+          }
+        }
         
         const getActionColor = (action: string) => {
-          if (action.includes('created')) return 'bg-green-100 text-green-800'
-          if (action.includes('updated')) return 'bg-blue-100 text-blue-800'
-          if (action.includes('deleted')) return 'bg-red-100 text-red-800'
-          if (action.includes('login')) return 'bg-purple-100 text-purple-800'
-          return 'bg-gray-100 text-gray-800'
+          if (action.includes('created')) return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+          if (action.includes('updated')) return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+          if (action.includes('deleted')) return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+          if (action.includes('login')) return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+          if (action.includes('assigned')) return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
+          if (action.includes('resolved') || action.includes('closed')) return 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200'
+          return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
         }
 
         return (
           <div className="space-y-1">
             <Badge className={getActionColor(action)}>
-              {action.replace('_', ' ')}
+              {translatedAction}
             </Badge>
             <div className="text-xs text-muted-foreground">
-              {entityType}
+              {entityTranslations[entityType] || entityType}
             </div>
           </div>
         )
@@ -228,72 +650,271 @@ export default function AuditPage() {
     {
       key: 'users',
       label: 'Usuario',
-      accessorKey: 'users',
-      header: 'Usuario',
-      cell: ({ row }: any) => {
-        const user = row.getValue('users')
-        if (!user) return <span className="text-muted-foreground">Sistema</span>
+      render: (log: any) => {
+        const user = log.users
+        if (!user) return (
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+              <Shield className="h-4 w-4 text-gray-500" />
+            </div>
+            <div>
+              <div className="text-sm font-medium">Sistema</div>
+              <div className="text-xs text-muted-foreground">Acción automática</div>
+            </div>
+          </div>
+        )
+        
+        const roleColors: Record<string, string> = {
+          'ADMIN': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+          'TECHNICIAN': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+          'CLIENT': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+        }
+        
+        const roleLabels: Record<string, string> = {
+          'ADMIN': 'Administrador',
+          'TECHNICIAN': 'Técnico',
+          'CLIENT': 'Cliente',
+        }
         
         return (
-          <div className="text-sm">
-            <div className="font-medium">{user.name}</div>
-            <div className="text-muted-foreground text-xs">{user.email}</div>
-            <Badge variant="outline" className="text-xs">
-              {user.role}
-            </Badge>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center font-semibold text-primary">
+              {user.name.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <div className="text-sm font-medium">{user.name}</div>
+              <div className="text-xs text-muted-foreground">{user.email}</div>
+              <Badge variant="outline" className={`text-xs mt-0.5 ${roleColors[user.role] || ''}`}>
+                {roleLabels[user.role] || user.role}
+              </Badge>
+            </div>
           </div>
         )
       }
     },
     {
       key: 'entityId',
-      label: 'Entidad',
-      accessorKey: 'entityId',
-      header: 'Entidad',
-      cell: ({ row }: any) => {
-        const entityId = row.getValue('entityId')
-        const entityType = row.original.entityType
+      label: 'Qué Pasó',
+      render: (log: any) => {
+        const details = log.details
+        const action = log.action
+        const entityType = log.entityType
+        const userName = log.users?.name || 'Sistema'
         
-        if (!entityId) return <span className="text-muted-foreground">-</span>
+        // Construir descripción natural y legible
+        let mainDescription = ''
+        let subDescription = ''
+        let icon = '📝'
+        
+        if (entityType === 'comment') {
+          icon = '💬'
+          mainDescription = 'Agregó un comentario'
+          
+          // Extraer el contenido del comentario
+          if (details?.content) {
+            const preview = String(details.content).slice(0, 80)
+            subDescription = `"${preview}${details.content.length > 80 ? '...' : ''}"`
+          } else if (details?.comment) {
+            const preview = String(details.comment).slice(0, 80)
+            subDescription = `"${preview}${details.comment.length > 80 ? '...' : ''}"`
+          } else if (details?.message) {
+            const preview = String(details.message).slice(0, 80)
+            subDescription = `"${preview}${details.message.length > 80 ? '...' : ''}"`
+          }
+          
+          // Indicar si es interno o público
+          if (details?.metadata?.isInternal === true) {
+            mainDescription += ' (nota interna)'
+          } else if (details?.metadata?.isInternal === false) {
+            mainDescription += ' (visible para cliente)'
+          }
+        } else if (entityType === 'ticket') {
+          icon = '🎫'
+          if (action.includes('created')) {
+            mainDescription = 'Creó un ticket'
+            if (details?.title) {
+              subDescription = details.title
+            }
+          } else if (action.includes('updated')) {
+            mainDescription = 'Actualizó un ticket'
+            if (details?.oldValues && details?.newValues) {
+              const changes = Object.keys(details.newValues).filter(
+                key => details.oldValues[key] !== details.newValues[key]
+              )
+              if (changes.length > 0) {
+                subDescription = `Modificó: ${changes.slice(0, 2).join(', ')}${changes.length > 2 ? '...' : ''}`
+              }
+            }
+          } else if (action.includes('deleted')) {
+            mainDescription = 'Eliminó un ticket'
+            icon = '🗑️'
+          } else if (action.includes('assigned')) {
+            mainDescription = 'Asignó el ticket'
+            icon = '👤'
+          } else if (action.includes('resolved')) {
+            mainDescription = 'Resolvió el ticket'
+            icon = '✅'
+          } else if (action.includes('closed')) {
+            mainDescription = 'Cerró el ticket'
+            icon = '🔒'
+          }
+        } else if (entityType === 'user') {
+          icon = '👤'
+          if (action.includes('created')) {
+            mainDescription = 'Creó un usuario'
+            if (details?.name) {
+              subDescription = details.name
+            }
+          } else if (action.includes('updated')) {
+            mainDescription = 'Actualizó un usuario'
+          } else if (action.includes('role_changed')) {
+            mainDescription = 'Cambió el rol de un usuario'
+            icon = '🔑'
+          }
+        } else if (entityType === 'category') {
+          icon = '📂'
+          mainDescription = action.includes('created') ? 'Creó una categoría' : 
+                           action.includes('updated') ? 'Actualizó una categoría' : 
+                           'Modificó una categoría'
+        } else if (entityType === 'department') {
+          icon = '🏢'
+          mainDescription = action.includes('created') ? 'Creó un departamento' : 
+                           action.includes('updated') ? 'Actualizó un departamento' : 
+                           'Modificó un departamento'
+        } else if (action.includes('login')) {
+          icon = '🔐'
+          mainDescription = 'Inició sesión'
+        } else if (action.includes('logout')) {
+          icon = '🚪'
+          mainDescription = 'Cerró sesión'
+        } else {
+          // Fallback genérico
+          const actionTranslated = translateAction(action)
+          const entityTranslated = translateEntityType(entityType)
+          mainDescription = `${actionTranslated} ${entityTranslated.toLowerCase()}`
+        }
         
         return (
-          <div className="text-sm">
-            <div className="font-mono text-xs">{entityId.slice(0, 8)}...</div>
-            <div className="text-muted-foreground text-xs">{entityType}</div>
+          <div className="text-sm space-y-1 max-w-md">
+            <div className="flex items-start gap-2">
+              <span className="text-lg">{icon}</span>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-foreground">
+                  {mainDescription}
+                </div>
+                {subDescription && (
+                  <div className="text-xs text-muted-foreground italic mt-1 line-clamp-2">
+                    {subDescription}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )
       }
     },
     {
       key: 'ipAddress',
-      label: 'IP',
-      accessorKey: 'ipAddress',
-      header: 'IP',
-      cell: ({ row }: any) => {
-        const ip = row.getValue('ipAddress')
-        return ip ? (
-          <span className="font-mono text-xs">{ip}</span>
-        ) : (
-          <span className="text-muted-foreground">-</span>
+      label: 'Contexto Técnico',
+      render: (log: any) => {
+        const ip = log.ipAddress
+        const userAgent = log.userAgent
+        const context = log.details?.context
+        
+        // Detectar navegador y SO del userAgent (fallback si no hay context)
+        let browser = context?.browser || 'Desconocido'
+        let os = context?.os || 'Desconocido'
+        let deviceType = context?.deviceType
+        let source = context?.source
+        
+        if (!context && userAgent) {
+          if (userAgent.includes('Chrome')) browser = '🌐 Chrome'
+          else if (userAgent.includes('Firefox')) browser = '🦊 Firefox'
+          else if (userAgent.includes('Safari')) browser = '🧭 Safari'
+          else if (userAgent.includes('Edge')) browser = '🌊 Edge'
+          
+          if (userAgent.includes('Windows')) os = '🪟 Windows'
+          else if (userAgent.includes('Mac')) os = '🍎 macOS'
+          else if (userAgent.includes('Linux')) os = '🐧 Linux'
+          else if (userAgent.includes('Android')) os = '🤖 Android'
+          else if (userAgent.includes('iOS')) os = '📱 iOS'
+        }
+        
+        return (
+          <div className="text-sm space-y-1">
+            {/* Origen */}
+            {source && (
+              <div className="flex items-center gap-1">
+                <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
+                  {source === 'WEB' && '🌐 Web'}
+                  {source === 'API' && '⚡ API'}
+                  {source === 'MOBILE' && '📱 Móvil'}
+                  {source === 'SYSTEM' && '⚙️ Sistema'}
+                </span>
+              </div>
+            )}
+            
+            {/* IP */}
+            {ip ? (
+              <div className="flex items-center gap-1">
+                <span className="text-muted-foreground text-xs">IP:</span>
+                <code className="text-xs bg-muted px-1 py-0.5 rounded font-mono">
+                  {ip}
+                </code>
+              </div>
+            ) : (
+              <span className="text-muted-foreground text-xs">Sin IP</span>
+            )}
+            
+            {/* Dispositivo */}
+            {deviceType && (
+              <div className="text-xs text-muted-foreground">
+                {deviceType === 'Desktop' && '🖥️ Escritorio'}
+                {deviceType === 'Mobile' && '📱 Móvil'}
+                {deviceType === 'Tablet' && '📱 Tablet'}
+              </div>
+            )}
+            
+            {/* Navegador y SO */}
+            {userAgent && (
+              <>
+                <div className="text-xs text-muted-foreground">{browser}</div>
+                <div className="text-xs text-muted-foreground">{os}</div>
+              </>
+            )}
+            
+            {/* Duración (si existe) */}
+            {context?.duration && (
+              <div className="text-xs text-purple-600 dark:text-purple-400">
+                ⏱️ {context.duration}ms
+              </div>
+            )}
+            
+            {/* Resultado (si es error) */}
+            {context?.result === 'ERROR' && (
+              <div className="text-xs text-red-600 dark:text-red-400 font-semibold">
+                ❌ Error
+              </div>
+            )}
+          </div>
         )
       }
     },
     {
       key: 'actions',
       label: 'Acciones',
-      id: 'actions',
-      header: 'Acciones',
-      cell: ({ row }: any) => {
+      render: (log: any) => {
         return (
           <Button
             variant="ghost"
             size="sm"
             onClick={() => {
-              // Mostrar detalles del log
-              console.log('Ver detalles:', row.original)
+              setSelectedLog(log)
+              setIsDialogOpen(true)
             }}
           >
-            <Eye className="h-4 w-4" />
+            <Eye className="h-4 w-4 mr-1" />
+            Ver
           </Button>
         )
       }
@@ -326,7 +947,7 @@ export default function AuditPage() {
         {/* Estadísticas de Auditoría */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <SymmetricStatsCard
-            title="Total de Logs"
+            title="Total de Eventos"
             value={stats?.totalLogs || 0}
             icon={FileText}
             color="blue"
@@ -334,25 +955,34 @@ export default function AuditPage() {
           />
           
           <SymmetricStatsCard
-            title="Acciones de Usuario"
-            value={stats?.actionStats?.filter(s => s.action.includes('user')).length || 0}
+            title="Usuarios Activos"
+            value={stats?.topUsers?.length || 0}
             icon={Users}
             color="green"
             role="ADMIN"
           />
           
           <SymmetricStatsCard
-            title="Actividad de Tickets"
-            value={stats?.actionStats?.filter(s => s.entityType === 'ticket').length || 0}
-            icon={Activity}
+            title="Acciones Críticas"
+            value={stats?.actionStats?.filter(s => 
+              s.action.includes('deleted') || 
+              s.action.includes('role_changed') ||
+              s.action.includes('login_failed')
+            ).reduce((acc, s) => acc + s._count.id, 0) || 0}
+            icon={AlertTriangle}
             color="orange"
             role="ADMIN"
+            status={(stats?.actionStats?.filter(s => 
+              s.action.includes('deleted') || 
+              s.action.includes('role_changed') ||
+              s.action.includes('login_failed')
+            ).reduce((acc, s) => acc + s._count.id, 0) || 0) > 10 ? 'warning' : 'normal'}
           />
           
           <SymmetricStatsCard
-            title="Eventos de Sistema"
-            value={stats?.actionStats?.filter(s => s.entityType === 'system').length || 0}
-            icon={Shield}
+            title="Módulos Activos"
+            value={stats?.actionStats?.length || 0}
+            icon={Activity}
             color="purple"
             role="ADMIN"
           />
@@ -441,39 +1071,45 @@ export default function AuditPage() {
                 />
               </div>
 
-              {/* Exportar */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Exportar</label>
-                <div className="flex gap-2">
+              {/* Exportar y Acciones */}
+              <div className="space-y-2 lg:col-span-2">
+                <label className="text-sm font-medium">Exportar y Acciones</label>
+                <div className="grid grid-cols-3 gap-2">
                   <Button 
-                    onClick={exportAuditReport}
-                    className="flex-1"
+                    onClick={() => exportAuditReport('csv')}
                     variant="outline"
                     size="sm"
+                    disabled={loading}
                   >
                     <Download className="h-4 w-4 mr-1" />
                     CSV
                   </Button>
+                  <Button 
+                    onClick={() => exportAuditReport('json')}
+                    variant="outline"
+                    size="sm"
+                    disabled={loading}
+                  >
+                    <Download className="h-4 w-4 mr-1" />
+                    JSON
+                  </Button>
+                  <Button 
+                    onClick={() => setFilters({
+                      search: '',
+                      entityType: 'all',
+                      action: '',
+                      userId: '',
+                      days: '30'
+                    })}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Limpiar
+                  </Button>
                 </div>
-              </div>
-
-              {/* Limpiar Filtros */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Acciones</label>
-                <Button 
-                  onClick={() => setFilters({
-                    search: '',
-                    entityType: 'all',
-                    action: '',
-                    userId: '',
-                    days: '30'
-                  })}
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                >
-                  Limpiar
-                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Máx. 50,000 registros por exportación
+                </p>
               </div>
             </div>
             
@@ -495,36 +1131,164 @@ export default function AuditPage() {
         {/* Tabla de Logs */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5" />
-              Logs de Auditoría
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                Logs de Auditoría
+              </div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Clock className="h-4 w-4" />
+                Mostrando {logs.length} de {pagination.total} registros
+              </div>
             </CardTitle>
             <CardDescription>
-              Registro detallado de todas las actividades del sistema
+              Registro detallado de todas las actividades del sistema con información contextual
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <DataTable
-              data={logs}
-              columns={auditColumns}
-              loading={loading}
-              searchable={false}
-              pagination={{
-                page: pagination.page,
-                limit: pagination.limit,
-                total: pagination.total,
-                onPageChange: (page) => loadAuditData(page, pagination.limit),
-                onLimitChange: (limit) => loadAuditData(1, limit)
-              }}
-              emptyState={{
-                icon: <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />,
-                title: "No hay logs de auditoría",
-                description: "No se encontraron registros con los filtros aplicados"
-              }}
-            />
+            {logs.length === 0 && !loading ? (
+              <div className="text-center py-12">
+                <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
+                <h3 className="text-lg font-semibold mb-2">No hay logs de auditoría</h3>
+                <p className="text-muted-foreground mb-4">
+                  No se encontraron registros con los filtros aplicados
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => setFilters({
+                    search: '',
+                    entityType: 'all',
+                    action: '',
+                    userId: '',
+                    days: '30'
+                  })}
+                >
+                  Limpiar filtros
+                </Button>
+              </div>
+            ) : (
+              <DataTable
+                data={logs}
+                columns={auditColumns}
+                loading={loading}
+                searchable={false}
+                pagination={{
+                  page: pagination.page,
+                  limit: pagination.limit,
+                  total: pagination.total,
+                  onPageChange: (page) => loadAuditData(page, pagination.limit),
+                  onLimitChange: (limit) => loadAuditData(1, limit)
+                }}
+                emptyState={{
+                  icon: <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />,
+                  title: "No hay logs de auditoría",
+                  description: "No se encontraron registros con los filtros aplicados"
+                }}
+              />
+            )}
           </CardContent>
         </Card>
       </div>
+
+      {/* Modal de Detalles */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-blue-600" />
+              Detalles del Registro de Auditoría
+            </DialogTitle>
+            <DialogDescription>
+              Información completa del evento registrado
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedLog && (
+            <div className="space-y-4 mt-4">
+              {/* Información básica */}
+              <div className="bg-muted/30 p-4 rounded-lg space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold">Acción:</span>
+                  <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                    {selectedLog.action}
+                  </Badge>
+                </div>
+                <div>
+                  <span className="font-semibold">Tipo de Entidad:</span>{' '}
+                  <span className="text-muted-foreground">{selectedLog.entityType}</span>
+                </div>
+                {selectedLog.entityId && (
+                  <div>
+                    <span className="font-semibold">
+                      {selectedLog.entityType === 'user' ? 'Usuario Afectado:' : 'ID de Entidad:'}
+                    </span>{' '}
+                    {selectedLog.entityType === 'user' && selectedLog.details?.userName ? (
+                      <span className="text-muted-foreground">
+                        {selectedLog.details.userName}
+                        {selectedLog.details.userEmail && (
+                          <span className="text-xs ml-2">({selectedLog.details.userEmail})</span>
+                        )}
+                      </span>
+                    ) : selectedLog.entityType === 'ticket' && selectedLog.details?.ticketTitle ? (
+                      <span className="text-muted-foreground">
+                        {selectedLog.details.ticketTitle}
+                      </span>
+                    ) : selectedLog.entityType === 'category' && selectedLog.details?.categoryName ? (
+                      <span className="text-muted-foreground">
+                        {selectedLog.details.categoryName}
+                      </span>
+                    ) : selectedLog.entityType === 'department' && selectedLog.details?.departmentName ? (
+                      <span className="text-muted-foreground">
+                        {selectedLog.details.departmentName}
+                      </span>
+                    ) : (
+                      <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                        {selectedLog.entityId}
+                      </code>
+                    )}
+                  </div>
+                )}
+                <div>
+                  <span className="font-semibold">Fecha:</span>{' '}
+                  <span className="text-muted-foreground">
+                    {new Date(selectedLog.createdAt).toLocaleString('es-ES', {
+                      day: '2-digit',
+                      month: 'long',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit'
+                    })}
+                  </span>
+                </div>
+                {selectedLog.users && (
+                  <div>
+                    <span className="font-semibold">Usuario:</span>{' '}
+                    <span className="text-muted-foreground">
+                      {selectedLog.users.name} ({selectedLog.users.email})
+                    </span>
+                  </div>
+                )}
+                {selectedLog.ipAddress && (
+                  <div>
+                    <span className="font-semibold">IP:</span>{' '}
+                    <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                      {selectedLog.ipAddress}
+                    </code>
+                  </div>
+                )}
+              </div>
+
+              {/* Detalles formateados */}
+              {selectedLog.details && (
+                <div className="border-t pt-4">
+                  <AuditDetailsResolver details={selectedLog.details} />
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </ModuleLayout>
   )
 }

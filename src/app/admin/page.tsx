@@ -1,9 +1,8 @@
 'use client'
 
-import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
-import { StatsCard, SymmetricStatsCard } from '@/components/shared/stats-card'
+import { UnifiedDashboardBase } from '@/components/dashboard/unified-dashboard-base'
+import { SymmetricStatsCard } from '@/components/shared/stats-card'
 import { ActionCard } from '@/components/common/action-card'
-import { LoadingDashboard } from '@/components/shared/loading-dashboard'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -12,7 +11,6 @@ import Link from 'next/link'
 import {
   Users,
   Ticket,
-  Clock,
   CheckCircle,
   AlertCircle,
   BarChart3,
@@ -21,106 +19,77 @@ import {
   UserPlus,
   TicketPlus,
   Eye,
-  TrendingUp,
-  AlertTriangle,
   Zap,
   Calendar,
   RefreshCw,
-  ExternalLink,
+  AlertTriangle,
 } from 'lucide-react'
-import { useAdminProtection } from '@/hooks/use-role-protection'
-import { useDashboardData } from '@/hooks/use-dashboard-data'
+import { useUnifiedDashboard } from '@/hooks/use-unified-dashboard'
 import { useSystemStatus } from '@/hooks/use-system-status'
-import { useRouter } from 'next/navigation'
-import { Notifications } from '@/components/ui/notifications'
-
-interface RecentActivity {
-  id: string
-  type: 'ticket_created' | 'ticket_resolved' | 'user_created'
-  title: string
-  description: string
-  time: string
-  user: string
-}
 
 export default function AdminDashboard() {
-  // Protección de ruta y carga de datos usando hooks
-  const { isAuthorized, isLoading: authLoading } = useAdminProtection()
-  const { stats, recentActivity, isLoading: dataLoading, error, refetch } = useDashboardData('ADMIN')
-  const { systemStatus, isLoading: systemLoading, error: systemError, refetch: refetchSystem } = useSystemStatus()
-  const router = useRouter()
+  const {
+    userName,
+    isLoading: dashboardLoading,
+    isAuthorized,
+    error: dashboardError,
+    stats,
+    recentActivity,
+    refetch: refetchDashboard
+  } = useUnifiedDashboard({ role: 'ADMIN' })
 
-  // Mostrar loading mientras se verifica autenticación o se cargan datos
-  if (authLoading || dataLoading || systemLoading) {
-    return (
-      <LoadingDashboard
-        title='Dashboard Administrativo'
-        subtitle='Vista general del sistema'
-        message='Cargando estadísticas del sistema...'
-      />
-    )
+  const { 
+    systemStatus, 
+    isLoading: systemLoading, 
+    error: systemError, 
+    refetch: refetchSystem 
+  } = useSystemStatus()
+
+  // Combinar estados de carga
+  const isLoading = dashboardLoading || systemLoading
+  const error = dashboardError || systemError
+
+  // Función de refresh combinada
+  const handleRefresh = () => {
+    refetchDashboard()
+    refetchSystem()
   }
 
-  // Si no está autorizado, el hook ya redirigió
-  if (!isAuthorized) return null
+  // Calcular métricas
+  const resolutionRate = stats.resolutionRate || 0
+  const systemHealth = stats.systemHealth || 'good'
 
-  // Mostrar error si hay problemas cargando datos
-  if (error || systemError) {
-    return (
-      <RoleDashboardLayout
-        title='Dashboard Administrativo'
-        subtitle='Vista general del sistema de tickets'
-      >
+  return (
+    <UnifiedDashboardBase
+      userName={userName}
+      userRole="ADMIN"
+      isLoading={isLoading}
+      isAuthorized={isAuthorized}
+      error={error}
+      title="Dashboard Administrativo"
+      subtitle="Vista general del sistema de tickets"
+      loadingMessage="Cargando estadísticas del sistema..."
+      onRefresh={handleRefresh}
+      notificationsMaxVisible={3}
+      statusBadge={{
+        text: `Sistema: ${systemHealth === 'excellent' ? 'Excelente' : 'Normal'}`,
+        variant: systemHealth === 'excellent' ? 'default' : 'secondary',
+        className: systemHealth === 'excellent' ? 'bg-green-100 text-green-800' : ''
+      }}
+    >
+      {/* Error adicional de sistema */}
+      {systemError && !dashboardError && (
         <Alert variant="destructive" className="mb-6">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription className="flex items-center justify-between">
-            <span>Error al cargar datos: {error || systemError}</span>
-            <div className="flex space-x-2">
-              {error && (
-                <Button variant="outline" size="sm" onClick={refetch}>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Reintentar Dashboard
-                </Button>
-              )}
-              {systemError && (
-                <Button variant="outline" size="sm" onClick={refetchSystem}>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Reintentar Sistema
-                </Button>
-              )}
-            </div>
+            <span>Error al cargar estado del sistema: {systemError}</span>
+            <Button variant="outline" size="sm" onClick={refetchSystem}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Reintentar Sistema
+            </Button>
           </AlertDescription>
         </Alert>
-      </RoleDashboardLayout>
-    )
-  }
-
-  // Calcular métricas derivadas
-  const resolutionRate = stats.resolutionRate || 0
-  const systemHealth = stats.systemHealth || 'good'
-  const criticalIssues = (stats.urgentTickets || 0) + (stats.overdueTickets || 0)
-
-  return (
-    <RoleDashboardLayout
-      title='Dashboard Administrativo'
-      subtitle='Vista general del sistema de tickets'
-      headerActions={
-        <div className="flex items-center space-x-3">
-          <Badge 
-            variant={systemHealth === 'excellent' ? 'default' : 'secondary'}
-            className={systemHealth === 'excellent' ? 'bg-green-100 text-green-800' : ''}
-          >
-            Sistema: {systemHealth === 'excellent' ? 'Excelente' : 'Normal'}
-          </Badge>
-          <Button variant="outline" size="sm" onClick={refetch}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Actualizar
-          </Button>
-        </div>
-      }
-    >
-      {/* Notificaciones y Alertas Unificadas */}
-      <Notifications variant="dashboard" className="mb-6" maxVisible={3} />
+      )}
 
       {/* Stats Cards */}
       <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8'>
@@ -178,7 +147,7 @@ export default function AdminDashboard() {
       </div>
 
       <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
-        {/* Quick Actions Mejoradas */}
+        {/* Quick Actions */}
         <div className='lg:col-span-2'>
           <Card>
             <CardHeader>
@@ -233,7 +202,7 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        {/* Recent Activity Mejorada */}
+        {/* Recent Activity */}
         <div>
           <Card>
             <CardHeader>
@@ -293,7 +262,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* System Status con Datos Reales */}
+      {/* System Status */}
       <div className='mt-6'>
         <Card>
           <CardHeader>
@@ -319,7 +288,7 @@ export default function AdminDashboard() {
           <CardContent>
             {systemStatus ? (
               <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
-                {/* Base de Datos Real */}
+                {/* Base de Datos */}
                 <div className={`flex flex-col p-4 rounded-lg border ${
                   systemStatus.database.status === 'active' 
                     ? 'bg-green-50 dark:bg-green-950/50 border-green-200 dark:border-green-800'
@@ -348,7 +317,7 @@ export default function AdminDashboard() {
                   )}
                 </div>
                 
-                {/* Cache Real */}
+                {/* Cache */}
                 <div className={`flex flex-col p-4 rounded-lg border ${
                   systemStatus.cache.status === 'active' 
                     ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800'
@@ -377,7 +346,7 @@ export default function AdminDashboard() {
                   )}
                 </div>
                 
-                {/* Email Service Real */}
+                {/* Email Service */}
                 <div className={`flex flex-col p-4 rounded-lg border ${
                   systemStatus.email.status === 'active' 
                     ? 'bg-purple-50 dark:bg-purple-950/50 border-purple-200 dark:border-purple-800'
@@ -406,7 +375,7 @@ export default function AdminDashboard() {
                   )}
                 </div>
                 
-                {/* Backup Real */}
+                {/* Backup */}
                 <div className={`flex flex-col p-4 rounded-lg border ${
                   systemStatus.backup.status === 'scheduled' 
                     ? 'bg-green-50 dark:bg-green-950/50 border-green-200 dark:border-green-800'
@@ -449,6 +418,6 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
-    </RoleDashboardLayout>
+    </UnifiedDashboardBase>
   )
 }

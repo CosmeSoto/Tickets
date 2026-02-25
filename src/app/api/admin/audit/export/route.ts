@@ -1,131 +1,132 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
+import prisma from '@/lib/prisma'
+import { AuditExportService } from '@/lib/services/audit-export-service'
 
-export async function GET(request: NextRequest) {
+export const maxDuration = 300 // 5 minutos máximo para exportaciones grandes
+
+export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { success: false, error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const { searchParams } = new URL(request.url)
-    
-    const filters = {
-      search: searchParams.get('search') || undefined,
-      entityType: searchParams.get('entityType') === 'all' ? undefined : searchParams.get('entityType') || undefined,
-      action: searchParams.get('action') || undefined,
-      userId: searchParams.get('userId') || undefined,
-      limit: parseInt(searchParams.get('limit') || '50000'), // Límite por defecto para exportación
-      offset: parseInt(searchParams.get('offset') || '0')
+    const body = await request.json()
+    const {
+      format = 'csv',
+      includeHeaders = true,
+      includeMetadata = true,
+      filters = {}
+    } = body
+
+    console.log(`📤 Iniciando exportación de auditoría - Formato: ${format}`)
+    console.log(`🔍 Filtros aplicados:`, filters)
+
+    // Construir query con filtros
+    const where: any = {}
+
+    // Filtro de búsqueda
+    if (filters.search) {
+      where.OR = [
+        { action: { contains: filters.search, mode: 'insensitive' } },
+        { entityType: { contains: filters.search, mode: 'insensitive' } },
+        { entityId: { contains: filters.search, mode: 'insensitive' } },
+        { users: { name: { contains: filters.search, mode: 'insensitive' } } },
+        { users: { email: { contains: filters.search, mode: 'insensitive' } } }
+      ]
     }
 
-    // Filtros de fecha
-    const days = parseInt(searchParams.get('days') || '30')
-    const startDate = new Date()
-    startDate.setDate(startDate.getDate() - days)
-    
-    // Parámetros de exportación
-    const format = searchParams.get('format') || 'csv'
-    const includeDetails = searchParams.get('includeDetails') === 'true'
-    const maxRecords = parseInt(searchParams.get('maxRecords') || '50000')
-    
-    const exportResult = await AuditServiceComplete.exportLogs({
-      format: format as 'csv' | 'json' | 'excel',
-      filters: {
-        ...filters,
-        startDate
-      },
-      includeDetails,
-      maxRecords
-    })
-
-    if (format === 'json') {
-      return NextResponse.json({
-        success: true,
-        ...exportResult,
-        exportedAt: new Date().toISOString(),
-        exportedBy: session.user.email
-      })
+    // Filtro de tipo de entidad
+    if (filters.entityType && filters.entityType !== 'all') {
+      where.entityType = filters.entityType
     }
 
-    // Generar CSV profesional
-    const headers = [
-      'Fecha y Hora',
-      'Acción',
-      'Módulo',
-      'ID de Entidad',
-      'Usuario',
-      'Email del Usuario',
-      'Rol',
-      'Dirección IP',
-      'Navegador'
-    ]
-
-    if (includeDetails) {
-      headers.push('Detalles', 'Valores Anteriores', 'Valores Nuevos')
+    // Filtro de acción
+    if (filters.action) {
+      where.action = { contains: filters.action, mode: 'insensitive' }
     }
 
-    const csvRows = [
-      // Header con información del reporte
-      `# Reporte de Auditoría del Sistema`,
-      `# Generado: ${new Date().toLocaleString('es-ES')}`,
-      `# Por: ${session.user.name} (${session.user.email})`,
-      `# Período: ${days} días`,
-      `# Total de registros: ${exportResult.total}`,
-      `# Registros exportados: ${exportResult.exported}`,
-      exportResult.truncated ? `# NOTA: Reporte truncado por límite de ${maxRecords} registros` : '',
-      '', // Línea vacía
-      headers.join(','),
-      ...exportResult.data.map(log => {
-        const baseRow = [
-          new Date(log.createdAt).toLocaleString('es-ES'),
-          log.action.replace(/_/g, ' ').toUpperCase(),
-          log.entityType.toUpperCase(),
-          log.entityId || 'N/A',
-          log.users?.name || 'Sistema',
-          log.users?.email || 'N/A',
-          log.users?.role || 'SYSTEM',
-          log.ipAddress || 'N/A',
-          log.userAgent ? log.userAgent.substring(0, 50) + '...' : 'N/A'
-        ]
+    // Filtro de usuario
+    if (filters.userId) {
+      where.userId = filters.userId
+    }
 
-        if (includeDetails) {
-          const details = log.details || {}
-          baseRow.push(
-            JSON.stringify(details.metadata || {}).replace(/"/g, '""'),
-            JSON.stringify(details.oldValues || {}).replace(/"/g, '""'),
-            JSON.stringify(details.newValues || {}).replace(/"/g, '""')
-          )
-        }
+    // Filtro de fecha (días)
+    if (filters.days) {
+      const daysAgo = new Date()
+      daysAgo.setDate(daysAgo.getDate() - parseInt(filters.days))
+      where.createdAt = { gte: daysAgo }
+    }
 
-        return baseRow.map(field => `"${field}"`).join(',')
-      })
-    ].filter(row => row !== '') // Filtrar líneas vacías
+    // Obtener logs con límite de seguridad
+    const limit = parseInt(filters.limit || '50000') // Máximo 50K por defecto
+    const offset = parseInt(filters.offset || '0')
 
-    const csvContent = csvRows.join('\n')
-    
-    const filename = `audit-report-${new Date().toISOString().split('T')[0]}-${exportResult.exported}records.csv`
-    
-    return new NextResponse(csvContent, {
+    console.log(`📊 Consultando base de datos - Límite: ${limit}, Offset: ${offset}`)
+
+    const [logs, total] = await Promise.all([
+      prisma.audit_logs.findMany({
+        where,
+        include: {
+          users: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' },
+        take: Math.min(limit, 100000), // Máximo absoluto 100K
+        skip: offset
+      }),
+      prisma.audit_logs.count({ where })
+    ])
+
+    console.log(`✅ Logs obtenidos: ${logs.length} de ${total} total`)
+
+    // Exportar usando el servicio
+    const result = await AuditExportService.exportAuditLogs(
+      logs,
+      filters,
+      {
+        format: format as 'csv' | 'json',
+        includeHeaders,
+        includeMetadata,
+        filename: filters.filename
+      }
+    )
+
+    console.log(`✅ Exportación completada - Tamaño: ${(result.content.length / 1024).toFixed(2)}KB`)
+
+    // Si hay advertencias, incluirlas en la respuesta
+    if (result.warnings && result.warnings.length > 0) {
+      console.warn(`⚠️ Advertencias de exportación:`, result.warnings)
+    }
+
+    // Retornar archivo para descarga
+    return new NextResponse(result.content, {
+      status: 200,
       headers: {
-        'Content-Type': 'text/csv; charset=utf-8',
-        'Content-Disposition': `attachment; filename="${filename}"`,
-        'X-Total-Records': exportResult.total.toString(),
-        'X-Exported-Records': exportResult.exported.toString(),
-        'X-Truncated': exportResult.truncated.toString()
+        'Content-Type': result.contentType,
+        'Content-Disposition': `attachment; filename="${result.filename}"`,
+        'X-Total-Records': total.toString(),
+        'X-Exported-Records': logs.length.toString(),
+        'X-Warnings': result.warnings ? JSON.stringify(result.warnings) : '[]'
       }
     })
 
   } catch (error) {
-    console.error('Error exporting audit logs:', error)
+    console.error('❌ Error en exportación de auditoría:', error)
     return NextResponse.json(
-      { success: false, error: 'Error interno del servidor' },
+      { 
+        error: 'Error al exportar logs de auditoría',
+        details: error instanceof Error ? error.message : 'Error desconocido'
+      },
       { status: 500 }
     )
   }

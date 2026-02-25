@@ -1,4 +1,5 @@
 import { ReportFilters } from './report-service'
+import { IdResolverService } from './id-resolver-service'
 
 export interface ExportOptions {
   format: 'csv' | 'excel' | 'pdf' | 'json'

@@ -44,9 +44,18 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Error fetching audit logs:', error)
+    console.error('[AUDIT API] Error fetching audit logs:', error)
+    console.error('[AUDIT API] Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    })
+    
     return NextResponse.json(
-      { success: false, error: 'Error interno del servidor' },
+      { 
+        success: false, 
+        error: 'Error interno del servidor',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     )
   }

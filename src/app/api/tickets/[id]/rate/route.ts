@@ -88,15 +88,16 @@ export async function POST(
     // Crear calificación
     const rating = await prisma.ticket_ratings.create({
       data: {
+        id: randomUUID(),
         ticketId,
         clientId: session.user.id,
         technicianId: ticket.assigneeId || undefined,
-        overall: data.overall,
+        rating: data.overall,
         responseTime: data.responseTime || 0,
         technicalSkill: data.technicalSkill || 0,
         communication: data.communication || 0,
         problemResolution: data.problemResolution || 0,
-        comments: data.comments,
+        feedback: data.comments,
         updatedAt: new Date(),
       },
     })
@@ -120,6 +121,7 @@ export async function POST(
     if (ticket.assigneeId) {
       await prisma.notifications.create({
         data: {
+          id: randomUUID(),
           title: 'Nueva calificación recibida',
           message: `El cliente calificó tu trabajo en el ticket: "${ticket.title}" con ${data.overall} estrellas`,
           type: 'INFO',
