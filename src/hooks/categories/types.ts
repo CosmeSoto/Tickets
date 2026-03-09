@@ -17,11 +17,14 @@ export interface CategoryData {
     name: string
     color: string
   }
-  parent?: {
+  parentId?: string
+  categories?: {
     id: string
     name: string
     color: string
     level: number
+    parentId?: string
+    categories?: any // Para relaciones anidadas
   }
   other_categories: {
     id: string

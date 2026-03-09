@@ -20,7 +20,8 @@ import {
   Eye,
   EyeOff,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  X
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { 
@@ -153,24 +154,7 @@ export function CreateUserModal({ isOpen, onClose, onUserCreated, departments }:
 
     setLoading(true)
     try {
-      // Si hay avatar, subirlo primero
-      let avatarUrl = null
-      if (formData.avatar) {
-        const avatarFormData = new FormData()
-        avatarFormData.append('avatar', formData.avatar)
-
-        const avatarResponse = await fetch('/api/upload/avatar', {
-          method: 'POST',
-          body: avatarFormData
-        })
-
-        if (avatarResponse.ok) {
-          const avatarResult = await avatarResponse.json()
-          avatarUrl = avatarResult.url
-        }
-      }
-
-      // Crear usuario
+      // Crear usuario primero
       const userData = {
         name: formData.name.trim(),
         email: formData.email.trim().toLowerCase(),
@@ -178,7 +162,6 @@ export function CreateUserModal({ isOpen, onClose, onUserCreated, departments }:
         role: formData.role,
         departmentId: formData.departmentId || null,
         phone: formData.phone.trim() || null,
-        avatar: avatarUrl,
         isActive: true
       }
 
@@ -193,6 +176,17 @@ export function CreateUserModal({ isOpen, onClose, onUserCreated, departments }:
       const result = await response.json()
 
       if (response.ok && result.success) {
+        // Si hay avatar, subirlo después de crear el usuario
+        if (formData.avatar && result.user?.id) {
+          const avatarFormData = new FormData()
+          avatarFormData.append('avatar', formData.avatar)
+
+          await fetch(`/api/users/${result.user.id}/avatar`, {
+            method: 'POST',
+            body: avatarFormData
+          })
+        }
+        
         toast({
           title: 'Usuario creado exitosamente',
           description: `${formData.name} ha sido registrado como ${USER_ROLE_FORM_OPTIONS.find(r => r.value === formData.role)?.label}`,
@@ -377,41 +371,54 @@ export function CreateUserModal({ isOpen, onClose, onUserCreated, departments }:
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center space-x-6">
-                  <div className="relative">
+                  <div className="relative group">
                     <Avatar className="h-20 w-20 border-4 border-white shadow-lg">
-                      <AvatarImage src={avatarPreview || ''} alt="Preview" />
+                      <AvatarImage src={avatarPreview || undefined} alt="Preview" />
                       <AvatarFallback className="text-lg font-semibold bg-gradient-to-br from-blue-500 to-purple-600 text-white">
                         {formData.name.split(' ').map(n => n[0]).join('').toUpperCase() || 'U'}
                       </AvatarFallback>
                     </Avatar>
+                    {/* Botón para cambiar foto */}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full p-0 shadow-sm"
+                      title="Seleccionar foto"
+                      onClick={() => document.getElementById('avatar')?.click()}
+                    >
+                      <Camera className="h-4 w-4" />
+                    </Button>
+                    {/* Botón para limpiar foto - Solo visible si hay foto seleccionada */}
+                    {(formData.avatar || avatarPreview) && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0 shadow-sm bg-white hover:bg-red-50 border-red-200 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Limpiar foto"
+                        onClick={() => {
+                          setFormData({ ...formData, avatar: undefined })
+                          setAvatarPreview(null)
+                        }}
+                      >
+                        <X className="h-3 w-3 text-red-600" />
+                      </Button>
+                    )}
                   </div>
                   
                   <div className="flex-1">
                     <div className="space-y-2">
                       <Label htmlFor="avatar">Seleccionar Imagen</Label>
-                      <div className="flex items-center space-x-2">
-                        <Input
-                          id="avatar"
-                          type="file"
-                          accept="image/*"
-                          onChange={handleAvatarChange}
-                          className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setFormData({ ...formData, avatar: undefined })
-                            setAvatarPreview(null)
-                          }}
-                          disabled={!formData.avatar && !avatarPreview}
-                        >
-                          Limpiar
-                        </Button>
-                      </div>
+                      <Input
+                        id="avatar"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleAvatarChange}
+                        className="hidden"
+                      />
                       <p className="text-xs text-muted-foreground">
-                        Formatos soportados: JPG, PNG, GIF. Tamaño máximo: 5MB
+                        Haz clic en el icono de cámara para seleccionar una foto. Formatos: JPG, PNG, GIF (máx. 5MB)
                       </p>
                     </div>
                   </div>
@@ -435,7 +442,7 @@ export function CreateUserModal({ isOpen, onClose, onUserCreated, departments }:
               <CardContent>
                 <div className="flex items-start space-x-6">
                   <Avatar className="h-16 w-16 border-4 border-white shadow-lg">
-                    <AvatarImage src={avatarPreview || ''} alt={formData.name} />
+                    <AvatarImage src={avatarPreview || undefined} alt={formData.name} />
                     <AvatarFallback className="text-lg font-semibold bg-gradient-to-br from-blue-500 to-purple-600 text-white">
                       {formData.name.split(' ').map(n => n[0]).join('').toUpperCase() || 'U'}
                     </AvatarFallback>

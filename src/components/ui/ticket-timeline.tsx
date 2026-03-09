@@ -81,6 +81,10 @@ export function TicketTimeline({
         return <AlertCircle className="h-4 w-4" />
       case 'resolution':
         return <CheckCircle className="h-4 w-4" />
+      case 'resolution_plan':
+        return <FileText className="h-4 w-4" />
+      case 'resolution_task':
+        return <CheckCircle className="h-4 w-4" />
       case 'rating':
         return <Star className="h-4 w-4" />
       case 'created':
@@ -102,6 +106,10 @@ export function TicketTimeline({
         return 'text-orange-600 bg-orange-100'
       case 'resolution':
         return 'text-emerald-600 bg-emerald-100'
+      case 'resolution_plan':
+        return 'text-indigo-600 bg-indigo-100'
+      case 'resolution_task':
+        return 'text-cyan-600 bg-cyan-100'
       case 'rating':
         return 'text-yellow-600 bg-yellow-100'
       case 'created':
@@ -132,6 +140,146 @@ export function TicketTimeline({
             <PriorityBadge priority={metadata.oldValue as any} size="sm" />
             <span className="text-muted-foreground">→</span>
             <PriorityBadge priority={metadata.newValue as any} size="sm" />
+          </div>
+        )
+      
+      case 'resolution_plan':
+        return (
+          <div className="mt-2 space-y-2 p-3 bg-indigo-50 dark:bg-indigo-950 rounded-lg border border-indigo-200 dark:border-indigo-800">
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              {metadata.startDate && (
+                <div>
+                  <span className="text-muted-foreground">Inicio programado:</span>
+                  <div className="font-medium text-indigo-700 dark:text-indigo-300">
+                    {new Date(metadata.startDate).toLocaleString('es-ES', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </div>
+                </div>
+              )}
+              {metadata.targetDate && (
+                <div>
+                  <span className="text-muted-foreground">Fecha objetivo:</span>
+                  <div className="font-medium text-indigo-700 dark:text-indigo-300">
+                    {new Date(metadata.targetDate).toLocaleString('es-ES', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </div>
+                </div>
+              )}
+              {metadata.estimatedHours && (
+                <div>
+                  <span className="text-muted-foreground">Horas estimadas:</span>
+                  <div className="font-medium">{metadata.estimatedHours}h</div>
+                </div>
+              )}
+              {metadata.totalTasks !== undefined && (
+                <div>
+                  <span className="text-muted-foreground">Tareas totales:</span>
+                  <div className="font-medium">{metadata.totalTasks}</div>
+                </div>
+              )}
+            </div>
+            <Badge variant="outline" className="text-xs">
+              Estado: {metadata.status}
+            </Badge>
+          </div>
+        )
+      
+      case 'resolution_task':
+        return (
+          <div className="mt-2 space-y-2 p-3 bg-cyan-50 dark:bg-cyan-950 rounded-lg border border-cyan-200 dark:border-cyan-800">
+            <div className="grid grid-cols-1 gap-2 text-sm">
+              {metadata.dueDate && (
+                <div>
+                  <span className="text-muted-foreground">Programado:</span>
+                  <div className="font-medium text-cyan-700 dark:text-cyan-300">
+                    {new Date(metadata.dueDate).toLocaleDateString('es-ES', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric'
+                    })}
+                  </div>
+                </div>
+              )}
+              {metadata.dueDate && metadata.estimatedHours && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="text-muted-foreground">Hora inicio:</span>
+                    <div className="font-medium text-cyan-700 dark:text-cyan-300">
+                      {new Date(metadata.dueDate).toLocaleTimeString('es-ES', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Hora fin:</span>
+                    <div className="font-medium text-cyan-700 dark:text-cyan-300">
+                      {(() => {
+                        const start = new Date(metadata.dueDate)
+                        const end = new Date(start.getTime() + (metadata.estimatedHours * 60 * 60 * 1000))
+                        return end.toLocaleTimeString('es-ES', {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {metadata.estimatedHours && (
+                <div>
+                  <span className="text-muted-foreground">Duración:</span>
+                  <div className="font-medium">
+                    {(() => {
+                      const hours = Math.floor(metadata.estimatedHours)
+                      const minutes = Math.round((metadata.estimatedHours - hours) * 60)
+                      if (hours === 0) return `${minutes} minutos`
+                      if (minutes === 0) return `${hours} ${hours === 1 ? 'hora' : 'horas'}`
+                      return `${hours} ${hours === 1 ? 'hora' : 'horas'} ${minutes} minutos`
+                    })()}
+                  </div>
+                </div>
+              )}
+              {metadata.completedAt && (
+                <div>
+                  <span className="text-muted-foreground">Completada:</span>
+                  <div className="font-medium text-green-700 dark:text-green-300">
+                    {new Date(metadata.completedAt).toLocaleString('es-ES', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </div>
+                </div>
+              )}
+              {metadata.assignedTo && (
+                <div>
+                  <span className="text-muted-foreground">Asignado a:</span>
+                  <div className="font-medium">{metadata.assignedTo.name}</div>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center space-x-2">
+              <Badge variant="outline" className="text-xs">
+                {metadata.priority === 'high' ? 'Alta' : metadata.priority === 'medium' ? 'Media' : 'Baja'}
+              </Badge>
+              <Badge variant={metadata.status === 'completed' ? 'default' : 'secondary'} className="text-xs">
+                {metadata.status === 'completed' ? 'Completada' : 
+                 metadata.status === 'in_progress' ? 'En progreso' : 'Pendiente'}
+              </Badge>
+            </div>
           </div>
         )
       

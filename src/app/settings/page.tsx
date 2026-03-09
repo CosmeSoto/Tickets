@@ -66,8 +66,8 @@ export default function SettingsPage() {
         if (data.success && data.settings) {
           setSettings({
             privacy: {
-              profileVisible: true,
-              activityVisible: true,
+              profileVisible: data.settings.profileVisible ?? true,
+              activityVisible: data.settings.activityVisible ?? true,
             },
             preferences: {
               theme: data.settings.theme || 'light',
@@ -170,16 +170,37 @@ export default function SettingsPage() {
   const savePrivacySettings = async () => {
     setLoading(true)
     try {
-      // Aquí iría la lógica para guardar configuraciones de privacidad
-      toast({
-        title: 'Configuración guardada',
-        description: 'Tus preferencias de privacidad han sido actualizadas',
+      const payload = {
+        profileVisible: settings.privacy.profileVisible,
+        activityVisible: settings.privacy.activityVisible,
+      }
+
+      const response = await fetch('/api/user/settings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
       })
+
+      if (response.ok) {
+        toast({
+          title: 'Configuración guardada',
+          description: 'Tus preferencias de privacidad han sido actualizadas',
+        })
+      } else {
+        const error = await response.json()
+        toast({
+          title: 'Error al guardar',
+          description: error.error || 'No se pudieron guardar las configuraciones de privacidad',
+          variant: 'destructive',
+        })
+      }
     } catch (error) {
       console.error('Error saving privacy settings:', error)
       toast({
-        title: 'Error al guardar',
-        description: 'No se pudieron guardar las configuraciones de privacidad',
+        title: 'Error de conexión',
+        description: 'No se pudo conectar con el servidor',
         variant: 'destructive',
       })
     } finally {

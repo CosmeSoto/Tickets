@@ -72,7 +72,8 @@ export async function POST(
     // Contar asignaciones activas
     const activeAssignments = await prisma.technician_assignments.count({
       where: {
-        technicianId: userId
+        technicianId: userId,
+        isActive: true
       }
     })
 

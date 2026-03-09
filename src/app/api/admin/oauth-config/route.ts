@@ -76,9 +76,9 @@ export async function POST(request: NextRequest) {
     const { provider, clientId, clientSecret, tenantId, isEnabled, redirectUri, scopes } = body
 
     // Validaciones
-    if (!provider || !clientId || !clientSecret) {
+    if (!provider || !clientId) {
       return NextResponse.json(
-        { success: false, error: 'Provider, clientId y clientSecret son requeridos' },
+        { success: false, error: 'Provider y clientId son requeridos' },
         { status: 400 }
       )
     }
@@ -90,8 +90,33 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Encriptar client secret
-    const encryptedSecret = encrypt(clientSecret)
+    // Buscar configuración existente
+    const existingConfig = await prisma.oauth_configs.findUnique({
+      where: { provider }
+    })
+
+    // Si es una nueva configuración, clientSecret es obligatorio
+    if (!existingConfig && !clientSecret) {
+      return NextResponse.json(
+        { success: false, error: 'Client Secret es requerido para nueva configuración' },
+        { status: 400 }
+      )
+    }
+
+    // Preparar datos de actualización
+    const updateData: any = {
+      clientId,
+      tenantId: tenantId || null,
+      isEnabled: isEnabled ?? false,
+      redirectUri: redirectUri || null,
+      scopes: scopes || null,
+      updatedAt: new Date(),
+    }
+
+    // Solo actualizar clientSecret si se proporcionó uno nuevo
+    if (clientSecret) {
+      updateData.clientSecret = encrypt(clientSecret)
+    }
 
     // Crear o actualizar configuración
     const config = await prisma.oauth_configs.upsert({
@@ -100,7 +125,7 @@ export async function POST(request: NextRequest) {
         id: randomUUID(),
         provider,
         clientId,
-        clientSecret: encryptedSecret,
+        clientSecret: encrypt(clientSecret!), // Sabemos que existe porque lo validamos arriba
         tenantId: tenantId || null,
         isEnabled: isEnabled ?? false,
         redirectUri: redirectUri || null,
@@ -108,15 +133,7 @@ export async function POST(request: NextRequest) {
         createdAt: new Date(),
         updatedAt: new Date(),
       },
-      update: {
-        clientId,
-        clientSecret: encryptedSecret,
-        tenantId: tenantId || null,
-        isEnabled: isEnabled ?? false,
-        redirectUri: redirectUri || null,
-        scopes: scopes || null,
-        updatedAt: new Date(),
-      }
+      update: updateData
     })
 
     return NextResponse.json({

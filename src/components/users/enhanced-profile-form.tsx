@@ -170,7 +170,7 @@ export function EnhancedProfileForm({
             <div className="relative group">
               <Avatar className="h-24 w-24 border-4 border-white shadow-lg">
                 <AvatarImage 
-                  src={user.oauthPicture || user.avatar || ''} 
+                  src={user.oauthPicture || user.avatar || undefined} 
                   alt={user.displayName || user.name} 
                 />
                 <AvatarFallback className="text-2xl font-bold bg-gradient-to-br from-blue-500 to-purple-600 text-white">

@@ -54,7 +54,9 @@ export function Notifications({
 
   // Cargar notificaciones
   const loadNotifications = async () => {
-    if (!session?.user?.id) return
+    if (!session?.user?.id) {
+      return
+    }
 
     setLoading(true)
     try {
@@ -69,13 +71,15 @@ export function Notifications({
       
       if (response.ok) {
         const data = await response.json()
-        const activeNotifications = data.notifications.filter((notification: Notification) => 
+        // El endpoint devuelve un array directamente, no un objeto con propiedad notifications
+        const notificationsArray = Array.isArray(data) ? data : (data.notifications || [])
+        const activeNotifications = notificationsArray.filter((notification: Notification) => 
           !dismissedNotifications.includes(notification.id)
         )
         setNotifications(activeNotifications)
       }
     } catch (error) {
-      console.error('Error loading notifications:', error)
+      console.error('[NOTIFICATIONS] Error loading notifications:', error)
     } finally {
       setLoading(false)
     }
@@ -83,23 +87,34 @@ export function Notifications({
 
   // Manejar acción de notificación
   const handleNotificationAction = (notification: Notification) => {
-    if (notification.actionUrl) {
-      // Marcar como leída si no lo está
-      if (!notification.isRead) {
-        markAsRead(notification.id)
-      }
+    // Marcar como leída si no lo está
+    if (!notification.isRead) {
+      markAsRead(notification.id)
+    }
+    
+    // Cerrar panel si es campanita
+    if (variant === 'bell') {
+      setIsOpen(false)
+    }
+    
+    // Determinar la URL de redirección
+    // 1. Intentar obtener del metadata.actionUrl o metadata.link
+    let redirectUrl = notification.metadata?.actionUrl || notification.metadata?.link || notification.actionUrl
+    
+    // 2. Si no hay link pero hay ticketId, construir la URL según el rol
+    if (!redirectUrl && notification.ticketId) {
+      const role = session?.user?.role?.toLowerCase() || 'client'
+      redirectUrl = `/${role}/tickets/${notification.ticketId}`
+    }
+    
+    // Redirigir si hay URL
+    if (redirectUrl) {
+      router.push(redirectUrl)
       
-      // Cerrar panel si es campanita
-      if (variant === 'bell') {
-        setIsOpen(false)
-      }
-      
-      // Redirigir
-      router.push(notification.actionUrl)
-      
+      const actionText = notification.metadata?.actionText || notification.actionText || 'Ver detalles'
       toast({
         title: 'Redirigiendo...',
-        description: `${notification.actionText}: ${notification.title}`,
+        description: `${actionText}: ${notification.title}`,
         duration: 3000,
       })
     }
@@ -130,22 +145,59 @@ export function Notifications({
   }
 
   // Eliminar notificación
-  const dismissNotification = (notificationId: string, event: React.MouseEvent) => {
+  const dismissNotification = async (notificationId: string, event: React.MouseEvent) => {
     event.stopPropagation()
+    event.preventDefault()
     
-    if (isDynamicNotification(notificationId)) {
-      markDynamicAsDismissed(notificationId)
-    }
+    // Prevenir múltiples clicks
+    const button = event.currentTarget as HTMLButtonElement
+    if (button.disabled) return
+    button.disabled = true
     
-    setDismissedNotifications(prev => [...prev, notificationId])
+    // Primero, remover de la UI inmediatamente para mejor UX
     setNotifications(prev => prev.filter(n => n.id !== notificationId))
     
-    const notification = notifications.find(n => n.id === notificationId)
-    toast({
-      title: 'Notificación eliminada',
-      description: notification ? `"${notification.title}" ha sido eliminada` : 'La notificación ha sido eliminada',
-      duration: 3000,
-    })
+    // Si es notificación dinámica (localStorage)
+    if (isDynamicNotification(notificationId)) {
+      markDynamicAsDismissed(notificationId)
+      setDismissedNotifications(prev => [...prev, notificationId])
+      
+      const notification = notifications.find(n => n.id === notificationId)
+      toast({
+        title: 'Notificación eliminada',
+        description: notification ? `"${notification.title}" ha sido eliminada` : 'La notificación ha sido eliminada',
+        duration: 3000,
+      })
+      button.disabled = false
+      return
+    }
+    
+    // Si es notificación persistente (base de datos), eliminarla del servidor
+    try {
+      const response = await fetch(`/api/notifications/${notificationId}`, {
+        method: 'DELETE'
+      })
+      
+      if (response.ok) {
+        const notification = notifications.find(n => n.id === notificationId)
+        toast({
+          title: 'Notificación eliminada',
+          description: notification ? `"${notification.title}" ha sido eliminada` : 'La notificación ha sido eliminada',
+          duration: 3000,
+        })
+      } else if (response.status === 404) {
+        // La notificación ya no existe en la BD, pero ya la removimos de la UI
+        // No mostrar error al usuario, es un caso normal
+      } else {
+        throw new Error('Error al eliminar notificación')
+      }
+    } catch (error) {
+      console.error('[NOTIFICATION] Error deleting notification:', error)
+      // Ya removimos de la UI, no es necesario hacer nada más
+    } finally {
+      // Re-habilitar el botón
+      button.disabled = false
+    }
   }
 
   // Marcar todas como leídas
@@ -235,7 +287,7 @@ export function Notifications({
   useEffect(() => {
     if (session?.user?.id) {
       loadNotifications()
-      const interval = setInterval(loadNotifications, 2 * 60 * 1000) // Cada 2 minutos
+      const interval = setInterval(loadNotifications, 30 * 1000) // Cada 30 segundos
       return () => clearInterval(interval)
     }
     return undefined

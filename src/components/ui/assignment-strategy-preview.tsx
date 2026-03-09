@@ -48,12 +48,14 @@ interface AssignmentStats {
 interface AssignmentStrategyPreviewProps {
   categoryId: string | null
   categoryLevel: number
+  hierarchyPath?: any[] // Agregar jerarquía para categorías nuevas
   onSimulate?: () => void
 }
 
 export function AssignmentStrategyPreview({ 
   categoryId, 
   categoryLevel,
+  hierarchyPath = [],
   onSimulate 
 }: AssignmentStrategyPreviewProps) {
   const [preview, setPreview] = useState<AssignmentPreview | null>(null)
@@ -61,27 +63,56 @@ export function AssignmentStrategyPreview({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Simular asignación
+  // Simular asignación para categorías existentes o nuevas
   const simulateAssignment = async () => {
-    if (!categoryId) return
-
     setLoading(true)
     setError(null)
 
     try {
-      const [previewResponse, statsResponse] = await Promise.all([
-        fetch(`/api/technicians/simulate-assignment?categoryId=${categoryId}`),
-        fetch(`/api/technicians/assignment-stats?categoryId=${categoryId}`)
-      ])
+      if (categoryId) {
+        // Categoría existente - usar API normal
+        const [previewResponse, statsResponse] = await Promise.all([
+          fetch(`/api/technicians/simulate-assignment?categoryId=${categoryId}`),
+          fetch(`/api/technicians/assignment-stats?categoryId=${categoryId}`)
+        ])
 
-      if (previewResponse.ok) {
-        const previewData = await previewResponse.json()
-        setPreview(previewData.data)
-      }
+        if (previewResponse.ok) {
+          const previewData = await previewResponse.json()
+          setPreview(previewData.data)
+        }
 
-      if (statsResponse.ok) {
-        const statsData = await statsResponse.json()
-        setStats(statsData.data || [])
+        if (statsResponse.ok) {
+          const statsData = await statsResponse.json()
+          setStats(statsData.data || [])
+        }
+      } else if (hierarchyPath.length > 0) {
+        // Categoría nueva - simular basado en jerarquía
+        const parentIds = hierarchyPath.slice(0, -1).map(item => item.id).filter(id => id !== 'new')
+        
+        if (parentIds.length > 0) {
+          // Simular usando el último padre válido
+          const parentId = parentIds[parentIds.length - 1]
+          const response = await fetch(`/api/technicians/simulate-assignment?categoryId=${parentId}&simulateLevel=${categoryLevel}`)
+          
+          if (response.ok) {
+            const data = await response.json()
+            setPreview({
+              ...data.data,
+              reason: `Simulación basada en jerarquía padre (Nivel ${categoryLevel})`
+            })
+          }
+        } else {
+          // Categoría de nivel 1 nueva
+          setPreview({
+            selectedTechnician: null,
+            strategy: {
+              categoryLevel,
+              availableTechnicians: [],
+              categoryPath: hierarchyPath
+            },
+            reason: 'Categoría de nivel 1 - Se asignarán técnicos generalistas'
+          })
+        }
       }
 
       onSimulate?.()
@@ -92,211 +123,75 @@ export function AssignmentStrategyPreview({
     }
   }
 
-  // Simular automáticamente cuando cambia la categoría
+  // Simular automáticamente cuando cambia la categoría o jerarquía
   useEffect(() => {
-    if (categoryId) {
+    if (categoryId || hierarchyPath.length > 0) {
       simulateAssignment()
     } else {
       setPreview(null)
       setStats([])
     }
-  }, [categoryId])
-
-  if (!categoryId) {
-    return (
-      <Card>
-        <CardContent className="pt-6">
-          <div className="text-center py-4 text-muted-foreground">
-            <Target className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-            <p>Selecciona una categoría para ver la estrategia de asignación</p>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
+  }, [categoryId, categoryLevel, hierarchyPath])
 
   return (
-    <div className="space-y-4">
-      {/* Simulación de Asignación */}
+    <div className="space-y-3">
+      {/* Simulación de Asignación - Compacta */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Zap className="h-5 w-5 text-blue-600" />
-              <span>Simulación de Asignación Automática</span>
-            </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={simulateAssignment}
-              disabled={loading}
-            >
-              {loading ? 'Simulando...' : 'Actualizar'}
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-4">
           {loading ? (
-            <div className="flex items-center justify-center py-4">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-              <span className="ml-2 text-muted-foreground">Simulando asignación...</span>
+            <div className="flex items-center justify-center py-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+              <span className="ml-2 text-sm text-muted-foreground">Simulando...</span>
             </div>
           ) : error ? (
-            <div className="flex items-center space-x-2 text-red-600 bg-red-50 p-3 rounded">
+            <div className="flex items-center space-x-2 text-red-600 bg-red-50 p-2 rounded text-sm">
               <AlertTriangle className="h-4 w-4" />
               <span>{error}</span>
             </div>
           ) : preview ? (
-            <div className="space-y-4">
+            <div className="space-y-2">
               {preview.selectedTechnician ? (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center space-x-3">
-                      <CheckCircle className="h-6 w-6 text-green-600" />
-                      <div>
+                <div className="bg-green-50 border border-green-200 rounded p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <div className="text-sm">
                         <div className="font-medium text-green-900">
                           {preview.selectedTechnician.name}
                         </div>
-                        <div className="text-sm text-green-700">
-                          {preview.selectedTechnician.email}
-                        </div>
-                        <div className="text-xs text-green-600 mt-1">
+                        <div className="text-xs text-green-700">
                           {preview.reason}
                         </div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <Badge variant="default" className="mb-1">
-                        Prioridad {preview.selectedTechnician.priority}
-                      </Badge>
-                      <div className="text-xs text-green-600">
-                        Nivel {preview.selectedTechnician.categoryLevel}
-                      </div>
-                      <div className="text-xs text-green-600">
-                        {preview.selectedTechnician.currentTickets}/{preview.selectedTechnician.maxTickets} tickets
-                      </div>
-                    </div>
+                    <Badge variant="default" className="text-xs">
+                      P{preview.selectedTechnician.priority}
+                    </Badge>
                   </div>
                 </div>
               ) : (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
                   <div className="flex items-center space-x-2">
-                    <AlertTriangle className="h-5 w-5 text-yellow-600" />
-                    <div>
+                    <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                    <div className="text-sm">
                       <div className="font-medium text-yellow-900">
-                        No hay técnicos disponibles
+                        Sin técnicos disponibles
                       </div>
-                      <div className="text-sm text-yellow-700">
-                        {preview.reason}
+                      <div className="text-xs text-yellow-700">
+                        Se asignará manualmente o se usará cascada hacia niveles superiores
                       </div>
                     </div>
                   </div>
                 </div>
               )}
-
-              {/* Información de la estrategia */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <div className="text-sm">
-                  <div className="font-medium text-blue-900 mb-2">
-                    Estrategia de Cascada Jerárquica:
-                  </div>
-                  <div className="space-y-1 text-blue-700">
-                    <div>• Categoría objetivo: Nivel {preview.strategy.categoryLevel}</div>
-                    <div>• Técnicos evaluados: {preview.strategy.availableTechnicians.length}</div>
-                    <div>• Niveles en cascada: {preview.strategy.categoryPath.length}</div>
-                  </div>
-                </div>
-              </div>
             </div>
-          ) : null}
+          ) : (
+            <div className="text-sm text-muted-foreground text-center py-2">
+              Configura técnicos para ver la simulación
+            </div>
+          )}
         </CardContent>
       </Card>
-
-      {/* Estadísticas de Asignación */}
-      {stats.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <BarChart3 className="h-5 w-5 text-purple-600" />
-              <span>Estadísticas de Técnicos Asignados</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {stats.map(stat => (
-                <div key={stat.technicianId} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className="flex items-center space-x-2">
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                      <Badge variant={stat.priority <= 2 ? 'default' : 'secondary'}>
-                        P{stat.priority}
-                      </Badge>
-                    </div>
-                    <div>
-                      <div className="font-medium text-foreground">
-                        {stat.technicianName}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {stat.currentTickets}/{stat.maxTickets} tickets asignados
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-3">
-                    <div className="text-right">
-                      <div className="text-sm font-medium">
-                        {stat.utilization.toFixed(1)}%
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Utilización
-                      </div>
-                    </div>
-                    
-                    <div className="w-16 bg-gray-200 rounded-full h-2">
-                      <div 
-                        className={`h-2 rounded-full ${
-                          stat.utilization >= 90 ? 'bg-red-500' :
-                          stat.utilization >= 70 ? 'bg-yellow-500' :
-                          'bg-green-500'
-                        }`}
-                        style={{ width: `${Math.min(stat.utilization, 100)}%` }}
-                      />
-                    </div>
-                    
-                    <Badge variant={stat.autoAssign ? 'default' : 'outline'}>
-                      {stat.autoAssign ? 'Auto' : 'Manual'}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-            
-            {/* Resumen */}
-            <div className="mt-4 pt-4 border-t border-border">
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div>
-                  <div className="text-lg font-semibold text-foreground">
-                    {stats.length}
-                  </div>
-                  <div className="text-xs text-muted-foreground">Técnicos</div>
-                </div>
-                <div>
-                  <div className="text-lg font-semibold text-foreground">
-                    {(stats.reduce((sum, s) => sum + s.utilization, 0) / stats.length).toFixed(1)}%
-                  </div>
-                  <div className="text-xs text-muted-foreground">Utilización Promedio</div>
-                </div>
-                <div>
-                  <div className="text-lg font-semibold text-foreground">
-                    {stats.filter(s => s.autoAssign).length}
-                  </div>
-                  <div className="text-xs text-muted-foreground">Auto-asignación</div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   )
 }

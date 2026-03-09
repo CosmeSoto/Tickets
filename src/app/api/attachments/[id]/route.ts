@@ -14,10 +14,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const fileInfo = await FileService.downloadFile((await params).id)
     const fileBuffer = await readFile(fileInfo.path)
 
+    // Verificar si es una solicitud de descarga o vista previa
+    const { searchParams } = new URL(request.url)
+    const download = searchParams.get('download') === 'true'
+
     return new NextResponse(fileBuffer, {
       headers: {
         'Content-Type': fileInfo.mimeType,
-        'Content-Disposition': `attachment; filename="${fileInfo.filename}"`,
+        'Content-Disposition': download 
+          ? `attachment; filename="${fileInfo.filename}"`
+          : `inline; filename="${fileInfo.filename}"`,
       },
     })
   } catch (error) {

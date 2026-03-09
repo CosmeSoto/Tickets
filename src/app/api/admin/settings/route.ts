@@ -6,31 +6,31 @@ import { z } from 'zod'
 import { randomUUID } from 'crypto'
 
 const settingsSchema = z.object({
-  systemName: z.string().min(1).max(100),
-  systemDescription: z.string().max(500),
-  supportEmail: z.string().email(),
-  maxTicketsPerUser: z.number().min(1).max(100),
-  autoAssignmentEnabled: z.boolean(),
-  emailEnabled: z.boolean(),
+  systemName: z.string().min(1).max(100).optional(),
+  systemDescription: z.string().max(500).optional(),
+  supportEmail: z.string().email().optional(),
+  maxTicketsPerUser: z.number().min(1).max(100).optional(),
+  autoAssignmentEnabled: z.boolean().optional(),
+  emailEnabled: z.boolean().optional(),
   smtpHost: z.string().optional(),
   smtpPort: z.number().optional(),
   smtpUser: z.string().optional(),
   smtpPassword: z.string().optional(),
-  smtpSecure: z.boolean(),
-  emailFrom: z.string().email().optional(),
-  notificationsEnabled: z.boolean(),
-  emailNotifications: z.boolean(),
-  browserNotifications: z.boolean(),
-  sessionTimeout: z.number().min(5).max(1440),
-  maxLoginAttempts: z.number().min(3).max(10),
-  passwordMinLength: z.number().min(6).max(20),
-  requirePasswordChange: z.boolean(),
-  maxFileSize: z.number().min(1).max(100),
-  allowedFileTypes: z.array(z.string()),
-  backupEnabled: z.boolean(),
-  backupFrequency: z.enum(['daily', 'weekly', 'monthly']),
-  backupRetention: z.number().min(7).max(365),
-})
+  smtpSecure: z.boolean().optional(),
+  emailFrom: z.string().email().optional().or(z.literal('')),
+  notificationsEnabled: z.boolean().optional(),
+  emailNotifications: z.boolean().optional(),
+  browserNotifications: z.boolean().optional(),
+  sessionTimeout: z.number().min(5).max(1440).optional(),
+  maxLoginAttempts: z.number().min(3).max(10).optional(),
+  passwordMinLength: z.number().min(6).max(20).optional(),
+  requirePasswordChange: z.boolean().optional(),
+  maxFileSize: z.number().min(1).max(100).optional(),
+  allowedFileTypes: z.array(z.string()).optional(),
+  backupEnabled: z.boolean().optional(),
+  backupFrequency: z.enum(['daily', 'weekly', 'monthly']).optional(),
+  backupRetention: z.number().min(7).max(365).optional(),
+}).passthrough() // Permitir campos adicionales
 
 // Configuración por defecto
 const defaultSettings = {
@@ -130,7 +130,19 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const validatedData = settingsSchema.parse(body)
+    
+    // Validar datos
+    const validation = settingsSchema.safeParse(body)
+    
+    if (!validation.success) {
+      console.error('Error de validación:', validation.error.errors)
+      return NextResponse.json({ 
+        error: 'Datos inválidos', 
+        details: validation.error.errors 
+      }, { status: 400 })
+    }
+    
+    const validatedData = validation.data
 
     // Actualizar configuraciones en la base de datos
     const updatePromises = Object.entries(validatedData).map(([key, value]) => {
@@ -142,6 +154,8 @@ export async function PUT(request: NextRequest) {
         stringValue = value.toString()
       } else if (Array.isArray(value)) {
         stringValue = JSON.stringify(value)
+      } else if (value === null || value === undefined) {
+        return null // Skip null/undefined values
       } else {
         stringValue = value as string
       }
@@ -157,9 +171,17 @@ export async function PUT(request: NextRequest) {
           updatedAt: new Date()
         },
       })
-    })
+    }).filter(Boolean) // Remove null entries
 
     await Promise.all(updatePromises)
+
+    // NUEVO: Limpiar caché de configuración de seguridad
+    try {
+      const { SecurityConfigService } = await import('@/lib/services/security-config-service')
+      SecurityConfigService.clearCache()
+    } catch (error) {
+      console.warn('No se pudo limpiar caché de seguridad:', error)
+    }
 
     // Crear entrada en el historial de auditoría
     await prisma.audit_logs.create({
@@ -178,11 +200,15 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Datos inválidos', details: error.errors }, { status: 400 })
-    }
-
     console.error('Error al actualizar configuración:', error)
+    
+    if (error instanceof Error) {
+      return NextResponse.json({ 
+        error: 'Error interno del servidor',
+        message: error.message 
+      }, { status: 500 })
+    }
+    
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }

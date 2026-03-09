@@ -237,41 +237,6 @@ export default function CategoriesPage() {
     }
   ]
 
-  // Configuración de acciones masivas
-  const massActionsConfig: MassActionConfig<any>[] = [
-    {
-      key: 'activate',
-      label: 'Activar',
-      onClick: async (categories) => {
-        if (massActions) {
-          await massActions.bulkActivate(categories)
-        }
-      },
-      variant: 'default'
-    },
-    {
-      key: 'deactivate',
-      label: 'Desactivar',
-      onClick: async (categories) => {
-        if (massActions) {
-          await massActions.bulkDeactivate(categories)
-        }
-      },
-      variant: 'outline'
-    },
-    {
-      key: 'delete',
-      label: 'Eliminar',
-      onClick: async (categories) => {
-        if (massActions) {
-          await massActions.bulkDelete(categories)
-        }
-      },
-      variant: 'destructive',
-      confirmMessage: '¿Estás seguro de que quieres eliminar las categorías seleccionadas?'
-    }
-  ]
-
   // Construir jerarquía para vista árbol
   const buildHierarchy = (cats: any[]): any[] => {
     // Crear mapa de categorías por ID con todos sus datos
@@ -330,11 +295,6 @@ export default function CategoriesPage() {
       onRetry={refresh}
       headerActions={
         <div className="flex items-center space-x-2">
-          {massActions && massActions.selectedCount > 0 && (
-            <Badge variant='outline'>
-              {massActions.selectedCount} seleccionado{massActions.selectedCount !== 1 ? 's' : ''}
-            </Badge>
-          )}
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -586,15 +546,10 @@ export default function CategoriesPage() {
                 
                 // Interacción
                 onRowClick={(category) => handleEdit(category)}
-                selectable={true}
-                selectedItems={[]}
-                onSelectionChange={(items) => {
-                  console.log('Selección cambiada:', items)
-                }}
+                selectable={false}
                 
                 // Acciones
                 actions={rowActions}
-                massActions={massActionsConfig}
                 
                 // Configuración
                 userRole="ADMIN"
@@ -648,21 +603,70 @@ export default function CategoriesPage() {
                       "{deletingCategory.name}"
                     </span>
                     <br /><br />
-                    <div className='mt-3 p-3 bg-muted rounded text-sm'>
+                    <div className='mt-3 p-3 bg-muted rounded text-sm space-y-2'>
                       <div className='font-medium mb-2'>Información de la categoría:</div>
-                      <div>• Nivel: {deletingCategory.levelName}</div>
-                      <div>• Tickets asociados: {deletingCategory._count?.tickets || 0}</div>
-                      <div>• Subcategorías: {deletingCategory._count?.other_categories || 0}</div>
-                      <div>• Técnicos asignados: {deletingCategory.technician_assignments?.length || 0}</div>
+                      <div className="flex items-center justify-between">
+                        <span>• Nivel:</span>
+                        <span className="font-medium">{deletingCategory.levelName}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>• Tickets asociados:</span>
+                        <span className={`font-medium ${deletingCategory._count?.tickets > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          {deletingCategory._count?.tickets || 0}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>• Subcategorías:</span>
+                        <span className={`font-medium ${deletingCategory._count?.other_categories > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          {deletingCategory._count?.other_categories || 0}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>• Técnicos asignados:</span>
+                        <span className="font-medium text-blue-600">
+                          {deletingCategory.technician_assignments?.length || 0}
+                        </span>
+                      </div>
+                      
                       {!deletingCategory.canDelete && (
-                        <div className='mt-2 text-red-600 font-medium'>
-                          ⚠️ No se puede eliminar: tiene tickets asociados o subcategorías
+                        <div className='mt-3 p-2 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded'>
+                          <div className='text-red-600 dark:text-red-400 font-medium text-sm'>
+                            ⚠️ No se puede eliminar esta categoría
+                          </div>
+                          <div className='text-red-600 dark:text-red-400 text-xs mt-1'>
+                            {deletingCategory._count?.tickets > 0 && (
+                              <div>• Tiene {deletingCategory._count.tickets} ticket(s) asociado(s)</div>
+                            )}
+                            {deletingCategory._count?.other_categories > 0 && (
+                              <div>• Tiene {deletingCategory._count.other_categories} subcategoría(s)</div>
+                            )}
+                          </div>
+                          <div className='text-red-600 dark:text-red-400 text-xs mt-2'>
+                            Para eliminar esta categoría, primero debes:
+                            {deletingCategory._count?.tickets > 0 && (
+                              <div>1. Reasignar o eliminar los tickets asociados</div>
+                            )}
+                            {deletingCategory._count?.other_categories > 0 && (
+                              <div>2. Eliminar o reasignar las subcategorías</div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {deletingCategory.canDelete && deletingCategory.technician_assignments?.length > 0 && (
+                        <div className='mt-3 p-2 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded'>
+                          <div className='text-blue-600 dark:text-blue-400 text-xs'>
+                            ℹ️ Las asignaciones de técnicos se eliminarán automáticamente
+                          </div>
                         </div>
                       )}
                     </div>
-                    <div className='mt-2'>
-                      Esta acción no se puede deshacer. Todos los datos asociados a esta categoría se perderán permanentemente.
-                    </div>
+                    
+                    {deletingCategory.canDelete && (
+                      <div className='mt-2 text-sm'>
+                        Esta acción no se puede deshacer.
+                      </div>
+                    )}
                   </>
                 )}
               </AlertDialogDescription>
@@ -672,7 +676,10 @@ export default function CategoriesPage() {
               <AlertDialogAction
                 onClick={handleDelete}
                 disabled={deleting || !deletingCategory?.canDelete}
-                className='bg-red-600 hover:bg-red-700 disabled:bg-gray-400'
+                className={cn(
+                  'bg-red-600 hover:bg-red-700',
+                  (!deletingCategory?.canDelete) && 'opacity-50 cursor-not-allowed'
+                )}
               >
                 {deleting ? (
                   <>

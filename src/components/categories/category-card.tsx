@@ -10,7 +10,8 @@ import {
   Users,
   FolderTree,
   Folder,
-  Tag
+  Tag,
+  ChevronRight
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -22,6 +23,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 
 import { CategoryData } from '@/hooks/categories/types'
+import { CategoryHierarchyCard } from '@/components/ui/category-hierarchy'
 
 interface CategoryCardProps {
   category: CategoryData
@@ -117,12 +119,23 @@ export function CategoryCard({ category, onEdit, onDelete }: CategoryCardProps) 
           <p className='text-sm text-muted-foreground'>{category.description}</p>
         )}
 
-        {category.parent && (
-          <div className="p-2 bg-gray-50 rounded-lg">
-            <p className='text-xs text-muted-foreground'>
-              <strong>Categoría Padre:</strong> {category.parent.name}
-            </p>
-          </div>
+        {/* Jerarquía de la categoría */}
+        {category.level > 1 && category.parent && (
+          <CategoryHierarchyCard
+            hierarchyPath={[{
+              id: category.parent.id,
+              name: category.parent.name,
+              level: category.parent.level,
+              color: category.parent.color || '#6B7280'
+            }]}
+            currentCategory={{
+              name: category.name,
+              level: category.level,
+              levelName: category.levelName,
+              color: category.color
+            }}
+            color={category.color}
+          />
         )}
 
         {/* Estadísticas */}

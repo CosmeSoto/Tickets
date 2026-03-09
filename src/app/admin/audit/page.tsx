@@ -351,7 +351,7 @@ export default function AuditPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 50,
+    limit: 20,
     total: 0,
     hasMore: false
   })
@@ -379,7 +379,7 @@ export default function AuditPage() {
     loadAuditData()
   }, [session, status, router, filters])
 
-  const loadAuditData = async (page = 1, limit = 50) => {
+  const loadAuditData = async (page = 1, limit = 20) => {
     try {
       setLoading(true)
       

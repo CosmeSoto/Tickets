@@ -5,3 +5,4 @@
 export { TechnicianFormDialog } from './TechnicianFormDialog'
 export { DeleteConfirmationDialog } from './DeleteConfirmationDialog'
 export { DemoteConfirmationDialog } from './DemoteConfirmationDialog'
+export { UserSelectionDialog } from './UserSelectionDialog'

@@ -156,7 +156,7 @@ export function OAuthAccountsManager({
                   <div key={account.id} className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex items-center space-x-4">
                       <Avatar className="h-12 w-12">
-                        <AvatarImage src={account.picture || ''} alt={account.name || account.email} />
+                        <AvatarImage src={account.picture || undefined} alt={account.name || account.email} />
                         <AvatarFallback className="bg-muted">
                           {provider.icon}
                         </AvatarFallback>

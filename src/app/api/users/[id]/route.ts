@@ -40,13 +40,22 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const user = await UserService.getUserById((await params).id)
 
     if (!user) {
-      return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
+      return NextResponse.json({ 
+        success: false,
+        error: 'Usuario no encontrado' 
+      }, { status: 404 })
     }
 
-    return NextResponse.json(user)
+    return NextResponse.json({
+      success: true,
+      user
+    })
   } catch (error) {
     console.error('Error fetching user:', error)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    return NextResponse.json({ 
+      success: false,
+      error: 'Error interno del servidor' 
+    }, { status: 500 })
   }
 }
 
@@ -264,6 +273,21 @@ export async function DELETE(
     }
 
     await UserService.deleteUser((await params).id)
+
+    // ⭐ AUDITORÍA: Registrar eliminación de usuario
+    await AuditServiceComplete.log({
+      action: AuditActionsComplete.USER_DELETED,
+      entityType: 'user',
+      entityId: (await params).id,
+      userId: session.user.id,
+      details: {
+        userName: userToDelete.name,
+        userEmail: userToDelete.email,
+        userRole: userToDelete.role,
+        deletedBy: session.user.name
+      },
+      request: request
+    })
 
     // Enviar notificaciones de usuario eliminado (log para auditoría)
     try {

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { useSession } from 'next-auth/react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -48,6 +49,7 @@ export function AvatarUploadModal({
   onAvatarUpdated
 }: AvatarUploadModalProps) {
   const { toast } = useToast()
+  const { data: session } = useSession()
   const fileInputRef = useRef<HTMLInputElement>(null)
   
   const [uploading, setUploading] = useState(false)
@@ -113,6 +115,13 @@ export function AvatarUploadModal({
         setPreviewAvatar(null)
         onClose()
         
+        // Si es el usuario actual, disparar evento para actualizar header
+        if (session?.user?.id === userId) {
+          window.dispatchEvent(new CustomEvent('avatarUpdated', { 
+            detail: { avatarUrl: result.data.avatarUrl } 
+          }))
+        }
+        
         toast({
           title: 'Avatar actualizado',
           description: `La foto de perfil de ${userName} se ha actualizado correctamente`,
@@ -149,6 +158,13 @@ export function AvatarUploadModal({
         onAvatarUpdated(null)
         setShowRemoveDialog(false)
         onClose()
+        
+        // Si es el usuario actual, disparar evento para actualizar header
+        if (session?.user?.id === userId) {
+          window.dispatchEvent(new CustomEvent('avatarUpdated', { 
+            detail: { avatarUrl: null } 
+          }))
+        }
         
         toast({
           title: 'Avatar eliminado',
@@ -187,7 +203,7 @@ export function AvatarUploadModal({
           
           <div className="flex flex-col items-center space-y-4 py-4">
             <Avatar className="h-24 w-24">
-              <AvatarImage src={currentAvatar || ''} alt={userName} />
+              <AvatarImage src={currentAvatar || undefined} alt={userName} />
               <AvatarFallback className="text-lg">
                 {userName.split(' ').map(n => n[0]).join('').toUpperCase()}
               </AvatarFallback>
@@ -244,7 +260,7 @@ export function AvatarUploadModal({
           </DialogHeader>
           <div className="flex justify-center py-4">
             <Avatar className="h-32 w-32">
-              <AvatarImage src={previewAvatar || ''} alt="Preview" />
+              <AvatarImage src={previewAvatar || undefined} alt="Preview" />
               <AvatarFallback className="text-xl">
                 {userName.split(' ').map(n => n[0]).join('').toUpperCase()}
               </AvatarFallback>

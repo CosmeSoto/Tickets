@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { ApplicationLogger } from '@/lib/logging'
+import { isPublicRoute, isProtectedRoute } from './middleware-config'
 
 // Rate limiting store (en producción usar Redis)
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>()
@@ -137,11 +138,18 @@ export async function middleware(request: NextRequest) {
     "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'none';"
   )
 
-  // Protección de rutas autenticadas
-  const protectedPaths = ['/admin', '/technician', '/client']
-  const isProtectedPath = protectedPaths.some(path => request.nextUrl.pathname.startsWith(path))
+  const isPublic = isPublicRoute(request.nextUrl.pathname)
+  const isProtected = isProtectedRoute(request.nextUrl.pathname)
 
-  if (isProtectedPath) {
+  if (isPublic) {
+    ApplicationLogger.child({ requestId, component: 'middleware' }).debug(
+      `Public path accessed: ${path}`,
+      { metadata: { isPublic: true } }
+    )
+    return response
+  }
+
+  if (isProtected) {
     const token = await getToken({
       req: request,
       secret: process.env.NEXTAUTH_SECRET,
@@ -246,8 +254,8 @@ export async function middleware(request: NextRequest) {
     {
       metadata: {
         statusCode: response.status,
-        isProtectedPath,
-        hasAuth: !!isProtectedPath,
+        isProtected,
+        hasAuth: !!isProtected,
       },
     }
   )

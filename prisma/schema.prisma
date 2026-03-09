@@ -483,6 +483,7 @@ model users {
   tasks_assigned                                    resolution_tasks[]          @relation("TaskAssignee")
   articles_created                                  ticket_knowledge_articles[] @relation("ArticleCreator")
   webhooks_created                                  webhooks[]                  @relation("WebhookCreator")
+  password_reset_tokens                             password_reset_tokens[]
   departments                                       departments?                @relation(fields: [departmentId], references: [id])
 
   @@index([departmentId])
@@ -496,6 +497,19 @@ model verification_tokens {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model password_reset_tokens {
+  id        String   @id
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  users     users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([token, expiresAt])
+  @@index([userId, createdAt(sort: Desc)])
 }
 
 model knowledge_articles {
@@ -628,6 +642,8 @@ model resolution_tasks {
   priority        String   @default("medium") // 'low', 'medium', 'high'
   estimatedHours  Float?   @map("estimated_hours")
   actualHours     Float?   @map("actual_hours")
+  startTime       String?  @map("start_time") // Hora de inicio (formato HH:mm)
+  endTime         String?  @map("end_time")   // Hora de fin (formato HH:mm)
   assignedTo      String?  @map("assigned_to")
   dueDate         DateTime? @map("due_date")
   completedAt     DateTime? @map("completed_at")
@@ -640,6 +656,7 @@ model resolution_tasks {
   
   @@index([planId])
   @@index([assignedTo])
+  @@index([startTime, endTime])
   @@map("resolution_tasks")
 }
 
@@ -774,4 +791,24 @@ model ticket_sla_metrics {
   @@index([ticketId])
   @@index([responseDeadline, resolutionDeadline])
   @@map("ticket_sla_metrics")
+}
+
+// ============================================
+// CATEGORY ANALYTICS
+// ============================================
+
+model category_analytics {
+  id            String   @id @default(uuid())
+  eventType     String   @map("event_type") @db.VarChar(50)
+  clientId      String   @map("client_id")
+  categoryId    String?  @map("category_id")
+  searchQuery   String?  @map("search_query") @db.VarChar(255)
+  timeToSelect  Int?     @map("time_to_select")
+  metadata      Json?
+  createdAt     DateTime @default(now()) @map("created_at")
+  
+  @@index([clientId, createdAt(sort: Desc)])
+  @@index([eventType, createdAt(sort: Desc)])
+  @@index([categoryId, createdAt(sort: Desc)])
+  @@map("category_analytics")
 }

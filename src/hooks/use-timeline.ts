@@ -5,7 +5,7 @@ import { useToast } from './use-toast'
 
 export interface TimelineEvent {
   id: string
-  type: 'comment' | 'status_change' | 'assignment' | 'priority_change' | 'resolution' | 'rating' | 'created'
+  type: 'comment' | 'status_change' | 'assignment' | 'priority_change' | 'resolution' | 'rating' | 'created' | 'resolution_plan' | 'resolution_task'
   title: string
   description?: string
   user: {
@@ -18,6 +18,23 @@ export interface TimelineEvent {
     oldValue?: string
     newValue?: string
     rating?: number
+    // Para planes de resolución
+    planId?: string
+    status?: string
+    totalTasks?: number
+    estimatedHours?: number
+    startDate?: string
+    targetDate?: string
+    // Para tareas
+    taskId?: string
+    priority?: string
+    dueDate?: string
+    completedAt?: string
+    assignedTo?: {
+      id: string
+      name: string
+      email: string
+    }
     attachments?: Array<{
       id: string
       name: string

@@ -8,6 +8,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { useToast } from '@/hooks/use-toast'
 import { devLogger } from '@/lib/dev-logger'
+import { enrichCategories } from '@/lib/utils/category-utils'
 import type { CategoryData, CacheEntry } from './types'
 
 interface UseCategoriesDataOptions {
@@ -73,7 +74,8 @@ export function useCategoriesData(options: UseCategoriesDataOptions = {}) {
     if (!forceRefresh) {
       const cached = getFromCache<CategoryData[]>(cacheKey)
       if (cached) {
-        setCategories(cached)
+        const enrichedCached = enrichCategoriesWithLevelName(cached)
+        setCategories(enrichedCached)
         setLoading(false)
         return
       }
@@ -104,8 +106,9 @@ export function useCategoriesData(options: UseCategoriesDataOptions = {}) {
       const data = await response.json()
       
       if (data.success && Array.isArray(data.data)) {
-        setCategories(data.data)
-        setToCache(cacheKey, data.data)
+        const enrichedCategories = enrichCategoriesWithLevelName(data.data)
+        setCategories(enrichedCategories)
+        setToCache(cacheKey, enrichedCategories)
       } else {
         throw new Error('Formato de respuesta inválido')
       }
@@ -170,23 +173,67 @@ export function useCategoriesData(options: UseCategoriesDataOptions = {}) {
     }
   }, [getCacheKey, getFromCache, setToCache])
   
-  // Cargar padres disponibles
+  // Función para obtener el nombre del nivel
+  const getLevelName = useCallback((level: number): string => {
+    switch (level) {
+      case 1: return 'Principal'
+      case 2: return 'Subcategoría'
+      case 3: return 'Especialidad'
+      case 4: return 'Detalle'
+      default: return 'Máximo'
+    }
+  }, [])
+
+  // Función para enriquecer categorías con levelName
+  const enrichCategoriesWithLevelName = useCallback((categories: CategoryData[]): CategoryData[] => {
+    return enrichCategories(categories)
+  }, [])
+
+  // Cargar padres disponibles con información de técnicos
   const loadAvailableParents = useCallback(async (currentCategoryId?: string) => {
     try {
-      const response = await fetch('/api/categories?level=1,2,3')
+      // Cargar todas las categorías activas con información completa de técnicos
+      const response = await fetch('/api/categories?isActive=true')
       if (response.ok) {
         const data = await response.json()
         if (data.success && Array.isArray(data.data)) {
-          const filtered = currentCategoryId
-            ? data.data.filter((cat: CategoryData) => cat.id !== currentCategoryId)
-            : data.data
-          setAvailableParents(filtered)
+          // Filtrar categorías que pueden ser padres (niveles 1, 2, 3)
+          const availableAsParents = data.data.filter((cat: CategoryData) => {
+            // Excluir la categoría actual si se está editando
+            if (currentCategoryId && cat.id === currentCategoryId) {
+              return false
+            }
+            // Solo niveles 1, 2, 3 pueden ser padres (nivel 4 es el máximo)
+            return cat.level <= 3 && cat.isActive
+          })
+          
+          // Enriquecer con levelName y información de técnicos
+          const enrichedCategories = enrichCategoriesWithLevelName(availableAsParents).map(cat => ({
+            ...cat,
+            // Agregar información de técnicos asignados
+            assignedTechnicians: cat.technician_assignments?.map(ta => ({
+              id: ta.users.id,
+              name: ta.users.name,
+              email: ta.users.email,
+              priority: ta.priority,
+              maxTickets: ta.maxTickets,
+              autoAssign: ta.autoAssign
+            })) || [],
+            // Agregar estadísticas de técnicos
+            technicianStats: {
+              total: cat.technician_assignments?.length || 0,
+              autoAssign: cat.technician_assignments?.filter(ta => ta.autoAssign).length || 0,
+              highPriority: cat.technician_assignments?.filter(ta => ta.priority <= 3).length || 0
+            }
+          }))
+          
+          setAvailableParents(enrichedCategories)
         }
       }
     } catch (error) {
       devLogger.error('[CATEGORIES] Error al cargar padres:', error)
     }
-  }, [])
+  }, [enrichCategoriesWithLevelName])
   
   return {
     // Estados

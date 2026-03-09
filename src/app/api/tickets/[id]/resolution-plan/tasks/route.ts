@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { auditTaskChange } from '@/lib/audit'
 import { randomUUID } from 'crypto'
+import { calculateDuration, validateTimeRange, combineDateAndTime, formatDuration } from '@/lib/time-utils'
 
 /**
  * POST /api/tickets/[id]/resolution-plan/tasks
@@ -31,6 +32,16 @@ export async function POST(
         { success: false, message: 'El título de la tarea es requerido' },
         { status: 400 }
       )
+    }
+
+    // Validar horarios si se proporcionan
+    if (body.startTime && body.endTime) {
+      if (!validateTimeRange(body.startTime, body.endTime)) {
+        return NextResponse.json(
+          { success: false, message: 'La hora de fin debe ser posterior a la hora de inicio' },
+          { status: 400 }
+        )
+      }
     }
 
     // Buscar plan de resolución
@@ -61,6 +72,20 @@ export async function POST(
       )
     }
 
+    // Calcular duración si hay horarios
+    let estimatedHours = body.estimatedHours || null
+    let dueDate = body.dueDate ? new Date(body.dueDate) : null
+    
+    if (body.startTime && body.endTime) {
+      // Calcular duración automáticamente
+      estimatedHours = calculateDuration(body.startTime, body.endTime)
+      
+      // Combinar fecha y hora de inicio para dueDate
+      if (body.dueDate) {
+        dueDate = combineDateAndTime(body.dueDate, body.startTime)
+      }
+    }
+
     // Crear tarea
     const task = await prisma.resolution_tasks.create({
       data: {
@@ -70,10 +95,12 @@ export async function POST(
         description: body.description?.trim() || null,
         status: 'pending',
         priority: body.priority || 'medium',
-        estimatedHours: body.estimatedHours || null,
+        estimatedHours,
         actualHours: null,
+        startTime: body.startTime || null,
+        endTime: body.endTime || null,
         assignedTo: body.assignedTo || null,
-        dueDate: body.dueDate ? new Date(body.dueDate) : null,
+        dueDate,
         notes: body.notes?.trim() || null,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -107,9 +134,61 @@ export async function POST(
       {
         title: task.title,
         priority: task.priority,
-        assignedTo: task.assignedTo
+        assignedTo: task.assignedTo,
+        startTime: task.startTime,
+        endTime: task.endTime,
+        estimatedHours: task.estimatedHours
       }
     )
+
+    // Crear notificación para el cliente si la tarea tiene fecha programada
+    if (task.dueDate) {
+      try {
+        const startDate = new Date(task.dueDate)
+        const formattedDate = startDate.toLocaleDateString('es-ES', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric'
+        })
+        
+        // Construir mensaje de horario
+        let timeInfo = ''
+        if (task.startTime && task.endTime && task.estimatedHours) {
+          const duration = formatDuration(task.estimatedHours)
+          timeInfo = `Horario: ${task.startTime} a ${task.endTime} (${duration})`
+        } else if (task.estimatedHours) {
+          timeInfo = `Duración estimada: ${formatDuration(task.estimatedHours)}`
+        }
+
+        await prisma.notifications.create({
+          data: {
+            id: randomUUID(),
+            userId: plan.ticket.clientId,
+            type: 'TASK_SCHEDULED',
+            title: 'Nueva tarea programada',
+            message: `Se ha programado una nueva tarea para tu ticket: "${task.title}". Fecha: ${formattedDate}. ${timeInfo}`,
+            ticketId,
+            isRead: false,
+            metadata: {
+              taskId: task.id,
+              planId: plan.id,
+              taskTitle: task.title,
+              dueDate: task.dueDate.toISOString(),
+              startTime: task.startTime,
+              endTime: task.endTime,
+              estimatedHours: task.estimatedHours,
+              actionUrl: `/client/tickets/${ticketId}`,
+              actionText: 'Ver ticket'
+            },
+            createdAt: new Date()
+          }
+        })
+        
+        console.log(`[API] Notification created for client ${plan.ticket.clientId} about task ${task.id}`)
+      } catch (notificationError) {
+        console.error('[API] Error creating notification for task:', notificationError)
+      }
+    }
 
     return NextResponse.json({
       success: true,
@@ -121,6 +200,8 @@ export async function POST(
         priority: task.priority,
         estimatedHours: task.estimatedHours,
         actualHours: task.actualHours,
+        startTime: task.startTime,
+        endTime: task.endTime,
         assignedTo: task.assignee,
         dueDate: task.dueDate?.toISOString() || null,
         completedAt: task.completedAt?.toISOString() || null,

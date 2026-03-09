@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { auditTaskChange } from '@/lib/audit'
+import { calculateDuration, validateTimeRange, combineDateAndTime } from '@/lib/time-utils'
 
 /**
  * PATCH /api/tickets/[id]/resolution-plan/tasks/[taskId]
@@ -106,6 +107,46 @@ export async function PATCH(
       changes.estimatedHours = { old: task.estimatedHours, new: body.estimatedHours }
     }
 
+    // Manejar actualización de horarios
+    if (body.startTime !== undefined || body.endTime !== undefined) {
+      const newStartTime = body.startTime !== undefined ? body.startTime : task.startTime
+      const newEndTime = body.endTime !== undefined ? body.endTime : task.endTime
+      
+      // Validar si ambos horarios están presentes
+      if (newStartTime && newEndTime) {
+        if (!validateTimeRange(newStartTime, newEndTime)) {
+          return NextResponse.json(
+            { success: false, message: 'La hora de fin debe ser posterior a la hora de inicio' },
+            { status: 400 }
+          )
+        }
+        
+        // Calcular duración automáticamente
+        const calculatedDuration = calculateDuration(newStartTime, newEndTime)
+        updateData.estimatedHours = calculatedDuration
+        changes.estimatedHours = { old: task.estimatedHours, new: calculatedDuration }
+      }
+      
+      if (body.startTime !== undefined) {
+        updateData.startTime = body.startTime
+        changes.startTime = { old: task.startTime, new: body.startTime }
+      }
+      
+      if (body.endTime !== undefined) {
+        updateData.endTime = body.endTime
+        changes.endTime = { old: task.endTime, new: body.endTime }
+      }
+      
+      // Si hay fecha y hora de inicio, combinarlas en dueDate
+      if (body.dueDate && newStartTime) {
+        updateData.dueDate = combineDateAndTime(body.dueDate, newStartTime)
+      } else if (task.dueDate && newStartTime && body.startTime !== undefined) {
+        // Si solo cambió la hora, actualizar dueDate manteniendo la fecha
+        const currentDate = task.dueDate.toISOString().split('T')[0]
+        updateData.dueDate = combineDateAndTime(currentDate, newStartTime)
+      }
+    }
+
     if (body.actualHours !== undefined) {
       updateData.actualHours = body.actualHours
       changes.actualHours = { old: task.actualHours, new: body.actualHours }
@@ -180,6 +221,8 @@ export async function PATCH(
         priority: updatedTask.priority,
         estimatedHours: updatedTask.estimatedHours,
         actualHours: updatedTask.actualHours,
+        startTime: updatedTask.startTime,
+        endTime: updatedTask.endTime,
         assignedTo: updatedTask.assignee,
         dueDate: updatedTask.dueDate?.toISOString() || null,
         completedAt: updatedTask.completedAt?.toISOString() || null,

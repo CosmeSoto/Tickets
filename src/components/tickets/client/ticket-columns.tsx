@@ -116,7 +116,10 @@ export function createClientTicketColumns({
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => onView(ticket)}
+          onClick={(e) => {
+            e.stopPropagation()
+            onView(ticket)
+          }}
         >
           <Eye className="h-4 w-4" />
         </Button>

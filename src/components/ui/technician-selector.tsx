@@ -159,12 +159,6 @@ export function TechnicianSelector({
 
   return (
     <div className="space-y-4">
-      {/* Información del nivel */}
-      <div className="text-xs text-blue-600 bg-blue-50 p-3 rounded-lg">
-        <div className="font-medium mb-1">Asignación para Nivel {categoryLevel}</div>
-        <div>{getLevelDescription(categoryLevel)}</div>
-      </div>
-
       {/* Técnicos asignados */}
       {assignedTechniciansWithInfo.length > 0 && (
         <div className="space-y-2">

@@ -18,14 +18,38 @@ const departmentSchema = z.object({
 // GET /api/departments - Listar departamentos
 export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url)
+    const isActive = searchParams.get('isActive')
+    const includeCount = searchParams.get('includeCount') === 'true'
+    const publicAccess = searchParams.get('public') === 'true'
+
+    // Si es acceso público (para registro), solo mostrar departamentos activos sin autenticación
+    if (publicAccess) {
+      const departments = await prisma.departments.findMany({
+        where: { isActive: true },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          color: true,
+        },
+        orderBy: [
+          { order: 'asc' },
+          { name: 'asc' }
+        ]
+      })
+
+      return NextResponse.json({
+        success: true,
+        departments: departments
+      })
+    }
+
+    // Para acceso autenticado, requerir sesión
     const session = await getServerSession(authOptions)
     if (!session) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
-
-    const { searchParams } = new URL(request.url)
-    const isActive = searchParams.get('isActive')
-    const includeCount = searchParams.get('includeCount') === 'true'
 
     const where: any = {}
     if (isActive !== null) {

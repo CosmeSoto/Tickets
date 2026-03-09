@@ -181,7 +181,8 @@ export function useCategories(options: UseCategoriesOptions = {}) {
     e.preventDefault()
     await formHook.handleSubmit(
       dataHook.invalidateCache,
-      () => dataHook.loadCategories(searchTerm, levelFilter, true)
+      () => dataHook.loadCategories(searchTerm, levelFilter, true),
+      dataHook.availableParents // ← PASAR availableParents
     )
   }, [formHook, dataHook, searchTerm, levelFilter])
   

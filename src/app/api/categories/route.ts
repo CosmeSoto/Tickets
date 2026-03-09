@@ -4,6 +4,19 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 
+/**
+ * Obtiene el nombre del nivel basado en el número
+ */
+function getLevelName(level: number): string {
+  switch (level) {
+    case 1: return 'Principal'
+    case 2: return 'Subcategoría'
+    case 3: return 'Especialidad'
+    case 4: return 'Detalle'
+    default: return 'Máximo'
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -70,6 +83,33 @@ export async function GET(request: NextRequest) {
             isActive: true
           }
         },
+        categories: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+            level: true,
+            parentId: true,
+            categories: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+                level: true,
+                parentId: true,
+                categories: {
+                  select: {
+                    id: true,
+                    name: true,
+                    color: true,
+                    level: true,
+                    parentId: true
+                  }
+                }
+              }
+            }
+          }
+        },
         technician_assignments: {
           where: {
             isActive: true
@@ -104,19 +144,26 @@ export async function GET(request: NextRequest) {
       ]
     })
 
+    // Enriquecer categorías con canDelete y levelName
+    const enrichedCategories = categories.map(category => ({
+      ...category,
+      levelName: getLevelName(category.level),
+      canDelete: category._count.tickets === 0 && category._count.other_categories === 0,
+    }))
+
     // Log para debugging en desarrollo
     if (process.env.NODE_ENV === 'development') {
-      console.log('📊 Categories loaded:', categories.length)
-      if (categories.length > 0) {
-        console.log('📊 Sample category:', JSON.stringify(categories[0], null, 2))
+      console.log('📊 Categories loaded:', enrichedCategories.length)
+      if (enrichedCategories.length > 0) {
+        console.log('📊 Sample category:', JSON.stringify(enrichedCategories[0], null, 2))
       }
     }
 
     return NextResponse.json({
       success: true,
-      data: categories,
+      data: enrichedCategories,
       meta: {
-        total: categories.length,
+        total: enrichedCategories.length,
         filters: {
           isActive,
           level,
@@ -201,9 +248,16 @@ export async function POST(request: NextRequest) {
       request
     })
 
+    // Enriquecer con canDelete y levelName
+    const enrichedCategory = {
+      ...category,
+      levelName: getLevelName(category.level),
+      canDelete: category._count.tickets === 0 && category._count.other_categories === 0,
+    }
+
     return NextResponse.json({
       success: true,
-      data: category,
+      data: enrichedCategory,
       message: 'Categoría creada exitosamente'
     })
   } catch (error) {

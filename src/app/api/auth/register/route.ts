@@ -3,26 +3,34 @@ import prisma from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { randomUUID } from 'crypto'
-
-// Schema de validación con Zod
-const registerSchema = z.object({
-  name: z.string()
-    .min(2, 'El nombre debe tener al menos 2 caracteres')
-    .max(100, 'El nombre es demasiado largo'),
-  email: z.string()
-    .email('Email inválido')
-    .toLowerCase(),
-  password: z.string()
-    .min(6, 'La contraseña debe tener al menos 6 caracteres')
-    .max(100, 'La contraseña es demasiado larga'),
-  phone: z.string()
-    .optional()
-    .nullable()
-    .transform(val => val || null),
-})
+import { SecurityConfigService } from '@/lib/services/security-config-service'
 
 export async function POST(request: NextRequest) {
   try {
+    // Obtener configuración de seguridad
+    const securityConfig = await SecurityConfigService.getConfig()
+
+    // Schema de validación con Zod (dinámico según configuración)
+    const registerSchema = z.object({
+      name: z.string()
+        .min(2, 'El nombre debe tener al menos 2 caracteres')
+        .max(100, 'El nombre es demasiado largo'),
+      email: z.string()
+        .email('Email inválido')
+        .toLowerCase(),
+      password: z.string()
+        .min(securityConfig.passwordMinLength, `La contraseña debe tener al menos ${securityConfig.passwordMinLength} caracteres`)
+        .max(100, 'La contraseña es demasiado larga'),
+      phone: z.string()
+        .optional()
+        .nullable()
+        .transform(val => val || null),
+      departmentId: z.string()
+        .optional()
+        .nullable()
+        .transform(val => val || null),
+    })
+
     // Parsear el body
     const body = await request.json()
 
@@ -45,7 +53,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { name, email, password, phone } = validationResult.data
+    const { name, email, password, phone, departmentId } = validationResult.data
 
     // Verificar si el email ya existe
     const existingUser = await prisma.users.findUnique({
@@ -63,6 +71,24 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Si se proporciona departmentId, verificar que existe
+    if (departmentId) {
+      const department = await prisma.departments.findUnique({
+        where: { id: departmentId }
+      })
+
+      if (!department) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: 'El departamento seleccionado no existe',
+            field: 'departmentId'
+          },
+          { status: 400 }
+        )
+      }
+    }
+
     // Hash de la contraseña
     const passwordHash = await bcrypt.hash(password, 10)
 
@@ -74,9 +100,10 @@ export async function POST(request: NextRequest) {
         email: email.toLowerCase().trim(),
         passwordHash,
         phone: phone || null,
-        role: 'CLIENT', // Siempre CLIENT para registro público
+        departmentId: departmentId || null,
+        role: 'CLIENT',
         isActive: true,
-        isEmailVerified: false, // Puede implementarse verificación después
+        isEmailVerified: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -85,6 +112,7 @@ export async function POST(request: NextRequest) {
         name: true,
         email: true,
         role: true,
+        departmentId: true,
         createdAt: true,
       }
     })
@@ -101,7 +129,8 @@ export async function POST(request: NextRequest) {
           name: user.name,
           email: user.email,
           role: user.role,
-          registrationMethod: 'manual'
+          departmentId: user.departmentId,
+          registrationMethod: 'self_register'
         },
         createdAt: new Date(),
       }
@@ -116,6 +145,7 @@ export async function POST(request: NextRequest) {
           name: user.name,
           email: user.email,
           role: user.role,
+          departmentId: user.departmentId,
         }
       },
       { status: 201 }

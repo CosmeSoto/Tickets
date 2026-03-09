@@ -7,6 +7,8 @@ import { auditTicketChange } from '@/lib/audit'
 import { WebhookService } from '@/lib/services/webhook-service'
 import { SLAService } from '@/lib/services/sla-service'
 import { EmailService } from '@/lib/services/email/email-service'
+import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
+import { NotificationService } from '@/lib/services/notification-service'
 
 export async function GET(
   request: NextRequest,
@@ -319,6 +321,25 @@ export async function PUT(
         )
       }
 
+      // ⭐ AUDITORÍA: Registrar actualización de ticket por cliente
+      await AuditServiceComplete.log({
+        action: AuditActionsComplete.TICKET_UPDATED,
+        entityType: 'ticket',
+        entityId: finalId,
+        userId: session.user.id,
+        details: {
+          ticketTitle: updatedTicket.title,
+          updatedBy: 'Cliente',
+          fieldsUpdated: Object.keys(filteredUpdates)
+        },
+        oldValues: {
+          title: existingTicket.title,
+          description: existingTicket.description
+        },
+        newValues: filteredUpdates,
+        request: request
+      })
+
       // ⭐ NUEVO: Disparar webhook de ticket actualizado
       await WebhookService.trigger(WebhookService.EVENTS.TICKET_UPDATED, {
         ticketId: finalId,
@@ -357,6 +378,11 @@ export async function PUT(
           filteredUpdates[field] = updates[field]
         }
       })
+
+      // Procesar assigneeId: convertir undefined a null para desasignar
+      if ('assigneeId' in filteredUpdates && filteredUpdates.assigneeId === undefined) {
+        filteredUpdates.assigneeId = null
+      }
 
       // Si intenta modificar título o descripción, rechazar
       if (updates.title || updates.description) {
@@ -435,10 +461,39 @@ export async function PUT(
           }
         )
 
+        // ⭐ AUDITORÍA: Registrar cambio de estado
+        await AuditServiceComplete.log({
+          action: AuditActionsComplete.TICKET_STATUS_CHANGED,
+          entityType: 'ticket',
+          entityId: finalId,
+          userId: session.user.id,
+          details: {
+            ticketTitle: updatedTicket.title,
+            technicianName: session.user.name
+          },
+          oldValues: { status: existingTicket.status },
+          newValues: { status: filteredUpdates.status },
+          request: request
+        })
+
         // ⭐ NUEVO: Registrar resolución en SLA si el estado cambió a RESOLVED
         if (filteredUpdates.status === 'RESOLVED') {
           await SLAService.recordResolution(finalId).catch(err => {
             console.error('[SLA] Error registrando resolución:', err)
+          })
+
+          // ⭐ AUDITORÍA: Registrar resolución de ticket
+          await AuditServiceComplete.log({
+            action: AuditActionsComplete.TICKET_RESOLVED,
+            entityType: 'ticket',
+            entityId: finalId,
+            userId: session.user.id,
+            details: {
+              ticketTitle: updatedTicket.title,
+              resolvedBy: session.user.name,
+              clientName: updatedTicket.users_tickets_clientIdTousers?.name
+            },
+            request: request
           })
 
           // Disparar webhook de ticket resuelto
@@ -470,11 +525,33 @@ export async function PUT(
             }, session.user.id).catch(err => {
               console.error('[EMAIL] Error enviando email de ticket resuelto:', err)
             })
+
+            // ⭐ NUEVO: Enviar notificación in-app al cliente
+            await NotificationService.notifyTicketResolved(finalId).catch(err => {
+              console.error('[NOTIFICATION] Error enviando notificación de ticket resuelto:', err)
+            })
           }
+
+          // ⭐ NUEVO: Notificar al administrador que el ticket fue resuelto
+          const { triggerTicketResolvedToAdminEmail } = await import('@/lib/email-triggers')
+          triggerTicketResolvedToAdminEmail(finalId)
         }
 
         // ⭐ NUEVO: Disparar webhook de ticket cerrado
         if (filteredUpdates.status === 'CLOSED') {
+          // ⭐ AUDITORÍA: Registrar cierre de ticket
+          await AuditServiceComplete.log({
+            action: AuditActionsComplete.TICKET_CLOSED,
+            entityType: 'ticket',
+            entityId: finalId,
+            userId: session.user.id,
+            details: {
+              ticketTitle: updatedTicket.title,
+              closedBy: session.user.name
+            },
+            request: request
+          })
+
           await WebhookService.trigger(WebhookService.EVENTS.TICKET_CLOSED, {
             ticketId: finalId,
             closedBy: session.user.name,
@@ -513,6 +590,21 @@ export async function PUT(
             newValue: filteredUpdates.priority
           }
         )
+
+        // ⭐ AUDITORÍA: Registrar cambio de prioridad
+        await AuditServiceComplete.log({
+          action: AuditActionsComplete.TICKET_PRIORITY_CHANGED,
+          entityType: 'ticket',
+          entityId: finalId,
+          userId: session.user.id,
+          details: {
+            ticketTitle: updatedTicket.title,
+            technicianName: session.user.name
+          },
+          oldValues: { priority: existingTicket.priority },
+          newValues: { priority: filteredUpdates.priority },
+          request: request
+        })
       }
 
       if (filteredUpdates.assigneeId && filteredUpdates.assigneeId !== existingTicket.assigneeId) {
@@ -525,6 +617,23 @@ export async function PUT(
             newValue: filteredUpdates.assigneeId
           }
         )
+
+        // ⭐ AUDITORÍA: Registrar asignación de ticket
+        await AuditServiceComplete.log({
+          action: AuditActionsComplete.TICKET_ASSIGNED,
+          entityType: 'ticket',
+          entityId: finalId,
+          userId: session.user.id,
+          details: {
+            ticketTitle: updatedTicket.title,
+            assignedBy: session.user.name,
+            assigneeName: updatedTicket.users_tickets_assigneeIdTousers?.name || 'Sin asignar',
+            previousAssignee: existingTicket.assigneeId ? 'Técnico anterior' : 'Sin asignar'
+          },
+          oldValues: { assigneeId: existingTicket.assigneeId },
+          newValues: { assigneeId: filteredUpdates.assigneeId },
+          request: request
+        })
 
         // ⭐ NUEVO: Disparar webhook de ticket asignado
         await WebhookService.trigger(WebhookService.EVENTS.TICKET_ASSIGNED, {
@@ -560,6 +669,14 @@ export async function PUT(
           }, session.user.id).catch(err => {
             console.error('[EMAIL] Error enviando email de ticket asignado:', err)
           })
+
+          // ⭐ NUEVO: Enviar notificaciones in-app
+          await NotificationService.notifyTicketAssigned(
+            finalId,
+            filteredUpdates.assigneeId
+          ).catch(err => {
+            console.error('[NOTIFICATION] Error enviando notificaciones de ticket asignado:', err)
+          })
         }
       }
 
@@ -578,6 +695,27 @@ export async function PUT(
         console.error('[WEBHOOK] Error disparando evento TICKET_UPDATED:', err)
       })
 
+      // ⭐ AUDITORÍA: Registrar actualización general de ticket por técnico
+      await AuditServiceComplete.log({
+        action: AuditActionsComplete.TICKET_UPDATED,
+        entityType: 'ticket',
+        entityId: finalId,
+        userId: session.user.id,
+        details: {
+          ticketTitle: updatedTicket.title,
+          updatedBy: 'Técnico',
+          technicianName: session.user.name,
+          fieldsUpdated: Object.keys(filteredUpdates)
+        },
+        oldValues: {
+          status: existingTicket.status,
+          priority: existingTicket.priority,
+          assigneeId: existingTicket.assigneeId
+        },
+        newValues: filteredUpdates,
+        request: request
+      })
+
       const transformedTicket = {
         ...updatedTicket,
         client: updatedTicket.users_tickets_clientIdTousers,
@@ -593,10 +731,17 @@ export async function PUT(
 
     } else if (session.user.role === 'ADMIN') {
       // Admin puede actualizar todo (con registro en historial)
+      
+      // Procesar assigneeId: convertir undefined a null para desasignar
+      const processedUpdates = { ...updates }
+      if ('assigneeId' in processedUpdates && processedUpdates.assigneeId === undefined) {
+        processedUpdates.assigneeId = null
+      }
+      
       const updatedTicket = await prisma.tickets.update({
         where: { id: finalId },
         data: {
-          ...updates,
+          ...processedUpdates,
           updatedAt: new Date()
         },
         include: {
@@ -640,11 +785,49 @@ export async function PUT(
         data: {
           id: randomUUID(),
           action: 'updated',
-          comment: `Administrador actualizó: ${Object.keys(updates).join(', ')}`,
+          comment: `Administrador actualizó: ${Object.keys(processedUpdates).join(', ')}`,
           ticketId: finalId,
           userId: session.user.id,
           createdAt: new Date()
         }
+      })
+
+      // ⭐ Enviar notificaciones si se cambió la asignación
+      if ('assigneeId' in processedUpdates && processedUpdates.assigneeId !== existingTicket.assigneeId) {
+        if (processedUpdates.assigneeId) {
+          // Se asignó a un técnico
+          const { NotificationService } = await import('@/lib/services/notification-service')
+          await NotificationService.notifyTicketAssigned(
+            finalId,
+            processedUpdates.assigneeId
+          ).catch(err => {
+            console.error('[NOTIFICATION] Error enviando notificaciones de ticket asignado:', err)
+          })
+        }
+      }
+
+      // ⭐ AUDITORÍA: Registrar actualización de ticket por admin
+      await AuditServiceComplete.log({
+        action: AuditActionsComplete.TICKET_UPDATED,
+        entityType: 'ticket',
+        entityId: finalId,
+        userId: session.user.id,
+        details: {
+          ticketTitle: updatedTicket.title,
+          updatedBy: 'Administrador',
+          adminName: session.user.name,
+          fieldsUpdated: Object.keys(processedUpdates)
+        },
+        oldValues: {
+          title: existingTicket.title,
+          description: existingTicket.description,
+          status: existingTicket.status,
+          priority: existingTicket.priority,
+          assigneeId: existingTicket.assigneeId,
+          categoryId: existingTicket.categoryId
+        },
+        newValues: processedUpdates,
+        request: request
       })
 
       const transformedTicket = {
@@ -741,9 +924,38 @@ export async function DELETE(
       )
     }
 
-    // Eliminar ticket (esto también eliminará comentarios, attachments e historial por cascada)
+    console.log('[TICKET DELETE] ========================================')
+    console.log('[TICKET DELETE] Eliminando ticket:', finalId)
+    console.log('[TICKET DELETE] Título:', existingTicket.title)
+    console.log('[TICKET DELETE] Estado:', existingTicket.status)
+    console.log('[TICKET DELETE] Eliminado por:', session.user.name, `(${session.user.role})`)
+    console.log('[TICKET DELETE] ========================================')
+
+    // Eliminar ticket (esto también eliminará comentarios, attachments, historial y notificaciones por cascada)
     await prisma.tickets.delete({
       where: { id: finalId }
+    })
+
+    console.log('[TICKET DELETE] ✅ Ticket eliminado exitosamente')
+    console.log('[TICKET DELETE] ✅ Notificaciones asociadas eliminadas por cascada')
+    console.log('[TICKET DELETE] ✅ Comentarios eliminados por cascada')
+    console.log('[TICKET DELETE] ✅ Attachments eliminados por cascada')
+    console.log('[TICKET DELETE] ✅ Historial eliminado por cascada')
+
+    // ⭐ AUDITORÍA: Registrar eliminación de ticket
+    await AuditServiceComplete.log({
+      action: AuditActionsComplete.TICKET_DELETED,
+      entityType: 'ticket',
+      entityId: finalId,
+      userId: session.user.id,
+      details: {
+        ticketTitle: existingTicket.title,
+        deletedBy: session.user.role === 'ADMIN' ? 'Administrador' : 'Cliente',
+        userName: session.user.name,
+        ticketStatus: existingTicket.status,
+        ticketPriority: existingTicket.priority
+      },
+      request: request
     })
 
     return NextResponse.json({

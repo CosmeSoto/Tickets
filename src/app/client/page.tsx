@@ -27,6 +27,26 @@ import {
 import Link from 'next/link'
 import { useUnifiedDashboard } from '@/hooks/use-unified-dashboard'
 import { getPriorityColor, getStatusColor } from '@/lib/utils/ticket-utils'
+import { useEffect, useState } from 'react'
+
+interface SystemMetrics {
+  responseTime: string
+  responseStatus: string
+  uptime: number
+  uptimeStatus: string
+  schedule: {
+    days: string
+    hours: string
+    timezone: string
+  }
+  satisfaction: {
+    rating: number
+    percentage: number
+    totalRatings: number
+    status: string
+  }
+  lastUpdated: string
+}
 
 export default function ClientDashboard() {
   const {
@@ -38,6 +58,28 @@ export default function ClientDashboard() {
     tickets: recentTickets,
     refetch
   } = useUnifiedDashboard({ role: 'CLIENT' })
+
+  const [systemMetrics, setSystemMetrics] = useState<SystemMetrics | null>(null)
+
+  // Cargar métricas del sistema
+  useEffect(() => {
+    const fetchSystemMetrics = async () => {
+      try {
+        const response = await fetch('/api/system/metrics')
+        if (response.ok) {
+          const data = await response.json()
+          setSystemMetrics(data)
+        }
+      } catch (error) {
+        console.error('Error loading system metrics:', error)
+      }
+    }
+
+    fetchSystemMetrics()
+    // Actualizar cada 5 minutos
+    const interval = setInterval(fetchSystemMetrics, 5 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [])
 
   // Calcular métricas
   const supportQuality = stats.supportQuality || 'good'
@@ -349,7 +391,10 @@ export default function ClientDashboard() {
               <div className="flex items-center space-x-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">
-                  Actualizado: {new Date().toLocaleTimeString('es-ES', { 
+                  Actualizado: {systemMetrics ? new Date(systemMetrics.lastUpdated).toLocaleTimeString('es-ES', { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                  }) : new Date().toLocaleTimeString('es-ES', { 
                     hour: '2-digit', 
                     minute: '2-digit' 
                   })}
@@ -358,71 +403,102 @@ export default function ClientDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-              <div className='flex flex-col space-y-3 p-4 bg-green-50 dark:bg-green-950/50 rounded-lg border border-green-200 dark:border-green-800'>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Clock className="h-4 w-4 text-green-600" />
-                    <p className='text-sm font-semibold text-foreground'>Tiempo de Respuesta</p>
+            {!systemMetrics ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Cargando métricas del sistema...
+              </div>
+            ) : (
+              <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                <div className='flex flex-col space-y-3 p-4 bg-green-50 dark:bg-green-950/50 rounded-lg border border-green-200 dark:border-green-800'>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Clock className="h-4 w-4 text-green-600" />
+                      <p className='text-sm font-semibold text-foreground'>Tiempo de Respuesta</p>
+                    </div>
+                    <Badge variant='default' className={`text-xs ${
+                      systemMetrics.responseStatus === 'excellent' 
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                        : systemMetrics.responseStatus === 'good'
+                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                        : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                    }`}>
+                      {systemMetrics.responseStatus === 'excellent' ? '✓ Excelente' : 
+                       systemMetrics.responseStatus === 'good' ? '✓ Bueno' : '⚠ Mejorable'}
+                    </Badge>
                   </div>
-                  <Badge variant='default' className='bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs'>
-                    ✓ Excelente
-                  </Badge>
+                  <div className="space-y-1">
+                    <p className='text-lg font-bold text-green-700 dark:text-green-300'>{systemMetrics.responseTime}</p>
+                    <p className='text-xs text-muted-foreground'>Promedio de respuesta inicial</p>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <p className='text-lg font-bold text-green-700 dark:text-green-300'>{stats.responseTime || '2h'}</p>
-                  <p className='text-xs text-muted-foreground'>Promedio de respuesta inicial</p>
+                
+                <div className='flex flex-col space-y-3 p-4 bg-blue-50 dark:bg-blue-950/50 rounded-lg border border-blue-200 dark:border-blue-800'>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Activity className="h-4 w-4 text-blue-600" />
+                      <p className='text-sm font-semibold text-foreground'>Disponibilidad del Sistema</p>
+                    </div>
+                    <Badge variant='default' className={`text-xs ${
+                      systemMetrics.uptimeStatus === 'excellent'
+                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                        : systemMetrics.uptimeStatus === 'good'
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                        : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                    }`}>
+                      ✓ {systemMetrics.uptime}%
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <p className='text-lg font-bold text-blue-700 dark:text-blue-300'>24/7</p>
+                    <p className='text-xs text-muted-foreground'>Sistema operativo continuamente</p>
+                  </div>
+                </div>
+                
+                <div className='flex flex-col space-y-3 p-4 bg-purple-50 dark:bg-purple-950/50 rounded-lg border border-purple-200 dark:border-purple-800'>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <User className="h-4 w-4 text-purple-600" />
+                      <p className='text-sm font-semibold text-foreground'>Horario de Soporte</p>
+                    </div>
+                    <Badge variant='default' className='bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 text-xs'>
+                      {systemMetrics.schedule.days}
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <p className='text-lg font-bold text-purple-700 dark:text-purple-300'>{systemMetrics.schedule.hours}</p>
+                    <p className='text-xs text-muted-foreground'>Atención personalizada</p>
+                  </div>
+                </div>
+                
+                <div className='flex flex-col space-y-3 p-4 bg-yellow-50 dark:bg-yellow-950/50 rounded-lg border border-yellow-200 dark:border-yellow-800'>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Star className="h-4 w-4 text-yellow-600 fill-current" />
+                      <p className='text-sm font-semibold text-foreground'>Satisfacción del Cliente</p>
+                    </div>
+                    <Badge variant='default' className={`text-xs ${
+                      systemMetrics.satisfaction.status === 'excellent'
+                        ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                        : systemMetrics.satisfaction.status === 'good'
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                        : 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
+                    }`}>
+                      {systemMetrics.satisfaction.percentage}%
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <p className='text-lg font-bold text-yellow-700 dark:text-yellow-300'>
+                      {systemMetrics.satisfaction.rating > 0 ? systemMetrics.satisfaction.rating.toFixed(1) : 'N/A'}/5
+                    </p>
+                    <p className='text-xs text-muted-foreground'>
+                      {systemMetrics.satisfaction.totalRatings > 0 
+                        ? `Basado en ${systemMetrics.satisfaction.totalRatings} calificaciones`
+                        : 'Sin calificaciones aún'}
+                    </p>
+                  </div>
                 </div>
               </div>
-              
-              <div className='flex flex-col space-y-3 p-4 bg-blue-50 dark:bg-blue-950/50 rounded-lg border border-blue-200 dark:border-blue-800'>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Activity className="h-4 w-4 text-blue-600" />
-                    <p className='text-sm font-semibold text-foreground'>Disponibilidad del Sistema</p>
-                  </div>
-                  <Badge variant='default' className='bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs'>
-                    ✓ 99.9%
-                  </Badge>
-                </div>
-                <div className="space-y-1">
-                  <p className='text-lg font-bold text-blue-700 dark:text-blue-300'>24/7</p>
-                  <p className='text-xs text-muted-foreground'>Sistema operativo continuamente</p>
-                </div>
-              </div>
-              
-              <div className='flex flex-col space-y-3 p-4 bg-purple-50 dark:bg-purple-950/50 rounded-lg border border-purple-200 dark:border-purple-800'>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <User className="h-4 w-4 text-purple-600" />
-                    <p className='text-sm font-semibold text-foreground'>Horario de Soporte</p>
-                  </div>
-                  <Badge variant='default' className='bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 text-xs'>
-                    Lun - Vie
-                  </Badge>
-                </div>
-                <div className="space-y-1">
-                  <p className='text-lg font-bold text-purple-700 dark:text-purple-300'>8:00 - 18:00</p>
-                  <p className='text-xs text-muted-foreground'>Atención personalizada</p>
-                </div>
-              </div>
-              
-              <div className='flex flex-col space-y-3 p-4 bg-yellow-50 dark:bg-yellow-950/50 rounded-lg border border-yellow-200 dark:border-yellow-800'>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Star className="h-4 w-4 text-yellow-600 fill-current" />
-                    <p className='text-sm font-semibold text-foreground'>Satisfacción del Cliente</p>
-                  </div>
-                  <Badge variant='default' className='bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 text-xs'>
-                    {Math.floor((stats.satisfactionRating || 4.5) * 20)}%
-                  </Badge>
-                </div>
-                <div className="space-y-1">
-                  <p className='text-lg font-bold text-yellow-700 dark:text-yellow-300'>{stats.satisfactionRating || 4.5}/5</p>
-                  <p className='text-xs text-muted-foreground'>Calidad del servicio</p>
-                </div>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>

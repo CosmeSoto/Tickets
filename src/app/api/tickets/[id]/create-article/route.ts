@@ -386,6 +386,24 @@ export async function GET(
             suggestedContent += `   - ${task.description}\n`
           }
           suggestedContent += `   - Estado: ${translateTaskStatus(task.status)}\n`
+          
+          // Incluir información de horario si está disponible
+          if (task.startTime && task.endTime && task.estimatedHours) {
+            const hours = Math.floor(task.estimatedHours)
+            const minutes = Math.round((task.estimatedHours - hours) * 60)
+            let duration = ''
+            if (hours === 0) {
+              duration = `${minutes} minutos`
+            } else if (minutes === 0) {
+              duration = `${hours} ${hours === 1 ? 'hora' : 'horas'}`
+            } else {
+              duration = `${hours} ${hours === 1 ? 'hora' : 'horas'} ${minutes} minutos`
+            }
+            suggestedContent += `   - Horario: ${task.startTime} a ${task.endTime} (${duration})\n`
+          } else if (task.estimatedHours) {
+            suggestedContent += `   - Tiempo estimado: ${task.estimatedHours} horas\n`
+          }
+          
           if (task.notes) {
             suggestedContent += `   - Notas: ${task.notes}\n`
           }
@@ -397,7 +415,17 @@ export async function GET(
       suggestedContent += `### Métricas\n\n`
       suggestedContent += `- **Tareas completadas:** ${plan.completedTasks} de ${plan.totalTasks}\n`
       if (plan.estimatedHours) {
-        suggestedContent += `- **Tiempo estimado:** ${plan.estimatedHours} horas\n`
+        const hours = Math.floor(plan.estimatedHours)
+        const minutes = Math.round((plan.estimatedHours - hours) * 60)
+        let duration = ''
+        if (hours === 0) {
+          duration = `${minutes} minutos`
+        } else if (minutes === 0) {
+          duration = `${hours} ${hours === 1 ? 'hora' : 'horas'}`
+        } else {
+          duration = `${hours} ${hours === 1 ? 'hora' : 'horas'} ${minutes} minutos`
+        }
+        suggestedContent += `- **Tiempo estimado total:** ${duration}\n`
       }
       if (plan.actualHours) {
         suggestedContent += `- **Tiempo real:** ${plan.actualHours} horas\n`

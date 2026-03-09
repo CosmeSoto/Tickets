@@ -1,27 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { NotificationService } from '@/lib/services/notification-service'
 
-export async function POST(request: NextRequest) {
+/**
+ * Función compartida para marcar todas las notificaciones como leídas
+ */
+async function markAllNotificationsAsRead(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
 
-    if (!session) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      )
     }
 
-    // Las notificaciones dinámicas se manejan en el cliente con localStorage
-    // Este endpoint es para notificaciones persistentes futuras
-    
-    return NextResponse.json({ 
+    const result = await NotificationService.markAllAsRead(session.user.id)
+
+    return NextResponse.json({
       success: true,
-      message: 'Todas las notificaciones marcadas como leídas'
+      count: result.count,
     })
   } catch (error) {
-    console.error('Error marking all notifications as read:', error)
+    console.error('Error marking all as read:', error)
     return NextResponse.json(
-      { error: 'Error interno del servidor' },
+      { error: 'Error al marcar todas como leídas' },
       { status: 500 }
     )
   }
+}
+
+/**
+ * POST /api/notifications/read-all
+ * Marcar todas las notificaciones como leídas (método POST para compatibilidad)
+ */
+export async function POST(request: NextRequest) {
+  return markAllNotificationsAsRead(request)
+}
+
+/**
+ * PATCH /api/notifications/read-all
+ * Marcar todas las notificaciones como leídas (método PATCH estándar)
+ */
+export async function PATCH(request: NextRequest) {
+  return markAllNotificationsAsRead(request)
 }

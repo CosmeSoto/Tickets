@@ -25,6 +25,37 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
+          // NUEVO: Verificar si la cuenta está bloqueada por intentos fallidos
+          const { SecurityConfigService } = await import('./services/security-config-service')
+          const ipAddress = 'unknown' // En producción, obtener IP real del request
+          
+          const lockStatus = await SecurityConfigService.isAccountLocked(credentials.email, ipAddress)
+          
+          if (lockStatus.locked) {
+            // Registrar intento de acceso a cuenta bloqueada
+            try {
+              const { AuditServiceComplete } = await import('./services/audit-service-complete')
+              await AuditServiceComplete.log({
+                action: 'login_failed',
+                entityType: 'user',
+                entityId: 'unknown',
+                userId: 'system',
+                details: {
+                  email: credentials.email,
+                  reason: 'account_locked',
+                  timestamp: new Date().toISOString()
+                },
+                result: 'ERROR',
+                errorCode: 'AUTH_ACCOUNT_LOCKED',
+                errorMessage: 'Cuenta bloqueada por múltiples intentos fallidos'
+              })
+            } catch (auditError) {
+              console.error('[AUTH] Error registrando intento bloqueado:', auditError)
+            }
+            
+            throw new Error('Cuenta bloqueada temporalmente por múltiples intentos fallidos. Intenta de nuevo en 30 minutos.')
+          }
+
           const user = await prisma.users.findUnique({
             where: {
               email: credentials.email,
@@ -36,6 +67,9 @@ export const authOptions: NextAuthOptions = {
 
           // Usuario no encontrado
           if (!user || !user.passwordHash) {
+            // NUEVO: Registrar intento fallido
+            await SecurityConfigService.recordFailedLogin(credentials.email, ipAddress)
+            
             // Registrar intento fallido en auditoría
             try {
               const { AuditServiceComplete } = await import('./services/audit-service-complete')
@@ -47,6 +81,7 @@ export const authOptions: NextAuthOptions = {
                 details: {
                   email: credentials.email,
                   reason: 'user_not_found',
+                  attemptsRemaining: lockStatus.attemptsRemaining ? lockStatus.attemptsRemaining - 1 : undefined,
                   timestamp: new Date().toISOString()
                 },
                 result: 'ERROR',
@@ -90,6 +125,12 @@ export const authOptions: NextAuthOptions = {
           const isPasswordValid = await bcrypt.compare(credentials.password, user.passwordHash)
 
           if (!isPasswordValid) {
+            // NUEVO: Registrar intento fallido
+            await SecurityConfigService.recordFailedLogin(credentials.email, ipAddress)
+            
+            // Obtener intentos restantes
+            const updatedLockStatus = await SecurityConfigService.isAccountLocked(credentials.email, ipAddress)
+            
             // Registrar contraseña incorrecta
             try {
               const { AuditServiceComplete } = await import('./services/audit-service-complete')
@@ -101,6 +142,7 @@ export const authOptions: NextAuthOptions = {
                 details: {
                   email: credentials.email,
                   reason: 'invalid_password',
+                  attemptsRemaining: updatedLockStatus.attemptsRemaining,
                   timestamp: new Date().toISOString()
                 },
                 result: 'ERROR',
@@ -111,8 +153,15 @@ export const authOptions: NextAuthOptions = {
               console.error('[AUTH] Error registrando intento fallido:', auditError)
             }
             
-            throw new Error('Credenciales inválidas')
+            const remainingMessage = updatedLockStatus.attemptsRemaining 
+              ? ` (${updatedLockStatus.attemptsRemaining} intentos restantes)`
+              : ''
+            
+            throw new Error(`Credenciales inválidas${remainingMessage}`)
           }
+
+          // NUEVO: Login exitoso - limpiar intentos fallidos
+          await SecurityConfigService.clearFailedLogins(credentials.email, ipAddress)
 
           // Login exitoso - actualizar último login
           await prisma.users.update({
@@ -188,11 +237,11 @@ export const authOptions: NextAuthOptions = {
   ],
   session: {
     strategy: 'jwt',
-    maxAge: 24 * 60 * 60, // 24 horas
-    updateAge: 24 * 60 * 60, // Actualizar cada 24 horas
+    maxAge: 24 * 60 * 60, // 24 horas (máximo permitido, se validará en middleware)
+    updateAge: 60 * 60, // Actualizar cada hora
   },
   jwt: {
-    maxAge: 24 * 60 * 60, // 24 horas
+    maxAge: 24 * 60 * 60, // 24 horas (máximo permitido, se validará en middleware)
   },
   callbacks: {
     async signIn({ user, account, profile }) {
@@ -290,6 +339,9 @@ export const authOptions: NextAuthOptions = {
       try {
         // Si es un nuevo login, agregar datos del usuario al token
         if (user) {
+          // Agregar timestamp de login para validar timeout
+          token.loginTime = Date.now()
+          
           // Para OAuth, obtener el usuario de la base de datos
           if (account?.provider === 'google' || account?.provider === 'azure-ad') {
             try {
@@ -352,6 +404,11 @@ export const authOptions: NextAuthOptions = {
           session.user.phone = token.phone as string | undefined
           session.user.avatar = token.avatar as string | undefined
           session.user.isOAuth = (token.isOAuth as boolean) || false
+          
+          // IMPORTANTE: Pasar loginTime a la sesión para el monitor de timeout
+          if (token.loginTime) {
+            (session as any).loginTime = token.loginTime
+          }
         }
         return session
       } catch (error) {
@@ -390,6 +447,9 @@ export const authOptions: NextAuthOptions = {
     error: '/login',
     newUser: '/client', // Redirigir nuevos usuarios OAuth al dashboard de cliente
   },
+  // Configurar rutas públicas que no requieren autenticación
+  // NextAuth no debe redirigir estas rutas
+  secret: process.env.NEXTAUTH_SECRET,
   events: {
     async signIn({ user, account, isNewUser }) {
       // Registrar inicio de sesión en auditoría

@@ -19,6 +19,7 @@ import {
   Key
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { Switch } from '@/components/ui/switch'
 
 interface OAuthConfig {
   id: string
@@ -45,7 +46,8 @@ export function OAuthSettingsTab() {
     clientId: '',
     clientSecret: '',
     isEnabled: false,
-    showSecret: false
+    showSecret: false,
+    hasExistingSecret: false // Para saber si ya existe un secret guardado
   })
 
   // Estados para Microsoft
@@ -54,7 +56,8 @@ export function OAuthSettingsTab() {
     clientSecret: '',
     tenantId: 'common',
     isEnabled: false,
-    showSecret: false
+    showSecret: false,
+    hasExistingSecret: false // Para saber si ya existe un secret guardado
   })
 
   useEffect(() => {
@@ -76,7 +79,8 @@ export function OAuthSettingsTab() {
             clientId: google.clientId,
             clientSecret: '', // No mostrar el secret completo
             isEnabled: google.isEnabled,
-            showSecret: false
+            showSecret: false,
+            hasExistingSecret: !!google.clientSecret // Marcar que existe un secret
           })
         }
 
@@ -88,7 +92,8 @@ export function OAuthSettingsTab() {
             clientSecret: '', // No mostrar el secret completo
             tenantId: microsoft.tenantId || 'common',
             isEnabled: microsoft.isEnabled,
-            showSecret: false
+            showSecret: false,
+            hasExistingSecret: !!microsoft.clientSecret // Marcar que existe un secret
           })
         }
       }
@@ -105,7 +110,8 @@ export function OAuthSettingsTab() {
   }
 
   const saveGoogleConfig = async () => {
-    if (!googleConfig.clientId || !googleConfig.clientSecret) {
+    // Validar solo si no hay secret existente
+    if (!googleConfig.clientId || (!googleConfig.clientSecret && !googleConfig.hasExistingSecret)) {
       toast({
         title: 'Campos requeridos',
         description: 'Client ID y Client Secret son obligatorios',
@@ -116,17 +122,23 @@ export function OAuthSettingsTab() {
 
     setSaving(true)
     try {
+      const payload: any = {
+        provider: 'google',
+        clientId: googleConfig.clientId,
+        isEnabled: googleConfig.isEnabled,
+        redirectUri: `${window.location.origin}/api/auth/callback/google`,
+        scopes: 'openid profile email'
+      }
+
+      // Solo enviar clientSecret si se proporcionó uno nuevo
+      if (googleConfig.clientSecret) {
+        payload.clientSecret = googleConfig.clientSecret
+      }
+
       const response = await fetch('/api/admin/oauth-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          provider: 'google',
-          clientId: googleConfig.clientId,
-          clientSecret: googleConfig.clientSecret,
-          isEnabled: googleConfig.isEnabled,
-          redirectUri: `${window.location.origin}/api/auth/callback/google`,
-          scopes: 'openid profile email'
-        })
+        body: JSON.stringify(payload)
       })
 
       const data = await response.json()
@@ -157,7 +169,8 @@ export function OAuthSettingsTab() {
   }
 
   const saveMicrosoftConfig = async () => {
-    if (!microsoftConfig.clientId || !microsoftConfig.clientSecret) {
+    // Validar solo si no hay secret existente
+    if (!microsoftConfig.clientId || (!microsoftConfig.clientSecret && !microsoftConfig.hasExistingSecret)) {
       toast({
         title: 'Campos requeridos',
         description: 'Client ID y Client Secret son obligatorios',
@@ -168,18 +181,24 @@ export function OAuthSettingsTab() {
 
     setSaving(true)
     try {
+      const payload: any = {
+        provider: 'azure-ad',
+        clientId: microsoftConfig.clientId,
+        tenantId: microsoftConfig.tenantId,
+        isEnabled: microsoftConfig.isEnabled,
+        redirectUri: `${window.location.origin}/api/auth/callback/azure-ad`,
+        scopes: 'openid profile email User.Read'
+      }
+
+      // Solo enviar clientSecret si se proporcionó uno nuevo
+      if (microsoftConfig.clientSecret) {
+        payload.clientSecret = microsoftConfig.clientSecret
+      }
+
       const response = await fetch('/api/admin/oauth-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          provider: 'azure-ad',
-          clientId: microsoftConfig.clientId,
-          clientSecret: microsoftConfig.clientSecret,
-          tenantId: microsoftConfig.tenantId,
-          isEnabled: microsoftConfig.isEnabled,
-          redirectUri: `${window.location.origin}/api/auth/callback/azure-ad`,
-          scopes: 'openid profile email User.Read'
-        })
+        body: JSON.stringify(payload)
       })
 
       const data = await response.json()
@@ -324,23 +343,26 @@ export function OAuthSettingsTab() {
           </div>
 
           {/* Enable/Disable */}
-          <div className="flex items-center space-x-3">
-            <input
-              type="checkbox"
+          <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div className="space-y-0.5">
+              <Label htmlFor="google-enabled" className="text-base font-medium cursor-pointer">
+                Habilitar Google OAuth
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Permite a los usuarios registrarse e iniciar sesión con Google
+              </p>
+            </div>
+            <Switch
               id="google-enabled"
               checked={googleConfig.isEnabled}
-              onChange={(e) => setGoogleConfig({ ...googleConfig, isEnabled: e.target.checked })}
-              className="h-4 w-4 rounded border-border"
+              onCheckedChange={(checked) => setGoogleConfig({ ...googleConfig, isEnabled: checked })}
             />
-            <Label htmlFor="google-enabled" className="text-sm font-medium cursor-pointer">
-              Habilitar Google OAuth
-            </Label>
           </div>
 
           {/* Save Button */}
           <Button
             onClick={saveGoogleConfig}
-            disabled={saving || !googleConfig.clientId || !googleConfig.clientSecret}
+            disabled={saving || !googleConfig.clientId || (!googleConfig.clientSecret && !googleConfig.hasExistingSecret)}
             className="w-full"
           >
             {saving ? (
@@ -458,23 +480,26 @@ export function OAuthSettingsTab() {
           </div>
 
           {/* Enable/Disable */}
-          <div className="flex items-center space-x-3">
-            <input
-              type="checkbox"
+          <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div className="space-y-0.5">
+              <Label htmlFor="microsoft-enabled" className="text-base font-medium cursor-pointer">
+                Habilitar Microsoft OAuth
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Permite a los usuarios registrarse e iniciar sesión con Microsoft
+              </p>
+            </div>
+            <Switch
               id="microsoft-enabled"
               checked={microsoftConfig.isEnabled}
-              onChange={(e) => setMicrosoftConfig({ ...microsoftConfig, isEnabled: e.target.checked })}
-              className="h-4 w-4 rounded border-border"
+              onCheckedChange={(checked) => setMicrosoftConfig({ ...microsoftConfig, isEnabled: checked })}
             />
-            <Label htmlFor="microsoft-enabled" className="text-sm font-medium cursor-pointer">
-              Habilitar Microsoft OAuth
-            </Label>
           </div>
 
           {/* Save Button */}
           <Button
             onClick={saveMicrosoftConfig}
-            disabled={saving || !microsoftConfig.clientId || !microsoftConfig.clientSecret}
+            disabled={saving || !microsoftConfig.clientId || (!microsoftConfig.clientSecret && !microsoftConfig.hasExistingSecret)}
             className="w-full"
           >
             {saving ? (

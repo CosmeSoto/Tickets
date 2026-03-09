@@ -69,7 +69,6 @@ const navigationByRole = {
   CLIENT: [
     { name: 'Dashboard', href: '/client', icon: LayoutDashboard },
     { name: 'Mis Tickets', href: '/client/tickets', icon: Ticket },
-    { name: 'Crear Ticket', href: '/client/tickets/create', icon: Ticket },
     { name: 'Base de Conocimientos', href: '/knowledge', icon: BookOpen },
     { name: 'Ayuda', href: '/client/help', icon: HelpCircle },
   ],

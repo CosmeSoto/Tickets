@@ -25,6 +25,7 @@ import {
   Camera,
   UserCheck,
   UserX,
+  UserCog,
 } from 'lucide-react'
 import { UserData, formatTimeAgo } from '@/hooks/use-users'
 import { 
@@ -39,6 +40,7 @@ interface UserColumnsProps {
   onUserDetails?: (user: UserData) => void
   onAvatarEdit?: (user: UserData) => void
   onToggleStatus?: (user: UserData) => void
+  onPromoteUser?: (user: UserData) => void
   currentUserId?: string
 }
 
@@ -48,6 +50,7 @@ export function createUserColumns({
   onUserDetails,
   onAvatarEdit,
   onToggleStatus,
+  onPromoteUser,
   currentUserId
 }: UserColumnsProps = {}) {
   return [
@@ -58,12 +61,12 @@ export function createUserColumns({
         const RoleIcon = USER_ROLE_ICONS[user.role]
         
         return (
-          <div className="flex items-center space-x-3">
-            <div className="relative">
-              <Avatar className="h-10 w-10">
+          <div className="flex items-center space-x-2 min-w-0">
+            <div className="relative flex-shrink-0">
+              <Avatar className="h-9 w-9">
                 <AvatarImage src={user.avatar} alt={user.name} />
                 <AvatarFallback className={USER_ROLE_COLORS[user.role]}>
-                  <RoleIcon className="h-5 w-5" />
+                  <RoleIcon className="h-4 w-4" />
                 </AvatarFallback>
               </Avatar>
               {onAvatarEdit && (
@@ -73,41 +76,41 @@ export function createUserColumns({
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-background border shadow-sm hover:bg-accent"
+                        className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-background border shadow-sm hover:bg-accent p-0"
                         onClick={(e) => {
                           e.stopPropagation()
                           onAvatarEdit(user)
                         }}
                       >
-                        <Camera className="h-3 w-3" />
+                        <Camera className="h-2.5 w-2.5" />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Cambiar foto de perfil</p>
+                      <p>Cambiar foto</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-1.5">
                 <p className="text-sm font-medium text-foreground truncate">
                   {user.name}
                 </p>
                 {!user.isActive && (
-                  <Badge variant="secondary" className="text-xs">
+                  <Badge variant="secondary" className="text-xs flex-shrink-0">
                     Inactivo
                   </Badge>
                 )}
               </div>
-              <p className="text-sm text-muted-foreground truncate">
+              <p className="text-xs text-muted-foreground truncate">
                 {user.email}
               </p>
             </div>
           </div>
         )
       },
-      width: '300px'
+      width: '250px'
     },
     {
       key: 'role',
@@ -116,47 +119,47 @@ export function createUserColumns({
         const RoleIcon = USER_ROLE_ICONS[user.role]
         
         return (
-          <Badge className={`${USER_ROLE_COLORS[user.role]} flex items-center space-x-1 w-fit`}>
+          <Badge className={`${USER_ROLE_COLORS[user.role]} flex items-center space-x-1 w-fit text-xs`}>
             <RoleIcon className="h-3 w-3" />
             <span>{USER_ROLE_LABELS[user.role]}</span>
           </Badge>
         )
       },
-      width: '120px'
+      width: '100px'
     },
     {
       key: 'department',
       label: 'Departamento',
       render: (user: UserData) => {
         if (!user.department) {
-          return <span className="text-muted-foreground text-sm">Sin asignar</span>
+          return <span className="text-muted-foreground text-xs">-</span>
         }
         
         if (typeof user.department === 'string') {
-          return <span className="text-sm">{user.department}</span>
+          return <span className="text-xs truncate">{user.department}</span>
         }
         
         return (
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1.5 min-w-0">
             <div
-              className="w-3 h-3 rounded-full"
+              className="w-2.5 h-2.5 rounded-full flex-shrink-0"
               style={{ backgroundColor: user.department.color }}
             />
-            <span className="text-sm">{user.department.name}</span>
+            <span className="text-xs truncate">{user.department.name}</span>
           </div>
         )
       },
-      width: '150px'
+      width: '130px'
     },
     {
       key: 'phone',
       label: 'Teléfono',
       render: (user: UserData) => (
-        <span className="text-sm">
-          {user.phone || <span className="text-muted-foreground">No especificado</span>}
+        <span className="text-xs">
+          {user.phone || <span className="text-muted-foreground">-</span>}
         </span>
       ),
-      width: '120px'
+      width: '110px'
     },
     {
       key: 'tickets',
@@ -166,17 +169,17 @@ export function createUserColumns({
         const assignedCount = user._count?.tickets_tickets_assigneeIdTousers || 0
         
         return (
-          <div className="text-sm">
-            <div className="flex items-center space-x-2">
-              <span className="text-muted-foreground">Creados:</span>
-              <Badge variant="outline" className="text-xs">
+          <div className="text-xs space-y-0.5">
+            <div className="flex items-center space-x-1.5">
+              <span className="text-muted-foreground">C:</span>
+              <Badge variant="outline" className="text-xs h-5 px-1.5">
                 {createdCount}
               </Badge>
             </div>
             {user.role === 'TECHNICIAN' && (
-              <div className="flex items-center space-x-2 mt-1">
-                <span className="text-muted-foreground">Asignados:</span>
-                <Badge variant="outline" className="text-xs">
+              <div className="flex items-center space-x-1.5">
+                <span className="text-muted-foreground">A:</span>
+                <Badge variant="outline" className="text-xs h-5 px-1.5">
                   {assignedCount}
                 </Badge>
               </div>
@@ -184,31 +187,31 @@ export function createUserColumns({
           </div>
         )
       },
-      width: '120px'
+      width: '80px'
     },
     {
       key: 'lastLogin',
       label: 'Último Acceso',
       render: (user: UserData) => (
-        <div className="text-sm">
+        <div className="text-xs">
           {user.lastLogin ? (
-            <span>{formatTimeAgo(user.lastLogin)}</span>
+            <span className="truncate">{formatTimeAgo(user.lastLogin)}</span>
           ) : (
             <span className="text-muted-foreground">Nunca</span>
           )}
         </div>
       ),
-      width: '120px'
+      width: '100px'
     },
     {
       key: 'createdAt',
       label: 'Creado',
       render: (user: UserData) => (
-        <span className="text-sm text-muted-foreground">
+        <span className="text-xs text-muted-foreground truncate">
           {formatTimeAgo(user.createdAt)}
         </span>
       ),
-      width: '100px'
+      width: '90px'
     },
     {
       key: 'actions',
@@ -219,80 +222,95 @@ export function createUserColumns({
             <Tooltip>
               <TooltipTrigger asChild>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="h-8 w-8 p-0">
+                  <Button 
+                    variant="ghost" 
+                    className="h-7 w-7 p-0"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <span className="sr-only">Abrir menú</span>
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Acciones del usuario</p>
+                <p>Acciones</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>Acciones</DropdownMenuLabel>
             
             {onUserDetails && (
-              <DropdownMenuItem onClick={() => onUserDetails(user)}>
+              <DropdownMenuItem onClick={(e) => {
+                e.stopPropagation()
+                onUserDetails(user)
+              }}>
                 <Eye className="mr-2 h-4 w-4" />
-                <div className="flex flex-col">
-                  <span>Ver Detalles</span>
-                  <span className="text-xs text-muted-foreground">Información completa del usuario</span>
-                </div>
+                <span>Ver Detalles</span>
               </DropdownMenuItem>
             )}
             
             {onUserEdit && (
-              <DropdownMenuItem onClick={() => onUserEdit(user)}>
+              <DropdownMenuItem onClick={(e) => {
+                e.stopPropagation()
+                onUserEdit(user)
+              }}>
                 <Edit className="mr-2 h-4 w-4" />
-                <div className="flex flex-col">
-                  <span>Editar Usuario</span>
-                  <span className="text-xs text-muted-foreground">Modificar información y permisos</span>
-                </div>
+                <span>Editar Usuario</span>
               </DropdownMenuItem>
             )}
             
-            {onToggleStatus && (
-              <DropdownMenuItem onClick={() => onToggleStatus(user)}>
+            {onToggleStatus && user.id !== currentUserId && (
+              <DropdownMenuItem onClick={(e) => {
+                e.stopPropagation()
+                onToggleStatus(user)
+              }}>
                 {user.isActive ? (
                   <>
                     <UserX className="mr-2 h-4 w-4" />
-                    <div className="flex flex-col">
-                      <span>Desactivar</span>
-                      <span className="text-xs text-muted-foreground">Bloquear acceso al sistema</span>
-                    </div>
+                    <span>Desactivar</span>
                   </>
                 ) : (
                   <>
                     <UserCheck className="mr-2 h-4 w-4" />
-                    <div className="flex flex-col">
-                      <span>Activar</span>
-                      <span className="text-xs text-muted-foreground">Permitir acceso al sistema</span>
-                    </div>
+                    <span>Activar</span>
                   </>
                 )}
               </DropdownMenuItem>
+            )}
+            
+            {/* Promover a Técnico - Solo para usuarios CLIENT activos */}
+            {onPromoteUser && user.role === 'CLIENT' && user.isActive && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={(e) => {
+                  e.stopPropagation()
+                  onPromoteUser(user)
+                }} className="text-blue-600">
+                  <UserCog className="mr-2 h-4 w-4" />
+                  <span>Promover a Técnico</span>
+                </DropdownMenuItem>
+              </>
             )}
             
             <DropdownMenuSeparator />
             
             {onUserDelete && user.id !== currentUserId && (
               <DropdownMenuItem 
-                onClick={() => onUserDelete(user)}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onUserDelete(user)
+                }}
                 className="text-red-600"
               >
                 <Trash2 className="mr-2 h-4 w-4" />
-                <div className="flex flex-col">
-                  <span>Eliminar Usuario</span>
-                  <span className="text-xs text-muted-foreground">Eliminar permanentemente</span>
-                </div>
+                <span>Eliminar Usuario</span>
               </DropdownMenuItem>
             )}
           </DropdownMenuContent>
         </DropdownMenu>
       ),
-      width: '80px'
+      width: '70px'
     }
   ]
 }
@@ -320,14 +338,17 @@ export function UserCard({
   const assignedCount = user._count?.tickets_tickets_assigneeIdTousers || 0
   
   return (
-    <div className="p-4 border rounded-lg hover:shadow-md transition-shadow bg-card">
+    <div 
+      className="p-4 border rounded-lg hover:shadow-md transition-shadow bg-card cursor-pointer"
+      onClick={() => onDetails && onDetails(user)}
+    >
       <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center space-x-3">
-          <div className="relative">
-            <Avatar className="h-12 w-12">
+        <div className="flex items-center space-x-2.5">
+          <div className="relative flex-shrink-0">
+            <Avatar className="h-11 w-11">
               <AvatarImage src={user.avatar} alt={user.name} />
               <AvatarFallback className={USER_ROLE_COLORS[user.role]}>
-                <RoleIcon className="h-6 w-6" />
+                <RoleIcon className="h-5 w-5" />
               </AvatarFallback>
             </Avatar>
             {onAvatarEdit && (
@@ -337,34 +358,34 @@ export function UserCard({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-background border shadow-sm hover:bg-accent"
+                      className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-background border shadow-sm hover:bg-accent p-0"
                       onClick={(e) => {
                         e.stopPropagation()
                         onAvatarEdit(user)
                       }}
                     >
-                      <Camera className="h-3 w-3" />
+                      <Camera className="h-2.5 w-2.5" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Cambiar foto de perfil</p>
+                    <p>Cambiar foto</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             )}
           </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <h3 className="font-medium text-foreground">{user.name}</h3>
+          <div className="min-w-0">
+            <div className="flex items-center space-x-1.5">
+              <h3 className="font-medium text-foreground text-sm">{user.name}</h3>
               {!user.isActive && (
                 <Badge variant="secondary" className="text-xs">
                   Inactivo
                 </Badge>
               )}
             </div>
-            <p className="text-sm text-muted-foreground">{user.email}</p>
+            <p className="text-xs text-muted-foreground">{user.email}</p>
             {user.phone && (
-              <p className="text-sm text-muted-foreground">{user.phone}</p>
+              <p className="text-xs text-muted-foreground">{user.phone}</p>
             )}
           </div>
         </div>
@@ -374,56 +395,57 @@ export function UserCard({
             <Tooltip>
               <TooltipTrigger asChild>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="h-8 w-8 p-0">
+                  <Button 
+                    variant="ghost" 
+                    className="h-7 w-7 p-0"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Acciones del usuario</p>
+                <p>Acciones</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>Acciones</DropdownMenuLabel>
             
             {onDetails && (
-              <DropdownMenuItem onClick={() => onDetails(user)}>
+              <DropdownMenuItem onClick={(e) => {
+                e.stopPropagation()
+                onDetails(user)
+              }}>
                 <Eye className="mr-2 h-4 w-4" />
-                <div className="flex flex-col">
-                  <span>Ver Detalles</span>
-                  <span className="text-xs text-muted-foreground">Información completa del usuario</span>
-                </div>
+                <span>Ver Detalles</span>
               </DropdownMenuItem>
             )}
             
             {onEdit && (
-              <DropdownMenuItem onClick={() => onEdit(user)}>
+              <DropdownMenuItem onClick={(e) => {
+                e.stopPropagation()
+                onEdit(user)
+              }}>
                 <Edit className="mr-2 h-4 w-4" />
-                <div className="flex flex-col">
-                  <span>Editar Usuario</span>
-                  <span className="text-xs text-muted-foreground">Modificar información y permisos</span>
-                </div>
+                <span>Editar Usuario</span>
               </DropdownMenuItem>
             )}
             
-            {onToggleStatus && (
-              <DropdownMenuItem onClick={() => onToggleStatus(user)}>
+            {onToggleStatus && user.id !== currentUserId && (
+              <DropdownMenuItem onClick={(e) => {
+                e.stopPropagation()
+                onToggleStatus(user)
+              }}>
                 {user.isActive ? (
                   <>
                     <UserX className="mr-2 h-4 w-4" />
-                    <div className="flex flex-col">
-                      <span>Desactivar</span>
-                      <span className="text-xs text-muted-foreground">Bloquear acceso al sistema</span>
-                    </div>
+                    <span>Desactivar</span>
                   </>
                 ) : (
                   <>
                     <UserCheck className="mr-2 h-4 w-4" />
-                    <div className="flex flex-col">
-                      <span>Activar</span>
-                      <span className="text-xs text-muted-foreground">Permitir acceso al sistema</span>
-                    </div>
+                    <span>Activar</span>
                   </>
                 )}
               </DropdownMenuItem>
@@ -433,14 +455,14 @@ export function UserCard({
             
             {onDelete && user.id !== currentUserId && (
               <DropdownMenuItem 
-                onClick={() => onDelete(user)}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDelete(user)
+                }}
                 className="text-red-600"
               >
                 <Trash2 className="mr-2 h-4 w-4" />
-                <div className="flex flex-col">
-                  <span>Eliminar Usuario</span>
-                  <span className="text-xs text-muted-foreground">Eliminar permanentemente</span>
-                </div>
+                <span>Eliminar Usuario</span>
               </DropdownMenuItem>
             )}
           </DropdownMenuContent>
@@ -449,8 +471,8 @@ export function UserCard({
       
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Rol:</span>
-          <Badge className={`${USER_ROLE_COLORS[user.role]} flex items-center space-x-1`}>
+          <span className="text-xs text-muted-foreground">Rol:</span>
+          <Badge className={`${USER_ROLE_COLORS[user.role]} flex items-center space-x-1 text-xs`}>
             <RoleIcon className="h-3 w-3" />
             <span>{USER_ROLE_LABELS[user.role]}</span>
           </Badge>
@@ -458,15 +480,15 @@ export function UserCard({
         
         {user.department && (
           <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Departamento:</span>
-            <div className="flex items-center space-x-2">
+            <span className="text-xs text-muted-foreground">Departamento:</span>
+            <div className="flex items-center space-x-1.5">
               {typeof user.department !== 'string' && (
                 <div
-                  className="w-3 h-3 rounded-full"
+                  className="w-2.5 h-2.5 rounded-full"
                   style={{ backgroundColor: user.department.color }}
                 />
               )}
-              <span className="text-sm">
+              <span className="text-xs">
                 {typeof user.department === 'string' ? user.department : user.department.name}
               </span>
             </div>
@@ -474,31 +496,31 @@ export function UserCard({
         )}
         
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Tickets creados:</span>
-          <Badge variant="outline" className="text-xs">
+          <span className="text-xs text-muted-foreground">Tickets creados:</span>
+          <Badge variant="outline" className="text-xs h-5 px-1.5">
             {createdCount}
           </Badge>
         </div>
         
         {user.role === 'TECHNICIAN' && (
           <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Tickets asignados:</span>
-            <Badge variant="outline" className="text-xs">
+            <span className="text-xs text-muted-foreground">Tickets asignados:</span>
+            <Badge variant="outline" className="text-xs h-5 px-1.5">
               {assignedCount}
             </Badge>
           </div>
         )}
         
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Último acceso:</span>
-          <span className="text-sm">
+          <span className="text-xs text-muted-foreground">Último acceso:</span>
+          <span className="text-xs">
             {user.lastLogin ? formatTimeAgo(user.lastLogin) : 'Nunca'}
           </span>
         </div>
         
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Creado:</span>
-          <span className="text-sm">{formatTimeAgo(user.createdAt)}</span>
+          <span className="text-xs text-muted-foreground">Creado:</span>
+          <span className="text-xs">{formatTimeAgo(user.createdAt)}</span>
         </div>
       </div>
     </div>

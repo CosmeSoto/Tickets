@@ -6,6 +6,8 @@ import { randomUUID } from 'crypto'
 import { WebhookService } from '@/lib/services/webhook-service'
 import { SLAService } from '@/lib/services/sla-service'
 import { EmailService } from '@/lib/services/email/email-service'
+import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
+import { NotificationService } from '@/lib/services/notification-service'
 
 export async function GET(request: NextRequest) {
   try {
@@ -293,6 +295,22 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    // ⭐ AUDITORÍA: Registrar creación de ticket
+    await AuditServiceComplete.log({
+      action: AuditActionsComplete.TICKET_CREATED,
+      entityType: 'ticket',
+      entityId: newTicket.id,
+      userId: session.user.id,
+      details: {
+        ticketTitle: newTicket.title,
+        priority: newTicket.priority,
+        categoryName: newTicket.categories.name,
+        clientName: newTicket.users_tickets_clientIdTousers.name,
+        assigneeName: newTicket.users_tickets_assigneeIdTousers?.name || 'Sin asignar'
+      },
+      request: request
+    })
+
     // ⭐ NUEVO: Asignar SLA al ticket
     await SLAService.assignSLA(newTicket.id).catch(err => {
       console.error('[SLA] Error asignando SLA al ticket:', err)
@@ -337,6 +355,15 @@ export async function POST(request: NextRequest) {
       }
     }, session.user.id).catch(err => {
       console.error('[EMAIL] Error enviando email de ticket creado:', err)
+    })
+
+    // ⭐ NUEVO: Enviar email al administrador para que asigne el ticket
+    const { triggerTicketCreatedToAdminEmail } = await import('@/lib/email-triggers')
+    triggerTicketCreatedToAdminEmail(newTicket.id)
+
+    // ⭐ NUEVO: Enviar notificaciones in-app a todos los admins
+    await NotificationService.notifyTicketCreated(newTicket.id).catch(err => {
+      console.error('[NOTIFICATION] Error enviando notificaciones de ticket creado:', err)
     })
 
     // Mapear los datos para que coincidan con lo que espera el frontend

@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import prisma from '@/lib/prisma'
+import { randomUUID } from 'crypto'
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      )
+    }
+
     const { id: ticketId } = await params
     const assignmentData = await request.json()
 
@@ -21,48 +31,90 @@ export async function PATCH(
       )
     }
 
-    // Simular delay de red
-    await new Promise(resolve => setTimeout(resolve, 300))
+    // Obtener el ticket actual para comparar
+    const currentTicket = await prisma.tickets.findUnique({
+      where: { id: ticketId },
+      select: {
+        assigneeId: true,
+        users_tickets_assigneeIdTousers: {
+          select: { id: true, name: true, email: true }
+        }
+      }
+    })
 
-    // En producción, actualizar asignación en base de datos y crear entrada en timeline
-    const updatedTicket = {
-      id: ticketId,
-      assigneeId: assignmentData.assigneeId,
-      assignee: assignmentData.assigneeId ? {
-        id: assignmentData.assigneeId,
-        name: 'Técnico Asignado',
-        email: 'tecnico@soporte.com',
-        role: 'TECHNICIAN'
-      } : null,
-      updatedAt: new Date().toISOString()
+    if (!currentTicket) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Ticket no encontrado'
+        },
+        { status: 404 }
+      )
     }
 
-    // También crear entrada en timeline
-    const timelineEntry = {
-      id: `timeline_${Date.now()}`,
-      ticketId,
-      type: 'assignment',
-      title: assignmentData.assigneeId ? 'Ticket asignado' : 'Asignación removida',
-      description: assignmentData.comment || (assignmentData.assigneeId ? 'Ticket asignado a técnico' : 'Se removió la asignación del ticket'),
-      user: {
-        id: 'current_user',
-        name: 'Usuario Actual',
-        email: 'usuario@soporte.com',
-        role: 'ADMIN'
+    // Actualizar asignación en base de datos
+    const updatedTicket = await prisma.tickets.update({
+      where: { id: ticketId },
+      data: {
+        assigneeId: assignmentData.assigneeId,
+        status: assignmentData.assigneeId ? 'IN_PROGRESS' : 'OPEN',
+        updatedAt: new Date()
       },
-      metadata: {
-        oldValue: 'PREVIOUS_ASSIGNEE', // En producción, obtener el técnico anterior
-        newValue: assignmentData.assigneeId ? 'Técnico Asignado' : null
-      },
-      createdAt: new Date().toISOString(),
-      isInternal: false
+      include: {
+        users_tickets_assigneeIdTousers: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true
+          }
+        },
+        users_tickets_clientIdTousers: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      }
+    })
+
+    // Crear entrada en el historial
+    const oldAssigneeName = currentTicket.users_tickets_assigneeIdTousers?.name || 'Sin asignar'
+    const newAssigneeName = updatedTicket.users_tickets_assigneeIdTousers?.name || 'Sin asignar'
+
+    await prisma.ticket_history.create({
+      data: {
+        id: randomUUID(),
+        ticketId,
+        userId: session.user.id,
+        action: assignmentData.assigneeId ? 'assigned' : 'unassigned',
+        comment: assignmentData.comment || `Asignación cambiada de ${oldAssigneeName} a ${newAssigneeName}`,
+        createdAt: new Date()
+      }
+    })
+
+    // Enviar notificaciones si se asignó a un técnico
+    if (assignmentData.assigneeId && assignmentData.assigneeId !== currentTicket.assigneeId) {
+      const { NotificationService } = await import('@/lib/services/notification-service')
+      await NotificationService.notifyTicketAssigned(ticketId, assignmentData.assigneeId).catch(err => {
+        console.error('[ASSIGN] Error enviando notificaciones:', err)
+      })
+
+      // ⭐ NUEVO: Enviar email al técnico asignado
+      const { 
+        triggerTicketAssignedToTechnicianEmail,
+        triggerTicketAssignedToClientEmail 
+      } = await import('@/lib/email-triggers')
+      
+      triggerTicketAssignedToTechnicianEmail(ticketId)
+      triggerTicketAssignedToClientEmail(ticketId)
     }
 
     return NextResponse.json({
       success: true,
       data: {
-        ticket: updatedTicket,
-        timelineEntry
+        ticket: updatedTicket
       },
       message: assignmentData.assigneeId ? 'Ticket asignado exitosamente' : 'Asignación removida exitosamente'
     })
@@ -97,29 +149,30 @@ export async function POST(
     if (mode === 'auto') {
       const body = await request.json()
       
-      // Simular lógica de asignación automática
-      const bestTechnician = {
-        id: 'tech_auto_001',
-        name: 'Juan Pérez',
-        email: 'juan.perez@soporte.com',
-        assignmentReason: 'Seleccionado por menor carga de trabajo y especialización en la categoría'
+      console.log('[AUTO-ASSIGN] Iniciando asignación automática para ticket:', ticketId)
+      console.log('[AUTO-ASSIGN] Criterios:', body)
+      
+      // ⭐ IMPORTAR Y USAR EL SERVICIO REAL
+      const { AssignmentService } = await import('@/lib/services/assignment-service')
+      
+      try {
+        const result = await AssignmentService.autoAssignTicket(ticketId, {
+          workloadBalance: body.workloadBalance !== false,
+          skillMatch: body.skillMatch !== false,
+        })
+
+        console.log('[AUTO-ASSIGN] ✅ Asignación exitosa:', result.assignedTechnician.name)
+        return NextResponse.json(result)
+      } catch (error) {
+        console.error('[AUTO-ASSIGN] ❌ Error:', error)
+        console.error('[AUTO-ASSIGN] Stack:', error instanceof Error ? error.stack : 'No stack')
+        return NextResponse.json(
+          {
+            error: error instanceof Error ? error.message : 'Error en asignación automática'
+          },
+          { status: 400 }
+        )
       }
-
-      // Simular delay de procesamiento
-      await new Promise(resolve => setTimeout(resolve, 1000))
-
-      const result = {
-        ticket: {
-          id: ticketId,
-          assigneeId: bestTechnician.id,
-          status: 'IN_PROGRESS',
-          updatedAt: new Date().toISOString()
-        },
-        assignedTechnician: bestTechnician,
-        reason: 'Asignación automática basada en carga de trabajo y especialización'
-      }
-
-      return NextResponse.json(result)
     }
 
     // Para otros tipos de POST, redirigir a PATCH

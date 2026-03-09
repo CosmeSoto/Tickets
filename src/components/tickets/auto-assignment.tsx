@@ -84,16 +84,9 @@ export function AutoAssignment({
         })
         onAssignmentComplete?.()
       } else {
-        // Intentar parsear el error JSON, si falla usar texto plano
-        let errorMessage = 'Error al asignar ticket'
-        try {
-          const errorData = await response.json()
-          errorMessage = errorData.error || errorData.message || errorMessage
-        } catch (jsonError) {
-          // Si no se puede parsear como JSON, usar el texto de la respuesta
-          const errorText = await response.text()
-          errorMessage = errorText || `Error ${response.status}: ${response.statusText}`
-        }
+        // Leer el body solo una vez
+        const errorData = await response.json().catch(() => ({ error: `Error ${response.status}: ${response.statusText}` }))
+        const errorMessage = errorData.error || errorData.message || 'Error al asignar ticket'
         
         setError(errorMessage)
         toast({

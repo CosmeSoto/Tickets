@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -40,6 +40,39 @@ interface HeaderProps {
 export function Header({ title, subtitle, actions }: HeaderProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const { data: session } = useSession()
+  const [currentAvatar, setCurrentAvatar] = useState<string | null>(null)
+
+  // Cargar avatar actualizado desde BD
+  useEffect(() => {
+    if (session?.user?.id) {
+      const loadAvatar = () => {
+        fetch(`/api/users/${session.user.id}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data.success && data.user) {
+              setCurrentAvatar(data.user.avatar)
+            }
+          })
+          .catch(() => {
+            setCurrentAvatar(session.user.avatar || null)
+          })
+      }
+      
+      // Cargar al montar
+      loadAvatar()
+      
+      // Escuchar evento de actualización de avatar
+      const handleAvatarUpdate = (event: CustomEvent) => {
+        setCurrentAvatar(event.detail.avatarUrl)
+      }
+      
+      window.addEventListener('avatarUpdated', handleAvatarUpdate as EventListener)
+      
+      return () => {
+        window.removeEventListener('avatarUpdated', handleAvatarUpdate as EventListener)
+      }
+    }
+  }, [session?.user?.id, session?.user?.avatar])
 
   const getRoleIcon = () => {
     switch (session?.user?.role) {
@@ -177,7 +210,7 @@ export function Header({ title, subtitle, actions }: HeaderProps) {
             <DropdownMenuTrigger asChild>
               <Button variant='ghost' className='flex items-center space-x-2 px-3'>
                 <Avatar className='h-8 w-8'>
-                  <AvatarImage src={session?.user?.avatar || ''} />
+                  <AvatarImage src={currentAvatar || undefined} />
                   <AvatarFallback className={getRoleColor()}>
                     <RoleIcon className='h-4 w-4' />
                   </AvatarFallback>

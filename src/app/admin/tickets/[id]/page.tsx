@@ -38,7 +38,7 @@ import {
 } from 'lucide-react'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
 import { AutoAssignment } from '@/components/tickets/auto-assignment'
-import { FileUpload } from '@/components/tickets/file-upload'
+import { CompactFileManager } from '@/components/tickets/compact-file-manager'
 import { TicketTimeline } from '@/components/ui/ticket-timeline'
 import { TicketRatingSystem } from '@/components/ui/ticket-rating-system'
 import { TicketResolutionTracker } from '@/components/ui/ticket-resolution-tracker'
@@ -68,11 +68,9 @@ export default function TicketDetailPage() {
   const { data: session } = useSession()
   const { getTicket, updateTicket, loading } = useTicketData()
   const { getTechnicians } = useUserData()
-  const { getCategories } = useCategoryData()
   
   const [ticket, setTicket] = useState<Ticket | null>(null)
   const [technicians, setTechnicians] = useState<any[]>([])
-  const [categories, setCategories] = useState<any[]>([])
   const [isEditing, setIsEditing] = useState(false)
   const [editForm, setEditForm] = useState({
     title: '',
@@ -80,26 +78,7 @@ export default function TicketDetailPage() {
     status: '' as Ticket['status'],
     priority: '' as Ticket['priority'],
     assigneeId: '',
-    categoryId: '',
-  })
-  
-  // Estados para selección en cascada de categorías
-  const [selectedCategories, setSelectedCategories] = useState<{
-    level1?: string
-    level2?: string
-    level3?: string
-    level4?: string
-  }>({})
-  const [availableCategories, setAvailableCategories] = useState<{
-    level1: any[]
-    level2: any[]
-    level3: any[]
-    level4: any[]
-  }>({
-    level1: [],
-    level2: [],
-    level3: [],
-    level4: []
+    // categoryId y clientId NO son editables - preservan la solicitud original
   })
 
   useEffect(() => {
@@ -107,16 +86,8 @@ export default function TicketDetailPage() {
     if (params.id && params.id !== 'create') {
       loadTicket()
       loadTechnicians()
-      loadCategories()
     }
   }, [params.id])
-  
-  // Construir jerarquía cuando se cargan las categorías
-  useEffect(() => {
-    if (categories.length > 0 && ticket?.category?.id) {
-      buildCategoryHierarchy(ticket.category.id, categories)
-    }
-  }, [categories, ticket?.category?.id])
 
   const loadTicket = async () => {
     // Validación adicional
@@ -133,139 +104,14 @@ export default function TicketDetailPage() {
         status: ticketData.status,
         priority: ticketData.priority,
         assigneeId: ticketData.assignee?.id || '',
-        categoryId: ticketData.category.id,
+        // categoryId y clientId NO son editables
       })
-      
-      // Construir la jerarquía de categorías si ya tenemos las categorías cargadas
-      if (categories.length > 0) {
-        buildCategoryHierarchy(ticketData.category.id, categories)
-      }
     }
   }
 
   const loadTechnicians = async () => {
     const technicianData = await getTechnicians()
     setTechnicians(technicianData)
-  }
-
-  const loadCategories = async () => {
-    const categoryData = await getCategories({ isActive: true })
-    setCategories(categoryData)
-  }
-  
-  // Función para construir la jerarquía de categorías desde una categoría específica
-  const buildCategoryHierarchy = (categoryId: string, allCategories: any[]) => {
-    const findCategoryPath = (catId: string, cats: any[], path: string[] = []): string[] | null => {
-      for (const cat of cats) {
-        if (cat.id === catId) {
-          return [...path, cat.id]
-        }
-        if (cat.children && cat.children.length > 0) {
-          const found = findCategoryPath(catId, cat.children, [...path, cat.id])
-          if (found) return found
-        }
-      }
-      return null
-    }
-    
-    const path = findCategoryPath(categoryId, allCategories)
-    if (!path) return
-    
-    // Configurar las selecciones basadas en el path
-    const newSelections: any = {}
-    const newAvailable: any = {
-      level1: allCategories.filter(c => c.level === 1),
-      level2: [],
-      level3: [],
-      level4: []
-    }
-    
-    path.forEach((catId, index) => {
-      const level = index + 1
-      newSelections[`level${level}`] = catId
-      
-      // Encontrar la categoría para obtener sus hijos
-      const findCat = (cats: any[]): any => {
-        for (const cat of cats) {
-          if (cat.id === catId) return cat
-          if (cat.children) {
-            const found = findCat(cat.children)
-            if (found) return found
-          }
-        }
-        return null
-      }
-      
-      const cat = findCat(allCategories)
-      if (cat && cat.children && level < 4) {
-        newAvailable[`level${level + 1}`] = cat.children
-      }
-    })
-    
-    setSelectedCategories(newSelections)
-    setAvailableCategories(newAvailable)
-  }
-  
-  // Manejar selección de categoría en cascada
-  const handleCategorySelect = (level: number, categoryId: string) => {
-    const findCategory = (cats: any[], id: string): any | null => {
-      for (const cat of cats) {
-        if (cat.id === id) return cat
-        if (cat.children && cat.children.length > 0) {
-          const found = findCategory(cat.children, id)
-          if (found) return found
-        }
-      }
-      return null
-    }
-
-    const selectedCat = findCategory(categories, categoryId)
-    if (!selectedCat) return
-
-    // Actualizar selecciones
-    const newSelections = { ...selectedCategories }
-    
-    if (level === 1) {
-      newSelections.level1 = categoryId
-      newSelections.level2 = undefined
-      newSelections.level3 = undefined
-      newSelections.level4 = undefined
-      
-      setAvailableCategories(prev => ({
-        ...prev,
-        level2: selectedCat.children || [],
-        level3: [],
-        level4: []
-      }))
-    } else if (level === 2) {
-      newSelections.level2 = categoryId
-      newSelections.level3 = undefined
-      newSelections.level4 = undefined
-      
-      setAvailableCategories(prev => ({
-        ...prev,
-        level3: selectedCat.children || [],
-        level4: []
-      }))
-    } else if (level === 3) {
-      newSelections.level3 = categoryId
-      newSelections.level4 = undefined
-      
-      setAvailableCategories(prev => ({
-        ...prev,
-        level4: selectedCat.children || []
-      }))
-    } else if (level === 4) {
-      newSelections.level4 = categoryId
-    }
-
-    setSelectedCategories(newSelections)
-    
-    // Actualizar el valor del formulario con la categoría más específica seleccionada
-    const finalCategoryId = newSelections.level4 || newSelections.level3 || newSelections.level2 || newSelections.level1
-    if (finalCategoryId) {
-      setEditForm({ ...editForm, categoryId: finalCategoryId })
-    }
   }
 
   const handleSave = async () => {
@@ -412,10 +258,17 @@ export default function TicketDetailPage() {
                         status: ticket.status,
                         priority: ticket.priority,
                         assigneeId: ticket.assignee?.id || '',
-                        categoryId: ticket.category.id,
                       })
                     } else {
                       setIsEditing(true)
+                      // Resetear formulario con valores actuales
+                      setEditForm({
+                        title: ticket.title,
+                        description: ticket.description,
+                        status: ticket.status,
+                        priority: ticket.priority,
+                        assigneeId: ticket.assignee?.id || '',
+                      })
                     }
                   }}
                 >
@@ -617,55 +470,23 @@ export default function TicketDetailPage() {
             </TabsContent>
             
             <TabsContent value="files" className="space-y-4">
-              <FileUpload 
-                ticketId={ticket.id} 
-                onUploadComplete={loadTicket} 
-                disabled={ticket.status === 'CLOSED'} 
-              />
-              
-              {/* Lista de archivos existentes */}
-              {ticket.attachments && ticket.attachments.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className='flex items-center'>
-                      <Paperclip className='h-5 w-5 mr-2' />
-                      Archivos Adjuntos ({ticket.attachments.length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className='space-y-2'>
-                      {ticket.attachments.map(attachment => (
-                        <div
-                          key={attachment.id}
-                          className='flex items-center justify-between p-3 bg-muted rounded-lg'
-                        >
-                          <div className="flex items-center space-x-3">
-                            <Paperclip className="h-4 w-4 text-muted-foreground" />
-                            <div>
-                              <p className='text-sm font-medium'>{attachment.originalName}</p>
-                              <p className='text-xs text-muted-foreground'>
-                                {(attachment.size / 1024).toFixed(1)} KB • {formatDate(attachment.createdAt)}
-                              </p>
-                            </div>
-                          </div>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button variant='outline' size='sm'>
-                                  Descargar
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Descarga el archivo {attachment.originalName}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Archivos Adjuntos</CardTitle>
+                  <CardDescription>
+                    Gestiona los archivos relacionados con este ticket
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <CompactFileManager
+                    ticketId={ticket.id}
+                    attachments={ticket.attachments || []}
+                    onUploadComplete={loadTicket}
+                    disabled={ticket.status === 'CLOSED'}
+                    maxFileSize={10}
+                  />
+                </CardContent>
+              </Card>
             </TabsContent>
           </Tabs>
         </div>
@@ -697,6 +518,11 @@ export default function TicketDetailPage() {
                         ? ticket.client.department 
                         : (ticket.client.department as any)?.name || 'Sin departamento'}
                     </Badge>
+                  )}
+                  {isEditing && (
+                    <p className='text-xs text-amber-600 mt-1'>
+                      ⚠️ El cliente no puede ser modificado
+                    </p>
                   )}
                 </div>
               </div>
@@ -741,151 +567,18 @@ export default function TicketDetailPage() {
                 <Tag className='h-4 w-4 text-muted-foreground' />
                 <div className='flex-1'>
                   <p className='text-sm font-medium'>Categoría</p>
-                  {isEditing ? (
-                    <div className='space-y-3 mt-2'>
-                      {/* Nivel 1 - Categoría Principal */}
-                      <div className='space-y-2'>
-                        <Label htmlFor='category-level-1' className='text-xs font-medium'>
-                          1. Categoría Principal
-                        </Label>
-                        <Select 
-                          value={selectedCategories.level1 || ''} 
-                          onValueChange={(value) => handleCategorySelect(1, value)}
-                        >
-                          <SelectTrigger className='h-8 text-xs'>
-                            <SelectValue placeholder='Selecciona la categoría principal' />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableCategories.level1.map((category: any) => (
-                              <SelectItem key={category.id} value={category.id}>
-                                <div className='flex items-center space-x-2'>
-                                  <div
-                                    className='w-2 h-2 rounded-full flex-shrink-0'
-                                    style={{ backgroundColor: category.color }}
-                                  />
-                                  <span className='text-xs'>{category.name}</span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {/* Nivel 2 - Subcategoría */}
-                      {selectedCategories.level1 && availableCategories.level2.length > 0 && (
-                        <div className='space-y-2 pl-3 border-l-2 border-blue-200'>
-                          <Label htmlFor='category-level-2' className='text-xs font-medium'>
-                            2. Subcategoría
-                          </Label>
-                          <Select 
-                            value={selectedCategories.level2 || ''} 
-                            onValueChange={(value) => handleCategorySelect(2, value)}
-                          >
-                            <SelectTrigger className='h-8 text-xs'>
-                              <SelectValue placeholder='Selecciona la subcategoría' />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {availableCategories.level2.map((category: any) => (
-                                <SelectItem key={category.id} value={category.id}>
-                                  <div className='flex items-center space-x-2'>
-                                    <div
-                                      className='w-2 h-2 rounded-full flex-shrink-0'
-                                      style={{ backgroundColor: category.color }}
-                                    />
-                                    <span className='text-xs'>{category.name}</span>
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-
-                      {/* Nivel 3 - Especialidad */}
-                      {selectedCategories.level2 && availableCategories.level3.length > 0 && (
-                        <div className='space-y-2 pl-6 border-l-2 border-green-200'>
-                          <Label htmlFor='category-level-3' className='text-xs font-medium'>
-                            3. Especialidad
-                          </Label>
-                          <Select 
-                            value={selectedCategories.level3 || ''} 
-                            onValueChange={(value) => handleCategorySelect(3, value)}
-                          >
-                            <SelectTrigger className='h-8 text-xs'>
-                              <SelectValue placeholder='Selecciona la especialidad' />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {availableCategories.level3.map((category: any) => (
-                                <SelectItem key={category.id} value={category.id}>
-                                  <div className='flex items-center space-x-2'>
-                                    <div
-                                      className='w-2 h-2 rounded-full flex-shrink-0'
-                                      style={{ backgroundColor: category.color }}
-                                    />
-                                    <span className='text-xs'>{category.name}</span>
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-
-                      {/* Nivel 4 - Detalle */}
-                      {selectedCategories.level3 && availableCategories.level4.length > 0 && (
-                        <div className='space-y-2 pl-9 border-l-2 border-purple-200'>
-                          <Label htmlFor='category-level-4' className='text-xs font-medium'>
-                            4. Detalle Específico
-                          </Label>
-                          <Select 
-                            value={selectedCategories.level4 || ''} 
-                            onValueChange={(value) => handleCategorySelect(4, value)}
-                          >
-                            <SelectTrigger className='h-8 text-xs'>
-                              <SelectValue placeholder='Selecciona el detalle específico' />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {availableCategories.level4.map((category: any) => (
-                                <SelectItem key={category.id} value={category.id}>
-                                  <div className='flex items-center space-x-2'>
-                                    <div
-                                      className='w-2 h-2 rounded-full flex-shrink-0'
-                                      style={{ backgroundColor: category.color }}
-                                    />
-                                    <span className='text-xs'>{category.name}</span>
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-                      
-                      {/* Ruta de navegación */}
-                      {selectedCategories.level1 && (
-                        <div className='p-2 bg-muted rounded text-xs text-muted-foreground'>
-                          <strong>Ruta:</strong>{' '}
-                          {availableCategories.level1.find((c: any) => c.id === selectedCategories.level1)?.name}
-                          {selectedCategories.level2 && (
-                            <> → {availableCategories.level2.find((c: any) => c.id === selectedCategories.level2)?.name}</>
-                          )}
-                          {selectedCategories.level3 && (
-                            <> → {availableCategories.level3.find((c: any) => c.id === selectedCategories.level3)?.name}</>
-                          )}
-                          {selectedCategories.level4 && (
-                            <> → {availableCategories.level4.find((c: any) => c.id === selectedCategories.level4)?.name}</>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className='flex items-center space-x-2 mt-1'>
-                      <div
-                        className='w-3 h-3 rounded-full'
-                        style={{ backgroundColor: ticket.category.color }}
-                      />
-                      <span className='text-sm text-muted-foreground'>{ticket.category.name}</span>
-                    </div>
+                  {/* La categoría NO es editable - preserva la solicitud original del cliente */}
+                  <div className='flex items-center space-x-2 mt-1'>
+                    <div
+                      className='w-3 h-3 rounded-full'
+                      style={{ backgroundColor: ticket.category.color }}
+                    />
+                    <span className='text-sm text-muted-foreground'>{ticket.category.name}</span>
+                  </div>
+                  {isEditing && (
+                    <p className='text-xs text-amber-600 mt-1'>
+                      ⚠️ La categoría no puede ser modificada para preservar la solicitud original
+                    </p>
                   )}
                 </div>
               </div>

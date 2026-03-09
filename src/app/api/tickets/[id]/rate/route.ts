@@ -132,6 +132,10 @@ export async function POST(
       })
     }
 
+    // ⭐ NUEVO: Notificar al administrador sobre la nueva calificación
+    const { triggerRatingToAdminEmail } = await import('@/lib/email-triggers')
+    triggerRatingToAdminEmail(ticketId, data.overall)
+
     return NextResponse.json(rating, { status: 201 })
   } catch (error) {
     console.error('Error al calificar ticket:', error)

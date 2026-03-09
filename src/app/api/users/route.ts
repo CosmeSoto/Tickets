@@ -141,12 +141,17 @@ export async function GET(request: NextRequest) {
 
     // Calcular si se puede eliminar (solo para técnicos) y normalizar department
     const usersWithCanDelete = usersWithLevelNames.map(user => {
-      // Normalizar departments -> department para consistencia con el frontend
+      // Normalizar departments -> department y technician_assignments -> technicianAssignments
       const normalizedUser: any = {
         ...user,
-        department: user.departments // Cambiar departments a department
+        department: user.departments, // Cambiar departments a department
+        technicianAssignments: user.technician_assignments?.map((assignment: any) => ({
+          ...assignment,
+          category: assignment.categories // Cambiar categories a category (singular)
+        }))
       }
       delete normalizedUser.departments // Eliminar departments
+      delete normalizedUser.technician_assignments // Eliminar snake_case
       
       if (user.role === 'TECHNICIAN') {
         const canDelete = 

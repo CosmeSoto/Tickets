@@ -2,10 +2,12 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { SessionProviderWrapper } from '@/components/providers/session-provider-wrapper'
+import { QueryProvider } from '@/components/providers/query-provider'
 import { ToastProvider } from '@/components/providers/toast-provider'
 import { Toaster } from '@/components/ui/toaster'
 import { Toaster as SonnerToaster } from 'sonner'
 import { ThemeScript } from '@/components/theme-script'
+import { SessionTimeoutMonitor } from '@/components/auth/session-timeout-monitor'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -24,11 +26,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeScript />
       </head>
       <body className={`${inter.className} antialiased`} suppressHydrationWarning>
-        <ToastProvider>
-          <SessionProviderWrapper>{children}</SessionProviderWrapper>
-          <Toaster />
-          <SonnerToaster position="top-right" richColors />
-        </ToastProvider>
+        <QueryProvider>
+          <ToastProvider>
+            <SessionProviderWrapper>
+              <SessionTimeoutMonitor />
+              {children}
+            </SessionProviderWrapper>
+            <Toaster />
+            <SonnerToaster position="top-right" richColors />
+          </ToastProvider>
+        </QueryProvider>
       </body>
     </html>
   )

@@ -112,13 +112,24 @@ export function TicketResolutionTracker({
   const [editingTask, setEditingTask] = useState<string | null>(null)
   const [showAddTask, setShowAddTask] = useState(false)
   const [taskToDelete, setTaskToDelete] = useState<string | null>(null)
+  const [showCreatePlan, setShowCreatePlan] = useState(false)
+  const [planForm, setPlanForm] = useState({
+    title: '',
+    description: '',
+    startDate: '',
+    startTime: '',
+    targetDate: '',
+    targetTime: '',
+    estimatedHours: ''
+  })
   
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
     priority: 'medium' as const,
-    estimatedHours: '',
-    dueDate: ''
+    dueDate: '',
+    startTime: '',
+    endTime: ''
   })
 
   useEffect(() => {
@@ -144,25 +155,60 @@ export function TicketResolutionTracker({
   }
 
   const createResolutionPlan = async () => {
+    if (!planForm.title.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Título requerido",
+        description: "Debes ingresar un título para el plan"
+      })
+      return
+    }
+
     try {
+      // Combinar fecha y hora para startDate
+      let startDate = null
+      if (planForm.startDate && planForm.startTime) {
+        startDate = new Date(`${planForm.startDate}T${planForm.startTime}:00`).toISOString()
+      }
+
+      // Combinar fecha y hora para targetDate
+      let targetDate = null
+      if (planForm.targetDate && planForm.targetTime) {
+        targetDate = new Date(`${planForm.targetDate}T${planForm.targetTime}:00`).toISOString()
+      }
+
       const response = await fetch(`/api/tickets/${ticketId}/resolution-plan`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          title: `Plan de Resolución - Ticket #${ticketId.slice(-8)}`,
-          description: 'Plan de trabajo para resolver este ticket'
+          title: planForm.title.trim(),
+          description: planForm.description.trim() || undefined,
+          startDate,
+          targetDate,
+          estimatedHours: planForm.estimatedHours ? parseFloat(planForm.estimatedHours) : undefined
         })
       })
 
       if (!response.ok) {
-        throw new Error('Error al crear plan de resolución')
+        const error = await response.json()
+        throw new Error(error.message || 'Error al crear plan de resolución')
       }
 
       const data = await response.json()
       if (data.success) {
         setPlan(data.data)
+        setShowCreatePlan(false)
+        setPlanForm({
+          title: '',
+          description: '',
+          startDate: '',
+          startTime: '',
+          targetDate: '',
+          targetTime: '',
+          estimatedHours: ''
+        })
         toast({
           title: "Plan de resolución creado",
           description: "Ahora puedes agregar tareas para organizar el trabajo de este ticket",
@@ -173,7 +219,7 @@ export function TicketResolutionTracker({
       toast({
         variant: "destructive",
         title: "Error al crear plan",
-        description: "No se pudo crear el plan de resolución. Intenta nuevamente."
+        description: err instanceof Error ? err.message : "No se pudo crear el plan de resolución. Intenta nuevamente."
       })
     }
   }
@@ -189,14 +235,42 @@ export function TicketResolutionTracker({
     }
 
     try {
+      // Combinar fecha y horas para dueDate y calcular duración
+      let dueDate = null
+      let estimatedHours = null
+      
+      if (newTask.dueDate && newTask.startTime && newTask.endTime) {
+        // Crear fecha de inicio
+        const startDateTime = new Date(`${newTask.dueDate}T${newTask.startTime}:00`)
+        dueDate = startDateTime.toISOString()
+        
+        // Crear fecha de fin y calcular duración
+        const endDateTime = new Date(`${newTask.dueDate}T${newTask.endTime}:00`)
+        const durationMs = endDateTime.getTime() - startDateTime.getTime()
+        estimatedHours = durationMs / (1000 * 60 * 60) // Convertir a horas
+        
+        // Validar que la hora de fin sea después de la hora de inicio
+        if (estimatedHours <= 0) {
+          toast({
+            variant: "destructive",
+            title: "Horario inválido",
+            description: "La hora de fin debe ser posterior a la hora de inicio"
+          })
+          return
+        }
+      }
+
       const response = await fetch(`/api/tickets/${ticketId}/resolution-plan/tasks`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          ...newTask,
-          estimatedHours: newTask.estimatedHours ? parseFloat(newTask.estimatedHours) : undefined
+          title: newTask.title,
+          description: newTask.description,
+          priority: newTask.priority,
+          estimatedHours,
+          dueDate
         })
       })
 
@@ -212,8 +286,9 @@ export function TicketResolutionTracker({
           title: '',
           description: '',
           priority: 'medium',
-          estimatedHours: '',
-          dueDate: ''
+          dueDate: '',
+          startTime: '',
+          endTime: ''
         })
         setShowAddTask(false)
         toast({
@@ -321,6 +396,26 @@ export function TicketResolutionTracker({
   }
 
   // Funciones auxiliares
+  const calculateDuration = (startTime: string, endTime: string): string => {
+    if (!startTime || !endTime) return ''
+    
+    const [startHour, startMin] = startTime.split(':').map(Number)
+    const [endHour, endMin] = endTime.split(':').map(Number)
+    
+    const startMinutes = startHour * 60 + startMin
+    const endMinutes = endHour * 60 + endMin
+    const durationMinutes = endMinutes - startMinutes
+    
+    if (durationMinutes <= 0) return 'Horario inválido'
+    
+    const hours = Math.floor(durationMinutes / 60)
+    const minutes = durationMinutes % 60
+    
+    if (hours === 0) return `${minutes} minutos`
+    if (minutes === 0) return `${hours} ${hours === 1 ? 'hora' : 'horas'}`
+    return `${hours} ${hours === 1 ? 'hora' : 'horas'} ${minutes} minutos`
+  }
+
   const calculateElapsedTime = (startDate: string): string => {
     const start = new Date(startDate)
     const now = new Date()
@@ -497,30 +592,129 @@ export function TicketResolutionTracker({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8">
-            <Target className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-            <h3 className="text-lg font-medium text-foreground mb-2">
-              No hay plan de resolución
-            </h3>
-            <p className="text-muted-foreground mb-4">
-              Crea un plan para organizar las tareas necesarias para resolver este ticket
-            </p>
-            {canEdit && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button onClick={createResolutionPlan}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Crear Plan de Resolución
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Crea un plan estructurado con tareas para resolver este ticket</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </div>
+          {!showCreatePlan ? (
+            <div className="text-center py-8">
+              <Target className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+              <h3 className="text-lg font-medium text-foreground mb-2">
+                No hay plan de resolución
+              </h3>
+              <p className="text-muted-foreground mb-4">
+                Crea un plan para organizar las tareas necesarias para resolver este ticket
+              </p>
+              {canEdit && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button onClick={() => setShowCreatePlan(true)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Crear Plan de Resolución
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Crea un plan estructurado con tareas para resolver este ticket</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <h3 className="font-medium text-foreground">Nuevo Plan de Resolución</h3>
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm font-medium">Título del Plan *</label>
+                  <Input
+                    placeholder="Ej: Reparación del servidor principal"
+                    value={planForm.title}
+                    onChange={(e) => setPlanForm(prev => ({ ...prev, title: e.target.value }))}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Descripción</label>
+                  <Textarea
+                    placeholder="Describe el plan de trabajo..."
+                    value={planForm.description}
+                    onChange={(e) => setPlanForm(prev => ({ ...prev, description: e.target.value }))}
+                    rows={3}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Fecha de Inicio</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        type="date"
+                        value={planForm.startDate}
+                        onChange={(e) => setPlanForm(prev => ({ ...prev, startDate: e.target.value }))}
+                      />
+                      <Input
+                        type="time"
+                        value={planForm.startTime}
+                        onChange={(e) => setPlanForm(prev => ({ ...prev, startTime: e.target.value }))}
+                        placeholder="HH:MM"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium">Fecha Objetivo</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        type="date"
+                        value={planForm.targetDate}
+                        onChange={(e) => setPlanForm(prev => ({ ...prev, targetDate: e.target.value }))}
+                      />
+                      <Input
+                        type="time"
+                        value={planForm.targetTime}
+                        onChange={(e) => setPlanForm(prev => ({ ...prev, targetTime: e.target.value }))}
+                        placeholder="HH:MM"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Horas Estimadas Totales</label>
+                  <Input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    placeholder="Ej: 8 (8 horas)"
+                    value={planForm.estimatedHours}
+                    onChange={(e) => setPlanForm(prev => ({ ...prev, estimatedHours: e.target.value }))}
+                  />
+                </div>
+
+                <div className="flex items-center space-x-2 pt-2">
+                  <Button onClick={createResolutionPlan}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Crear Plan
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      setShowCreatePlan(false)
+                      setPlanForm({
+                        title: '',
+                        description: '',
+                        startDate: '',
+                        startTime: '',
+                        targetDate: '',
+                        targetTime: '',
+                        estimatedHours: ''
+                      })
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     )
@@ -657,7 +851,7 @@ export function TicketResolutionTracker({
                   onChange={(e) => setNewTask(prev => ({ ...prev, description: e.target.value }))}
                   rows={2}
                 />
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <select
                     value={newTask.priority}
                     onChange={(e) => setNewTask(prev => ({ 
@@ -670,32 +864,40 @@ export function TicketResolutionTracker({
                     <option value="medium">Prioridad Media</option>
                     <option value="high">Prioridad Alta</option>
                   </select>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Input
-                          type="number"
-                          placeholder="Ej: 0.5 (30min) o 2 (2h)"
-                          step="0.25"
-                          min="0"
-                          value={newTask.estimatedHours}
-                          onChange={(e) => setNewTask(prev => ({ ...prev, estimatedHours: e.target.value }))}
-                        />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Tiempo estimado en horas. Ejemplos:</p>
-                        <p>• 0.25 = 15 minutos</p>
-                        <p>• 0.5 = 30 minutos</p>
-                        <p>• 1 = 1 hora</p>
-                        <p>• 2.5 = 2 horas 30 minutos</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
                   <Input
                     type="date"
                     value={newTask.dueDate}
                     onChange={(e) => setNewTask(prev => ({ ...prev, dueDate: e.target.value }))}
+                    placeholder="Fecha programada"
                   />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Horario de la Tarea</label>
+                  <div className="grid grid-cols-2 gap-2 mt-1">
+                    <div>
+                      <label className="text-xs text-muted-foreground">Hora inicio</label>
+                      <Input
+                        type="time"
+                        value={newTask.startTime}
+                        onChange={(e) => setNewTask(prev => ({ ...prev, startTime: e.target.value }))}
+                        placeholder="HH:MM"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Hora fin</label>
+                      <Input
+                        type="time"
+                        value={newTask.endTime}
+                        onChange={(e) => setNewTask(prev => ({ ...prev, endTime: e.target.value }))}
+                        placeholder="HH:MM"
+                      />
+                    </div>
+                  </div>
+                  {newTask.startTime && newTask.endTime && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Duración: {calculateDuration(newTask.startTime, newTask.endTime)}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center space-x-2">
                   <Button onClick={addTask} size="sm">

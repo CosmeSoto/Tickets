@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { CategorySelectorWrapper } from '@/features/category-selection/components/CategorySelectorWrapper'
+import { useSession } from 'next-auth/react'
 
 interface TicketFormProps {
   onSubmit?: (data: any) => void
@@ -15,21 +17,36 @@ interface TicketFormProps {
 }
 
 export function TicketForm({ onSubmit, initialData, isLoading = false }: TicketFormProps) {
+  const { data: session } = useSession()
   const [formData, setFormData] = useState({
     title: initialData?.title || '',
     description: initialData?.description || '',
     priority: initialData?.priority || 'medium',
-    category: initialData?.category || '',
+    categoryId: initialData?.categoryId || initialData?.category || '',
     ...initialData
   })
+  const [categoryError, setCategoryError] = useState<string>('')
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Validate category selection
+    if (!formData.categoryId) {
+      setCategoryError('Por favor selecciona una categoría para el ticket')
+      return
+    }
+    
+    setCategoryError('')
     onSubmit?.(formData)
   }
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev: any) => ({ ...prev, [field]: value }))
+  }
+
+  const handleCategoryChange = (categoryId: string) => {
+    setFormData((prev: any) => ({ ...prev, categoryId }))
+    setCategoryError('')
   }
 
   return (
@@ -85,21 +102,20 @@ export function TicketForm({ onSubmit, initialData, isLoading = false }: TicketF
                 </SelectContent>
               </Select>
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="category">Categoría</Label>
-              <Select value={formData.category} onValueChange={(value) => handleChange('category', value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona la categoría" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="technical">Técnico</SelectItem>
-                  <SelectItem value="billing">Facturación</SelectItem>
-                  <SelectItem value="general">General</SelectItem>
-                  <SelectItem value="feature">Nueva Funcionalidad</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          {/* Enhanced Category Selector */}
+          <div className="space-y-2">
+            <Label htmlFor="category">Categoría *</Label>
+            <CategorySelectorWrapper
+              value={formData.categoryId}
+              onChange={handleCategoryChange}
+              ticketTitle={formData.title}
+              ticketDescription={formData.description}
+              clientId={session?.user?.id}
+              error={categoryError}
+              disabled={disabled}
+            />
           </div>
 
           <div className="flex justify-end space-x-2">

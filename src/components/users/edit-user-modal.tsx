@@ -21,7 +21,9 @@ import {
   AlertCircle,
   CheckCircle,
   AlertTriangle,
-  Activity
+  Activity,
+  RotateCcw,
+  X
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { UserData } from '@/hooks/use-users'
@@ -159,32 +161,14 @@ export function EditUserModal({ isOpen, onClose, onUserUpdated, user, department
 
     setLoading(true)
     try {
-      // Si hay nuevo avatar, subirlo primero
-      let avatarUrl = user.avatar // Mantener avatar actual por defecto
-      if (formData.avatar) {
-        const avatarFormData = new FormData()
-        avatarFormData.append('avatar', formData.avatar)
-
-        const avatarResponse = await fetch('/api/upload/avatar', {
-          method: 'POST',
-          body: avatarFormData
-        })
-
-        if (avatarResponse.ok) {
-          const avatarResult = await avatarResponse.json()
-          avatarUrl = avatarResult.url
-        }
-      }
-
-      // Actualizar usuario
+      // Actualizar usuario primero
       const userData = {
         name: formData.name.trim(),
         email: formData.email.trim().toLowerCase(),
         role: formData.role,
         departmentId: formData.departmentId || null,
         phone: formData.phone.trim() || null,
-        isActive: formData.isActive,
-        avatar: avatarUrl
+        isActive: formData.isActive
       }
 
       const response = await fetch(`/api/users/${user.id}`, {
@@ -198,6 +182,17 @@ export function EditUserModal({ isOpen, onClose, onUserUpdated, user, department
       const result = await response.json()
 
       if (response.ok && result.success) {
+        // Si hay nuevo avatar, subirlo después
+        if (formData.avatar) {
+          const avatarFormData = new FormData()
+          avatarFormData.append('avatar', formData.avatar)
+
+          await fetch(`/api/users/${user.id}/avatar`, {
+            method: 'POST',
+            body: avatarFormData
+          })
+        }
+        
         toast({
           title: 'Usuario actualizado exitosamente',
           description: `${formData.name} ha sido actualizado correctamente`,
@@ -405,41 +400,102 @@ export function EditUserModal({ isOpen, onClose, onUserUpdated, user, department
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center space-x-6">
-                  <div className="relative">
+                  <div className="relative group">
                     <Avatar className="h-20 w-20 border-4 border-white shadow-lg">
-                      <AvatarImage src={avatarPreview || user.avatar || ''} alt={user.name} />
+                      <AvatarImage src={avatarPreview || user.avatar || undefined} alt={user.name} />
                       <AvatarFallback className="text-lg font-semibold bg-gradient-to-br from-blue-500 to-purple-600 text-white">
                         {user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
+                    {/* Botón para cambiar foto */}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full p-0 shadow-sm"
+                      title="Cambiar foto"
+                      onClick={() => document.getElementById('edit-avatar')?.click()}
+                    >
+                      <Camera className="h-4 w-4" />
+                    </Button>
+                    {/* Botón para restaurar foto - Solo visible si hay cambios pendientes */}
+                    {formData.avatar && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="absolute -top-2 -left-2 h-6 w-6 rounded-full p-0 shadow-sm bg-white hover:bg-orange-50 border-orange-200 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Cancelar cambio"
+                        onClick={() => {
+                          setFormData({ ...formData, avatar: undefined })
+                          setAvatarPreview(user.avatar || null)
+                        }}
+                      >
+                        <RotateCcw className="h-3 w-3 text-orange-600" />
+                      </Button>
+                    )}
+                    {/* Botón para eliminar foto - Solo visible si el usuario tiene avatar */}
+                    {(avatarPreview || user.avatar) && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0 shadow-sm bg-white hover:bg-red-50 border-red-200 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Eliminar foto"
+                        onClick={async () => {
+                          // Eliminar avatar del servidor
+                          try {
+                            const response = await fetch(`/api/users/${user.id}/avatar`, {
+                              method: 'DELETE',
+                            })
+                            
+                            const result = await response.json()
+                            
+                            if (response.ok && result.success) {
+                              setAvatarPreview(null)
+                              setFormData({ ...formData, avatar: undefined })
+                              
+                              toast({
+                                title: 'Avatar eliminado',
+                                description: 'La foto de perfil ha sido eliminada exitosamente',
+                              })
+                              
+                              // Actualizar la lista de usuarios
+                              onUserUpdated()
+                            } else {
+                              toast({
+                                title: 'Error al eliminar',
+                                description: result.error || 'No se pudo eliminar el avatar',
+                                variant: 'destructive',
+                              })
+                            }
+                          } catch (error) {
+                            console.error('Error al eliminar avatar:', error)
+                            toast({
+                              title: 'Error de conexión',
+                              description: 'No se pudo conectar con el servidor',
+                              variant: 'destructive',
+                            })
+                          }
+                        }}
+                      >
+                        <X className="h-3 w-3 text-red-600" />
+                      </Button>
+                    )}
                   </div>
                   
                   <div className="flex-1">
                     <div className="space-y-2">
                       <Label htmlFor="edit-avatar">Cambiar Imagen</Label>
-                      <div className="flex items-center space-x-2">
-                        <Input
-                          id="edit-avatar"
-                          type="file"
-                          accept="image/*"
-                          onChange={handleAvatarChange}
-                          className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setFormData({ ...formData, avatar: undefined })
-                            setAvatarPreview(user.avatar || null)
-                          }}
-                          disabled={!formData.avatar}
-                        >
-                          Restaurar
-                        </Button>
-                      </div>
+                      <Input
+                        id="edit-avatar"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleAvatarChange}
+                        className="hidden"
+                      />
                       <p className="text-xs text-muted-foreground">
-                        Formatos soportados: JPG, PNG, GIF. Tamaño máximo: 5MB
+                        Haz clic en el icono de cámara para cambiar la foto. Formatos: JPG, PNG, GIF (máx. 5MB)
                       </p>
                     </div>
                   </div>
@@ -514,7 +570,7 @@ export function EditUserModal({ isOpen, onClose, onUserUpdated, user, department
               <CardContent>
                 <div className="flex items-start space-x-6">
                   <Avatar className="h-16 w-16 border-4 border-white shadow-lg">
-                    <AvatarImage src={avatarPreview || user.avatar || ''} alt={formData.name} />
+                    <AvatarImage src={avatarPreview || user.avatar || undefined} alt={formData.name} />
                     <AvatarFallback className="text-lg font-semibold bg-gradient-to-br from-blue-500 to-purple-600 text-white">
                       {formData.name.split(' ').map(n => n[0]).join('').toUpperCase()}
                     </AvatarFallback>

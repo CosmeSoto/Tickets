@@ -188,35 +188,6 @@ export function UserDetailsModal({
                 Información detallada de tickets y actividad del usuario
               </DialogDescription>
             </div>
-            <div className="flex items-center space-x-2">
-              {canEdit && onEdit && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    onEdit()
-                    onClose()
-                  }}
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Editar
-                </Button>
-              )}
-              {canDelete && onDelete && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    onDelete()
-                    onClose()
-                  }}
-                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Eliminar
-                </Button>
-              )}
-            </div>
           </div>
         </DialogHeader>
 

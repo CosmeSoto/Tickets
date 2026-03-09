@@ -17,6 +17,7 @@ import { UserDetailsModal } from '@/components/ui/user-details-modal'
 import { AvatarUploadModal } from '@/components/users/avatar-upload-modal'
 import { CreateUserModal } from '@/components/users/create-user-modal'
 import { EditUserModal } from '@/components/users/edit-user-modal'
+import { PromoteUserDialog } from '@/components/users/promote-user-dialog'
 import { createUserColumns, UserCard } from '@/components/users/admin/user-columns'
 import { Button } from '@/components/ui/button'
 import {
@@ -102,6 +103,8 @@ export default function AdminUsersPage() {
     userName: '',
     currentAvatar: undefined
   })
+  const [promotingUser, setPromotingUser] = useState<UserData | null>(null)
+  const [promoteDialogOpen, setPromoteDialogOpen] = useState(false)
 
   useEffect(() => {
     if (status === 'loading') return
@@ -210,6 +213,15 @@ export default function AdminUsersPage() {
     }
   }
 
+  const handlePromoteUser = (user: UserData) => {
+    setPromotingUser(user)
+    setPromoteDialogOpen(true)
+  }
+
+  const handlePromoteSuccess = () => {
+    refresh()
+  }
+
   const handleUserUpdated = () => {
     refresh()
   }
@@ -267,6 +279,7 @@ export default function AdminUsersPage() {
     onUserDetails: handleUserDetails,
     onAvatarEdit: handleAvatarEdit,
     onToggleStatus: handleToggleStatus,
+    onPromoteUser: handlePromoteUser,
     currentUserId: session?.user?.id
   })
 
@@ -318,13 +331,13 @@ export default function AdminUsersPage() {
         {/* DataTable */}
         <DataTable
           title={viewMode === 'table' ? "Vista de Tabla - Información detallada de usuarios" : "Información visual de usuarios"}
-          description={viewMode === 'table' ? "Información completa en formato tabular" : "Clic en tarjeta para ver detalles"}
+          description={viewMode === 'table' ? "Información completa en formato tabular" : "Clic en usuario para ver detalles"}
           data={users}
           columns={columns}
           loading={loading}
           error={error?.message}
-          externalSearch={true} // Deshabilitar búsqueda interna
-          hideInternalFilters={true} // Ocultar filtros internos
+          externalSearch={true}
+          hideInternalFilters={true}
           onRowClick={handleViewUser}
           pagination={{
             page: usersPagination.page,
@@ -336,27 +349,6 @@ export default function AdminUsersPage() {
               console.log('Change limit to:', limit)
             }
           }}
-          rowActions={(user) => (
-            <div className="flex items-center space-x-1">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleViewUser(user)}
-                      className="h-8 px-2"
-                    >
-                      Ver
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Ver detalles completos del usuario</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-          )}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           cardRenderer={(user) => (
@@ -487,6 +479,20 @@ export default function AdminUsersPage() {
         onUserCreated={handleUserUpdated}
         departments={departments}
       />
+
+      {/* Diálogo de promoción a técnico */}
+      {promotingUser && (
+        <PromoteUserDialog
+          open={promoteDialogOpen}
+          onOpenChange={setPromoteDialogOpen}
+          user={{
+            id: promotingUser.id,
+            name: promotingUser.name,
+            email: promotingUser.email
+          }}
+          onSuccess={handlePromoteSuccess}
+        />
+      )}
     </ModuleLayout>
   )
 }

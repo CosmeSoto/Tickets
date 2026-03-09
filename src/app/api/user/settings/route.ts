@@ -37,6 +37,10 @@ const userSettingsSchema = z.object({
   theme: z.enum(['light', 'dark', 'system']).optional(),
   language: z.enum(['es', 'en', 'fr', 'de']).optional(),
   timezone: z.string().optional(),
+
+  // Privacidad
+  profileVisible: z.boolean().optional(),
+  activityVisible: z.boolean().optional(),
 })
 
 /**
@@ -54,6 +58,11 @@ export async function GET(request: NextRequest) {
 
     // Buscar configuración existente
     let settings = await prisma.user_settings.findUnique({
+      where: { userId },
+    })
+
+    // Buscar preferencias de privacidad
+    let preferences = await prisma.user_preferences.findUnique({
       where: { userId },
     })
 
@@ -83,6 +92,23 @@ export async function GET(request: NextRequest) {
           theme: 'light',
           language: 'es',
           timezone: 'America/Guayaquil',
+          updatedAt: now,
+        },
+      })
+    }
+
+    // Si no existen preferencias, crear con valores por defecto
+    if (!preferences) {
+      const now = new Date()
+      preferences = await prisma.user_preferences.create({
+        data: {
+          id: randomUUID(),
+          userId,
+          theme: 'system',
+          timezone: 'America/Guayaquil',
+          language: 'es',
+          profileVisible: true,
+          activityVisible: true,
           updatedAt: now,
         },
       })
@@ -123,6 +149,10 @@ export async function GET(request: NextRequest) {
         theme: settings.theme,
         language: settings.language,
         timezone: settings.timezone,
+
+        // Privacidad
+        profileVisible: preferences.profileVisible,
+        activityVisible: preferences.activityVisible,
       },
     })
   } catch (error) {
@@ -201,7 +231,7 @@ export async function PUT(request: NextRequest) {
     if (data.language !== undefined) updateData.language = data.language
     if (data.timezone !== undefined) updateData.timezone = data.timezone
 
-    // Actualizar o crear configuración
+    // Actualizar o crear configuración de notificaciones
     const settings = await prisma.user_settings.upsert({
       where: { userId },
       update: updateData,
@@ -231,6 +261,32 @@ export async function PUT(request: NextRequest) {
       },
     })
 
+    // Actualizar o crear preferencias de privacidad
+    const preferencesUpdateData: any = {
+      updatedAt: new Date(),
+    }
+    
+    if (data.profileVisible !== undefined) preferencesUpdateData.profileVisible = data.profileVisible
+    if (data.activityVisible !== undefined) preferencesUpdateData.activityVisible = data.activityVisible
+    if (data.theme !== undefined) preferencesUpdateData.theme = data.theme
+    if (data.timezone !== undefined) preferencesUpdateData.timezone = data.timezone
+    if (data.language !== undefined) preferencesUpdateData.language = data.language
+
+    const preferences = await prisma.user_preferences.upsert({
+      where: { userId },
+      update: preferencesUpdateData,
+      create: {
+        id: randomUUID(),
+        userId,
+        theme: data.theme ?? 'system',
+        timezone: data.timezone ?? 'America/Guayaquil',
+        language: data.language ?? 'es',
+        profileVisible: data.profileVisible ?? true,
+        activityVisible: data.activityVisible ?? true,
+        updatedAt: new Date(),
+      },
+    })
+
     return NextResponse.json({
       success: true,
       message: 'Configuración actualizada correctamente',
@@ -256,6 +312,8 @@ export async function PUT(request: NextRequest) {
         theme: settings.theme,
         language: settings.language,
         timezone: settings.timezone,
+        profileVisible: preferences.profileVisible,
+        activityVisible: preferences.activityVisible,
       },
     })
   } catch (error) {

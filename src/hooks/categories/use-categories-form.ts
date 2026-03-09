@@ -99,11 +99,25 @@ export function useCategoriesForm(options: UseCategoriesFormOptions = {}) {
   // Abrir diálogo para editar
   const handleEdit = useCallback((category: CategoryData) => {
     setEditingCategory(category)
+    
+    // Obtener parentId correctamente
+    // Puede venir como category.parentId o category.categories?.id
+    const parentId = category.parentId || category.categories?.id || null
+    
+    devLogger.info('[CATEGORIES-FORM] Editando categoría:', {
+      id: category.id,
+      name: category.name,
+      level: category.level,
+      parentId: parentId,
+      rawParentId: category.parentId,
+      categoriesParent: category.categories
+    })
+    
     setFormData({
       name: category.name,
       description: category.description || '',
       color: category.color,
-      parentId: category.parent?.id || null,
+      parentId: parentId,
       departmentId: category.departmentId || null,
       isActive: category.isActive,
       technician_assignments: category.technician_assignments.map(ta => ({
@@ -116,8 +130,15 @@ export function useCategoriesForm(options: UseCategoriesFormOptions = {}) {
     setIsDialogOpen(true)
   }, [])
   
+  // Calcular nivel basado en categoría padre
+  const calculateLevel = useCallback((parentId: string | null, availableParents: CategoryData[]): number => {
+    if (!parentId) return 1
+    const parent = availableParents.find(p => p.id === parentId)
+    return (parent?.level || 0) + 1
+  }, [])
+
   // Enviar formulario
-  const handleSubmit = useCallback(async (invalidateCache: () => void, reload: () => Promise<void>) => {
+  const handleSubmit = useCallback(async (invalidateCache: () => void, reload: () => Promise<void>, availableParents: CategoryData[] = []) => {
     if (!validateForm()) {
       toast({
         title: 'Error de validación',
@@ -144,10 +165,22 @@ export function useCategoriesForm(options: UseCategoriesFormOptions = {}) {
       const colorRegex = /^#[0-9A-F]{6}$/i
       const validColor = colorRegex.test(restFormData.color) ? restFormData.color : '#6B7280'
       
+      // Calcular nivel basado en categoría padre
+      const level = calculateLevel(restFormData.parentId, availableParents)
+      
+      devLogger.info('[CATEGORIES-FORM] Calculando nivel:', {
+        parentId: restFormData.parentId,
+        availableParentsCount: availableParents.length,
+        calculatedLevel: level,
+        editingCategory: editingCategory?.id,
+        editingCategoryLevel: editingCategory?.level
+      })
+      
       const apiData = {
         name: restFormData.name.trim(),
         description: restFormData.description?.trim() || '',
         color: validColor,
+        level: level, // ← AGREGAR EL NIVEL CALCULADO
         parentId: restFormData.parentId || undefined,
         departmentId: restFormData.departmentId || undefined,
         isActive: Boolean(restFormData.isActive),
@@ -159,7 +192,11 @@ export function useCategoriesForm(options: UseCategoriesFormOptions = {}) {
         }))
       }
       
-      devLogger.info('[CATEGORIES] Enviando datos:', apiData)
+      devLogger.info('[CATEGORIES-FORM] Enviando datos a API:', {
+        url,
+        method,
+        data: apiData
+      })
       
       const response = await fetch(url, {
         method,
@@ -169,6 +206,12 @@ export function useCategoriesForm(options: UseCategoriesFormOptions = {}) {
       })
       
       const data = await response.json()
+      
+      devLogger.info('[CATEGORIES-FORM] Respuesta de API:', {
+        ok: response.ok,
+        status: response.status,
+        data
+      })
       
       if (response.ok && data.success) {
         const categoryName = formData.name
@@ -194,7 +237,7 @@ export function useCategoriesForm(options: UseCategoriesFormOptions = {}) {
         throw new Error(errorDetails)
       }
     } catch (error) {
-      devLogger.error('[CATEGORIES] Error al guardar:', error)
+      devLogger.error('[CATEGORIES-FORM] Error al guardar:', error)
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido'
       toast({
         title: editingCategory ? 'Error al actualizar categoría' : 'Error al crear categoría',
@@ -206,7 +249,7 @@ export function useCategoriesForm(options: UseCategoriesFormOptions = {}) {
     } finally {
       setSubmitting(false)
     }
-  }, [formData, editingCategory, validateForm, resetForm, toast, onSuccess, onError])
+  }, [formData, editingCategory, validateForm, resetForm, toast, onSuccess, onError, calculateLevel])
   
   // Eliminar categoría
   const handleDelete = useCallback(async (invalidateCache: () => void, reload: () => Promise<void>) => {
@@ -269,6 +312,7 @@ export function useCategoriesForm(options: UseCategoriesFormOptions = {}) {
     handleDelete,
     resetForm,
     validateForm,
+    calculateLevel,
     
     // Setters
     setIsDialogOpen,

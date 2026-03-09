@@ -221,6 +221,31 @@ export class FileService {
     }
   }
 
+  static async getFile(fileId: string) {
+    const attachment = await prisma.attachments.findUnique({
+      where: { id: fileId },
+    })
+
+    if (!attachment) {
+      throw new Error('Archivo no encontrado')
+    }
+
+    try {
+      const fs = require('fs').promises
+      const buffer = await fs.readFile(attachment.path)
+      
+      return {
+        buffer,
+        filename: attachment.originalName,
+        mimeType: attachment.mimeType,
+        size: attachment.size
+      }
+    } catch (error) {
+      console.error('Error al leer archivo:', error)
+      throw new Error('No se pudo leer el archivo')
+    }
+  }
+
   static getFileIcon(mimeType: string): string {
     if (mimeType.startsWith('image/')) return '🖼️'
     if (mimeType === 'application/pdf') return '📄'

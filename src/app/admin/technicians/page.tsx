@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -15,12 +16,14 @@ import { DataTable } from '@/components/ui/data-table'
 import { TechnicianStatsPanel } from '@/components/technicians/technician-stats-panel'
 import { TechnicianFilters } from '@/components/technicians/technician-filters'
 import { TechnicianAssignmentsModal } from '@/components/ui/technician-assignments-modal'
+import { DemoteTechnicianDialog } from '@/components/technicians/demote-technician-dialog'
 
 // Diálogos modularizados
 import {
   TechnicianFormDialog,
   DeleteConfirmationDialog,
-  DemoteConfirmationDialog
+  DemoteConfirmationDialog,
+  UserSelectionDialog
 } from '@/components/admin/technicians/dialogs'
 
 // Columnas y tarjetas
@@ -30,6 +33,9 @@ import {
 } from '@/components/admin/technicians/tables/technician-columns'
 
 export default function TechniciansPage() {
+  // Estado para el diálogo de selección de usuario
+  const [showUserSelection, setShowUserSelection] = useState(false)
+
   // Hook consolidado con toda la lógica
   const {
     // Datos
@@ -103,7 +109,7 @@ export default function TechniciansPage() {
       error={error}
       onRetry={reload}
       headerActions={
-        <Button onClick={() => setIsDialogOpen(true)}>
+        <Button onClick={() => setShowUserSelection(true)}>
           <Plus className='h-4 w-4 mr-2' />
           Promover Usuario a Técnico
         </Button>
@@ -131,12 +137,13 @@ export default function TechniciansPage() {
         {/* DataTable con Toggle de Vistas */}
         <DataTable
           title="Técnicos"
-          description={`Gestión de técnicos del sistema (${filteredTechnicians.length} técnicos)`}
+          description={`Gestión de técnicos del sistema (${filteredTechnicians.length} técnicos) - Clic para ver asignaciones`}
           data={pagination.currentItems}
           columns={columns}
           loading={loading}
           pagination={paginationConfig}
           onRefresh={reload}
+          onRowClick={handleViewAssignments}
           viewMode={viewMode as 'table' | 'cards'}
           onViewModeChange={setViewMode as (mode: 'table' | 'cards') => void}
           externalSearch={true}
@@ -150,7 +157,6 @@ export default function TechniciansPage() {
               onViewAssignments={handleViewAssignments}
             />
           )}
-          onRowClick={(technician) => handleEdit(technician)}
           emptyState={{
             title: filters.search || filters.department !== 'all' || filters.status !== 'all'
               ? "No se encontraron técnicos"
@@ -163,7 +169,7 @@ export default function TechniciansPage() {
                 Limpiar filtros
               </Button>
             ) : (
-              <Button onClick={() => setIsDialogOpen(true)}>
+              <Button onClick={() => setShowUserSelection(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Promover Usuario
               </Button>
@@ -171,6 +177,16 @@ export default function TechniciansPage() {
           }}
         />
       </div>
+
+      {/* Diálogo de selección de usuario */}
+      <UserSelectionDialog
+        open={showUserSelection}
+        onOpenChange={setShowUserSelection}
+        onUserSelected={(user) => {
+          handlePromoteUser(user)
+          setShowUserSelection(false)
+        }}
+      />
 
       {/* Diálogos modularizados */}
       <TechnicianFormDialog
@@ -191,16 +207,24 @@ export default function TechniciansPage() {
         onCancel={() => setDeletingTechnician(null)}
       />
 
-      <DemoteConfirmationDialog
-        open={!!demotingTechnician}
-        technician={demotingTechnician}
-        validation={demoteValidation}
-        onConfirm={handleDemote}
-        onCancel={() => {
-          setDemotingTechnician(null)
-          setDemoteValidation(null)
-        }}
-      />
+      {/* Diálogo simple de despromover */}
+      {demotingTechnician && (
+        <DemoteTechnicianDialog
+          open={!!demotingTechnician}
+          onOpenChange={(open) => {
+            if (!open) {
+              setDemotingTechnician(null)
+              setDemoteValidation(null)
+            }
+          }}
+          technician={{
+            id: demotingTechnician.id,
+            name: demotingTechnician.name,
+            email: demotingTechnician.email
+          }}
+          onSuccess={reload}
+        />
+      )}
 
       {/* Modal de asignaciones */}
       <TechnicianAssignmentsModal

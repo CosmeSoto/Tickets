@@ -71,6 +71,32 @@ export async function POST(
       )
     }
 
+    // VALIDACIÓN CRÍTICA: Verificar que no tenga tickets pendientes
+    const pendingTicketsCount = await prisma.tickets.count({
+      where: {
+        clientId: id,
+        status: {
+          in: ['OPEN', 'IN_PROGRESS']
+        }
+      }
+    })
+
+    if (pendingTicketsCount > 0) {
+      console.log(`❌ [API-USER-PROMOTE] Usuario tiene ${pendingTicketsCount} tickets pendientes`)
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'No se puede promover el usuario',
+          details: {
+            reason: 'pending_tickets',
+            message: `El usuario tiene ${pendingTicketsCount} ticket(s) pendiente(s). Debe cerrar o reasignar todos sus tickets antes de ser promovido a técnico.`,
+            pendingTickets: pendingTicketsCount
+          }
+        },
+        { status: 400 }
+      )
+    }
+
     const body = await request.json()
     console.log('📝 [API-USER-PROMOTE] Datos recibidos:', JSON.stringify(body, null, 2))
     

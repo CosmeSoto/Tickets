@@ -1,9 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import { z } from 'zod'
 
+const ratingSchema = z.object({
+  rating: z.number().min(1).max(5),
+  feedback: z.string().optional(),
+  categories: z.object({
+    responseTime: z.number().min(0).max(5),
+    technicalSkill: z.number().min(0).max(5),
+    communication: z.number().min(0).max(5),
+    problemResolution: z.number().min(0).max(5),
+  }),
+})
+
+/**
+ * GET /api/tickets/[id]/rating
+ * Obtiene la calificación de un ticket
+ */
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
@@ -12,38 +28,39 @@ export async function GET(
     const session = await getServerSession(authOptions)
     if (!session) {
       return NextResponse.json(
-        { success: false, message: 'No autorizado' },
+        { success: false, error: 'No autorizado' },
         { status: 401 }
       )
     }
 
     const params = await context.params
-    const ticketId = params?.id
-
-    if (!ticketId) {
-      return NextResponse.json(
-        { success: false, message: 'ID de ticket requerido' },
-        { status: 400 }
-      )
-    }
+    const ticketId = params.id
 
     // Verificar que el ticket existe
     const ticket = await prisma.tickets.findUnique({
       where: { id: ticketId },
-      select: { id: true, clientId: true, assigneeId: true }
+      select: {
+        id: true,
+        clientId: true,
+        assigneeId: true,
+      },
     })
 
     if (!ticket) {
       return NextResponse.json(
-        { success: false, message: 'Ticket no encontrado' },
+        { success: false, error: 'Ticket no encontrado' },
         { status: 404 }
       )
     }
 
     // Verificar permisos
-    if (session.user.role === 'CLIENT' && ticket.clientId !== session.user.id) {
+    const isAdmin = session.user.role === 'ADMIN'
+    const isClient = ticket.clientId === session.user.id
+    const isTechnician = ticket.assigneeId === session.user.id
+
+    if (!isAdmin && !isClient && !isTechnician) {
       return NextResponse.json(
-        { success: false, message: 'No tienes permisos para ver esta calificación' },
+        { success: false, error: 'No tienes permisos para ver esta calificación' },
         { status: 403 }
       )
     }
@@ -56,24 +73,23 @@ export async function GET(
           select: {
             id: true,
             name: true,
-            email: true
-          }
+            email: true,
+          },
         },
         users_ticket_ratings_technicianIdTousers: {
           select: {
             id: true,
             name: true,
-            email: true
-          }
-        }
-      }
+            email: true,
+          },
+        },
+      },
     })
 
     if (!rating) {
       return NextResponse.json({
         success: true,
         data: null,
-        message: 'No hay calificación para este ticket'
       })
     }
 
@@ -87,31 +103,41 @@ export async function GET(
         responseTime: rating.responseTime,
         technicalSkill: rating.technicalSkill,
         communication: rating.communication,
-        problemResolution: rating.problemResolution
+        problemResolution: rating.problemResolution,
       },
-      client: rating.users_ticket_ratings_clientIdTousers,
-      technician: rating.users_ticket_ratings_technicianIdTousers,
+      client: {
+        id: rating.users_ticket_ratings_clientIdTousers.id,
+        name: rating.users_ticket_ratings_clientIdTousers.name,
+        email: rating.users_ticket_ratings_clientIdTousers.email,
+      },
+      technician: rating.users_ticket_ratings_technicianIdTousers
+        ? {
+            id: rating.users_ticket_ratings_technicianIdTousers.id,
+            name: rating.users_ticket_ratings_technicianIdTousers.name,
+            email: rating.users_ticket_ratings_technicianIdTousers.email,
+          }
+        : null,
       createdAt: rating.createdAt.toISOString(),
-      isPublic: rating.isPublic
+      isPublic: rating.isPublic,
     }
 
     return NextResponse.json({
       success: true,
-      data: formattedRating
+      data: formattedRating,
     })
   } catch (error) {
-    console.error('Error fetching ticket rating:', error)
+    console.error('[API-RATING] GET Error:', error)
     return NextResponse.json(
-      {
-        success: false,
-        message: 'Error al cargar la calificación',
-        error: error instanceof Error ? error.message : 'Error desconocido'
-      },
+      { success: false, error: 'Error al obtener la calificación' },
       { status: 500 }
     )
   }
 }
 
+/**
+ * POST /api/tickets/[id]/rating
+ * Crea una calificación para un ticket
+ */
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
@@ -120,165 +146,161 @@ export async function POST(
     const session = await getServerSession(authOptions)
     if (!session) {
       return NextResponse.json(
-        { success: false, message: 'No autorizado' },
+        { success: false, error: 'No autorizado' },
         { status: 401 }
       )
     }
 
     const params = await context.params
-    const ticketId = params?.id
+    const ticketId = params.id
     const body = await request.json()
 
-    if (!ticketId) {
+    // Validar datos
+    const validation = ratingSchema.safeParse(body)
+    if (!validation.success) {
       return NextResponse.json(
-        { success: false, message: 'ID de ticket requerido' },
+        {
+          success: false,
+          error: 'Datos inválidos',
+          details: validation.error.errors,
+        },
         { status: 400 }
       )
     }
 
-    // Validar datos de entrada
-    const { rating, feedback, categories } = body
+    const data = validation.data
 
-    if (!rating || rating < 1 || rating > 5) {
-      return NextResponse.json(
-        { success: false, message: 'Calificación debe estar entre 1 y 5' },
-        { status: 400 }
-      )
-    }
-
-    if (!categories || 
-        !categories.responseTime || !categories.technicalSkill || 
-        !categories.communication || !categories.problemResolution) {
-      return NextResponse.json(
-        { success: false, message: 'Todas las calificaciones por categoría son requeridas' },
-        { status: 400 }
-      )
-    }
-
-    // Verificar que el ticket existe y está resuelto/cerrado
+    // Verificar que el ticket existe y obtener información
     const ticket = await prisma.tickets.findUnique({
       where: { id: ticketId },
-      select: { 
-        id: true, 
-        clientId: true, 
-        assigneeId: true, 
-        status: true 
-      }
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        clientId: true,
+        assigneeId: true,
+      },
     })
 
     if (!ticket) {
       return NextResponse.json(
-        { success: false, message: 'Ticket no encontrado' },
+        { success: false, error: 'Ticket no encontrado' },
         { status: 404 }
       )
     }
 
-    // Solo el cliente puede calificar
+    // Solo el cliente puede calificar su propio ticket
     if (ticket.clientId !== session.user.id) {
       return NextResponse.json(
-        { success: false, message: 'Solo el cliente puede calificar el ticket' },
+        { success: false, error: 'Solo el cliente puede calificar este ticket' },
         { status: 403 }
       )
     }
 
-    // El ticket debe estar resuelto o cerrado
-    if (ticket.status !== 'RESOLVED' && ticket.status !== 'CLOSED') {
+    // Solo se puede calificar tickets cerrados o resueltos
+    if (ticket.status !== 'CLOSED' && ticket.status !== 'RESOLVED') {
       return NextResponse.json(
-        { success: false, message: 'Solo se pueden calificar tickets resueltos o cerrados' },
+        {
+          success: false,
+          error: 'Solo puedes calificar tickets que han sido cerrados o resueltos',
+        },
         { status: 400 }
       )
     }
 
-    // Verificar que no existe ya una calificación
+    // Verificar si ya existe una calificación
     const existingRating = await prisma.ticket_ratings.findUnique({
-      where: { ticketId }
+      where: { ticketId },
     })
 
     if (existingRating) {
       return NextResponse.json(
-        { success: false, message: 'Este ticket ya ha sido calificado' },
+        { success: false, error: 'Este ticket ya ha sido calificado' },
         { status: 400 }
       )
     }
 
     // Crear calificación
-    const newRating = await prisma.ticket_ratings.create({
+    const rating = await prisma.ticket_ratings.create({
       data: {
         id: randomUUID(),
         ticketId,
         clientId: session.user.id,
         technicianId: ticket.assigneeId,
-        rating,
-        feedback: feedback || null,
-        responseTime: categories.responseTime,
-        technicalSkill: categories.technicalSkill,
-        communication: categories.communication,
-        problemResolution: categories.problemResolution,
+        rating: data.rating,
+        feedback: data.feedback || null,
+        responseTime: data.categories.responseTime,
+        technicalSkill: data.categories.technicalSkill,
+        communication: data.categories.communication,
+        problemResolution: data.categories.problemResolution,
         isPublic: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       },
       include: {
         users_ticket_ratings_clientIdTousers: {
           select: {
             id: true,
             name: true,
-            email: true
-          }
+            email: true,
+          },
         },
         users_ticket_ratings_technicianIdTousers: {
           select: {
             id: true,
             name: true,
-            email: true
-          }
-        }
-      }
+            email: true,
+          },
+        },
+      },
     })
 
-    // Crear entrada en el historial
-    await prisma.ticket_history.create({
-      data: {
-        id: randomUUID(),
-        action: 'rating_added',
-        comment: `Calificación agregada: ${rating}/5 estrellas`,
-        ticketId,
-        userId: session.user.id,
-        createdAt: new Date()
-      }
+    console.log('[RATING] Nueva calificación creada:', {
+      ticketId,
+      rating: data.rating,
+      client: session.user.name,
     })
+
+    // ⭐ NUEVO: Notificar al administrador sobre la nueva calificación
+    const { triggerRatingToAdminEmail } = await import('@/lib/email-triggers')
+    triggerRatingToAdminEmail(ticketId, data.rating)
 
     // Formatear respuesta
     const formattedRating = {
-      id: newRating.id,
-      ticketId: newRating.ticketId,
-      rating: newRating.rating,
-      feedback: newRating.feedback,
+      id: rating.id,
+      ticketId: rating.ticketId,
+      rating: rating.rating,
+      feedback: rating.feedback,
       categories: {
-        responseTime: newRating.responseTime,
-        technicalSkill: newRating.technicalSkill,
-        communication: newRating.communication,
-        problemResolution: newRating.problemResolution
+        responseTime: rating.responseTime,
+        technicalSkill: rating.technicalSkill,
+        communication: rating.communication,
+        problemResolution: rating.problemResolution,
       },
-      client: newRating.users_ticket_ratings_clientIdTousers,
-      technician: newRating.users_ticket_ratings_technicianIdTousers,
-      createdAt: newRating.createdAt.toISOString(),
-      isPublic: newRating.isPublic
+      client: {
+        id: rating.users_ticket_ratings_clientIdTousers.id,
+        name: rating.users_ticket_ratings_clientIdTousers.name,
+        email: rating.users_ticket_ratings_clientIdTousers.email,
+      },
+      technician: rating.users_ticket_ratings_technicianIdTousers
+        ? {
+            id: rating.users_ticket_ratings_technicianIdTousers.id,
+            name: rating.users_ticket_ratings_technicianIdTousers.name,
+            email: rating.users_ticket_ratings_technicianIdTousers.email,
+          }
+        : null,
+      createdAt: rating.createdAt.toISOString(),
+      isPublic: rating.isPublic,
     }
 
     return NextResponse.json({
       success: true,
+      message: 'Calificación creada exitosamente',
       data: formattedRating,
-      message: 'Calificación creada exitosamente'
     })
   } catch (error) {
-    console.error('Error creating ticket rating:', error)
+    console.error('[API-RATING] POST Error:', error)
     return NextResponse.json(
-      {
-        success: false,
-        message: 'Error al crear la calificación',
-        error: error instanceof Error ? error.message : 'Error desconocido'
-      },
+      { success: false, error: 'Error al crear la calificación' },
       { status: 500 }
     )
   }

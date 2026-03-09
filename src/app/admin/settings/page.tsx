@@ -49,8 +49,10 @@ interface SystemSettings {
   smtpSecure: boolean
   emailFrom: string
 
-  // Configuración de notificaciones (SOLO GLOBAL)
+  // Configuración de notificaciones
   notificationsEnabled: boolean
+  emailNotifications: boolean
+  browserNotifications: boolean
 
   // Configuración de seguridad
   sessionTimeout: number
@@ -61,6 +63,11 @@ interface SystemSettings {
   // Configuración de archivos
   maxFileSize: number
   allowedFileTypes: string[]
+
+  // Configuración de backups
+  backupEnabled: boolean
+  backupFrequency: 'daily' | 'weekly' | 'monthly'
+  backupRetention: number
 }
 
 export default function SettingsPage() {
@@ -69,6 +76,7 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<SystemSettings | null>(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [activeTab, setActiveTab] = useState('general')
   const { toast } = useToast()
 
   useEffect(() => {
@@ -226,10 +234,13 @@ export default function SettingsPage() {
         <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
         Recargar
       </Button>
-      <Button onClick={saveSettings} disabled={saving}>
-        <Save className={`h-4 w-4 mr-2 ${saving ? 'animate-spin' : ''}`} />
-        {saving ? 'Guardando...' : 'Guardar'}
-      </Button>
+      {/* Solo mostrar botón guardar si NO estamos en la pestaña OAuth */}
+      {activeTab !== 'oauth' && (
+        <Button onClick={saveSettings} disabled={saving}>
+          <Save className={`h-4 w-4 mr-2 ${saving ? 'animate-spin' : ''}`} />
+          {saving ? 'Guardando...' : 'Guardar'}
+        </Button>
+      )}
     </div>
   )
 
@@ -239,7 +250,7 @@ export default function SettingsPage() {
       subtitle='Administra la configuración global del sistema de tickets'
       headerActions={headerActions}
     >
-      <Tabs defaultValue='general' className='space-y-6'>
+      <Tabs defaultValue='general' className='space-y-6' onValueChange={setActiveTab}>
         <TabsList className='grid w-full grid-cols-5'>
           <TabsTrigger value='general'>General</TabsTrigger>
           <TabsTrigger value='email'>Email</TabsTrigger>
@@ -512,46 +523,71 @@ export default function SettingsPage() {
               <CardContent className='space-y-4'>
                 <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                   <div>
-                    <Label htmlFor='sessionTimeout'>Tiempo de Sesión (minutos)</Label>
-                    <Input
-                      id='sessionTimeout'
-                      type='number'
-                      value={settings.sessionTimeout}
-                      onChange={e =>
-                        setSettings({ ...settings, sessionTimeout: parseInt(e.target.value) })
-                      }
-                      min='5'
-                      max='1440'
-                    />
+                    <Label htmlFor='sessionTimeout'>Tiempo de Sesión</Label>
+                    <div className="space-y-2">
+                      <Input
+                        id='sessionTimeout'
+                        type='number'
+                        value={settings.sessionTimeout}
+                        onChange={e =>
+                          setSettings({ ...settings, sessionTimeout: parseInt(e.target.value) })
+                        }
+                        min='5'
+                        max='1440'
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        {settings.sessionTimeout < 60 
+                          ? `${settings.sessionTimeout} minutos`
+                          : settings.sessionTimeout === 60
+                          ? '1 hora'
+                          : settings.sessionTimeout < 1440
+                          ? `${Math.floor(settings.sessionTimeout / 60)} horas ${settings.sessionTimeout % 60 > 0 ? `y ${settings.sessionTimeout % 60} minutos` : ''}`
+                          : '24 horas (1 día)'
+                        }
+                      </p>
+                      <p className="text-xs text-amber-600">
+                        ⚠️ La sesión se cerrará automáticamente después de este tiempo de inactividad
+                      </p>
+                    </div>
                   </div>
                   <div>
                     <Label htmlFor='maxLoginAttempts'>Máximo Intentos de Login</Label>
-                    <Input
-                      id='maxLoginAttempts'
-                      type='number'
-                      value={settings.maxLoginAttempts}
-                      onChange={e =>
-                        setSettings({ ...settings, maxLoginAttempts: parseInt(e.target.value) })
-                      }
-                      min='3'
-                      max='10'
-                    />
+                    <div className="space-y-2">
+                      <Input
+                        id='maxLoginAttempts'
+                        type='number'
+                        value={settings.maxLoginAttempts}
+                        onChange={e =>
+                          setSettings({ ...settings, maxLoginAttempts: parseInt(e.target.value) })
+                        }
+                        min='3'
+                        max='10'
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        {settings.maxLoginAttempts} intentos antes de bloquear
+                      </p>
+                    </div>
                   </div>
                 </div>
 
                 <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                   <div>
                     <Label htmlFor='passwordMinLength'>Longitud Mínima de Contraseña</Label>
-                    <Input
-                      id='passwordMinLength'
-                      type='number'
-                      value={settings.passwordMinLength}
-                      onChange={e =>
-                        setSettings({ ...settings, passwordMinLength: parseInt(e.target.value) })
-                      }
-                      min='6'
-                      max='20'
-                    />
+                    <div className="space-y-2">
+                      <Input
+                        id='passwordMinLength'
+                        type='number'
+                        value={settings.passwordMinLength}
+                        onChange={e =>
+                          setSettings({ ...settings, passwordMinLength: parseInt(e.target.value) })
+                        }
+                        min='6'
+                        max='20'
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        Mínimo {settings.passwordMinLength} caracteres
+                      </p>
+                    </div>
                   </div>
                   <div className='flex items-center space-x-2 pt-6'>
                     <Switch
@@ -566,17 +602,33 @@ export default function SettingsPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor='maxFileSize'>Tamaño Máximo de Archivo (MB)</Label>
-                  <Input
-                    id='maxFileSize'
-                    type='number'
-                    value={settings.maxFileSize}
-                    onChange={e =>
-                      setSettings({ ...settings, maxFileSize: parseInt(e.target.value) })
-                    }
-                    min='1'
-                    max='100'
-                  />
+                  <Label htmlFor='maxFileSize'>Tamaño Máximo de Archivo</Label>
+                  <div className="space-y-2">
+                    <Input
+                      id='maxFileSize'
+                      type='number'
+                      value={settings.maxFileSize}
+                      onChange={e =>
+                        setSettings({ ...settings, maxFileSize: parseInt(e.target.value) })
+                      }
+                      min='1'
+                      max='100'
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Máximo {settings.maxFileSize} MB por archivo
+                    </p>
+                  </div>
+                </div>
+
+                {/* Información adicional sobre seguridad */}
+                <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <h4 className="font-medium text-blue-900 mb-2">ℹ️ Información de Seguridad</h4>
+                  <ul className="text-sm text-blue-700 space-y-1">
+                    <li>• El cierre automático de sesión se activa después del tiempo configurado sin actividad</li>
+                    <li>• Se mostrará una advertencia 5 minutos antes de cerrar la sesión</li>
+                    <li>• Cualquier acción del usuario (click, tecla, scroll) reinicia el contador</li>
+                    <li>• Los cambios requieren reiniciar sesión para aplicarse</li>
+                  </ul>
                 </div>
               </CardContent>
             </Card>

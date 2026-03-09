@@ -239,7 +239,6 @@ export default function AdminTicketsPage() {
           data={pagination.currentItems}
           columns={createAdminTicketColumns({
             onView: handleViewTicket,
-            onEdit: handleEditTicket,
           })}
           loading={loading}
           pagination={paginationConfig}

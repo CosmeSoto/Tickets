@@ -102,16 +102,37 @@ export class AssignmentService {
         },
       })
 
-      // Crear asignación en la tabla de asignaciones
-      await prisma.technician_assignments.create({
-        data: {
-          id: randomUUID(),
-          technicianId: bestTechnician.id,
-          categoryId: ticket.categoryId,
-          isActive: true,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
+      // Verificar si ya existe una asignación para este técnico y categoría
+      const existingAssignment = await prisma.technician_assignments.findUnique({
+        where: {
+          technicianId_categoryId: {
+            technicianId: bestTechnician.id,
+            categoryId: ticket.categoryId,
+          }
+        }
+      })
+
+      // Solo crear si no existe (evitar duplicados por el constraint unique)
+      if (!existingAssignment) {
+        await prisma.technician_assignments.create({
+          data: {
+            id: randomUUID(),
+            technicianId: bestTechnician.id,
+            categoryId: ticket.categoryId,
+            priority: 5, // Prioridad media por defecto
+            maxTickets: 10,
+            autoAssign: true,
+            isActive: true,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        })
+      }
+
+      // ⭐ NUEVO: Enviar notificaciones de asignación
+      const { NotificationService } = await import('./notification-service')
+      await NotificationService.notifyTicketAssigned(ticketId, bestTechnician.id).catch(err => {
+        console.error('[AUTO-ASSIGN] Error enviando notificaciones:', err)
       })
 
       return {

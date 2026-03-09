@@ -228,7 +228,7 @@ export function MassActionsToolbar({
               <AlertTriangle className="h-5 w-5 text-red-500" />
               <span>¿Eliminar categorías seleccionadas?</span>
             </AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogDescription asChild>
               <div className="space-y-3">
                 <p>
                   Estás a punto de eliminar <strong>{deletableItems.length}</strong> categoría{deletableItems.length !== 1 ? 's' : ''}.

@@ -260,7 +260,6 @@ export async function GET(request: Request) {
       categoryStats: formattedCategoryStats
     }
 
-    console.log('[API-TECHNICIAN-STATS] Respuesta exitosa:', response)
     return NextResponse.json(response)
     
   } catch (error: any) {

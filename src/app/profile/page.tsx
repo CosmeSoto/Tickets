@@ -38,13 +38,15 @@ import {
   Shield,
   Wrench,
   UserCircle,
-  Calendar,
   Save,
   Edit,
   Camera,
   Upload,
   Loader2,
-  Trash2
+  X,
+  Key,
+  Eye,
+  EyeOff
 } from 'lucide-react'
 
 export default function ProfilePage() {
@@ -60,6 +62,18 @@ export default function ProfilePage() {
   const [showRemoveAvatarDialog, setShowRemoveAvatarDialog] = useState(false)
   const [previewAvatar, setPreviewAvatar] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [currentAvatar, setCurrentAvatar] = useState<string | null>(null)
+  
+  // Estados para cambio de contraseña
+  const [changingPassword, setChangingPassword] = useState(false)
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  })
   
   const [formData, setFormData] = useState({
     name: '',
@@ -75,12 +89,34 @@ export default function ProfilePage() {
       return
     }
 
-    // Cargar datos del usuario
-    setFormData({
-      name: session.user.name || '',
-      email: session.user.email || '',
-      phone: session.user.phone || '',
-    })
+    // Cargar datos del usuario incluyendo avatar actualizado
+    const loadUserData = async () => {
+      try {
+        const response = await fetch(`/api/users/${session.user.id}`)
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && data.user) {
+            setCurrentAvatar(data.user.avatar)
+            setFormData({
+              name: data.user.name || '',
+              email: data.user.email || '',
+              phone: data.user.phone || '',
+            })
+          }
+        }
+      } catch (error) {
+        console.error('Error loading user data:', error)
+        // Fallback a datos de sesión
+        setCurrentAvatar(session.user.avatar || null)
+        setFormData({
+          name: session.user.name || '',
+          email: session.user.email || '',
+          phone: session.user.phone || '',
+        })
+      }
+    }
+    
+    loadUserData()
   }, [session, status, router])
 
   const getRoleIcon = () => {
@@ -174,19 +210,16 @@ export default function ProfilePage() {
       const result = await response.json()
 
       if (response.ok && result.success) {
-        // Actualizar la sesión con el nuevo avatar
-        await update({
-          ...session,
-          user: {
-            ...session.user,
-            avatar: result.data.avatarUrl
-          }
-        })
-        
-        // Cerrar modal y limpiar estado
+        // Actualizar avatar local
+        setCurrentAvatar(result.data.avatarUrl)
         setShowAvatarDialog(false)
         setSelectedFile(null)
         setPreviewAvatar(null)
+        
+        // Disparar evento para actualizar header
+        window.dispatchEvent(new CustomEvent('avatarUpdated', { 
+          detail: { avatarUrl: result.data.avatarUrl } 
+        }))
         
         toast({
           title: 'Avatar actualizado',
@@ -224,16 +257,14 @@ export default function ProfilePage() {
       const result = await response.json()
 
       if (response.ok && result.success) {
-        // Actualizar la sesión sin avatar
-        await update({
-          ...session,
-          user: {
-            ...session.user,
-            avatar: null
-          }
-        })
-        
+        // Actualizar avatar local
+        setCurrentAvatar(null)
         setShowRemoveAvatarDialog(false)
+        
+        // Disparar evento para actualizar header
+        window.dispatchEvent(new CustomEvent('avatarUpdated', { 
+          detail: { avatarUrl: null } 
+        }))
         
         toast({
           title: 'Avatar eliminado',
@@ -273,21 +304,19 @@ export default function ProfilePage() {
       const result = await response.json()
 
       if (response.ok && result.success) {
-        // Actualizar la sesión
-        await update({
-          ...session,
-          user: {
-            ...session?.user,
-            name: formData.name,
-            phone: formData.phone,
-          }
-        })
+        // Actualizar la sesión con los nuevos datos
+        if (update) {
+          await update()
+        }
 
         toast({
           title: 'Perfil actualizado',
           description: 'Tu información ha sido guardada exitosamente',
         })
         setEditing(false)
+        
+        // Recargar la página para reflejar los cambios
+        window.location.reload()
       } else {
         toast({
           title: 'Error al actualizar',
@@ -304,6 +333,78 @@ export default function ProfilePage() {
       })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleChangePassword = async () => {
+    // Validaciones básicas
+    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
+      toast({
+        title: 'Campos incompletos',
+        description: 'Por favor completa todos los campos',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast({
+        title: 'Error',
+        description: 'Las contraseñas nuevas no coinciden',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    if (passwordForm.newPassword.length < 6) {
+      toast({
+        title: 'Contraseña muy corta',
+        description: 'La contraseña debe tener al menos 6 caracteres',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setChangingPassword(true)
+    try {
+      const response = await fetch('/api/user/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(passwordForm),
+      })
+
+      const result = await response.json()
+
+      if (response.ok && result.success) {
+        toast({
+          title: 'Contraseña actualizada',
+          description: 'Tu contraseña ha sido cambiada exitosamente',
+        })
+        
+        // Limpiar formulario
+        setPasswordForm({
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: '',
+        })
+      } else {
+        toast({
+          title: 'Error al cambiar contraseña',
+          description: result.error || 'No se pudo cambiar la contraseña',
+          variant: 'destructive',
+        })
+      }
+    } catch (error) {
+      console.error('Error changing password:', error)
+      toast({
+        title: 'Error de conexión',
+        description: 'No se pudo conectar con el servidor',
+        variant: 'destructive',
+      })
+    } finally {
+      setChangingPassword(false)
     }
   }
 
@@ -343,17 +444,18 @@ export default function ProfilePage() {
           <CardContent className="space-y-6">
             {/* Avatar y Rol - MEJORADO */}
             <div className="flex items-center space-x-6">
-              <div className="relative">
+              <div className="relative group">
                 <Avatar className="h-20 w-20">
-                  <AvatarImage src={session.user.avatar || ''} />
+                  <AvatarImage src={currentAvatar || undefined} />
                   <AvatarFallback className="text-lg">
                     <RoleIcon className="h-8 w-8" />
                   </AvatarFallback>
                 </Avatar>
+                {/* Botón para cambiar foto */}
                 <Button
                   size="sm"
                   variant="outline"
-                  className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full p-0"
+                  className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full p-0 shadow-sm"
                   title="Cambiar foto"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={avatarUploading}
@@ -364,6 +466,19 @@ export default function ProfilePage() {
                     <Camera className="h-4 w-4" />
                   )}
                 </Button>
+                {/* Botón para eliminar foto - Solo visible si hay avatar */}
+                {currentAvatar && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0 shadow-sm bg-white hover:bg-red-50 border-red-200 opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Eliminar foto"
+                    onClick={() => setShowRemoveAvatarDialog(true)}
+                    disabled={avatarUploading}
+                  >
+                    <X className="h-3 w-3 text-red-600" />
+                  </Button>
+                )}
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -385,18 +500,6 @@ export default function ProfilePage() {
                     day: 'numeric'
                   })}
                 </p>
-                {session.user.avatar && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setShowRemoveAvatarDialog(true)}
-                    disabled={avatarUploading}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="h-3 w-3 mr-1" />
-                    Eliminar foto
-                  </Button>
-                )}
               </div>
             </div>
 
@@ -501,6 +604,98 @@ export default function ProfilePage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Seguridad */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Key className="h-5 w-5" />
+              <span>Seguridad</span>
+            </CardTitle>
+            <CardDescription>
+              Cambia tu contraseña para mantener tu cuenta segura
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="currentPassword">Contraseña actual</Label>
+                <div className="relative">
+                  <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    id="currentPassword"
+                    type={showCurrentPassword ? 'text' : 'password'}
+                    value={passwordForm.currentPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                    className="pl-10 pr-10"
+                    placeholder="Ingresa tu contraseña actual"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="newPassword">Nueva contraseña</Label>
+                <div className="relative">
+                  <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    id="newPassword"
+                    type={showNewPassword ? 'text' : 'password'}
+                    value={passwordForm.newPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                    className="pl-10 pr-10"
+                    placeholder="Mínimo 6 caracteres"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirmar nueva contraseña</Label>
+                <div className="relative">
+                  <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={passwordForm.confirmPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                    className="pl-10 pr-10"
+                    placeholder="Repite la nueva contraseña"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end">
+              <Button
+                onClick={handleChangePassword}
+                disabled={changingPassword || !passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword}
+              >
+                <Key className="h-4 w-4 mr-2" />
+                {changingPassword ? 'Cambiando...' : 'Cambiar Contraseña'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Modal de confirmación de avatar - NUEVO */}
@@ -514,7 +709,7 @@ export default function ProfilePage() {
           </DialogHeader>
           <div className="flex justify-center py-4">
             <Avatar className="h-32 w-32">
-              <AvatarImage src={previewAvatar || ''} alt="Preview" />
+              <AvatarImage src={previewAvatar || undefined} alt="Preview" />
               <AvatarFallback>
                 <RoleIcon className="h-16 w-16" />
               </AvatarFallback>

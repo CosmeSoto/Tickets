@@ -37,15 +37,30 @@ export function CategorySelector({
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
-  // Filtrar categorías basado en búsqueda
-  const filteredCategories = categories.filter(category =>
-    category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    category.levelName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (category.parent?.name.toLowerCase().includes(searchTerm.toLowerCase()))
-  )
+  // Filtrar y agrupar categorías basado en búsqueda
+  const filteredCategories = Array.isArray(categories) 
+    ? categories.filter(category =>
+        category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (category.levelName && category.levelName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (category.parent?.name.toLowerCase().includes(searchTerm.toLowerCase()))
+      )
+    : []
+
+  // Agrupar categorías por nivel para mejor visualización
+  const categoriesByLevel = filteredCategories.reduce((acc, category) => {
+    const level = category.level
+    if (!acc[level]) acc[level] = []
+    acc[level].push(category)
+    return acc
+  }, {} as Record<number, Category[]>)
+
+  // Ordenar niveles
+  const sortedLevels = Object.keys(categoriesByLevel).map(Number).sort()
 
   // Obtener categoría seleccionada
-  const selectedCategory = categories.find(cat => cat.id === value)
+  const selectedCategory = Array.isArray(categories) 
+    ? categories.find(cat => cat.id === value)
+    : null
 
   // Obtener icono por nivel
   const getLevelIcon = (level: number) => {
@@ -164,45 +179,60 @@ export function CategorySelector({
               <span className="text-sm font-medium">Sin categoría padre (Nivel 1)</span>
             </div>
 
-            {/* Categorías filtradas */}
-            {filteredCategories.length > 0 ? (
-              filteredCategories.map((category, index) => (
-                <div
-                  key={category.id}
-                  className={cn(
-                    "px-3 py-2 cursor-pointer flex items-center space-x-2",
-                    "hover:bg-muted",
-                    highlightedIndex === index && "bg-blue-50",
-                    value === category.id && "bg-blue-100 text-blue-900"
-                  )}
-                  onClick={() => handleSelect(category.id)}
-                >
-                  <div 
-                    className="w-4 h-4 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: category.color }}
-                  />
-                  <div className="flex items-center space-x-1 text-muted-foreground">
-                    {getLevelIcon(category.level)}
+            {/* Categorías agrupadas por nivel */}
+            {sortedLevels.length > 0 ? (
+              sortedLevels.map(level => (
+                <div key={level}>
+                  {/* Separador de nivel */}
+                  <div className="px-3 py-1 bg-muted/50 text-xs font-medium text-muted-foreground border-t">
+                    {level === 1 ? 'Principales' : level === 2 ? 'Subcategorías' : level === 3 ? 'Especialidades' : 'Detalles'}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-foreground truncate">
-                      {category.name}
-                    </div>
-                    <div className="text-xs text-muted-foreground flex items-center space-x-1">
-                      <span>{category.levelName}</span>
-                      {category.parent && (
-                        <>
-                          <span>•</span>
-                          <span>Hijo de: {category.parent.name}</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
+                  
+                  {/* Categorías del nivel */}
+                  {categoriesByLevel[level].map((category, categoryIndex) => {
+                    const globalIndex = sortedLevels.slice(0, sortedLevels.indexOf(level))
+                      .reduce((sum, prevLevel) => sum + categoriesByLevel[prevLevel].length, 0) + categoryIndex
+                    
+                    return (
+                      <div
+                        key={category.id}
+                        className={cn(
+                          "px-3 py-2 cursor-pointer flex items-center space-x-2",
+                          "hover:bg-muted",
+                          highlightedIndex === globalIndex && "bg-blue-50",
+                          value === category.id && "bg-blue-100 text-blue-900"
+                        )}
+                        onClick={() => handleSelect(category.id)}
+                      >
+                        <div 
+                          className="w-4 h-4 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: category.color }}
+                        />
+                        <div className="flex items-center space-x-1 text-muted-foreground">
+                          {getLevelIcon(category.level)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-foreground truncate">
+                            {category.name}
+                          </div>
+                          <div className="text-xs text-muted-foreground flex items-center space-x-1">
+                            <span>{category.levelName || `Nivel ${category.level}`}</span>
+                            {category.parent && (
+                              <>
+                                <span>•</span>
+                                <span>Hijo de: {category.parent.name}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               ))
             ) : (
               <div className="px-3 py-2 text-sm text-muted-foreground">
-                No se encontraron categorías
+                {searchTerm ? 'No se encontraron categorías que coincidan con la búsqueda' : 'No hay categorías disponibles'}
               </div>
             )}
           </div>

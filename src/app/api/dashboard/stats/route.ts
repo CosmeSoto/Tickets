@@ -23,6 +23,48 @@ function calculateAvgResolutionTime(tickets: any[]): string {
   return `${minutes}min`
 }
 
+// Función para calcular tiempo promedio de primera respuesta
+async function calculateAvgResponseTime(): Promise<string> {
+  try {
+    const ticketsWithComments = await prisma.tickets.findMany({
+      where: {
+        comments: {
+          some: {}
+        }
+      },
+      select: {
+        id: true,
+        createdAt: true,
+        comments: {
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+          select: { createdAt: true }
+        }
+      }
+    })
+
+    if (ticketsWithComments.length === 0) return '2h'
+
+    const totalMinutes = ticketsWithComments.reduce((acc, ticket) => {
+      if (ticket.comments[0]) {
+        const diff = ticket.comments[0].createdAt.getTime() - ticket.createdAt.getTime()
+        return acc + (diff / (1000 * 60))
+      }
+      return acc
+    }, 0)
+
+    const avgMinutes = totalMinutes / ticketsWithComments.length
+    const hours = Math.floor(avgMinutes / 60)
+    const minutes = Math.floor(avgMinutes % 60)
+
+    if (hours > 0) return `${hours}h ${minutes > 0 ? minutes + 'min' : ''}`
+    return `${minutes}min`
+  } catch (error) {
+    console.error('Error calculating response time:', error)
+    return '2h'
+  }
+}
+
 // Función para generar actividad reciente
 async function getRecentActivity(role: string, userId: string) {
   const activities: any[] = []
@@ -238,6 +280,13 @@ export async function GET(request: NextRequest) {
         avgResolutionTime,
         responseTime,
         satisfactionScore: Math.round(avgRating * 10) / 10,
+        totalRatings: ratings.length,
+        ratingsBreakdown: {
+          excellent: ratings.filter(r => r.rating === 5).length,
+          good: ratings.filter(r => r.rating === 4).length,
+          average: ratings.filter(r => r.rating === 3).length,
+          poor: ratings.filter(r => r.rating <= 2).length,
+        },
         performance: avgRating >= 4.5 ? 'excellent' : avgRating >= 4 ? 'good' : 'needs_improvement',
         workload: assignedTickets > 15 ? 'high' : assignedTickets > 8 ? 'medium' : 'low'
       }
@@ -285,6 +334,18 @@ export async function GET(request: NextRequest) {
         ? ratings.reduce((acc, r) => acc + r.rating, 0) / ratings.length 
         : 0
       
+      // Contar tickets que pueden ser calificados (RESOLVED o CLOSED sin calificación)
+      const ticketsToRate = await prisma.tickets.count({
+        where: {
+          clientId: userId,
+          status: { in: ['RESOLVED', 'CLOSED'] },
+          ticket_ratings: null
+        }
+      })
+      
+      // Calcular tiempo de respuesta real
+      const responseTime = await calculateAvgResponseTime()
+      
       stats = {
         totalTickets,
         openTickets,
@@ -293,7 +354,9 @@ export async function GET(request: NextRequest) {
         thisMonthTickets,
         avgResolutionTime,
         satisfactionRating: Math.round(avgRating * 10) / 10,
-        responseTime: '2h', // Tiempo promedio de primera respuesta
+        totalRatings: ratings.length,
+        ticketsToRate, // Tickets pendientes de calificar
+        responseTime, // Tiempo promedio de primera respuesta (calculado)
         supportQuality: avgRating >= 4.5 ? 'excellent' : avgRating >= 4 ? 'good' : 'fair'
       }
     }

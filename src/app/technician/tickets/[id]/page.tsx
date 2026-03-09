@@ -30,6 +30,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useTicketData, type Ticket as TicketType, TICKET_STATUSES, TICKET_PRIORITIES, formatDate } from '@/hooks/use-ticket-data'
 import { formatTimeAgo } from '@/hooks/use-users'
 import { AttachmentButton } from '@/components/tickets/attachment-button'
+import { CompactFileManager } from '@/components/tickets/compact-file-manager'
 import {
   Tooltip,
   TooltipContent,
@@ -117,19 +118,13 @@ export default function TechnicianTicketDetailPage() {
 
     setUpdating(true)
     try {
-      const oldStatusLabel = getStatusConfig(ticket.status).label
-      const newStatusLabel = getStatusConfig(newStatus).label
-      
       const updatedTicket = await updateTicket(ticket.id, { status: newStatus })
       if (updatedTicket) {
         setTicket(updatedTicket)
-        toast({
-          title: 'Estado actualizado exitosamente',
-          description: `El ticket "${ticket.title}" cambió de ${oldStatusLabel} a ${newStatusLabel}`,
-          duration: 4000
-        })
+        // El toast ya se muestra automáticamente en el hook use-ticket-data
       }
     } catch (err) {
+      // Los errores también se manejan en el hook, pero agregamos uno específico aquí
       toast({
         title: 'Error al actualizar estado',
         description: 'No se pudo actualizar el estado del ticket. Intenta nuevamente.',
@@ -460,70 +455,13 @@ export default function TechnicianTicketDetailPage() {
               </TabsContent>
               
               <TabsContent value="files" className="space-y-4">
-                {/* Lista de archivos existentes */}
-                {ticket.attachments && ticket.attachments.length > 0 ? (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className='flex items-center'>
-                        <Paperclip className='h-5 w-5 mr-2' />
-                        Archivos Adjuntos ({ticket.attachments.length})
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className='space-y-2'>
-                        {ticket.attachments.map(attachment => (
-                          <div
-                            key={attachment.id}
-                            className='flex items-center justify-between p-3 bg-muted rounded-lg'
-                          >
-                            <div className="flex items-center space-x-3">
-                              <div className="flex-shrink-0">
-                                {attachment.mimeType?.startsWith('image/') ? (
-                                  <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
-                                    <span className="text-blue-600 text-xs font-medium">IMG</span>
-                                  </div>
-                                ) : attachment.mimeType === 'application/pdf' ? (
-                                  <div className="w-8 h-8 bg-red-100 rounded flex items-center justify-center">
-                                    <span className="text-red-600 text-xs font-medium">PDF</span>
-                                  </div>
-                                ) : (
-                                  <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center">
-                                    <Paperclip className="h-4 w-4 text-gray-600" />
-                                  </div>
-                                )}
-                              </div>
-                              <div>
-                                <p className='text-sm font-medium'>{attachment.originalName}</p>
-                                <p className='text-xs text-muted-foreground'>
-                                  {attachment.size ? `${(attachment.size / 1024).toFixed(1)} KB` : 'Tamaño desconocido'} • {formatDate(attachment.createdAt)}
-                                </p>
-                              </div>
-                            </div>
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button variant='outline' size='sm'>
-                                    Descargar
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Descarga el archivo {attachment.originalName}</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <Card>
-                    <CardContent className='py-8 text-center'>
-                      <Paperclip className='h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50' />
-                      <p className='text-sm text-muted-foreground'>No hay archivos adjuntos</p>
-                    </CardContent>
-                  </Card>
-                )}
+                <CompactFileManager 
+                  ticketId={ticket.id}
+                  attachments={ticket.attachments || []}
+                  onAttachmentsChange={loadTicket}
+                  canUpload={true}
+                  canDelete={true}
+                />
               </TabsContent>
             </Tabs>
           </div>
@@ -541,7 +479,7 @@ export default function TechnicianTicketDetailPage() {
               <CardContent>
                 <div className='flex items-center space-x-3'>
                   <Avatar className='h-10 w-10'>
-                    <AvatarImage src={ticket.client?.avatar || ''} />
+                    <AvatarImage src={ticket.client?.avatar || undefined} />
                     <AvatarFallback>
                       {ticket.client?.name?.charAt(0) || 'C'}
                     </AvatarFallback>

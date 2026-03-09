@@ -681,6 +681,7 @@ export const AuditActionsComplete = {
   USER_PASSWORD_CHANGED: 'user_password_changed',
   USER_AVATAR_UPDATED: 'user_avatar_updated',
   USER_PREFERENCES_UPDATED: 'user_preferences_updated',
+  PASSWORD_RESET: 'password_reset',
 
   // Técnicos
   TECHNICIAN_ASSIGNED: 'technician_assigned',

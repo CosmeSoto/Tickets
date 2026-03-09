@@ -587,7 +587,7 @@ export function UserTable({
                             <div className='flex items-center space-x-3'>
                               <div className='relative group/avatar'>
                                 <Avatar className='h-8 w-8'>
-                                  <AvatarImage src={user.avatar || ''} alt={user.name} />
+                                  <AvatarImage src={user.avatar || undefined} alt={user.name} />
                                   <AvatarFallback className='bg-muted text-muted-foreground'>
                                     {user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
                                   </AvatarFallback>

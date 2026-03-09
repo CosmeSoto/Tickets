@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import prisma from '@/lib/prisma'
 
 export async function GET(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -16,23 +16,14 @@ export async function GET(
       )
     }
 
-    const params = await context.params
-    const technicianId = params?.id
-
-    if (!technicianId) {
-      return NextResponse.json(
-        { success: false, message: 'ID de técnico requerido' },
-        { status: 400 }
-      )
-    }
+    const technicianId = (await params).id
 
     // Verificar que el técnico existe
     const technician = await prisma.users.findUnique({
       where: { 
         id: technicianId,
         role: 'TECHNICIAN'
-      },
-      select: { id: true, name: true, email: true }
+      }
     })
 
     if (!technician) {
@@ -42,30 +33,25 @@ export async function GET(
       )
     }
 
-    // Verificar permisos (solo admins o el propio técnico)
-    if (session.user.role !== 'ADMIN' && session.user.id !== technicianId) {
-      return NextResponse.json(
-        { success: false, message: 'No tienes permisos para ver estas estadísticas' },
-        { status: 403 }
-      )
-    }
-
     // Obtener todas las calificaciones del técnico
     const ratings = await prisma.ticket_ratings.findMany({
-      where: { technicianId },
+      where: {
+        tickets: {
+          assigneeId: technicianId
+        }
+      },
       include: {
-        users_ticket_ratings_clientIdTousers: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        },
         tickets: {
           select: {
             id: true,
             title: true,
             createdAt: true
+          }
+        },
+        users: {
+          select: {
+            id: true,
+            name: true
           }
         }
       },
@@ -74,7 +60,10 @@ export async function GET(
       }
     })
 
-    if (ratings.length === 0) {
+    // Calcular estadísticas
+    const totalRatings = ratings.length
+    
+    if (totalRatings === 0) {
       return NextResponse.json({
         success: true,
         data: {
@@ -91,61 +80,55 @@ export async function GET(
       })
     }
 
-    // Calcular estadísticas
-    const totalRatings = ratings.length
-    const averageRating = ratings.reduce((sum, r) => sum + r.rating, 0) / totalRatings
+    // Calcular promedios
+    const sumResponseTime = ratings.reduce((sum, r) => sum + r.responseTime, 0)
+    const sumTechnicalSkill = ratings.reduce((sum, r) => sum + r.technicalSkill, 0)
+    const sumCommunication = ratings.reduce((sum, r) => sum + r.communication, 0)
+    const sumProblemResolution = ratings.reduce((sum, r) => sum + r.problemResolution, 0)
 
-    const categoryAverages = {
-      responseTime: ratings.reduce((sum, r) => sum + r.responseTime, 0) / totalRatings,
-      technicalSkill: ratings.reduce((sum, r) => sum + r.technicalSkill, 0) / totalRatings,
-      communication: ratings.reduce((sum, r) => sum + r.communication, 0) / totalRatings,
-      problemResolution: ratings.reduce((sum, r) => sum + r.problemResolution, 0) / totalRatings
-    }
+    const avgResponseTime = sumResponseTime / totalRatings
+    const avgTechnicalSkill = sumTechnicalSkill / totalRatings
+    const avgCommunication = sumCommunication / totalRatings
+    const avgProblemResolution = sumProblemResolution / totalRatings
 
-    // Formatear calificaciones recientes
-    const recentRatings = ratings.slice(0, 10).map(rating => ({
+    // Promedio general
+    const averageRating = (avgResponseTime + avgTechnicalSkill + avgCommunication + avgProblemResolution) / 4
+
+    // Formatear calificaciones recientes (últimas 5)
+    const recentRatings = ratings.slice(0, 5).map(rating => ({
       id: rating.id,
       ticketId: rating.ticketId,
-      rating: rating.rating,
-      feedback: rating.feedback,
-      categories: {
-        responseTime: rating.responseTime,
-        technicalSkill: rating.technicalSkill,
-        communication: rating.communication,
-        problemResolution: rating.problemResolution
-      },
-      client: rating.users_ticket_ratings_clientIdTousers,
-      createdAt: rating.createdAt.toISOString(),
-      isPublic: rating.isPublic,
-      ticket: {
-        id: rating.tickets.id,
-        title: rating.tickets.title,
-        createdAt: rating.tickets.createdAt.toISOString()
-      }
+      clientId: rating.clientId,
+      responseTime: rating.responseTime,
+      technicalSkill: rating.technicalSkill,
+      communication: rating.communication,
+      problemResolution: rating.problemResolution,
+      comment: rating.comment,
+      createdAt: rating.createdAt,
+      client: rating.users,
+      ticket: rating.tickets
     }))
-
-    const stats = {
-      averageRating: Math.round(averageRating * 10) / 10, // Redondear a 1 decimal
-      totalRatings,
-      categoryAverages: {
-        responseTime: Math.round(categoryAverages.responseTime * 10) / 10,
-        technicalSkill: Math.round(categoryAverages.technicalSkill * 10) / 10,
-        communication: Math.round(categoryAverages.communication * 10) / 10,
-        problemResolution: Math.round(categoryAverages.problemResolution * 10) / 10
-      },
-      recentRatings
-    }
 
     return NextResponse.json({
       success: true,
-      data: stats
+      data: {
+        averageRating: Math.round(averageRating * 10) / 10, // Redondear a 1 decimal
+        totalRatings,
+        categoryAverages: {
+          responseTime: Math.round(avgResponseTime * 10) / 10,
+          technicalSkill: Math.round(avgTechnicalSkill * 10) / 10,
+          communication: Math.round(avgCommunication * 10) / 10,
+          problemResolution: Math.round(avgProblemResolution * 10) / 10
+        },
+        recentRatings
+      }
     })
   } catch (error) {
-    console.error('Error fetching technician stats:', error)
+    console.error('[CRITICAL] Error fetching technician stats:', error)
     return NextResponse.json(
       {
         success: false,
-        message: 'Error al cargar las estadísticas del técnico',
+        message: 'Error al obtener estadísticas del técnico',
         error: error instanceof Error ? error.message : 'Error desconocido'
       },
       { status: 500 }

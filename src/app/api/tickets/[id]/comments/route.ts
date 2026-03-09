@@ -6,6 +6,8 @@ import { randomUUID } from 'crypto'
 import { auditCommentCreated } from '@/lib/audit'
 import { WebhookService } from '@/lib/services/webhook-service'
 import { SLAService } from '@/lib/services/sla-service'
+import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
+import { NotificationService } from '@/lib/services/notification-service'
 
 export async function POST(
   request: NextRequest,
@@ -90,6 +92,23 @@ export async function POST(
       commentData.isInternal || false
     )
 
+    // ⭐ AUDITORÍA: Registrar creación de comentario
+    await AuditServiceComplete.log({
+      action: AuditActionsComplete.COMMENT_ADDED,
+      entityType: 'comment',
+      entityId: newComment.id,
+      userId: session.user.id,
+      details: {
+        ticketId: ticketId,
+        ticketTitle: ticket.title,
+        authorName: newComment.users.name,
+        authorRole: newComment.users.role,
+        isInternal: newComment.isInternal,
+        contentPreview: newComment.content.substring(0, 100)
+      },
+      request: request
+    })
+
     // ⭐ NUEVO: Registrar primera respuesta en SLA si es un técnico/admin
     if (session.user.role === 'TECHNICIAN' || session.user.role === 'ADMIN') {
       await SLAService.recordFirstResponse(ticketId).catch(err => {
@@ -111,6 +130,11 @@ export async function POST(
       createdAt: newComment.createdAt
     }).catch(err => {
       console.error('[WEBHOOK] Error disparando evento COMMENT_ADDED:', err)
+    })
+
+    // ⭐ NUEVO: Enviar notificaciones in-app
+    await NotificationService.notifyNewComment(newComment.id).catch(err => {
+      console.error('[NOTIFICATION] Error enviando notificaciones de nuevo comentario:', err)
     })
 
     return NextResponse.json({

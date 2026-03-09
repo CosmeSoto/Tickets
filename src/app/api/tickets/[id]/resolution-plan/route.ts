@@ -39,7 +39,6 @@ export async function GET(
     })
 
     if (!ticket) {
-      console.log('[API] Ticket not found:', ticketId)
       return NextResponse.json(
         { success: false, message: 'Ticket no encontrado' },
         { status: 404 }
@@ -124,6 +123,8 @@ export async function GET(
         priority: task.priority,
         estimatedHours: task.estimatedHours,
         actualHours: task.actualHours,
+        startTime: task.startTime,
+        endTime: task.endTime,
         assignedTo: task.assignee,
         dueDate: task.dueDate?.toISOString() || null,
         completedAt: task.completedAt?.toISOString() || null,
@@ -270,6 +271,82 @@ export async function POST(
         status: plan.status
       }
     )
+
+    // Crear entrada en el historial del ticket
+    try {
+      await prisma.ticket_history.create({
+        data: {
+          id: randomUUID(),
+          ticketId,
+          userId: session.user.id,
+          action: 'resolution_plan_created',
+          field: 'resolution_plan',
+          oldValue: null,
+          newValue: plan.title,
+          comment: `Plan de resolución creado: "${plan.title}"${plan.startDate ? `. Inicio: ${new Date(plan.startDate).toLocaleDateString('es-ES')}` : ''}${plan.targetDate ? `. Objetivo: ${new Date(plan.targetDate).toLocaleDateString('es-ES')}` : ''}`,
+          createdAt: new Date()
+        }
+      })
+    } catch (historyError) {
+      console.error('[API] Error creating ticket history:', historyError)
+    }
+
+    // Crear notificación para el cliente
+    try {
+      const formattedStartDate = plan.startDate 
+        ? new Date(plan.startDate).toLocaleString('es-ES', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })
+        : null
+
+      const formattedTargetDate = plan.targetDate
+        ? new Date(plan.targetDate).toLocaleString('es-ES', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })
+        : null
+
+      let message = `Se ha creado un plan de resolución para tu ticket: "${plan.title}".`
+      if (formattedStartDate) {
+        message += ` Inicio programado: ${formattedStartDate}.`
+      }
+      if (formattedTargetDate) {
+        message += ` Fecha objetivo: ${formattedTargetDate}.`
+      }
+
+      await prisma.notifications.create({
+        data: {
+          id: randomUUID(),
+          userId: ticket.clientId,
+          type: 'RESOLUTION_PLAN_CREATED',
+          title: 'Plan de resolución creado',
+          message,
+          ticketId,
+          isRead: false,
+          metadata: {
+            planId: plan.id,
+            planTitle: plan.title,
+            startDate: plan.startDate?.toISOString() || null,
+            targetDate: plan.targetDate?.toISOString() || null,
+            actionUrl: `/client/tickets/${ticketId}`,
+            actionText: 'Ver ticket'
+          },
+          createdAt: new Date()
+        }
+      })
+      
+      console.log(`[API] Notification created for client ${ticket.clientId} about resolution plan ${plan.id}`)
+    } catch (notificationError) {
+      // No fallar si la notificación falla, solo registrar el error
+      console.error('[API] Error creating notification for resolution plan:', notificationError)
+    }
 
     return NextResponse.json({
       success: true,

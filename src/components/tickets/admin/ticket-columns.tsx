@@ -5,7 +5,7 @@
 
 'use client'
 
-import { User, Calendar, Clock, MessageSquare, Paperclip, Eye, Edit } from 'lucide-react'
+import { User, Calendar, Clock, MessageSquare, Paperclip, Eye } from 'lucide-react'
 import { StatusBadge, PriorityBadge } from '@/components/ui/status-badge'
 import { Button } from '@/components/ui/button'
 import type { Column } from '@/components/ui/data-table'
@@ -14,12 +14,10 @@ import { formatTimeAgo } from '@/hooks/use-ticket-data'
 
 interface AdminTicketColumnsProps {
   onView: (ticket: TicketType) => void
-  onEdit?: (ticket: TicketType) => void
 }
 
 export function createAdminTicketColumns({
-  onView,
-  onEdit
+  onView
 }: AdminTicketColumnsProps): Column<TicketType>[] {
   return [
     {
@@ -129,24 +127,16 @@ export function createAdminTicketColumns({
       key: 'actions',
       label: 'Acciones',
       render: (ticket: TicketType) => (
-        <div className="flex items-center space-x-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onView(ticket)}
-          >
-            <Eye className="h-4 w-4" />
-          </Button>
-          {onEdit && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onEdit(ticket)}
-            >
-              <Edit className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation()
+            onView(ticket)
+          }}
+        >
+          <Eye className="h-4 w-4" />
+        </Button>
       ),
     },
   ]

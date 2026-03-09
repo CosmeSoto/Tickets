@@ -27,7 +27,14 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Plus, X, Save, User } from 'lucide-react'
+import { 
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import { Badge } from '@/components/ui/badge'
+import { Plus, X, Save, User, HelpCircle, Info, Zap, Users, Shield } from 'lucide-react'
 import type { 
   Technician, 
   TechnicianFormData, 
@@ -35,6 +42,7 @@ import type {
   Category 
 } from '@/types/technicians'
 import { validateTechnicianForm } from '../TechnicianManagement.module'
+import { SimpleCategoryAssignment } from './SimpleCategoryAssignment'
 
 interface Props {
   open: boolean
@@ -107,6 +115,17 @@ export function TechnicianFormDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
+    // Validar que estemos en modo edición o promoción
+    if (!isEditing && !isPromoting) {
+      toast({
+        title: 'Operación no disponible',
+        description: 'Los técnicos se crean promoviendo usuarios. Por favor, selecciona un usuario primero.',
+        variant: 'destructive'
+      })
+      onClose()
+      return
+    }
+    
     const validation = validateTechnicianForm(formData)
     if (!validation.isValid) {
       setErrors(validation.errors)
@@ -132,7 +151,11 @@ export function TechnicianFormDialog({
         method = 'PUT'
         payload = {
           isActive: formData.isActive,
-          assignedCategories: formData.assignedCategories
+          assignments: formData.assignedCategories.map(a => ({
+            categoryId: a.categoryId,
+            priorityLevel: a.priority,
+            maxTickets: a.maxTickets
+          }))
         }
       } else if (isPromoting) {
         // Para promoción de usuarios a técnicos
@@ -212,8 +235,8 @@ export function TechnicianFormDialog({
         ...prev.assignedCategories,
         {
           categoryId: '',
-          priority: 1,
-          maxTickets: undefined,
+          priority: 2, // Regular por defecto
+          maxTickets: 10,
           autoAssign: true
         }
       ]
@@ -259,13 +282,17 @@ export function TechnicianFormDialog({
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Información Básica</CardTitle>
-              {isEditing && (
-                <p className="text-sm text-muted-foreground">
-                  Los datos personales se editan desde el módulo de usuarios
-                </p>
-              )}
+              <p className="text-sm text-muted-foreground">
+                Los datos personales solo se pueden editar desde el módulo de usuarios
+              </p>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <p className="text-sm text-blue-900">
+                  <strong>Nota:</strong> Nombre, email, teléfono y departamento están bloqueados. Para editarlos, ve al módulo de usuarios del administrador.
+                </p>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="name">Nombre completo *</Label>
@@ -275,14 +302,12 @@ export function TechnicianFormDialog({
                     onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                     placeholder="Nombre del técnico"
                     className={errors.name ? 'border-red-500' : ''}
-                    disabled={isEditing} // Solo lectura para técnicos existentes
+                    disabled={true} // Siempre bloqueado - editar desde usuarios
                   />
                   {errors.name && <p className="text-sm text-red-500 mt-1">{errors.name}</p>}
-                  {isEditing && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Editar desde el módulo de usuarios
-                    </p>
-                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Editar desde el módulo de usuarios
+                  </p>
                 </div>
 
                 <div>
@@ -294,14 +319,12 @@ export function TechnicianFormDialog({
                     onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                     placeholder="email@ejemplo.com"
                     className={errors.email ? 'border-red-500' : ''}
-                    disabled={isEditing || isPromoting} // Solo lectura para técnicos existentes y promociones
+                    disabled={true} // Siempre bloqueado - editar desde usuarios
                   />
                   {errors.email && <p className="text-sm text-red-500 mt-1">{errors.email}</p>}
-                  {isEditing && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Editar desde el módulo de usuarios
-                    </p>
-                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Editar desde el módulo de usuarios
+                  </p>
                 </div>
 
                 <div>
@@ -312,14 +335,12 @@ export function TechnicianFormDialog({
                     onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
                     placeholder="+1 234 567 8900"
                     className={errors.phone ? 'border-red-500' : ''}
-                    disabled={isEditing} // Solo lectura para técnicos existentes
+                    disabled={true} // Siempre bloqueado - editar desde usuarios
                   />
                   {errors.phone && <p className="text-sm text-red-500 mt-1">{errors.phone}</p>}
-                  {isEditing && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Editar desde el módulo de usuarios
-                    </p>
-                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Editar desde el módulo de usuarios
+                  </p>
                 </div>
 
                 <div>
@@ -330,7 +351,7 @@ export function TechnicianFormDialog({
                       ...prev, 
                       departmentId: value === 'none' ? null : value 
                     }))}
-                    disabled={isEditing} // Solo lectura para técnicos existentes
+                    disabled={true} // Siempre bloqueado - editar desde usuarios
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar departamento" />
@@ -350,11 +371,9 @@ export function TechnicianFormDialog({
                       ))}
                     </SelectContent>
                   </Select>
-                  {isEditing && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Editar desde el módulo de usuarios
-                    </p>
-                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Editar desde el módulo de usuarios
+                  </p>
                 </div>
               </div>
 
@@ -369,141 +388,15 @@ export function TechnicianFormDialog({
             </CardContent>
           </Card>
 
-          {/* Asignaciones de categorías */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-lg">Asignaciones de Categorías</CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Las prioridades determinan el orden de asignación automática de tickets
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={addCategoryAssignment}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Agregar Categoría
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {formData.assignedCategories.length === 0 ? (
-                <p className="text-muted-foreground text-center py-4">
-                  No hay categorías asignadas. Haz clic en "Agregar Categoría" para comenzar.
-                </p>
-              ) : (
-                <div className="space-y-4">
-                  {formData.assignedCategories.map((assignment, index) => (
-                    <Card key={index} className="border-dashed">
-                      <CardContent className="pt-4">
-                        <div className="flex items-start justify-between mb-4">
-                          <h4 className="font-medium">Asignación {index + 1}</h4>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeCategoryAssignment(index)}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                          <div>
-                            <Label>Categoría</Label>
-                            <Select
-                              value={assignment.categoryId}
-                              onValueChange={(value) => updateCategoryAssignment(index, 'categoryId', value)}
-                            >
-                              <SelectTrigger className={errors[`assignedCategories[${index}].categoryId`] ? 'border-red-500' : ''}>
-                                <SelectValue placeholder="Seleccionar" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {availableCategories.map(category => (
-                                  <SelectItem key={category.id} value={category.id}>
-                                    <div className="flex items-center space-x-2">
-                                      <div 
-                                        className="w-3 h-3 rounded-full" 
-                                        style={{ backgroundColor: category.color }}
-                                      />
-                                      <span>{category.name}</span>
-                                    </div>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            {errors[`assignedCategories[${index}].categoryId`] && (
-                              <p className="text-sm text-red-500 mt-1">
-                                {errors[`assignedCategories[${index}].categoryId`]}
-                              </p>
-                            )}
-                          </div>
-
-                          <div>
-                            <Label>Prioridad</Label>
-                            <Select
-                              value={assignment.priority.toString()}
-                              onValueChange={(value) => updateCategoryAssignment(index, 'priority', parseInt(value))}
-                            >
-                              <SelectTrigger className={errors[`assignedCategories[${index}].priority`] ? 'border-red-500' : ''}>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(priority => (
-                                  <SelectItem key={priority} value={priority.toString()}>
-                                    Prioridad {priority}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            {errors[`assignedCategories[${index}].priority`] && (
-                              <p className="text-sm text-red-500 mt-1">
-                                {errors[`assignedCategories[${index}].priority`]}
-                              </p>
-                            )}
-                          </div>
-
-                          <div>
-                            <Label>Máx. Tickets</Label>
-                            <Input
-                              type="number"
-                              min="1"
-                              max="1000"
-                              value={assignment.maxTickets || ''}
-                              onChange={(e) => updateCategoryAssignment(
-                                index, 
-                                'maxTickets', 
-                                e.target.value ? parseInt(e.target.value) : undefined
-                              )}
-                              placeholder="Sin límite"
-                              className={errors[`assignedCategories[${index}].maxTickets`] ? 'border-red-500' : ''}
-                            />
-                            {errors[`assignedCategories[${index}].maxTickets`] && (
-                              <p className="text-sm text-red-500 mt-1">
-                                {errors[`assignedCategories[${index}].maxTickets`]}
-                              </p>
-                            )}
-                          </div>
-
-                          <div className="flex items-center space-x-2 pt-6">
-                            <Switch
-                              checked={assignment.autoAssign}
-                              onCheckedChange={(checked) => updateCategoryAssignment(index, 'autoAssign', checked)}
-                            />
-                            <Label className="text-sm">Auto-asignar</Label>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          {/* Asignaciones de categorías - SIMPLIFICADO */}
+          <SimpleCategoryAssignment
+            assignments={formData.assignedCategories}
+            availableCategories={availableCategories}
+            errors={errors}
+            onAdd={addCategoryAssignment}
+            onRemove={removeCategoryAssignment}
+            onUpdate={updateCategoryAssignment}
+          />
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>

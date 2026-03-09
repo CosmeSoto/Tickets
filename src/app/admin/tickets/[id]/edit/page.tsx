@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { StatusBadge, PriorityBadge } from '@/components/ui/status-badge'
 import { CategorySelector } from '@/components/ui/category-selector'
 import { TechnicianSearchSelector } from '@/components/ui/technician-search-selector'
-import { useToast } from '@/hooks/use-toast'
+import { enrichCategories } from '@/lib/utils/category-utils'
 import { ArrowLeft, Save, X } from 'lucide-react'
 import Link from 'next/link'
 
@@ -74,8 +74,12 @@ export default function EditTicketPage() {
     try {
       const response = await fetch('/api/categories')
       if (response.ok) {
-        const data = await response.json()
-        setCategories(data)
+        const result = await response.json()
+        if (result.success && Array.isArray(result.data)) {
+          // Enriquecer categorías con levelName
+          const enrichedCategories = enrichCategories(result.data)
+          setCategories(enrichedCategories)
+        }
       }
     } catch (error) {
       console.error('Error loading categories:', error)

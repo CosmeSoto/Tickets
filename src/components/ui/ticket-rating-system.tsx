@@ -248,6 +248,28 @@ export function TicketRatingSystem({
 
   return (
     <div className="space-y-6">
+      {/* Mensaje informativo cuando no se puede calificar aún */}
+      {!rating && !canRate && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="pt-6">
+            <div className="flex items-start space-x-3">
+              <div className="flex-shrink-0">
+                <Star className="h-5 w-5 text-blue-600 mt-0.5" />
+              </div>
+              <div>
+                <h4 className="font-medium text-blue-900 mb-1">
+                  Calificación no disponible aún
+                </h4>
+                <p className="text-sm text-blue-800">
+                  Podrás calificar este ticket una vez que haya sido <strong>cerrado o resuelto</strong>. 
+                  Tu opinión nos ayuda a mejorar la calidad de nuestro servicio.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Calificación existente */}
       {rating && (
         <Card>
