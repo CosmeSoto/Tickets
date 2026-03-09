@@ -25,6 +25,7 @@ import {
 
 // Componentes estandarizados
 import { ModuleLayout } from '@/components/common/layout/module-layout'
+import { CompactFileManager } from '@/components/tickets/compact-file-manager'
 import { TicketTimeline } from '@/components/ui/ticket-timeline'
 import { TicketRatingSystem } from '@/components/ui/ticket-rating-system'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -101,10 +102,6 @@ export default function ClientTicketDetailPage() {
       if (updatedTicket) {
         setTicket(updatedTicket)
         setIsEditing(false)
-        toast({
-          title: 'Ticket actualizado',
-          description: 'Los cambios se han guardado exitosamente',
-        })
       } else {
         toast({
           title: 'Error',
@@ -143,13 +140,19 @@ export default function ClientTicketDetailPage() {
           title: 'Ticket eliminado',
           description: 'El ticket ha sido eliminado exitosamente',
         })
+        // Cerrar el diálogo inmediatamente
+        setShowDeleteDialog(false)
+        // Navegar inmediatamente antes de que se intenten recargar los datos
         router.push('/client/tickets')
+        router.refresh()
       } else {
         toast({
           title: 'Error',
           description: 'No se pudo eliminar el ticket. Solo puedes eliminar tickets que aún no han sido revisados.',
           variant: 'destructive',
         })
+        setDeleting(false)
+        setShowDeleteDialog(false)
       }
     } catch (error) {
       console.error('[CRITICAL] Error deleting ticket:', error)
@@ -158,10 +161,10 @@ export default function ClientTicketDetailPage() {
         description: 'Ocurrió un error al eliminar el ticket',
         variant: 'destructive',
       })
-    } finally {
       setDeleting(false)
       setShowDeleteDialog(false)
     }
+    // No hacer finally aquí para evitar cambiar el estado después de la redirección
   }
 
   // Verificar si el ticket puede ser eliminado (solo si está en estado OPEN)
@@ -372,47 +375,12 @@ export default function ClientTicketDetailPage() {
             </TabsContent>
             
             <TabsContent value="files" className="space-y-4">
-              {/* Lista de archivos existentes */}
-              {ticket.attachments && ticket.attachments.length > 0 ? (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className='flex items-center'>
-                      <Paperclip className='h-5 w-5 mr-2' />
-                      Archivos Adjuntos ({ticket.attachments.length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className='space-y-2'>
-                      {ticket.attachments.map(attachment => (
-                        <div
-                          key={attachment.id}
-                          className='flex items-center justify-between p-3 bg-muted rounded-lg'
-                        >
-                          <div className="flex items-center space-x-3">
-                            <Paperclip className="h-4 w-4 text-muted-foreground" />
-                            <div>
-                              <p className='text-sm font-medium'>{attachment.originalName}</p>
-                              <p className='text-xs text-muted-foreground'>
-                                {(attachment.size / 1024).toFixed(1)} KB • {formatDate(attachment.createdAt)}
-                              </p>
-                            </div>
-                          </div>
-                          <Button variant='outline' size='sm'>
-                            Descargar
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : (
-                <Card>
-                  <CardContent className='py-8 text-center'>
-                    <Paperclip className='h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50' />
-                    <p className='text-sm text-muted-foreground'>No hay archivos adjuntos</p>
-                  </CardContent>
-                </Card>
-              )}
+              <CompactFileManager
+                ticketId={ticket.id}
+                attachments={ticket.attachments || []}
+                onUploadComplete={loadTicket}
+                disabled={ticket.status === 'CLOSED'}
+              />
             </TabsContent>
           </Tabs>
         </div>

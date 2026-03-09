@@ -43,17 +43,7 @@ import {
 import Link from 'next/link'
 import { useToast } from '@/hooks/use-toast'
 import { UserCombobox } from '@/components/ui/user-combobox'
-
-interface Category {
-  id: string
-  name: string
-  description?: string
-  color: string
-  level: number
-  parentId?: string
-  departmentId?: string
-  children: Category[]
-}
+import { CategorySelectorWrapper } from '@/features/category-selection'
 
 interface User {
   id: string
@@ -92,7 +82,6 @@ export default function CreateTicketPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const { toast } = useToast()
-  const [categories, setCategories] = useState<Category[]>([])
   const [clients, setClients] = useState<User[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -100,26 +89,6 @@ export default function CreateTicketPage() {
   const [selectedClient, setSelectedClient] = useState<User | null>(null)
   const [loadError, setLoadError] = useState('')
   const [createdTicketId, setCreatedTicketId] = useState<string | null>(null)
-  
-  // Estados para selección en cascada de categorías
-  const [selectedCategories, setSelectedCategories] = useState<{
-    level1?: string
-    level2?: string
-    level3?: string
-    level4?: string
-  }>({})
-  const [availableCategories, setAvailableCategories] = useState<{
-    level1: Category[]
-    level2: Category[]
-    level3: Category[]
-    level4: Category[]
-  }>({
-    level1: [],
-    level2: [],
-    level3: [],
-    level4: []
-  })
-  const [filterByDepartment, setFilterByDepartment] = useState(false)
   
   // Estados para archivos
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
@@ -140,6 +109,9 @@ export default function CreateTicketPage() {
 
   const selectedPriority = watch('priority')
   const selectedCategoryId = watch('categoryId')
+  const ticketTitle = watch('title')
+  const ticketDescription = watch('description')
+  const clientId = watch('clientId')
 
   useEffect(() => {
     if (status === 'loading') return
@@ -154,65 +126,14 @@ export default function CreateTicketPage() {
       return
     }
 
-    // Solo cargar datos cuando la sesión esté confirmada
-    loadData()
+    // Cargar clientes
+    loadClients()
   }, [session, status, router])
 
-  // Función para construir estructura jerárquica de categorías
-  const buildCategoryTree = (flatCategories: any[]): Category[] => {
-    // Crear un mapa de categorías por ID
-    const categoryMap = new Map<string, Category>()
-    
-    // Primero, crear todas las categorías con children vacío
-    flatCategories.forEach(cat => {
-      categoryMap.set(cat.id, {
-        ...cat,
-        children: []
-      })
-    })
-    
-    // Luego, construir la jerarquía
-    const rootCategories: Category[] = []
-    
-    flatCategories.forEach(cat => {
-      const category = categoryMap.get(cat.id)!
-      
-      if (cat.parentId) {
-        // Si tiene padre, agregarlo a los children del padre
-        const parent = categoryMap.get(cat.parentId)
-        if (parent) {
-          parent.children.push(category)
-        }
-      } else {
-        // Si no tiene padre, es una categoría raíz
-        rootCategories.push(category)
-      }
-    })
-    
-    return rootCategories
-  }
-
-  const loadData = async () => {
+  const loadClients = async () => {
     try {
       setLoadError('')
       
-      // Cargar categorías
-      const categoriesResponse = await fetch('/api/categories?isActive=true')
-      
-      if (categoriesResponse.ok) {
-        const result = await categoriesResponse.json()
-        if (result.success && result.data) {
-          // Construir árbol jerárquico
-          const categoryTree = buildCategoryTree(result.data)
-          console.log('📊 Category tree built:', categoryTree)
-          setCategories(categoryTree)
-          updateAvailableCategories(categoryTree, null)
-        }
-      } else {
-        setLoadError('Error al cargar las categorías')
-      }
-
-      // Cargar clientes
       const clientsResponse = await fetch('/api/users?role=CLIENT&isActive=true')
       
       if (clientsResponse.ok) {
@@ -224,117 +145,10 @@ export default function CreateTicketPage() {
         setLoadError('Error al cargar los clientes')
       }
     } catch (error) {
-      console.error('Error loading data:', error)
+      console.error('Error loading clients:', error)
       setLoadError('Error de conexión al cargar los datos')
     } finally {
       setIsLoading(false)
-    }
-  }
-
-  // Actualizar categorías disponibles basado en filtros
-  const updateAvailableCategories = (allCategories: Category[], departmentId: string | null) => {
-    let filteredCategories = allCategories
-
-    // Filtrar por departamento si está habilitado y hay un departamento seleccionado
-    if (filterByDepartment && departmentId) {
-      filteredCategories = allCategories.filter(cat => 
-        !cat.departmentId || cat.departmentId === departmentId
-      )
-    }
-
-    // Obtener categorías de nivel 1
-    const level1Categories = filteredCategories.filter((cat: Category) => cat.level === 1)
-    
-    setAvailableCategories({
-      level1: level1Categories,
-      level2: [],
-      level3: [],
-      level4: []
-    })
-    
-    // Resetear selecciones
-    setSelectedCategories({})
-    setValue('categoryId', '')
-  }
-
-  // Manejar selección de categoría en cascada
-  const handleCategorySelect = (level: number, categoryId: string) => {
-    const findCategory = (cats: Category[], id: string): Category | null => {
-      for (const cat of cats) {
-        if (cat.id === id) return cat
-        if (cat.children && cat.children.length > 0) {
-          const found = findCategory(cat.children, id)
-          if (found) return found
-        }
-      }
-      return null
-    }
-
-    const selectedCat = findCategory(categories, categoryId)
-    if (!selectedCat) {
-      console.warn('Category not found:', categoryId)
-      return
-    }
-
-    console.log('Selected category:', selectedCat)
-    console.log('Children:', selectedCat.children)
-
-    // Actualizar selecciones
-    const newSelections = { ...selectedCategories }
-    
-    if (level === 1) {
-      newSelections.level1 = categoryId
-      newSelections.level2 = undefined
-      newSelections.level3 = undefined
-      newSelections.level4 = undefined
-      
-      // Actualizar categorías disponibles para nivel 2
-      const level2Categories = selectedCat.children || []
-      console.log('Level 2 categories available:', level2Categories.length)
-      
-      setAvailableCategories(prev => ({
-        ...prev,
-        level2: level2Categories,
-        level3: [],
-        level4: []
-      }))
-    } else if (level === 2) {
-      newSelections.level2 = categoryId
-      newSelections.level3 = undefined
-      newSelections.level4 = undefined
-      
-      // Actualizar categorías disponibles para nivel 3
-      const level3Categories = selectedCat.children || []
-      console.log('Level 3 categories available:', level3Categories.length)
-      
-      setAvailableCategories(prev => ({
-        ...prev,
-        level3: level3Categories,
-        level4: []
-      }))
-    } else if (level === 3) {
-      newSelections.level3 = categoryId
-      newSelections.level4 = undefined
-      
-      // Actualizar categorías disponibles para nivel 4
-      const level4Categories = selectedCat.children || []
-      console.log('Level 4 categories available:', level4Categories.length)
-      
-      setAvailableCategories(prev => ({
-        ...prev,
-        level4: level4Categories
-      }))
-    } else if (level === 4) {
-      newSelections.level4 = categoryId
-    }
-
-    setSelectedCategories(newSelections)
-    
-    // Actualizar el valor del formulario con la categoría más específica seleccionada
-    const finalCategoryId = newSelections.level4 || newSelections.level3 || newSelections.level2 || newSelections.level1
-    if (finalCategoryId) {
-      setValue('categoryId', finalCategoryId)
-      console.log('Final category ID set:', finalCategoryId)
     }
   }
 
@@ -449,34 +263,6 @@ export default function CreateTicketPage() {
     const client = clients.find(c => c.id === clientId)
     setSelectedClient(client || null)
     setValue('clientId', clientId)
-    
-    // Si el filtro por departamento está activo, actualizar categorías disponibles
-    if (filterByDepartment && client?.department) {
-      const departmentId = typeof client.department === 'object' ? client.department.id : null
-      updateAvailableCategories(categories, departmentId)
-    }
-  }
-
-  const selectedCategory = getFinalCategory()
-
-  // Función para obtener la categoría final seleccionada
-  function getFinalCategory() {
-    const finalId = selectedCategories.level4 || selectedCategories.level3 || selectedCategories.level2 || selectedCategories.level1
-    if (!finalId) return null
-    
-    // Buscar en todas las categorías
-    const findCategory = (cats: Category[]): Category | null => {
-      for (const cat of cats) {
-        if (cat.id === finalId) return cat
-        if (cat.children && cat.children.length > 0) {
-          const found = findCategory(cat.children)
-          if (found) return found
-        }
-      }
-      return null
-    }
-    
-    return findCategory(categories)
   }
 
   if (status === 'loading' || isLoading) {
@@ -619,258 +405,83 @@ export default function CreateTicketPage() {
                         <Textarea
                           id='description'
                           placeholder='Proporciona todos los detalles relevantes sobre el problema o solicitud. Incluye pasos para reproducir el problema, mensajes de error, etc.'
-                          rows={8}
+                          rows={6}
                           {...register('description')}
                           className={errors.description ? 'border-red-500' : ''}
                         />
                         {errors.description && (
                           <p className='text-sm text-red-600'>{errors.description.message}</p>
                         )}
-                        <div className='text-xs text-muted-foreground space-y-1'>
-                          <p><strong>Incluye:</strong></p>
-                          <ul className='list-disc list-inside ml-2 space-y-1'>
-                            <li>Pasos detallados para reproducir el problema</li>
-                            <li>Mensajes de error exactos (si los hay)</li>
-                            <li>Navegador y sistema operativo</li>
-                            <li>Comportamiento esperado vs. actual</li>
-                          </ul>
+                      </div>
+
+                      {/* Prioridad */}
+                      <div className='space-y-2'>
+                        <Label htmlFor='priority' className='flex items-center'>
+                          <AlertCircle className='h-4 w-4 mr-2' />
+                          Prioridad *
+                        </Label>
+                        <Select
+                          value={selectedPriority}
+                          onValueChange={value => setValue('priority', value as TicketPriority)}
+                        >
+                          <SelectTrigger className={errors.priority ? 'border-red-500' : ''}>
+                            <SelectValue placeholder='Selecciona la prioridad' />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(priorityLabels).map(([value, label]) => (
+                              <SelectItem key={value} value={value}>
+                                <div className='flex items-center space-x-2'>
+                                  <div
+                                    className={`w-3 h-3 rounded-full ${
+                                      value === 'LOW'
+                                        ? 'bg-green-500'
+                                        : value === 'MEDIUM'
+                                          ? 'bg-yellow-500'
+                                          : value === 'HIGH'
+                                            ? 'bg-orange-500'
+                                            : 'bg-red-500'
+                                    }`}
+                                  />
+                                  <span>{label}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {errors.priority && (
+                          <p className='text-sm text-red-600'>{errors.priority.message}</p>
+                        )}
+                        {selectedPriority && (
+                          <div className={`p-3 rounded-lg text-xs ${priorityColors[selectedPriority as keyof typeof priorityColors]}`}>
+                            <strong>{priorityLabels[selectedPriority as keyof typeof priorityLabels]}:</strong> {priorityDescriptions[selectedPriority as keyof typeof priorityDescriptions]}
+                          </div>
+                        )}
+                      </div>
+
+                      <Separator className='my-6' />
+
+                      {/* Selector de Categorías Mejorado - ANCHO COMPLETO CON MÁS ESPACIO */}
+                      <div className='space-y-2'>
+                        <Label className='flex items-center text-base font-semibold'>
+                          <Tag className='h-5 w-5 mr-2' />
+                          Categoría del Ticket *
+                        </Label>
+                        <p className='text-sm text-muted-foreground mb-3'>
+                          Selecciona la categoría más específica que describa el problema. Puedes usar la búsqueda (Ctrl+K) o navegar por el árbol.
+                        </p>
+                        <div className='border rounded-lg p-4 bg-muted/30'>
+                          <CategorySelectorWrapper
+                            value={selectedCategoryId}
+                            onChange={(categoryId) => setValue('categoryId', categoryId)}
+                            ticketTitle={ticketTitle || ''}
+                            ticketDescription={ticketDescription || ''}
+                            clientId={clientId || ''}
+                            error={errors.categoryId?.message}
+                          />
                         </div>
                       </div>
 
-                      <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
-                        {/* Prioridad */}
-                        <div className='space-y-2'>
-                          <Label htmlFor='priority' className='flex items-center'>
-                            <AlertCircle className='h-4 w-4 mr-2' />
-                            Prioridad *
-                          </Label>
-                          <Select
-                            value={selectedPriority}
-                            onValueChange={value => setValue('priority', value as TicketPriority)}
-                          >
-                            <SelectTrigger className={errors.priority ? 'border-red-500' : ''}>
-                              <SelectValue placeholder='Selecciona la prioridad' />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {Object.entries(priorityLabels).map(([value, label]) => (
-                                <SelectItem key={value} value={value}>
-                                  <div className='flex items-center space-x-2'>
-                                    <div
-                                      className={`w-3 h-3 rounded-full ${
-                                        value === 'LOW'
-                                          ? 'bg-green-500'
-                                          : value === 'MEDIUM'
-                                            ? 'bg-yellow-500'
-                                            : value === 'HIGH'
-                                              ? 'bg-orange-500'
-                                              : 'bg-red-500'
-                                      }`}
-                                    />
-                                    <span>{label}</span>
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {errors.priority && (
-                            <p className='text-sm text-red-600'>{errors.priority.message}</p>
-                          )}
-                          {selectedPriority && (
-                            <div className={`p-3 rounded-lg text-xs ${priorityColors[selectedPriority as keyof typeof priorityColors]}`}>
-                              <strong>{priorityLabels[selectedPriority as keyof typeof priorityLabels]}:</strong> {priorityDescriptions[selectedPriority as keyof typeof priorityDescriptions]}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Categorías en Cascada */}
-                        <div className='space-y-4'>
-                          <div className='flex items-center justify-between'>
-                            <Label className='flex items-center'>
-                              <Tag className='h-4 w-4 mr-2' />
-                              Categoría del Ticket *
-                            </Label>
-                            {selectedClient?.department && (
-                              <div className='flex items-center space-x-2'>
-                                <input
-                                  type='checkbox'
-                                  id='filter-by-department'
-                                  checked={filterByDepartment}
-                                  onChange={(e) => {
-                                    setFilterByDepartment(e.target.checked)
-                                    const departmentId = typeof selectedClient.department === 'object' 
-                                      ? selectedClient.department.id 
-                                      : null
-                                    updateAvailableCategories(categories, e.target.checked ? departmentId : null)
-                                  }}
-                                  className='rounded'
-                                />
-                                <Label htmlFor='filter-by-department' className='text-xs text-muted-foreground cursor-pointer'>
-                                  Filtrar por departamento del cliente
-                                </Label>
-                              </div>
-                            )}
-                          </div>
-                          
-                          {/* Nivel 1 - Categoría Principal */}
-                          <div className='space-y-2'>
-                            <Label htmlFor='category-level-1' className='text-sm font-medium'>
-                              1. Categoría Principal
-                            </Label>
-                            <Select 
-                              value={selectedCategories.level1 || ''} 
-                              onValueChange={(value) => handleCategorySelect(1, value)}
-                            >
-                              <SelectTrigger className={errors.categoryId && !selectedCategories.level1 ? 'border-red-500' : ''}>
-                                <SelectValue placeholder='Selecciona la categoría principal' />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {availableCategories.level1.map(category => (
-                                  <SelectItem key={category.id} value={category.id}>
-                                    <div className='flex items-center space-x-2'>
-                                      <div
-                                        className='w-3 h-3 rounded-full flex-shrink-0'
-                                        style={{ backgroundColor: category.color }}
-                                      />
-                                      <span>{category.name}</span>
-                                    </div>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          {/* Nivel 2 - Subcategoría */}
-                          {selectedCategories.level1 && availableCategories.level2.length > 0 && (
-                            <div className='space-y-2 pl-4 border-l-2 border-blue-200'>
-                              <Label htmlFor='category-level-2' className='text-sm font-medium'>
-                                2. Subcategoría
-                              </Label>
-                              <Select 
-                                value={selectedCategories.level2 || ''} 
-                                onValueChange={(value) => handleCategorySelect(2, value)}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder='Selecciona la subcategoría' />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {availableCategories.level2.map(category => (
-                                    <SelectItem key={category.id} value={category.id}>
-                                      <div className='flex items-center space-x-2'>
-                                        <div
-                                          className='w-3 h-3 rounded-full flex-shrink-0'
-                                          style={{ backgroundColor: category.color }}
-                                        />
-                                        <span>{category.name}</span>
-                                      </div>
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          )}
-
-                          {/* Nivel 3 - Especialidad */}
-                          {selectedCategories.level2 && availableCategories.level3.length > 0 && (
-                            <div className='space-y-2 pl-8 border-l-2 border-green-200'>
-                              <Label htmlFor='category-level-3' className='text-sm font-medium'>
-                                3. Especialidad
-                              </Label>
-                              <Select 
-                                value={selectedCategories.level3 || ''} 
-                                onValueChange={(value) => handleCategorySelect(3, value)}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder='Selecciona la especialidad' />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {availableCategories.level3.map(category => (
-                                    <SelectItem key={category.id} value={category.id}>
-                                      <div className='flex items-center space-x-2'>
-                                        <div
-                                          className='w-3 h-3 rounded-full flex-shrink-0'
-                                          style={{ backgroundColor: category.color }}
-                                        />
-                                        <span>{category.name}</span>
-                                      </div>
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          )}
-
-                          {/* Nivel 4 - Detalle */}
-                          {selectedCategories.level3 && availableCategories.level4.length > 0 && (
-                            <div className='space-y-2 pl-12 border-l-2 border-purple-200'>
-                              <Label htmlFor='category-level-4' className='text-sm font-medium'>
-                                4. Detalle Específico
-                              </Label>
-                              <Select 
-                                value={selectedCategories.level4 || ''} 
-                                onValueChange={(value) => handleCategorySelect(4, value)}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder='Selecciona el detalle específico' />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {availableCategories.level4.map(category => (
-                                    <SelectItem key={category.id} value={category.id}>
-                                      <div className='flex items-center space-x-2'>
-                                        <div
-                                          className='w-3 h-3 rounded-full flex-shrink-0'
-                                          style={{ backgroundColor: category.color }}
-                                        />
-                                        <span>{category.name}</span>
-                                      </div>
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          )}
-
-                          {/* Mensaje de error */}
-                          {errors.categoryId && (
-                            <p className='text-sm text-red-600'>{errors.categoryId.message}</p>
-                          )}
-                          
-                          {/* Descripción de la categoría seleccionada */}
-                          {selectedCategory && selectedCategory.description && (
-                            <div className='p-3 bg-blue-50 border border-blue-200 rounded-lg'>
-                              <p className='text-xs font-medium text-blue-900 mb-1'>Descripción:</p>
-                              <p className='text-xs text-blue-700'>{selectedCategory.description}</p>
-                            </div>
-                          )}
-                          
-                          {/* Ruta de navegación de categorías */}
-                          {selectedCategories.level1 && (
-                            <div className='p-3 bg-muted rounded-lg'>
-                              <p className='text-xs font-medium text-foreground mb-1'>Ruta seleccionada:</p>
-                              <div className='flex items-center space-x-2 text-xs text-muted-foreground'>
-                                {availableCategories.level1.find(c => c.id === selectedCategories.level1)?.name}
-                                {selectedCategories.level2 && (
-                                  <>
-                                    <span>→</span>
-                                    {availableCategories.level2.find(c => c.id === selectedCategories.level2)?.name}
-                                  </>
-                                )}
-                                {selectedCategories.level3 && (
-                                  <>
-                                    <span>→</span>
-                                    {availableCategories.level3.find(c => c.id === selectedCategories.level3)?.name}
-                                  </>
-                                )}
-                                {selectedCategories.level4 && (
-                                  <>
-                                    <span>→</span>
-                                    {availableCategories.level4.find(c => c.id === selectedCategories.level4)?.name}
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                      <Separator className='my-6' />
 
                       {/* Archivos Adjuntos */}
                       <div className='space-y-2'>
@@ -994,32 +605,12 @@ export default function CreateTicketPage() {
                         
                         <div>
                           <Label className='text-sm font-medium text-muted-foreground'>Categoría</Label>
-                          {selectedCategory && (
-                            <div className='space-y-2'>
-                              <div className='flex items-center space-x-2'>
-                                <div
-                                  className='w-3 h-3 rounded-full'
-                                  style={{ backgroundColor: selectedCategory.color }}
-                                />
-                                <span className='text-sm font-medium'>{selectedCategory.name}</span>
-                              </div>
-                              {/* Mostrar ruta completa */}
-                              {selectedCategories.level1 && (
-                                <div className='p-2 bg-muted rounded text-xs text-muted-foreground'>
-                                  <strong>Ruta:</strong>{' '}
-                                  {availableCategories.level1.find(c => c.id === selectedCategories.level1)?.name}
-                                  {selectedCategories.level2 && (
-                                    <> → {availableCategories.level2.find(c => c.id === selectedCategories.level2)?.name}</>
-                                  )}
-                                  {selectedCategories.level3 && (
-                                    <> → {availableCategories.level3.find(c => c.id === selectedCategories.level3)?.name}</>
-                                  )}
-                                  {selectedCategories.level4 && (
-                                    <> → {availableCategories.level4.find(c => c.id === selectedCategories.level4)?.name}</>
-                                  )}
-                                </div>
-                              )}
-                            </div>
+                          {selectedCategoryId ? (
+                            <Badge variant="outline">
+                              Categoría seleccionada
+                            </Badge>
+                          ) : (
+                            <p className='text-sm text-muted-foreground'>Sin categoría</p>
                           )}
                         </div>
                       </div>

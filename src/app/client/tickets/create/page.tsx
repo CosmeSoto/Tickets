@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Separator } from '@/components/ui/separator'
 import { createTicketSchema, CreateTicketData } from '@/lib/schemas/ticket-schemas'
 import { TicketPriority } from '@prisma/client'
 import { 
@@ -38,16 +39,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/hooks/use-toast'
-
-interface Category {
-  id: string
-  name: string
-  description?: string
-  color: string
-  level: number
-  parentId?: string
-  children: Category[]
-}
+import { CategorySelectorWrapper } from '@/features/category-selection'
 
 const priorityLabels = {
   LOW: 'Baja',
@@ -74,31 +66,10 @@ export default function CreateClientTicketPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const { toast } = useToast()
-  const [categories, setCategories] = useState<Category[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
-  const [loadError, setLoadError] = useState('')
   const [createdTicketId, setCreatedTicketId] = useState<string | null>(null)
-  
-  // Estados para selección en cascada de categorías
-  const [selectedCategories, setSelectedCategories] = useState<{
-    level1?: string
-    level2?: string
-    level3?: string
-    level4?: string
-  }>({})
-  const [availableCategories, setAvailableCategories] = useState<{
-    level1: Category[]
-    level2: Category[]
-    level3: Category[]
-    level4: Category[]
-  }>({
-    level1: [],
-    level2: [],
-    level3: [],
-    level4: []
-  })
   
   // Estados para archivos
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
@@ -114,11 +85,14 @@ export default function CreateClientTicketPage() {
     resolver: zodResolver(createTicketSchema),
     defaultValues: {
       priority: TicketPriority.MEDIUM,
-      clientId: session?.user?.id, // Auto-asignar el cliente actual
+      clientId: session?.user?.id,
     },
   })
 
   const selectedPriority = watch('priority')
+  const selectedCategoryId = watch('categoryId')
+  const ticketTitle = watch('title')
+  const ticketDescription = watch('description')
 
   useEffect(() => {
     if (status === 'loading') return
@@ -135,98 +109,7 @@ export default function CreateClientTicketPage() {
 
     // Auto-asignar el clientId
     setValue('clientId', session.user.id)
-
-    // Cargar categorías
-    loadCategories()
   }, [session, status, router, setValue])
-
-  const loadCategories = async () => {
-    try {
-      setLoadError('')
-      
-      const response = await fetch('/api/categories?isActive=true')
-      
-      if (response.ok) {
-        const result = await response.json()
-        if (result.success && result.data) {
-          setCategories(result.data)
-          // Obtener categorías de nivel 1
-          const level1Categories = result.data.filter((cat: Category) => cat.level === 1)
-          setAvailableCategories(prev => ({
-            ...prev,
-            level1: level1Categories
-          }))
-        }
-      } else {
-        setLoadError('Error al cargar las categorías')
-      }
-    } catch (error) {
-      console.error('Error loading categories:', error)
-      setLoadError('Error de conexión al cargar las categorías')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // Manejar selección de categoría en cascada
-  const handleCategorySelect = (level: number, categoryId: string) => {
-    const findCategory = (cats: Category[], id: string): Category | null => {
-      for (const cat of cats) {
-        if (cat.id === id) return cat
-        if (cat.children && cat.children.length > 0) {
-          const found = findCategory(cat.children, id)
-          if (found) return found
-        }
-      }
-      return null
-    }
-
-    const selectedCat = findCategory(categories, categoryId)
-    if (!selectedCat) return
-
-    const newSelections = { ...selectedCategories }
-    
-    if (level === 1) {
-      newSelections.level1 = categoryId
-      newSelections.level2 = undefined
-      newSelections.level3 = undefined
-      newSelections.level4 = undefined
-      
-      setAvailableCategories(prev => ({
-        ...prev,
-        level2: selectedCat.children || [],
-        level3: [],
-        level4: []
-      }))
-    } else if (level === 2) {
-      newSelections.level2 = categoryId
-      newSelections.level3 = undefined
-      newSelections.level4 = undefined
-      
-      setAvailableCategories(prev => ({
-        ...prev,
-        level3: selectedCat.children || [],
-        level4: []
-      }))
-    } else if (level === 3) {
-      newSelections.level3 = categoryId
-      newSelections.level4 = undefined
-      
-      setAvailableCategories(prev => ({
-        ...prev,
-        level4: selectedCat.children || []
-      }))
-    } else if (level === 4) {
-      newSelections.level4 = categoryId
-    }
-
-    setSelectedCategories(newSelections)
-    
-    const finalCategoryId = newSelections.level4 || newSelections.level3 || newSelections.level2 || newSelections.level1
-    if (finalCategoryId) {
-      setValue('categoryId', finalCategoryId)
-    }
-  }
 
   // Manejar selección de archivos
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -330,7 +213,7 @@ export default function CreateClientTicketPage() {
     }
   }
 
-  if (status === 'loading' || isLoading) {
+  if (status === 'loading') {
     return (
       <RoleDashboardLayout title='Crear Ticket' subtitle='Nueva solicitud de soporte'>
         <div className='flex items-center justify-center h-64'>
@@ -385,13 +268,6 @@ export default function CreateClientTicketPage() {
       headerActions={headerActions}
     >
       <div className='max-w-4xl mx-auto'>
-        {loadError && (
-          <Alert variant='destructive' className='mb-6'>
-            <AlertCircle className='h-4 w-4' />
-            <AlertDescription>{loadError}</AlertDescription>
-          </Alert>
-        )}
-        
         <Card>
           <CardHeader>
             <CardTitle className='flex items-center'>
@@ -422,7 +298,7 @@ export default function CreateClientTicketPage() {
                 <Textarea
                   id='description'
                   placeholder='Proporciona todos los detalles relevantes sobre tu problema. Incluye pasos para reproducirlo, mensajes de error, etc.'
-                  rows={8}
+                  rows={6}
                   {...register('description')}
                   className={errors.description ? 'border-red-500' : ''}
                 />
@@ -431,170 +307,71 @@ export default function CreateClientTicketPage() {
                 )}
               </div>
 
-              <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
-                {/* Prioridad */}
-                <div className='space-y-2'>
-                  <Label htmlFor='priority'>Prioridad *</Label>
-                  <Select
-                    value={selectedPriority}
-                    onValueChange={value => setValue('priority', value as TicketPriority)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(priorityLabels).map(([value, label]) => (
-                        <SelectItem key={value} value={value}>
-                          <div className='flex items-center space-x-2'>
-                            <div
-                              className={`w-3 h-3 rounded-full ${
-                                value === 'LOW'
-                                  ? 'bg-green-500'
-                                  : value === 'MEDIUM'
-                                    ? 'bg-yellow-500'
-                                    : value === 'HIGH'
-                                      ? 'bg-orange-500'
-                                      : 'bg-red-500'
-                              }`}
-                            />
-                            <span>{label}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {selectedPriority && (
-                    <div className={`p-3 rounded-lg text-xs ${priorityColors[selectedPriority as keyof typeof priorityColors]}`}>
-                      <strong>{priorityLabels[selectedPriority as keyof typeof priorityLabels]}:</strong> {priorityDescriptions[selectedPriority as keyof typeof priorityDescriptions]}
-                    </div>
-                  )}
-                </div>
-
-                {/* Categorías */}
-                <div className='space-y-4'>
-                  <Label>Categoría *</Label>
-                  
-                  {/* Nivel 1 */}
-                  <div className='space-y-2'>
-                    <Label htmlFor='category-level-1' className='text-sm'>
-                      1. Categoría Principal
-                    </Label>
-                    <Select 
-                      value={selectedCategories.level1 || ''} 
-                      onValueChange={(value) => handleCategorySelect(1, value)}
-                    >
-                      <SelectTrigger className={errors.categoryId && !selectedCategories.level1 ? 'border-red-500' : ''}>
-                        <SelectValue placeholder='Selecciona una categoría' />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableCategories.level1.map(category => (
-                          <SelectItem key={category.id} value={category.id}>
-                            <div className='flex items-center space-x-2'>
-                              <div
-                                className='w-3 h-3 rounded-full'
-                                style={{ backgroundColor: category.color }}
-                              />
-                              <span>{category.name}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+              {/* Prioridad - Movida antes de Categoría */}
+              <div className='space-y-2'>
+                <Label htmlFor='priority' className='flex items-center'>
+                  <Zap className='h-4 w-4 mr-2' />
+                  Prioridad *
+                </Label>
+                <Select
+                  value={selectedPriority}
+                  onValueChange={value => setValue('priority', value as TicketPriority)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(priorityLabels).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        <div className='flex items-center space-x-2'>
+                          <div
+                            className={`w-3 h-3 rounded-full ${
+                              value === 'LOW'
+                                ? 'bg-green-500'
+                                : value === 'MEDIUM'
+                                  ? 'bg-yellow-500'
+                                  : value === 'HIGH'
+                                    ? 'bg-orange-500'
+                                    : 'bg-red-500'
+                            }`}
+                          />
+                          <span>{label}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedPriority && (
+                  <div className={`p-3 rounded-lg text-xs ${priorityColors[selectedPriority as keyof typeof priorityColors]}`}>
+                    <strong>{priorityLabels[selectedPriority as keyof typeof priorityLabels]}:</strong> {priorityDescriptions[selectedPriority as keyof typeof priorityDescriptions]}
                   </div>
+                )}
+              </div>
 
-                  {/* Nivel 2 */}
-                  {selectedCategories.level1 && availableCategories.level2.length > 0 && (
-                    <div className='space-y-2 pl-4 border-l-2 border-primary/20'>
-                      <Label htmlFor='category-level-2' className='text-sm'>
-                        2. Subcategoría
-                      </Label>
-                      <Select 
-                        value={selectedCategories.level2 || ''} 
-                        onValueChange={(value) => handleCategorySelect(2, value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder='Selecciona una subcategoría' />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableCategories.level2.map(category => (
-                            <SelectItem key={category.id} value={category.id}>
-                              <div className='flex items-center space-x-2'>
-                                <div
-                                  className='w-3 h-3 rounded-full'
-                                  style={{ backgroundColor: category.color }}
-                                />
-                                <span>{category.name}</span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
+              <Separator className='my-6' />
 
-                  {/* Nivel 3 */}
-                  {selectedCategories.level2 && availableCategories.level3.length > 0 && (
-                    <div className='space-y-2 pl-8 border-l-2 border-primary/20'>
-                      <Label htmlFor='category-level-3' className='text-sm'>
-                        3. Especialidad
-                      </Label>
-                      <Select 
-                        value={selectedCategories.level3 || ''} 
-                        onValueChange={(value) => handleCategorySelect(3, value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder='Selecciona una especialidad' />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableCategories.level3.map(category => (
-                            <SelectItem key={category.id} value={category.id}>
-                              <div className='flex items-center space-x-2'>
-                                <div
-                                  className='w-3 h-3 rounded-full'
-                                  style={{ backgroundColor: category.color }}
-                                />
-                                <span>{category.name}</span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-
-                  {/* Nivel 4 */}
-                  {selectedCategories.level3 && availableCategories.level4.length > 0 && (
-                    <div className='space-y-2 pl-12 border-l-2 border-primary/20'>
-                      <Label htmlFor='category-level-4' className='text-sm'>
-                        4. Detalle
-                      </Label>
-                      <Select 
-                        value={selectedCategories.level4 || ''} 
-                        onValueChange={(value) => handleCategorySelect(4, value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder='Selecciona el detalle' />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableCategories.level4.map(category => (
-                            <SelectItem key={category.id} value={category.id}>
-                              <div className='flex items-center space-x-2'>
-                                <div
-                                  className='w-3 h-3 rounded-full'
-                                  style={{ backgroundColor: category.color }}
-                                />
-                                <span>{category.name}</span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                  
-                  {errors.categoryId && <p className='text-sm text-red-600'>{errors.categoryId.message}</p>}
+              {/* Selector de Categorías Mejorado - ANCHO COMPLETO CON MÁS ESPACIO */}
+              <div className='space-y-2'>
+                <Label className='flex items-center text-base font-semibold'>
+                  <Tag className='h-5 w-5 mr-2' />
+                  Categoría *
+                </Label>
+                <p className='text-sm text-muted-foreground mb-3'>
+                  Selecciona la categoría que mejor describa tu problema. Usa la búsqueda (Ctrl+K) para encontrarla rápidamente.
+                </p>
+                <div className='border rounded-lg p-4 bg-muted/30'>
+                  <CategorySelectorWrapper
+                    value={selectedCategoryId}
+                    onChange={(categoryId) => setValue('categoryId', categoryId)}
+                    ticketTitle={ticketTitle || ''}
+                    ticketDescription={ticketDescription || ''}
+                    clientId={session?.user?.id || ''}
+                    error={errors.categoryId?.message}
+                  />
                 </div>
               </div>
+
+              <Separator className='my-6' />
 
               {/* Archivos Adjuntos */}
               <div className='space-y-2'>
