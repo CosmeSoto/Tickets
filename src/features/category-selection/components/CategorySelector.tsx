@@ -50,6 +50,8 @@ export interface CategorySelectorProps {
   error?: string;
   disabled?: boolean;
   className?: string;
+  showFrequentCategories?: boolean; // Nueva prop para controlar si se muestran categorías frecuentes
+  showSuggestions?: boolean; // Nueva prop para controlar si se muestran sugerencias
 }
 
 /**
@@ -125,6 +127,8 @@ export function CategorySelector({
   error,
   disabled = false,
   className,
+  showFrequentCategories = true,
+  showSuggestions = true,
 }: CategorySelectorProps) {
   // State management
   const [state, setState] = useState<CategorySelectorState>({
@@ -497,7 +501,7 @@ export function CategorySelector({
       </div>
 
       {/* Frequent categories - compact */}
-      {!isLoadingFrequent && frequentCategories.length > 0 && (
+      {showFrequentCategories && !isLoadingFrequent && frequentCategories.length > 0 && (
         <FrequentCategories
           frequentCategories={frequentCategories}
           onSelect={handleFrequentSelect}
@@ -507,7 +511,7 @@ export function CategorySelector({
       )}
 
       {/* Suggestions - compact */}
-      {(ticketTitle || ticketDescription) && (
+      {showSuggestions && (ticketTitle || ticketDescription) && (
         <SuggestionEngine
           title={ticketTitle}
           description={ticketDescription}

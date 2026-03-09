@@ -379,6 +379,11 @@ export function SimpleCategoryAssignment({
             }))}
             ticketTitle=""
             ticketDescription=""
+            showFrequentCategories={false}
+            showSuggestions={false}
+          />
+        </div>
+            ticketDescription=""
           />
         </div>
 

@@ -232,13 +232,14 @@ export function TechnicianFormDialog({
     setFormData(prev => ({
       ...prev,
       assignedCategories: [
-        ...prev.assignedCategories,
+        // Nueva categoría al PRINCIPIO
         {
           categoryId: '',
           priority: 2, // Regular por defecto
           maxTickets: 10,
           autoAssign: true
-        }
+        },
+        ...prev.assignedCategories
       ]
     }))
   }
