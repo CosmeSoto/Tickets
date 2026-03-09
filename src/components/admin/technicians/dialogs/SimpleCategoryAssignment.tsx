@@ -18,6 +18,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Plus, X, Shield, Users, Zap, AlertCircle } from 'lucide-react'
+import { CategorySelector } from '@/features/category-selection/components/CategorySelector'
 import type { Category } from '@/types/technicians'
 
 interface CategoryAssignment {
@@ -144,35 +145,26 @@ export function SimpleCategoryAssignment({
                         </Button>
                       </div>
 
-                      {/* Selector de categoría */}
+                      {/* Selector de categoría - Búsqueda Avanzada */}
                       <div>
-                        <Label className="text-xs font-medium">Categoría *</Label>
-                        <Select
+                        <Label className="text-xs font-medium mb-2 block">Categoría *</Label>
+                        <CategorySelector
                           value={assignment.categoryId}
-                          onValueChange={(value) => onUpdate(index, 'categoryId', value)}
-                        >
-                          <SelectTrigger className={errors[`assignedCategories[${index}].categoryId`] ? 'border-red-500' : ''}>
-                            <SelectValue placeholder="Seleccionar categoría" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableCategories.map(cat => (
-                              <SelectItem key={cat.id} value={cat.id}>
-                                <div className="flex items-center space-x-2">
-                                  <div 
-                                    className="w-3 h-3 rounded-full" 
-                                    style={{ backgroundColor: cat.color }}
-                                  />
-                                  <span>{cat.name}</span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {errors[`assignedCategories[${index}].categoryId`] && (
-                          <p className="text-xs text-red-500 mt-1">
-                            {errors[`assignedCategories[${index}].categoryId`]}
-                          </p>
-                        )}
+                          onChange={(categoryId) => onUpdate(index, 'categoryId', categoryId)}
+                          clientId="admin"
+                          categories={availableCategories.map(cat => ({
+                            id: cat.id,
+                            name: cat.name,
+                            description: cat.description || '',
+                            parentId: cat.parentId || null,
+                            level: cat.level || 1,
+                            isActive: cat.isActive !== false,
+                            color: cat.color || '#6B7280'
+                          }))}
+                          error={errors[`assignedCategories[${index}].categoryId`]}
+                          ticketTitle=""
+                          ticketDescription=""
+                        />
                       </div>
 
                       {/* Nivel de prioridad - SIMPLE */}
