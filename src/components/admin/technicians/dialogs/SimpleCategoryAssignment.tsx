@@ -5,6 +5,7 @@
 
 'use client'
 
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
@@ -15,9 +16,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Plus, X, Shield, Users, Zap, AlertCircle } from 'lucide-react'
+import { Plus, X, Shield, Users, Zap, AlertCircle, Search } from 'lucide-react'
 import { CategorySelector } from '@/features/category-selection/components/CategorySelector'
 import type { Category } from '@/types/technicians'
 
@@ -76,29 +84,51 @@ export function SimpleCategoryAssignment({
   onRemove,
   onUpdate
 }: Props) {
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <CardTitle className="text-lg">Categorías de Trabajo</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Selecciona en qué categorías trabajará este técnico
-            </p>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onAdd}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Agregar Categoría
-          </Button>
-        </div>
-      </CardHeader>
+  const [editingIndex, setEditingIndex] = useState<number | null>(null)
+  const [tempCategoryId, setTempCategoryId] = useState<string>('')
 
-      <CardContent>
+  const handleOpenSelector = (index: number) => {
+    setEditingIndex(index)
+    setTempCategoryId(assignments[index].categoryId)
+  }
+
+  const handleConfirmCategory = () => {
+    if (editingIndex !== null && tempCategoryId) {
+      onUpdate(editingIndex, 'categoryId', tempCategoryId)
+      setEditingIndex(null)
+      setTempCategoryId('')
+    }
+  }
+
+  const handleCancelSelection = () => {
+    setEditingIndex(null)
+    setTempCategoryId('')
+  }
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <CardTitle className="text-lg">Categorías de Trabajo</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Selecciona en qué categorías trabajará este técnico
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onAdd}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Agregar Categoría
+            </Button>
+          </div>
+        </CardHeader>
+
+        <CardContent>
         {assignments.length === 0 ? (
           <div className="text-center py-8 space-y-3 border-2 border-dashed rounded-lg">
             <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground/50" />
@@ -145,26 +175,51 @@ export function SimpleCategoryAssignment({
                         </Button>
                       </div>
 
-                      {/* Selector de categoría - Búsqueda Avanzada */}
+                      {/* Selector de categoría - Compacto con Modal */}
                       <div>
                         <Label className="text-xs font-medium mb-2 block">Categoría *</Label>
-                        <CategorySelector
-                          value={assignment.categoryId}
-                          onChange={(categoryId) => onUpdate(index, 'categoryId', categoryId)}
-                          clientId="admin"
-                          categories={availableCategories.map(cat => ({
-                            id: cat.id,
-                            name: cat.name,
-                            description: cat.description || '',
-                            parentId: cat.parentId || null,
-                            level: cat.level || 1,
-                            isActive: cat.isActive !== false,
-                            color: cat.color || '#6B7280'
-                          }))}
-                          error={errors[`assignedCategories[${index}].categoryId`]}
-                          ticketTitle=""
-                          ticketDescription=""
-                        />
+                        {assignment.categoryId ? (
+                          // Mostrar categoría seleccionada de forma compacta
+                          <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                            <div className="flex items-center space-x-2 flex-1 min-w-0">
+                              {category && (
+                                <div 
+                                  className="w-3 h-3 rounded-full flex-shrink-0" 
+                                  style={{ backgroundColor: category.color }}
+                                />
+                              )}
+                              <span className="text-sm font-medium truncate">
+                                {category?.name || 'Categoría seleccionada'}
+                              </span>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleOpenSelector(index)}
+                              className="flex-shrink-0"
+                            >
+                              <Search className="h-4 w-4 mr-1" />
+                              Cambiar
+                            </Button>
+                          </div>
+                        ) : (
+                          // Botón para abrir selector cuando no hay categoría
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full justify-start text-muted-foreground border-dashed"
+                            onClick={() => handleOpenSelector(index)}
+                          >
+                            <Search className="h-4 w-4 mr-2" />
+                            Seleccionar categoría
+                          </Button>
+                        )}
+                        {errors[`assignedCategories[${index}].categoryId`] && (
+                          <p className="text-xs text-red-500 mt-1">
+                            {errors[`assignedCategories[${index}].categoryId`]}
+                          </p>
+                        )}
                       </div>
 
                       {/* Nivel de prioridad - SIMPLE */}
@@ -294,5 +349,57 @@ export function SimpleCategoryAssignment({
         )}
       </CardContent>
     </Card>
+
+    {/* Modal para seleccionar categoría */}
+    <Dialog open={editingIndex !== null} onOpenChange={(open) => !open && handleCancelSelection()}>
+      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Search className="h-5 w-5" />
+            Seleccionar Categoría
+          </DialogTitle>
+          <DialogDescription>
+            Busca y selecciona la categoría en la que trabajará el técnico
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="py-4">
+          <CategorySelector
+            value={tempCategoryId}
+            onChange={setTempCategoryId}
+            clientId="admin"
+            categories={availableCategories.map(cat => ({
+              id: cat.id,
+              name: cat.name,
+              description: cat.description || '',
+              parentId: cat.parentId || null,
+              level: cat.level || 1,
+              isActive: cat.isActive !== false,
+              color: cat.color || '#6B7280'
+            }))}
+            ticketTitle=""
+            ticketDescription=""
+          />
+        </div>
+
+        <div className="flex justify-end gap-2 pt-4 border-t">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleCancelSelection}
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            onClick={handleConfirmCategory}
+            disabled={!tempCategoryId}
+          >
+            Confirmar Categoría
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  </>
   )
 }
