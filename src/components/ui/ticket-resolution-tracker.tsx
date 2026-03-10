@@ -219,7 +219,9 @@ export function TicketResolutionTracker({
 
       const data = await response.json()
       if (data.success) {
-        setPlan(data.data)
+        // Recargar el plan completo desde el servidor
+        await loadResolutionPlan()
+        
         setShowCreatePlan(false)
         setPlanForm({
           title: '',
@@ -232,8 +234,8 @@ export function TicketResolutionTracker({
         })
         toast({
           title: "Plan de resolución creado",
-          description: `Plan creado con ${estimatedHours ? estimatedHours.toFixed(1) + ' horas estimadas' : 'éxito'}`,
-          duration: 4000
+          description: `Plan creado con ${estimatedHours ? estimatedHours.toFixed(1) + ' horas estimadas' : 'éxito'}. Se ha notificado al cliente.`,
+          duration: 5000
         })
       }
     } catch (err) {
