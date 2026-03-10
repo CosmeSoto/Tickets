@@ -100,7 +100,7 @@ export default function AdminKnowledgeDetailPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           title: article.title,
-          description: article.summary || article.content.substring(0, 200),
+          description: article.summary || article.content?.substring(0, 200) || '',
           categoryId: article.categoryId,
           limit: 3 
         }),
@@ -111,6 +111,8 @@ export default function AdminKnowledgeDetailPage() {
         // Filtrar el artículo actual de los resultados
         const filtered = (data.articles || []).filter((a: Article) => a.id !== article.id)
         setSimilarArticles(filtered)
+      } else {
+        console.error('Error loading similar articles:', response.status, response.statusText)
       }
     } catch (err) {
       console.error('Error loading similar articles:', err)
