@@ -665,6 +665,16 @@ export async function PATCH(
           updateData.completedDate = new Date()
         }
 
+        // Calcular actualHours automáticamente si no se proporciona
+        if (body.actualHours === undefined) {
+          const completedDate = updateData.completedDate || new Date()
+          const startDate = existingPlan.startDate || existingPlan.createdAt
+          const actualMs = completedDate.getTime() - startDate.getTime()
+          const actualHours = Math.round((actualMs / (1000 * 60 * 60)) * 10) / 10
+          updateData.actualHours = actualHours
+          changes.actualHours = { old: existingPlan.actualHours, new: actualHours }
+        }
+
         // Obtener tareas actuales para el mensaje
         const tasks = await prisma.resolution_tasks.findMany({
           where: { planId: existingPlan.id }
