@@ -12,6 +12,7 @@ import {
   Circle, 
   Clock, 
   AlertTriangle, 
+  AlertCircle,
   Plus, 
   Edit2, 
   Trash2,
@@ -177,6 +178,26 @@ export function TicketResolutionTracker({
         targetDate = new Date(`${planForm.targetDate}T${planForm.targetTime}:00`).toISOString()
       }
 
+      // Calcular automáticamente las horas estimadas si hay fechas
+      let estimatedHours = undefined
+      if (startDate && targetDate) {
+        const start = new Date(startDate)
+        const target = new Date(targetDate)
+        const diffMs = target.getTime() - start.getTime()
+        const diffHours = diffMs / (1000 * 60 * 60)
+        
+        if (diffHours > 0) {
+          estimatedHours = parseFloat(diffHours.toFixed(1))
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Fechas inválidas",
+            description: "La fecha objetivo debe ser posterior a la fecha de inicio"
+          })
+          return
+        }
+      }
+
       const response = await fetch(`/api/tickets/${ticketId}/resolution-plan`, {
         method: 'POST',
         headers: {
@@ -187,7 +208,7 @@ export function TicketResolutionTracker({
           description: planForm.description.trim() || undefined,
           startDate,
           targetDate,
-          estimatedHours: planForm.estimatedHours ? parseFloat(planForm.estimatedHours) : undefined
+          estimatedHours
         })
       })
 
@@ -211,7 +232,7 @@ export function TicketResolutionTracker({
         })
         toast({
           title: "Plan de resolución creado",
-          description: "Ahora puedes agregar tareas para organizar el trabajo de este ticket",
+          description: `Plan creado con ${estimatedHours ? estimatedHours.toFixed(1) + ' horas estimadas' : 'éxito'}`,
           duration: 4000
         })
       }
@@ -645,49 +666,101 @@ export function TicketResolutionTracker({
                   <div>
                     <label className="text-sm font-medium">Fecha de Inicio</label>
                     <div className="grid grid-cols-2 gap-2">
-                      <Input
-                        type="date"
-                        value={planForm.startDate}
-                        onChange={(e) => setPlanForm(prev => ({ ...prev, startDate: e.target.value }))}
-                      />
-                      <Input
-                        type="time"
-                        value={planForm.startTime}
-                        onChange={(e) => setPlanForm(prev => ({ ...prev, startTime: e.target.value }))}
-                        placeholder="HH:MM"
-                      />
+                      <div className="relative">
+                        <Input
+                          type="date"
+                          value={planForm.startDate}
+                          onChange={(e) => setPlanForm(prev => ({ ...prev, startDate: e.target.value }))}
+                          className="pr-10"
+                        />
+                        <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                      </div>
+                      <div className="relative">
+                        <Input
+                          type="time"
+                          value={planForm.startTime}
+                          onChange={(e) => setPlanForm(prev => ({ ...prev, startTime: e.target.value }))}
+                          placeholder="HH:MM"
+                          className="pr-10"
+                        />
+                        <Clock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                      </div>
                     </div>
                   </div>
 
                   <div>
                     <label className="text-sm font-medium">Fecha Objetivo</label>
                     <div className="grid grid-cols-2 gap-2">
-                      <Input
-                        type="date"
-                        value={planForm.targetDate}
-                        onChange={(e) => setPlanForm(prev => ({ ...prev, targetDate: e.target.value }))}
-                      />
-                      <Input
-                        type="time"
-                        value={planForm.targetTime}
-                        onChange={(e) => setPlanForm(prev => ({ ...prev, targetTime: e.target.value }))}
-                        placeholder="HH:MM"
-                      />
+                      <div className="relative">
+                        <Input
+                          type="date"
+                          value={planForm.targetDate}
+                          onChange={(e) => setPlanForm(prev => ({ ...prev, targetDate: e.target.value }))}
+                          className="pr-10"
+                        />
+                        <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                      </div>
+                      <div className="relative">
+                        <Input
+                          type="time"
+                          value={planForm.targetTime}
+                          onChange={(e) => setPlanForm(prev => ({ ...prev, targetTime: e.target.value }))}
+                          placeholder="HH:MM"
+                          className="pr-10"
+                        />
+                        <Clock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-sm font-medium">Horas Estimadas Totales</label>
-                  <Input
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    placeholder="Ej: 8 (8 horas)"
-                    value={planForm.estimatedHours}
-                    onChange={(e) => setPlanForm(prev => ({ ...prev, estimatedHours: e.target.value }))}
-                  />
-                </div>
+                {/* Cálculo automático de horas estimadas */}
+                {planForm.startDate && planForm.startTime && planForm.targetDate && planForm.targetTime && (() => {
+                  const start = new Date(`${planForm.startDate}T${planForm.startTime}`)
+                  const target = new Date(`${planForm.targetDate}T${planForm.targetTime}`)
+                  const diffMs = target.getTime() - start.getTime()
+                  const diffHours = diffMs / (1000 * 60 * 60)
+                  
+                  if (diffHours > 0) {
+                    return (
+                      <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                        <div className="flex items-center space-x-2">
+                          <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                          <div>
+                            <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                              Horas Estimadas Totales: {diffHours.toFixed(1)} horas
+                            </p>
+                            <p className="text-xs text-blue-700 dark:text-blue-300">
+                              Calculado automáticamente desde {start.toLocaleString('es-ES', { 
+                                day: '2-digit', 
+                                month: 'short', 
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                              })} hasta {target.toLocaleString('es-ES', { 
+                                day: '2-digit', 
+                                month: 'short', 
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                              })}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  } else if (diffHours < 0) {
+                    return (
+                      <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                        <div className="flex items-center space-x-2">
+                          <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                          <p className="text-sm text-red-900 dark:text-red-100">
+                            La fecha objetivo debe ser posterior a la fecha de inicio
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  }
+                  return null
+                })()}
 
                 <div className="flex items-center space-x-2 pt-2">
                   <Button onClick={createResolutionPlan}>
