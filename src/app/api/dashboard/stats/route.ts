@@ -298,18 +298,38 @@ export async function GET(request: NextRequest) {
           select: { rating: true }
         }),
         // Estadísticas de mis planes de resolución
-        prisma.resolution_plans.aggregate({
-          where: {
-            tickets: { assigneeId: userId }
-          },
-          _count: { id: true },
-          _avg: { 
-            estimatedHours: true,
-            actualHours: true,
-            completedTasks: true,
-            totalTasks: true
+        (async () => {
+          const myTickets = await prisma.tickets.findMany({
+            where: { assigneeId: userId },
+            select: { id: true }
+          })
+          const myTicketIds = myTickets.map(t => t.id)
+          
+          if (myTicketIds.length === 0) {
+            return {
+              _count: { id: 0 },
+              _avg: {
+                estimatedHours: null,
+                actualHours: null,
+                completedTasks: null,
+                totalTasks: null
+              }
+            }
           }
-        }),
+          
+          return prisma.resolution_plans.aggregate({
+            where: {
+              ticketId: { in: myTicketIds }
+            },
+            _count: { id: true },
+            _avg: { 
+              estimatedHours: true,
+              actualHours: true,
+              completedTasks: true,
+              totalTasks: true
+            }
+          })
+        })(),
         // Calcular mi tiempo promedio de primera respuesta
         calculateAvgResponseTime()
       ])
