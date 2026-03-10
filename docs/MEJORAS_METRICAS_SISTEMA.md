@@ -141,6 +141,108 @@ const taskCompletionRate = plansStats._avg.totalTasks && plansStats._avg.complet
 }
 ```
 
+### 4. Visualización en Dashboards
+
+**Archivos:** 
+- `src/app/admin/page.tsx`
+- `src/app/technician/page.tsx`
+
+#### Dashboard de Administrador
+
+Se agregó una segunda fila de métricas que muestra información de planes de resolución:
+
+```tsx
+{stats.resolutionPlans && stats.resolutionPlans.total > 0 && (
+  <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8'>
+    <SymmetricStatsCard
+      title='Planes Creados'
+      value={stats.resolutionPlans.total}
+      icon={FileText}
+      color='blue'
+      badge={{ text: 'Total', variant: 'secondary' }}
+    />
+    <SymmetricStatsCard
+      title='Tiempo Estimado Promedio'
+      value={`${stats.resolutionPlans.avgEstimatedHours}h`}
+      icon={Calendar}
+      color='green'
+      badge={{ text: 'Planificado', variant: 'default' }}
+    />
+    <SymmetricStatsCard
+      title='Tiempo Real Promedio'
+      value={`${stats.resolutionPlans.avgActualHours}h`}
+      icon={Clock}
+      color='orange'
+      badge={{ text: 'Ejecutado', variant: 'default' }}
+    />
+    <SymmetricStatsCard
+      title='Eficiencia de Planes'
+      value={`${stats.resolutionPlans.efficiency}%`}
+      icon={Activity}
+      color='purple'
+      status={efficiency >= 90 ? 'success' : efficiency >= 70 ? 'normal' : 'warning'}
+      badge={{ text: `${taskCompletionRate}% tareas`, variant: 'default' }}
+    />
+  </div>
+)}
+```
+
+**Características:**
+- Solo se muestra si hay planes creados
+- Usa componentes existentes (SymmetricStatsCard)
+- Indicadores de estado por color según eficiencia
+- Badges informativos con contexto adicional
+
+#### Dashboard de Técnico
+
+Se agregó una segunda fila de métricas personales:
+
+```tsx
+{stats.myResolutionPlans && stats.myResolutionPlans.total > 0 && (
+  <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8'>
+    <SymmetricStatsCard
+      title='Mis Planes Creados'
+      value={stats.myResolutionPlans.total}
+      icon={FileText}
+      color='blue'
+      role='TECHNICIAN'
+      badge={{ text: 'Total', variant: 'secondary' }}
+    />
+    <SymmetricStatsCard
+      title='Tiempo Estimado'
+      value={`${stats.myResolutionPlans.avgEstimatedHours}h`}
+      icon={Calendar}
+      color='green'
+      role='TECHNICIAN'
+      badge={{ text: 'Promedio', variant: 'default' }}
+    />
+    <SymmetricStatsCard
+      title='Tiempo Real'
+      value={`${stats.myResolutionPlans.avgActualHours}h`}
+      icon={Clock}
+      color='orange'
+      role='TECHNICIAN'
+      badge={{ text: 'Promedio', variant: 'default' }}
+    />
+    <SymmetricStatsCard
+      title='Mi Eficiencia'
+      value={`${stats.myResolutionPlans.efficiency}%`}
+      icon={Target}
+      color='purple'
+      role='TECHNICIAN'
+      status={efficiency >= 90 ? 'success' : efficiency >= 70 ? 'normal' : 'warning'}
+      badge={{ text: `${taskCompletionRate}% tareas`, variant: 'default' }}
+    />
+  </div>
+)}
+```
+
+**Características:**
+- Métricas personales del técnico
+- Mismo diseño que admin para consistencia
+- Indicadores visuales de rendimiento
+- Información contextual en badges
+
 ## Beneficios por Rol
 
 ### Para Administradores
@@ -378,7 +480,12 @@ El sistema ahora proporciona las herramientas necesarias para:
 ---
 
 **Desarrollado por:** Kiro AI Assistant  
-**Commits:** 3 (Artículos, Dashboard Admin, Dashboard Técnico)  
-**Archivos modificados:** 2  
-**Líneas agregadas:** ~200  
+**Commits:** 5 (Artículos, Dashboard Stats API, Dashboard Admin UI, Dashboard Técnico UI, Documentación)  
+**Archivos modificados:** 4
+- `src/app/api/tickets/[id]/create-article/route.ts` (métricas en artículos)
+- `src/app/api/dashboard/stats/route.ts` (métricas de planes en API)
+- `src/app/admin/page.tsx` (visualización admin)
+- `src/app/technician/page.tsx` (visualización técnico)
+
+**Líneas agregadas:** ~300  
 **Estado:** ✅ Completado y probado

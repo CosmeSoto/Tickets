@@ -111,6 +111,51 @@ export default function TechnicianDashboard() {
         />
       </div>
 
+      {/* Métricas de Mis Planes de Resolución */}
+      {stats.myResolutionPlans && stats.myResolutionPlans.total > 0 && (
+        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8'>
+          <SymmetricStatsCard
+            title='Mis Planes Creados'
+            value={stats.myResolutionPlans.total}
+            icon={FileText}
+            color='blue'
+            role='TECHNICIAN'
+            badge={{ text: 'Total', variant: 'secondary' }}
+          />
+
+          <SymmetricStatsCard
+            title='Tiempo Estimado'
+            value={`${stats.myResolutionPlans.avgEstimatedHours}h`}
+            icon={Calendar}
+            color='green'
+            role='TECHNICIAN'
+            badge={{ text: 'Promedio', variant: 'default' }}
+          />
+
+          <SymmetricStatsCard
+            title='Tiempo Real'
+            value={`${stats.myResolutionPlans.avgActualHours}h`}
+            icon={Clock}
+            color='orange'
+            role='TECHNICIAN'
+            badge={{ text: 'Promedio', variant: 'default' }}
+          />
+
+          <SymmetricStatsCard
+            title='Mi Eficiencia'
+            value={`${stats.myResolutionPlans.efficiency}%`}
+            icon={Target}
+            color='purple'
+            role='TECHNICIAN'
+            status={stats.myResolutionPlans.efficiency >= 90 ? 'success' : stats.myResolutionPlans.efficiency >= 70 ? 'normal' : 'warning'}
+            badge={{ 
+              text: `${stats.myResolutionPlans.taskCompletionRate}% tareas`, 
+              variant: 'default' 
+            }}
+          />
+        </div>
+      )}
+
       <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
         {/* Tickets Asignados */}
         <div className='lg:col-span-2'>

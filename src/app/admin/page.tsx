@@ -146,6 +146,47 @@ export default function AdminDashboard() {
         />
       </div>
 
+      {/* Métricas de Planes de Resolución */}
+      {stats.resolutionPlans && stats.resolutionPlans.total > 0 && (
+        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8'>
+          <SymmetricStatsCard
+            title='Planes Creados'
+            value={stats.resolutionPlans.total}
+            icon={FileText}
+            color='blue'
+            badge={{ text: 'Total', variant: 'secondary' }}
+          />
+
+          <SymmetricStatsCard
+            title='Tiempo Estimado Promedio'
+            value={`${stats.resolutionPlans.avgEstimatedHours}h`}
+            icon={Calendar}
+            color='green'
+            badge={{ text: 'Planificado', variant: 'default' }}
+          />
+
+          <SymmetricStatsCard
+            title='Tiempo Real Promedio'
+            value={`${stats.resolutionPlans.avgActualHours}h`}
+            icon={Clock}
+            color='orange'
+            badge={{ text: 'Ejecutado', variant: 'default' }}
+          />
+
+          <SymmetricStatsCard
+            title='Eficiencia de Planes'
+            value={`${stats.resolutionPlans.efficiency}%`}
+            icon={Activity}
+            color='purple'
+            status={stats.resolutionPlans.efficiency >= 90 ? 'success' : stats.resolutionPlans.efficiency >= 70 ? 'normal' : 'warning'}
+            badge={{ 
+              text: `${stats.resolutionPlans.taskCompletionRate}% tareas`, 
+              variant: 'default' 
+            }}
+          />
+        </div>
+      )}
+
       <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
         {/* Quick Actions */}
         <div className='lg:col-span-2'>
