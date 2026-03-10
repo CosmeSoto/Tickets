@@ -17,7 +17,9 @@ import {
   Star,
   Send,
   Paperclip,
-  Upload
+  Upload,
+  Calendar,
+  Target
 } from 'lucide-react'
 import { useTimeline, type TimelineEvent } from '@/hooks/use-timeline'
 import { formatTimeAgo } from '@/hooks/use-ticket-data'
@@ -145,52 +147,94 @@ export function TicketTimeline({
       
       case 'resolution_plan':
         return (
-          <div className="mt-2 space-y-2 p-3 bg-indigo-50 dark:bg-indigo-950 rounded-lg border border-indigo-200 dark:border-indigo-800">
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              {metadata.startDate && (
+          <div className="mt-3 space-y-3 p-4 bg-indigo-50 dark:bg-indigo-950 rounded-lg border border-indigo-200 dark:border-indigo-800">
+            {metadata.planTitle && (
+              <div className="flex items-start space-x-2">
+                <FileText className="h-5 w-5 text-indigo-600 dark:text-indigo-400 mt-0.5" />
                 <div>
-                  <span className="text-muted-foreground">Inicio programado:</span>
-                  <div className="font-medium text-indigo-700 dark:text-indigo-300">
-                    {new Date(metadata.startDate).toLocaleString('es-ES', {
-                      day: '2-digit',
-                      month: 'short',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
+                  <p className="font-semibold text-indigo-900 dark:text-indigo-100">
+                    {metadata.planTitle}
+                  </p>
+                </div>
+              </div>
+            )}
+            
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              {metadata.startDate && (
+                <div className="flex items-center space-x-2">
+                  <Calendar className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                  <div>
+                    <span className="text-muted-foreground block text-xs">Inicio programado</span>
+                    <div className="font-medium text-indigo-700 dark:text-indigo-300">
+                      {new Date(metadata.startDate).toLocaleString('es-ES', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </div>
                   </div>
                 </div>
               )}
               {metadata.targetDate && (
-                <div>
-                  <span className="text-muted-foreground">Fecha objetivo:</span>
-                  <div className="font-medium text-indigo-700 dark:text-indigo-300">
-                    {new Date(metadata.targetDate).toLocaleString('es-ES', {
-                      day: '2-digit',
-                      month: 'short',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
+                <div className="flex items-center space-x-2">
+                  <Target className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                  <div>
+                    <span className="text-muted-foreground block text-xs">Fecha objetivo</span>
+                    <div className="font-medium text-indigo-700 dark:text-indigo-300">
+                      {new Date(metadata.targetDate).toLocaleString('es-ES', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </div>
                   </div>
                 </div>
               )}
               {metadata.estimatedHours && (
-                <div>
-                  <span className="text-muted-foreground">Horas estimadas:</span>
-                  <div className="font-medium">{metadata.estimatedHours}h</div>
+                <div className="flex items-center space-x-2">
+                  <Clock className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                  <div>
+                    <span className="text-muted-foreground block text-xs">Horas estimadas</span>
+                    <div className="font-medium">{metadata.estimatedHours}h</div>
+                  </div>
                 </div>
               )}
               {metadata.totalTasks !== undefined && (
-                <div>
-                  <span className="text-muted-foreground">Tareas totales:</span>
-                  <div className="font-medium">{metadata.totalTasks}</div>
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                  <div>
+                    <span className="text-muted-foreground block text-xs">Tareas</span>
+                    <div className="font-medium">
+                      {metadata.completedTasks || 0} de {metadata.totalTasks}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
-            <Badge variant="outline" className="text-xs">
-              Estado: {metadata.status}
-            </Badge>
+            
+            {metadata.status && (
+              <div className="flex items-center space-x-2 pt-2 border-t border-indigo-200 dark:border-indigo-800">
+                <Badge 
+                  variant={metadata.status === 'completed' ? 'default' : 'outline'} 
+                  className={`text-xs ${
+                    metadata.status === 'completed' 
+                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
+                      : metadata.status === 'active'
+                      ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                      : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+                  }`}
+                >
+                  {metadata.status === 'draft' && '📝 Borrador'}
+                  {metadata.status === 'active' && '🔄 Activo'}
+                  {metadata.status === 'completed' && '✅ Completado'}
+                  {metadata.status === 'cancelled' && '❌ Cancelado'}
+                </Badge>
+              </div>
+            )}
           </div>
         )
       

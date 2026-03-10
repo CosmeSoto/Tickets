@@ -78,8 +78,8 @@ export async function GET(
       const baseEvent = {
         id: entry.id,
         type: mapActionToType(entry.action),
-        title: entry.description || generateTitle(entry.action, entry.field),
-        description: entry.description,
+        title: generateTitle(entry.action, entry.field, entry.newValue, entry.oldValue),
+        description: generateDescription(entry.action, entry.description, entry.newValue, entry.oldValue),
         user: entry.users
           ? {
               id: entry.users.id,
@@ -90,10 +90,7 @@ export async function GET(
             }
           : null,
         createdAt: entry.createdAt.toISOString(),
-        metadata: {
-          oldValue: entry.oldValue,
-          newValue: entry.newValue,
-        }
+        metadata: parseMetadata(entry.action, entry.newValue, entry.oldValue)
       }
 
       return baseEvent
@@ -123,6 +120,7 @@ function mapActionToType(action: string): string {
     'comment_added': 'comment',
     'resolution_plan_created': 'resolution_plan',
     'resolution_plan_updated': 'resolution_plan',
+    'resolution_plan_completed': 'resolution_plan',
     'resolution_plan_deleted': 'resolution_plan',
     'resolution_task_created': 'resolution_task',
     'resolution_task_updated': 'resolution_task',
@@ -134,8 +132,8 @@ function mapActionToType(action: string): string {
   return mapping[action] || 'created'
 }
 
-// Generar título basado en la acción
-function generateTitle(action: string, field: string | null): string {
+// Generar título descriptivo basado en la acción
+function generateTitle(action: string, field: string | null, newValue: string | null, oldValue: string | null): string {
   const titles: Record<string, string> = {
     'created': 'Ticket creado',
     'status_changed': 'Estado actualizado',
@@ -143,15 +141,71 @@ function generateTitle(action: string, field: string | null): string {
     'unassigned': 'Ticket desasignado',
     'priority_changed': 'Prioridad cambiada',
     'comment_added': 'Comentario agregado',
-    'resolution_plan_created': 'Plan de resolución creado',
-    'resolution_plan_updated': 'Plan de resolución actualizado',
-    'resolution_plan_deleted': 'Plan de resolución eliminado',
-    'resolution_task_created': 'Tarea agregada',
-    'resolution_task_updated': 'Tarea actualizada',
-    'resolution_task_deleted': 'Tarea eliminada',
-    'rating_submitted': 'Calificación enviada',
+    'resolution_plan_created': '📋 Plan de resolución creado',
+    'resolution_plan_updated': '📋 Plan de resolución actualizado',
+    'resolution_plan_completed': '✅ Plan de resolución completado',
+    'resolution_plan_deleted': '🗑️ Plan de resolución eliminado',
+    'resolution_task_created': '✓ Nueva tarea agregada',
+    'resolution_task_updated': '✓ Tarea actualizada',
+    'resolution_task_deleted': '✓ Tarea eliminada',
+    'rating_submitted': '⭐ Calificación recibida',
     'resolved': 'Ticket resuelto',
   }
   
   return titles[action] || `Cambio en ${field || 'ticket'}`
+}
+
+// Generar descripción detallada
+function generateDescription(action: string, originalDescription: string | null, newValue: string | null, oldValue: string | null): string {
+  // Si ya hay una descripción, usarla
+  if (originalDescription) {
+    return originalDescription
+  }
+
+  // Generar descripción basada en la acción
+  switch (action) {
+    case 'resolution_plan_created':
+      return `Se ha creado un plan de resolución: "${newValue}". El técnico ha estructurado un plan de trabajo para resolver este ticket de manera organizada.`
+    
+    case 'resolution_plan_completed':
+      return `El plan de resolución "${oldValue}" ha sido completado exitosamente. Todas las tareas programadas han sido finalizadas.`
+    
+    case 'resolution_plan_deleted':
+      return `El plan de resolución "${oldValue}" ha sido eliminado del ticket.`
+    
+    case 'assigned':
+      return `El ticket ha sido asignado a un técnico para su atención.`
+    
+    case 'unassigned':
+      return `El ticket ha sido desasignado y está disponible para reasignación.`
+    
+    case 'status_changed':
+      return `El estado del ticket cambió de "${oldValue}" a "${newValue}".`
+    
+    case 'priority_changed':
+      return `La prioridad del ticket cambió de "${oldValue}" a "${newValue}".`
+    
+    default:
+      return ''
+  }
+}
+
+// Parsear metadata para eventos específicos
+function parseMetadata(action: string, newValue: string | null, oldValue: string | null): any {
+  const metadata: any = {
+    oldValue,
+    newValue
+  }
+
+  // Para planes de resolución, intentar parsear información adicional
+  if (action.includes('resolution_plan') && newValue) {
+    try {
+      // El newValue podría contener el título del plan
+      metadata.planTitle = newValue
+    } catch (e) {
+      // Ignorar errores de parsing
+    }
+  }
+
+  return metadata
 }
