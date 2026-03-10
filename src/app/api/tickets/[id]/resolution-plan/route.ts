@@ -273,7 +273,7 @@ export async function POST(
       }
     )
 
-    // Crear entrada en el historial del ticket
+    // Crear entrada en el historial del ticket (sin comment para evitar redundancia)
     try {
       await prisma.ticket_history.create({
         data: {
@@ -284,7 +284,7 @@ export async function POST(
           field: 'resolution_plan',
           oldValue: null,
           newValue: plan.title,
-          comment: `Plan de resolución creado: "${plan.title}"${plan.startDate ? `. Inicio: ${new Date(plan.startDate).toLocaleDateString('es-ES')}` : ''}${plan.targetDate ? `. Objetivo: ${new Date(plan.targetDate).toLocaleDateString('es-ES')}` : ''}`,
+          comment: null,
           createdAt: new Date()
         }
       })
@@ -336,7 +336,7 @@ export async function POST(
         data: {
           id: randomUUID(),
           userId: ticket.clientId,
-          type: 'RESOLUTION_PLAN_CREATED',
+          type: 'INFO',
           title: 'Plan de resolución creado',
           message,
           ticketId,
@@ -693,7 +693,7 @@ export async function PATCH(
             data: {
               id: randomUUID(),
               userId: existingPlan.ticket.clientId,
-              type: 'RESOLUTION_PLAN_COMPLETED',
+              type: 'SUCCESS',
               title: 'Plan de resolución completado',
               message: `El plan de resolución "${existingPlan.title}" ha sido completado. ${completedTasks} de ${totalTasks} tareas fueron finalizadas.`,
               ticketId,
