@@ -17,7 +17,6 @@ import {
   Edit2, 
   Trash2,
   PlayCircle,
-  PauseCircle,
   Target,
   Calendar,
   User,
@@ -99,21 +98,20 @@ interface ResolutionPlan {
 interface TicketResolutionTrackerProps {
   ticketId: string
   canEdit?: boolean
-  mode?: 'technician' | 'admin' | 'client'
 }
 
 export function TicketResolutionTracker({ 
   ticketId, 
-  canEdit = false, 
-  mode = 'technician' 
+  canEdit = false
 }: TicketResolutionTrackerProps) {
   const { toast } = useToast()
   const [plan, setPlan] = useState<ResolutionPlan | null>(null)
   const [loading, setLoading] = useState(true)
-  const [editingTask, setEditingTask] = useState<string | null>(null)
   const [showAddTask, setShowAddTask] = useState(false)
   const [taskToDelete, setTaskToDelete] = useState<string | null>(null)
   const [showCreatePlan, setShowCreatePlan] = useState(false)
+  const [showEditPlan, setShowEditPlan] = useState(false)
+  const [showDeletePlan, setShowDeletePlan] = useState(false)
   const [planForm, setPlanForm] = useState({
     title: '',
     description: '',
@@ -439,47 +437,18 @@ export function TicketResolutionTracker({
     return `${hours} ${hours === 1 ? 'hora' : 'horas'} ${minutes} minutos`
   }
 
-  const calculateElapsedTime = (startDate: string): string => {
-    const start = new Date(startDate)
-    const now = new Date()
-    const diff = now.getTime() - start.getTime()
-    
-    const hours = Math.floor(diff / (1000 * 60 * 60))
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-    
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`
-    }
-    return `${minutes}m`
-  }
-
   const formatDuration = (hours?: number): string => {
     if (!hours) return ''
-    
-    // Si es menos de 1 hora, mostrar en minutos
     if (hours < 1) {
       const minutes = Math.round(hours * 60)
       return `${minutes}m`
     }
-    
-    // Si tiene decimales, mostrar horas y minutos
     const wholeHours = Math.floor(hours)
     const minutes = Math.round((hours - wholeHours) * 60)
-    
     if (minutes > 0) {
       return `${wholeHours}h ${minutes}m`
     }
     return `${wholeHours}h`
-  }
-
-  const formatDateTime = (date: string): string => {
-    return new Date(date).toLocaleString('es-ES', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
   }
 
   const formatDate = (date: string): string => {
@@ -588,6 +557,155 @@ export function TicketResolutionTracker({
   const calculateProgress = () => {
     if (!plan || plan.totalTasks === 0) return 0
     return Math.round((plan.completedTasks / plan.totalTasks) * 100)
+  }
+
+  const updatePlan = async () => {
+    if (!planForm.title.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Título requerido",
+        description: "Debes ingresar un título para el plan"
+      })
+      return
+    }
+
+    try {
+      let startDate = null
+      if (planForm.startDate && planForm.startTime) {
+        startDate = new Date(`${planForm.startDate}T${planForm.startTime}:00`).toISOString()
+      }
+
+      let targetDate = null
+      if (planForm.targetDate && planForm.targetTime) {
+        targetDate = new Date(`${planForm.targetDate}T${planForm.targetTime}:00`).toISOString()
+      }
+
+      let estimatedHours = undefined
+      if (startDate && targetDate) {
+        const start = new Date(startDate)
+        const target = new Date(targetDate)
+        const diffMs = target.getTime() - start.getTime()
+        const diffHours = diffMs / (1000 * 60 * 60)
+        
+        if (diffHours > 0) {
+          estimatedHours = parseFloat(diffHours.toFixed(1))
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Fechas inválidas",
+            description: "La fecha objetivo debe ser posterior a la fecha de inicio"
+          })
+          return
+        }
+      }
+
+      const response = await fetch(`/api/tickets/${ticketId}/resolution-plan`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          title: planForm.title.trim(),
+          description: planForm.description.trim() || undefined,
+          startDate,
+          targetDate,
+          estimatedHours
+        })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || 'Error al actualizar plan')
+      }
+
+      const data = await response.json()
+      if (data.success) {
+        await loadResolutionPlan()
+        setShowEditPlan(false)
+        toast({
+          title: "Plan actualizado",
+          description: "El plan de resolución ha sido actualizado exitosamente"
+        })
+      }
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Error al actualizar plan",
+        description: err instanceof Error ? err.message : "No se pudo actualizar el plan"
+      })
+    }
+  }
+
+  const deletePlan = async () => {
+    try {
+      const response = await fetch(`/api/tickets/${ticketId}/resolution-plan`, {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || 'Error al eliminar plan')
+      }
+
+      const data = await response.json()
+      if (data.success) {
+        setPlan(null)
+        setShowDeletePlan(false)
+        toast({
+          title: "Plan eliminado",
+          description: "El plan de resolución ha sido eliminado permanentemente"
+        })
+      }
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Error al eliminar plan",
+        description: err instanceof Error ? err.message : "No se pudo eliminar el plan"
+      })
+    }
+  }
+
+  const activatePlan = async () => {
+    try {
+      const response = await fetch(`/api/tickets/${ticketId}/resolution-plan`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          status: 'active'
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Error al activar plan')
+      }
+
+      const data = await response.json()
+      if (data.success) {
+        await loadResolutionPlan()
+        toast({
+          title: "Plan activado",
+          description: "El plan de resolución está ahora activo"
+        })
+      }
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Error al activar plan",
+        description: "No se pudo activar el plan"
+      })
+    }
+  }
+
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      draft: 'Borrador',
+      active: 'Activo',
+      completed: 'Completado',
+      cancelled: 'Cancelado'
+    }
+    return labels[status] || status
   }
 
   if (loading) {
@@ -779,22 +897,69 @@ export function TicketResolutionTracker({
     )
   }
 
+  // Renderizar plan existente
   return (
     <div className="space-y-6">
       {/* Resumen del plan */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <div>
+            <div className="flex-1">
               <CardTitle className="flex items-center space-x-2">
                 <Target className="h-5 w-5" />
                 <span>{plan.title}</span>
               </CardTitle>
               <CardDescription>{plan.description}</CardDescription>
             </div>
-            <Badge className={getStatusColor(plan.status as any)}>
-              {plan.status}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge className={getStatusColor(plan.status as any)}>
+                {getStatusLabel(plan.status)}
+              </Badge>
+              {canEdit && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {plan.status === 'draft' && (
+                      <>
+                        <DropdownMenuItem onClick={activatePlan}>
+                          <PlayCircle className="h-4 w-4 mr-2" />
+                          Activar Plan
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
+                    <DropdownMenuItem onClick={() => {
+                      // Cargar datos actuales del plan en el formulario
+                      setPlanForm({
+                        title: plan.title,
+                        description: plan.description || '',
+                        startDate: plan.startDate ? new Date(plan.startDate).toISOString().split('T')[0] : '',
+                        startTime: plan.startDate ? new Date(plan.startDate).toTimeString().slice(0, 5) : '',
+                        targetDate: plan.targetDate ? new Date(plan.targetDate).toISOString().split('T')[0] : '',
+                        targetTime: plan.targetDate ? new Date(plan.targetDate).toTimeString().slice(0, 5) : '',
+                        estimatedHours: plan.estimatedHours?.toString() || ''
+                      })
+                      setShowEditPlan(true)
+                    }}>
+                      <Edit2 className="h-4 w-4 mr-2" />
+                      Editar Plan
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem 
+                      onClick={() => setShowDeletePlan(true)}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Eliminar Plan
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -1192,7 +1357,7 @@ export function TicketResolutionTracker({
         </CardContent>
       </Card>
 
-      {/* Diálogo de confirmación de eliminación */}
+      {/* Diálogo de confirmación de eliminación de tarea */}
       <AlertDialog open={!!taskToDelete} onOpenChange={(open) => !open && setTaskToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1220,6 +1385,141 @@ export function TicketResolutionTracker({
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Eliminar Tarea
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Diálogo de edición del plan */}
+      <AlertDialog open={showEditPlan} onOpenChange={setShowEditPlan}>
+        <AlertDialogContent className="max-w-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Editar Plan de Resolución</AlertDialogTitle>
+            <AlertDialogDescription>
+              Actualiza la información del plan de resolución
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium">Título del Plan *</label>
+              <Input
+                placeholder="Ej: Reparación del servidor principal"
+                value={planForm.title}
+                onChange={(e) => setPlanForm(prev => ({ ...prev, title: e.target.value }))}
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Descripción</label>
+              <Textarea
+                placeholder="Describe el plan de trabajo..."
+                value={planForm.description}
+                onChange={(e) => setPlanForm(prev => ({ ...prev, description: e.target.value }))}
+                rows={3}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Fecha de Inicio</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    type="date"
+                    value={planForm.startDate}
+                    onChange={(e) => setPlanForm(prev => ({ ...prev, startDate: e.target.value }))}
+                  />
+                  <Input
+                    type="time"
+                    value={planForm.startTime}
+                    onChange={(e) => setPlanForm(prev => ({ ...prev, startTime: e.target.value }))}
+                    placeholder="HH:MM"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium">Fecha Objetivo</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    type="date"
+                    value={planForm.targetDate}
+                    onChange={(e) => setPlanForm(prev => ({ ...prev, targetDate: e.target.value }))}
+                  />
+                  <Input
+                    type="time"
+                    value={planForm.targetTime}
+                    onChange={(e) => setPlanForm(prev => ({ ...prev, targetTime: e.target.value }))}
+                    placeholder="HH:MM"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {planForm.startDate && planForm.startTime && planForm.targetDate && planForm.targetTime && (() => {
+              const start = new Date(`${planForm.startDate}T${planForm.startTime}`)
+              const target = new Date(`${planForm.targetDate}T${planForm.targetTime}`)
+              const diffMs = target.getTime() - start.getTime()
+              const diffHours = diffMs / (1000 * 60 * 60)
+              
+              if (diffHours > 0) {
+                return (
+                  <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                    <div className="flex items-center space-x-2">
+                      <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <div>
+                        <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                          Horas Estimadas Totales: {diffHours.toFixed(1)} horas
+                        </p>
+                        <p className="text-xs text-blue-700 dark:text-blue-300">
+                          Calculado automáticamente
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              } else if (diffHours < 0) {
+                return (
+                  <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                    <div className="flex items-center space-x-2">
+                      <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                      <p className="text-sm text-red-900 dark:text-red-100">
+                        La fecha objetivo debe ser posterior a la fecha de inicio
+                      </p>
+                    </div>
+                  </div>
+                )
+              }
+              return null
+            })()}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={updatePlan}>
+              Actualizar Plan
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Diálogo de confirmación de eliminación del plan */}
+      <AlertDialog open={showDeletePlan} onOpenChange={setShowDeletePlan}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar plan de resolución?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Estás a punto de eliminar el plan:{' '}
+              <span className="font-semibold text-foreground">"{plan?.title}"</span>
+              <br /><br />
+              Esta acción eliminará el plan y todas sus tareas permanentemente. No se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={deletePlan}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Eliminar Plan Completo
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

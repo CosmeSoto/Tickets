@@ -284,7 +284,7 @@ export async function POST(
           field: 'resolution_plan',
           oldValue: null,
           newValue: plan.title,
-          comment: `Plan de resolución creado: "${plan.title}"${plan.startDate ? `. Inicio: ${new Date(plan.startDate).toLocaleDateString('es-ES')}` : ''}${plan.targetDate ? `. Objetivo: ${new Date(plan.targetDate).toLocaleDateString('es-ES')}` : ''}`,
+          description: `Plan de resolución creado: "${plan.title}"${plan.startDate ? `. Inicio: ${new Date(plan.startDate).toLocaleDateString('es-ES')}` : ''}${plan.targetDate ? `. Objetivo: ${new Date(plan.targetDate).toLocaleDateString('es-ES')}` : ''}`,
           createdAt: new Date()
         }
       })
@@ -476,6 +476,112 @@ export async function POST(
       {
         success: false,
         message: 'Error al crear el plan de resolución',
+        error: error instanceof Error ? error.message : 'Error desconocido'
+      },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * DELETE /api/tickets/[id]/resolution-plan
+ * Elimina un plan de resolución y todas sus tareas
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, message: 'No autorizado' },
+        { status: 401 }
+      )
+    }
+
+    const { id: ticketId } = await params
+
+    // Buscar plan existente
+    const existingPlan = await prisma.resolution_plans.findFirst({
+      where: { ticketId },
+      include: {
+        ticket: true,
+        tasks: true
+      }
+    })
+
+    if (!existingPlan) {
+      return NextResponse.json(
+        { success: false, message: 'Plan de resolución no encontrado' },
+        { status: 404 }
+      )
+    }
+
+    // Verificar permisos
+    const isAdmin = session.user.role === 'ADMIN'
+    const isAssignedTechnician = 
+      session.user.role === 'TECHNICIAN' && 
+      existingPlan.ticket.assigneeId === session.user.id
+
+    if (!isAdmin && !isAssignedTechnician) {
+      return NextResponse.json(
+        { success: false, message: 'No tienes permiso para eliminar este plan' },
+        { status: 403 }
+      )
+    }
+
+    // Eliminar todas las tareas primero
+    await prisma.resolution_tasks.deleteMany({
+      where: { planId: existingPlan.id }
+    })
+
+    // Eliminar el plan
+    await prisma.resolution_plans.delete({
+      where: { id: existingPlan.id }
+    })
+
+    // Auditoría
+    await auditResolutionPlanChange(
+      existingPlan.id,
+      ticketId,
+      session.user.id,
+      'deleted',
+      {
+        title: existingPlan.title,
+        tasksDeleted: existingPlan.tasks.length
+      }
+    )
+
+    // Crear entrada en el historial del ticket
+    try {
+      await prisma.ticket_history.create({
+        data: {
+          id: randomUUID(),
+          ticketId,
+          userId: session.user.id,
+          action: 'resolution_plan_deleted',
+          field: 'resolution_plan',
+          oldValue: existingPlan.title,
+          newValue: null,
+          description: `Plan de resolución eliminado: "${existingPlan.title}" (${existingPlan.tasks.length} tareas)`,
+          createdAt: new Date()
+        }
+      })
+    } catch (historyError) {
+      console.error('[API] Error creating ticket history:', historyError)
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Plan de resolución eliminado exitosamente'
+    })
+  } catch (error) {
+    console.error('[API] Error in resolution plan DELETE:', error)
+    return NextResponse.json(
+      {
+        success: false,
+        message: 'Error al eliminar el plan de resolución',
         error: error instanceof Error ? error.message : 'Error desconocido'
       },
       { status: 500 }
