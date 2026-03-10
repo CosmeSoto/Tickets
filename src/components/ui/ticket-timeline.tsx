@@ -582,7 +582,8 @@ export function TicketTimeline({
                       <p className="text-sm font-medium text-foreground">
                         {event.title}
                       </p>
-                      {event.description && (
+                      {/* Solo mostrar descripción si no es un evento de plan de resolución con metadata */}
+                      {event.description && !(event.type === 'resolution_plan' && event.metadata) && (
                         <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
                           {event.description}
                         </p>

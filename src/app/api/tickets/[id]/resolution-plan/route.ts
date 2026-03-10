@@ -665,7 +665,14 @@ export async function PATCH(
           updateData.completedDate = new Date()
         }
 
-        // Registrar en el historial del ticket
+        // Obtener tareas actuales para el mensaje
+        const tasks = await prisma.resolution_tasks.findMany({
+          where: { planId: existingPlan.id }
+        })
+        const totalTasks = tasks.length
+        const completedTasks = tasks.filter(t => t.status === 'completed').length
+
+        // Registrar en el historial del ticket (sin comment para evitar redundancia)
         await prisma.ticket_history.create({
           data: {
             id: randomUUID(),
@@ -675,7 +682,7 @@ export async function PATCH(
             field: 'resolution_plan',
             oldValue: existingPlan.status,
             newValue: 'completed',
-            comment: `Plan de resolución completado: "${existingPlan.title}". ${existingPlan.completedTasks} de ${existingPlan.totalTasks} tareas finalizadas.`,
+            comment: null,
             createdAt: new Date()
           }
         })
@@ -688,7 +695,7 @@ export async function PATCH(
               userId: existingPlan.ticket.clientId,
               type: 'RESOLUTION_PLAN_COMPLETED',
               title: 'Plan de resolución completado',
-              message: `El plan de resolución "${existingPlan.title}" ha sido completado. ${existingPlan.completedTasks} de ${existingPlan.totalTasks} tareas fueron finalizadas.`,
+              message: `El plan de resolución "${existingPlan.title}" ha sido completado. ${completedTasks} de ${totalTasks} tareas fueron finalizadas.`,
               ticketId,
               isRead: false,
               createdAt: new Date()

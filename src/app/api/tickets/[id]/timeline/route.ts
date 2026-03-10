@@ -180,17 +180,13 @@ function generateDescription(action: string, originalComment: string | null, new
     return originalComment
   }
 
+  // Para planes de resolución, no generar descripción adicional ya que se muestra en el metadata card
+  if (action.includes('resolution_plan')) {
+    return ''
+  }
+
   // Generar descripción basada en la acción
   switch (action) {
-    case 'resolution_plan_created':
-      return `Se ha creado un plan de resolución: "${newValue}". El técnico ha estructurado un plan de trabajo para resolver este ticket de manera organizada.`
-    
-    case 'resolution_plan_completed':
-      return `El plan de resolución "${oldValue}" ha sido completado exitosamente. Todas las tareas programadas han sido finalizadas.`
-    
-    case 'resolution_plan_deleted':
-      return `El plan de resolución "${oldValue}" ha sido eliminado del ticket.`
-    
     case 'assigned':
       return `El ticket ha sido asignado a un técnico para su atención.`
     
