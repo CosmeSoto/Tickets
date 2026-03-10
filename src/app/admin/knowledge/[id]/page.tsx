@@ -95,15 +95,19 @@ export default function AdminKnowledgeDetailPage() {
     if (!article) return
     
     try {
+      const payload = { 
+        title: article.title || '',
+        description: article.summary || article.content?.substring(0, 200) || '',
+        categoryId: article.categoryId || '',
+        limit: 3 
+      }
+      
+      console.log('[Similar Articles] Sending payload:', payload)
+      
       const response = await fetch(`/api/knowledge/similar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          title: article.title,
-          description: article.summary || article.content?.substring(0, 200) || '',
-          categoryId: article.categoryId,
-          limit: 3 
-        }),
+        body: JSON.stringify(payload),
       })
       
       if (response.ok) {
@@ -112,7 +116,12 @@ export default function AdminKnowledgeDetailPage() {
         const filtered = (data.articles || []).filter((a: Article) => a.id !== article.id)
         setSimilarArticles(filtered)
       } else {
-        console.error('Error loading similar articles:', response.status, response.statusText)
+        const errorData = await response.json().catch(() => ({}))
+        console.error('Error loading similar articles:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        })
       }
     } catch (err) {
       console.error('Error loading similar articles:', err)

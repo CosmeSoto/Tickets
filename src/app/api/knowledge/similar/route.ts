@@ -6,9 +6,9 @@ import { z } from 'zod'
 
 // Schema de validación para búsqueda de similares
 const similarSearchSchema = z.object({
-  title: z.string().min(3, 'El título debe tener al menos 3 caracteres'),
-  description: z.string().optional(),
-  categoryId: z.string().uuid().optional(),
+  title: z.string().min(1, 'El título es requerido').max(500),
+  description: z.string().optional().default(''),
+  categoryId: z.string().optional(),
   limit: z.number().min(1).max(20).optional().default(5),
 })
 
@@ -94,11 +94,18 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     
+    console.log('[API-Similar] Received body:', body)
+    
     // Validar datos
     const validationResult = similarSearchSchema.safeParse(body)
     if (!validationResult.success) {
+      console.error('[API-Similar] Validation failed:', validationResult.error.errors)
       return NextResponse.json(
-        { error: 'Datos inválidos', details: validationResult.error.errors },
+        { 
+          error: 'Datos inválidos', 
+          details: validationResult.error.errors,
+          received: body
+        },
         { status: 400 }
       )
     }
