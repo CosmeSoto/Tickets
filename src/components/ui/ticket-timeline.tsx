@@ -194,12 +194,38 @@ export function TicketTimeline({
                   </div>
                 </div>
               )}
+              {metadata.completedDate && (
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  <div>
+                    <span className="text-muted-foreground block text-xs">Completado el</span>
+                    <div className="font-medium text-green-700 dark:text-green-300">
+                      {new Date(metadata.completedDate).toLocaleString('es-ES', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
               {metadata.estimatedHours && (
                 <div className="flex items-center space-x-2">
                   <Clock className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                   <div>
-                    <span className="text-muted-foreground block text-xs">Horas estimadas</span>
+                    <span className="text-muted-foreground block text-xs">Tiempo estimado</span>
                     <div className="font-medium">{metadata.estimatedHours}h</div>
+                  </div>
+                </div>
+              )}
+              {metadata.actualHours !== undefined && metadata.actualHours > 0 && (
+                <div className="flex items-center space-x-2">
+                  <Clock className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                  <div>
+                    <span className="text-muted-foreground block text-xs">Tiempo real</span>
+                    <div className="font-medium text-purple-700 dark:text-purple-300">{metadata.actualHours}h</div>
                   </div>
                 </div>
               )}
@@ -207,9 +233,14 @@ export function TicketTimeline({
                 <div className="flex items-center space-x-2">
                   <CheckCircle className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                   <div>
-                    <span className="text-muted-foreground block text-xs">Tareas</span>
+                    <span className="text-muted-foreground block text-xs">Progreso de tareas</span>
                     <div className="font-medium">
                       {metadata.completedTasks || 0} de {metadata.totalTasks}
+                      {metadata.totalTasks > 0 && (
+                        <span className="text-xs text-muted-foreground ml-1">
+                          ({Math.round(((metadata.completedTasks || 0) / metadata.totalTasks) * 100)}%)
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -73,6 +73,24 @@ export async function GET(
       },
     })
 
+    // Obtener plan de resolución si existe para enriquecer metadata
+    const resolutionPlan = await prisma.resolution_plans.findFirst({
+      where: { ticketId },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        totalTasks: true,
+        completedTasks: true,
+        estimatedHours: true,
+        actualHours: true,
+        startDate: true,
+        targetDate: true,
+        completedDate: true,
+        createdAt: true,
+      }
+    })
+
     // Formatear timeline con transformación de eventos
     const timeline = history.map((entry) => {
       const baseEvent = {
@@ -90,7 +108,7 @@ export async function GET(
             }
           : null,
         createdAt: entry.createdAt.toISOString(),
-        metadata: parseMetadata(entry.action, entry.newValue, entry.oldValue)
+        metadata: parseMetadata(entry.action, entry.newValue, entry.oldValue, resolutionPlan)
       }
 
       return baseEvent
@@ -191,20 +209,33 @@ function generateDescription(action: string, originalDescription: string | null,
 }
 
 // Parsear metadata para eventos específicos
-function parseMetadata(action: string, newValue: string | null, oldValue: string | null): any {
+function parseMetadata(action: string, newValue: string | null, oldValue: string | null, resolutionPlan: any): any {
   const metadata: any = {
     oldValue,
     newValue
   }
 
-  // Para planes de resolución, intentar parsear información adicional
-  if (action.includes('resolution_plan') && newValue) {
-    try {
-      // El newValue podría contener el título del plan
-      metadata.planTitle = newValue
-    } catch (e) {
-      // Ignorar errores de parsing
+  // Para planes de resolución, agregar información completa del plan
+  if (action.includes('resolution_plan') && resolutionPlan) {
+    metadata.planTitle = resolutionPlan.title
+    metadata.status = resolutionPlan.status
+    metadata.totalTasks = resolutionPlan.totalTasks
+    metadata.completedTasks = resolutionPlan.completedTasks
+    metadata.estimatedHours = resolutionPlan.estimatedHours
+    metadata.actualHours = resolutionPlan.actualHours
+    
+    if (resolutionPlan.startDate) {
+      metadata.startDate = resolutionPlan.startDate.toISOString()
     }
+    if (resolutionPlan.targetDate) {
+      metadata.targetDate = resolutionPlan.targetDate.toISOString()
+    }
+    if (resolutionPlan.completedDate) {
+      metadata.completedDate = resolutionPlan.completedDate.toISOString()
+    }
+  } else if (action.includes('resolution_plan')) {
+    // Si no hay plan (fue eliminado), usar el título del newValue/oldValue
+    metadata.planTitle = newValue || oldValue
   }
 
   return metadata

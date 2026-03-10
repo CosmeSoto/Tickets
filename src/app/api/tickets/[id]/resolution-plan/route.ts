@@ -660,6 +660,11 @@ export async function PATCH(
       
       // Si se marca como completado, registrar en historial y notificar
       if (body.status === 'completed' && existingPlan.status !== 'completed') {
+        // Si no se proporciona completedDate, establecerla ahora
+        if (!body.completedDate) {
+          updateData.completedDate = new Date()
+        }
+
         // Registrar en el historial del ticket
         await prisma.ticket_history.create({
           data: {
@@ -676,26 +681,23 @@ export async function PATCH(
         })
 
         // Crear notificación para el cliente
-        await prisma.notifications.create({
-          data: {
-            id: randomUUID(),
-            userId: existingPlan.ticket.clientId,
-            type: 'RESOLUTION_PLAN_COMPLETED',
-            title: 'Plan de resolución completado',
-            message: `El plan de resolución "${existingPlan.title}" ha sido completado. ${existingPlan.completedTasks} de ${existingPlan.totalTasks} tareas fueron finalizadas.`,
-            ticketId,
-            isRead: false,
-            metadata: {
-              planId: existingPlan.id,
-              planTitle: existingPlan.title,
-              totalTasks: existingPlan.totalTasks,
-              completedTasks: existingPlan.completedTasks,
-              actionUrl: `/client/tickets/${ticketId}`,
-              actionText: 'Ver ticket'
-            },
-            createdAt: new Date()
-          }
-        })
+        try {
+          await prisma.notifications.create({
+            data: {
+              id: randomUUID(),
+              userId: existingPlan.ticket.clientId,
+              type: 'RESOLUTION_PLAN_COMPLETED',
+              title: 'Plan de resolución completado',
+              message: `El plan de resolución "${existingPlan.title}" ha sido completado. ${existingPlan.completedTasks} de ${existingPlan.totalTasks} tareas fueron finalizadas.`,
+              ticketId,
+              isRead: false,
+              createdAt: new Date()
+            }
+          })
+        } catch (notifError) {
+          console.error('[API] Error creating notification:', notifError)
+          // No fallar si la notificación falla
+        }
       }
     }
 
