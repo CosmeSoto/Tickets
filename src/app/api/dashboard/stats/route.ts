@@ -136,7 +136,9 @@ export async function GET(request: NextRequest) {
         overdueTickets,
         todayTickets,
         thisWeekTickets,
-        resolvedTicketsWithTime
+        resolvedTicketsWithTime,
+        plansStats,
+        avgFirstResponseTime
       ] = await Promise.all([
         prisma.users.count(),
         prisma.tickets.count(),
@@ -191,11 +193,33 @@ export async function GET(request: NextRequest) {
             resolvedAt: { not: null }
           },
           select: { createdAt: true, resolvedAt: true }
-        })
+        }),
+        // Estadísticas de planes de resolución
+        prisma.resolution_plans.aggregate({
+          _count: { id: true },
+          _avg: { 
+            estimatedHours: true,
+            actualHours: true,
+            completedTasks: true,
+            totalTasks: true
+          }
+        }),
+        // Calcular tiempo promedio de primera respuesta
+        calculateAvgResponseTime()
       ])
       
       const avgResolutionTime = calculateAvgResolutionTime(resolvedTicketsWithTime)
       const resolutionRate = totalTickets > 0 ? Math.round(((resolvedTickets + closedTickets) / totalTickets) * 100) : 0
+      
+      // Calcular eficiencia de planes (tiempo real vs estimado)
+      const planEfficiency = plansStats._avg.estimatedHours && plansStats._avg.actualHours
+        ? Math.round((plansStats._avg.estimatedHours / plansStats._avg.actualHours) * 100)
+        : 100
+      
+      // Calcular tasa de completitud de tareas
+      const taskCompletionRate = plansStats._avg.totalTasks && plansStats._avg.completedTasks
+        ? Math.round((plansStats._avg.completedTasks / plansStats._avg.totalTasks) * 100)
+        : 0
       
       stats = {
         totalUsers,
@@ -209,9 +233,18 @@ export async function GET(request: NextRequest) {
         todayTickets,
         thisWeekTickets,
         avgResolutionTime,
+        avgFirstResponseTime,
         resolutionRate,
         activeTickets: openTickets + inProgressTickets,
         systemHealth: resolutionRate >= 85 ? 'excellent' : resolutionRate >= 70 ? 'good' : 'needs_attention',
+        // Métricas de planes de resolución
+        resolutionPlans: {
+          total: plansStats._count.id,
+          avgEstimatedHours: Math.round((plansStats._avg.estimatedHours || 0) * 10) / 10,
+          avgActualHours: Math.round((plansStats._avg.actualHours || 0) * 10) / 10,
+          efficiency: planEfficiency,
+          taskCompletionRate
+        },
         recentActivity: await getRecentActivity(role, userId)
       }
     } else if (role === 'TECHNICIAN') {
@@ -224,7 +257,9 @@ export async function GET(request: NextRequest) {
         thisWeekResolved,
         urgentTickets,
         resolvedTicketsWithTime,
-        ratings
+        ratings,
+        myPlansStats,
+        avgFirstResponseTime
       ] = await Promise.all([
         prisma.tickets.count({ where: { assigneeId: userId } }),
         prisma.tickets.count({ where: { assigneeId: userId, status: { in: ['RESOLVED', 'CLOSED'] } } }),
@@ -261,14 +296,38 @@ export async function GET(request: NextRequest) {
             tickets: { assigneeId: userId }
           },
           select: { rating: true }
-        })
+        }),
+        // Estadísticas de mis planes de resolución
+        prisma.resolution_plans.aggregate({
+          where: {
+            tickets: { assigneeId: userId }
+          },
+          _count: { id: true },
+          _avg: { 
+            estimatedHours: true,
+            actualHours: true,
+            completedTasks: true,
+            totalTasks: true
+          }
+        }),
+        // Calcular mi tiempo promedio de primera respuesta
+        calculateAvgResponseTime()
       ])
       
       const avgResolutionTime = calculateAvgResolutionTime(resolvedTicketsWithTime)
       const avgRating = ratings.length > 0 
         ? ratings.reduce((acc, r) => acc + r.rating, 0) / ratings.length 
         : 0
-      const responseTime = '45min' // Calculado basado en primeras respuestas
+      
+      // Calcular eficiencia de mis planes
+      const myPlanEfficiency = myPlansStats._avg.estimatedHours && myPlansStats._avg.actualHours
+        ? Math.round((myPlansStats._avg.estimatedHours / myPlansStats._avg.actualHours) * 100)
+        : 100
+      
+      // Calcular mi tasa de completitud de tareas
+      const myTaskCompletionRate = myPlansStats._avg.totalTasks && myPlansStats._avg.completedTasks
+        ? Math.round((myPlansStats._avg.completedTasks / myPlansStats._avg.totalTasks) * 100)
+        : 0
       
       stats = {
         assignedTickets,
@@ -278,7 +337,7 @@ export async function GET(request: NextRequest) {
         thisWeekResolved,
         urgentTickets,
         avgResolutionTime,
-        responseTime,
+        avgFirstResponseTime,
         satisfactionScore: Math.round(avgRating * 10) / 10,
         totalRatings: ratings.length,
         ratingsBreakdown: {
@@ -288,7 +347,15 @@ export async function GET(request: NextRequest) {
           poor: ratings.filter(r => r.rating <= 2).length,
         },
         performance: avgRating >= 4.5 ? 'excellent' : avgRating >= 4 ? 'good' : 'needs_improvement',
-        workload: assignedTickets > 15 ? 'high' : assignedTickets > 8 ? 'medium' : 'low'
+        workload: assignedTickets > 15 ? 'high' : assignedTickets > 8 ? 'medium' : 'low',
+        // Métricas de mis planes de resolución
+        myResolutionPlans: {
+          total: myPlansStats._count.id,
+          avgEstimatedHours: Math.round((myPlansStats._avg.estimatedHours || 0) * 10) / 10,
+          avgActualHours: Math.round((myPlansStats._avg.actualHours || 0) * 10) / 10,
+          efficiency: myPlanEfficiency,
+          taskCompletionRate: myTaskCompletionRate
+        }
       }
     } else if (role === 'CLIENT') {
       // Estadísticas profesionales para cliente
