@@ -478,25 +478,27 @@ export default function TechnicianKnowledgeDetailPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar artículo?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {article && (
-                <>
-                  Estás a punto de eliminar:{' '}
-                  <span className="font-semibold text-foreground">
-                    "{article.title}"
-                  </span>
-                  <br /><br />
-                </>
-              )}
-              Esta acción no se puede deshacer. El artículo será eliminado permanentemente
-              de la base de conocimientos.
-              {article?.sourceTicket && (
-                <div className="mt-3 p-3 bg-yellow-50 dark:bg-yellow-950 rounded-md">
-                  <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                    ⚠️ Este artículo está vinculado al ticket: {article.sourceTicket.title}
-                  </p>
-                </div>
-              )}
+            <AlertDialogDescription asChild>
+              <div>
+                {article && (
+                  <>
+                    Estás a punto de eliminar:{' '}
+                    <span className="font-semibold text-foreground">
+                      "{article.title}"
+                    </span>
+                    <br /><br />
+                  </>
+                )}
+                Esta acción no se puede deshacer. El artículo será eliminado permanentemente
+                de la base de conocimientos.
+                {article?.sourceTicket && (
+                  <div className="mt-3 p-3 bg-yellow-50 dark:bg-yellow-950 rounded-md">
+                    <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                      ⚠️ Este artículo está vinculado al ticket: {article.sourceTicket.title}
+                    </p>
+                  </div>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
