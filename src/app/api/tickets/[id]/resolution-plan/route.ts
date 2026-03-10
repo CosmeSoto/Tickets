@@ -284,7 +284,7 @@ export async function POST(
           field: 'resolution_plan',
           oldValue: null,
           newValue: plan.title,
-          description: `Plan de resolución creado: "${plan.title}"${plan.startDate ? `. Inicio: ${new Date(plan.startDate).toLocaleDateString('es-ES')}` : ''}${plan.targetDate ? `. Objetivo: ${new Date(plan.targetDate).toLocaleDateString('es-ES')}` : ''}`,
+          comment: `Plan de resolución creado: "${plan.title}"${plan.startDate ? `. Inicio: ${new Date(plan.startDate).toLocaleDateString('es-ES')}` : ''}${plan.targetDate ? `. Objetivo: ${new Date(plan.targetDate).toLocaleDateString('es-ES')}` : ''}`,
           createdAt: new Date()
         }
       })
@@ -564,7 +564,7 @@ export async function DELETE(
           field: 'resolution_plan',
           oldValue: existingPlan.title,
           newValue: null,
-          description: `Plan de resolución eliminado: "${existingPlan.title}" (${existingPlan.tasks.length} tareas)`,
+          comment: `Plan de resolución eliminado: "${existingPlan.title}" (${existingPlan.tasks.length} tareas)`,
           createdAt: new Date()
         }
       })
@@ -675,7 +675,7 @@ export async function PATCH(
             field: 'resolution_plan',
             oldValue: existingPlan.status,
             newValue: 'completed',
-            description: `Plan de resolución completado: "${existingPlan.title}". ${existingPlan.completedTasks} de ${existingPlan.totalTasks} tareas finalizadas.`,
+            comment: `Plan de resolución completado: "${existingPlan.title}". ${existingPlan.completedTasks} de ${existingPlan.totalTasks} tareas finalizadas.`,
             createdAt: new Date()
           }
         })

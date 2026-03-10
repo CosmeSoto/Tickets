@@ -97,7 +97,7 @@ export async function GET(
         id: entry.id,
         type: mapActionToType(entry.action),
         title: generateTitle(entry.action, entry.field, entry.newValue, entry.oldValue),
-        description: generateDescription(entry.action, entry.description, entry.newValue, entry.oldValue),
+        description: generateDescription(entry.action, entry.comment, entry.newValue, entry.oldValue),
         user: entry.users
           ? {
               id: entry.users.id,
@@ -174,10 +174,10 @@ function generateTitle(action: string, field: string | null, newValue: string | 
 }
 
 // Generar descripción detallada
-function generateDescription(action: string, originalDescription: string | null, newValue: string | null, oldValue: string | null): string {
-  // Si ya hay una descripción, usarla
-  if (originalDescription) {
-    return originalDescription
+function generateDescription(action: string, originalComment: string | null, newValue: string | null, oldValue: string | null): string {
+  // Si ya hay un comentario, usarlo
+  if (originalComment) {
+    return originalComment
   }
 
   // Generar descripción basada en la acción
