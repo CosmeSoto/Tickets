@@ -60,7 +60,7 @@ function NewArticleContent() {
       setHasCheckedExisting(true)
       loadTicketSuggestions(fromTicket)
     }
-  }, [searchParams, hasCheckedExisting])
+  }, [searchParams]) // Remover hasCheckedExisting de las dependencias
 
   const loadTicketSuggestions = async (ticketId: string) => {
     setLoadingSuggestions(true)

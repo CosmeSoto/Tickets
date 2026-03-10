@@ -458,6 +458,23 @@ export async function GET(
     // Tiempo de primera respuesta
     suggestedContent += `- **Tiempo de primera respuesta:** ${firstResponseTime}\n`
     
+    // Función para formatear horas a formato legible
+    const formatHours = (hours: number): string => {
+      if (hours < 1) {
+        const minutes = Math.round(hours * 60)
+        return `${minutes} minuto${minutes !== 1 ? 's' : ''}`
+      }
+      
+      const wholeHours = Math.floor(hours)
+      const remainingMinutes = Math.round((hours - wholeHours) * 60)
+      
+      if (remainingMinutes === 0) {
+        return `${wholeHours} hora${wholeHours !== 1 ? 's' : ''}`
+      }
+      
+      return `${wholeHours} hora${wholeHours !== 1 ? 's' : ''} ${remainingMinutes} minuto${remainingMinutes !== 1 ? 's' : ''}`
+    }
+    
     // Número de interacciones
     const clientComments = ticket.comments.filter((c: any) => c.users.role === 'CLIENT').length
     const technicianComments = ticket.comments.filter((c: any) => c.users.role === 'TECHNICIAN' || c.users.role === 'ADMIN').length
@@ -468,10 +485,10 @@ export async function GET(
       const plan = ticket.resolution_plans[0]
       suggestedContent += `- **Tareas del plan:** ${plan.completedTasks} de ${plan.totalTasks} completadas\n`
       if (plan.estimatedHours) {
-        suggestedContent += `- **Tiempo estimado del plan:** ${plan.estimatedHours} horas\n`
+        suggestedContent += `- **Tiempo estimado del plan:** ${formatHours(plan.estimatedHours)}\n`
       }
       if (plan.actualHours && plan.actualHours > 0) {
-        suggestedContent += `- **Tiempo real del plan:** ${plan.actualHours} horas\n`
+        suggestedContent += `- **Tiempo real del plan:** ${formatHours(plan.actualHours)}\n`
       }
     }
     suggestedContent += `\n`
