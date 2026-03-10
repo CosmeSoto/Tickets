@@ -666,50 +666,34 @@ export function TicketResolutionTracker({
                   <div>
                     <label className="text-sm font-medium">Fecha de Inicio</label>
                     <div className="grid grid-cols-2 gap-2">
-                      <div className="relative">
-                        <Input
-                          type="date"
-                          value={planForm.startDate}
-                          onChange={(e) => setPlanForm(prev => ({ ...prev, startDate: e.target.value }))}
-                          className="pr-10"
-                        />
-                        <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                      </div>
-                      <div className="relative">
-                        <Input
-                          type="time"
-                          value={planForm.startTime}
-                          onChange={(e) => setPlanForm(prev => ({ ...prev, startTime: e.target.value }))}
-                          placeholder="HH:MM"
-                          className="pr-10"
-                        />
-                        <Clock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                      </div>
+                      <Input
+                        type="date"
+                        value={planForm.startDate}
+                        onChange={(e) => setPlanForm(prev => ({ ...prev, startDate: e.target.value }))}
+                      />
+                      <Input
+                        type="time"
+                        value={planForm.startTime}
+                        onChange={(e) => setPlanForm(prev => ({ ...prev, startTime: e.target.value }))}
+                        placeholder="HH:MM"
+                      />
                     </div>
                   </div>
 
                   <div>
                     <label className="text-sm font-medium">Fecha Objetivo</label>
                     <div className="grid grid-cols-2 gap-2">
-                      <div className="relative">
-                        <Input
-                          type="date"
-                          value={planForm.targetDate}
-                          onChange={(e) => setPlanForm(prev => ({ ...prev, targetDate: e.target.value }))}
-                          className="pr-10"
-                        />
-                        <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                      </div>
-                      <div className="relative">
-                        <Input
-                          type="time"
-                          value={planForm.targetTime}
-                          onChange={(e) => setPlanForm(prev => ({ ...prev, targetTime: e.target.value }))}
-                          placeholder="HH:MM"
-                          className="pr-10"
-                        />
-                        <Clock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                      </div>
+                      <Input
+                        type="date"
+                        value={planForm.targetDate}
+                        onChange={(e) => setPlanForm(prev => ({ ...prev, targetDate: e.target.value }))}
+                      />
+                      <Input
+                        type="time"
+                        value={planForm.targetTime}
+                        onChange={(e) => setPlanForm(prev => ({ ...prev, targetTime: e.target.value }))}
+                        placeholder="HH:MM"
+                      />
                     </div>
                   </div>
                 </div>
