@@ -368,6 +368,34 @@ export async function GET(
     suggestedContent += `## 🔍 Problema Reportado\n\n`
     suggestedContent += `${ticket.description}\n\n`
     
+    // Calcular métricas reales del ticket
+    const createdAt = new Date(ticket.createdAt)
+    const resolvedAt = ticket.resolvedAt ? new Date(ticket.resolvedAt) : new Date()
+    const resolutionTimeMs = resolvedAt.getTime() - createdAt.getTime()
+    const resolutionTimeHours = Math.round(resolutionTimeMs / (1000 * 60 * 60) * 10) / 10
+    const resolutionTimeDays = Math.floor(resolutionTimeHours / 24)
+    const remainingHours = Math.round((resolutionTimeHours % 24) * 10) / 10
+    
+    // Tiempo de primera respuesta (primer comentario del técnico)
+    const firstTechnicianComment = ticket.comments.find((c: any) => 
+      c.users.role === 'TECHNICIAN' || c.users.role === 'ADMIN'
+    )
+    let firstResponseTime = 'N/A'
+    if (firstTechnicianComment) {
+      const firstResponseMs = new Date(firstTechnicianComment.createdAt).getTime() - createdAt.getTime()
+      const firstResponseHours = Math.round(firstResponseMs / (1000 * 60 * 60) * 10) / 10
+      if (firstResponseHours < 1) {
+        const minutes = Math.round(firstResponseMs / (1000 * 60))
+        firstResponseTime = `${minutes} minutos`
+      } else if (firstResponseHours < 24) {
+        firstResponseTime = `${firstResponseHours} horas`
+      } else {
+        const days = Math.floor(firstResponseHours / 24)
+        const hours = Math.round((firstResponseHours % 24) * 10) / 10
+        firstResponseTime = `${days} ${days === 1 ? 'día' : 'días'}${hours > 0 ? ` ${hours} horas` : ''}`
+      }
+    }
+    
     // 3. Plan de Resolución (si existe)
     if (ticket.resolution_plans && ticket.resolution_plans.length > 0) {
       const plan = ticket.resolution_plans[0]
@@ -410,39 +438,56 @@ export async function GET(
           suggestedContent += `\n`
         })
       }
-      
-      // Métricas del plan
-      suggestedContent += `### Métricas\n\n`
-      suggestedContent += `- **Tareas completadas:** ${plan.completedTasks} de ${plan.totalTasks}\n`
-      if (plan.estimatedHours) {
-        const hours = Math.floor(plan.estimatedHours)
-        const minutes = Math.round((plan.estimatedHours - hours) * 60)
-        let duration = ''
-        if (hours === 0) {
-          duration = `${minutes} minutos`
-        } else if (minutes === 0) {
-          duration = `${hours} ${hours === 1 ? 'hora' : 'horas'}`
-        } else {
-          duration = `${hours} ${hours === 1 ? 'hora' : 'horas'} ${minutes} minutos`
-        }
-        suggestedContent += `- **Tiempo estimado total:** ${duration}\n`
-      }
-      if (plan.actualHours) {
-        suggestedContent += `- **Tiempo real:** ${plan.actualHours} horas\n`
-      }
       suggestedContent += `\n`
     }
     
-    // 4. Solución Aplicada (comentarios de técnicos)
-    const technicianComments = ticket.comments.filter((comment: any) => comment.users.role === 'TECHNICIAN')
-    if (technicianComments.length > 0) {
+    // 4. Métricas del Ticket (información real y útil)
+    suggestedContent += `## 📊 Métricas de Resolución\n\n`
+    
+    // Tiempo total de resolución
+    if (resolutionTimeDays > 0) {
+      suggestedContent += `- **Tiempo de resolución:** ${resolutionTimeDays} ${resolutionTimeDays === 1 ? 'día' : 'días'}`
+      if (remainingHours > 0) {
+        suggestedContent += ` ${remainingHours} horas`
+      }
+      suggestedContent += `\n`
+    } else {
+      suggestedContent += `- **Tiempo de resolución:** ${resolutionTimeHours} horas\n`
+    }
+    
+    // Tiempo de primera respuesta
+    suggestedContent += `- **Tiempo de primera respuesta:** ${firstResponseTime}\n`
+    
+    // Número de interacciones
+    const clientComments = ticket.comments.filter((c: any) => c.users.role === 'CLIENT').length
+    const technicianComments = ticket.comments.filter((c: any) => c.users.role === 'TECHNICIAN' || c.users.role === 'ADMIN').length
+    suggestedContent += `- **Interacciones totales:** ${ticket.comments.length} (${clientComments} del cliente, ${technicianComments} del equipo técnico)\n`
+    
+    // Información del plan si existe
+    if (ticket.resolution_plans && ticket.resolution_plans.length > 0) {
+      const plan = ticket.resolution_plans[0]
+      suggestedContent += `- **Tareas del plan:** ${plan.completedTasks} de ${plan.totalTasks} completadas\n`
+      if (plan.estimatedHours) {
+        suggestedContent += `- **Tiempo estimado del plan:** ${plan.estimatedHours} horas\n`
+      }
+      if (plan.actualHours && plan.actualHours > 0) {
+        suggestedContent += `- **Tiempo real del plan:** ${plan.actualHours} horas\n`
+      }
+    }
+    suggestedContent += `\n`
+    
+    // 5. Solución Aplicada (comentarios de técnicos)
+    // 5. Solución Aplicada (comentarios de técnicos)
+    const techComments = ticket.comments.filter((comment: any) => comment.users.role === 'TECHNICIAN')
+    if (techComments.length > 0) {
       suggestedContent += `## ✅ Solución Aplicada\n\n`
-      technicianComments.forEach((comment: any) => {
+      techComments.forEach((comment: any) => {
         suggestedContent += `${comment.content}\n\n`
       })
     }
     
-    // 5. Calificación del Cliente (si existe)
+    // 6. Calificación del Cliente (si existe)
+    // 6. Calificación del Cliente (si existe)
     if (ticket.ticket_ratings) {
       const rating = ticket.ticket_ratings
       suggestedContent += `## ⭐ Calificación del Cliente\n\n`
@@ -457,7 +502,8 @@ export async function GET(
       suggestedContent += `\n`
     }
     
-    // 6. Conclusión
+    // 7. Conclusión
+    // 7. Conclusión
     suggestedContent += `## 💡 Conclusión\n\n`
     suggestedContent += `Este artículo documenta la solución aplicada al ticket #${ticket.id.substring(0, 8)}. `
     suggestedContent += `La información aquí presentada puede ser útil para resolver casos similares en el futuro.\n\n`
