@@ -191,12 +191,58 @@ export async function PATCH(
         t.id === taskId ? body.status === 'completed' : t.status === 'completed'
       ).length
 
+      const totalTasks = allTasks.length
+      const planUpdateData: any = {
+        completedTasks: completedCount,
+        updatedAt: new Date()
+      }
+
+      // Si todas las tareas están completadas y el plan está activo, marcarlo como completado
+      if (completedCount === totalTasks && totalTasks > 0 && task.plan.status === 'active') {
+        planUpdateData.status = 'completed'
+        planUpdateData.completedDate = new Date()
+
+        // Registrar en el historial del ticket
+        await prisma.ticket_history.create({
+          data: {
+            id: require('crypto').randomUUID(),
+            ticketId: task.plan.ticketId,
+            userId: session.user.id,
+            action: 'resolution_plan_completed',
+            field: 'resolution_plan',
+            oldValue: 'active',
+            newValue: 'completed',
+            description: `Plan de resolución completado: "${task.plan.title}". Todas las tareas (${totalTasks}) han sido finalizadas exitosamente.`,
+            createdAt: new Date()
+          }
+        })
+
+        // Crear notificación para el cliente
+        await prisma.notifications.create({
+          data: {
+            id: require('crypto').randomUUID(),
+            userId: task.plan.ticket.clientId,
+            type: 'RESOLUTION_PLAN_COMPLETED',
+            title: 'Plan de resolución completado',
+            message: `El plan de resolución "${task.plan.title}" ha sido completado exitosamente. Todas las tareas programadas han sido finalizadas.`,
+            ticketId: task.plan.ticketId,
+            isRead: false,
+            metadata: {
+              planId: task.plan.id,
+              planTitle: task.plan.title,
+              totalTasks,
+              completedTasks: completedCount,
+              actionUrl: `/client/tickets/${task.plan.ticketId}`,
+              actionText: 'Ver ticket'
+            },
+            createdAt: new Date()
+          }
+        })
+      }
+
       await prisma.resolution_plans.update({
         where: { id: task.planId },
-        data: {
-          completedTasks: completedCount,
-          updatedAt: new Date()
-        }
+        data: planUpdateData
       })
     }
 

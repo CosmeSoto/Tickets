@@ -698,6 +698,40 @@ export function TicketResolutionTracker({
     }
   }
 
+  const completePlan = async () => {
+    try {
+      const response = await fetch(`/api/tickets/${ticketId}/resolution-plan`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          status: 'completed',
+          completedDate: new Date().toISOString()
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Error al completar plan')
+      }
+
+      const data = await response.json()
+      if (data.success) {
+        await loadResolutionPlan()
+        toast({
+          title: "Plan completado",
+          description: "El plan de resolución ha sido marcado como completado exitosamente"
+        })
+      }
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Error al completar plan",
+        description: "No se pudo completar el plan"
+      })
+    }
+  }
+
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
       draft: 'Borrador',
@@ -928,6 +962,15 @@ export function TicketResolutionTracker({
                         <DropdownMenuItem onClick={activatePlan}>
                           <PlayCircle className="h-4 w-4 mr-2" />
                           Activar Plan
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
+                    {plan.status === 'active' && (
+                      <>
+                        <DropdownMenuItem onClick={completePlan}>
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Marcar como Completado
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                       </>

@@ -657,6 +657,46 @@ export async function PATCH(
     if (body.status !== undefined) {
       updateData.status = body.status
       changes.status = { old: existingPlan.status, new: body.status }
+      
+      // Si se marca como completado, registrar en historial y notificar
+      if (body.status === 'completed' && existingPlan.status !== 'completed') {
+        // Registrar en el historial del ticket
+        await prisma.ticket_history.create({
+          data: {
+            id: randomUUID(),
+            ticketId,
+            userId: session.user.id,
+            action: 'resolution_plan_completed',
+            field: 'resolution_plan',
+            oldValue: existingPlan.status,
+            newValue: 'completed',
+            description: `Plan de resolución completado: "${existingPlan.title}". ${existingPlan.completedTasks} de ${existingPlan.totalTasks} tareas finalizadas.`,
+            createdAt: new Date()
+          }
+        })
+
+        // Crear notificación para el cliente
+        await prisma.notifications.create({
+          data: {
+            id: randomUUID(),
+            userId: existingPlan.ticket.clientId,
+            type: 'RESOLUTION_PLAN_COMPLETED',
+            title: 'Plan de resolución completado',
+            message: `El plan de resolución "${existingPlan.title}" ha sido completado. ${existingPlan.completedTasks} de ${existingPlan.totalTasks} tareas fueron finalizadas.`,
+            ticketId,
+            isRead: false,
+            metadata: {
+              planId: existingPlan.id,
+              planTitle: existingPlan.title,
+              totalTasks: existingPlan.totalTasks,
+              completedTasks: existingPlan.completedTasks,
+              actionUrl: `/client/tickets/${ticketId}`,
+              actionText: 'Ver ticket'
+            },
+            createdAt: new Date()
+          }
+        })
+      }
     }
 
     if (body.estimatedHours !== undefined) {
