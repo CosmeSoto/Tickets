@@ -57,23 +57,18 @@ export default function TechnicianTicketDetailPage() {
   const [newStatus, setNewStatus] = useState<'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | 'ON_HOLD'>('OPEN')
 
   // Variables derivadas
-  // TODO: Agregar knowledge_article al tipo Ticket cuando se implemente la funcionalidad
-  const canCreateArticle = false // ticket?.status === 'RESOLVED' && session?.user?.role === 'TECHNICIAN'
-  const hasArticle = false // !!ticket?.knowledge_article
+  const canCreateArticle = ticket?.status === 'RESOLVED' && session?.user?.role === 'TECHNICIAN'
+  const hasArticle = !!ticket?.knowledgeArticleId
 
   const handleViewArticle = () => {
-    // TODO: Implementar cuando se agregue knowledge_article al tipo Ticket
-    // if (ticket?.knowledge_article) {
-    //   router.push(`/knowledge/${ticket.knowledge_article.id}`)
-    // }
+    if (ticket?.knowledgeArticleId) {
+      router.push(`/technician/knowledge/${ticket.knowledgeArticleId}`)
+    }
   }
 
   const handleCreateArticle = () => {
-    // TODO: Implementar creación de artículo desde ticket
-    toast({
-      title: 'Funcionalidad en desarrollo',
-      description: 'La creación de artículos desde tickets estará disponible próximamente',
-    })
+    // Redirigir a crear artículo con datos del ticket
+    router.push(`/technician/knowledge/new?fromTicket=${ticket?.id}`)
   }
 
   useEffect(() => {
@@ -199,22 +194,6 @@ export default function TechnicianTicketDetailPage() {
 
   const statusConfig = getStatusConfig(ticket.status)
   const priorityConfig = getPriorityConfig(ticket.priority)
-
-  // Verificar si puede crear artículo (ticket resuelto y es el técnico asignado) - TEMPORALMENTE DESHABILITADO
-  // const canCreateArticle = ticket.status === 'RESOLVED' && ticket.assignee?.id === session?.user?.id
-  // const hasArticle = ticket.knowledge_article !== null && ticket.knowledge_article !== undefined
-
-  // const handleCreateArticle = () => {
-  //   // Redirigir a crear artículo con datos del ticket
-  //   router.push(`/technician/knowledge/new?fromTicket=${ticket.id}`)
-  // }
-
-  // const handleViewArticle = () => {
-  //   // Redirigir al artículo existente
-  //   if (ticket.knowledge_article?.id) {
-  //     router.push(`/technician/knowledge/${ticket.knowledge_article.id}`)
-  //   }
-  // }
 
   return (
     <ModuleLayout

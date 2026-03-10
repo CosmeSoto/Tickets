@@ -189,23 +189,20 @@ export default function TicketDetailPage() {
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
-      {/* Botón Inteligente de Artículo (solo si ticket está RESOLVED) - TEMPORALMENTE DESHABILITADO */}
-      {/* {ticket.status === 'RESOLVED' && (
-        ticket.knowledge_article ? (
+      {/* Botón Inteligente de Artículo (solo si ticket está RESOLVED) */}
+      {ticket.status === 'RESOLVED' && (
+        ticket.knowledgeArticleId ? (
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant='outline'
                   size='sm'
-                  onClick={() => router.push(`/admin/knowledge/${ticket.knowledge_article.id}`)}
+                  onClick={() => router.push(`/admin/knowledge/${ticket.knowledgeArticleId}`)}
                 >
                   <BookOpen className='h-4 w-4 mr-2' />
                   <span className='hidden sm:inline'>Ver Artículo</span>
                   <span className='sm:hidden'>Artículo</span>
-                  {!ticket.knowledge_article.isPublished && (
-                    <Badge variant='secondary' className='ml-2 text-xs'>Borrador</Badge>
-                  )}
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
@@ -233,7 +230,7 @@ export default function TicketDetailPage() {
             </Tooltip>
           </TooltipProvider>
         )
-      )} */}
+      )}
       {getStatusBadge(ticket.status)}
       {getPriorityBadge(ticket.priority)}
       {session?.user?.role === 'ADMIN' && (

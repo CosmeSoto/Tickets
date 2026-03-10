@@ -49,6 +49,7 @@ export interface Ticket {
   updatedAt: string
   resolvedAt?: string
   dueDate?: string
+  knowledgeArticleId?: string | null
   tags?: string[]
   attachments?: Array<{
     id: string
