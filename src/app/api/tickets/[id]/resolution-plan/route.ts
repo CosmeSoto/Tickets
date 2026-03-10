@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { auditResolutionPlanChange } from '@/lib/audit'
+import { EmailService } from '@/lib/services/email/email-service'
 import { randomUUID } from 'crypto'
 
 /**
@@ -291,6 +292,16 @@ export async function POST(
       console.error('[API] Error creating ticket history:', historyError)
     }
 
+    // Obtener información del cliente para notificaciones y email
+    const client = await prisma.users.findUnique({
+      where: { id: ticket.clientId },
+      select: {
+        id: true,
+        name: true,
+        email: true
+      }
+    })
+
     // Crear notificación para el cliente
     try {
       const formattedStartDate = plan.startDate 
@@ -346,6 +357,90 @@ export async function POST(
     } catch (notificationError) {
       // No fallar si la notificación falla, solo registrar el error
       console.error('[API] Error creating notification for resolution plan:', notificationError)
+    }
+
+    // Enviar email al cliente
+    if (client) {
+      try {
+        const formattedStartDate = plan.startDate 
+          ? new Date(plan.startDate).toLocaleString('es-ES', {
+              weekday: 'long',
+              day: '2-digit',
+              month: 'long',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            })
+          : null
+
+        const formattedTargetDate = plan.targetDate
+          ? new Date(plan.targetDate).toLocaleString('es-ES', {
+              weekday: 'long',
+              day: '2-digit',
+              month: 'long',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            })
+          : null
+
+        let emailBody = `
+          <h2>Plan de Resolución Creado</h2>
+          <p>Hola ${client.name},</p>
+          <p>Se ha creado un plan de resolución para tu ticket <strong>#${ticketId.substring(0, 8)}</strong>.</p>
+          
+          <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #1f2937;">${plan.title}</h3>
+            ${plan.description ? `<p style="color: #4b5563;">${plan.description}</p>` : ''}
+            
+            ${formattedStartDate ? `
+              <p style="margin: 10px 0;">
+                <strong>📅 Inicio programado:</strong><br/>
+                ${formattedStartDate}
+              </p>
+            ` : ''}
+            
+            ${formattedTargetDate ? `
+              <p style="margin: 10px 0;">
+                <strong>🎯 Fecha objetivo:</strong><br/>
+                ${formattedTargetDate}
+              </p>
+            ` : ''}
+            
+            ${plan.estimatedHours ? `
+              <p style="margin: 10px 0;">
+                <strong>⏱️ Horas estimadas:</strong> ${plan.estimatedHours} horas
+              </p>
+            ` : ''}
+          </div>
+          
+          <p>Nuestro equipo técnico trabajará en resolver tu solicitud siguiendo este plan estructurado.</p>
+          <p>Recibirás actualizaciones conforme avancemos en las tareas programadas.</p>
+          
+          <div style="margin-top: 30px;">
+            <a href="${process.env.NEXTAUTH_URL}/client/tickets/${ticketId}" 
+               style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+              Ver Ticket y Plan de Resolución
+            </a>
+          </div>
+          
+          <p style="margin-top: 30px; color: #6b7280; font-size: 14px;">
+            Si tienes alguna pregunta, puedes responder a este correo o agregar un comentario en el ticket.
+          </p>
+        `
+
+        await EmailService.queueEmail({
+          to: client.email,
+          subject: `Plan de Resolución Creado - Ticket #${ticketId.substring(0, 8)}`,
+          html: emailBody,
+          text: `Plan de Resolución Creado\n\nHola ${client.name},\n\nSe ha creado un plan de resolución para tu ticket #${ticketId.substring(0, 8)}.\n\nTítulo: ${plan.title}\n${plan.description ? `Descripción: ${plan.description}\n` : ''}${formattedStartDate ? `Inicio: ${formattedStartDate}\n` : ''}${formattedTargetDate ? `Objetivo: ${formattedTargetDate}\n` : ''}${plan.estimatedHours ? `Horas estimadas: ${plan.estimatedHours}\n` : ''}\n\nVer ticket: ${process.env.NEXTAUTH_URL}/client/tickets/${ticketId}`
+        }, session.user.id)
+
+        console.log(`[API] Email queued for client ${client.email} about resolution plan ${plan.id}`)
+      } catch (emailError) {
+        // No fallar si el email falla, solo registrar el error
+        console.error('[API] Error sending email for resolution plan:', emailError)
+      }
     }
 
     return NextResponse.json({
