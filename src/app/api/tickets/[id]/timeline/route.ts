@@ -54,7 +54,7 @@ export async function GET(
       )
     }
 
-    // Obtener historial del ticket
+    // Obtener historial del ticket (más reciente primero)
     const history = await prisma.ticket_history.findMany({
       where: { ticketId },
       include: {
@@ -69,7 +69,7 @@ export async function GET(
         },
       },
       orderBy: {
-        createdAt: 'asc',
+        createdAt: 'desc',
       },
     })
 
