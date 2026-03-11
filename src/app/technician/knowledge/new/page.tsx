@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useKnowledge } from '@/hooks/use-knowledge'
@@ -44,7 +44,9 @@ function NewArticleContent() {
   const [isSaving, setIsSaving] = useState(false)
   const [sourceTicketId, setSourceTicketId] = useState<string | null>(null)
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
-  const [hasCheckedExisting, setHasCheckedExisting] = useState(false)
+  
+  // Usar useRef para evitar ejecuciones duplicadas en Strict Mode
+  const hasLoadedTicket = useRef(false)
 
   // Cargar categorías al montar el componente
   useEffect(() => {
@@ -55,12 +57,12 @@ function NewArticleContent() {
   useEffect(() => {
     const fromTicket = searchParams.get('fromTicket')
     
-    if (fromTicket && !hasCheckedExisting) {
+    if (fromTicket && !hasLoadedTicket.current) {
+      hasLoadedTicket.current = true
       setSourceTicketId(fromTicket)
-      setHasCheckedExisting(true)
       loadTicketSuggestions(fromTicket)
     }
-  }, [searchParams]) // Remover hasCheckedExisting de las dependencias
+  }, [searchParams])
 
   const loadTicketSuggestions = async (ticketId: string) => {
     setLoadingSuggestions(true)
