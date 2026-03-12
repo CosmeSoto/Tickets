@@ -355,6 +355,7 @@ model tickets {
   ticket_knowledge_articles        ticket_knowledge_articles[]
   sla_violations                   sla_violations[]
   ticket_sla_metrics               ticket_sla_metrics?
+  maintenance_records              maintenance_records[]
   users_tickets_assigneeIdTousers  users?                      @relation("tickets_assigneeIdTousers", fields: [assigneeId], references: [id])
   categories                       categories                  @relation(fields: [categoryId], references: [id])
   users_tickets_clientIdTousers    users                       @relation("tickets_clientIdTousers", fields: [clientId], references: [id])
@@ -485,6 +486,13 @@ model users {
   webhooks_created                                  webhooks[]                  @relation("WebhookCreator")
   password_reset_tokens                             password_reset_tokens[]
   departments                                       departments?                @relation(fields: [departmentId], references: [id])
+  
+  // Inventory relations
+  assignmentsReceived                               equipment_assignments[]     @relation("AssignmentReceiver")
+  assignmentsDelivered                              equipment_assignments[]     @relation("AssignmentDeliverer")
+  maintenanceRecords                                maintenance_records[]       @relation("MaintenanceTechnician")
+  licensesAssigned                                  software_licenses[]         @relation("LicenseUser")
+  stockMovements                                    stock_movements[]           @relation("StockMovementUser")
 
   @@index([departmentId])
   @@index([name, email])
@@ -910,4 +918,316 @@ model landing_page_banners {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("landing_page_banners")
+}
+
+// ============================================
+// INVENTORY MANAGEMENT SYSTEM
+// ============================================
+
+// Equipment table
+model equipment {
+  id                   String            @id @default(uuid())
+  code                 String            @unique
+  serialNumber         String            @map("serial_number")
+  brand                String
+  model                String
+  type                 EquipmentType
+  status               EquipmentStatus   @default(AVAILABLE)
+  condition            EquipmentCondition @default(GOOD)
+  ownershipType        OwnershipType     @default(FIXED_ASSET) @map("ownership_type")
+  purchaseDate         DateTime?         @map("purchase_date")
+  purchasePrice        Float?            @map("purchase_price")
+  warrantyExpiration   DateTime?         @map("warranty_expiration")
+  specifications       Json?
+  accessories          String[]
+  location             String?
+  notes                String?           @db.Text
+  photoUrl             String?           @map("photo_url")
+  qrCode               String            @unique @map("qr_code")
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+  
+  assignments          equipment_assignments[]
+  maintenanceRecords   maintenance_records[]
+  licenses             software_licenses[]
+  
+  @@index([code])
+  @@index([serialNumber])
+  @@index([type, status])
+  @@index([status])
+  @@map("equipment")
+}
+
+enum EquipmentType {
+  LAPTOP
+  DESKTOP
+  MONITOR
+  PRINTER
+  PHONE
+  TABLET
+  KEYBOARD
+  MOUSE
+  HEADSET
+  WEBCAM
+  DOCKING_STATION
+  UPS
+  ROUTER
+  SWITCH
+  OTHER
+}
+
+enum EquipmentStatus {
+  AVAILABLE
+  ASSIGNED
+  MAINTENANCE
+  DAMAGED
+  RETIRED
+}
+
+enum EquipmentCondition {
+  NEW
+  LIKE_NEW
+  GOOD
+  FAIR
+  POOR
+}
+
+enum OwnershipType {
+  FIXED_ASSET
+  RENTAL
+  LOAN
+}
+
+// Equipment assignments table
+model equipment_assignments {
+  id              String          @id @default(uuid())
+  equipmentId     String          @map("equipment_id")
+  receiverId      String          @map("receiver_id")
+  delivererId     String          @map("deliverer_id")
+  assignmentType  AssignmentType  @map("assignment_type")
+  startDate       DateTime        @map("start_date")
+  endDate         DateTime?       @map("end_date")
+  actualEndDate   DateTime?       @map("actual_end_date")
+  accessories     String[]
+  observations    String?         @db.Text
+  isActive        Boolean         @default(true) @map("is_active")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  
+  equipment       equipment       @relation(fields: [equipmentId], references: [id])
+  receiver        users           @relation("AssignmentReceiver", fields: [receiverId], references: [id])
+  deliverer       users           @relation("AssignmentDeliverer", fields: [delivererId], references: [id])
+  deliveryAct     delivery_acts?
+  returnAct       return_acts?
+  
+  @@index([equipmentId, isActive])
+  @@index([receiverId, isActive])
+  @@index([delivererId])
+  @@map("equipment_assignments")
+}
+
+enum AssignmentType {
+  PERMANENT
+  TEMPORARY
+  LOAN
+}
+
+// Delivery acts table
+model delivery_acts {
+  id                  String          @id @default(uuid())
+  folio               String          @unique
+  assignmentId        String          @unique @map("assignment_id")
+  equipmentSnapshot   Json            @map("equipment_snapshot")
+  delivererInfo       Json            @map("deliverer_info")
+  receiverInfo        Json            @map("receiver_info")
+  accessories         String[]
+  observations        String?         @db.Text
+  termsVersion        String          @default("1.0") @map("terms_version")
+  status              ActStatus       @default(PENDING)
+  acceptanceToken     String          @unique @map("acceptance_token")
+  expirationDate      DateTime        @map("expiration_date")
+  acceptedAt          DateTime?       @map("accepted_at")
+  rejectedAt          DateTime?       @map("rejected_at")
+  rejectionReason     String?         @db.Text @map("rejection_reason")
+  signatureTimestamp  DateTime?       @map("signature_timestamp")
+  signatureIp         String?         @map("signature_ip")
+  signatureUserAgent  String?         @map("signature_user_agent")
+  verificationHash    String?         @map("verification_hash")
+  pdfPath             String?         @map("pdf_path")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+  
+  assignment          equipment_assignments @relation(fields: [assignmentId], references: [id])
+  
+  @@index([folio])
+  @@index([status, expirationDate])
+  @@index([acceptanceToken])
+  @@map("delivery_acts")
+}
+
+enum ActStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+// Return acts table
+model return_acts {
+  id                  String          @id @default(uuid())
+  folio               String          @unique
+  assignmentId        String          @unique @map("assignment_id")
+  deliveryActId       String          @map("delivery_act_id")
+  equipmentCondition  EquipmentCondition @map("equipment_condition")
+  inspectionNotes     String?         @db.Text @map("inspection_notes")
+  returnDate          DateTime        @map("return_date")
+  receiverInfo        Json            @map("receiver_info")
+  delivererInfo       Json            @map("deliverer_info")
+  status              ActStatus       @default(PENDING)
+  acceptanceToken     String          @unique @map("acceptance_token")
+  expirationDate      DateTime        @map("expiration_date")
+  acceptedAt          DateTime?       @map("accepted_at")
+  rejectedAt          DateTime?       @map("rejected_at")
+  rejectionReason     String?         @db.Text @map("rejection_reason")
+  signatureTimestamp  DateTime?       @map("signature_timestamp")
+  signatureIp         String?         @map("signature_ip")
+  signatureUserAgent  String?         @map("signature_user_agent")
+  verificationHash    String?         @map("verification_hash")
+  pdfPath             String?         @map("pdf_path")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+  
+  assignment          equipment_assignments @relation(fields: [assignmentId], references: [id])
+  
+  @@index([folio])
+  @@index([status, expirationDate])
+  @@index([acceptanceToken])
+  @@map("return_acts")
+}
+
+// Maintenance records table
+model maintenance_records {
+  id              String          @id @default(uuid())
+  equipmentId     String          @map("equipment_id")
+  type            MaintenanceType
+  date            DateTime
+  description     String          @db.Text
+  technicianId    String          @map("technician_id")
+  cost            Float?
+  partsReplaced   String[]        @map("parts_replaced")
+  ticketId        String?         @map("ticket_id")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  
+  equipment       equipment       @relation(fields: [equipmentId], references: [id])
+  technician      users           @relation("MaintenanceTechnician", fields: [technicianId], references: [id])
+  ticket          tickets?        @relation(fields: [ticketId], references: [id])
+  
+  @@index([equipmentId, date])
+  @@index([technicianId])
+  @@index([ticketId])
+  @@map("maintenance_records")
+}
+
+enum MaintenanceType {
+  PREVENTIVE
+  CORRECTIVE
+}
+
+// Software licenses table
+model software_licenses {
+  id              String        @id @default(uuid())
+  name            String
+  type            LicenseType
+  key             String        @db.Text // Encrypted
+  purchaseDate    DateTime      @map("purchase_date")
+  expirationDate  DateTime?     @map("expiration_date")
+  cost            Float?
+  vendor          String?
+  assignedToEquipment String?   @map("assigned_to_equipment")
+  assignedToUser  String?       @map("assigned_to_user")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  
+  equipment       equipment?    @relation(fields: [assignedToEquipment], references: [id])
+  user            users?        @relation("LicenseUser", fields: [assignedToUser], references: [id])
+  
+  @@index([type, expirationDate])
+  @@index([assignedToEquipment])
+  @@index([assignedToUser])
+  @@map("software_licenses")
+}
+
+enum LicenseType {
+  WINDOWS
+  OFFICE
+  ANTIVIRUS
+  ADOBE
+  AUTOCAD
+  OTHER
+}
+
+// Consumables table
+model consumables {
+  id                  String            @id @default(uuid())
+  name                String
+  type                ConsumableType
+  unitOfMeasure       String            @map("unit_of_measure")
+  currentStock        Float             @map("current_stock")
+  minStock            Float             @map("min_stock")
+  maxStock            Float             @map("max_stock")
+  costPerUnit         Float?            @map("cost_per_unit")
+  compatibleEquipment String[]          @map("compatible_equipment")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+  
+  movements           stock_movements[]
+  
+  @@index([type, currentStock])
+  @@map("consumables")
+}
+
+enum ConsumableType {
+  TONER
+  INK
+  PAPER
+  CABLE
+  BATTERY
+  CLEANING
+  OTHER
+}
+
+// Stock movements table
+model stock_movements {
+  id            String        @id @default(uuid())
+  consumableId  String        @map("consumable_id")
+  type          MovementType
+  quantity      Float
+  reason        String?       @db.Text
+  userId        String        @map("user_id")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  
+  consumable    consumables   @relation(fields: [consumableId], references: [id])
+  user          users         @relation("StockMovementUser", fields: [userId], references: [id])
+  
+  @@index([consumableId, createdAt])
+  @@index([userId])
+  @@map("stock_movements")
+}
+
+enum MovementType {
+  ENTRY
+  EXIT
+  ADJUSTMENT
+}
+
+// Folio counters table (for sequential folio generation)
+model folio_counters {
+  id        String   @id @default(uuid())
+  year      Int
+  type      String   // 'ACT' or 'DEV'
+  lastNumber Int     @default(0) @map("last_number")
+  
+  @@unique([year, type])
+  @@map("folio_counters")
 }

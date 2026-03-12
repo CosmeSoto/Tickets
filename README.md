@@ -87,6 +87,7 @@ npm run build
 # Migraciones
 npx prisma migrate dev
 npx prisma migrate deploy
+npx prisma migrate reset --force
 
 # Seed
 npx prisma db seed

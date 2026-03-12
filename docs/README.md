@@ -6,9 +6,11 @@
 2. [Despliegue con Docker](./DEPLOYMENT.md)
 3. [Características del Sistema](./FEATURES.md)
 4. [Solución de Problemas](./TROUBLESHOOTING.md)
-5. [Configuración OAuth (Google/Microsoft)](./OAUTH_SETUP_GUIDE.md)
-6. [Integración del Selector de Categorías](./CATEGORY_SELECTOR_INTEGRATION.md)
-7. [Guía de Desarrollo del Selector de Categorías](./CATEGORY_SELECTOR_DEVELOPER.md)
+5. [Base de Datos](./DATABASE.md)
+6. [Guía de Migración a Otro Equipo](./MIGRATION_GUIDE.md)
+7. [Configuración OAuth (Google/Microsoft)](./OAUTH_SETUP_GUIDE.md)
+8. [Integración del Selector de Categorías](./CATEGORY_SELECTOR_INTEGRATION.md)
+9. [Guía de Desarrollo del Selector de Categorías](./CATEGORY_SELECTOR_DEVELOPER.md)
 
 ## 🎯 Descripción
 
