@@ -7,7 +7,6 @@ import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
 import { useToast } from '@/hooks/use-toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PersonalSettings } from '@/components/settings/personal-settings'
-import { PrivacySettings } from '@/components/settings/privacy-settings'
 import { NotificationSettingsCard } from '@/components/notifications/notification-settings-card'
 import {
   NotificationPreferences,
@@ -16,10 +15,6 @@ import {
 } from '@/types/notification-preferences'
 
 interface UserSettings {
-  privacy: {
-    profileVisible: boolean
-    activityVisible: boolean
-  }
   preferences: {
     theme: 'light' | 'dark' | 'system'
     timezone: string
@@ -33,10 +28,6 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(false)
 
   const [settings, setSettings] = useState<UserSettings>({
-    privacy: {
-      profileVisible: true,
-      activityVisible: true,
-    },
     preferences: {
       theme: 'light',
       timezone: 'America/Guayaquil',
@@ -65,10 +56,6 @@ export default function SettingsPage() {
         const data = await response.json()
         if (data.success && data.settings) {
           setSettings({
-            privacy: {
-              profileVisible: data.settings.profileVisible ?? true,
-              activityVisible: data.settings.activityVisible ?? true,
-            },
             preferences: {
               theme: data.settings.theme || 'light',
               timezone: data.settings.timezone || 'America/Guayaquil',
@@ -157,57 +144,6 @@ export default function SettingsPage() {
     setNotificationPrefs(prev => ({ ...prev, ...updates }))
   }
 
-  const updatePrivacySetting = (key: keyof UserSettings['privacy'], value: boolean) => {
-    setSettings(prev => ({
-      ...prev,
-      privacy: {
-        ...prev.privacy,
-        [key]: value,
-      },
-    }))
-  }
-
-  const savePrivacySettings = async () => {
-    setLoading(true)
-    try {
-      const payload = {
-        profileVisible: settings.privacy.profileVisible,
-        activityVisible: settings.privacy.activityVisible,
-      }
-
-      const response = await fetch('/api/user/settings', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      })
-
-      if (response.ok) {
-        toast({
-          title: 'Configuración guardada',
-          description: 'Tus preferencias de privacidad han sido actualizadas',
-        })
-      } else {
-        const error = await response.json()
-        toast({
-          title: 'Error al guardar',
-          description: error.error || 'No se pudieron guardar las configuraciones de privacidad',
-          variant: 'destructive',
-        })
-      }
-    } catch (error) {
-      console.error('Error saving privacy settings:', error)
-      toast({
-        title: 'Error de conexión',
-        description: 'No se pudo conectar con el servidor',
-        variant: 'destructive',
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const savePersonalSettings = async () => {
     setLoading(true)
     try {
@@ -278,10 +214,9 @@ export default function SettingsPage() {
     >
       <div className='max-w-6xl mx-auto'>
         <Tabs defaultValue='personal' className='space-y-6'>
-          <TabsList className='grid w-full grid-cols-3'>
+          <TabsList className='grid w-full grid-cols-2'>
             <TabsTrigger value='personal'>Personal</TabsTrigger>
             <TabsTrigger value='notifications'>Notificaciones</TabsTrigger>
-            <TabsTrigger value='privacy'>Privacidad</TabsTrigger>
           </TabsList>
 
           {/* Configuración Personal */}
@@ -297,18 +232,6 @@ export default function SettingsPage() {
               onUpdate={updateNotificationPrefs}
               onSave={saveNotificationSettings}
               loading={loading}
-            />
-          </TabsContent>
-
-          {/* Privacidad */}
-          <TabsContent value='privacy' className='space-y-6'>
-            <PrivacySettings
-              settings={settings}
-              onUpdateSetting={updatePrivacySetting}
-              onSave={savePrivacySettings}
-              loading={loading}
-              isAdmin={isAdmin}
-              userRole={userRole}
             />
           </TabsContent>
         </Tabs>

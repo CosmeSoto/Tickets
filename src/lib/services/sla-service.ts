@@ -215,12 +215,21 @@ export class SLAService {
         ? now <= new Date(metrics.responseDeadline)
         : null
 
+      // Actualizar métricas SLA
       await prisma.ticket_sla_metrics.update({
         where: { ticketId },
         data: {
           firstResponseAt: now,
           responseTimeMinutes: responseTimeMins,
           responseSLAMet
+        }
+      })
+
+      // También actualizar el campo en la tabla tickets
+      await prisma.tickets.update({
+        where: { id: ticketId },
+        data: {
+          firstResponseAt: now
         }
       })
 

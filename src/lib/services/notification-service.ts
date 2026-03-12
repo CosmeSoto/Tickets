@@ -13,10 +13,120 @@ export interface CreateNotificationData {
 
 export class NotificationService {
   /**
+   * Verificar si se debe enviar una notificación según las preferencias del usuario
+   */
+  private static async shouldNotify(
+    userId: string,
+    notificationType: 'push' | 'email',
+    specificType?: 'ticketCreated' | 'ticketAssigned' | 'statusChanged' | 'newComments' | 'ticketUpdates'
+  ): Promise<boolean> {
+    try {
+      const prefs = await prisma.user_preferences.findUnique({
+        where: { userId },
+        select: {
+          emailNotifications: true,
+          pushNotifications: true,
+          ticketCreated: true,
+          ticketAssigned: true,
+          statusChanged: true,
+          newComments: true,
+          ticketUpdates: true,
+          quietHoursEnabled: true,
+          quietHoursStart: true,
+          quietHoursEnd: true,
+        }
+      })
+
+      if (!prefs) return true // Si no hay preferencias, enviar por defecto
+
+      // Verificar horarios silenciosos
+      if (prefs.quietHoursEnabled && prefs.quietHoursStart && prefs.quietHoursEnd) {
+        const now = new Date()
+        const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+        
+        // Comparar horarios
+        if (prefs.quietHoursStart <= prefs.quietHoursEnd) {
+          // Rango normal (ej: 22:00 - 08:00 del día siguiente)
+          if (currentTime >= prefs.quietHoursStart && currentTime <= prefs.quietHoursEnd) {
+            console.log(`[NOTIFICATION] User ${userId} is in quiet hours`)
+            return false
+          }
+        } else {
+          // Rango que cruza medianoche (ej: 22:00 - 08:00)
+          if (currentTime >= prefs.quietHoursStart || currentTime <= prefs.quietHoursEnd) {
+            console.log(`[NOTIFICATION] User ${userId} is in quiet hours`)
+            return false
+          }
+        }
+      }
+
+      // Verificar tipo de notificación general
+      if (notificationType === 'push' && !prefs.pushNotifications) {
+        console.log(`[NOTIFICATION] User ${userId} has push notifications disabled`)
+        return false
+      }
+
+      if (notificationType === 'email' && !prefs.emailNotifications) {
+        console.log(`[NOTIFICATION] User ${userId} has email notifications disabled`)
+        return false
+      }
+
+      // Verificar tipo específico
+      if (specificType) {
+        switch (specificType) {
+          case 'ticketCreated':
+            if (!prefs.ticketCreated) {
+              console.log(`[NOTIFICATION] User ${userId} has ticketCreated notifications disabled`)
+              return false
+            }
+            break
+          case 'ticketAssigned':
+            if (!prefs.ticketAssigned) {
+              console.log(`[NOTIFICATION] User ${userId} has ticketAssigned notifications disabled`)
+              return false
+            }
+            break
+          case 'statusChanged':
+            if (!prefs.statusChanged) {
+              console.log(`[NOTIFICATION] User ${userId} has statusChanged notifications disabled`)
+              return false
+            }
+            break
+          case 'newComments':
+            if (!prefs.newComments) {
+              console.log(`[NOTIFICATION] User ${userId} has newComments notifications disabled`)
+              return false
+            }
+            break
+          case 'ticketUpdates':
+            if (!prefs.ticketUpdates) {
+              console.log(`[NOTIFICATION] User ${userId} has ticketUpdates notifications disabled`)
+              return false
+            }
+            break
+        }
+      }
+
+      return true
+    } catch (error) {
+      console.error('[NOTIFICATION] Error checking preferences:', error)
+      return true // En caso de error, enviar por defecto para no bloquear notificaciones críticas
+    }
+  }
+
+  /**
    * Crear una notificación in-app
    */
-  static async createNotification(data: CreateNotificationData) {
+  static async createNotification(data: CreateNotificationData & { specificType?: 'ticketCreated' | 'ticketAssigned' | 'statusChanged' | 'newComments' | 'ticketUpdates' }) {
     try {
+      // Verificar si el usuario quiere notificaciones push
+      const shouldSend = await this.shouldNotify(data.userId, 'push', data.specificType)
+      
+      if (!shouldSend) {
+        console.log(`[NOTIFICATION] Skipping push notification for user ${data.userId}`)
+        return null
+      }
+
       const notification = await prisma.notifications.create({
         data: {
           id: randomUUID(),
@@ -95,6 +205,7 @@ export class NotificationService {
             title: 'Nuevo ticket creado',
             message: `${ticket.users_tickets_clientIdTousers.name} ha creado el ticket "${ticket.title}"`,
             ticketId: ticket.id,
+            specificType: 'ticketCreated',
             metadata: {
               priority: ticket.priority,
               category: ticket.categories.name,
@@ -143,13 +254,14 @@ export class NotificationService {
           title: 'Nuevo ticket asignado',
           message: `Se te ha asignado el ticket "${ticket.title}"`,
           ticketId: ticket.id,
+          specificType: 'ticketAssigned',
           metadata: {
             priority: ticket.priority,
             clientName: ticket.users_tickets_clientIdTousers.name,
             link: `/technician/tickets/${ticket.id}`,
           },
         })
-        notifications.push(techNotification)
+        if (techNotification) notifications.push(techNotification)
       }
 
       // Notificar al cliente
@@ -159,11 +271,12 @@ export class NotificationService {
         title: 'Ticket asignado',
         message: `Tu ticket "${ticket.title}" ha sido asignado a ${ticket.users_tickets_assigneeIdTousers?.name || 'un técnico'}`,
         ticketId: ticket.id,
+        specificType: 'ticketAssigned',
         metadata: {
           link: `/client/tickets/${ticket.id}`,
         },
       })
-      notifications.push(clientNotification)
+      if (clientNotification) notifications.push(clientNotification)
 
       return notifications
     } catch (error) {
@@ -221,8 +334,9 @@ export class NotificationService {
           title: 'Nueva respuesta en tu ticket',
           message: `${author.name} ha respondido en el ticket "${ticket.title}"`,
           ticketId: ticket.id,
+          specificType: 'newComments',
         })
-        notifications.push(clientNotification)
+        if (clientNotification) notifications.push(clientNotification)
       }
 
       // Si el autor es cliente, notificar al técnico asignado
@@ -233,8 +347,9 @@ export class NotificationService {
           title: 'Nueva respuesta del cliente',
           message: `${author.name} ha respondido en el ticket "${ticket.title}"`,
           ticketId: ticket.id,
+          specificType: 'newComments',
         })
-        notifications.push(techNotification)
+        if (techNotification) notifications.push(techNotification)
       }
 
       return notifications
@@ -273,6 +388,7 @@ export class NotificationService {
         title: 'Ticket resuelto',
         message: `Tu ticket "${ticket.title}" ha sido marcado como resuelto`,
         ticketId: ticket.id,
+        specificType: 'statusChanged',
       })
 
       return notification

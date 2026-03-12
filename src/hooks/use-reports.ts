@@ -54,6 +54,9 @@ interface UseReportsConfig {
 // Cache simple en memoria
 const cache = new Map<string, { data: any; timestamp: number }>()
 
+// Control de peticiones en progreso para evitar duplicados
+const pendingRequests = new Map<string, Promise<any>>()
+
 const getFromCache = <T>(key: string, ttl: number = 5 * 60 * 1000): T | null => {
   const cached = cache.get(key)
   if (cached && Date.now() - cached.timestamp < ttl) {
@@ -64,6 +67,41 @@ const getFromCache = <T>(key: string, ttl: number = 5 * 60 * 1000): T | null => 
 
 const setToCache = (key: string, data: any) => {
   cache.set(key, { data, timestamp: Date.now() })
+}
+
+// Función helper para retry con backoff exponencial
+const fetchWithRetry = async (
+  url: string,
+  maxRetries = 3,
+  initialDelay = 1000
+): Promise<Response> => {
+  let lastError: Error | null = null
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch(url)
+      
+      // Si es 429, esperar y reintentar
+      if (response.status === 429 && attempt < maxRetries) {
+        const delay = initialDelay * Math.pow(2, attempt) // Backoff exponencial
+        console.log(`Rate limited, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`)
+        await new Promise(resolve => setTimeout(resolve, delay))
+        continue
+      }
+      
+      return response
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Unknown error')
+      
+      if (attempt < maxRetries) {
+        const delay = initialDelay * Math.pow(2, attempt)
+        console.log(`Request failed, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`)
+        await new Promise(resolve => setTimeout(resolve, delay))
+      }
+    }
+  }
+  
+  throw lastError || new Error('Max retries exceeded')
 }
 
 export function useReports(config: UseReportsConfig = {}) {
@@ -191,69 +229,92 @@ export function useReports(config: UseReportsConfig = {}) {
       return
     }
 
+    const cacheKey = `reports-${JSON.stringify(filters)}`
+    
+    // Si ya hay una petición en progreso para esta clave, esperar a que termine
+    if (pendingRequests.has(cacheKey)) {
+      console.log('⏳ Request already in progress, waiting...')
+      return pendingRequests.get(cacheKey)
+    }
+
     setLoadingReports(true)
     setError(null)
 
-    try {
-      const cacheKey = `reports-${JSON.stringify(filters)}`
-      
-      // Verificar cache si está habilitado
-      if (enableCache && !force) {
-        const cached = getFromCache<{
-          ticketReport: TicketReport | null
-          technicianReport: TechnicianReport[]
-          categoryReport: CategoryReport[]
-          departmentReport: DepartmentReport[]
-        }>(cacheKey, cacheTTL)
+    // Crear la promesa de carga
+    const loadPromise = (async () => {
+      try {
+        // Verificar cache si está habilitado
+        if (enableCache && !force) {
+          const cached = getFromCache<{
+            ticketReport: TicketReport | null
+            technicianReport: TechnicianReport[]
+            categoryReport: CategoryReport[]
+            departmentReport: DepartmentReport[]
+          }>(cacheKey, cacheTTL)
 
-        if (cached) {
-          setTicketReport(cached.ticketReport)
-          setTechnicianReport(Array.isArray(cached.technicianReport) ? cached.technicianReport : [])
-          setCategoryReport(Array.isArray(cached.categoryReport) ? cached.categoryReport : [])
-          setDepartmentReport(Array.isArray(cached.departmentReport) ? cached.departmentReport : [])
-          setLoading(false)
-          return
+          if (cached) {
+            setTicketReport(cached.ticketReport)
+            setTechnicianReport(Array.isArray(cached.technicianReport) ? cached.technicianReport : [])
+            setCategoryReport(Array.isArray(cached.categoryReport) ? cached.categoryReport : [])
+            setDepartmentReport(Array.isArray(cached.departmentReport) ? cached.departmentReport : [])
+            setLoading(false)
+            return
+          }
         }
+
+        // Cargar datos frescos con delay entre peticiones para evitar rate limiting
+        // En lugar de Promise.all, cargamos secuencialmente con pequeños delays
+        const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+        
+        const ticketRes = await loadTicketReport()
+        await delay(150) // 150ms entre peticiones
+        
+        const technicianRes = await loadTechnicianReport()
+        await delay(150)
+        
+        const categoryRes = await loadCategoryReport()
+        await delay(150)
+        
+        const departmentRes = await loadDepartmentReport()
+
+        const reportData = {
+          ticketReport: ticketRes,
+          technicianReport: Array.isArray(technicianRes) ? technicianRes : [],
+          categoryReport: Array.isArray(categoryRes) ? categoryRes : [],
+          departmentReport: Array.isArray(departmentRes) ? departmentRes : []
+        }
+
+        // Guardar en cache
+        if (enableCache) {
+          setToCache(cacheKey, reportData)
+        }
+
+        setTicketReport(ticketRes)
+        setTechnicianReport(reportData.technicianReport)
+        setCategoryReport(reportData.categoryReport)
+        setDepartmentReport(reportData.departmentReport)
+        setLoading(false)
+
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Error al cargar reportes'
+        setError(errorMessage)
+        setLoading(false)
+        toast({
+          title: 'Error',
+          description: errorMessage,
+          variant: 'destructive'
+        })
+      } finally {
+        setLoadingReports(false)
+        // Limpiar la petición pendiente
+        pendingRequests.delete(cacheKey)
       }
+    })()
 
-      // Cargar datos frescos
-      const [ticketRes, technicianRes, categoryRes, departmentRes] = await Promise.all([
-        loadTicketReport(),
-        loadTechnicianReport(),
-        loadCategoryReport(),
-        loadDepartmentReport()
-      ])
-
-      const reportData = {
-        ticketReport: ticketRes,
-        technicianReport: Array.isArray(technicianRes) ? technicianRes : [],
-        categoryReport: Array.isArray(categoryRes) ? categoryRes : [],
-        departmentReport: Array.isArray(departmentRes) ? departmentRes : []
-      }
-
-      // Guardar en cache
-      if (enableCache) {
-        setToCache(cacheKey, reportData)
-      }
-
-      setTicketReport(ticketRes)
-      setTechnicianReport(reportData.technicianReport)
-      setCategoryReport(reportData.categoryReport)
-      setDepartmentReport(reportData.departmentReport)
-      setLoading(false)
-
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Error al cargar reportes'
-      setError(errorMessage)
-      setLoading(false)
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive'
-      })
-    } finally {
-      setLoadingReports(false)
-    }
+    // Guardar la promesa en el mapa de peticiones pendientes
+    pendingRequests.set(cacheKey, loadPromise)
+    
+    return loadPromise
   }, [session, filters, enableCache, cacheTTL, toast])
 
   const loadTicketReport = useCallback(async (): Promise<TicketReport | null> => {
@@ -270,7 +331,7 @@ export function useReports(config: UseReportsConfig = {}) {
         )
       })
 
-      const response = await fetch(`/api/reports?${params}`)
+      const response = await fetchWithRetry(`/api/reports?${params}`)
       if (response.ok) {
         const result = await response.json()
         
@@ -308,7 +369,7 @@ export function useReports(config: UseReportsConfig = {}) {
         )
       })
 
-      const response = await fetch(`/api/reports?${params}`)
+      const response = await fetchWithRetry(`/api/reports?${params}`)
       if (response.ok) {
         const data = await response.json()
         // Asegurar que siempre retornemos un array
@@ -336,7 +397,7 @@ export function useReports(config: UseReportsConfig = {}) {
         )
       })
 
-      const response = await fetch(`/api/reports?${params}`)
+      const response = await fetchWithRetry(`/api/reports?${params}`)
       if (response.ok) {
         const data = await response.json()
         // Asegurar que siempre retornemos un array
@@ -364,7 +425,7 @@ export function useReports(config: UseReportsConfig = {}) {
         )
       })
 
-      const response = await fetch(`/api/reports?${params}`)
+      const response = await fetchWithRetry(`/api/reports?${params}`)
       if (response.ok) {
         const data = await response.json()
         // Asegurar que siempre retornemos un array
@@ -547,8 +608,20 @@ export function useReports(config: UseReportsConfig = {}) {
   // Cargar reportes automáticamente en el mount inicial
   useEffect(() => {
     if (isAuthenticated && isInitialMount) {
-      // Cargar datos inmediatamente cuando se monta el componente
-      loadReports()
+      // Usar un flag para evitar doble ejecución en React Strict Mode
+      let cancelled = false
+      
+      const loadData = async () => {
+        if (!cancelled) {
+          await loadReports()
+        }
+      }
+      
+      loadData()
+      
+      return () => {
+        cancelled = true
+      }
     }
   }, [isAuthenticated, isInitialMount, loadReports])
 

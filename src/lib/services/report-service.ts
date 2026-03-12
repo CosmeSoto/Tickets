@@ -805,9 +805,12 @@ export class ReportService {
           }
         }
 
-        // Usar tiempo de respuesta real de las métricas
-        if (metrics.responseTimeMinutes) {
-          totalResponseTime += metrics.responseTimeMinutes
+        // Calcular tiempo de respuesta desde métricas o ticket
+        const firstResponse = metrics.firstResponseAt || ticket.firstResponseAt
+        if (firstResponse) {
+          const responseTime = new Date(firstResponse).getTime() - new Date(ticket.createdAt).getTime()
+          const responseMinutes = responseTime / (1000 * 60)
+          totalResponseTime += responseMinutes
           responseTimeCount++
         }
       } else if (ticket.slaDeadline) {

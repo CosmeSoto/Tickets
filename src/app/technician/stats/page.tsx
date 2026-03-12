@@ -42,12 +42,6 @@ interface TechnicianStats {
     totalHours: number
     efficiency: number
   }
-  performance: {
-    responseTimeRank: number
-    resolutionTimeRank: number
-    satisfactionRank: number
-    totalTechnicians: number
-  }
 }
 
 interface CategoryStats {
@@ -80,12 +74,6 @@ export default function TechnicianStatsPage() {
       totalHours: 0,
       efficiency: 0,
     },
-    performance: {
-      responseTimeRank: 0,
-      resolutionTimeRank: 0,
-      satisfactionRank: 0,
-      totalTechnicians: 0,
-    },
   })
   const [categoryStats, setCategoryStats] = useState<CategoryStats[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -109,25 +97,105 @@ export default function TechnicianStatsPage() {
     if (showRefresh) setIsRefreshing(true)
     
     try {
-      const response = await fetch('/api/technician/stats')
+      const response = await fetch('/api/dashboard/stats?role=TECHNICIAN')
       if (response.ok) {
         const data = await response.json()
-        if (data.success && data.stats) {
-          setStats(data.stats)
-          setCategoryStats(data.categoryStats || [])
-        } else {
-          console.error('API returned unsuccessful response:', data)
+        
+        // Mapear datos reales del API al formato esperado
+        const mappedStats: TechnicianStats = {
+          today: {
+            resolved: data.completedToday || 0,
+            assigned: data.assignedTickets || 0,
+            avgResponseTime: data.avgFirstResponseTime || '0h',
+            avgResolutionTime: data.avgResolutionTime || '0h',
+          },
+          week: {
+            resolved: data.thisWeekResolved || 0,
+            assigned: data.assignedTickets || 0,
+            avgSatisfaction: data.satisfactionScore || 0,
+            productivity: data.thisWeekResolved > 0 ? Math.min(Math.round((data.thisWeekResolved / 7) * 10), 100) : 0,
+          },
+          month: {
+            resolved: data.resolvedTickets || 0,
+            assigned: data.assignedTickets || 0,
+            totalHours: data.myResolutionPlans?.avgActualHours ? Math.round(data.myResolutionPlans.avgActualHours * data.myResolutionPlans.total) : 0,
+            efficiency: data.myResolutionPlans?.efficiency || 0,
+          },
         }
+        
+        setStats(mappedStats)
+        
+        // Cargar estadísticas por categoría
+        loadCategoryStats()
       } else {
         console.error('API request failed with status:', response.status)
-        const errorData = await response.json().catch(() => ({}))
-        console.error('Error details:', errorData)
       }
     } catch (error) {
       console.error('Error loading stats:', error)
     } finally {
       setIsLoading(false)
       setIsRefreshing(false)
+    }
+  }
+  
+  const loadCategoryStats = async () => {
+    try {
+      const response = await fetch('/api/dashboard/tickets?role=TECHNICIAN&limit=100')
+      if (response.ok) {
+        const data = await response.json()
+        const tickets = Array.isArray(data.tickets) ? data.tickets : []
+        
+        // Agrupar por categoría
+        const categoryMap = new Map<string, { resolved: number; pending: number; times: number[]; color: string }>()
+        
+        tickets.forEach(ticket => {
+          const category = ticket.category || 'Sin categoría'
+          if (!categoryMap.has(category)) {
+            categoryMap.set(category, {
+              resolved: 0,
+              pending: 0,
+              times: [],
+              color: ticket.categoryColor || '#3b82f6'
+            })
+          }
+          
+          const catData = categoryMap.get(category)!
+          if (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') {
+            catData.resolved++
+            if (ticket.resolvedAt && ticket.createdAt) {
+              const diff = new Date(ticket.resolvedAt).getTime() - new Date(ticket.createdAt).getTime()
+              catData.times.push(diff / (1000 * 60 * 60)) // horas
+            }
+          } else {
+            catData.pending++
+          }
+        })
+        
+        // Convertir a array y calcular promedios
+        const categoryStats: CategoryStats[] = Array.from(categoryMap.entries()).map(([name, data]) => {
+          const avgHours = data.times.length > 0 
+            ? data.times.reduce((a, b) => a + b, 0) / data.times.length 
+            : 0
+          
+          const avgTime = avgHours < 1 
+            ? `${Math.round(avgHours * 60)}min`
+            : avgHours < 24
+            ? `${Math.round(avgHours * 10) / 10}h`
+            : `${Math.round(avgHours / 24 * 10) / 10}d`
+          
+          return {
+            name,
+            resolved: data.resolved,
+            pending: data.pending,
+            avgTime,
+            color: data.color
+          }
+        }).sort((a, b) => (b.resolved + b.pending) - (a.resolved + a.pending))
+        
+        setCategoryStats(categoryStats.slice(0, 5)) // Top 5 categorías
+      }
+    } catch (error) {
+      console.error('Error loading category stats:', error)
     }
   }
 
@@ -213,27 +281,26 @@ export default function TechnicianStatsPage() {
               value={stats.week.resolved}
               icon={CheckCircle}
               color="green"
-              trend={{ value: 15, label: 'vs semana pasada', isPositive: true }}
             />
             <SymmetricStatsCard
               title="Asignados"
               value={stats.week.assigned}
               icon={Target}
               color="blue"
-              trend={{ value: 8, label: 'vs semana pasada', isPositive: true }}
             />
             <SymmetricStatsCard
               title="Satisfacción"
               value={`${stats.week.avgSatisfaction}/5`}
               icon={Star}
               color="orange"
+              status={(stats.week.avgSatisfaction || 0) >= 4.5 ? 'success' : (stats.week.avgSatisfaction || 0) >= 4 ? 'normal' : 'warning'}
             />
             <SymmetricStatsCard
               title="Productividad"
               value={`${stats.week.productivity}%`}
               icon={TrendingUp}
               color="purple"
-              trend={{ value: 5, label: 'vs semana pasada', isPositive: true }}
+              status={stats.week.productivity >= 80 ? 'success' : stats.week.productivity >= 60 ? 'normal' : 'warning'}
             />
           </div>
         </div>
@@ -273,88 +340,8 @@ export default function TechnicianStatsPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Performance Ranking */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Award className="h-5 w-5 mr-2 text-yellow-600" />
-                Ranking de Rendimiento
-              </CardTitle>
-              <CardDescription>
-                Tu posición entre {stats.performance.totalTechnicians} técnicos
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-4 border border-border rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Zap className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">Tiempo de Respuesta</p>
-                    <p className="text-sm text-muted-foreground">
-                      Qué tan rápido respondes
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <Badge className="bg-blue-100 text-blue-800">
-                    #{stats.performance.responseTimeRank}
-                  </Badge>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Top {Math.round((stats.performance.responseTimeRank / stats.performance.totalTechnicians) * 100)}%
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between p-4 border border-border rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">Tiempo de Resolución</p>
-                    <p className="text-sm text-muted-foreground">
-                      Qué tan rápido resuelves
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <Badge className="bg-green-100 text-green-800">
-                    #{stats.performance.resolutionTimeRank}
-                  </Badge>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Top {Math.round((stats.performance.resolutionTimeRank / stats.performance.totalTechnicians) * 100)}%
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between p-4 border border-border rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-yellow-100 rounded-lg">
-                    <Star className="h-5 w-5 text-yellow-600" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">Satisfacción del Cliente</p>
-                    <p className="text-sm text-muted-foreground">
-                      Calificaciones recibidas
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <Badge className="bg-yellow-100 text-yellow-800">
-                    #{stats.performance.satisfactionRank}
-                  </Badge>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Top {Math.round((stats.performance.satisfactionRank / stats.performance.totalTechnicians) * 100)}%
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Category Stats */}
-          <Card>
+          {/* Estadísticas por Categoría */}
+          <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle className="flex items-center">
                 <BarChart3 className="h-5 w-5 mr-2 text-purple-600" />
@@ -373,15 +360,15 @@ export default function TechnicianStatsPage() {
                   </p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {categoryStats.map((category, index) => (
                     <div
                       key={index}
-                      className="flex items-center justify-between p-3 border border-border rounded-lg"
+                      className="flex items-center justify-between p-4 border border-border rounded-lg"
                     >
                       <div className="flex items-center space-x-3">
                         <div
-                          className="w-3 h-3 rounded-full"
+                          className="w-3 h-3 rounded-full flex-shrink-0"
                           style={{ backgroundColor: category.color }}
                         />
                         <div>

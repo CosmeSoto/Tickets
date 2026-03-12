@@ -141,6 +141,16 @@ export async function middleware(request: NextRequest) {
   const isPublic = isPublicRoute(request.nextUrl.pathname)
   const isProtected = isProtectedRoute(request.nextUrl.pathname)
 
+  // Permitir acceso a la página de inicio con parámetro preview
+  const isPreview = request.nextUrl.searchParams.get('preview') === 'true'
+  if (request.nextUrl.pathname === '/' && isPreview) {
+    ApplicationLogger.child({ requestId, component: 'middleware' }).debug(
+      `Preview mode accessed: ${path}`,
+      { metadata: { isPreview: true } }
+    )
+    return response
+  }
+
   if (isPublic) {
     ApplicationLogger.child({ requestId, component: 'middleware' }).debug(
       `Public path accessed: ${path}`,

@@ -296,17 +296,127 @@ function AuditDetailsResolver({ details }: { details: any }) {
   if (resolvedDetails.type === 'generic') {
     const entries = Object.entries(resolvedDetails.data)
     if (entries.length > 0) {
+      // Función para formatear valores de manera amigable
+      const formatValue = (key: string, value: any): string => {
+        // Ocultar información sensible
+        if (key === 'checksum' || key === 'hash') {
+          return '(Verificación de integridad)'
+        }
+        
+        // Formatear tamaños de archivo
+        if (key === 'size' && typeof value === 'number') {
+          const kb = value / 1024
+          const mb = kb / 1024
+          if (mb >= 1) {
+            return `${mb.toFixed(2)} MB`
+          }
+          return `${kb.toFixed(2)} KB`
+        }
+        
+        // Formatear fechas
+        if ((key.includes('At') || key.includes('Date')) && typeof value === 'string') {
+          try {
+            return new Date(value).toLocaleString('es-ES', {
+              day: '2-digit',
+              month: 'long',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            })
+          } catch {
+            return String(value)
+          }
+        }
+        
+        // Formatear tipos
+        if (key === 'type') {
+          const types: Record<string, string> = {
+            'manual': 'Manual',
+            'automatic': 'Automático',
+            'scheduled': 'Programado',
+            'full': 'Completo',
+            'incremental': 'Incremental'
+          }
+          return types[String(value)] || String(value)
+        }
+        
+        // Formatear booleanos
+        if (typeof value === 'boolean') {
+          return value ? 'Sí' : 'No'
+        }
+        
+        // Formatear objetos
+        if (typeof value === 'object' && value !== null) {
+          return JSON.stringify(value, null, 2)
+        }
+        
+        return String(value)
+      }
+
+      // Función para obtener nombre amigable del campo
+      const getFieldLabel = (key: string): string => {
+        const labels: Record<string, string> = {
+          'filename': 'Nombre del Archivo',
+          'size': 'Tamaño',
+          'type': 'Tipo',
+          'checksum': 'Suma de Verificación',
+          'entityName': 'Nombre',
+          'deletedAt': 'Fecha de Eliminación',
+          'createdAt': 'Fecha de Creación',
+          'updatedAt': 'Última Actualización',
+          'compressed': 'Comprimido',
+          'encrypted': 'Encriptado',
+          'status': 'Estado',
+          'error': 'Error',
+          'duration': 'Duración',
+          'records': 'Registros',
+          'tables': 'Tablas',
+          'CategoriesCount': 'Cantidad de Categorías',
+          'TotalCurrentTickets': 'Tickets Actuales',
+          'isPublished': 'Publicado',
+          'title': 'Título',
+          'content': 'Contenido',
+          'views': 'Visualizaciones',
+          'helpful': 'Útil',
+          'notHelpful': 'No Útil'
+        }
+        return labels[key] || key.charAt(0).toUpperCase() + key.slice(1)
+      }
+
+      // Filtrar campos que no deben mostrarse
+      const filteredEntries = entries.filter(([key]) => {
+        // Ocultar entityName si ya se muestra arriba
+        if (key === 'entityName') return false
+        // Ocultar checksums largos
+        if (key === 'checksum' && String(resolvedDetails.data[key]).length > 50) return false
+        // Ocultar información técnica del sistema
+        if (key === 'requestId') return false
+        if (key === 'timestamp') return false
+        if (key === 'Context') return false
+        if (key === 'context') return false
+        if (key === 'os' && resolvedDetails.data[key] === 'Server') return false
+        if (key === 'browser' && resolvedDetails.data[key] === 'System') return false
+        if (key === 'deviceType' && resolvedDetails.data[key] === 'Unknown') return false
+        if (key === 'source' && resolvedDetails.data[key] === 'SYSTEM') return false
+        if (key === 'result' && resolvedDetails.data[key] === 'SUCCESS') return false
+        // Ocultar contadores si son 0
+        if ((key === 'CategoriesCount' || key === 'TotalCurrentTickets') && resolvedDetails.data[key] === 0) return false
+        return true
+      })
+
       return (
         <div className="space-y-2">
           <div className="font-semibold text-gray-600 dark:text-gray-400">
-            📦 Información
+            📦 Información Adicional
           </div>
-          <div className="bg-muted/50 p-3 rounded text-sm space-y-1">
-            {entries.map(([key, value]) => (
-              <div key={key}>
-                <span className="font-medium">{key}:</span>{' '}
-                <span className="text-muted-foreground">
-                  {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+          <div className="bg-muted/50 p-4 rounded-lg space-y-3">
+            {filteredEntries.map(([key, value]) => (
+              <div key={key} className="flex flex-col space-y-1">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  {getFieldLabel(key)}
+                </span>
+                <span className="text-sm text-foreground font-medium">
+                  {formatValue(key, value)}
                 </span>
               </div>
             ))}
@@ -1218,12 +1328,85 @@ export default function AuditPage() {
                 <div className="flex items-center gap-2">
                   <span className="font-semibold">Acción:</span>
                   <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                    {selectedLog.action}
+                    {(() => {
+                      const actionLabels: Record<string, string> = {
+                        // Backups
+                        'backup_created': 'Respaldo Creado',
+                        'backup_deleted': 'Respaldo Eliminado',
+                        'backup_restored': 'Respaldo Restaurado',
+                        // Usuarios
+                        'user_created': 'Usuario Creado',
+                        'user_updated': 'Usuario Actualizado',
+                        'user_deleted': 'Usuario Eliminado',
+                        'user_login': 'Inicio de Sesión',
+                        'user_logout': 'Cierre de Sesión',
+                        // Tickets
+                        'ticket_created': 'Ticket Creado',
+                        'ticket_updated': 'Ticket Actualizado',
+                        'ticket_deleted': 'Ticket Eliminado',
+                        'ticket_assigned': 'Ticket Asignado',
+                        'ticket_closed': 'Ticket Cerrado',
+                        'ticket_reopened': 'Ticket Reabierto',
+                        'ticket_viewed': 'Ticket Visualizado',
+                        // Categorías
+                        'category_created': 'Categoría Creada',
+                        'category_updated': 'Categoría Actualizada',
+                        'category_deleted': 'Categoría Eliminada',
+                        'category_view': 'Categoría Visualizada',
+                        // Departamentos
+                        'department_created': 'Departamento Creado',
+                        'department_updated': 'Departamento Actualizado',
+                        'department_deleted': 'Departamento Eliminado',
+                        // Artículos de conocimiento
+                        'knowledge_article_created': 'Artículo Creado',
+                        'knowledge_article_updated': 'Artículo Actualizado',
+                        'knowledge_article_deleted': 'Artículo Eliminado',
+                        'knowledge_article_published': 'Artículo Publicado',
+                        'knowledge_article_unpublished': 'Artículo Despublicado',
+                        // Configuración
+                        'settings_updated': 'Configuración Actualizada',
+                        'settings_viewed': 'Configuración Visualizada',
+                        // Autenticación
+                        'login': 'Inicio de Sesión',
+                        'logout': 'Cierre de Sesión',
+                        'password_changed': 'Contraseña Cambiada',
+                        'password_reset': 'Contraseña Restablecida',
+                        // Operaciones genéricas
+                        'CREATE': 'Creación',
+                        'UPDATE': 'Actualización',
+                        'DELETE': 'Eliminación',
+                        'VIEW': 'Visualización',
+                        'READ': 'Lectura'
+                      }
+                      return actionLabels[selectedLog.action] || selectedLog.action
+                    })()}
                   </Badge>
                 </div>
                 <div>
-                  <span className="font-semibold">Tipo de Entidad:</span>{' '}
-                  <span className="text-muted-foreground">{selectedLog.entityType}</span>
+                  <span className="font-semibold">Módulo:</span>{' '}
+                  <span className="text-muted-foreground">
+                    {(() => {
+                      const entityLabels: Record<string, string> = {
+                        'System': 'Sistema',
+                        'system': 'Sistema',
+                        'user': 'Usuarios',
+                        'ticket': 'Tickets',
+                        'category': 'Categorías',
+                        'department': 'Departamentos',
+                        'settings': 'Configuración',
+                        'backup': 'Respaldos',
+                        'auth': 'Autenticación',
+                        'knowledge_article': 'Base de Conocimiento',
+                        'comment': 'Comentarios',
+                        'attachment': 'Archivos Adjuntos',
+                        'notification': 'Notificaciones',
+                        'sla': 'Acuerdos de Nivel de Servicio',
+                        'report': 'Reportes',
+                        'audit': 'Auditoría'
+                      }
+                      return entityLabels[selectedLog.entityType] || selectedLog.entityType
+                    })()}
+                  </span>
                 </div>
                 {selectedLog.entityId && (
                   <div>
@@ -1232,7 +1415,8 @@ export default function AuditPage() {
                        selectedLog.entityType === 'ticket' ? 'Ticket:' :
                        selectedLog.entityType === 'category' ? 'Categoría:' :
                        selectedLog.entityType === 'department' ? 'Departamento:' :
-                       'ID de Entidad:'}
+                       selectedLog.entityType === 'System' ? 'Elemento:' :
+                       'Elemento Afectado:'}
                     </span>{' '}
                     {/* PRIORIDAD 1: Usar entityName si está disponible (ya resuelto) */}
                     {selectedLog.details?.entityName ? (

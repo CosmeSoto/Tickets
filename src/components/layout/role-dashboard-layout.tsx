@@ -24,9 +24,11 @@ import {
   Wrench,
   BookOpen,
   Bell,
+  Globe,
 } from 'lucide-react'
 import { Notifications } from '@/components/ui/notifications'
 import { Button } from '@/components/ui/button'
+import { SystemLogo } from '@/components/common/system-logo'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -138,10 +140,9 @@ export function RoleDashboardLayout({
       {/* Sidebar */}
       <aside className="fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border">
         {/* Logo */}
-        <div className="flex items-center justify-center h-16 border-b border-border">
-          <Link href={`/${userRole.toLowerCase()}`} className="flex items-center space-x-2">
-            <Ticket className="h-8 w-8 text-primary" />
-            <span className="text-xl font-bold text-foreground">TicketPro</span>
+        <div className="flex items-center justify-center h-16 border-b border-border px-4">
+          <Link href={`/${userRole.toLowerCase()}`}>
+            <SystemLogo size="sm" showText={true} />
           </Link>
         </div>
 
@@ -225,6 +226,12 @@ export function RoleDashboardLayout({
                       <Link href="/settings">
                         <Settings className="h-4 w-4 mr-2" />
                         Configuración Personal
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/?preview=true" target="_blank">
+                        <Globe className="h-4 w-4 mr-2" />
+                        Ver Página Pública
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />

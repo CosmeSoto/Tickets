@@ -325,11 +325,11 @@ model ticket_resolution_tasks {
 }
 
 model tickets {
-  id                               String                        @id
+  id                               String                      @id
   title                            String
   description                      String
-  status                           TicketStatus                  @default(OPEN)
-  priority                         TicketPriority                @default(MEDIUM)
+  status                           TicketStatus                @default(OPEN)
+  priority                         TicketPriority              @default(MEDIUM)
   clientId                         String
   assigneeId                       String?
   categoryId                       String
@@ -341,8 +341,8 @@ model tickets {
   estimatedTime                    Int?
   actualTime                       Int?
   tags                             String[]
-  source                           TicketSource                  @default(WEB)
-  createdAt                        DateTime                      @default(now())
+  source                           TicketSource                @default(WEB)
+  createdAt                        DateTime                    @default(now())
   updatedAt                        DateTime
   attachments                      attachments[]
   comments                         comments[]
@@ -350,15 +350,15 @@ model tickets {
   ticket_history                   ticket_history[]
   ticket_ratings                   ticket_ratings?
   ticket_resolution_plans          ticket_resolution_plans?
-  knowledge_article                knowledge_articles?           @relation("knowledge_articles_source")
+  knowledge_article                knowledge_articles?         @relation("knowledge_articles_source")
   resolution_plans                 resolution_plans[]
   ticket_knowledge_articles        ticket_knowledge_articles[]
   sla_violations                   sla_violations[]
   ticket_sla_metrics               ticket_sla_metrics?
-  users_tickets_assigneeIdTousers  users?                        @relation("tickets_assigneeIdTousers", fields: [assigneeId], references: [id])
-  categories                       categories                    @relation(fields: [categoryId], references: [id])
-  users_tickets_clientIdTousers    users                         @relation("tickets_clientIdTousers", fields: [clientId], references: [id])
-  users_tickets_createdByIdTousers users?                        @relation("tickets_createdByIdTousers", fields: [createdById], references: [id])
+  users_tickets_assigneeIdTousers  users?                      @relation("tickets_assigneeIdTousers", fields: [assigneeId], references: [id])
+  categories                       categories                  @relation(fields: [categoryId], references: [id])
+  users_tickets_clientIdTousers    users                       @relation("tickets_clientIdTousers", fields: [clientId], references: [id])
+  users_tickets_createdByIdTousers users?                      @relation("tickets_createdByIdTousers", fields: [createdById], references: [id])
 
   @@index([assigneeId, status])
   @@index([categoryId, status])
@@ -383,43 +383,43 @@ model user_preferences {
 }
 
 model user_settings {
-  id                   String   @id
-  userId               String   @unique
-  
+  id     String @id
+  userId String @unique
+
   // Notificaciones básicas
-  emailNotifications   Boolean  @default(true)
-  pushNotifications    Boolean  @default(true)
-  
+  emailNotifications Boolean @default(true)
+  pushNotifications  Boolean @default(true)
+
   // Notificaciones intermedias
-  ticketUpdates        Boolean  @default(true)
-  systemAlerts         Boolean  @default(true)
-  weeklyReport         Boolean  @default(false)
-  
+  ticketUpdates Boolean @default(true)
+  systemAlerts  Boolean @default(true)
+  weeklyReport  Boolean @default(false)
+
   // Notificaciones avanzadas
-  soundEnabled         Boolean  @default(true)
-  ticketCreated        Boolean  @default(true)
-  ticketAssigned       Boolean  @default(true)
-  statusChanged        Boolean  @default(true)
-  newComments          Boolean  @default(true)
-  ticketUpdated        Boolean  @default(true)
-  
+  soundEnabled   Boolean @default(true)
+  ticketCreated  Boolean @default(true)
+  ticketAssigned Boolean @default(true)
+  statusChanged  Boolean @default(true)
+  newComments    Boolean @default(true)
+  ticketUpdated  Boolean @default(true)
+
   // Horarios silenciosos
-  quietHoursEnabled    Boolean  @default(false)
-  quietHoursStart      String   @default("22:00")
-  quietHoursEnd        String   @default("08:00")
-  
+  quietHoursEnabled Boolean @default(false)
+  quietHoursStart   String  @default("22:00")
+  quietHoursEnd     String  @default("08:00")
+
   // Configuraciones de técnico
-  autoAssignEnabled    Boolean  @default(true)
-  maxConcurrentTickets Int      @default(10)
-  
+  autoAssignEnabled    Boolean @default(true)
+  maxConcurrentTickets Int     @default(10)
+
   // Preferencias generales
-  theme                String   @default("light")
-  language             String   @default("es")
-  timezone             String   @default("America/Guayaquil")
-  
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime
-  users                users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  theme    String @default("light")
+  language String @default("es")
+  timezone String @default("America/Guayaquil")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  users     users    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
@@ -507,7 +507,7 @@ model password_reset_tokens {
   used      Boolean  @default(false)
   createdAt DateTime @default(now())
   users     users    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
   @@index([token, expiresAt])
   @@index([userId, createdAt(sort: Desc)])
 }
@@ -608,52 +608,52 @@ enum UserRole {
 // ============================================
 
 model resolution_plans {
-  id              String   @id @default(uuid())
-  ticketId        String   @map("ticket_id")
-  title           String
-  description     String?  @db.Text
-  status          String   @default("draft") // 'draft', 'active', 'completed', 'cancelled'
-  totalTasks      Int      @default(0) @map("total_tasks")
-  completedTasks  Int      @default(0) @map("completed_tasks")
-  estimatedHours  Float    @default(0) @map("estimated_hours")
-  actualHours     Float    @default(0) @map("actual_hours")
-  startDate       DateTime? @map("start_date")
-  targetDate      DateTime? @map("target_date")
-  completedDate   DateTime? @map("completed_date")
-  createdBy       String   @map("created_by")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-  
-  ticket          tickets  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  creator         users    @relation("ResolutionPlanCreator", fields: [createdBy], references: [id])
-  tasks           resolution_tasks[]
-  
+  id             String    @id @default(uuid())
+  ticketId       String    @map("ticket_id")
+  title          String
+  description    String?   @db.Text
+  status         String    @default("draft") // 'draft', 'active', 'completed', 'cancelled'
+  totalTasks     Int       @default(0) @map("total_tasks")
+  completedTasks Int       @default(0) @map("completed_tasks")
+  estimatedHours Float     @default(0) @map("estimated_hours")
+  actualHours    Float     @default(0) @map("actual_hours")
+  startDate      DateTime? @map("start_date")
+  targetDate     DateTime? @map("target_date")
+  completedDate  DateTime? @map("completed_date")
+  createdBy      String    @map("created_by")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  ticket  tickets            @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  creator users              @relation("ResolutionPlanCreator", fields: [createdBy], references: [id])
+  tasks   resolution_tasks[]
+
   @@index([ticketId])
   @@index([createdBy])
   @@map("resolution_plans")
 }
 
 model resolution_tasks {
-  id              String   @id @default(uuid())
-  planId          String   @map("plan_id")
-  title           String
-  description     String?  @db.Text
-  status          String   @default("pending") // 'pending', 'in_progress', 'completed', 'blocked'
-  priority        String   @default("medium") // 'low', 'medium', 'high'
-  estimatedHours  Float?   @map("estimated_hours")
-  actualHours     Float?   @map("actual_hours")
-  startTime       String?  @map("start_time") // Hora de inicio (formato HH:mm)
-  endTime         String?  @map("end_time")   // Hora de fin (formato HH:mm)
-  assignedTo      String?  @map("assigned_to")
-  dueDate         DateTime? @map("due_date")
-  completedAt     DateTime? @map("completed_at")
-  notes           String?  @db.Text
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-  
-  plan            resolution_plans @relation(fields: [planId], references: [id], onDelete: Cascade)
-  assignee        users?   @relation("TaskAssignee", fields: [assignedTo], references: [id])
-  
+  id             String    @id @default(uuid())
+  planId         String    @map("plan_id")
+  title          String
+  description    String?   @db.Text
+  status         String    @default("pending") // 'pending', 'in_progress', 'completed', 'blocked'
+  priority       String    @default("medium") // 'low', 'medium', 'high'
+  estimatedHours Float?    @map("estimated_hours")
+  actualHours    Float?    @map("actual_hours")
+  startTime      String?   @map("start_time") // Hora de inicio (formato HH:mm)
+  endTime        String?   @map("end_time") // Hora de fin (formato HH:mm)
+  assignedTo     String?   @map("assigned_to")
+  dueDate        DateTime? @map("due_date")
+  completedAt    DateTime? @map("completed_at")
+  notes          String?   @db.Text
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  plan     resolution_plans @relation(fields: [planId], references: [id], onDelete: Cascade)
+  assignee users?           @relation("TaskAssignee", fields: [assignedTo], references: [id])
+
   @@index([planId])
   @@index([assignedTo])
   @@index([startTime, endTime])
@@ -665,16 +665,16 @@ model resolution_tasks {
 // ============================================
 
 model ticket_knowledge_articles {
-  id          String   @id @default(uuid())
-  ticketId    String   @map("ticket_id")
-  articleId   String   @map("article_id")
-  createdBy   String   @map("created_by")
-  createdAt   DateTime @default(now()) @map("created_at")
-  
-  ticket      tickets  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  article     knowledge_articles @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  creator     users    @relation("ArticleCreator", fields: [createdBy], references: [id])
-  
+  id        String   @id @default(uuid())
+  ticketId  String   @map("ticket_id")
+  articleId String   @map("article_id")
+  createdBy String   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  ticket  tickets            @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  article knowledge_articles @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  creator users              @relation("ArticleCreator", fields: [createdBy], references: [id])
+
   @@unique([ticketId, articleId])
   @@index([ticketId])
   @@index([articleId])
@@ -686,38 +686,38 @@ model ticket_knowledge_articles {
 // ============================================
 
 model webhooks {
-  id                String         @id @default(uuid())
-  name              String         @db.VarChar(100)
-  url               String         @db.VarChar(500)
-  events            String[]
-  secret            String         @db.VarChar(255)
-  isActive          Boolean        @default(true) @map("is_active")
-  headers           Json?
-  timeoutMs         Int            @default(30000) @map("timeout_ms")
-  retryCount        Int            @default(3) @map("retry_count")
-  createdBy         String?        @map("created_by")
-  createdAt         DateTime       @default(now()) @map("created_at")
-  updatedAt         DateTime       @default(now()) @updatedAt @map("updated_at")
-  lastTriggeredAt   DateTime?      @map("last_triggered_at")
-  webhook_logs      webhook_logs[]
-  creator           users?         @relation("WebhookCreator", fields: [createdBy], references: [id])
+  id              String         @id @default(uuid())
+  name            String         @db.VarChar(100)
+  url             String         @db.VarChar(500)
+  events          String[]
+  secret          String         @db.VarChar(255)
+  isActive        Boolean        @default(true) @map("is_active")
+  headers         Json?
+  timeoutMs       Int            @default(30000) @map("timeout_ms")
+  retryCount      Int            @default(3) @map("retry_count")
+  createdBy       String?        @map("created_by")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @default(now()) @updatedAt @map("updated_at")
+  lastTriggeredAt DateTime?      @map("last_triggered_at")
+  webhook_logs    webhook_logs[]
+  creator         users?         @relation("WebhookCreator", fields: [createdBy], references: [id])
 
   @@index([isActive])
   @@map("webhooks")
 }
 
 model webhook_logs {
-  id             String    @id @default(uuid())
-  webhookId      String    @map("webhook_id")
-  event          String    @db.VarChar(50)
+  id             String   @id @default(uuid())
+  webhookId      String   @map("webhook_id")
+  event          String   @db.VarChar(50)
   payload        Json
-  responseStatus Int?      @map("response_status")
-  responseBody   String?   @db.Text @map("response_body")
-  errorMessage   String?   @db.Text @map("error_message")
-  durationMs     Int?      @map("duration_ms")
-  attempt        Int       @default(1)
-  createdAt      DateTime  @default(now()) @map("created_at")
-  webhook        webhooks  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  responseStatus Int?     @map("response_status")
+  responseBody   String?  @map("response_body") @db.Text
+  errorMessage   String?  @map("error_message") @db.Text
+  durationMs     Int?     @map("duration_ms")
+  attempt        Int      @default(1)
+  createdAt      DateTime @default(now()) @map("created_at")
+  webhook        webhooks @relation(fields: [webhookId], references: [id], onDelete: Cascade)
 
   @@index([webhookId, createdAt(sort: Desc)])
   @@index([event, createdAt(sort: Desc)])
@@ -729,23 +729,23 @@ model webhook_logs {
 // ============================================
 
 model sla_policies {
-  id                   String            @id @default(uuid())
-  name                 String            @db.VarChar(100)
-  description          String?           @db.Text
-  categoryId           String?           @map("category_id")
-  priority             String            @db.VarChar(20)
-  responseTimeHours    Int               @map("response_time_hours")
-  resolutionTimeHours  Int               @map("resolution_time_hours")
-  businessHoursOnly    Boolean           @default(false) @map("business_hours_only")
-  businessHoursStart   String            @default("09:00:00") @map("business_hours_start") @db.VarChar(8)
-  businessHoursEnd     String            @default("18:00:00") @map("business_hours_end") @db.VarChar(8)
-  businessDays         String            @default("MON,TUE,WED,THU,FRI") @map("business_days") @db.VarChar(50)
-  isActive             Boolean           @default(true) @map("is_active")
-  createdAt            DateTime          @default(now()) @map("created_at")
-  updatedAt            DateTime          @default(now()) @updatedAt @map("updated_at")
-  category             categories?       @relation("SLAPolicyCategory", fields: [categoryId], references: [id])
-  sla_violations       sla_violations[]
-  ticket_sla_metrics   ticket_sla_metrics[]
+  id                  String               @id @default(uuid())
+  name                String               @db.VarChar(100)
+  description         String?              @db.Text
+  categoryId          String?              @map("category_id")
+  priority            String               @db.VarChar(20)
+  responseTimeHours   Int                  @map("response_time_hours")
+  resolutionTimeHours Int                  @map("resolution_time_hours")
+  businessHoursOnly   Boolean              @default(false) @map("business_hours_only")
+  businessHoursStart  String               @default("09:00:00") @map("business_hours_start") @db.VarChar(8)
+  businessHoursEnd    String               @default("18:00:00") @map("business_hours_end") @db.VarChar(8)
+  businessDays        String               @default("MON,TUE,WED,THU,FRI") @map("business_days") @db.VarChar(50)
+  isActive            Boolean              @default(true) @map("is_active")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @default(now()) @updatedAt @map("updated_at")
+  category            categories?          @relation("SLAPolicyCategory", fields: [categoryId], references: [id])
+  sla_violations      sla_violations[]
+  ticket_sla_metrics  ticket_sla_metrics[]
 
   @@index([isActive, categoryId, priority])
   @@map("sla_policies")
@@ -755,7 +755,7 @@ model sla_violations {
   id            String       @id @default(uuid())
   ticketId      String       @map("ticket_id")
   slaPolicyId   String       @map("sla_policy_id")
-  violationType String       @db.VarChar(50) @map("violation_type")
+  violationType String       @map("violation_type") @db.VarChar(50)
   expectedAt    DateTime     @map("expected_at")
   actualAt      DateTime?    @map("actual_at")
   isResolved    Boolean      @default(false) @map("is_resolved")
@@ -798,17 +798,116 @@ model ticket_sla_metrics {
 // ============================================
 
 model category_analytics {
-  id            String   @id @default(uuid())
-  eventType     String   @map("event_type") @db.VarChar(50)
-  clientId      String   @map("client_id")
-  categoryId    String?  @map("category_id")
-  searchQuery   String?  @map("search_query") @db.VarChar(255)
-  timeToSelect  Int?     @map("time_to_select")
-  metadata      Json?
-  createdAt     DateTime @default(now()) @map("created_at")
-  
+  id           String   @id @default(uuid())
+  eventType    String   @map("event_type") @db.VarChar(50)
+  clientId     String   @map("client_id")
+  categoryId   String?  @map("category_id")
+  searchQuery  String?  @map("search_query") @db.VarChar(255)
+  timeToSelect Int?     @map("time_to_select")
+  metadata     Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+
   @@index([clientId, createdAt(sort: Desc)])
   @@index([eventType, createdAt(sort: Desc)])
   @@index([categoryId, createdAt(sort: Desc)])
   @@map("category_analytics")
+}
+
+// ============================================
+// CMS - Landing Page
+// ============================================
+
+model landing_page_content {
+  id String @id @default(uuid())
+
+  // Hero Section
+  heroTitle          String  @default("Soporte Técnico Profesional") @map("hero_title")
+  heroSubtitle       String  @default("Resolvemos tus problemas técnicos de manera rápida y eficiente") @map("hero_subtitle")
+  heroCtaPrimary     String  @default("Crear Ticket de Soporte") @map("hero_cta_primary")
+  heroCtaPrimaryUrl  String  @default("/login") @map("hero_cta_primary_url")
+  heroCtaSecondary   String  @default("Ver Servicios") @map("hero_cta_secondary")
+  heroCtaSecondaryUrl String @default("#servicios") @map("hero_cta_secondary_url")
+  heroImageUrl       String? @map("hero_image_url")
+
+  // Services Section
+  servicesTitle    String  @default("Nuestros Servicios") @map("services_title")
+  servicesSubtitle String  @default("Ofrecemos soporte técnico integral para todas tus necesidades tecnológicas") @map("services_subtitle")
+  servicesEnabled  Boolean @default(true) @map("services_enabled")
+
+  // Company Info
+  companyName         String  @default("Sistema de Tickets") @map("company_name")
+  companyTagline      String  @default("Soporte técnico profesional") @map("company_tagline")
+  companyLogoLightUrl String? @map("company_logo_light_url")
+  companyLogoDarkUrl  String? @map("company_logo_dark_url")
+
+  // Contact
+  contactEmail   String? @map("contact_email")
+  contactPhone   String? @map("contact_phone")
+  contactAddress String? @map("contact_address")
+
+  // Footer
+  footerText String @default("© 2024 Sistema de Tickets. Todos los derechos reservados.") @map("footer_text")
+
+  // SEO
+  metaTitle       String  @default("Sistema de Tickets - Soporte Técnico Profesional") @map("meta_title")
+  metaDescription String  @default("Sistema profesional de gestión de tickets de soporte técnico") @map("meta_description")
+  metaKeywords    String? @map("meta_keywords")
+
+  // Features
+  showStats        Boolean @default(false) @map("show_stats")
+  showTestimonials Boolean @default(false) @map("show_testimonials")
+  showFaq          Boolean @default(false) @map("show_faq")
+
+  // Timestamps
+  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by")
+
+  @@map("landing_page_content")
+}
+
+model landing_page_services {
+  id      String  @id @default(uuid())
+  order   Int     @default(0)
+  enabled Boolean @default(true)
+
+  icon        String // lucide icon name
+  iconColor   String  @default("blue") @map("icon_color")
+  title       String
+  description String  @db.Text
+  linkUrl     String? @map("link_url")
+  linkText    String? @map("link_text")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("landing_page_services")
+}
+
+model landing_page_banners {
+  id      String  @id @default(uuid())
+  order   Int     @default(0)
+  enabled Boolean @default(true)
+
+  title        String
+  description  String? @db.Text
+  imageUrl     String  @map("image_url")
+  imageUrlDark String? @map("image_url_dark")
+  linkUrl      String? @map("link_url")
+  linkText     String? @map("link_text")
+
+  // Positioning
+  position String @default("hero") // hero, services, footer
+
+  // Scheduling
+  startDate DateTime? @map("start_date")
+  endDate   DateTime? @map("end_date")
+
+  // Analytics
+  clicks Int @default(0)
+  views  Int @default(0)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("landing_page_banners")
 }

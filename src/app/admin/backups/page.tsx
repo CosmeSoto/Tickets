@@ -166,7 +166,7 @@ export default function BackupsPage() {
           title: 'Éxito',
           description: 'Backup creado correctamente',
         })
-        loadBackups(true)
+        loadBackups(false) // No mostrar toast adicional
         loadStats()
       } else {
         const error = await response.json()

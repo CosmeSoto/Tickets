@@ -271,7 +271,10 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
                 min="1"
                 max="365"
                 value={config.retentionDays}
-                onChange={(e) => updateConfig('retentionDays', parseInt(e.target.value))}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value)
+                  updateConfig('retentionDays', isNaN(value) ? 30 : value)
+                }}
               />
               <p className="text-xs text-muted-foreground">
                 Días que se mantendrán los backups automáticos
@@ -285,7 +288,10 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
                 min="10"
                 max="1000"
                 value={config.maxBackups}
-                onChange={(e) => updateConfig('maxBackups', parseInt(e.target.value))}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value)
+                  updateConfig('maxBackups', isNaN(value) ? 50 : value)
+                }}
               />
               <p className="text-xs text-muted-foreground">
                 Número máximo de backups a mantener

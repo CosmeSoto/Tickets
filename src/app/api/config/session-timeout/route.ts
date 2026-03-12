@@ -11,7 +11,7 @@ const DEFAULT_SESSION_TIMEOUT = 1440 // 24 horas en minutos
 export async function GET() {
   try {
     // Buscar configuración de sessionTimeout
-    const setting = await prisma.system_settings.findUnique({
+    const setting = await prisma.system_settings.findFirst({
       where: { key: 'sessionTimeout' }
     })
 

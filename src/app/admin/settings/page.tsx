@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { OAuthSettingsTab } from '@/components/settings/oauth-settings-tab'
+import { LandingPageCMSTab } from '@/components/settings/landing-page-cms-tab'
 
 interface SystemSettings {
   // Configuración general
@@ -234,8 +235,8 @@ export default function SettingsPage() {
         <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
         Recargar
       </Button>
-      {/* Solo mostrar botón guardar si NO estamos en la pestaña OAuth */}
-      {activeTab !== 'oauth' && (
+      {/* Solo mostrar botón guardar si NO estamos en la pestaña OAuth o Landing */}
+      {activeTab !== 'oauth' && activeTab !== 'landing' && (
         <Button onClick={saveSettings} disabled={saving}>
           <Save className={`h-4 w-4 mr-2 ${saving ? 'animate-spin' : ''}`} />
           {saving ? 'Guardando...' : 'Guardar'}
@@ -250,8 +251,8 @@ export default function SettingsPage() {
       subtitle='Administra la configuración global del sistema de tickets'
       headerActions={headerActions}
     >
-      <Tabs defaultValue='general' className='space-y-6' onValueChange={setActiveTab}>
-        <TabsList className='grid w-full grid-cols-5'>
+      <Tabs value={activeTab} className='space-y-6' onValueChange={setActiveTab}>
+        <TabsList className='grid w-full grid-cols-6'>
           <TabsTrigger value='general'>General</TabsTrigger>
           <TabsTrigger value='email'>Email</TabsTrigger>
           <TabsTrigger value='notifications'>Notificaciones</TabsTrigger>
@@ -260,6 +261,7 @@ export default function SettingsPage() {
             <Key className="h-4 w-4 mr-2" />
             OAuth
           </TabsTrigger>
+          <TabsTrigger value='landing'>Página Pública</TabsTrigger>
         </TabsList>
 
         {/* Configuración General */}
@@ -313,9 +315,10 @@ export default function SettingsPage() {
                     id='maxTicketsPerUser'
                     type='number'
                     value={settings.maxTicketsPerUser}
-                    onChange={e =>
-                      setSettings({ ...settings, maxTicketsPerUser: parseInt(e.target.value) })
-                    }
+                    onChange={e => {
+                      const value = parseInt(e.target.value)
+                      setSettings({ ...settings, maxTicketsPerUser: isNaN(value) ? 10 : value })
+                    }}
                     min='1'
                     max='100'
                   />
@@ -375,9 +378,10 @@ export default function SettingsPage() {
                         id='smtpPort'
                         type='number'
                         value={settings.smtpPort}
-                        onChange={e =>
-                          setSettings({ ...settings, smtpPort: parseInt(e.target.value) })
-                        }
+                        onChange={e => {
+                          const value = parseInt(e.target.value)
+                          setSettings({ ...settings, smtpPort: isNaN(value) ? 587 : value })
+                        }}
                         placeholder='587'
                       />
                     </div>
@@ -529,9 +533,10 @@ export default function SettingsPage() {
                         id='sessionTimeout'
                         type='number'
                         value={settings.sessionTimeout}
-                        onChange={e =>
-                          setSettings({ ...settings, sessionTimeout: parseInt(e.target.value) })
-                        }
+                        onChange={e => {
+                          const value = parseInt(e.target.value)
+                          setSettings({ ...settings, sessionTimeout: isNaN(value) ? 30 : value })
+                        }}
                         min='5'
                         max='1440'
                       />
@@ -557,9 +562,10 @@ export default function SettingsPage() {
                         id='maxLoginAttempts'
                         type='number'
                         value={settings.maxLoginAttempts}
-                        onChange={e =>
-                          setSettings({ ...settings, maxLoginAttempts: parseInt(e.target.value) })
-                        }
+                        onChange={e => {
+                          const value = parseInt(e.target.value)
+                          setSettings({ ...settings, maxLoginAttempts: isNaN(value) ? 5 : value })
+                        }}
                         min='3'
                         max='10'
                       />
@@ -578,9 +584,10 @@ export default function SettingsPage() {
                         id='passwordMinLength'
                         type='number'
                         value={settings.passwordMinLength}
-                        onChange={e =>
-                          setSettings({ ...settings, passwordMinLength: parseInt(e.target.value) })
-                        }
+                        onChange={e => {
+                          const value = parseInt(e.target.value)
+                          setSettings({ ...settings, passwordMinLength: isNaN(value) ? 8 : value })
+                        }}
                         min='6'
                         max='20'
                       />
@@ -608,9 +615,10 @@ export default function SettingsPage() {
                       id='maxFileSize'
                       type='number'
                       value={settings.maxFileSize}
-                      onChange={e =>
-                        setSettings({ ...settings, maxFileSize: parseInt(e.target.value) })
-                      }
+                      onChange={e => {
+                        const value = parseInt(e.target.value)
+                        setSettings({ ...settings, maxFileSize: isNaN(value) ? 10 : value })
+                      }}
                       min='1'
                       max='100'
                     />
@@ -669,6 +677,11 @@ export default function SettingsPage() {
         {/* Configuración OAuth */}
         <TabsContent value='oauth'>
           <OAuthSettingsTab />
+        </TabsContent>
+
+        {/* Página Pública CMS */}
+        <TabsContent value='landing'>
+          <LandingPageCMSTab />
         </TabsContent>
       </Tabs>
     </RoleDashboardLayout>

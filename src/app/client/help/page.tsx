@@ -23,86 +23,80 @@ import {
   Zap,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import Link from 'next/link'
 
-interface FAQItem {
+interface FAQ {
   id: string
   question: string
   answer: string
   category: string
-  helpful: number
+  icon: any
 }
 
-const faqCategories = [
-  { id: 'getting-started', name: 'Primeros Pasos', icon: Zap },
-  { id: 'tickets', name: 'Tickets', icon: FileText },
-  { id: 'account', name: 'Cuenta', icon: HelpCircle },
-  { id: 'technical', name: 'Técnico', icon: BookOpen },
-]
-
-const faqData: FAQItem[] = [
+const faqs: FAQ[] = [
   {
     id: '1',
     question: '¿Cómo creo un nuevo ticket?',
     answer:
-      'Para crear un nuevo ticket, haz clic en el botón "Crear Ticket" en el dashboard o en la navegación lateral. Completa el formulario con el título, descripción, categoría y prioridad. Puedes adjuntar archivos si es necesario. Una vez enviado, recibirás una confirmación por email.',
-    category: 'getting-started',
-    helpful: 45,
+      'Para crear un nuevo ticket, haz clic en el botón "Crear Ticket" en el menú principal o en tu dashboard. Completa el formulario con el título, descripción detallada del problema, selecciona la categoría apropiada y la prioridad. Puedes adjuntar archivos si es necesario. Una vez enviado, recibirás una notificación de confirmación y podrás hacer seguimiento desde "Mis Tickets".',
+    category: 'Primeros Pasos',
+    icon: Zap,
   },
   {
     id: '2',
-    question: '¿Cuánto tiempo tarda en responderse un ticket?',
+    question: '¿Cómo puedo ver el estado de mis tickets?',
     answer:
-      'El tiempo de respuesta depende de la prioridad del ticket. Los tickets urgentes se responden en menos de 2 horas, los de alta prioridad en 4 horas, los de prioridad media en 8 horas, y los de baja prioridad en 24 horas. Estos son tiempos promedio y pueden variar según la carga de trabajo.',
-    category: 'tickets',
-    helpful: 38,
+      'Puedes ver todos tus tickets en la sección "Mis Tickets" del menú principal. Allí encontrarás una lista con el estado actual de cada ticket (Abierto, En Progreso, Resuelto, Cerrado). Haz clic en cualquier ticket para ver los detalles completos, el historial de cambios y las respuestas del equipo de soporte.',
+    category: 'Gestión de Tickets',
+    icon: FileText,
   },
   {
     id: '3',
-    question: '¿Cómo puedo ver el estado de mis tickets?',
+    question: '¿Qué significan los diferentes estados de un ticket?',
     answer:
-      'Puedes ver todos tus tickets en la sección "Mis Tickets" del menú. Allí encontrarás el estado actual (Abierto, En Progreso, Resuelto, Cerrado), el técnico asignado, y la última actualización. También recibirás notificaciones por email cuando haya cambios.',
-    category: 'tickets',
-    helpful: 42,
+      'Los estados de un ticket son: OPEN (recién creado, esperando asignación), IN_PROGRESS (un técnico está trabajando en él), RESOLVED (el problema ha sido solucionado, esperando tu confirmación), CLOSED (ticket finalizado y cerrado). También existe PENDING para tickets que esperan información adicional de tu parte.',
+    category: 'Gestión de Tickets',
+    icon: FileText,
   },
   {
     id: '4',
-    question: '¿Cómo cambio mi contraseña?',
+    question: '¿Cómo puedo responder o agregar información a un ticket?',
     answer:
-      'Ve a tu perfil haciendo clic en tu avatar en la esquina superior derecha, luego selecciona "Mi Perfil". En la sección de Seguridad encontrarás la opción "Cambiar Contraseña". Necesitarás tu contraseña actual para confirmar el cambio.',
-    category: 'account',
-    helpful: 31,
+      'Abre el ticket desde "Mis Tickets" y encontrarás un área de comentarios en la parte inferior. Escribe tu mensaje, puedes adjuntar archivos si es necesario, y haz clic en "Enviar Comentario". El técnico asignado recibirá una notificación inmediata de tu respuesta.',
+    category: 'Gestión de Tickets',
+    icon: MessageSquare,
   },
   {
     id: '5',
-    question: '¿Puedo adjuntar archivos a un ticket?',
+    question: '¿Puedo cambiar la prioridad de mi ticket?',
     answer:
-      'Sí, puedes adjuntar archivos al crear un ticket o al agregar comentarios. Los formatos permitidos son: imágenes (JPG, PNG, GIF), documentos (PDF, DOC, DOCX), y archivos comprimidos (ZIP, RAR). El tamaño máximo por archivo es de 10MB.',
-    category: 'tickets',
-    helpful: 29,
+      'No, los clientes no pueden cambiar la prioridad de un ticket una vez creado. Sin embargo, si consideras que tu ticket requiere atención urgente, puedes agregar un comentario explicando la situación y un administrador evaluará si es necesario ajustar la prioridad.',
+    category: 'Gestión de Tickets',
+    icon: FileText,
   },
   {
     id: '6',
-    question: '¿Cómo actualizo mi información de contacto?',
+    question: '¿Cómo configuro mis notificaciones?',
     answer:
-      'Ve a "Mi Perfil" desde el menú de usuario. Haz clic en "Editar" y actualiza tu nombre, teléfono, empresa o dirección. No olvides hacer clic en "Guardar" para aplicar los cambios. El correo electrónico no se puede cambiar por seguridad.',
-    category: 'account',
-    helpful: 25,
+      'Ve a "Configuración" en el menú principal, luego a la pestaña "Notificaciones". Allí puedes activar o desactivar notificaciones por email y push, elegir qué tipos de eventos quieres recibir (actualizaciones de tickets, nuevos comentarios, cambios de estado) y configurar horarios silenciosos si no quieres recibir notificaciones en ciertos horarios.',
+    category: 'Configuración de Cuenta',
+    icon: HelpCircle,
   },
   {
     id: '7',
-    question: '¿Qué significan las prioridades de los tickets?',
+    question: '¿Cómo actualizo mi información personal?',
     answer:
-      'Urgente: Problemas críticos que bloquean operaciones. Alta: Problemas importantes que afectan funcionalidad. Media: Problemas que causan inconvenientes menores. Baja: Consultas generales o mejoras sugeridas.',
-    category: 'getting-started',
-    helpful: 36,
+      'En "Configuración", pestaña "Personal", puedes actualizar tu nombre, email, teléfono y otros datos de contacto. También puedes cambiar tu contraseña, configurar tu zona horaria y preferencias de tema (claro/oscuro). Recuerda guardar los cambios antes de salir.',
+    category: 'Configuración de Cuenta',
+    icon: HelpCircle,
   },
   {
     id: '8',
-    question: '¿Cómo puedo calificar el servicio recibido?',
+    question: '¿Qué hago si olvidé mi contraseña?',
     answer:
-      'Una vez que tu ticket sea resuelto, recibirás un email con un enlace para calificar el servicio. También puedes calificar desde la página del ticket haciendo clic en "Calificar Servicio". Tu feedback nos ayuda a mejorar.',
-    category: 'tickets',
-    helpful: 22,
+      'En la página de inicio de sesión, haz clic en "¿Olvidaste tu contraseña?". Ingresa tu email registrado y recibirás un enlace para restablecer tu contraseña. El enlace es válido por 24 horas. Si no recibes el email, verifica tu carpeta de spam o contacta al administrador.',
+    category: 'Configuración de Cuenta',
+    icon: HelpCircle,
   },
 ]
 
@@ -111,7 +105,7 @@ export default function ClientHelpPage() {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
-  const [expandedFAQ, setExpandedFAQ] = useState<string | null>(null)
+  const [expandedFaq, setExpandedFaq] = useState<string | null>(null)
 
   useEffect(() => {
     if (!session) {
@@ -125,7 +119,9 @@ export default function ClientHelpPage() {
     }
   }, [session, router])
 
-  const filteredFAQs = faqData.filter((faq) => {
+  const categories = Array.from(new Set(faqs.map((faq) => faq.category)))
+
+  const filteredFaqs = faqs.filter((faq) => {
     const matchesSearch =
       searchQuery === '' ||
       faq.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -134,8 +130,8 @@ export default function ClientHelpPage() {
     return matchesSearch && matchesCategory
   })
 
-  const toggleFAQ = (id: string) => {
-    setExpandedFAQ(expandedFAQ === id ? null : id)
+  const toggleFaq = (id: string) => {
+    setExpandedFaq(expandedFaq === id ? null : id)
   }
 
   return (
@@ -150,7 +146,7 @@ export default function ClientHelpPage() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
-                placeholder="Buscar en la ayuda..."
+                placeholder="Buscar en preguntas frecuentes..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 h-12 text-base"
@@ -162,57 +158,63 @@ export default function ClientHelpPage() {
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="hover:shadow-md transition-shadow cursor-pointer">
-            <CardContent className="p-6">
-              <div className="flex items-start space-x-4">
-                <div className="p-3 bg-blue-100 rounded-lg">
-                  <BookOpen className="h-6 w-6 text-blue-600" />
+            <Link href="/client/tickets/create">
+              <CardContent className="p-6">
+                <div className="flex items-start space-x-4">
+                  <div className="p-3 bg-blue-100 rounded-lg">
+                    <MessageSquare className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground mb-1">
+                      Crear Ticket
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      ¿No encuentras la respuesta? Contacta con soporte
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-semibold text-foreground mb-1">
-                    Guías y Tutoriales
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Aprende a usar el sistema paso a paso
-                  </p>
-                </div>
-              </div>
-            </CardContent>
+              </CardContent>
+            </Link>
           </Card>
 
           <Card className="hover:shadow-md transition-shadow cursor-pointer">
-            <CardContent className="p-6">
-              <div className="flex items-start space-x-4">
-                <div className="p-3 bg-purple-100 rounded-lg">
-                  <Video className="h-6 w-6 text-purple-600" />
+            <Link href="/client/tickets">
+              <CardContent className="p-6">
+                <div className="flex items-start space-x-4">
+                  <div className="p-3 bg-purple-100 rounded-lg">
+                    <FileText className="h-6 w-6 text-purple-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground mb-1">
+                      Mis Tickets
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Ver el estado de tus solicitudes
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-semibold text-foreground mb-1">
-                    Videos Tutoriales
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Mira videos explicativos
-                  </p>
-                </div>
-              </div>
-            </CardContent>
+              </CardContent>
+            </Link>
           </Card>
 
           <Card className="hover:shadow-md transition-shadow cursor-pointer">
-            <CardContent className="p-6">
-              <div className="flex items-start space-x-4">
-                <div className="p-3 bg-green-100 rounded-lg">
-                  <MessageSquare className="h-6 w-6 text-green-600" />
+            <Link href="/settings">
+              <CardContent className="p-6">
+                <div className="flex items-start space-x-4">
+                  <div className="p-3 bg-green-100 rounded-lg">
+                    <HelpCircle className="h-6 w-6 text-green-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground mb-1">
+                      Configuración
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Personaliza tu cuenta y notificaciones
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-semibold text-foreground mb-1">
-                    Contactar Soporte
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Habla con nuestro equipo
-                  </p>
-                </div>
-              </div>
-            </CardContent>
+              </CardContent>
+            </Link>
           </Card>
         </div>
 
@@ -231,19 +233,22 @@ export default function ClientHelpPage() {
                 >
                   <HelpCircle className="h-4 w-4 mr-2" />
                   Todas
+                  <Badge variant="secondary" className="ml-auto">
+                    {faqs.length}
+                  </Badge>
                 </Button>
-                {faqCategories.map((category) => {
-                  const Icon = category.icon
-                  const count = faqData.filter((faq) => faq.category === category.id).length
+                {categories.map((category) => {
+                  const count = faqs.filter((faq) => faq.category === category).length
+                  const Icon = category === 'Primeros Pasos' ? Zap : category === 'Gestión de Tickets' ? FileText : HelpCircle
                   return (
                     <Button
-                      key={category.id}
-                      variant={selectedCategory === category.id ? 'default' : 'ghost'}
+                      key={category}
+                      variant={selectedCategory === category ? 'default' : 'ghost'}
                       className="w-full justify-start"
-                      onClick={() => setSelectedCategory(category.id)}
+                      onClick={() => setSelectedCategory(category)}
                     >
                       <Icon className="h-4 w-4 mr-2" />
-                      {category.name}
+                      {category}
                       <Badge variant="secondary" className="ml-auto">
                         {count}
                       </Badge>
@@ -259,106 +264,84 @@ export default function ClientHelpPage() {
                 <CardTitle className="text-base">¿Necesitas más ayuda?</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="flex items-center space-x-3 text-sm">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="font-medium text-foreground">Email</p>
-                    <p className="text-muted-foreground">support@example.com</p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-3 text-sm">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="font-medium text-foreground">Teléfono</p>
-                    <p className="text-muted-foreground">+1 (555) 123-4567</p>
-                  </div>
-                </div>
-                <Button className="w-full mt-4">
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  Iniciar Chat
+                <p className="text-sm text-muted-foreground mb-4">
+                  Si no encuentras la respuesta que buscas, nuestro equipo de soporte está listo para ayudarte.
+                </p>
+                <Button className="w-full" asChild>
+                  <Link href="/client/tickets/create">
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    Contactar Soporte
+                  </Link>
                 </Button>
               </CardContent>
             </Card>
           </div>
 
-          {/* FAQ List */}
+          {/* FAQs List */}
           <div className="lg:col-span-3">
             <Card>
               <CardHeader>
                 <CardTitle>Preguntas Frecuentes</CardTitle>
                 <CardDescription>
-                  {filteredFAQs.length} pregunta{filteredFAQs.length !== 1 ? 's' : ''}{' '}
-                  {searchQuery && `encontrada${filteredFAQs.length !== 1 ? 's' : ''}`}
+                  {filteredFaqs.length} pregunta{filteredFaqs.length !== 1 ? 's' : ''}{' '}
+                  {searchQuery && `encontrada${filteredFaqs.length !== 1 ? 's' : ''}`}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {filteredFAQs.length === 0 ? (
+                {filteredFaqs.length === 0 ? (
                   <div className="text-center py-12">
                     <HelpCircle className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
                     <h3 className="text-lg font-semibold text-foreground mb-2">
                       No se encontraron resultados
                     </h3>
-                    <p className="text-muted-foreground">
-                      Intenta con otros términos de búsqueda
+                    <p className="text-muted-foreground mb-4">
+                      Intenta con otros términos de búsqueda o explora todas las categorías
                     </p>
+                    <Button onClick={() => setSearchQuery('')}>
+                      Ver todas las preguntas
+                    </Button>
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {filteredFAQs.map((faq) => (
-                      <div
-                        key={faq.id}
-                        className="border border-border rounded-lg overflow-hidden"
-                      >
-                        <button
-                          onClick={() => toggleFAQ(faq.id)}
-                          className="w-full p-4 flex items-center justify-between hover:bg-muted transition-colors"
+                    {filteredFaqs.map((faq) => {
+                      const Icon = faq.icon
+                      return (
+                        <div
+                          key={faq.id}
+                          className="border border-border rounded-lg overflow-hidden"
                         >
-                          <div className="flex items-start space-x-3 text-left">
-                            <HelpCircle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                            <div>
-                              <h3 className="font-semibold text-foreground">
-                                {faq.question}
-                              </h3>
-                              <div className="flex items-center space-x-2 mt-1">
-                                <Badge variant="secondary" className="text-xs">
-                                  {
-                                    faqCategories.find((c) => c.id === faq.category)
-                                      ?.name
-                                  }
+                          <button
+                            onClick={() => toggleFaq(faq.id)}
+                            className="w-full p-4 flex items-center justify-between hover:bg-muted transition-colors"
+                          >
+                            <div className="flex items-start space-x-3 text-left">
+                              <Icon className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                              <div>
+                                <h3 className="font-semibold text-foreground">
+                                  {faq.question}
+                                </h3>
+                                <Badge variant="secondary" className="mt-2 text-xs">
+                                  {faq.category}
                                 </Badge>
-                                <span className="text-xs text-muted-foreground">
-                                  {faq.helpful} personas encontraron esto útil
-                                </span>
                               </div>
                             </div>
-                          </div>
-                          {expandedFAQ === faq.id ? (
-                            <ChevronUp className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                          ) : (
-                            <ChevronDown className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                          )}
-                        </button>
+                            {expandedFaq === faq.id ? (
+                              <ChevronUp className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                            ) : (
+                              <ChevronDown className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                            )}
+                          </button>
 
-                        {expandedFAQ === faq.id && (
-                          <div className="p-4 pt-0 border-t bg-muted/50">
-                            <p className="text-sm text-foreground leading-relaxed mb-4">
-                              {faq.answer}
-                            </p>
-                            <div className="flex items-center space-x-2">
-                              <span className="text-sm text-muted-foreground">
-                                ¿Te fue útil?
-                              </span>
-                              <Button variant="outline" size="sm">
-                                Sí
-                              </Button>
-                              <Button variant="outline" size="sm">
-                                No
-                              </Button>
+                          {expandedFaq === faq.id && (
+                            <div className="p-4 pt-0 border-t bg-muted/50">
+                              <p className="text-sm text-foreground leading-relaxed">
+                                {faq.answer}
+                              </p>
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </CardContent>

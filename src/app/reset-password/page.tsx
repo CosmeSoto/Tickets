@@ -19,6 +19,7 @@ import {
   Shield
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { SystemLogo } from '@/components/common/system-logo'
 
 function ResetPasswordForm() {
   const router = useRouter()
@@ -175,19 +176,19 @@ function ResetPasswordForm() {
       <Card className='w-full max-w-md shadow-xl border-0 bg-card/80 backdrop-blur-sm'>
         <CardHeader className='space-y-1 pb-8'>
           <div className="flex justify-center mb-4">
-            <div className={`p-3 rounded-full ${
-              success ? 'bg-green-100' : 
-              error ? 'bg-red-100' : 
-              'bg-blue-100'
-            }`}>
-              {success ? (
-                <CheckCircle className="h-8 w-8 text-green-600" />
-              ) : error ? (
-                <AlertCircle className="h-8 w-8 text-red-600" />
-              ) : (
-                <Key className="h-8 w-8 text-blue-600" />
-              )}
-            </div>
+            {success || error ? (
+              <div className={`p-3 rounded-full ${
+                success ? 'bg-green-100' : 'bg-red-100'
+              }`}>
+                {success ? (
+                  <CheckCircle className="h-8 w-8 text-green-600" />
+                ) : (
+                  <AlertCircle className="h-8 w-8 text-red-600" />
+                )}
+              </div>
+            ) : (
+              <SystemLogo size="md" showText={true} />
+            )}
           </div>
           <CardTitle className='text-2xl font-bold text-center text-foreground'>
             {success ? '¡Contraseña Actualizada!' : 

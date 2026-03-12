@@ -22,6 +22,7 @@ import {
   EyeOff,
   Building2
 } from 'lucide-react'
+import { SystemLogo } from '@/components/common/system-logo'
 
 interface FormErrors {
   name?: string
@@ -251,9 +252,7 @@ export default function RegisterPage() {
       <Card className='w-full max-w-md shadow-xl border-0 bg-card/80 backdrop-blur-sm'>
         <CardHeader className='space-y-1 pb-8'>
           <div className="flex justify-center mb-4">
-            <div className="p-3 bg-blue-100 rounded-full">
-              <UserPlus className="h-8 w-8 text-blue-600" />
-            </div>
+            <SystemLogo size="md" showText={true} />
           </div>
           <CardTitle className='text-2xl font-bold text-center text-foreground'>
             Crear Cuenta

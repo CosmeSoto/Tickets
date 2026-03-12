@@ -22,6 +22,7 @@ import {
   Lock,
   LogIn
 } from 'lucide-react'
+import { SystemLogo } from '@/components/common/system-logo'
 
 // Tipos para errores específicos - ahora manejados por el hook
 // type LoginError = {
@@ -140,13 +141,8 @@ export default function LoginPage() {
       <Card className='w-full max-w-md shadow-xl border-0 bg-card/80 backdrop-blur-sm'>
         <CardHeader className='space-y-1 pb-8'>
           <div className="flex justify-center mb-4">
-            <div className="p-3 bg-blue-100 rounded-full">
-              <Shield className="h-8 w-8 text-blue-600" />
-            </div>
+            <SystemLogo size="md" showText={true} />
           </div>
-          <CardTitle className='text-2xl font-bold text-center text-foreground'>
-            Sistema de Tickets
-          </CardTitle>
           <CardDescription className='text-center text-muted-foreground'>
             Ingresa tus credenciales para acceder al sistema
           </CardDescription>

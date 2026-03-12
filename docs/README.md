@@ -1,145 +1,55 @@
-# Documentación del Sistema de Tickets
+# Sistema de Tickets - Documentación
 
-Este directorio contiene toda la documentación técnica y guías del sistema de tickets profesional.
+## 📚 Índice
 
-## 📋 Documentos Activos (Última Actualización: 2026-02-20)
+1. [Instalación y Configuración](./SETUP.md)
+2. [Despliegue con Docker](./DEPLOYMENT.md)
+3. [Características del Sistema](./FEATURES.md)
+4. [Solución de Problemas](./TROUBLESHOOTING.md)
+5. [Configuración OAuth (Google/Microsoft)](./OAUTH_SETUP_GUIDE.md)
+6. [Integración del Selector de Categorías](./CATEGORY_SELECTOR_INTEGRATION.md)
+7. [Guía de Desarrollo del Selector de Categorías](./CATEGORY_SELECTOR_DEVELOPER.md)
 
-### 🚀 Sprints y Correcciones
-- **`RESUMEN_CORRECCION_AUDITORIA.md`** ⭐ - Resumen ejecutivo de correcciones del módulo de auditoría
-- **`CORRECCION_FINAL_AUDITORIA.md`** - Detalle completo de las 3 correcciones aplicadas
-- **`OPTIMIZACIONES_AUDITORIA_FINAL.md`** - Optimizaciones y características del sistema
-- `SPRINT_1_FINAL.md` - Documentación del primer sprint
-- `SPRINT_2_COMPLETADO.md` - Documentación del segundo sprint
+## 🎯 Descripción
 
-### 🔧 Soluciones Técnicas Recientes
-- **`RESUMEN_CORRECCION_AUDITORIA.md`** ⭐ - Corrección error 500 + layout + columna detalles
-- `AUDITORIA_UX_ROLES.md` - Diseño UX y roles del módulo de auditoría
-- `RESUMEN_AUDITORIA_UX.md` - Resumen de mejoras UX
+Sistema profesional de gestión de tickets de soporte con:
 
-### 📊 Sistemas Específicos
-- `SISTEMA_NOTIFICACIONES_COMPLETO.md` - Sistema completo de notificaciones para 3 roles
-- `RESUMEN_NOTIFICACIONES_2026-02-19.md` - Resumen del sistema de notificaciones
-- `GUIA_NOTIFICACIONES_TECNICO.md` - Guía para técnicos
-- `SOLUCION_NOTIFICACIONES_COMENTARIOS.md` - Solución notificaciones de comentarios
+- ✅ Gestión completa de tickets
+- ✅ Sistema de SLA automático
+- ✅ Notificaciones en tiempo real
+- ✅ Reportes y métricas
+- ✅ Sistema de auditoría
+- ✅ Base de conocimientos (CMS)
+- ✅ Multi-departamento y categorías jerárquicas
 
-### ⚡ Performance y Optimización
-- `OPTIMIZACIONES_PERFORMANCE_COMPLETADAS.md` - Optimizaciones de rendimiento implementadas
-- `RESUMEN_OPTIMIZACIONES_2026-02-19.md` - Resumen de optimizaciones
-- `OPTIMIZATION_GUIDE.md` - Guía de optimización y mejores prácticas
-
-### 🏗️ Arquitectura y Refactorización
-- `REFACTORIZACION_COMPLETADA.md` - Detalles de la refactorización del código
-- `LIMPIEZA_PROYECTO_COMPLETADA.md` - Limpieza y organización del proyecto
-- `LIMPIEZA_NOTIFICACIONES_COMPLETADA.md` - Limpieza del sistema de notificaciones
-
-### 📚 Guías Principales
-- **`GUIA_CONFIGURACION_EMAIL.md`** ⭐ - Guía completa para configurar el sistema de email
-- `MIGRATION_GUIDE.md` - Guía completa de migración del sistema legacy
-- `EXECUTIVE_SUMMARY.md` - Resumen ejecutivo del proyecto
-- `RESUMEN_AUDITORIA_UX.md` - Análisis de auditoría y mejoras de UX
-- `COMPONENT_GUIDE.md` - Guía de componentes
-- `DESIGN_PATTERNS.md` - Patrones de diseño
-- `EXAMPLES.md` - Ejemplos de código
-
-### 📁 Histórico
-El directorio `historico/` contiene documentación de análisis y soluciones previas que ya fueron implementadas y archivadas.
-
-## 🎯 Documentos Prioritarios
-
-Si necesitas información rápida, consulta estos documentos en orden:
-
-1. **`GUIA_CONFIGURACION_EMAIL.md`** ⭐ - Configurar sistema de email (cuando se necesite)
-2. **`RESUMEN_CORRECCION_AUDITORIA.md`** - Estado actual del módulo de auditoría
-3. **`CORRECCION_FINAL_AUDITORIA.md`** - Detalle completo de correcciones
-4. **`OPTIMIZACIONES_AUDITORIA_FINAL.md`** - Características y optimizaciones
-5. **`SISTEMA_NOTIFICACIONES_COMPLETO.md`** - Para entender notificaciones
-
-## ⚠️ Acciones Pendientes
-
-### Crítico - Requiere Atención Inmediata
-- **Reiniciar servidor** para aplicar correcciones del módulo de auditoría
-  ```bash
-  rm -rf .next && npm run dev
-  ```
-- **Limpiar cache del navegador** (Ctrl+Shift+R o Cmd+Shift+R)
-
-### Verificación
-- Ejecutar `./scripts/verificar-auditoria.sh` para verificar correcciones
-- Probar exportación CSV y JSON en módulo de auditoría
-- Verificar que columna Detalles muestre información clara
-- Verificar que botones estén organizados en grid de 3 columnas
-
-## 📝 Convenciones
-
-- ✅ Todos los documentos están en español
-- ✅ Los nombres de archivo usan MAYÚSCULAS para facilitar la búsqueda
-- ✅ Los documentos históricos se mueven a `historico/` una vez archivados
-- ✅ Se mantiene un registro de cambios en cada sprint
-- ✅ Documentos redundantes se eliminan para mantener el proyecto limpio
-- ⭐ Los documentos marcados con estrella son los más recientes/importantes
-
-### Nombres de Archivos
-- `SPRINT_*.md` - Documentación de sprints
-- `SOLUCION_*.md` - Soluciones a problemas específicos
-- `MEJORAS_*.md` - Mejoras implementadas
-- `SISTEMA_*.md` - Documentación de sistemas completos
-- `GUIA_*.md` - Guías de uso o desarrollo
-- `RESUMEN_*.md` - Resúmenes ejecutivos
-
-## 🔄 Última Actualización
-
-**Fecha**: 2026-02-25  
-**Módulo**: Sistema de Email (Documentación)  
-**Estado**: ✅ Código Completo - Configuración Pendiente  
-**Documentación**: Guía completa de configuración SMTP creada  
-**Acción Requerida**: Configurar SMTP cuando se vaya a producción (ver GUIA_CONFIGURACION_EMAIL.md)
-
-## 🛠️ Scripts Útiles
+## 🚀 Inicio Rápido
 
 ```bash
-# Verificar correcciones de auditoría
-./scripts/verificar-auditoria.sh
+# Clonar repositorio
+git clone <repo-url>
+cd sistema-tickets-nextjs
 
-# Reiniciar servidor limpiamente
-rm -rf .next && npm run dev
+# Configurar variables de entorno
+cp .env.example .env
 
-# Verificar procesos
-ps aux | grep "next dev"
+# Iniciar con Docker
+docker-compose up -d
 
-# Verificar puerto
-lsof -i :3000
+# Ejecutar migraciones y seed
+docker-compose exec app npx prisma migrate deploy
+docker-compose exec app npx prisma db seed
+
+# Acceder al sistema
+http://localhost:3000
 ```
 
-## 📂 Organización de Carpetas
+## 👤 Credenciales por Defecto
 
-### `/docs` (actual)
-Documentación activa y relevante para el desarrollo actual
+```
+Email: admin@tickets.com
+Contraseña: admin123
+```
 
-### `/docs-obsoletos`
-~180 documentos históricos de correcciones pasadas (referencia histórica)
+## 📖 Documentación Detallada
 
-### `/archived-docs`
-Documentación archivada organizada por categorías
-
-### `/historico`
-Análisis y soluciones previas ya implementadas
-
-## 🧹 Limpieza de Documentación
-
-**Última limpieza:** 20 de Febrero, 2026
-
-**Acciones realizadas:**
-- ✅ Eliminado `MEJORAS_MODULO_AUDITORIA.md` (consolidado)
-- ✅ Eliminado `MEJORA_DETALLES_AUDITORIA.md` (consolidado)
-- ✅ Eliminado `SOLUCION_ERROR_AUDIT.md` (consolidado)
-- ✅ Creado `RESUMEN_CORRECCION_AUDITORIA.md` (resumen ejecutivo)
-- ✅ Creado `CORRECCION_FINAL_AUDITORIA.md` (detalle completo)
-- ✅ Actualizado `OPTIMIZACIONES_AUDITORIA_FINAL.md` (características)
-- ✅ Actualizado README con documentos prioritarios
-
----
-
-**Mantenido por**: Kiro AI Assistant  
-**Proyecto**: Sistema de Tickets Profesional  
-**Versión**: 2.0 (Next.js 16 + Turbopack)  
-**Última actualización**: 20 de Febrero, 2026
+Consulta los archivos en esta carpeta para información específica.

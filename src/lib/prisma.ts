@@ -19,5 +19,6 @@ if (process.env.NODE_ENV !== 'production') {
   global.prisma = prisma
 }
 
-// Exportar por defecto
+// Exportar por defecto y como named export para compatibilidad
 export default prisma
+export { prisma }

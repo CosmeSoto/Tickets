@@ -18,6 +18,7 @@ import {
   Shield
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { SystemLogo } from '@/components/common/system-logo'
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
@@ -94,9 +95,7 @@ export default function ForgotPasswordPage() {
       <Card className='w-full max-w-md shadow-xl border-0 bg-card/80 backdrop-blur-sm'>
         <CardHeader className='space-y-1 pb-8'>
           <div className="flex justify-center mb-4">
-            <div className="p-3 bg-blue-100 rounded-full">
-              <Key className="h-8 w-8 text-blue-600" />
-            </div>
+            <SystemLogo size="md" showText={true} />
           </div>
           <CardTitle className='text-2xl font-bold text-center text-foreground'>
             {step === 'email' && '¿Olvidaste tu contraseña?'}
