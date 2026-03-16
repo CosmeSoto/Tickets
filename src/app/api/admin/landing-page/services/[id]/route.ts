@@ -5,7 +5,7 @@ import prisma from '@/lib/prisma'
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -13,14 +13,15 @@ export async function PUT(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    const { id } = await params
     const body = await request.json()
     const { icon, iconColor, title, description, enabled } = body
 
     const service = await prisma.landing_page_services.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         ...(icon && { icon }),
-        ...(iconColor && { icon_color: iconColor }),
+        ...(iconColor && { iconColor }),
         ...(title && { title }),
         ...(description && { description }),
         ...(enabled !== undefined && { enabled }),
@@ -30,7 +31,7 @@ export async function PUT(
     return NextResponse.json({
       id: service.id,
       icon: service.icon,
-      iconColor: service.icon_color,
+      iconColor: service.iconColor,
       title: service.title,
       description: service.description,
       order: service.order,
@@ -46,8 +47,8 @@ export async function PUT(
 }
 
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -55,8 +56,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    const { id } = await params
+
     await prisma.landing_page_services.delete({
-      where: { id: params.id },
+      where: { id },
     })
 
     return NextResponse.json({ success: true })

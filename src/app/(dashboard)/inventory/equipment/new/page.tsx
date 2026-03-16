@@ -1,35 +1,57 @@
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { redirect } from 'next/navigation'
+'use client'
+
+import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
+import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
 import { EquipmentFormWrapper } from '@/components/inventory/equipment-form-wrapper'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
-export default async function NewEquipmentPage() {
-  const session = await getServerSession(authOptions)
+export default function NewEquipmentPage() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
 
-  if (!session?.user) {
-    redirect('/login')
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login')
+    } else if (session?.user?.role === 'CLIENT') {
+      router.push('/inventory')
+    }
+  }, [status, session, router])
+
+  if (status === 'loading') {
+    return (
+      <RoleDashboardLayout title="Cargando..." subtitle="Preparando formulario">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      </RoleDashboardLayout>
+    )
   }
 
-  // Solo ADMIN y TECHNICIAN pueden crear equipos
-  if (session.user.role === 'CLIENT') {
-    redirect('/inventory')
+  if (!session?.user || session.user.role === 'CLIENT') {
+    return null
   }
 
   return (
-    <div className="container mx-auto py-6 max-w-4xl">
-      <Card>
-        <CardHeader>
-          <CardTitle>Nuevo Equipo</CardTitle>
-          <CardDescription>
-            Registra un nuevo equipo en el inventario
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <EquipmentFormWrapper />
-        </CardContent>
-      </Card>
-    </div>
+    <RoleDashboardLayout
+      title="Nuevo Equipo"
+      subtitle="Registra un nuevo equipo en el inventario"
+    >
+      <div className="max-w-4xl mx-auto">
+        <Card>
+          <CardHeader>
+            <CardTitle>Información del Equipo</CardTitle>
+            <CardDescription>
+              Completa los datos del equipo a registrar
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <EquipmentFormWrapper />
+          </CardContent>
+        </Card>
+      </div>
+    </RoleDashboardLayout>
   )
 }
 

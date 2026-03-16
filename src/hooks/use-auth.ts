@@ -254,20 +254,6 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
       return false
     }
 
-    // Verificar conexión
-    if (!authState.isOnline) {
-      setAuthState(prev => ({ 
-        ...prev, 
-        error: {
-          type: 'network',
-          message: 'Sin conexión a internet',
-          suggestion: 'Verifica tu conexión y vuelve a intentar',
-          code: 'NETWORK_OFFLINE'
-        }
-      }))
-      return false
-    }
-
     setAuthState(prev => ({
       ...prev,
       isLoading: true,
@@ -276,9 +262,6 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
     }))
 
     try {
-      // Simular validación (para UX)
-      await new Promise(resolve => setTimeout(resolve, 300))
-      
       setAuthState(prev => ({ ...prev, loginStep: 'authenticating' }))
 
       const result = await signIn('credentials', {
@@ -287,8 +270,10 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
         redirect: false,
       })
 
-      // Si hay un error explícito, mostrarlo
-      if (result?.error) {
+      console.log('[AUTH] signIn result:', JSON.stringify(result))
+
+      // Si hay un error explícito o ok es false
+      if (!result?.ok || result?.error) {
         const authError = createAuthError(null, result)
         setAuthState(prev => ({ 
           ...prev, 
@@ -299,29 +284,31 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
         return false
       }
 
-      // Login exitoso - cambiar a estado de redirección inmediatamente
+      // Login exitoso
       setAuthState(prev => ({ ...prev, loginStep: 'redirecting' }))
 
       if (redirectOnSuccess) {
-        // Esperar un momento para que la sesión se actualice
-        await new Promise(resolve => setTimeout(resolve, 800))
-        
         // Obtener la sesión actualizada para determinar el rol
-        try {
-          const response = await fetch('/api/auth/session')
-          const sessionData = await response.json()
-          
-          const userRole = sessionData?.user?.role
-          const redirectUrl = getRedirectUrl(userRole)
-          
-          // Redirigir al dashboard correspondiente
-          router.push(redirectUrl)
-          router.refresh()
-        } catch (error) {
-          // Si falla obtener la sesión, redirigir a home
-          router.push('/')
-          router.refresh()
+        let userRole: string | undefined
+        for (let i = 0; i < 5; i++) {
+          await new Promise(resolve => setTimeout(resolve, 400))
+          try {
+            const response = await fetch('/api/auth/session', { cache: 'no-store' })
+            const sessionData = await response.json()
+            console.log(`[AUTH] Session attempt ${i + 1}:`, JSON.stringify(sessionData?.user))
+            userRole = sessionData?.user?.role
+            if (userRole) break
+          } catch (e) {
+            console.warn(`[AUTH] Session fetch attempt ${i + 1} failed:`, e)
+          }
         }
+        
+        const redirectUrl = getRedirectUrl(userRole)
+        console.log('[AUTH] Redirecting to:', redirectUrl)
+        
+        // Hard navigation para forzar recarga completa de sesión
+        window.location.href = redirectUrl
+        return true
       }
 
       setAuthState(prev => ({
@@ -334,6 +321,7 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
       return true
 
     } catch (error) {
+      console.error('[AUTH] Login error:', error)
       const authError = createAuthError(error)
       setAuthState(prev => ({
         ...prev,
@@ -344,7 +332,7 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
 
       return false
     }
-  }, [authState.isOnline, validateCredentials, createAuthError, redirectOnSuccess, getRedirectUrl, router])
+  }, [validateCredentials, createAuthError, redirectOnSuccess, getRedirectUrl])
 
   // Función de logout optimizada
   const logout = useCallback(async (options: { redirect?: boolean } = {}) => {

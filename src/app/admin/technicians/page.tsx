@@ -10,6 +10,7 @@ import { useTechnicianStats } from '@/components/admin/technicians/TechnicianMan
 
 // Componentes de layout y UI
 import { ModuleLayout } from '@/components/common/layout/module-layout'
+import { BackToTickets } from '@/components/tickets/back-to-tickets'
 import { DataTable } from '@/components/ui/data-table'
 
 // Componentes específicos del módulo
@@ -116,6 +117,7 @@ export default function TechniciansPage() {
       }
     >
       <div className="space-y-6">
+        <BackToTickets />
         {/* Panel de estadísticas */}
         <TechnicianStatsPanel stats={stats} loading={loading} />
 

@@ -12,6 +12,7 @@ import {
 
 // Componentes estandarizados
 import { ModuleLayout } from '@/components/common/layout/module-layout'
+import { BackToTickets } from '@/components/tickets/back-to-tickets'
 import { DataTable } from '@/components/ui/data-table'
 import { SymmetricStatsCard } from '@/components/shared/stats-card'
 import { KnowledgeFilters } from '@/components/knowledge/knowledge-filters'
@@ -156,6 +157,7 @@ export default function KnowledgePage() {
       onRetry={reload}
     >
       <div className="space-y-6">
+        <BackToTickets />
         {/* Panel de Estadísticas con Tema CLIENT */}
         <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
           <SymmetricStatsCard

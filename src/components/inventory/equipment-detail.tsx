@@ -13,7 +13,8 @@ import {
   Calendar,
   DollarSign,
   MapPin,
-  FileText
+  FileText,
+  AlertCircle
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -169,6 +170,17 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
     router.push(`/inventory/equipment/${equipmentId}/maintenance`)
   }
 
+  const handleReportProblem = () => {
+    // Redirigir a crear ticket con información del equipo pre-llenada
+    const equipmentInfo = `Equipo: ${equipment.code} - ${equipment.brand} ${equipment.model}\nNúmero de Serie: ${equipment.serialNumber}`
+    const queryParams = new URLSearchParams({
+      title: `Problema con equipo ${equipment.code}`,
+      description: equipmentInfo,
+      equipmentId: equipment.id,
+    })
+    router.push(`/client/tickets/create?${queryParams.toString()}`)
+  }
+
   const downloadQR = () => {
     if (!qrCode) return
 
@@ -190,6 +202,7 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
   const canEdit = userRole === 'ADMIN' || userRole === 'TECHNICIAN'
   const canDelete = userRole === 'ADMIN'
   const canAssign = (userRole === 'ADMIN' || userRole === 'TECHNICIAN') && equipment.status === 'AVAILABLE'
+  const canReportProblem = userRole === 'CLIENT' && currentAssignment?.receiverId === userId
 
   return (
     <div className="space-y-6">
@@ -205,6 +218,12 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
           </div>
         </div>
         <div className="flex gap-2">
+          {canReportProblem && (
+            <Button onClick={handleReportProblem} variant="default">
+              <AlertCircle className="mr-2 h-4 w-4" />
+              Reportar Problema
+            </Button>
+          )}
           {canEdit && (
             <Button onClick={handleEdit} variant="outline">
               <Edit className="mr-2 h-4 w-4" />

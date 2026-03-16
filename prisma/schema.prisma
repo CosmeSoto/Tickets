@@ -96,8 +96,12 @@ model categories {
   knowledge_articles     knowledge_articles[]
   sla_policies           sla_policies[]           @relation("SLAPolicyCategory")
 
+  // Unique constraints manejados via SQL parcial indexes:
+  // - categories_name_parentId_level_key: UNIQUE(name, parentId, level) WHERE parentId IS NOT NULL
+  // - categories_name_level_root_key: UNIQUE(name, level) WHERE parentId IS NULL
   @@index([departmentId])
   @@index([parentId, level, isActive])
+  @@index([name, level])
 }
 
 model comments {
@@ -566,6 +570,7 @@ enum NotificationType {
   SUCCESS
   WARNING
   ERROR
+  INVENTORY
 }
 
 enum ResolutionStatus {
@@ -922,6 +927,24 @@ model landing_page_banners {
 
 // ============================================
 // INVENTORY MANAGEMENT SYSTEM
+// Equipment Types (dynamic catalog)
+model equipment_types {
+  id          String      @id @default(uuid())
+  code        String      @unique // LAPTOP, DESKTOP, etc.
+  name        String      // Laptop, Desktop, etc.
+  description String?
+  icon        String?     // Nombre del ícono de lucide-react
+  isActive    Boolean     @default(true) @map("is_active")
+  order       Int         @default(0) // Para ordenar en el dropdown
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  
+  equipment   equipment[]
+  
+  @@index([isActive, order])
+  @@map("equipment_types")
+}
+
 // ============================================
 
 // Equipment table
@@ -931,7 +954,7 @@ model equipment {
   serialNumber         String            @map("serial_number")
   brand                String
   model                String
-  type                 EquipmentType
+  typeId               String            @map("type_id") // Cambiado de enum a relación
   status               EquipmentStatus   @default(AVAILABLE)
   condition            EquipmentCondition @default(GOOD)
   ownershipType        OwnershipType     @default(FIXED_ASSET) @map("ownership_type")
@@ -944,36 +967,33 @@ model equipment {
   notes                String?           @db.Text
   photoUrl             String?           @map("photo_url")
   qrCode               String            @unique @map("qr_code")
+  
+  // Campos para equipos rentados/alquilados
+  rentalProvider       String?           @map("rental_provider")
+  rentalContractNumber String?           @map("rental_contract_number")
+  rentalStartDate      DateTime?         @map("rental_start_date")
+  rentalEndDate        DateTime?         @map("rental_end_date")
+  rentalMonthlyCost    Float?            @map("rental_monthly_cost")
+  rentalContactName    String?           @map("rental_contact_name")
+  rentalContactEmail   String?           @map("rental_contact_email")
+  rentalContactPhone   String?           @map("rental_contact_phone")
+  rentalNotes          String?           @db.Text @map("rental_notes")
+  
   createdAt            DateTime          @default(now()) @map("created_at")
   updatedAt            DateTime          @updatedAt @map("updated_at")
   
+  type                 equipment_types   @relation(fields: [typeId], references: [id])
   assignments          equipment_assignments[]
   maintenanceRecords   maintenance_records[]
   licenses             software_licenses[]
   
   @@index([code])
   @@index([serialNumber])
-  @@index([type, status])
+  @@index([typeId, status])
   @@index([status])
+  @@index([rentalProvider])
+  @@index([rentalEndDate])
   @@map("equipment")
-}
-
-enum EquipmentType {
-  LAPTOP
-  DESKTOP
-  MONITOR
-  PRINTER
-  PHONE
-  TABLET
-  KEYBOARD
-  MOUSE
-  HEADSET
-  WEBCAM
-  DOCKING_STATION
-  UPS
-  ROUTER
-  SWITCH
-  OTHER
 }
 
 enum EquipmentStatus {

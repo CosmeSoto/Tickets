@@ -1,6 +1,8 @@
 import { PrismaClient } from '@prisma/client'
 import { FolioService } from './folio.service'
 import { DigitalSignatureService } from './digital-signature.service'
+import { PDFGeneratorService } from './pdf-generator.service'
+import { InventoryNotificationService } from './inventory-notification.service'
 import type { DeliveryAct, UserInfo } from '@/types/inventory/delivery-act'
 
 const prisma = new PrismaClient()
@@ -9,6 +11,35 @@ const prisma = new PrismaClient()
  * Servicio para gestión de actas de entrega digitales
  */
 export class DeliveryActService {
+  /**
+   * Genera el PDF de un acta con lógica de reintentos
+   * @private
+   */
+  private static async generatePDFWithRetry(actId: string, maxRetries: number = 3): Promise<string | null> {
+    let lastError: Error | null = null
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`Generando PDF para acta ${actId}, intento ${attempt}/${maxRetries}`)
+        const pdfPath = await PDFGeneratorService.generateDeliveryActPDF(actId)
+        console.log(`PDF generado exitosamente: ${pdfPath}`)
+        return pdfPath
+      } catch (error) {
+        lastError = error as Error
+        console.error(`Error en intento ${attempt}/${maxRetries} generando PDF:`, error)
+        
+        // Si no es el último intento, esperar antes de reintentar
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
+        }
+      }
+    }
+    
+    // Si llegamos aquí, todos los intentos fallaron
+    console.error(`Falló la generación de PDF después de ${maxRetries} intentos:`, lastError)
+    return null
+  }
+
   /**
    * Genera un acta de entrega para una asignación
    * Se llama automáticamente al crear una asignación
@@ -116,6 +147,12 @@ export class DeliveryActService {
             receiverId: assignment.receiverId,
           }
         }
+      })
+
+      // Enviar notificación de acta creada (asíncrono)
+      InventoryNotificationService.sendActCreatedNotification(act.id).catch(error => {
+        console.error('Error enviando notificación de acta creada:', error)
+        // El error se registra pero no se propaga para no afectar la creación del acta
       })
 
       return act as DeliveryAct
@@ -247,6 +284,20 @@ export class DeliveryActService {
         }
       })
 
+      // Generar PDF automáticamente (con reintentos)
+      // Se ejecuta de forma asíncrona para no bloquear la respuesta
+      this.generatePDFWithRetry(actId, 3)
+        .then(pdfPath => {
+          if (pdfPath) {
+            // Enviar notificación de aceptación con PDF a ambas partes
+            return InventoryNotificationService.sendActAcceptedNotification(actId, pdfPath)
+          }
+        })
+        .catch(error => {
+          console.error('Error en proceso post-aceptación:', error)
+          // El error se registra pero no se propaga para no afectar la aceptación
+        })
+
       return updated as DeliveryAct
     } catch (error) {
       console.error('Error aceptando acta:', error)
@@ -325,6 +376,12 @@ export class DeliveryActService {
         })
 
         return updatedAct
+      })
+
+      // Enviar notificación de rechazo (asíncrono)
+      InventoryNotificationService.sendActRejectedNotification(actId).catch(error => {
+        console.error('Error enviando notificación de rechazo:', error)
+        // El error se registra pero no se propaga para no afectar el rechazo
       })
 
       return updated as DeliveryAct

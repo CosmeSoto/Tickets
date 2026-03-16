@@ -205,11 +205,27 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Validar que no exista una categoría con el mismo nombre en el mismo nivel y padre
+    const existing = await prisma.categories.findFirst({
+      where: {
+        name: name.trim(),
+        level,
+        parentId: parentId || null,
+      }
+    })
+
+    if (existing) {
+      return NextResponse.json(
+        { success: false, message: `Ya existe una categoría "${name}" en este nivel y padre` },
+        { status: 409 }
+      )
+    }
+
     // Crear categoría
     const category = await prisma.categories.create({
       data: {
         id: `cat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        name,
+        name: name.trim(),
         description,
         level,
         parentId: parentId || null,

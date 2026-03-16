@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { AlertCircle, CheckCircle2, Info, ChevronRight } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Info, ChevronRight, X } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
@@ -660,6 +660,28 @@ export function CategorySelector({
                   </div>
                 </div>
               </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setState({
+                    selectedPath: [],
+                    mode: 'full',
+                    searchQuery: '',
+                    showConfirmation: true,
+                    selectionStartTime: Date.now(),
+                    interactionMethod: null,
+                  });
+                  setCategoryMetadata(null);
+                  setConfidenceScore(0);
+                  onChange('');
+                }}
+                className="flex-shrink-0 text-muted-foreground hover:text-destructive"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Limpiar
+              </Button>
               <Button
                 type="button"
                 variant="ghost"

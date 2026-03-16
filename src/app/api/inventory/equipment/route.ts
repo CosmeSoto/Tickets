@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { EquipmentService } from '@/lib/services/equipment.service'
 import { createEquipmentSchema, equipmentFiltersSchema } from '@/lib/validations/inventory/equipment'
 import { ZodError } from 'zod'
+import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 
 /**
  * GET /api/inventory/equipment
@@ -101,6 +102,21 @@ export async function POST(request: NextRequest) {
       validatedData,
       session.user.id
     )
+
+    // Registrar en auditoría
+    await AuditServiceComplete.log({
+      action: AuditActionsComplete.EQUIPMENT_CREATED,
+      entityType: 'equipment',
+      entityId: equipment.id,
+      userId: session.user.id,
+      details: {
+        code: equipment.code,
+        type: validatedData.type,
+        brand: validatedData.brand,
+        model: validatedData.model,
+        serialNumber: validatedData.serialNumber,
+      },
+    })
 
     return NextResponse.json(equipment, { status: 201 })
   } catch (error) {

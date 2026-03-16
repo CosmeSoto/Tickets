@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Loader2, Plus, X } from 'lucide-react'
+import { Loader2, Plus, X, Package, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -26,23 +26,14 @@ interface EquipmentFormProps {
   onCancel?: () => void
 }
 
-const EQUIPMENT_TYPE_OPTIONS = [
-  { value: 'LAPTOP', label: 'Laptop' },
-  { value: 'DESKTOP', label: 'Desktop' },
-  { value: 'MONITOR', label: 'Monitor' },
-  { value: 'PRINTER', label: 'Impresora' },
-  { value: 'PHONE', label: 'Teléfono' },
-  { value: 'TABLET', label: 'Tablet' },
-  { value: 'KEYBOARD', label: 'Teclado' },
-  { value: 'MOUSE', label: 'Mouse' },
-  { value: 'HEADSET', label: 'Audífonos' },
-  { value: 'WEBCAM', label: 'Webcam' },
-  { value: 'DOCKING_STATION', label: 'Docking Station' },
-  { value: 'UPS', label: 'UPS' },
-  { value: 'ROUTER', label: 'Router' },
-  { value: 'SWITCH', label: 'Switch' },
-  { value: 'OTHER', label: 'Otro' },
-]
+interface EquipmentType {
+  id: string
+  code: string
+  name: string
+  icon?: string
+  isActive: boolean
+  order: number
+}
 
 const EQUIPMENT_STATUS_OPTIONS = [
   { value: 'AVAILABLE', label: 'Disponible' },
@@ -69,6 +60,8 @@ const OWNERSHIP_TYPE_OPTIONS = [
 export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormProps) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
+  const [loadingTypes, setLoadingTypes] = useState(true)
+  const [equipmentTypes, setEquipmentTypes] = useState<EquipmentType[]>([])
   const [accessories, setAccessories] = useState<string[]>(equipment?.accessories || [])
   const [newAccessory, setNewAccessory] = useState('')
   const [specifications, setSpecifications] = useState<Record<string, string>>(
@@ -78,6 +71,36 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
   const [newSpecValue, setNewSpecValue] = useState('')
 
   const isEditing = !!equipment
+
+  // Cargar tipos de equipo desde la API
+  useEffect(() => {
+    async function fetchEquipmentTypes() {
+      try {
+        const response = await fetch('/api/admin/equipment-types')
+        if (response.ok) {
+          const types = await response.json()
+          setEquipmentTypes(types)
+        } else {
+          toast({
+            title: 'Error',
+            description: 'No se pudieron cargar los tipos de equipo',
+            variant: 'destructive'
+          })
+        }
+      } catch (error) {
+        console.error('Error cargando tipos de equipo:', error)
+        toast({
+          title: 'Error',
+          description: 'Error de conexión al cargar tipos de equipo',
+          variant: 'destructive'
+        })
+      } finally {
+        setLoadingTypes(false)
+      }
+    }
+
+    fetchEquipmentTypes()
+  }, [])
 
   const {
     register,
@@ -101,12 +124,24 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
       warrantyExpiration: equipment.warrantyExpiration ? new Date(equipment.warrantyExpiration) : undefined,
       location: equipment.location || undefined,
       notes: equipment.notes || undefined,
+      rentalProvider: equipment.rentalProvider || undefined,
+      rentalContractNumber: equipment.rentalContractNumber || undefined,
+      rentalStartDate: equipment.rentalStartDate ? new Date(equipment.rentalStartDate) : undefined,
+      rentalEndDate: equipment.rentalEndDate ? new Date(equipment.rentalEndDate) : undefined,
+      rentalMonthlyCost: equipment.rentalMonthlyCost || undefined,
+      rentalContactName: equipment.rentalContactName || undefined,
+      rentalContactEmail: equipment.rentalContactEmail || undefined,
+      rentalContactPhone: equipment.rentalContactPhone || undefined,
+      rentalNotes: equipment.rentalNotes || undefined,
     } : {
       status: 'AVAILABLE',
       condition: 'GOOD',
       ownershipType: 'FIXED_ASSET',
     },
   })
+
+  const ownershipType = watch('ownershipType')
+  const isRental = ownershipType === 'RENTAL'
 
   const onSubmit = async (data: CreateEquipmentInput) => {
     try {
@@ -156,8 +191,9 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
   }
 
   const addAccessory = () => {
-    if (newAccessory.trim()) {
-      setAccessories([...accessories, newAccessory.trim()])
+    const trimmed = newAccessory.trim()
+    if (trimmed && trimmed.length > 0) {
+      setAccessories([...accessories, trimmed])
       setNewAccessory('')
     }
   }
@@ -256,21 +292,27 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
               <Label htmlFor="type">
                 Tipo <span className="text-destructive">*</span>
               </Label>
-              <Select
-                value={watch('type')}
-                onValueChange={(value) => setValue('type', value as any)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona un tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  {EQUIPMENT_TYPE_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {loadingTypes ? (
+                <div className="flex items-center justify-center h-10 border rounded-md">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <Select
+                  value={watch('type') || ''}
+                  onValueChange={(value) => setValue('type', value as any, { shouldValidate: true })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona un tipo" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[300px]">
+                    {equipmentTypes.map((type) => (
+                      <SelectItem key={type.id} value={type.id}>
+                        {type.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               {errors.type && (
                 <p className="text-sm text-destructive">{errors.type.message}</p>
               )}
@@ -402,6 +444,120 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
         </CardContent>
       </Card>
 
+      {/* Información de Renta (solo para equipos rentados) */}
+      {isRental && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Información de Renta/Alquiler</CardTitle>
+            <CardDescription>
+              Datos del proveedor y contrato de renta
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="rentalProvider">
+                  Proveedor <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="rentalProvider"
+                  {...register('rentalProvider')}
+                  placeholder="TechRent Solutions"
+                />
+                {errors.rentalProvider && (
+                  <p className="text-sm text-destructive">{errors.rentalProvider.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="rentalContractNumber">Número de Contrato</Label>
+                <Input
+                  id="rentalContractNumber"
+                  {...register('rentalContractNumber')}
+                  placeholder="TR-2026-0123"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="rentalStartDate">Fecha de Inicio</Label>
+                <Input
+                  id="rentalStartDate"
+                  type="date"
+                  {...register('rentalStartDate')}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="rentalEndDate">Fecha de Fin</Label>
+                <Input
+                  id="rentalEndDate"
+                  type="date"
+                  {...register('rentalEndDate')}
+                />
+                {errors.rentalEndDate && (
+                  <p className="text-sm text-destructive">{errors.rentalEndDate.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="rentalMonthlyCost">Costo Mensual (USD)</Label>
+                <Input
+                  id="rentalMonthlyCost"
+                  type="number"
+                  step="0.01"
+                  {...register('rentalMonthlyCost', { valueAsNumber: true })}
+                  placeholder="150.00"
+                />
+                {errors.rentalMonthlyCost && (
+                  <p className="text-sm text-destructive">{errors.rentalMonthlyCost.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="rentalContactName">Nombre de Contacto</Label>
+                <Input
+                  id="rentalContactName"
+                  {...register('rentalContactName')}
+                  placeholder="Juan Pérez"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="rentalContactEmail">Email de Contacto</Label>
+                <Input
+                  id="rentalContactEmail"
+                  type="email"
+                  {...register('rentalContactEmail')}
+                  placeholder="contacto@proveedor.com"
+                />
+                {errors.rentalContactEmail && (
+                  <p className="text-sm text-destructive">{errors.rentalContactEmail.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="rentalContactPhone">Teléfono de Contacto</Label>
+                <Input
+                  id="rentalContactPhone"
+                  {...register('rentalContactPhone')}
+                  placeholder="+1-555-0123"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="rentalNotes">Notas de Renta</Label>
+              <Textarea
+                id="rentalNotes"
+                {...register('rentalNotes')}
+                placeholder="Información adicional sobre el contrato, términos especiales, etc."
+                rows={3}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Accesorios */}
       <Card>
         <CardHeader>
@@ -415,25 +571,46 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
             <Input
               value={newAccessory}
               onChange={(e) => setNewAccessory(e.target.value)}
-              placeholder="Ej: Cargador, Mouse, Cable HDMI"
-              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addAccessory())}
+              placeholder="Ej: Cargador, Mouse inalámbrico, Cable HDMI"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  addAccessory()
+                }
+              }}
+              className="flex-1"
             />
-            <Button type="button" onClick={addAccessory} size="icon">
+            <Button 
+              type="button" 
+              onClick={addAccessory} 
+              size="icon"
+              variant="secondary"
+              disabled={!newAccessory.trim()}
+            >
               <Plus className="h-4 w-4" />
             </Button>
           </div>
-          {accessories.length > 0 && (
+
+          {accessories.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
+              <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No se han agregado accesorios</p>
+              <p className="text-xs mt-1">Agrega accesorios usando el campo de arriba</p>
+            </div>
+          ) : (
             <div className="flex flex-wrap gap-2">
               {accessories.map((accessory, index) => (
                 <div
                   key={index}
-                  className="flex items-center gap-1 rounded-md bg-secondary px-3 py-1 text-sm"
+                  className="flex items-center gap-2 rounded-md bg-secondary px-3 py-2 text-sm"
                 >
-                  {accessory}
+                  <Package className="h-3 w-3" />
+                  <span>{accessory}</span>
                   <button
                     type="button"
                     onClick={() => removeAccessory(index)}
-                    className="ml-1 hover:text-destructive"
+                    className="ml-1 hover:text-destructive transition-colors"
+                    aria-label={`Eliminar ${accessory}`}
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -458,31 +635,56 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
               value={newSpecKey}
               onChange={(e) => setNewSpecKey(e.target.value)}
               placeholder="Nombre (ej: Procesador)"
+              className="flex-1"
             />
             <Input
               value={newSpecValue}
               onChange={(e) => setNewSpecValue(e.target.value)}
-              placeholder="Valor (ej: Intel Core i7)"
-              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addSpecification())}
+              placeholder="Valor (ej: Intel Core i7-1185G7)"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  addSpecification()
+                }
+              }}
+              className="flex-1"
             />
-            <Button type="button" onClick={addSpecification} size="icon">
+            <Button 
+              type="button" 
+              onClick={addSpecification} 
+              size="icon"
+              variant="secondary"
+              disabled={!newSpecKey.trim() || !newSpecValue.trim()}
+            >
               <Plus className="h-4 w-4" />
             </Button>
           </div>
-          {Object.keys(specifications).length > 0 && (
+
+          {Object.keys(specifications).length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
+              <Settings className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No se han agregado especificaciones</p>
+              <p className="text-xs mt-1">Agrega especificaciones técnicas usando los campos de arriba</p>
+            </div>
+          ) : (
             <div className="space-y-2">
               {Object.entries(specifications).map(([key, value]) => (
                 <div
                   key={key}
-                  className="flex items-center justify-between rounded-md border p-3"
+                  className="flex items-center justify-between rounded-md border p-3 hover:bg-accent/50 transition-colors"
                 >
-                  <div>
-                    <span className="font-medium">{key}:</span> {value}
+                  <div className="flex items-center gap-2">
+                    <Settings className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <span className="font-medium">{key}:</span>{' '}
+                      <span className="text-muted-foreground">{value}</span>
+                    </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => removeSpecification(key)}
-                    className="hover:text-destructive"
+                    className="hover:text-destructive transition-colors"
+                    aria-label={`Eliminar especificación ${key}`}
                   >
                     <X className="h-4 w-4" />
                   </button>

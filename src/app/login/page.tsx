@@ -79,15 +79,14 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
+    console.log('[LOGIN] Attempting login with email:', email)
+    
     const success = await login({
       email,
       password
     })
 
-    if (success) {
-      // Login exitoso, el hook maneja la redirección
-      console.log('Login exitoso')
-    }
+    console.log('[LOGIN] Login result:', success)
   }
 
   // Función para obtener el icono del error

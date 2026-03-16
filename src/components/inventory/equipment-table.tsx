@@ -21,7 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { EquipmentType, EquipmentStatus, EquipmentCondition } from '@prisma/client'
+import { EquipmentStatus, EquipmentCondition } from '@prisma/client'
 import type { Equipment } from '@/types/inventory/equipment'
 import { formatDate } from '@/lib/utils'
 
@@ -31,24 +31,6 @@ interface EquipmentTableProps {
   onEdit?: (equipment: Equipment) => void
   onDelete?: (equipment: Equipment) => void
   onViewQR?: (equipment: Equipment) => void
-}
-
-const EQUIPMENT_TYPE_LABELS: Record<EquipmentType, string> = {
-  LAPTOP: 'Laptop',
-  DESKTOP: 'Desktop',
-  MONITOR: 'Monitor',
-  PRINTER: 'Impresora',
-  PHONE: 'Teléfono',
-  TABLET: 'Tablet',
-  KEYBOARD: 'Teclado',
-  MOUSE: 'Mouse',
-  HEADSET: 'Audífonos',
-  WEBCAM: 'Webcam',
-  DOCKING_STATION: 'Docking',
-  UPS: 'UPS',
-  ROUTER: 'Router',
-  SWITCH: 'Switch',
-  OTHER: 'Otro',
 }
 
 const STATUS_COLORS: Record<EquipmentStatus, string> = {
@@ -138,7 +120,7 @@ export function EquipmentTable({
               </TableCell>
               <TableCell>
                 <Badge variant="outline">
-                  {EQUIPMENT_TYPE_LABELS[item.type]}
+                  {item.type?.name || 'Sin tipo'}
                 </Badge>
               </TableCell>
               <TableCell>

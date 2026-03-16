@@ -4,6 +4,7 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { BackToTickets } from '@/components/tickets/back-to-tickets'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -140,6 +141,7 @@ export default function ClientHelpPage() {
       subtitle="Encuentra respuestas y recursos útiles"
     >
       <div className="max-w-6xl mx-auto space-y-6">
+        <BackToTickets />
         {/* Search Bar */}
         <Card>
           <CardContent className="p-6">

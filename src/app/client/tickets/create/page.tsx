@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
@@ -65,11 +65,13 @@ const priorityDescriptions = {
 export default function CreateClientTicketPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [createdTicketId, setCreatedTicketId] = useState<string | null>(null)
+  const [equipmentId, setEquipmentId] = useState<string | null>(null)
   
   // Estados para archivos
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
@@ -93,6 +95,23 @@ export default function CreateClientTicketPage() {
   const selectedCategoryId = watch('categoryId')
   const ticketTitle = watch('title')
   const ticketDescription = watch('description')
+
+  // Pre-llenar formulario desde query params (para reportar problemas de equipos)
+  useEffect(() => {
+    const title = searchParams.get('title')
+    const description = searchParams.get('description')
+    const equipId = searchParams.get('equipmentId')
+
+    if (title) {
+      setValue('title', title)
+    }
+    if (description) {
+      setValue('description', description)
+    }
+    if (equipId) {
+      setEquipmentId(equipId)
+    }
+  }, [searchParams, setValue])
 
   useEffect(() => {
     if (status === 'loading') return
@@ -182,6 +201,22 @@ export default function CreateClientTicketPage() {
         setCreatedTicketId(ticketId)
         
         await uploadFiles(ticketId)
+        
+        // Si viene de un reporte de equipo, vincular el ticket con el equipo
+        if (equipmentId) {
+          try {
+            await fetch(`/api/inventory/equipment/${equipmentId}/link-ticket`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ ticketId }),
+            })
+          } catch (error) {
+            console.error('Error vinculando ticket con equipo:', error)
+            // No fallar si el vínculo falla, el ticket ya fue creado
+          }
+        }
         
         setSubmitSuccess(true)
 

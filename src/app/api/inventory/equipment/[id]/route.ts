@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { EquipmentService } from '@/lib/services/equipment.service'
 import { updateEquipmentSchema, equipmentIdSchema } from '@/lib/validations/inventory/equipment'
 import { ZodError } from 'zod'
+import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 
 /**
  * GET /api/inventory/equipment/[id]
@@ -107,6 +108,15 @@ export async function PUT(
       session.user.id
     )
 
+    // Registrar en auditoría
+    await AuditServiceComplete.log({
+      action: AuditActionsComplete.EQUIPMENT_UPDATED,
+      entityType: 'equipment',
+      entityId: id,
+      userId: session.user.id,
+      details: { updatedFields: Object.keys(validatedData) },
+    })
+
     return NextResponse.json(equipment)
   } catch (error) {
     console.error('Error en PUT /api/inventory/equipment/[id]:', error)
@@ -170,6 +180,14 @@ export async function DELETE(
 
     // Eliminar equipo
     await EquipmentService.deleteEquipment(id, session.user.id)
+
+    // Registrar en auditoría
+    await AuditServiceComplete.log({
+      action: AuditActionsComplete.EQUIPMENT_DELETED,
+      entityType: 'equipment',
+      entityId: id,
+      userId: session.user.id,
+    })
 
     return NextResponse.json({ message: 'Equipo retirado exitosamente' })
   } catch (error) {

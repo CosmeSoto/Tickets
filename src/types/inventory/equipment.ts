@@ -1,9 +1,19 @@
 import { 
-  EquipmentType, 
   EquipmentStatus, 
   EquipmentCondition, 
   OwnershipType 
 } from '@prisma/client'
+
+// Equipment type from DB
+export interface EquipmentTypeInfo {
+  id: string
+  code: string
+  name: string
+  description?: string
+  icon?: string
+  isActive: boolean
+  order: number
+}
 
 // Equipment interface
 export interface Equipment {
@@ -12,7 +22,8 @@ export interface Equipment {
   serialNumber: string
   brand: string
   model: string
-  type: EquipmentType
+  typeId: string
+  type?: EquipmentTypeInfo
   status: EquipmentStatus
   condition: EquipmentCondition
   ownershipType: OwnershipType
@@ -25,6 +36,15 @@ export interface Equipment {
   notes?: string
   photoUrl?: string
   qrCode: string
+  rentalProvider?: string
+  rentalContractNumber?: string
+  rentalStartDate?: Date
+  rentalEndDate?: Date
+  rentalMonthlyCost?: number
+  rentalContactName?: string
+  rentalContactEmail?: string
+  rentalContactPhone?: string
+  rentalNotes?: string
   createdAt: Date
   updatedAt: Date
 }
@@ -42,7 +62,7 @@ export interface EquipmentFormData {
   serialNumber: string
   brand: string
   model: string
-  type: EquipmentType
+  typeId: string
   status?: EquipmentStatus
   condition: EquipmentCondition
   ownershipType: OwnershipType
@@ -54,12 +74,21 @@ export interface EquipmentFormData {
   location?: string
   notes?: string
   photo?: File
+  rentalProvider?: string
+  rentalContractNumber?: string
+  rentalStartDate?: Date | string
+  rentalEndDate?: Date | string
+  rentalMonthlyCost?: number
+  rentalContactName?: string
+  rentalContactEmail?: string
+  rentalContactPhone?: string
+  rentalNotes?: string
 }
 
 // Equipment filters
 export interface EquipmentFilters {
   search?: string
-  type?: EquipmentType[]
+  typeId?: string[]
   status?: EquipmentStatus[]
   condition?: EquipmentCondition[]
   assignedTo?: string
@@ -101,7 +130,27 @@ export interface EquipmentSummary {
   maintenance: number
   damaged: number
   retired: number
-  byType: Record<EquipmentType, number>
+  byType: Record<string, number>
   byCondition: Record<EquipmentCondition, number>
   totalValue: number
+}
+
+// Rental equipment summary
+export interface RentalEquipmentSummary {
+  totalRented: number
+  activeRentals: number
+  expiringThisMonth: number
+  expiringSoon: number
+  totalMonthlyCost: number
+  byProvider: Record<string, {
+    count: number
+    monthlyCost: number
+  }>
+  expiringContracts: Array<{
+    id: string
+    code: string
+    provider: string
+    endDate: Date
+    daysRemaining: number
+  }>
 }

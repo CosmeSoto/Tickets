@@ -17,7 +17,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { InfoIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { InfoIcon, X } from 'lucide-react';
 
 interface Category {
   id: string;
@@ -280,9 +281,31 @@ export function CategorySelectorFallback({
 
       {/* Display selected path */}
       {selectedPath.length > 0 && (
-        <div className="rounded-md bg-muted p-3">
-          <p className="text-sm font-medium">Categoría seleccionada:</p>
-          <p className="text-sm text-muted-foreground">{getDisplayPath()}</p>
+        <div className="rounded-md bg-muted p-3 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium">Categoría seleccionada:</p>
+            <p className="text-sm text-muted-foreground">{getDisplayPath()}</p>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSelectedPath([]);
+              setAvailableCategories(prev => ({
+                ...prev,
+                level2: [],
+                level3: [],
+                level4: [],
+              }));
+              onChange('');
+            }}
+            disabled={disabled}
+            className="text-muted-foreground hover:text-destructive"
+          >
+            <X className="h-4 w-4 mr-1" />
+            Limpiar
+          </Button>
         </div>
       )}
 

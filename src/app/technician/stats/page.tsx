@@ -4,6 +4,7 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { BackToTickets } from '@/components/tickets/back-to-tickets'
 import { StatsCard, SymmetricStatsCard } from '@/components/shared/stats-card'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -215,6 +216,7 @@ export default function TechnicianStatsPage() {
       subtitle="Análisis de rendimiento y productividad"
     >
       <div className="space-y-6">
+        <BackToTickets />
         {/* Header Actions */}
         <div className="flex items-center justify-between">
           <div>

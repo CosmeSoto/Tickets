@@ -1,9 +1,10 @@
-import { Suspense } from 'react'
-import { notFound } from 'next/navigation'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+'use client'
+
+import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
+import { useEffect } from 'react'
+import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
 import { EquipmentDetail } from '@/components/inventory/equipment-detail'
-import { Skeleton } from '@/components/ui/skeleton'
 
 interface EquipmentDetailPageProps {
   params: {
@@ -11,35 +12,40 @@ interface EquipmentDetailPageProps {
   }
 }
 
-export default async function EquipmentDetailPage({ params }: EquipmentDetailPageProps) {
-  const session = await getServerSession(authOptions)
+export default function EquipmentDetailPage({ params }: EquipmentDetailPageProps) {
+  const { data: session, status } = useSession()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login')
+    }
+  }, [status, router])
+
+  if (status === 'loading') {
+    return (
+      <RoleDashboardLayout title="Cargando..." subtitle="Obteniendo información del equipo">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      </RoleDashboardLayout>
+    )
+  }
 
   if (!session?.user) {
-    notFound()
+    return null
   }
 
   return (
-    <div className="container mx-auto py-6">
-      <Suspense fallback={<EquipmentDetailSkeleton />}>
-        <EquipmentDetail 
-          equipmentId={params.id} 
-          userRole={session.user.role}
-          userId={session.user.id}
-        />
-      </Suspense>
-    </div>
-  )
-}
-
-function EquipmentDetailSkeleton() {
-  return (
-    <div className="space-y-6">
-      <Skeleton className="h-8 w-64" />
-      <div className="grid gap-6 md:grid-cols-2">
-        <Skeleton className="h-96" />
-        <Skeleton className="h-96" />
-      </div>
-      <Skeleton className="h-64" />
-    </div>
+    <RoleDashboardLayout
+      title="Detalle del Equipo"
+      subtitle="Información completa del equipo"
+    >
+      <EquipmentDetail 
+        equipmentId={params.id} 
+        userRole={session.user.role}
+        userId={session.user.id}
+      />
+    </RoleDashboardLayout>
   )
 }

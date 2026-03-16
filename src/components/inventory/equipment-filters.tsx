@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Search, Filter, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -12,31 +12,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { EquipmentType, EquipmentStatus, EquipmentCondition } from '@prisma/client'
-import type { EquipmentFilters as EquipmentFiltersType } from '@/types/inventory/equipment'
+import { EquipmentStatus, EquipmentCondition } from '@prisma/client'
+import type { EquipmentFilters as EquipmentFiltersType, EquipmentTypeInfo } from '@/types/inventory/equipment'
 
 interface EquipmentFiltersProps {
   filters: EquipmentFiltersType
   onFiltersChange: (filters: EquipmentFiltersType) => void
   onReset: () => void
-}
-
-const EQUIPMENT_TYPE_LABELS: Record<EquipmentType, string> = {
-  LAPTOP: 'Laptop',
-  DESKTOP: 'Desktop',
-  MONITOR: 'Monitor',
-  PRINTER: 'Impresora',
-  PHONE: 'Teléfono',
-  TABLET: 'Tablet',
-  KEYBOARD: 'Teclado',
-  MOUSE: 'Mouse',
-  HEADSET: 'Audífonos',
-  WEBCAM: 'Webcam',
-  DOCKING_STATION: 'Docking Station',
-  UPS: 'UPS',
-  ROUTER: 'Router',
-  SWITCH: 'Switch',
-  OTHER: 'Otro',
 }
 
 const EQUIPMENT_STATUS_LABELS: Record<EquipmentStatus, string> = {
@@ -61,6 +43,26 @@ export function EquipmentFilters({
   onReset,
 }: EquipmentFiltersProps) {
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [equipmentTypes, setEquipmentTypes] = useState<EquipmentTypeInfo[]>([])
+  const [loadingTypes, setLoadingTypes] = useState(true)
+
+  // Cargar tipos de equipo desde la API
+  useEffect(() => {
+    async function fetchTypes() {
+      try {
+        const response = await fetch('/api/admin/equipment-types')
+        if (response.ok) {
+          const types = await response.json()
+          setEquipmentTypes(types)
+        }
+      } catch (error) {
+        console.error('Error cargando tipos de equipo:', error)
+      } finally {
+        setLoadingTypes(false)
+      }
+    }
+    fetchTypes()
+  }, [])
 
   const handleSearchChange = (value: string) => {
     onFiltersChange({ ...filters, search: value || undefined })
@@ -68,9 +70,9 @@ export function EquipmentFilters({
 
   const handleTypeChange = (value: string) => {
     if (value === 'all') {
-      onFiltersChange({ ...filters, type: undefined })
+      onFiltersChange({ ...filters, typeId: undefined })
     } else {
-      onFiltersChange({ ...filters, type: [value as EquipmentType] })
+      onFiltersChange({ ...filters, typeId: [value] })
     }
   }
 
@@ -92,10 +94,15 @@ export function EquipmentFilters({
 
   const activeFiltersCount = [
     filters.search,
-    filters.type?.length,
+    filters.typeId?.length,
     filters.status?.length,
     filters.condition?.length,
   ].filter(Boolean).length
+
+  // Obtener nombre del tipo seleccionado
+  const getTypeName = (typeId: string) => {
+    return equipmentTypes.find(t => t.id === typeId)?.name || typeId
+  }
 
   return (
     <div className="space-y-4">
@@ -131,17 +138,18 @@ export function EquipmentFilters({
           <div className="space-y-2">
             <label className="text-sm font-medium">Tipo</label>
             <Select
-              value={filters.type?.[0] || 'all'}
+              value={filters.typeId?.[0] || 'all'}
               onValueChange={handleTypeChange}
+              disabled={loadingTypes}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Todos los tipos" />
+                <SelectValue placeholder={loadingTypes ? 'Cargando...' : 'Todos los tipos'} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos los tipos</SelectItem>
-                {Object.entries(EQUIPMENT_TYPE_LABELS).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
+                {equipmentTypes.map((type) => (
+                  <SelectItem key={type.id} value={type.id}>
+                    {type.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -202,9 +210,9 @@ export function EquipmentFilters({
               />
             </Badge>
           )}
-          {filters.type?.map((type) => (
-            <Badge key={type} variant="secondary" className="gap-1">
-              Tipo: {EQUIPMENT_TYPE_LABELS[type]}
+          {filters.typeId?.map((typeId) => (
+            <Badge key={typeId} variant="secondary" className="gap-1">
+              Tipo: {getTypeName(typeId)}
               <X
                 className="h-3 w-3 cursor-pointer"
                 onClick={() => handleTypeChange('all')}

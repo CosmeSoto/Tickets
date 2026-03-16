@@ -42,8 +42,8 @@ export function SessionProviderWrapper({ children }: { children: React.ReactNode
 
   return (
     <SessionProvider
-      refetchInterval={0}
-      refetchOnWindowFocus={false}
+      refetchInterval={5 * 60}
+      refetchOnWindowFocus={true}
     >
       {children}
     </SessionProvider>

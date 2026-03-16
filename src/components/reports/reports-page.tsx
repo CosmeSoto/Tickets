@@ -30,6 +30,7 @@ import { cn } from '@/lib/utils'
 
 // Componente estandarizado
 import { ModuleLayout } from '@/components/common/layout/module-layout'
+import { BackToTickets } from '@/components/tickets/back-to-tickets'
 
 // Componentes consolidados
 import { ReportFilters } from './report-filters'
@@ -135,7 +136,7 @@ export default function ReportsPage() {
       onRetry={refresh}
     >
       <div className='space-y-6'>
-        {/* Barra de estado y acciones rápidas */}
+        <BackToTickets />
         <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">

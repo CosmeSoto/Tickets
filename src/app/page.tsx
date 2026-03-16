@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Loader2 } from 'lucide-react'
 import * as Icons from 'lucide-react'
@@ -35,9 +34,6 @@ interface Service {
 
 export default function HomePage() {
   const { data: session, status } = useSession()
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const isPreview = searchParams.get('preview') === 'true'
   const [content, setContent] = useState<LandingContent | null>(null)
   const [services, setServices] = useState<Service[]>([])
   const [loading, setLoading] = useState(true)
@@ -54,35 +50,11 @@ export default function HomePage() {
       .finally(() => setLoading(false))
   }, [])
 
-  useEffect(() => {
-    // Si es preview, no redirigir
-    if (isPreview) return
+  // Ya no redirigimos automáticamente al dashboard.
+  // La landing page siempre se muestra; el navbar cambia según la sesión.
 
-    // Si el usuario está autenticado, redirigir a su dashboard
-    if (status === 'authenticated' && session?.user) {
-      const role = session.user.role
-      let redirectUrl = '/'
-
-      switch (role) {
-        case 'ADMIN':
-          redirectUrl = '/admin'
-          break
-        case 'TECHNICIAN':
-          redirectUrl = '/technician'
-          break
-        case 'CLIENT':
-          redirectUrl = '/client'
-          break
-        default:
-          redirectUrl = '/login'
-      }
-
-      router.push(redirectUrl)
-    }
-  }, [status, session, router, isPreview])
-
-  // Mostrar loading mientras se verifica la sesión o carga contenido
-  if (status === 'loading' || loading) {
+  // Mostrar loading solo mientras carga el contenido del CMS
+  if (loading) {
     return (
       <div className='min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800'>
         <div className='text-center'>
@@ -93,20 +65,8 @@ export default function HomePage() {
     )
   }
 
-  // Si está autenticado y NO es preview, mostrar loading mientras redirige
-  if (status === 'authenticated' && !isPreview) {
-    return (
-      <div className='min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800'>
-        <div className='text-center'>
-          <Loader2 className='h-12 w-12 animate-spin text-blue-600 mx-auto mb-4' />
-          <p className='text-muted-foreground'>Redirigiendo a tu dashboard...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Si no hay contenido, mostrar por defecto
-  const displayContent = content || {
+  // Valores por defecto
+  const defaultContent = {
     heroTitle: 'Soporte Técnico Profesional',
     heroSubtitle: 'Resolvemos tus problemas técnicos de manera rápida y eficiente',
     heroCtaPrimary: 'Crear Ticket de Soporte',
@@ -122,6 +82,26 @@ export default function HomePage() {
     companyLogoDarkUrl: '',
     footerText: '© 2024 Sistema de Tickets',
   }
+
+  // Combinar contenido de la API con valores por defecto
+  const displayContent = {
+    ...defaultContent,
+    ...content,
+    // Asegurar que los campos críticos nunca sean undefined
+    heroTitle: content?.heroTitle || defaultContent.heroTitle,
+    heroSubtitle: content?.heroSubtitle || defaultContent.heroSubtitle,
+    heroCtaPrimary: content?.heroCtaPrimary || defaultContent.heroCtaPrimary,
+    heroCtaPrimaryUrl: content?.heroCtaPrimaryUrl || defaultContent.heroCtaPrimaryUrl,
+    heroCtaSecondary: content?.heroCtaSecondary || defaultContent.heroCtaSecondary,
+    heroCtaSecondaryUrl: content?.heroCtaSecondaryUrl || defaultContent.heroCtaSecondaryUrl,
+    servicesTitle: content?.servicesTitle || defaultContent.servicesTitle,
+    servicesSubtitle: content?.servicesSubtitle || defaultContent.servicesSubtitle,
+    companyName: content?.companyName || defaultContent.companyName,
+    footerText: content?.footerText || defaultContent.footerText,
+  }
+
+  // Asegurar que heroTitle siempre tenga un valor válido
+  const safeHeroTitle = displayContent.heroTitle
 
   const getIcon = (iconName: string) => {
     const Icon = (Icons as any)[iconName] || Icons.HelpCircle
@@ -191,9 +171,9 @@ export default function HomePage() {
         )}
         <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10'>
           <h1 className={`text-4xl md:text-6xl font-bold mb-6 ${displayContent.heroImageUrl ? 'text-white' : 'text-foreground'}`}>
-            {displayContent.heroTitle.split(' ').slice(0, -1).join(' ')}{' '}
+            {safeHeroTitle.split(' ').slice(0, -1).join(' ')}{' '}
             <span className={displayContent.heroImageUrl ? 'text-blue-300' : 'text-blue-600 dark:text-blue-400'}>
-              {displayContent.heroTitle.split(' ').slice(-1)}
+              {safeHeroTitle.split(' ').slice(-1)}
             </span>
           </h1>
           <p className={`text-xl mb-8 max-w-3xl mx-auto ${displayContent.heroImageUrl ? 'text-gray-100' : 'text-muted-foreground'}`}>

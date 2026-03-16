@@ -8,11 +8,15 @@ import {
   AlertCircle, 
   CheckCircle, 
   Target,
-  Ticket as TicketIcon
+  Ticket as TicketIcon,
+  BarChart3,
+  FolderTree,
+  BookOpen,
 } from 'lucide-react'
 
 // Componentes estandarizados
 import { ModuleLayout } from '@/components/common/layout/module-layout'
+import Link from 'next/link'
 
 // Componentes específicos del módulo
 import { DataTable } from '@/components/ui/data-table'
@@ -198,6 +202,28 @@ export default function TechnicianTicketsPage() {
       loading={loading && allTickets.length === 0}
       error={error}
       onRetry={reload}
+      headerActions={
+        <div className="flex gap-2">
+          <Link href="/technician/stats">
+            <Button variant="outline" size="sm">
+              <BarChart3 className="mr-2 h-4 w-4" />
+              Estadísticas
+            </Button>
+          </Link>
+          <Link href="/technician/categories">
+            <Button variant="outline" size="sm">
+              <FolderTree className="mr-2 h-4 w-4" />
+              Mis Categorías
+            </Button>
+          </Link>
+          <Link href="/technician/knowledge">
+            <Button variant="outline" size="sm">
+              <BookOpen className="mr-2 h-4 w-4" />
+              Conocimientos
+            </Button>
+          </Link>
+        </div>
+      }
     >
       <div className="space-y-6">
         {/* Panel de Estadísticas con Tema TECHNICIAN */}

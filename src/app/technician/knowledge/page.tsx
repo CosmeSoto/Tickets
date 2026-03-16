@@ -13,6 +13,7 @@ import {
 
 // Componentes estandarizados
 import { ModuleLayout } from '@/components/common/layout/module-layout'
+import { BackToTickets } from '@/components/tickets/back-to-tickets'
 import { DataTable } from '@/components/ui/data-table'
 import { SymmetricStatsCard } from '@/components/shared/stats-card'
 import { KnowledgeFilters } from '@/components/knowledge/knowledge-filters'
@@ -188,6 +189,7 @@ export default function TechnicianKnowledgePage() {
       onRetry={reload}
     >
       <div className="space-y-6">
+        <BackToTickets />
         {/* Nota informativa */}
         <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
           <CardContent className="pt-6">

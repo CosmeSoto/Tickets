@@ -99,11 +99,6 @@ export default function AdminDashboard() {
           value={stats.totalUsers || 0}
           icon={Users}
           color='blue'
-          trend={{ 
-            value: Math.floor(Math.random() * 20) + 5, 
-            label: 'desde el mes pasado', 
-            isPositive: true 
-          }}
           badge={{ text: `${stats.todayTickets || 0} nuevos hoy`, variant: 'secondary' }}
           status='success'
         />
@@ -113,11 +108,6 @@ export default function AdminDashboard() {
           value={stats.totalTickets || 0}
           icon={Ticket}
           color='green'
-          trend={{ 
-            value: Math.floor(Math.random() * 15) + 3, 
-            label: 'desde la semana pasada', 
-            isPositive: true 
-          }}
           badge={{ text: `${stats.activeTickets || 0} activos`, variant: 'default' }}
         />
 
@@ -139,11 +129,6 @@ export default function AdminDashboard() {
           icon={CheckCircle}
           color='purple'
           status={resolutionRate >= 85 ? 'success' : resolutionRate >= 70 ? 'warning' : 'error'}
-          trend={{ 
-            value: resolutionRate >= 85 ? 5 : -2, 
-            label: 'vs mes anterior', 
-            isPositive: resolutionRate >= 85 
-          }}
         />
       </div>
 

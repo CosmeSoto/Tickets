@@ -32,6 +32,7 @@ Contraseña: admin123
 
 ## ✨ Características Principales
 
+### Sistema de Tickets
 - ✅ Gestión completa de tickets
 - ✅ Sistema de SLA automático
 - ✅ Notificaciones (Email, Teams, In-App)
@@ -39,8 +40,21 @@ Contraseña: admin123
 - ✅ Base de conocimientos (CMS)
 - ✅ Auditoría completa
 - ✅ Multi-departamento
-- ✅ Categorías jerárquicas
+- ✅ Categorías jerárquicas con sugerencias inteligentes
 - ✅ API REST
+
+### Módulo de Inventario
+- ✅ Gestión de equipos (laptops, desktops, impresoras, etc.)
+- ✅ Asignación de equipos a usuarios
+- ✅ Actas de entrega digitales con firma electrónica
+- ✅ Actas de devolución
+- ✅ Códigos QR para identificación rápida
+- ✅ Historial completo de asignaciones
+- ✅ Registro de mantenimientos
+- ✅ Gestión de licencias de software (encriptadas)
+- ✅ Control de consumibles y stock
+- ✅ Reportes de inventario
+- ✅ Vinculación de tickets con equipos
 
 ## 📚 Documentación
 

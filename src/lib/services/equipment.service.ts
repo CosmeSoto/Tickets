@@ -87,7 +87,8 @@ export class EquipmentService {
   static async getEquipmentById(id: string): Promise<Equipment | null> {
     try {
       const equipment = await prisma.equipment.findUnique({
-        where: { id }
+        where: { id },
+        include: { type: true }
       })
 
       return equipment as Equipment | null
@@ -105,6 +106,7 @@ export class EquipmentService {
       const equipment = await prisma.equipment.findUnique({
         where: { id },
         include: {
+          type: true,
           assignments: {
             include: {
               receiver: { select: { id: true, name: true, email: true } },
@@ -174,8 +176,8 @@ export class EquipmentService {
       }
 
       // Filtros por tipo
-      if (filters.type && filters.type.length > 0) {
-        where.type = { in: filters.type }
+      if (filters.typeId && filters.typeId.length > 0) {
+        where.typeId = { in: filters.typeId }
       }
 
       // Filtros por estado
@@ -215,6 +217,9 @@ export class EquipmentService {
           where,
           skip,
           take: limit,
+          include: {
+            type: true, // Incluir relación con equipment_types
+          },
           orderBy: { createdAt: 'desc' }
         })
       ])
@@ -357,7 +362,7 @@ export class EquipmentService {
           _count: true
         }),
         prisma.equipment.groupBy({
-          by: ['type'],
+          by: ['typeId'],
           _count: true
         }),
         prisma.equipment.groupBy({
@@ -369,20 +374,43 @@ export class EquipmentService {
         })
       ])
 
+      // Helper para extraer conteo de forma segura
+      const getCount = (arr: any[], key: string, value: string): number => {
+        return arr.find(item => item[key] === value)?._count ?? 0
+      }
+
       return {
         total,
-        available: byStatus.find(s => s.status === 'AVAILABLE')?._count || 0,
-        assigned: byStatus.find(s => s.status === 'ASSIGNED')?._count || 0,
-        maintenance: byStatus.find(s => s.status === 'MAINTENANCE')?._count || 0,
-        damaged: byStatus.find(s => s.status === 'DAMAGED')?._count || 0,
-        retired: byStatus.find(s => s.status === 'RETIRED')?._count || 0,
-        byType: byType.reduce((acc, item) => ({ ...acc, [item.type]: item._count }), {} as any),
-        byCondition: byCondition.reduce((acc, item) => ({ ...acc, [item.condition]: item._count }), {} as any),
-        totalValue: totalValue._sum.purchasePrice || 0
+        available: getCount(byStatus, 'status', 'AVAILABLE'),
+        assigned: getCount(byStatus, 'status', 'ASSIGNED'),
+        maintenance: getCount(byStatus, 'status', 'MAINTENANCE'),
+        damaged: getCount(byStatus, 'status', 'DAMAGED'),
+        retired: getCount(byStatus, 'status', 'RETIRED'),
+        byType: byType.reduce((acc, item) => ({ ...acc, [item.typeId]: item._count }), {} as Record<string, number>),
+        byCondition: byCondition.reduce((acc, item) => ({ ...acc, [item.condition]: item._count }), {} as Record<string, number>),
+        totalValue: totalValue._sum.purchasePrice ?? 0
       }
     } catch (error) {
       console.error('Error obteniendo resumen de equipos:', error)
-      throw error
+      
+      // Log detallado para debugging
+      if (error instanceof Error) {
+        console.error('Error message:', error.message)
+        console.error('Error stack:', error.stack)
+      }
+      
+      // Retornar estructura válida con valores en cero en caso de error
+      return {
+        total: 0,
+        available: 0,
+        assigned: 0,
+        maintenance: 0,
+        damaged: 0,
+        retired: 0,
+        byType: {},
+        byCondition: {},
+        totalValue: 0
+      }
     }
   }
 

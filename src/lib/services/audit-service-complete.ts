@@ -10,7 +10,7 @@ import { NextRequest } from 'next/server'
 
 export interface AuditLogData {
   action: string
-  entityType: 'ticket' | 'user' | 'category' | 'department' | 'comment' | 'attachment' | 'system' | 'report' | 'settings' | 'technician' | 'assignment'
+  entityType: 'ticket' | 'user' | 'category' | 'department' | 'comment' | 'attachment' | 'system' | 'report' | 'settings' | 'technician' | 'assignment' | 'equipment' | 'inventory'
   entityId?: string
   userId: string
   details?: Record<string, any>
@@ -742,7 +742,44 @@ export const AuditActionsComplete = {
   EMAIL_FAILED: 'email_failed',
   OAUTH_CONFIG_UPDATED: 'oauth_config_updated',
   EMAIL_CONFIG_UPDATED: 'email_config_updated',
-  NOTIFICATION_CONFIG_UPDATED: 'notification_config_updated'
+  NOTIFICATION_CONFIG_UPDATED: 'notification_config_updated',
+
+  // Inventario - Equipos
+  EQUIPMENT_CREATED: 'equipment_created',
+  EQUIPMENT_UPDATED: 'equipment_updated',
+  EQUIPMENT_DELETED: 'equipment_deleted',
+  EQUIPMENT_STATUS_CHANGED: 'equipment_status_changed',
+
+  // Inventario - Asignaciones
+  ASSIGNMENT_CREATED: 'assignment_created',
+  ASSIGNMENT_COMPLETED: 'assignment_completed',
+  ASSIGNMENT_CANCELLED: 'assignment_cancelled',
+
+  // Inventario - Actas
+  ACT_CREATED: 'act_created',
+  ACT_ACCEPTED: 'act_accepted',
+  ACT_REJECTED: 'act_rejected',
+  ACT_EXPIRED: 'act_expired',
+
+  // Inventario - Mantenimiento
+  MAINTENANCE_CREATED: 'maintenance_created',
+  MAINTENANCE_UPDATED: 'maintenance_updated',
+
+  // Inventario - Licencias
+  LICENSE_CREATED: 'license_created',
+  LICENSE_UPDATED: 'license_updated',
+  LICENSE_DELETED: 'license_deleted',
+  LICENSE_ASSIGNED: 'license_assigned',
+  LICENSE_UNASSIGNED: 'license_unassigned',
+
+  // Inventario - Consumibles
+  CONSUMABLE_CREATED: 'consumable_created',
+  CONSUMABLE_UPDATED: 'consumable_updated',
+  CONSUMABLE_DELETED: 'consumable_deleted',
+  STOCK_MOVEMENT_CREATED: 'stock_movement_created',
+
+  // Inventario - Reportes
+  INVENTORY_REPORT_GENERATED: 'inventory_report_generated',
 } as const
 
 // Helpers para registrar acciones específicas con valores anteriores y nuevos

@@ -14,7 +14,18 @@ export async function GET() {
       orderBy: { order: 'asc' },
     })
 
-    return NextResponse.json(services)
+    // Mapear a formato frontend
+    const mapped = services.map(s => ({
+      id: s.id,
+      icon: s.icon,
+      iconColor: s.iconColor,
+      title: s.title,
+      description: s.description,
+      order: s.order,
+      enabled: s.enabled,
+    }))
+
+    return NextResponse.json(mapped)
   } catch (error) {
     console.error('Error loading services:', error)
     return NextResponse.json(
@@ -32,12 +43,32 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
+    const { icon, iconColor, title, description } = body
 
-    const service = await prisma.landing_page_services.create({
-      data: body,
+    // Calcular el siguiente orden
+    const maxOrder = await prisma.landing_page_services.aggregate({
+      _max: { order: true },
     })
 
-    return NextResponse.json(service)
+    const service = await prisma.landing_page_services.create({
+      data: {
+        icon,
+        iconColor: iconColor || 'blue',
+        title,
+        description,
+        order: (maxOrder._max.order ?? -1) + 1,
+      },
+    })
+
+    return NextResponse.json({
+      id: service.id,
+      icon: service.icon,
+      iconColor: service.iconColor,
+      title: service.title,
+      description: service.description,
+      order: service.order,
+      enabled: service.enabled,
+    })
   } catch (error) {
     console.error('Error creating service:', error)
     return NextResponse.json(

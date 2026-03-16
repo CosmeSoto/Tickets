@@ -1,10 +1,5 @@
 import { z } from 'zod'
-import { EquipmentType, EquipmentStatus, EquipmentCondition, OwnershipType } from '@prisma/client'
-
-// Equipment type enum schema
-export const equipmentTypeSchema = z.nativeEnum(EquipmentType, {
-  errorMap: () => ({ message: 'Tipo de equipo inválido' })
-})
+import { EquipmentStatus, EquipmentCondition, OwnershipType } from '@prisma/client'
 
 // Equipment status enum schema
 export const equipmentStatusSchema = z.nativeEnum(EquipmentStatus, {
@@ -21,8 +16,8 @@ export const ownershipTypeSchema = z.nativeEnum(OwnershipType, {
   errorMap: () => ({ message: 'Tipo de propiedad inválido' })
 })
 
-// Create equipment schema
-export const createEquipmentSchema = z.object({
+// Base equipment schema (sin refine para poder usar partial)
+const baseEquipmentSchema = z.object({
   code: z.string()
     .min(3, 'El código debe tener al menos 3 caracteres')
     .max(20, 'El código no puede exceder 20 caracteres')
@@ -40,7 +35,7 @@ export const createEquipmentSchema = z.object({
     .min(2, 'El modelo debe tener al menos 2 caracteres')
     .max(50, 'El modelo no puede exceder 50 caracteres'),
   
-  type: equipmentTypeSchema,
+  typeId: z.string().uuid('Tipo de equipo inválido'),
   
   status: equipmentStatusSchema.optional().default('AVAILABLE'),
   
@@ -63,15 +58,76 @@ export const createEquipmentSchema = z.object({
   location: z.string().max(100, 'La ubicación no puede exceder 100 caracteres').optional(),
   
   notes: z.string().max(1000, 'Las notas no pueden exceder 1000 caracteres').optional(),
+  
+  // Campos para equipos rentados/alquilados
+  rentalProvider: z.string()
+    .min(2, 'El proveedor debe tener al menos 2 caracteres')
+    .max(255, 'El proveedor no puede exceder 255 caracteres')
+    .optional(),
+  
+  rentalContractNumber: z.string()
+    .max(100, 'El número de contrato no puede exceder 100 caracteres')
+    .optional(),
+  
+  rentalStartDate: z.coerce.date().optional(),
+  
+  rentalEndDate: z.coerce.date().optional(),
+  
+  rentalMonthlyCost: z.number()
+    .positive('El costo mensual debe ser positivo')
+    .optional(),
+  
+  rentalContactName: z.string()
+    .max(255, 'El nombre de contacto no puede exceder 255 caracteres')
+    .optional(),
+  
+  rentalContactEmail: z.string()
+    .email('Email de contacto inválido')
+    .optional(),
+  
+  rentalContactPhone: z.string()
+    .max(50, 'El teléfono de contacto no puede exceder 50 caracteres')
+    .optional(),
+  
+  rentalNotes: z.string()
+    .max(1000, 'Las notas de renta no pueden exceder 1000 caracteres')
+    .optional(),
 })
 
-// Update equipment schema (all fields optional except id)
-export const updateEquipmentSchema = createEquipmentSchema.partial()
+// Create equipment schema (con validaciones refine)
+export const createEquipmentSchema = baseEquipmentSchema.refine(
+  (data) => {
+    // Si es RENTAL, el proveedor es obligatorio
+    if (data.ownershipType === 'RENTAL' && !data.rentalProvider) {
+      return false
+    }
+    return true
+  },
+  {
+    message: 'El proveedor es obligatorio para equipos rentados',
+    path: ['rentalProvider']
+  }
+).refine(
+  (data) => {
+    // Si hay fecha de fin de renta, debe ser posterior a la fecha de inicio
+    if (data.rentalStartDate && data.rentalEndDate) {
+      return new Date(data.rentalEndDate) > new Date(data.rentalStartDate)
+    }
+    return true
+  },
+  {
+    message: 'La fecha de fin debe ser posterior a la fecha de inicio',
+    path: ['rentalEndDate']
+  }
+)
+
+// Update equipment schema (all fields optional)
+export const updateEquipmentSchema = baseEquipmentSchema.partial()
 
 // Equipment filters schema
 export const equipmentFiltersSchema = z.object({
   search: z.string().optional(),
-  type: z.array(equipmentTypeSchema).optional(),
+  typeId: z.array(z.string().uuid()).optional(),
   status: z.array(equipmentStatusSchema).optional(),
   condition: z.array(equipmentConditionSchema).optional(),
   assignedTo: z.string().uuid('ID de usuario inválido').optional(),

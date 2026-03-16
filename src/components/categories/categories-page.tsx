@@ -33,6 +33,7 @@ import {
 
 // Componentes estandarizados
 import { ModuleLayout } from '@/components/common/layout/module-layout'
+import { BackToTickets } from '@/components/tickets/back-to-tickets'
 
 // Componentes comunes
 import { DataTableAdvanced } from '@/components/common/data-table-advanced'
@@ -312,6 +313,7 @@ export default function CategoriesPage() {
       }
     >
       <div className='space-y-6'>
+        <BackToTickets />
         {/* Panel de estado del sistema */}
         <CategoryStatsPanel stats={stats} loading={loading} />
 

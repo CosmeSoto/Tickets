@@ -21,9 +21,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Plus, Pencil, Trash2, GripVertical } from 'lucide-react'
 import * as Icons from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { IconPicker } from '@/components/inventory/icon-picker'
 
 interface Service {
   id: string
@@ -34,19 +45,6 @@ interface Service {
   order: number
   enabled: boolean
 }
-
-const iconOptions = [
-  { value: 'Wrench', label: 'Llave' },
-  { value: 'Monitor', label: 'Monitor' },
-  { value: 'Shield', label: 'Escudo' },
-  { value: 'Zap', label: 'Rayo' },
-  { value: 'Users', label: 'Usuarios' },
-  { value: 'Settings', label: 'Configuración' },
-  { value: 'Cloud', label: 'Nube' },
-  { value: 'Database', label: 'Base de Datos' },
-  { value: 'Lock', label: 'Candado' },
-  { value: 'Smartphone', label: 'Smartphone' },
-]
 
 const colorOptions = [
   { value: 'blue', label: 'Azul', class: 'bg-blue-100 text-blue-600' },
@@ -67,6 +65,7 @@ export function LandingServicesManager() {
     title: '',
     description: '',
   })
+  const [deletingServiceId, setDeletingServiceId] = useState<string | null>(null)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -153,8 +152,6 @@ export function LandingServicesManager() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('¿Eliminar este servicio?')) return
-
     try {
       const response = await fetch(`/api/admin/landing-page/services/${id}`, {
         method: 'DELETE',
@@ -174,6 +171,8 @@ export function LandingServicesManager() {
         description: 'Error al eliminar el servicio',
         variant: 'destructive',
       })
+    } finally {
+      setDeletingServiceId(null)
     }
   }
 
@@ -266,7 +265,7 @@ export function LandingServicesManager() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleDelete(service.id)}
+                        onClick={() => setDeletingServiceId(service.id)}
                       >
                         <Trash2 className="h-4 w-4 text-red-600" />
                       </Button>
@@ -291,29 +290,11 @@ export function LandingServicesManager() {
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Icono</Label>
-              <Select
+            <div>
+              <IconPicker
                 value={formData.icon}
-                onValueChange={(value) => setFormData({ ...formData, icon: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {iconOptions.map((option) => {
-                    const Icon = getIcon(option.value)
-                    return (
-                      <SelectItem key={option.value} value={option.value}>
-                        <div className="flex items-center">
-                          <Icon className="h-4 w-4 mr-2" />
-                          {option.label}
-                        </div>
-                      </SelectItem>
-                    )
-                  })}
-                </SelectContent>
-              </Select>
+                onChange={(value) => setFormData({ ...formData, icon: value })}
+              />
             </div>
 
             <div className="space-y-2">
@@ -368,6 +349,26 @@ export function LandingServicesManager() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deletingServiceId} onOpenChange={(open) => !open && setDeletingServiceId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar este servicio?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. El servicio será eliminado de la página pública.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deletingServiceId && handleDelete(deletingServiceId)}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }

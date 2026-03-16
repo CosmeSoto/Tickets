@@ -7,7 +7,7 @@
 
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useRef } from 'react';
 import { CategorySelector } from './CategorySelector';
 import { CategorySelectorFallback } from './CategorySelectorFallback';
 import { useCategorySelectorFeatureFlags } from '../hooks/useFeatureFlags';
@@ -38,15 +38,15 @@ export function CategorySelectorWrapper({
   error,
   disabled = false,
 }: CategorySelectorWrapperProps) {
+  const flagsInitialized = useRef(false);
+  if (!flagsInitialized.current) {
+    initializeCategorySelectorFlags();
+    flagsInitialized.current = true;
+  }
   const flags = useCategorySelectorFeatureFlags();
   const { categories, isLoading } = useCategoriesQuery();
 
-  // Initialize feature flags on mount
-  useEffect(() => {
-    initializeCategorySelectorFlags();
-  }, []);
-
-  // Show loading state
+  // Show loading state while categories load
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">

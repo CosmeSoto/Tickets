@@ -4,6 +4,7 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { BackToTickets } from '@/components/tickets/back-to-tickets'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -107,6 +108,7 @@ export default function TechnicianCategoriesPage() {
       subtitle={`${categories.length} categorías asignadas`}
     >
       <div className="space-y-6">
+        <BackToTickets />
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>

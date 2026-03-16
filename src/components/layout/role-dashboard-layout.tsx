@@ -13,18 +13,13 @@ import {
   LayoutDashboard,
   Ticket,
   Users,
-  FolderTree,
   Building,
-  BarChart3,
   Settings,
-  HelpCircle,
   Shield,
   User,
   LogOut,
-  Wrench,
-  BookOpen,
-  Bell,
   Globe,
+  Package,
 } from 'lucide-react'
 import { Notifications } from '@/components/ui/notifications'
 import { Button } from '@/components/ui/button'
@@ -53,26 +48,20 @@ const navigationByRole = {
     { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
     { name: 'Tickets', href: '/admin/tickets', icon: Ticket },
     { name: 'Usuarios', href: '/admin/users', icon: Users },
-    { name: 'Técnicos', href: '/admin/technicians', icon: Wrench },
-    { name: 'Categorías', href: '/admin/categories', icon: FolderTree },
     { name: 'Departamentos', href: '/admin/departments', icon: Building },
-    { name: 'Base de Conocimientos', href: '/admin/knowledge', icon: BookOpen },
-    { name: 'Reportes', href: '/admin/reports', icon: BarChart3 },
+    { name: 'Inventario', href: '/inventory', icon: Package },
     { name: 'Auditoría', href: '/admin/audit', icon: Shield },
     { name: 'Configuración Sistema', href: '/admin/settings', icon: Settings },
   ],
   TECHNICIAN: [
     { name: 'Dashboard', href: '/technician', icon: LayoutDashboard },
     { name: 'Mis Tickets', href: '/technician/tickets', icon: Ticket },
-    { name: 'Estadísticas', href: '/technician/stats', icon: BarChart3 },
-    { name: 'Mis Categorías', href: '/technician/categories', icon: FolderTree },
-    { name: 'Base de Conocimientos', href: '/technician/knowledge', icon: BookOpen },
+    { name: 'Inventario', href: '/inventory', icon: Package },
   ],
   CLIENT: [
     { name: 'Dashboard', href: '/client', icon: LayoutDashboard },
     { name: 'Mis Tickets', href: '/client/tickets', icon: Ticket },
-    { name: 'Base de Conocimientos', href: '/knowledge', icon: BookOpen },
-    { name: 'Ayuda', href: '/client/help', icon: HelpCircle },
+    { name: 'Mis Equipos', href: '/inventory', icon: Package },
   ],
 }
 
@@ -150,7 +139,14 @@ export function RoleDashboardLayout({
         <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto h-[calc(100vh-4rem)]">
           {navigation.map((item) => {
             const Icon = item.icon
-            const isActive = pathname === item.href || pathname?.startsWith(item.href + '/')
+            // Sub-páginas del módulo de tickets que deben resaltar el item "Tickets"
+            const ticketSubPaths = [
+              '/admin/reports', '/admin/categories', '/admin/technicians', '/admin/knowledge',
+              '/technician/stats', '/technician/categories', '/technician/knowledge',
+              '/client/help', '/knowledge',
+            ]
+            const isTicketSubPage = (item.href.endsWith('/tickets')) && ticketSubPaths.some(p => pathname?.startsWith(p))
+            const isActive = pathname === item.href || pathname?.startsWith(item.href + '/') || isTicketSubPage
             
             return (
               <Link

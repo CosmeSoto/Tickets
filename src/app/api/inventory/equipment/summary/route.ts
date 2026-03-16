@@ -20,12 +20,21 @@ export async function GET() {
 
     const summary = await EquipmentService.getEquipmentSummary()
 
-    return NextResponse.json(summary)
+    return NextResponse.json(summary, { status: 200 })
   } catch (error) {
     console.error('Error en GET /api/inventory/equipment/summary:', error)
     
+    // Log detallado para debugging
+    if (error instanceof Error) {
+      console.error('Error message:', error.message)
+      console.error('Error stack:', error.stack)
+    }
+    
     return NextResponse.json(
-      { error: 'Error al obtener resumen de equipos' },
+      { 
+        error: 'Error al obtener resumen de equipos',
+        details: process.env.NODE_ENV === 'development' ? String(error) : undefined
+      },
       { status: 500 }
     )
   }
