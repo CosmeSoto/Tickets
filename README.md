@@ -1,23 +1,33 @@
 # Sistema de Tickets de Soporte
 
-Sistema profesional de gestión de tickets con SLA, notificaciones, reportes y base de conocimientos.
+Sistema profesional de gestión de tickets con SLA, notificaciones, reportes, inventario y base de conocimientos.
 
 ## 🚀 Inicio Rápido
 
 ```bash
 # Clonar repositorio
-git clone <repo-url>
-cd sistema-tickets-nextjs
+git clone https://github.com/CosmeSoto/Tickets.git
+cd Tickets
 
 # Configurar entorno
 cp .env.example .env
+# Editar .env con tus valores reales (ver docs/SETUP.md)
 
-# Iniciar con Docker
+# Levantar PostgreSQL y Redis con Docker
 docker-compose up -d
 
-# Ejecutar migraciones y seed
-docker-compose exec app npx prisma migrate deploy
-docker-compose exec app npx prisma db seed
+# Instalar dependencias
+npm install
+
+# Generar cliente Prisma y sincronizar BD
+npx prisma generate
+npx prisma db push
+
+# Cargar datos iniciales
+npm run db:seed
+
+# Iniciar en desarrollo
+npm run dev
 
 # Acceder
 http://localhost:3000
@@ -65,12 +75,15 @@ Contraseña: admin123
 
 ## 🛠️ Stack Tecnológico
 
-- **Frontend**: Next.js 14, React, TypeScript, Tailwind CSS
+- **Frontend**: Next.js 16.1.1, React 19, TypeScript, Tailwind CSS
 - **Backend**: Next.js API Routes, Prisma ORM
-- **Base de Datos**: PostgreSQL 15
+- **Base de Datos**: PostgreSQL 15 (Docker)
+- **Cache**: Redis 7 (Docker)
 - **Autenticación**: NextAuth.js
-- **UI**: Shadcn/UI, Radix UI
-- **Despliegue**: Docker, Docker Compose
+- **UI**: Shadcn/UI, Radix UI, Lucide Icons
+- **Gráficas**: Recharts
+- **Validación**: Zod
+- **Estado**: Zustand, React Query
 
 ## 📦 Estructura del Proyecto
 
@@ -98,19 +111,19 @@ npm run dev
 # Build
 npm run build
 
-# Migraciones
-npx prisma migrate dev
-npx prisma migrate deploy
-npx prisma migrate reset --force
-
-# Seed
-npx prisma db seed
+# Base de datos (sin migraciones, usamos db push)
+npx prisma db push          # Sincronizar schema con BD
+npx prisma generate          # Regenerar cliente Prisma
+npm run db:seed              # Cargar datos iniciales
+npm run db:reset             # Reset completo (push + seed)
 
 # Tests
 npm test
+npm run test:e2e
 
-# Lint
-npm run lint
+# Calidad de código
+npm run quality:check        # Lint + format check
+npm run quality:fix          # Lint fix + format
 ```
 
 ## 🐳 Docker
