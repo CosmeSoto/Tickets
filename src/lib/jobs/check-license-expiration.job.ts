@@ -1,7 +1,6 @@
-import { PrismaClient } from '@prisma/client'
+import prisma from '@/lib/prisma'
 import { LicenseService } from '../services/license.service'
-
-const prisma = new PrismaClient()
+import { randomUUID } from 'crypto'
 
 /**
  * Job para verificar licencias próximas a expirar
@@ -39,20 +38,25 @@ export class CheckLicenseExpirationJob {
           ? `Equipo: ${license.equipment.code}`
           : license.user
           ? `Usuario: ${license.user.name}`
+          : license.department
+          ? `Departamento: ${license.department.name}`
           : 'No asignada'
+
+        const typeName = license.licenseType?.name || 'Sin tipo'
 
         // Crear notificaciones in-app para cada admin
         for (const admin of admins) {
           try {
             await prisma.notifications.create({
               data: {
+                id: randomUUID(),
                 userId: admin.id,
-                type: 'SYSTEM',
+                type: 'WARNING',
                 title: daysRemaining <= 7
                   ? '¡URGENTE! Licencia por Expirar'
                   : 'Licencia Próxima a Expirar',
-                message: `La licencia "${license.name}" (${license.type}) expira en ${daysRemaining} ${daysRemaining === 1 ? 'día' : 'días'}. ${assignedTo}`,
-                link: `/inventory/licenses/${license.id}`,
+                message: `La licencia "${license.name}" (${typeName}) expira en ${daysRemaining} ${daysRemaining === 1 ? 'día' : 'días'}. ${assignedTo}`,
+                metadata: { link: `/inventory/licenses` },
                 isRead: false,
               },
             })
@@ -60,18 +64,16 @@ export class CheckLicenseExpirationJob {
             // Crear email en cola
             await prisma.email_queue.create({
               data: {
-                to: admin.email,
+                id: randomUUID(),
+                toEmail: admin.email,
                 subject: daysRemaining <= 7
                   ? `¡URGENTE! Licencia por Expirar - ${license.name}`
                   : `Licencia Próxima a Expirar - ${license.name}`,
                 body: this.generateEmailBody(license, daysRemaining, admin.name, assignedTo),
-                status: 'PENDING',
-                priority: daysRemaining <= 7 ? 'URGENT' : 'HIGH',
-                metadata: {
-                  type: 'license_expiration_alert',
-                  licenseId: license.id,
-                  daysRemaining,
-                },
+                status: 'pending',
+                attempts: 0,
+                maxAttempts: 3,
+                scheduledAt: new Date(),
               },
             })
 
@@ -133,7 +135,7 @@ export class CheckLicenseExpirationJob {
       
       <div class="info-box">
         <p><strong>Licencia:</strong> ${license.name}</p>
-        <p><strong>Tipo:</strong> ${license.type}</p>
+        <p><strong>Tipo:</strong> ${license.licenseType?.name || 'Sin tipo'}</p>
         <p><strong>Fecha de Expiración:</strong> ${expirationDate}</p>
         <p><strong>Asignada a:</strong> ${assignedTo}</p>
         ${license.vendor ? `<p><strong>Proveedor:</strong> ${license.vendor}</p>` : ''}

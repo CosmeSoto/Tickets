@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import prisma from '@/lib/prisma'
+import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 
 /**
  * GET /api/admin/equipment-types
@@ -106,6 +105,16 @@ export async function POST(request: NextRequest) {
         isActive: true
       }
     })
+
+    await AuditServiceComplete.log({
+      action: AuditActionsComplete.EQUIPMENT_TYPE_CREATED,
+      entityType: 'inventory',
+      entityId: newType.id,
+      userId: session.user.id,
+      details: { code: newType.code, name: newType.name, description },
+      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+      userAgent: request.headers.get('user-agent') || 'unknown',
+    }).catch(err => console.error('[AUDIT] Error registrando creación de tipo de equipo:', err))
 
     return NextResponse.json(newType, { status: 201 })
   } catch (error) {

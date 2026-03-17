@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Loader2, Plus, X, Package, Settings } from 'lucide-react'
+import { Loader2, Plus, X, Package, Settings, ExternalLink } from 'lucide-react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -15,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Combobox, type ComboboxOption } from '@/components/ui/combobox'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
 import { createEquipmentSchema, type CreateEquipmentInput } from '@/lib/validations/inventory/equipment'
@@ -297,21 +299,32 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
                   <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                 </div>
               ) : (
-                <Select
-                  value={watch('type') || ''}
-                  onValueChange={(value) => setValue('type', value as any, { shouldValidate: true })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona un tipo" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[300px]">
-                    {equipmentTypes.map((type) => (
-                      <SelectItem key={type.id} value={type.id}>
-                        {type.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <Combobox
+                      options={equipmentTypes.map((type): ComboboxOption => ({
+                        value: type.id,
+                        label: type.name,
+                      }))}
+                      value={watch('type') || ''}
+                      onValueChange={(value) => setValue('type', value as any, { shouldValidate: true })}
+                      placeholder="Buscar tipo de equipo..."
+                      searchPlaceholder="Escriba para buscar..."
+                      emptyText="No se encontró el tipo"
+                    />
+                  </div>
+                  <Link href="/inventory/equipment-types" target="_blank">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="shrink-0"
+                      title="Gestionar tipos de equipo"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                </div>
               )}
               {errors.type && (
                 <p className="text-sm text-destructive">{errors.type.message}</p>

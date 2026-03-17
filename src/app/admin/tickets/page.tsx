@@ -8,14 +8,7 @@ import {
   Ticket,
   AlertCircle,
   Clock,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
   UserX,
-  BarChart3,
-  FolderTree,
-  Wrench,
-  BookOpen,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -157,38 +150,12 @@ export default function AdminTicketsPage() {
       error={error}
       onRetry={reload}
       headerActions={
-        <div className="flex gap-2">
-          <Link href="/admin/reports">
-            <Button variant="outline" size="sm">
-              <BarChart3 className="mr-2 h-4 w-4" />
-              Reportes
-            </Button>
+        <Button size="sm" asChild>
+          <Link href="/admin/tickets/create">
+            <Plus className="h-4 w-4 mr-2" />
+            Nuevo Ticket
           </Link>
-          <Link href="/admin/categories">
-            <Button variant="outline" size="sm">
-              <FolderTree className="mr-2 h-4 w-4" />
-              Categorías
-            </Button>
-          </Link>
-          <Link href="/admin/technicians">
-            <Button variant="outline" size="sm">
-              <Wrench className="mr-2 h-4 w-4" />
-              Técnicos
-            </Button>
-          </Link>
-          <Link href="/admin/knowledge">
-            <Button variant="outline" size="sm">
-              <BookOpen className="mr-2 h-4 w-4" />
-              Conocimientos
-            </Button>
-          </Link>
-          <Button size="sm" asChild>
-            <Link href="/admin/tickets/create">
-              <Plus className="h-4 w-4 mr-2" />
-              Nuevo Ticket
-            </Link>
-          </Button>
-        </div>
+        </Button>
       }
     >
       <div className="space-y-6">

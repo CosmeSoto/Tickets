@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { PrismaClient } from '@prisma/client'
+import prisma from '@/lib/prisma'
 import { z } from 'zod'
-
-const prisma = new PrismaClient()
 
 const linkTicketSchema = z.object({
   ticketId: z.string().uuid(),
@@ -12,7 +10,7 @@ const linkTicketSchema = z.object({
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -26,7 +24,7 @@ export async function POST(
 
     const body = await request.json()
     const { ticketId } = linkTicketSchema.parse(body)
-    const equipmentId = params.id
+    const { id: equipmentId } = await params
 
     // Verificar que el equipo existe
     const equipment = await prisma.equipment.findUnique({

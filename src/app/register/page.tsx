@@ -589,7 +589,7 @@ export default function RegisterPage() {
             </p>
           </div>
 
-          {/* Benefits Section */}
+          {/* Benefits Section
           <div className='mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200'>
             <div className='text-sm space-y-3'>
               <p className='font-medium text-blue-900 flex items-center'>
@@ -619,7 +619,7 @@ export default function RegisterPage() {
                 </li>
               </ul>
             </div>
-          </div>
+          </div> */}
 
           {/* Privacy Notice */}
           <div className='mt-6 text-center'>

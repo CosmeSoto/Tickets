@@ -1,6 +1,4 @@
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import prisma from '@/lib/prisma'
 
 /**
  * Servicio para generación de reportes de inventario
@@ -346,8 +344,8 @@ export class InventoryReportService {
               select: {
                 id: true,
                 name: true,
-                type: true,
-                unitOfMeasure: true,
+                consumableType: { select: { name: true } },
+                unitOfMeasure: { select: { name: true, symbol: true } },
               },
             },
             user: {
@@ -404,6 +402,7 @@ export class InventoryReportService {
             },
           },
           include: {
+            licenseType: true,
             equipment: {
               select: {
                 id: true,
@@ -419,6 +418,12 @@ export class InventoryReportService {
                 email: true,
               },
             },
+            department: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
           orderBy: { expirationDate: 'asc' },
         }),
@@ -429,6 +434,7 @@ export class InventoryReportService {
             },
           },
           include: {
+            licenseType: true,
             equipment: {
               select: {
                 id: true,
@@ -444,7 +450,7 @@ export class InventoryReportService {
           },
         }),
         prisma.software_licenses.groupBy({
-          by: ['type'],
+          by: ['typeId'],
           where: {
             expirationDate: {
               gte: new Date(),
@@ -455,10 +461,17 @@ export class InventoryReportService {
         }),
       ])
 
+      // Resolver nombres de tipos
+      const typeIds = byType.map(t => t.typeId)
+      const types = typeIds.length > 0
+        ? await prisma.license_types.findMany({ where: { id: { in: typeIds } }, select: { id: true, name: true } })
+        : []
+      const typeMap = Object.fromEntries(types.map(t => [t.id, t.name]))
+
       return {
         expiring,
         expired,
-        byType: Object.fromEntries(byType.map(t => [t.type, t._count])),
+        byType: Object.fromEntries(byType.map(t => [typeMap[t.typeId] || t.typeId, t._count])),
       }
     } catch (error) {
       console.error('Error generando reporte de expiración de licencias:', error)
@@ -545,7 +558,7 @@ export class InventoryReportService {
           code: true,
           brand: true,
           model: true,
-          type: true,
+          typeId: true,
           status: true,
           rentalProvider: true,
           rentalContractNumber: true,

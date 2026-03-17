@@ -1,38 +1,52 @@
-import { LicenseType, Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 
 /**
- * Tipos para licencias de software
+ * Tipos para licencias de software / contratos
  */
 
 export type SoftwareLicense = Prisma.software_licensesGetPayload<{
   include: {
+    licenseType: true
     equipment: true
     user: true
+    department: true
   }
 }>
 
+export type LicenseType = Prisma.license_typesGetPayload<{}>
+
 export interface CreateLicenseData {
   name: string
-  type: LicenseType
-  key: string
-  purchaseDate: Date
+  typeId: string
+  key?: string
+  purchaseDate?: Date
   expirationDate?: Date
   cost?: number
   vendor?: string
+  notes?: string
+  assignedToEquipment?: string
+  assignedToUser?: string
+  assignedToDepartment?: string
 }
 
 export interface UpdateLicenseData {
   name?: string
-  type?: LicenseType
+  typeId?: string
   key?: string
+  purchaseDate?: Date
   expirationDate?: Date
   cost?: number
   vendor?: string
+  notes?: string
+  assignedToEquipment?: string | null
+  assignedToUser?: string | null
+  assignedToDepartment?: string | null
 }
 
 export interface AssignLicenseData {
   assignedToEquipment?: string
   assignedToUser?: string
+  assignedToDepartment?: string
 }
 
 export interface LicenseSummary {
@@ -40,7 +54,7 @@ export interface LicenseSummary {
   active: number
   expired: number
   expiringThisMonth: number
-  expiringSoon: number // próximos 30 días
+  expiringSoon: number
   unassigned: number
   byType: Record<string, number>
   totalCost: number

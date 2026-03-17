@@ -30,8 +30,11 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files
+.env
+.env.local
+.env.production
+.env.staging
 
 # vercel
 .vercel
@@ -40,19 +43,21 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# prisma generated
 /src/generated/prisma
+
+# IDE
+.idea/
+.vscode/
+.kiro/
+
+# SWC cache
+.swc/
 
 # Scripts temporales y de diagnóstico
 *.sh
 !scripts/**/*.sh
-diagnose-*.sh
-diagnosticar-*.sh
-fix-*.sh
-test-*.sh
-verificar-*.sh
-validate-*.sh
-restart-*.sh
-REINICIAR_*.sh
+!docker/**/*.sh
 
 # Archivos de documentación temporal
 EMAIL_SYSTEM.md
@@ -62,5 +67,5 @@ ESTADO_SISTEMA.md
 /uploads/
 /public/uploads/
 
-# Migraciones de Prisma (solo si ya están en producción)
-# /prisma/migrations/
+# Migraciones de Prisma (usamos db push)
+/prisma/migrations/

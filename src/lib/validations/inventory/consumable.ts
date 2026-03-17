@@ -1,22 +1,17 @@
 import { z } from 'zod'
-import { ConsumableType, MovementType } from '@prisma/client'
-
-export const consumableTypeSchema = z.nativeEnum(ConsumableType, {
-  errorMap: () => ({ message: 'Tipo de consumible inválido' })
-})
+import { MovementType } from '@prisma/client'
 
 export const movementTypeSchema = z.nativeEnum(MovementType, {
   errorMap: () => ({ message: 'Tipo de movimiento inválido' })
 })
 
-export const createConsumableSchema = z.object({
+const consumableBaseSchema = z.object({
   name: z.string()
     .min(2, 'El nombre debe tener al menos 2 caracteres')
     .max(100, 'El nombre no puede exceder 100 caracteres'),
-  type: consumableTypeSchema,
-  unitOfMeasure: z.string()
-    .min(1, 'La unidad de medida es requerida')
-    .max(20, 'La unidad de medida no puede exceder 20 caracteres'),
+  typeId: z.string().min(1, 'El tipo de consumible es requerido'),
+  unitOfMeasureId: z.string().min(1, 'La unidad de medida es requerida'),
+  assignedEquipmentId: z.string().optional().nullable(),
   currentStock: z.number()
     .min(0, 'El stock actual debe ser mayor o igual a 0'),
   minStock: z.number()
@@ -26,22 +21,20 @@ export const createConsumableSchema = z.object({
   costPerUnit: z.number()
     .min(0, 'El costo por unidad debe ser mayor o igual a 0')
     .optional(),
+  location: z.string().max(200).optional(),
+  notes: z.string().max(1000).optional(),
   compatibleEquipment: z.array(z.string()).optional(),
-}).refine(
+})
+
+export const createConsumableSchema = consumableBaseSchema.refine(
   (data) => data.maxStock >= data.minStock,
-  {
-    message: 'El stock máximo debe ser mayor o igual al stock mínimo',
-    path: ['maxStock']
-  }
+  { message: 'El stock máximo debe ser mayor o igual al stock mínimo', path: ['maxStock'] }
 ).refine(
   (data) => data.currentStock <= data.maxStock,
-  {
-    message: 'El stock actual no puede exceder el stock máximo',
-    path: ['currentStock']
-  }
+  { message: 'El stock actual no puede exceder el stock máximo', path: ['currentStock'] }
 )
 
-export const updateConsumableSchema = createConsumableSchema.partial().omit({ currentStock: true })
+export const updateConsumableSchema = consumableBaseSchema.omit({ currentStock: true }).partial()
 
 export const createStockMovementSchema = z.object({
   consumableId: z.string().uuid('ID de consumible inválido'),
@@ -51,11 +44,13 @@ export const createStockMovementSchema = z.object({
   reason: z.string()
     .max(500, 'El motivo no puede exceder 500 caracteres')
     .optional(),
+  assignedToUserId: z.string().uuid().optional(),
+  assignedToEquipmentId: z.string().uuid().optional(),
 })
 
 export const consumableFiltersSchema = z.object({
   search: z.string().optional(),
-  type: z.array(consumableTypeSchema).optional(),
+  typeId: z.array(z.string()).optional(),
   lowStock: z.boolean().optional(),
   page: z.coerce.number().int().positive().optional().default(1),
   limit: z.coerce.number().int().positive().max(100).optional().default(10),

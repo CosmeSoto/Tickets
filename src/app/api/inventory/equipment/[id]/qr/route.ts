@@ -12,7 +12,7 @@ import { ZodError } from 'zod'
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -25,7 +25,8 @@ export async function GET(
     }
 
     // Validar ID
-    const { id } = equipmentIdSchema.parse({ id: params.id })
+    const { id: rawId } = await params
+    const { id } = equipmentIdSchema.parse({ id: rawId })
 
     // Obtener equipo
     const equipment = await EquipmentService.getEquipmentById(id)

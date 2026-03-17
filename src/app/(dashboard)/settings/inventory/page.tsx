@@ -13,7 +13,6 @@ import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
 import { Save, Loader2, Users, X } from 'lucide-react'
-import { BackToInventory } from '@/components/inventory/back-to-inventory'
 
 interface InventorySettings {
   technician_can_manage_equipment: boolean
@@ -133,7 +132,6 @@ export default function InventorySettingsPage() {
   return (
     <RoleDashboardLayout title="Configuración de Inventario" subtitle="Ajustes del módulo de inventario">
       <div className="max-w-4xl mx-auto space-y-6">
-        <BackToInventory />
 
         {/* Permisos y Accesos */}
         <Card>

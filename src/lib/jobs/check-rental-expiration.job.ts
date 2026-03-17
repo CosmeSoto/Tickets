@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import { randomUUID } from 'crypto'
 
 const prisma = new PrismaClient()
 
@@ -83,13 +84,14 @@ export class CheckRentalExpirationJob {
           try {
             await prisma.notifications.create({
               data: {
+                id: randomUUID(),
                 userId: admin.id,
-                type: 'SYSTEM',
+                type: 'WARNING',
                 title: daysRemaining === 1 
                   ? '¡URGENTE! Contrato de Renta por Vencer'
                   : 'Contrato de Renta Próximo a Vencer',
                 message: `El contrato de renta del equipo ${equipmentDescription} con ${rental.rentalProvider} vence en ${daysRemaining} ${daysRemaining === 1 ? 'día' : 'días'} (${expirationDate.toLocaleDateString('es-ES')}).`,
-                link: `/inventory/equipment/${rental.id}`,
+                metadata: { link: `/inventory/equipment/${rental.id}` },
                 isRead: false,
               },
             })
@@ -97,18 +99,16 @@ export class CheckRentalExpirationJob {
             // Crear email en cola
             await prisma.email_queue.create({
               data: {
-                to: admin.email,
+                id: randomUUID(),
+                toEmail: admin.email,
                 subject: daysRemaining === 1
                   ? `¡URGENTE! Contrato de Renta por Vencer - ${rental.code}`
                   : `Contrato de Renta Próximo a Vencer - ${rental.code}`,
                 body: this.generateEmailBody(rental, daysRemaining, admin.name),
-                status: 'PENDING',
-                priority: daysRemaining === 1 ? 'URGENT' : 'HIGH',
-                metadata: {
-                  type: 'rental_expiration_alert',
-                  equipmentId: rental.id,
-                  daysRemaining,
-                },
+                status: 'pending',
+                attempts: 0,
+                maxAttempts: 3,
+                scheduledAt: new Date(),
               },
             })
 

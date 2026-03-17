@@ -26,13 +26,22 @@ async function main() {
   // 6. TIPOS DE EQUIPO
   await seedEquipmentTypes()
 
-  // 7. CONFIGURACIONES DE INVENTARIO
+  // 7. TIPOS DE LICENCIA
+  await seedLicenseTypes()
+
+  // 8. TIPOS DE CONSUMIBLE
+  await seedConsumableTypes()
+
+  // 9. UNIDADES DE MEDIDA
+  await seedUnitsOfMeasure()
+
+  // 10. CONFIGURACIONES DE INVENTARIO
   await seedInventorySettings()
 
-  // 8. CONTADORES DE FOLIO
+  // 11. CONTADORES DE FOLIO
   await seedFolioCounters()
 
-  // 9. LANDING PAGE + SERVICIOS
+  // 12. LANDING PAGE + SERVICIOS
   await seedLandingPage()
 
   console.log('\n🎉 Seed completado exitosamente!')
@@ -205,6 +214,81 @@ async function seedEquipmentTypes() {
     })
   }
   console.log(`✅ ${types.length} tipos de equipo`)
+}
+
+async function seedLicenseTypes() {
+  const types = [
+    { code: 'WINDOWS', name: 'Windows', icon: 'Monitor', order: 1 },
+    { code: 'OFFICE_365', name: 'Office 365', icon: 'FileText', order: 2 },
+    { code: 'ANTIVIRUS', name: 'Antivirus', icon: 'Shield', order: 3 },
+    { code: 'ADOBE', name: 'Adobe', icon: 'Palette', order: 4 },
+    { code: 'AUTOCAD', name: 'AutoCAD', icon: 'PenTool', order: 5 },
+    { code: 'GOOGLE_WORKSPACE', name: 'Google Workspace', icon: 'Cloud', order: 6 },
+    { code: 'SLACK', name: 'Slack', icon: 'MessageSquare', order: 7 },
+    { code: 'ZOOM', name: 'Zoom', icon: 'Video', order: 8 },
+    { code: 'JIRA', name: 'Jira', icon: 'Trello', order: 9 },
+    { code: 'GITHUB', name: 'GitHub', icon: 'Github', order: 10 },
+    { code: 'SAAS', name: 'SaaS (Otro)', icon: 'Globe', order: 11 },
+    { code: 'PERPETUAL', name: 'Licencia Perpetua', icon: 'Key', order: 12 },
+    { code: 'SUBSCRIPTION', name: 'Suscripción', icon: 'RefreshCw', order: 13 },
+    { code: 'OEM', name: 'OEM', icon: 'Cpu', order: 14 },
+    { code: 'OTHER', name: 'Otro', icon: 'Box', order: 15 },
+  ]
+  for (const t of types) {
+    await prisma.license_types.upsert({
+      where: { code: t.code },
+      update: { name: t.name, icon: t.icon, order: t.order },
+      create: { id: randomUUID(), ...t, isActive: true, createdAt: now, updatedAt: now },
+    })
+  }
+  console.log(`✅ ${types.length} tipos de licencia`)
+}
+
+async function seedConsumableTypes() {
+  const types = [
+    { code: 'TONER', name: 'Tóner', icon: 'Printer', order: 1 },
+    { code: 'INK', name: 'Tinta', icon: 'Droplet', order: 2 },
+    { code: 'PAPER', name: 'Papel', icon: 'FileText', order: 3 },
+    { code: 'CABLE', name: 'Cable', icon: 'Cable', order: 4 },
+    { code: 'BATTERY', name: 'Batería', icon: 'Battery', order: 5 },
+    { code: 'CLEANING', name: 'Limpieza', icon: 'Sparkles', order: 6 },
+    { code: 'ADAPTER', name: 'Adaptador', icon: 'Plug', order: 7 },
+    { code: 'STORAGE', name: 'Almacenamiento', icon: 'HardDrive', order: 8 },
+    { code: 'PERIPHERAL', name: 'Periférico', icon: 'Mouse', order: 9 },
+    { code: 'TOOL', name: 'Herramienta', icon: 'Wrench', order: 10 },
+    { code: 'OTHER', name: 'Otro', icon: 'Box', order: 99 },
+  ]
+  for (const t of types) {
+    await prisma.consumable_types.upsert({
+      where: { code: t.code },
+      update: { name: t.name, icon: t.icon, order: t.order },
+      create: { id: randomUUID(), ...t, isActive: true, createdAt: now, updatedAt: now },
+    })
+  }
+  console.log(`✅ ${types.length} tipos de consumible`)
+}
+
+async function seedUnitsOfMeasure() {
+  const units = [
+    { code: 'UNIT', name: 'Unidad', symbol: 'ud', order: 1 },
+    { code: 'BOX', name: 'Caja', symbol: 'caja', order: 2 },
+    { code: 'PACK', name: 'Paquete', symbol: 'paq', order: 3 },
+    { code: 'REAM', name: 'Resma', symbol: 'resma', order: 4 },
+    { code: 'ROLL', name: 'Rollo', symbol: 'rollo', order: 5 },
+    { code: 'METER', name: 'Metro', symbol: 'm', order: 6 },
+    { code: 'LITER', name: 'Litro', symbol: 'L', order: 7 },
+    { code: 'KG', name: 'Kilogramo', symbol: 'kg', order: 8 },
+    { code: 'SET', name: 'Juego', symbol: 'juego', order: 9 },
+    { code: 'PAIR', name: 'Par', symbol: 'par', order: 10 },
+  ]
+  for (const u of units) {
+    await prisma.units_of_measure.upsert({
+      where: { code: u.code },
+      update: { name: u.name, symbol: u.symbol, order: u.order },
+      create: { id: randomUUID(), ...u, isActive: true, createdAt: now, updatedAt: now },
+    })
+  }
+  console.log(`✅ ${units.length} unidades de medida`)
 }
 
 async function seedInventorySettings() {

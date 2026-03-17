@@ -129,6 +129,7 @@ model departments {
   updatedAt   DateTime
   categories  categories[]
   users       users[]
+  licenses    software_licenses[]
 
   @@index([isActive, order])
 }
@@ -497,6 +498,7 @@ model users {
   maintenanceRecords                                maintenance_records[]       @relation("MaintenanceTechnician")
   licensesAssigned                                  software_licenses[]         @relation("LicenseUser")
   stockMovements                                    stock_movements[]           @relation("StockMovementUser")
+  stockMovementsAssigned                            stock_movements[]           @relation("StockMovementAssignedTo")
 
   @@index([departmentId])
   @@index([name, email])
@@ -986,6 +988,8 @@ model equipment {
   assignments          equipment_assignments[]
   maintenanceRecords   maintenance_records[]
   licenses             software_licenses[]
+  consumables          consumables[]
+  stockMovements       stock_movements[] @relation("StockMovementEquipment")
   
   @@index([code])
   @@index([serialNumber])
@@ -1154,84 +1158,138 @@ enum MaintenanceType {
   CORRECTIVE
 }
 
-// Software licenses table
+// License Types (dynamic catalog, like equipment_types)
+model license_types {
+  id          String              @id @default(uuid())
+  code        String              @unique
+  name        String
+  description String?
+  icon        String?
+  isActive    Boolean             @default(true) @map("is_active")
+  order       Int                 @default(0)
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+
+  licenses    software_licenses[]
+
+  @@index([isActive, order])
+  @@map("license_types")
+}
+
+// Software licenses / contracts table
 model software_licenses {
-  id              String        @id @default(uuid())
-  name            String
-  type            LicenseType
-  key             String        @db.Text // Encrypted
-  purchaseDate    DateTime      @map("purchase_date")
-  expirationDate  DateTime?     @map("expiration_date")
-  cost            Float?
-  vendor          String?
-  assignedToEquipment String?   @map("assigned_to_equipment")
-  assignedToUser  String?       @map("assigned_to_user")
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
-  
-  equipment       equipment?    @relation(fields: [assignedToEquipment], references: [id])
-  user            users?        @relation("LicenseUser", fields: [assignedToUser], references: [id])
-  
-  @@index([type, expirationDate])
+  id                    String          @id @default(uuid())
+  name                  String
+  typeId                String          @map("type_id")
+  key                   String?         @db.Text // Encrypted, optional
+  purchaseDate          DateTime?       @map("purchase_date")
+  expirationDate        DateTime?       @map("expiration_date")
+  cost                  Float?
+  vendor                String?
+  notes                 String?         @db.Text
+  assignedToEquipment   String?         @map("assigned_to_equipment")
+  assignedToUser        String?         @map("assigned_to_user")
+  assignedToDepartment  String?         @map("assigned_to_department")
+  createdAt             DateTime        @default(now()) @map("created_at")
+  updatedAt             DateTime        @updatedAt @map("updated_at")
+
+  licenseType   license_types?  @relation(fields: [typeId], references: [id])
+  equipment     equipment?      @relation(fields: [assignedToEquipment], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  user          users?          @relation("LicenseUser", fields: [assignedToUser], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  department    departments?    @relation(fields: [assignedToDepartment], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([typeId, expirationDate])
   @@index([assignedToEquipment])
   @@index([assignedToUser])
+  @@index([assignedToDepartment])
   @@map("software_licenses")
 }
 
-enum LicenseType {
-  WINDOWS
-  OFFICE
-  ANTIVIRUS
-  ADOBE
-  AUTOCAD
-  OTHER
+// Consumable Types (dynamic catalog, like equipment_types)
+model consumable_types {
+  id          String        @id @default(uuid())
+  code        String        @unique
+  name        String
+  description String?
+  icon        String?
+  isActive    Boolean       @default(true) @map("is_active")
+  order       Int           @default(0)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  consumables consumables[]
+
+  @@index([isActive, order])
+  @@map("consumable_types")
+}
+
+// Units of Measure (dynamic catalog)
+model units_of_measure {
+  id          String        @id @default(uuid())
+  code        String        @unique
+  name        String
+  symbol      String
+  description String?
+  isActive    Boolean       @default(true) @map("is_active")
+  order       Int           @default(0)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  consumables consumables[]
+
+  @@index([isActive, order])
+  @@map("units_of_measure")
 }
 
 // Consumables table
 model consumables {
   id                  String            @id @default(uuid())
   name                String
-  type                ConsumableType
-  unitOfMeasure       String            @map("unit_of_measure")
+  typeId              String            @map("type_id")
+  unitOfMeasureId     String            @map("unit_of_measure_id")
+  assignedEquipmentId String?           @map("assigned_equipment_id")
   currentStock        Float             @map("current_stock")
   minStock            Float             @map("min_stock")
   maxStock            Float             @map("max_stock")
   costPerUnit         Float?            @map("cost_per_unit")
+  location            String?
+  notes               String?           @db.Text
   compatibleEquipment String[]          @map("compatible_equipment")
   createdAt           DateTime          @default(now()) @map("created_at")
   updatedAt           DateTime          @updatedAt @map("updated_at")
   
+  consumableType      consumable_types  @relation(fields: [typeId], references: [id])
+  unitOfMeasure       units_of_measure  @relation(fields: [unitOfMeasureId], references: [id])
+  assignedEquipment   equipment?        @relation(fields: [assignedEquipmentId], references: [id])
   movements           stock_movements[]
   
-  @@index([type, currentStock])
+  @@index([typeId, currentStock])
+  @@index([unitOfMeasureId])
+  @@index([assignedEquipmentId])
   @@map("consumables")
-}
-
-enum ConsumableType {
-  TONER
-  INK
-  PAPER
-  CABLE
-  BATTERY
-  CLEANING
-  OTHER
 }
 
 // Stock movements table
 model stock_movements {
-  id            String        @id @default(uuid())
-  consumableId  String        @map("consumable_id")
-  type          MovementType
-  quantity      Float
-  reason        String?       @db.Text
-  userId        String        @map("user_id")
-  createdAt     DateTime      @default(now()) @map("created_at")
+  id                  String        @id @default(uuid())
+  consumableId        String        @map("consumable_id")
+  type                MovementType
+  quantity            Float
+  reason              String?       @db.Text
+  userId              String        @map("user_id")
+  assignedToUserId    String?       @map("assigned_to_user_id")
+  assignedToEquipmentId String?     @map("assigned_to_equipment_id")
+  createdAt           DateTime      @default(now()) @map("created_at")
   
-  consumable    consumables   @relation(fields: [consumableId], references: [id])
-  user          users         @relation("StockMovementUser", fields: [userId], references: [id])
+  consumable          consumables   @relation(fields: [consumableId], references: [id])
+  user                users         @relation("StockMovementUser", fields: [userId], references: [id])
+  assignedToUser      users?        @relation("StockMovementAssignedTo", fields: [assignedToUserId], references: [id])
+  assignedToEquipment equipment?    @relation("StockMovementEquipment", fields: [assignedToEquipmentId], references: [id])
   
   @@index([consumableId, createdAt])
   @@index([userId])
+  @@index([assignedToUserId])
+  @@index([assignedToEquipmentId])
   @@map("stock_movements")
 }
 

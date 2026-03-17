@@ -780,6 +780,26 @@ export const AuditActionsComplete = {
 
   // Inventario - Reportes
   INVENTORY_REPORT_GENERATED: 'inventory_report_generated',
+
+  // Catálogos - Tipos de Equipo
+  EQUIPMENT_TYPE_CREATED: 'equipment_type_created',
+  EQUIPMENT_TYPE_UPDATED: 'equipment_type_updated',
+  EQUIPMENT_TYPE_DELETED: 'equipment_type_deleted',
+
+  // Catálogos - Tipos de Licencia
+  LICENSE_TYPE_CREATED: 'license_type_created',
+  LICENSE_TYPE_UPDATED: 'license_type_updated',
+  LICENSE_TYPE_DELETED: 'license_type_deleted',
+
+  // Catálogos - Tipos de Consumible
+  CONSUMABLE_TYPE_CREATED: 'consumable_type_created',
+  CONSUMABLE_TYPE_UPDATED: 'consumable_type_updated',
+  CONSUMABLE_TYPE_DELETED: 'consumable_type_deleted',
+
+  // Catálogos - Unidades de Medida
+  UNIT_OF_MEASURE_CREATED: 'unit_of_measure_created',
+  UNIT_OF_MEASURE_UPDATED: 'unit_of_measure_updated',
+  UNIT_OF_MEASURE_DELETED: 'unit_of_measure_deleted',
 } as const
 
 // Helpers para registrar acciones específicas con valores anteriores y nuevos

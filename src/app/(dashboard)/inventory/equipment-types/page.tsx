@@ -25,10 +25,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
 import { Plus, Pencil, Trash2, Loader2, Box } from 'lucide-react'
-import { BackToInventory } from '@/components/inventory/back-to-inventory'
 import { IconPicker } from '@/components/inventory/icon-picker'
 
 interface EquipmentType {
@@ -51,6 +60,8 @@ export default function EquipmentTypesPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingType, setEditingType] = useState<EquipmentType | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [deletingType, setDeletingType] = useState<EquipmentType | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   // Form state
   const [formData, setFormData] = useState({
@@ -80,7 +91,7 @@ export default function EquipmentTypesPage() {
 
   const fetchTypes = async () => {
     try {
-      const response = await fetch('/api/admin/equipment-types?includeInactive=true')
+      const response = await fetch(`/api/admin/equipment-types?includeInactive=true&_t=${Date.now()}`, { cache: 'no-store' })
       if (response.ok) {
         const data = await response.json()
         setTypes(data)
@@ -143,7 +154,7 @@ export default function EquipmentTypesPage() {
           description: `El tipo ${formData.name} ha sido ${editingType ? 'actualizado' : 'creado'} exitosamente`
         })
         setDialogOpen(false)
-        fetchTypes()
+        await fetchTypes()
       } else {
         const error = await response.json()
         toast({
@@ -175,27 +186,29 @@ export default function EquipmentTypesPage() {
       return
     }
 
-    if (!confirm(`¿Estás seguro de eliminar el tipo "${type.name}"?`)) {
-      return
-    }
+    setDeletingType(type)
+  }
+
+  const confirmDelete = async () => {
+    if (!deletingType) return
+    setDeleting(true)
 
     try {
-      const response = await fetch(`/api/admin/equipment-types/${type.id}`, {
+      const response = await fetch(`/api/admin/equipment-types/${deletingType.id}`, {
         method: 'DELETE'
       })
 
+      const result = await response.json()
       if (response.ok) {
-        const result = await response.json()
         toast({
-          title: 'Tipo eliminado',
+          title: result.type ? 'Tipo desactivado' : 'Tipo eliminado',
           description: result.message
         })
-        fetchTypes()
+        await fetchTypes()
       } else {
-        const error = await response.json()
         toast({
           title: 'Error',
-          description: error.error || 'Error al eliminar el tipo',
+          description: result.error || 'Error al eliminar el tipo',
           variant: 'destructive'
         })
       }
@@ -206,6 +219,9 @@ export default function EquipmentTypesPage() {
         description: 'Error de conexión',
         variant: 'destructive'
       })
+    } finally {
+      setDeleting(false)
+      setDeletingType(null)
     }
   }
 
@@ -230,7 +246,6 @@ export default function EquipmentTypesPage() {
         </Button>
       }
     >
-      <BackToInventory />
       <Card>
         <CardHeader>
           <CardTitle className='flex items-center'>
@@ -395,6 +410,31 @@ export default function EquipmentTypesPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deletingType} onOpenChange={(open) => !open && setDeletingType(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar tipo de equipo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Estás a punto de eliminar el tipo{' '}
+              <span className="font-semibold text-foreground">"{deletingType?.name}"</span>.
+              <br /><br />
+              Si hay equipos usando este tipo, será desactivado en lugar de eliminado. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </RoleDashboardLayout>
   )
 }

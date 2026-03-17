@@ -33,7 +33,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-import { BackToInventory } from '@/components/inventory/back-to-inventory'
 
 const REPORT_TYPES = [
   { id: 'equipment-summary', label: 'Resumen de Equipos', icon: Package, description: 'Equipos por estado, tipo y condición' },
@@ -102,7 +101,6 @@ export default function InventoryReportsPage() {
 
   return (
     <RoleDashboardLayout title="Reportes de Inventario" subtitle="Análisis y estadísticas del inventario">
-      <BackToInventory />
       <div className="space-y-6">
         {/* Selector de reporte */}
         <Card>

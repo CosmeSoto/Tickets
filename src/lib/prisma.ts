@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 
 // Prevenir múltiples instancias de Prisma Client en desarrollo
+// Regenerado: license_types, software_licenses con typeId, assignedToDepartment
 declare global {
   var prisma: PrismaClient | undefined
 }

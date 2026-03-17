@@ -5,7 +5,7 @@
 
 'use client'
 
-import { ReactNode } from 'react'
+import { ReactNode, useState } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
@@ -20,6 +20,17 @@ import {
   LogOut,
   Globe,
   Package,
+  ChevronDown,
+  BarChart3,
+  FolderTree,
+  Wrench,
+  BookOpen,
+  Key,
+  ShoppingCart,
+  List,
+  Boxes,
+  Ruler,
+  Monitor,
 } from 'lucide-react'
 import { Notifications } from '@/components/ui/notifications'
 import { Button } from '@/components/ui/button'
@@ -42,27 +53,157 @@ interface RoleDashboardLayoutProps {
   headerActions?: ReactNode
 }
 
-// Navegación por rol
-const navigationByRole = {
+interface NavItem {
+  name: string
+  href: string
+  icon: any
+  children?: NavItem[]
+}
+
+// Navegación por rol con submenús
+const navigationByRole: Record<string, NavItem[]> = {
   ADMIN: [
     { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
-    { name: 'Tickets', href: '/admin/tickets', icon: Ticket },
+    {
+      name: 'Tickets',
+      href: '/admin/tickets',
+      icon: Ticket,
+      children: [
+        { name: 'Todos los Tickets', href: '/admin/tickets', icon: Ticket },
+        { name: 'Reportes', href: '/admin/reports', icon: BarChart3 },
+        { name: 'Categorías', href: '/admin/categories', icon: FolderTree },
+        { name: 'Técnicos', href: '/admin/technicians', icon: Wrench },
+        { name: 'Base de Conocimientos', href: '/admin/knowledge', icon: BookOpen },
+      ],
+    },
     { name: 'Usuarios', href: '/admin/users', icon: Users },
     { name: 'Departamentos', href: '/admin/departments', icon: Building },
-    { name: 'Inventario', href: '/inventory', icon: Package },
+    {
+      name: 'Inventario',
+      href: '/inventory',
+      icon: Package,
+      children: [
+        { name: 'Equipos', href: '/inventory', icon: Monitor },
+        { name: 'Licencias', href: '/inventory/licenses', icon: Key },
+        { name: 'Consumibles', href: '/inventory/consumables', icon: ShoppingCart },
+        { name: 'Reportes', href: '/inventory/reports', icon: BarChart3 },
+        { name: 'Tipos de Equipo', href: '/inventory/equipment-types', icon: Boxes },
+        { name: 'Tipos de Licencia', href: '/inventory/license-types', icon: Key },
+        { name: 'Tipos de Consumible', href: '/inventory/consumable-types', icon: ShoppingCart },
+        { name: 'Unidades de Medida', href: '/inventory/units-of-measure', icon: Ruler },
+        { name: 'Configuración', href: '/settings/inventory', icon: Settings },
+      ],
+    },
     { name: 'Auditoría', href: '/admin/audit', icon: Shield },
     { name: 'Configuración Sistema', href: '/admin/settings', icon: Settings },
   ],
   TECHNICIAN: [
     { name: 'Dashboard', href: '/technician', icon: LayoutDashboard },
-    { name: 'Mis Tickets', href: '/technician/tickets', icon: Ticket },
-    { name: 'Inventario', href: '/inventory', icon: Package },
+    {
+      name: 'Tickets',
+      href: '/technician/tickets',
+      icon: Ticket,
+      children: [
+        { name: 'Mis Tickets', href: '/technician/tickets', icon: Ticket },
+        { name: 'Estadísticas', href: '/technician/stats', icon: BarChart3 },
+        { name: 'Categorías', href: '/technician/categories', icon: FolderTree },
+        { name: 'Base de Conocimientos', href: '/technician/knowledge', icon: BookOpen },
+      ],
+    },
+    {
+      name: 'Inventario',
+      href: '/inventory',
+      icon: Package,
+      children: [
+        { name: 'Equipos', href: '/inventory', icon: Monitor },
+        { name: 'Licencias', href: '/inventory/licenses', icon: Key },
+        { name: 'Consumibles', href: '/inventory/consumables', icon: ShoppingCart },
+        { name: 'Tipos de Equipo', href: '/inventory/equipment-types', icon: Boxes },
+        { name: 'Tipos de Licencia', href: '/inventory/license-types', icon: Key },
+        { name: 'Tipos de Consumible', href: '/inventory/consumable-types', icon: ShoppingCart },
+        { name: 'Unidades de Medida', href: '/inventory/units-of-measure', icon: Ruler },
+      ],
+    },
   ],
   CLIENT: [
     { name: 'Dashboard', href: '/client', icon: LayoutDashboard },
     { name: 'Mis Tickets', href: '/client/tickets', icon: Ticket },
     { name: 'Mis Equipos', href: '/inventory', icon: Package },
   ],
+}
+
+function NavItemComponent({ item, pathname }: { item: NavItem; pathname: string | null }) {
+  const hasChildren = item.children && item.children.length > 0
+  
+  // Determinar si algún hijo está activo
+  const isChildActive = hasChildren && item.children!.some(
+    child => pathname === child.href || pathname?.startsWith(child.href + '/')
+  )
+  const isDirectActive = pathname === item.href || pathname?.startsWith(item.href + '/')
+  const isActive = isDirectActive || isChildActive
+
+  const [isOpen, setIsOpen] = useState(isActive)
+
+  const Icon = item.icon
+
+  if (!hasChildren) {
+    return (
+      <Link
+        href={item.href}
+        className={`flex items-center px-4 py-2.5 text-sm font-medium rounded-lg transition-colors ${
+          isActive
+            ? 'bg-primary/10 text-primary'
+            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+        }`}
+      >
+        <Icon className={`h-5 w-5 mr-3 flex-shrink-0 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
+        {item.name}
+      </Link>
+    )
+  }
+
+  return (
+    <div>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`flex items-center w-full px-4 py-2.5 text-sm font-medium rounded-lg transition-colors ${
+          isActive
+            ? 'bg-primary/10 text-primary'
+            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+        }`}
+      >
+        <Icon className={`h-5 w-5 mr-3 flex-shrink-0 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
+        <span className="flex-1 text-left">{item.name}</span>
+        <ChevronDown
+          className={`h-4 w-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {isOpen && (
+        <div className="ml-4 mt-1 space-y-0.5 border-l-2 border-border pl-3">
+          {item.children!.map((child) => {
+            const ChildIcon = child.icon
+            const isChildItemActive = pathname === child.href || 
+              (child.href !== '/inventory' && pathname?.startsWith(child.href + '/')) ||
+              (child.href === '/inventory' && pathname === '/inventory')
+            return (
+              <Link
+                key={child.href + child.name}
+                href={child.href}
+                className={`flex items-center px-3 py-2 text-sm rounded-md transition-colors ${
+                  isChildItemActive
+                    ? 'bg-primary/10 text-primary font-medium'
+                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                }`}
+              >
+                <ChildIcon className={`h-4 w-4 mr-2.5 flex-shrink-0 ${isChildItemActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                {child.name}
+              </Link>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export function RoleDashboardLayout({
@@ -136,33 +277,10 @@ export function RoleDashboardLayout({
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto h-[calc(100vh-4rem)]">
-          {navigation.map((item) => {
-            const Icon = item.icon
-            // Sub-páginas del módulo de tickets que deben resaltar el item "Tickets"
-            const ticketSubPaths = [
-              '/admin/reports', '/admin/categories', '/admin/technicians', '/admin/knowledge',
-              '/technician/stats', '/technician/categories', '/technician/knowledge',
-              '/client/help', '/knowledge',
-            ]
-            const isTicketSubPage = (item.href.endsWith('/tickets')) && ticketSubPaths.some(p => pathname?.startsWith(p))
-            const isActive = pathname === item.href || pathname?.startsWith(item.href + '/') || isTicketSubPage
-            
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                  isActive
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                }`}
-              >
-                <Icon className={`h-5 w-5 mr-3 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
-                {item.name}
-              </Link>
-            )
-          })}
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto h-[calc(100vh-4rem)]">
+          {navigation.map((item) => (
+            <NavItemComponent key={item.name} item={item} pathname={pathname} />
+          ))}
         </nav>
       </aside>
 

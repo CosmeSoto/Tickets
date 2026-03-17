@@ -12,7 +12,7 @@ import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -25,7 +25,8 @@ export async function GET(
     }
 
     // Validar ID
-    const { id } = equipmentIdSchema.parse({ id: params.id })
+    const { id: rawId } = await params
+    const { id } = equipmentIdSchema.parse({ id: rawId })
 
     // Obtener equipo
     const equipment = await EquipmentService.getEquipmentDetail(id)
@@ -73,7 +74,7 @@ export async function GET(
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -94,7 +95,8 @@ export async function PUT(
     }
 
     // Validar ID
-    const { id } = equipmentIdSchema.parse({ id: params.id })
+    const { id: rawId } = await params
+    const { id } = equipmentIdSchema.parse({ id: rawId })
 
     const body = await request.json()
 
@@ -155,7 +157,7 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -176,7 +178,8 @@ export async function DELETE(
     }
 
     // Validar ID
-    const { id } = equipmentIdSchema.parse({ id: params.id })
+    const { id: rawId } = await params
+    const { id } = equipmentIdSchema.parse({ id: rawId })
 
     // Eliminar equipo
     await EquipmentService.deleteEquipment(id, session.user.id)

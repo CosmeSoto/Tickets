@@ -1,314 +1,191 @@
-import { PrismaClient } from '@prisma/client'
+import prisma from '@/lib/prisma'
 import { EncryptionService } from './encryption.service'
-import type { SoftwareLicense, CreateLicenseData, UpdateLicenseData, AssignLicenseData, LicenseSummary } from '@/types/inventory/license'
+import type { SoftwareLicense, CreateLicenseData, UpdateLicenseData, AssignLicenseData, LicenseSummary, LicenseListResponse } from '@/types/inventory/license'
 
-const prisma = new PrismaClient()
+const licenseInclude = {
+  licenseType: true,
+  equipment: true,
+  user: true,
+  department: true,
+}
 
 /**
- * Servicio para gestión de licencias de software
+ * Servicio para gestión de licencias de software / contratos
  */
 export class LicenseService {
   /**
-   * Crea una nueva licencia (encripta la clave)
+   * Crea una nueva licencia
    */
   static async createLicense(data: CreateLicenseData, userId: string): Promise<SoftwareLicense> {
-    try {
-      // Encriptar la clave antes de guardar
-      const encryptedKey = EncryptionService.encrypt(data.key)
+    const encryptedKey = data.key ? EncryptionService.encrypt(data.key) : null
 
-      const license = await prisma.software_licenses.create({
-        data: {
-          name: data.name,
-          type: data.type,
-          key: encryptedKey,
-          purchaseDate: data.purchaseDate,
-          expirationDate: data.expirationDate,
-          cost: data.cost,
-          vendor: data.vendor,
-        },
-        include: {
-          equipment: true,
-          user: true,
-        }
-      })
+    const license = await prisma.software_licenses.create({
+      data: {
+        name: data.name,
+        typeId: data.typeId,
+        key: encryptedKey,
+        purchaseDate: data.purchaseDate || null,
+        expirationDate: data.expirationDate || null,
+        cost: data.cost,
+        vendor: data.vendor,
+        notes: data.notes,
+        assignedToEquipment: data.assignedToEquipment || null,
+        assignedToUser: data.assignedToUser || null,
+        assignedToDepartment: data.assignedToDepartment || null,
+      },
+      include: licenseInclude,
+    })
 
-      // Registrar en auditoría
-      await prisma.audit_logs.create({
-        data: {
-          action: 'CREATE',
-          entityType: 'software_license',
-          entityId: license.id,
-          userId,
-          details: {
-            name: data.name,
-            type: data.type,
-          }
-        }
-      })
-
-      return license as SoftwareLicense
-    } catch (error) {
-      console.error('Error creando licencia:', error)
-      throw error
-    }
+    return this.decryptLicenseKey(license) as SoftwareLicense
   }
 
   /**
-   * Actualiza una licencia
+   * Actualiza una licencia existente
    */
   static async updateLicense(id: string, data: UpdateLicenseData, userId: string): Promise<SoftwareLicense> {
-    try {
-      const updateData: any = { ...data }
+    const updateData: any = { ...data }
 
-      // Si se actualiza la clave, encriptarla
-      if (data.key) {
-        updateData.key = EncryptionService.encrypt(data.key)
-      }
-
-      const license = await prisma.software_licenses.update({
-        where: { id },
-        data: updateData,
-        include: {
-          equipment: true,
-          user: true,
-        }
-      })
-
-      // Registrar en auditoría
-      await prisma.audit_logs.create({
-        data: {
-          action: 'UPDATE',
-          entityType: 'software_license',
-          entityId: id,
-          userId,
-          details: {
-            updatedFields: Object.keys(data),
-          }
-        }
-      })
-
-      return license as SoftwareLicense
-    } catch (error) {
-      console.error('Error actualizando licencia:', error)
-      throw error
+    // Solo encriptar si se envía una nueva clave
+    if (data.key !== undefined) {
+      updateData.key = data.key ? EncryptionService.encrypt(data.key) : null
     }
+
+    const license = await prisma.software_licenses.update({
+      where: { id },
+      data: updateData,
+      include: licenseInclude,
+    })
+
+    return this.decryptLicenseKey(license) as SoftwareLicense
   }
 
   /**
    * Elimina una licencia
    */
   static async deleteLicense(id: string, userId: string): Promise<void> {
-    try {
-      await prisma.software_licenses.delete({
-        where: { id }
-      })
-
-      // Registrar en auditoría
-      await prisma.audit_logs.create({
-        data: {
-          action: 'DELETE',
-          entityType: 'software_license',
-          entityId: id,
-          userId,
-          details: {}
-        }
-      })
-    } catch (error) {
-      console.error('Error eliminando licencia:', error)
-      throw error
-    }
+    await prisma.software_licenses.delete({ where: { id } })
   }
 
   /**
-   * Asigna una licencia a un equipo o usuario
+   * Asigna una licencia a equipo, usuario y/o departamento
    */
   static async assignLicense(id: string, data: AssignLicenseData, userId: string): Promise<SoftwareLicense> {
-    try {
-      // Validar que no esté asignada a ambos
-      if (data.assignedToEquipment && data.assignedToUser) {
-        throw new Error('La licencia solo puede asignarse a un equipo O a un usuario, no a ambos')
-      }
+    const license = await prisma.software_licenses.update({
+      where: { id },
+      data: {
+        assignedToEquipment: data.assignedToEquipment || null,
+        assignedToUser: data.assignedToUser || null,
+        assignedToDepartment: data.assignedToDepartment || null,
+      },
+      include: licenseInclude,
+    })
 
-      const license = await prisma.software_licenses.update({
-        where: { id },
-        data: {
-          assignedToEquipment: data.assignedToEquipment || null,
-          assignedToUser: data.assignedToUser || null,
-        },
-        include: {
-          equipment: true,
-          user: true,
-        }
-      })
-
-      // Registrar en auditoría
-      await prisma.audit_logs.create({
-        data: {
-          action: 'ASSIGN',
-          entityType: 'software_license',
-          entityId: id,
-          userId,
-          details: {
-            assignedToEquipment: data.assignedToEquipment,
-            assignedToUser: data.assignedToUser,
-          }
-        }
-      })
-
-      return license as SoftwareLicense
-    } catch (error) {
-      console.error('Error asignando licencia:', error)
-      throw error
-    }
+    return this.decryptLicenseKey(license) as SoftwareLicense
   }
 
   /**
-   * Desasigna una licencia
+   * Desasigna una licencia de todo
    */
   static async unassignLicense(id: string, userId: string): Promise<SoftwareLicense> {
-    try {
-      const license = await prisma.software_licenses.update({
-        where: { id },
-        data: {
-          assignedToEquipment: null,
-          assignedToUser: null,
-        },
-        include: {
-          equipment: true,
-          user: true,
-        }
-      })
+    const license = await prisma.software_licenses.update({
+      where: { id },
+      data: {
+        assignedToEquipment: null,
+        assignedToUser: null,
+        assignedToDepartment: null,
+      },
+      include: licenseInclude,
+    })
 
-      // Registrar en auditoría
-      await prisma.audit_logs.create({
-        data: {
-          action: 'UNASSIGN',
-          entityType: 'software_license',
-          entityId: id,
-          userId,
-          details: {}
-        }
-      })
-
-      return license as SoftwareLicense
-    } catch (error) {
-      console.error('Error desasignando licencia:', error)
-      throw error
-    }
+    return this.decryptLicenseKey(license) as SoftwareLicense
   }
 
   /**
-   * Obtiene una licencia por ID (desencripta la clave solo para ADMIN)
+   * Obtiene una licencia por ID
    */
-  static async getLicenseById(id: string, userRole: string): Promise<SoftwareLicense | null> {
-    try {
-      const license = await prisma.software_licenses.findUnique({
-        where: { id },
-        include: {
-          equipment: true,
-          user: true,
-        }
-      })
+  static async getLicenseById(id: string, role: string): Promise<SoftwareLicense | null> {
+    const license = await prisma.software_licenses.findUnique({
+      where: { id },
+      include: licenseInclude,
+    })
 
-      if (!license) {
-        return null
-      }
+    if (!license) return null
 
-      // Desencriptar clave solo para ADMIN
-      if (userRole === 'ADMIN') {
-        try {
-          license.key = EncryptionService.decrypt(license.key)
-        } catch (error) {
-          console.error('Error desencriptando clave:', error)
-          license.key = '[Error al desencriptar]'
-        }
-      } else {
-        // Para otros roles, enmascarar la clave
-        license.key = EncryptionService.maskKey(license.key, 4)
-      }
-
-      return license as SoftwareLicense
-    } catch (error) {
-      console.error('Error obteniendo licencia:', error)
-      throw error
+    // Solo ADMIN y TECHNICIAN ven la clave desencriptada
+    if (role === 'ADMIN' || role === 'TECHNICIAN') {
+      return this.decryptLicenseKey(license) as SoftwareLicense
     }
+
+    return { ...license, key: license.key ? '••••••••' : null } as SoftwareLicense
   }
 
   /**
-   * Lista licencias con filtros
+   * Lista licencias con filtros y paginación
    */
-  static async listLicenses(filters: any, userRole: string): Promise<{ licenses: SoftwareLicense[], total: number }> {
-    try {
-      const where: any = {}
+  static async listLicenses(filters: any, role: string): Promise<LicenseListResponse> {
+    const where: any = {}
 
-      if (filters.search) {
-        where.OR = [
-          { name: { contains: filters.search, mode: 'insensitive' } },
-          { vendor: { contains: filters.search, mode: 'insensitive' } },
-        ]
+    if (filters.search) {
+      where.OR = [
+        { name: { contains: filters.search, mode: 'insensitive' } },
+        { vendor: { contains: filters.search, mode: 'insensitive' } },
+        { notes: { contains: filters.search, mode: 'insensitive' } },
+      ]
+    }
+
+    if (filters.typeId && filters.typeId.length > 0) {
+      where.typeId = { in: filters.typeId }
+    }
+
+    if (filters.assigned === 'assigned') {
+      where.OR = [
+        { assignedToEquipment: { not: null } },
+        { assignedToUser: { not: null } },
+        { assignedToDepartment: { not: null } },
+      ]
+    } else if (filters.assigned === 'unassigned') {
+      where.assignedToEquipment = null
+      where.assignedToUser = null
+      where.assignedToDepartment = null
+    }
+
+    const now = new Date()
+    if (filters.expired === 'expired') {
+      where.expirationDate = { lt: now }
+    } else if (filters.expired === 'active') {
+      where.OR = [
+        { expirationDate: null },
+        { expirationDate: { gte: now } },
+      ]
+    } else if (filters.expired === 'expiring') {
+      const thirtyDays = new Date()
+      thirtyDays.setDate(thirtyDays.getDate() + 30)
+      where.expirationDate = { gte: now, lte: thirtyDays }
+    }
+
+    const [licenses, total] = await Promise.all([
+      prisma.software_licenses.findMany({
+        where,
+        include: licenseInclude,
+        orderBy: { createdAt: 'desc' },
+        skip: ((filters.page || 1) - 1) * (filters.limit || 10),
+        take: filters.limit || 10,
+      }),
+      prisma.software_licenses.count({ where }),
+    ])
+
+    const processedLicenses = licenses.map(l => {
+      if (role === 'ADMIN' || role === 'TECHNICIAN') {
+        return this.decryptLicenseKey(l)
       }
+      return { ...l, key: l.key ? '••••••••' : null }
+    })
 
-      if (filters.type && filters.type.length > 0) {
-        where.type = { in: filters.type }
-      }
-
-      if (filters.assigned === 'assigned') {
-        where.OR = [
-          { assignedToEquipment: { not: null } },
-          { assignedToUser: { not: null } },
-        ]
-      } else if (filters.assigned === 'unassigned') {
-        where.assignedToEquipment = null
-        where.assignedToUser = null
-      }
-
-      if (filters.expired === 'expired') {
-        where.expirationDate = { lt: new Date() }
-      } else if (filters.expired === 'active') {
-        where.OR = [
-          { expirationDate: null },
-          { expirationDate: { gte: new Date() } },
-        ]
-      } else if (filters.expired === 'expiring') {
-        const thirtyDaysFromNow = new Date()
-        thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30)
-        where.expirationDate = {
-          gte: new Date(),
-          lte: thirtyDaysFromNow,
-        }
-      }
-
-      const [licenses, total] = await Promise.all([
-        prisma.software_licenses.findMany({
-          where,
-          include: {
-            equipment: true,
-            user: true,
-          },
-          skip: (filters.page - 1) * filters.limit,
-          take: filters.limit,
-          orderBy: { createdAt: 'desc' },
-        }),
-        prisma.software_licenses.count({ where }),
-      ])
-
-      // Enmascarar claves según rol
-      licenses.forEach(license => {
-        if (userRole === 'ADMIN') {
-          try {
-            license.key = EncryptionService.decrypt(license.key)
-          } catch (error) {
-            license.key = '[Error al desencriptar]'
-          }
-        } else {
-          license.key = EncryptionService.maskKey(license.key, 4)
-        }
-      })
-
-      return { licenses: licenses as SoftwareLicense[], total }
-    } catch (error) {
-      console.error('Error listando licencias:', error)
-      throw error
+    return {
+      licenses: processedLicenses as SoftwareLicense[],
+      total,
+      page: filters.page || 1,
+      limit: filters.limit || 10,
     }
   }
 
@@ -316,96 +193,92 @@ export class LicenseService {
    * Obtiene resumen de licencias
    */
   static async getLicenseSummary(): Promise<LicenseSummary> {
-    try {
-      const now = new Date()
-      const thirtyDaysFromNow = new Date()
-      thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30)
+    const now = new Date()
+    const thirtyDays = new Date()
+    thirtyDays.setDate(thirtyDays.getDate() + 30)
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
 
-      const [total, expired, expiringSoon, unassigned, byType, totalCostResult] = await Promise.all([
-        prisma.software_licenses.count(),
-        prisma.software_licenses.count({
-          where: { expirationDate: { lt: now } }
-        }),
-        prisma.software_licenses.count({
-          where: {
-            expirationDate: {
-              gte: now,
-              lte: thirtyDaysFromNow,
-            }
-          }
-        }),
-        prisma.software_licenses.count({
-          where: {
-            assignedToEquipment: null,
-            assignedToUser: null,
-          }
-        }),
-        prisma.software_licenses.groupBy({
-          by: ['type'],
-          _count: true,
-        }),
-        prisma.software_licenses.aggregate({
-          _sum: { cost: true }
-        }),
-      ])
+    const [total, expired, expiringSoon, expiringThisMonth, unassigned, totalCostAgg, byType] = await Promise.all([
+      prisma.software_licenses.count(),
+      prisma.software_licenses.count({ where: { expirationDate: { lt: now } } }),
+      prisma.software_licenses.count({ where: { expirationDate: { gte: now, lte: thirtyDays } } }),
+      prisma.software_licenses.count({ where: { expirationDate: { gte: now, lte: endOfMonth } } }),
+      prisma.software_licenses.count({
+        where: {
+          assignedToEquipment: null,
+          assignedToUser: null,
+          assignedToDepartment: null,
+        },
+      }),
+      prisma.software_licenses.aggregate({ _sum: { cost: true } }),
+      prisma.software_licenses.groupBy({
+        by: ['typeId'],
+        _count: true,
+      }),
+    ])
 
-      const byTypeMap: Record<string, number> = {}
-      byType.forEach(item => {
-        byTypeMap[item.type] = item._count
-      })
+    // Resolver nombres de tipos
+    const typeIds = byType.map(t => t.typeId)
+    const types = typeIds.length > 0
+      ? await prisma.license_types.findMany({ where: { id: { in: typeIds } }, select: { id: true, name: true } })
+      : []
+    const typeMap = Object.fromEntries(types.map(t => [t.id, t.name]))
 
-      return {
-        total,
-        active: total - expired,
-        expired,
-        expiringThisMonth: expiringSoon,
-        expiringSoon,
-        unassigned,
-        byType: byTypeMap,
-        totalCost: totalCostResult._sum.cost || 0,
-      }
-    } catch (error) {
-      console.error('Error obteniendo resumen de licencias:', error)
-      throw error
+    const byTypeResolved: Record<string, number> = {}
+    for (const t of byType) {
+      byTypeResolved[typeMap[t.typeId] || t.typeId] = t._count
+    }
+
+    return {
+      total,
+      active: total - expired,
+      expired,
+      expiringThisMonth,
+      expiringSoon,
+      unassigned,
+      byType: byTypeResolved,
+      totalCost: totalCostAgg._sum.cost || 0,
     }
   }
 
   /**
    * Verifica si una licencia está expirada
    */
-  static isLicenseExpired(license: SoftwareLicense): boolean {
-    if (!license.expirationDate) {
-      return false
-    }
-    return new Date() > new Date(license.expirationDate)
+  static isLicenseExpired(license: { expirationDate: Date | null }): boolean {
+    if (!license.expirationDate) return false
+    return new Date(license.expirationDate) < new Date()
   }
 
   /**
    * Obtiene licencias próximas a expirar
    */
-  static async getExpiringLicenses(days: number): Promise<SoftwareLicense[]> {
+  static async getExpiringLicenses(daysBeforeExpiration: number): Promise<SoftwareLicense[]> {
+    const now = new Date()
+    const targetDate = new Date()
+    targetDate.setDate(targetDate.getDate() + daysBeforeExpiration)
+
+    const licenses = await prisma.software_licenses.findMany({
+      where: {
+        expirationDate: {
+          gte: now,
+          lte: targetDate,
+        },
+      },
+      include: licenseInclude,
+    })
+
+    return licenses as SoftwareLicense[]
+  }
+
+  /**
+   * Desencripta la clave de una licencia si existe
+   */
+  private static decryptLicenseKey(license: any): any {
+    if (!license.key) return license
     try {
-      const targetDate = new Date()
-      targetDate.setDate(targetDate.getDate() + days)
-
-      const licenses = await prisma.software_licenses.findMany({
-        where: {
-          expirationDate: {
-            lte: targetDate,
-            gte: new Date(),
-          }
-        },
-        include: {
-          equipment: true,
-          user: true,
-        },
-        orderBy: { expirationDate: 'asc' },
-      })
-
-      return licenses as SoftwareLicense[]
-    } catch (error) {
-      console.error('Error obteniendo licencias por expirar:', error)
-      throw error
+      return { ...license, key: EncryptionService.decrypt(license.key) }
+    } catch {
+      return { ...license, key: '[Error al desencriptar]' }
     }
   }
 }
