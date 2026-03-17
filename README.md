@@ -70,7 +70,11 @@ Contraseña: admin123
 
 - [Instalación y Configuración](./docs/SETUP.md)
 - [Despliegue con Docker](./docs/DEPLOYMENT.md)
-- [Características](./docs/FEATURES.md)
+- [Características del Sistema](./docs/FEATURES.md)
+- [Base de Datos](./docs/DATABASE.md)
+- [Configuración OAuth (Google/Microsoft)](./docs/OAUTH_SETUP_GUIDE.md)
+- [Configuración de Email/SMTP](./docs/GUIA_CONFIGURACION_EMAIL.md)
+- [SMTP desde la Interfaz](./docs/CONFIGURACION_SMTP_INTERFAZ.md)
 - [Solución de Problemas](./docs/TROUBLESHOOTING.md)
 
 ## 🛠️ Stack Tecnológico
