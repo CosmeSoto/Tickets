@@ -1,16 +1,15 @@
 'use client'
 
-import { 
-  Bell, 
-  RefreshCw, 
-  Trash2, 
-  CheckCheck,
-  AlertCircle
+import {
+  Bell, RefreshCw, Trash2, CheckCheck, AlertCircle,
+  Info, CheckCircle, Clock, Search, X, Ticket,
+  Check, Filter
 } from 'lucide-react'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,130 +20,163 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { useNotifications } from '@/hooks/use-notifications'
-import { NotificationFilters } from './notification-filters'
-import { NotificationList } from './notification-list'
+import { useNotifications, type NotificationData } from '@/hooks/use-notifications'
 import { useState } from 'react'
+import { cn } from '@/lib/utils'
+import { formatDistanceToNow } from 'date-fns'
+import { es } from 'date-fns/locale'
+
+// Configuración visual por tipo de notificación
+const TYPE_CONFIG: Record<string, { icon: React.ElementType; borderColor: string; bgColor: string; label: string }> = {
+  SUCCESS: { icon: CheckCircle, borderColor: 'border-l-green-500', bgColor: 'bg-green-50/40 dark:bg-green-950/20', label: 'Éxito' },
+  INFO:    { icon: Info,         borderColor: 'border-l-blue-500',  bgColor: 'bg-blue-50/40 dark:bg-blue-950/20',  label: 'Info' },
+  WARNING: { icon: Clock,        borderColor: 'border-l-yellow-500',bgColor: 'bg-yellow-50/40 dark:bg-yellow-950/20', label: 'Atención' },
+  ERROR:   { icon: AlertCircle,  borderColor: 'border-l-red-500',   bgColor: 'bg-red-50/40 dark:bg-red-950/20',   label: 'Error' },
+}
+
+function NotificationCard({
+  notification,
+  onMarkRead,
+  onDelete,
+  onNavigate,
+}: {
+  notification: NotificationData
+  onMarkRead: (id: string) => void
+  onDelete: (id: string) => void
+  onNavigate: (n: NotificationData) => void
+}) {
+  const cfg = TYPE_CONFIG[notification.type] ?? TYPE_CONFIG.INFO
+  const Icon = cfg.icon
+  const timeAgo = formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true, locale: es })
+  const isClickable = !!notification.ticketId
+
+  return (
+    <div
+      className={cn(
+        'border-l-4 rounded-lg p-4 transition-all hover:shadow-sm',
+        cfg.borderColor,
+        !notification.isRead ? cfg.bgColor : 'bg-muted/30',
+        isClickable && 'cursor-pointer'
+      )}
+      onClick={isClickable ? () => onNavigate(notification) : undefined}
+    >
+      <div className="flex items-start gap-3">
+        <Icon className={cn(
+          'h-5 w-5 mt-0.5 shrink-0',
+          notification.type === 'SUCCESS' ? 'text-green-600' :
+          notification.type === 'WARNING' ? 'text-yellow-600' :
+          notification.type === 'ERROR'   ? 'text-red-600' :
+          'text-blue-600'
+        )} />
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2 mb-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={cn('text-sm font-semibold', !notification.isRead && 'text-foreground')}>
+                {notification.title}
+              </span>
+              {!notification.isRead && (
+                <span className="w-2 h-2 bg-blue-500 rounded-full shrink-0" />
+              )}
+              <Badge variant="outline" className="text-xs">{cfg.label}</Badge>
+            </div>
+            <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">{timeAgo}</span>
+          </div>
+
+          <p className="text-sm text-muted-foreground mb-2 leading-relaxed">
+            {notification.message}
+          </p>
+
+          {notification.tickets && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2 bg-muted/50 rounded px-2 py-1 w-fit">
+              <Ticket className="h-3 w-3" />
+              <span className="truncate max-w-[200px]">{notification.tickets.title}</span>
+              <span className="text-muted-foreground/60">#{notification.tickets.id.slice(-6)}</span>
+            </div>
+          )}
+
+          <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+            {!notification.isRead && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs text-green-700 hover:text-green-800 hover:bg-green-50"
+                onClick={() => onMarkRead(notification.id)}
+              >
+                <Check className="h-3 w-3 mr-1" />
+                Marcar leída
+              </Button>
+            )}
+            {isClickable && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs text-blue-700 hover:text-blue-800 hover:bg-blue-50"
+                onClick={() => onNavigate(notification)}
+              >
+                <Ticket className="h-3 w-3 mr-1" />
+                Ver ticket
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 ml-auto"
+              onClick={() => onDelete(notification.id)}
+            >
+              <Trash2 className="h-3 w-3 mr-1" />
+              Eliminar
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function NotificationsPage() {
   const {
-    // Estados principales
-    notifications,
-    loading,
-    error,
-    
-    // Estados de filtros
-    filterType,
-    setFilterType,
-    filterRead,
-    setFilterRead,
-    searchTerm,
-    setSearchTerm,
-    
-    // Datos procesados
-    filteredNotifications,
-    stats,
-    
-    // Funciones principales
-    markAsRead,
-    markAllAsRead,
-    deleteNotification,
-    clearAllNotifications,
-    
-    // Funciones de utilidad
-    refresh,
+    loading, error,
+    filterRead, setFilterRead,
+    filterType, setFilterType,
+    searchTerm, setSearchTerm,
+    filteredNotifications, stats,
+    markAsRead, markAllAsRead,
+    deleteNotification, clearAllNotifications,
+    navigateToTicket, refresh,
     isAuthenticated,
   } = useNotifications()
 
-  const [showClearAllDialog, setShowClearAllDialog] = useState(false)
+  const [showClearDialog, setShowClearDialog] = useState(false)
 
-  // Renderizado de loading inicial
-  if (loading && notifications.length === 0) {
-    return (
-      <RoleDashboardLayout title="Notificaciones" subtitle="Centro de notificaciones del sistema">
-        <div className='flex items-center justify-center h-64'>
-          <div className='text-center'>
-            <RefreshCw className='h-8 w-8 animate-spin text-blue-600 mx-auto' />
-            <p className='mt-2 text-muted-foreground'>Cargando notificaciones...</p>
-          </div>
-        </div>
-      </RoleDashboardLayout>
-    )
-  }
-
-  // Renderizado de error de autenticación
   if (!isAuthenticated) {
     return (
-      <RoleDashboardLayout title="Notificaciones" subtitle="Centro de notificaciones del sistema">
-        <Card>
-          <CardContent className="pt-6">
-            <div className='flex flex-col items-center justify-center py-12'>
-              <AlertCircle className='h-16 w-16 text-red-400 mb-4' />
-              <h3 className='text-lg font-medium text-foreground mb-2'>Acceso no autorizado</h3>
-              <p className='text-muted-foreground text-center mb-6'>
-                Necesitas iniciar sesión para ver las notificaciones
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+      <RoleDashboardLayout title="Notificaciones" subtitle="Centro de notificaciones">
+        <Card><CardContent className="pt-6 text-center py-12">
+          <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-3" />
+          <p className="text-muted-foreground">Necesitas iniciar sesión para ver las notificaciones</p>
+        </CardContent></Card>
       </RoleDashboardLayout>
     )
-  }
-
-  // Renderizado de error
-  if (error && notifications.length === 0) {
-    return (
-      <RoleDashboardLayout title="Notificaciones" subtitle="Centro de notificaciones del sistema">
-        <Card>
-          <CardContent className="pt-6">
-            <div className='flex flex-col items-center justify-center py-12'>
-              <AlertCircle className='h-16 w-16 text-red-400 mb-4' />
-              <h3 className='text-lg font-medium text-foreground mb-2'>Error al cargar notificaciones</h3>
-              <p className='text-muted-foreground text-center mb-6'>{error}</p>
-              <Button onClick={() => refresh()}>
-                <RefreshCw className='h-4 w-4 mr-2' />
-                Reintentar
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </RoleDashboardLayout>
-    )
-  }
-
-  const handleClearAll = async () => {
-    await clearAllNotifications()
-    setShowClearAllDialog(false)
   }
 
   const headerActions = (
-    <div className='flex items-center space-x-2'>
+    <div className="flex items-center gap-2 flex-wrap">
       {stats.unread > 0 && (
-        <Button 
-          variant='outline' 
-          onClick={markAllAsRead}
-          disabled={loading}
-          className="text-green-600 hover:text-green-700"
-        >
-          <CheckCheck className='h-4 w-4 mr-2' />
+        <Button variant="outline" size="sm" onClick={markAllAsRead} disabled={loading}>
+          <CheckCheck className="h-4 w-4 mr-2" />
           Marcar todas como leídas
         </Button>
       )}
-      
       {stats.total > 0 && (
-        <Button 
-          variant='outline' 
-          onClick={() => setShowClearAllDialog(true)}
-          disabled={loading}
-          className="text-red-600 hover:text-red-700"
-        >
-          <Trash2 className='h-4 w-4 mr-2' />
-          Limpiar todas
+        <Button variant="outline" size="sm" onClick={() => setShowClearDialog(true)} disabled={loading}
+          className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300">
+          <Trash2 className="h-4 w-4 mr-2" />
+          Limpiar todo
         </Button>
       )}
-      
-      <Button variant='outline' onClick={() => refresh()} disabled={loading}>
-        <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+      <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
+        <RefreshCw className={cn('h-4 w-4 mr-2', loading && 'animate-spin')} />
         Actualizar
       </Button>
     </div>
@@ -152,65 +184,129 @@ export default function NotificationsPage() {
 
   return (
     <RoleDashboardLayout
-      title='Notificaciones'
-      subtitle={`Centro de notificaciones del sistema${stats.unread > 0 ? ` • ${stats.unread} sin leer` : ''}`}
+      title="Notificaciones"
+      subtitle={stats.unread > 0 ? `${stats.unread} sin leer` : 'Todo al día'}
       headerActions={headerActions}
     >
-      <div className='space-y-6'>
-        {/* Filtros */}
-        <NotificationFilters
-          filterType={filterType}
-          setFilterType={setFilterType}
-          filterRead={filterRead}
-          setFilterRead={setFilterRead}
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
-          hasActiveFilters={stats.hasActiveFilters}
-          stats={stats}
-        />
+      <div className="max-w-3xl mx-auto space-y-4">
 
-        {/* Lista de notificaciones */}
+        {/* Filtros */}
         <Card>
-          <CardHeader>
-            <CardTitle className='flex items-center justify-between'>
-              <div className="flex items-center space-x-2">
-                <Bell className="h-5 w-5" />
-                <span>
-                  Notificaciones ({stats.filtered})
-                  {stats.filtered !== stats.total && (
-                    <span className="text-muted-foreground font-normal"> de {stats.total}</span>
-                  )}
-                </span>
-              </div>
+          <CardContent className="p-4 space-y-3">
+            {/* Búsqueda */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar en notificaciones..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="pl-9 pr-9"
+              />
+              {searchTerm && (
+                <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Filtros de estado */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+              {(['all', 'unread', 'read'] as const).map(f => (
+                <Button
+                  key={f}
+                  variant={filterRead === f ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setFilterRead(f)}
+                  className="h-7 text-xs"
+                >
+                  {f === 'all' ? `Todas (${stats.total})` :
+                   f === 'unread' ? `Sin leer (${stats.unread})` :
+                   `Leídas (${stats.read})`}
+                </Button>
+              ))}
+              <div className="w-px h-5 bg-border mx-1" />
+              {(['all', 'SUCCESS', 'INFO', 'WARNING', 'ERROR'] as const).map(t => (
+                <Button
+                  key={t}
+                  variant={filterType === t ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setFilterType(t)}
+                  className="h-7 text-xs"
+                >
+                  {t === 'all' ? 'Todos los tipos' :
+                   t === 'SUCCESS' ? '✅ Éxito' :
+                   t === 'INFO' ? 'ℹ️ Info' :
+                   t === 'WARNING' ? '⚠️ Atención' :
+                   '❌ Error'}
+                </Button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Lista */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Bell className="h-5 w-5" />
+              {stats.filtered === stats.total
+                ? `${stats.total} notificaciones`
+                : `${stats.filtered} de ${stats.total} notificaciones`}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <NotificationList
-              notifications={filteredNotifications}
-              onMarkAsRead={markAsRead}
-              onDelete={deleteNotification}
-              searchTerm={searchTerm}
-              loading={loading}
-            />
+            {loading && filteredNotifications.length === 0 ? (
+              <div className="space-y-3">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="h-20 bg-muted animate-pulse rounded-lg" />
+                ))}
+              </div>
+            ) : filteredNotifications.length === 0 ? (
+              <div className="text-center py-12">
+                <Bell className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
+                <p className="text-muted-foreground">
+                  {stats.hasActiveFilters
+                    ? 'No hay notificaciones con esos filtros'
+                    : 'No tienes notificaciones por ahora'}
+                </p>
+                {stats.hasActiveFilters && (
+                  <Button variant="ghost" size="sm" className="mt-2"
+                    onClick={() => { setFilterRead('all'); setFilterType('all'); setSearchTerm('') }}>
+                    Limpiar filtros
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredNotifications.map(n => (
+                  <NotificationCard
+                    key={n.id}
+                    notification={n}
+                    onMarkRead={markAsRead}
+                    onDelete={deleteNotification}
+                    onNavigate={navigateToTicket}
+                  />
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Dialog de confirmación para limpiar todas */}
-      <AlertDialog open={showClearAllDialog} onOpenChange={setShowClearAllDialog}>
+      <AlertDialog open={showClearDialog} onOpenChange={setShowClearDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar todas las notificaciones?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción eliminará permanentemente todas tus notificaciones ({stats.total} en total).
-              Esta acción no se puede deshacer.
+              Se eliminarán {stats.total} notificaciones permanentemente. Esta acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleClearAll}
-              className='bg-red-600 hover:bg-red-700'
+              onClick={async () => { await clearAllNotifications(); setShowClearDialog(false) }}
+              className="bg-red-600 hover:bg-red-700"
             >
               <Trash2 className="h-4 w-4 mr-2" />
               Eliminar todas

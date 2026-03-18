@@ -36,10 +36,10 @@ async function markNotificationAsRead(
     }
 
     if (notification.userId !== session.user.id) {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 403 }
-      )
+      // La notificación no pertenece a este usuario — retornar éxito silencioso
+      // para evitar errores 403 cuando el componente intenta marcar notificaciones
+      // que no son del usuario actual (ej: notificaciones dinámicas mezcladas)
+      return NextResponse.json({ success: true, skipped: true })
     }
 
     const updatedNotification = await NotificationService.markAsRead(notificationId)

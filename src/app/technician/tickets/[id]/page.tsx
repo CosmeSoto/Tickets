@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Clock, User, Tag, AlertCircle, MessageSquare, Paperclip, History, Save, FileText, Lightbulb, BookOpen } from 'lucide-react'
+import { ArrowLeft, Clock, User, Tag, AlertCircle, MessageSquare, Paperclip, History, Save, FileText, Lightbulb, BookOpen, Star, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
 
 // Componentes estandarizados
@@ -52,12 +52,14 @@ export default function TechnicianTicketDetailPage() {
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [timelineRefreshKey, setTimelineRefreshKey] = useState(0)
+  const [fileRefreshKey, setFileRefreshKey] = useState(0)
   
   // Estados del formulario
   const [newStatus, setNewStatus] = useState<'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | 'ON_HOLD'>('OPEN')
 
-  // Variables derivadas
-  const canCreateArticle = ticket?.status === 'RESOLVED' && session?.user?.role === 'TECHNICIAN'
+  // Variables derivadas - artículo disponible en RESOLVED o CLOSED
+  const canCreateArticle = (ticket?.status === 'RESOLVED' || ticket?.status === 'CLOSED') && session?.user?.role === 'TECHNICIAN'
   const hasArticle = !!ticket?.knowledgeArticleId
 
   const handleViewArticle = () => {
@@ -89,6 +91,30 @@ export default function TechnicianTicketDetailPage() {
     }
   }, [session, status, router, ticketId])
 
+  // Polling para detectar cambios de estado (ej: cliente calificó → ticket CLOSED)
+  useEffect(() => {
+    if (!ticketId || loading) return
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/tickets/${ticketId}`)
+        if (!res.ok) return
+        const data = await res.json()
+        if (!data.success || !data.data) return
+        const fresh = data.data
+        setTicket(prev => {
+          if (!prev) return prev
+          // Solo actualizar si el estado cambió
+          if (prev.status !== fresh.status || prev.updatedAt !== fresh.updatedAt) {
+            setNewStatus(fresh.status as typeof newStatus)
+            return fresh
+          }
+          return prev
+        })
+      } catch {}
+    }, 10000)
+    return () => clearInterval(interval)
+  }, [ticketId, loading])
+
   const loadTicket = async () => {
     setLoading(true)
     setError(null)
@@ -113,18 +139,34 @@ export default function TechnicianTicketDetailPage() {
 
     setUpdating(true)
     try {
-      const updatedTicket = await updateTicket(ticket.id, { status: newStatus })
-      if (updatedTicket) {
-        setTicket(updatedTicket)
-        // El toast ya se muestra automáticamente en el hook use-ticket-data
+      const res = await fetch(`/api/tickets/${ticket.id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Error al actualizar estado')
       }
+      // Recargar ticket completo para tener todos los campos actualizados
+      const refreshed = await getTicket(ticket.id)
+      if (refreshed) {
+        setTicket(refreshed)
+        setNewStatus(refreshed.status as typeof newStatus)
+      } else {
+        setTicket(prev => prev ? { ...prev, status: newStatus } : prev)
+      }
+      setTimelineRefreshKey(k => k + 1)
+      toast({
+        title: 'Estado actualizado',
+        description: `El ticket ahora está ${getStatusConfig(newStatus).label}`,
+      })
     } catch (err) {
-      // Los errores también se manejan en el hook, pero agregamos uno específico aquí
       toast({
         title: 'Error al actualizar estado',
-        description: 'No se pudo actualizar el estado del ticket. Intenta nuevamente.',
+        description: err instanceof Error ? err.message : 'Intenta nuevamente.',
         variant: 'destructive',
-        duration: 5000
+        duration: 5000,
       })
     } finally {
       setUpdating(false)
@@ -143,6 +185,8 @@ export default function TechnicianTicketDetailPage() {
     if (!ticket) return []
     
     // Lógica de transición de estados para técnicos
+    // NOTA: CLOSED no está disponible para técnicos. El cierre ocurre
+    // automáticamente cuando el cliente califica el ticket resuelto.
     switch (ticket.status) {
       case 'OPEN':
         return ['OPEN', 'IN_PROGRESS']
@@ -152,6 +196,8 @@ export default function TechnicianTicketDetailPage() {
         return ['ON_HOLD', 'IN_PROGRESS']
       case 'RESOLVED':
         return ['RESOLVED', 'IN_PROGRESS'] // Puede reabrir si es necesario
+      case 'CLOSED':
+        return ['CLOSED'] // Solo lectura, no puede cambiar
       default:
         return [ticket.status as 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | 'ON_HOLD']
     }
@@ -328,7 +374,69 @@ export default function TechnicianTicketDetailPage() {
               </TabsList>
               
               <TabsContent value="status" className="space-y-4">
-                {/* Actualizar Estado */}
+                {/* Banner: Esperando calificación del cliente */}
+                {ticket.status === 'RESOLVED' && (
+                  <Card className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
+                    <CardContent className="pt-6">
+                      <div className="flex items-start gap-3">
+                        <Star className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                        <div>
+                          <p className="font-medium text-amber-900 dark:text-amber-100">
+                            Esperando calificación del cliente
+                          </p>
+                          <p className="text-sm text-amber-800 dark:text-amber-200 mt-1">
+                            El ticket se cerrará automáticamente cuando el cliente envíe su calificación. 
+                            Si necesitas reabrir el ticket, puedes cambiar el estado a &quot;En Progreso&quot;.
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Banner: Ticket cerrado - promover a artículo */}
+                {ticket.status === 'CLOSED' && (
+                  <Card className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
+                    <CardContent className="pt-6">
+                      <div className="flex items-start gap-3">
+                        <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
+                        <div className="flex-1">
+                          <p className="font-medium text-green-900 dark:text-green-100">
+                            Ticket cerrado y calificado
+                          </p>
+                          <p className="text-sm text-green-800 dark:text-green-200 mt-1">
+                            El cliente ha calificado el servicio. Este ticket puede ser promovido a artículo de conocimiento para ayudar a resolver casos similares en el futuro.
+                          </p>
+                          {!hasArticle && (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="mt-3 border-green-300 text-green-800 hover:bg-green-100 dark:border-green-700 dark:text-green-200 dark:hover:bg-green-900"
+                              onClick={handleCreateArticle}
+                            >
+                              <BookOpen className="h-4 w-4 mr-2" />
+                              Promover a Artículo de Conocimiento
+                            </Button>
+                          )}
+                          {hasArticle && (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="mt-3 border-green-300 text-green-800 hover:bg-green-100 dark:border-green-700 dark:text-green-200 dark:hover:bg-green-900"
+                              onClick={handleViewArticle}
+                            >
+                              <BookOpen className="h-4 w-4 mr-2" />
+                              Ver Artículo Creado
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Actualizar Estado - solo si no está cerrado */}
+                {ticket.status !== 'CLOSED' && (
                 <Card>
                   <CardHeader>
                     <CardTitle className='flex items-center space-x-2'>
@@ -411,10 +519,12 @@ export default function TechnicianTicketDetailPage() {
                         <li>• <strong>En Progreso</strong> → Resuelto, En Espera</li>
                         <li>• <strong>En Espera</strong> → En Progreso</li>
                         <li>• <strong>Resuelto</strong> → En Progreso (reabrir si es necesario)</li>
+                        <li>• <strong>Resuelto</strong> → Cerrado (automático tras calificación del cliente)</li>
                       </ul>
                     </div>
                   </CardContent>
                 </Card>
+                )}
               </TabsContent>
               
               <TabsContent value="timeline" className="space-y-4">
@@ -422,6 +532,8 @@ export default function TechnicianTicketDetailPage() {
                   ticketId={ticket.id}
                   canAddComments={true}
                   canViewInternal={true}
+                  refreshKey={timelineRefreshKey}
+                  onCommentAdded={() => setFileRefreshKey(k => k + 1)}
                 />
               </TabsContent>
               
@@ -430,16 +542,17 @@ export default function TechnicianTicketDetailPage() {
                   ticketId={ticket.id}
                   canEdit={ticket.assignee?.id === session?.user?.id}
                   mode='technician'
+                  onPlanChange={() => setTimelineRefreshKey(k => k + 1)}
                 />
               </TabsContent>
               
               <TabsContent value="files" className="space-y-4">
                 <CompactFileManager 
                   ticketId={ticket.id}
-                  attachments={ticket.attachments || []}
                   onAttachmentsChange={loadTicket}
                   canUpload={true}
                   canDelete={true}
+                  refreshKey={fileRefreshKey}
                 />
               </TabsContent>
             </Tabs>

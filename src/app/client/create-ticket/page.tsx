@@ -25,6 +25,7 @@ import { TicketPriority } from '@prisma/client'
 import { Ticket, AlertCircle, CheckCircle, Loader2, ArrowLeft, Upload, File, X, Paperclip } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/hooks/use-toast'
+import { FilePreviewList } from '@/components/tickets/file-preview-list'
 
 interface Category {
   id: string
@@ -642,35 +643,8 @@ export default function CreateTicketPage() {
                   </p>
                 </div>
 
-                {/* Lista de archivos seleccionados */}
                 {selectedFiles.length > 0 && (
-                  <div className='space-y-2 mt-3'>
-                    <p className='text-sm font-medium'>Archivos seleccionados ({selectedFiles.length}/5):</p>
-                    {selectedFiles.map((file, index) => (
-                      <div
-                        key={index}
-                        className='flex items-center justify-between p-2 bg-muted rounded-lg'
-                      >
-                        <div className='flex items-center space-x-2'>
-                          <File className='h-4 w-4 text-muted-foreground' />
-                          <div>
-                            <p className='text-sm font-medium'>{file.name}</p>
-                            <p className='text-xs text-muted-foreground'>
-                              {(file.size / 1024).toFixed(1)} KB
-                            </p>
-                          </div>
-                        </div>
-                        <Button
-                          type='button'
-                          variant='ghost'
-                          size='sm'
-                          onClick={() => removeFile(index)}
-                        >
-                          <X className='h-4 w-4' />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
+                  <FilePreviewList files={selectedFiles} onRemove={removeFile} />
                 )}
               </div>
 

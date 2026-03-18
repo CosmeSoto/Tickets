@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 import { PrismaClient } from '@prisma/client'
 import { FolioService } from './folio.service'
 import { DigitalSignatureService } from './digital-signature.service'
@@ -137,6 +138,7 @@ export class DeliveryActService {
       // Registrar en auditoría
       await prisma.audit_logs.create({
         data: {
+          id: randomUUID(),
           action: 'CREATE',
           entityType: 'delivery_act',
           entityId: act.id,
@@ -272,6 +274,7 @@ export class DeliveryActService {
       // Registrar en auditoría
       await prisma.audit_logs.create({
         data: {
+          id: randomUUID(),
           action: 'ACCEPTED',
           entityType: 'delivery_act',
           entityId: actId,
@@ -364,6 +367,7 @@ export class DeliveryActService {
         // Registrar en auditoría
         await tx.audit_logs.create({
           data: {
+            id: randomUUID(),
             action: 'REJECTED',
             entityType: 'delivery_act',
             entityId: actId,

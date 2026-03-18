@@ -379,6 +379,18 @@ export async function PUT(
         }
       })
 
+      // Bloquear transición directa a CLOSED para técnicos.
+      // El cierre ocurre automáticamente cuando el cliente califica.
+      if (filteredUpdates.status === 'CLOSED') {
+        return NextResponse.json(
+          { 
+            success: false, 
+            message: 'Los técnicos no pueden cerrar tickets directamente. El ticket se cierra automáticamente cuando el cliente envía su calificación.' 
+          },
+          { status: 403 }
+        )
+      }
+
       // Procesar assigneeId: convertir undefined a null para desasignar
       if ('assigneeId' in filteredUpdates && filteredUpdates.assigneeId === undefined) {
         filteredUpdates.assigneeId = null
@@ -669,14 +681,6 @@ export async function PUT(
           }, session.user.id).catch(err => {
             console.error('[EMAIL] Error enviando email de ticket asignado:', err)
           })
-
-          // ⭐ NUEVO: Enviar notificaciones in-app
-          await NotificationService.notifyTicketAssigned(
-            finalId,
-            filteredUpdates.assigneeId
-          ).catch(err => {
-            console.error('[NOTIFICATION] Error enviando notificaciones de ticket asignado:', err)
-          })
         }
       }
 
@@ -734,8 +738,13 @@ export async function PUT(
       
       // Procesar assigneeId: convertir undefined a null para desasignar
       const processedUpdates = { ...updates }
-      if ('assigneeId' in processedUpdates && processedUpdates.assigneeId === undefined) {
+      if ('assigneeId' in processedUpdates && (processedUpdates.assigneeId === undefined || processedUpdates.assigneeId === '')) {
         processedUpdates.assigneeId = null
+      }
+
+      // Si se desasigna el técnico, volver el estado a OPEN automáticamente
+      if ('assigneeId' in processedUpdates && processedUpdates.assigneeId === null && existingTicket.assigneeId) {
+        processedUpdates.status = processedUpdates.status || 'OPEN'
       }
       
       const updatedTicket = await prisma.tickets.update({
@@ -792,18 +801,15 @@ export async function PUT(
         }
       })
 
-      // ⭐ Enviar notificaciones si se cambió la asignación
-      if ('assigneeId' in processedUpdates && processedUpdates.assigneeId !== existingTicket.assigneeId) {
-        if (processedUpdates.assigneeId) {
-          // Se asignó a un técnico
-          const { NotificationService } = await import('@/lib/services/notification-service')
-          await NotificationService.notifyTicketAssigned(
-            finalId,
-            processedUpdates.assigneeId
-          ).catch(err => {
-            console.error('[NOTIFICATION] Error enviando notificaciones de ticket asignado:', err)
-          })
-        }
+      // Enviar notificación si se cambió la asignación desde el formulario de edición
+      if ('assigneeId' in processedUpdates && processedUpdates.assigneeId && processedUpdates.assigneeId !== existingTicket.assigneeId) {
+        const { NotificationService } = await import('@/lib/services/notification-service')
+        await NotificationService.notifyTicketAssigned(
+          finalId,
+          processedUpdates.assigneeId
+        ).catch(err => {
+          console.error('[NOTIFICATION] Error enviando notificaciones de ticket asignado:', err)
+        })
       }
 
       // ⭐ AUDITORÍA: Registrar actualización de ticket por admin

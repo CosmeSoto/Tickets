@@ -65,6 +65,9 @@ interface SystemSettings {
   maxFileSize: number
   allowedFileTypes: string[]
 
+  // Configuración de auto-cierre de tickets
+  autoCloseDays: number
+
   // Configuración de backups
   backupEnabled: boolean
   backupFrequency: 'daily' | 'weekly' | 'monthly'
@@ -140,6 +143,8 @@ export default function SettingsPage() {
           title: 'Éxito',
           description: 'Configuración guardada correctamente',
         })
+        // Notificar a componentes que escuchan cambios de configuración (ej: session timeout monitor)
+        window.dispatchEvent(new CustomEvent('settings-updated'))
       } else {
         const error = await response.json()
         toast({
@@ -628,6 +633,32 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
+                <div>
+                  <Label htmlFor='autoCloseDays'>Auto-cierre de Tickets Resueltos</Label>
+                  <div className="space-y-2">
+                    <Input
+                      id='autoCloseDays'
+                      type='number'
+                      value={settings.autoCloseDays}
+                      onChange={e => {
+                        const value = parseInt(e.target.value)
+                        setSettings({ ...settings, autoCloseDays: isNaN(value) ? 3 : value })
+                      }}
+                      min='1'
+                      max='30'
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      {settings.autoCloseDays === 1
+                        ? '1 día para que el cliente califique'
+                        : `${settings.autoCloseDays} días para que el cliente califique`
+                      }
+                    </p>
+                    <p className="text-xs text-amber-600">
+                      ⚠️ Los tickets resueltos se cerrarán automáticamente si el cliente no califica dentro de este plazo
+                    </p>
+                  </div>
+                </div>
+
                 {/* Información adicional sobre seguridad */}
                 <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <h4 className="font-medium text-blue-900 mb-2">ℹ️ Información de Seguridad</h4>
@@ -636,6 +667,7 @@ export default function SettingsPage() {
                     <li>• Se mostrará una advertencia 5 minutos antes de cerrar la sesión</li>
                     <li>• Cualquier acción del usuario (click, tecla, scroll) reinicia el contador</li>
                     <li>• Los cambios requieren reiniciar sesión para aplicarse</li>
+                    <li>• Los tickets resueltos sin calificación se cierran automáticamente según el plazo configurado</li>
                   </ul>
                 </div>
               </CardContent>

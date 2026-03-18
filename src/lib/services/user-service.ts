@@ -277,6 +277,22 @@ export class UserService {
         })
       }
 
+      // Crear user_settings por defecto (garantiza que las notificaciones estén habilitadas)
+      await tx.user_settings.create({
+        data: {
+          id: randomUUID(),
+          userId: user.id,
+          emailNotifications: true,
+          pushNotifications: true,
+          ticketCreated: true,
+          ticketAssigned: true,
+          statusChanged: true,
+          newComments: true,
+          ticketUpdated: true,
+          updatedAt: new Date(),
+        }
+      })
+
       // Registrar auditoría
       if (performedBy) {
         await AuditServiceComplete.log({
@@ -417,40 +433,77 @@ export class UserService {
   }
 
   static async deleteUser(id: string) {
-    // Verificar si el usuario tiene tickets asignados
-    const tickets_tickets_assigneeIdTousers = await prisma.tickets.count({
-      where: { assigneeId: id },
+    // Verificar si el usuario tiene tickets asignados activos
+    const activeTickets = await prisma.tickets.count({
+      where: { assigneeId: id, status: { in: ['OPEN', 'IN_PROGRESS'] } },
     })
 
-    if (tickets_tickets_assigneeIdTousers > 0) {
-      throw new Error('No se puede eliminar un usuario con tickets asignados')
+    if (activeTickets > 0) {
+      throw new Error('No se puede eliminar un usuario con tickets activos asignados. Reasigna o cierra los tickets primero.')
     }
 
-    // Verificar si es técnico y tiene asignaciones de categorías activas
-    const user = await prisma.users.findUnique({
-      where: { id },
-      select: { role: true },
-    })
+    await prisma.$transaction(async (tx) => {
+      // --- Campos no-nullable: hay que ELIMINAR los registros ---
 
-    if (user?.role === 'TECHNICIAN') {
-      const activeAssignments = await prisma.technician_assignments.count({
-        where: { 
-          technicianId: id,
-          isActive: true,
-        },
+      // Asignaciones de técnico
+      await tx.technician_assignments.deleteMany({ where: { technicianId: id } })
+
+      // Historial de tickets (userId NOT NULL)
+      await tx.ticket_history.deleteMany({ where: { userId: id } })
+
+      // Comentarios (authorId NOT NULL)
+      await tx.comments.deleteMany({ where: { authorId: id } })
+
+      // Attachments (uploadedBy NOT NULL)
+      await tx.attachments.deleteMany({ where: { uploadedBy: id } })
+
+      // Calificaciones de tickets (clientId NOT NULL, technicianId nullable)
+      await tx.ticket_ratings.deleteMany({ where: { OR: [{ clientId: id }, { technicianId: id }] } })
+
+      // Artículos de conocimiento (authorId NOT NULL) — eliminar votos primero
+      const articles = await tx.knowledge_articles.findMany({
+        where: { authorId: id },
+        select: { id: true },
       })
-
-      if (activeAssignments > 0) {
-        throw new Error('No se puede eliminar un técnico con asignaciones de categorías activas')
+      if (articles.length > 0) {
+        const articleIds = articles.map(a => a.id)
+        await tx.article_votes.deleteMany({ where: { articleId: { in: articleIds } } })
+        await tx.ticket_knowledge_articles.deleteMany({ where: { articleId: { in: articleIds } } })
+        await tx.knowledge_articles.deleteMany({ where: { authorId: id } })
       }
-    }
 
-    // Eliminar asignaciones de técnico antes de eliminar el usuario
-    await prisma.technician_assignments.deleteMany({
-      where: { technicianId: id },
+      // Planes de resolución (createdBy NOT NULL) — las tareas se eliminan en cascade
+      await tx.resolution_plans.deleteMany({ where: { createdBy: id } })
+
+      // Registros de mantenimiento (technicianId NOT NULL)
+      await tx.maintenance_records.deleteMany({ where: { technicianId: id } })
+
+      // Movimientos de stock (userId NOT NULL)
+      await tx.stock_movements.deleteMany({ where: { userId: id } })
+
+      // --- Campos nullable: NULLIFICAR en lugar de eliminar ---
+
+      // Tickets: desasignar assignee, nullificar createdById
+      await tx.tickets.updateMany({ where: { assigneeId: id }, data: { assigneeId: null, status: 'OPEN' } })
+      await tx.tickets.updateMany({ where: { createdById: id }, data: { createdById: null } })
+
+      // Tareas de resolución: nullificar assignedTo (nullable)
+      await tx.resolution_tasks.updateMany({ where: { assignedTo: id }, data: { assignedTo: null } })
+
+      // Webhooks: nullificar createdBy (nullable)
+      await tx.webhooks.updateMany({ where: { createdBy: id }, data: { createdBy: null } })
+
+      // Movimientos de stock: nullificar assignedToUserId (nullable)
+      await tx.stock_movements.updateMany({ where: { assignedToUserId: id }, data: { assignedToUserId: null } })
+
+      // Licencias de software: nullificar assignedToUser (nullable)
+      await tx.software_licenses.updateMany({ where: { assignedToUser: id }, data: { assignedToUser: null } })
+
+      // Eliminar el usuario (Prisma cascade elimina: accounts, sessions,
+      // notification_preferences, notifications, user_preferences,
+      // user_settings, password_reset_tokens, article_votes)
+      await tx.users.delete({ where: { id } })
     })
-
-    return prisma.users.delete({ where: { id } })
   }
 
   static async getUserStats() {

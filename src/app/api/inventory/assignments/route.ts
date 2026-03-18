@@ -5,7 +5,6 @@ import { AssignmentService } from '@/lib/services/assignment.service'
 import { DeliveryActService } from '@/lib/services/delivery-act.service'
 import { createAssignmentSchema } from '@/lib/validations/inventory/assignment'
 import { ZodError } from 'zod'
-import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 
 /**
  * POST /api/inventory/assignments
@@ -48,19 +47,7 @@ export async function POST(request: NextRequest) {
     const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
     const acceptanceUrl = `${baseUrl}/acts/${deliveryAct.id}/accept?token=${deliveryAct.acceptanceToken}`
 
-    // Registrar en auditoría
-    await AuditServiceComplete.log({
-      action: AuditActionsComplete.ASSIGNMENT_CREATED,
-      entityType: 'equipment',
-      entityId: validatedData.equipmentId,
-      userId: session.user.id,
-      details: {
-        assignmentId: assignment.id,
-        receiverId: validatedData.receiverId,
-        type: validatedData.type,
-        actFolio: deliveryAct.folio,
-      },
-    })
+    // Auditoría ya se registra en AssignmentService.createAssignment
 
     return NextResponse.json({
       assignment,

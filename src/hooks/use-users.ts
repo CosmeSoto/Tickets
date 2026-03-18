@@ -87,6 +87,7 @@ interface UseUsersReturn {
   updateUser: (userId: string, userData: any) => Promise<boolean>
   deleteUser: (userId: string) => Promise<boolean>
   toggleUserStatus: (userId: string, currentStatus: boolean) => Promise<boolean>
+  removeUserLocally: (userId: string) => void
 }
 
 // Función para filtrar usuarios en memoria (como filterTechnicians)
@@ -147,7 +148,8 @@ export function useUsers(options: UseUsersOptions = {}): UseUsersReturn {
     data: allUsers,
     loading,
     error: moduleError,
-    reload
+    reload,
+    setData
   } = useModuleData<UserData>({
     endpoint: '/api/users',
     initialLoad: true
@@ -354,6 +356,10 @@ export function useUsers(options: UseUsersOptions = {}): UseUsersReturn {
 
   const refresh = reload
 
+  const removeUserLocally = useCallback((userId: string) => {
+    setData(prev => prev.filter(u => u.id !== userId))
+  }, [setData])
+
   const goToPage = (page: number) => {
     if (page !== pagination.currentPage && page >= 1 && page <= pagination.totalPages) {
       pagination.goToPage(page)
@@ -390,7 +396,8 @@ export function useUsers(options: UseUsersOptions = {}): UseUsersReturn {
     createUser,
     updateUser,
     deleteUser,
-    toggleUserStatus
+    toggleUserStatus,
+    removeUserLocally
   }
 }
 

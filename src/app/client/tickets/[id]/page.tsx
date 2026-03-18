@@ -21,6 +21,7 @@ import {
   Edit,
   Save,
   X,
+  Star,
 } from 'lucide-react'
 
 // Componentes estandarizados
@@ -59,26 +60,52 @@ export default function ClientTicketDetailPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
+  const [activeTab, setActiveTab] = useState('timeline')
+  const [timelineRefreshKey, setTimelineRefreshKey] = useState(0)
+  const [fileRefreshKey, setFileRefreshKey] = useState(0)
   const [editForm, setEditForm] = useState({
     title: '',
     description: ''
   })
 
   useEffect(() => {
-    if (params.id && params.id !== 'create') {
+    if (params.id && params.id !== 'create' && session?.user?.id) {
       loadTicket()
     }
-  }, [params.id])
+  }, [params.id, session?.user?.id])
+
+  // Polling para detectar cambios de estado (ej: técnico marcó como RESOLVED)
+  useEffect(() => {
+    const ticketId = params.id as string
+    if (!ticketId || ticketId === 'create' || !session?.user?.id) return
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/tickets/${ticketId}`)
+        if (!res.ok) return
+        const data = await res.json()
+        if (!data.success || !data.data) return
+        const fresh = data.data
+        setTicket(prev => {
+          if (!prev) return prev
+          if (prev.status !== fresh.status || prev.updatedAt !== fresh.updatedAt) {
+            return fresh
+          }
+          return prev
+        })
+      } catch {}
+    }, 10000)
+    return () => clearInterval(interval)
+  }, [params.id, session?.user?.id])
 
   const loadTicket = async () => {
-    if (!params.id || params.id === 'create') {
+    if (!params.id || params.id === 'create' || !session?.user?.id) {
       return
     }
     
     const ticketData = await getTicket(params.id as string)
     if (ticketData) {
       // Verificar que el ticket pertenece al cliente actual
-      if (ticketData.client?.id !== session?.user?.id) {
+      if (ticketData.client?.id !== session.user.id) {
         router.push('/unauthorized')
         return
       }
@@ -348,8 +375,38 @@ export default function ClientTicketDetailPage() {
             </CardContent>
           </Card>
 
+          {/* Banner prominente: Califica para cerrar el ticket */}
+          {ticket.status === 'RESOLVED' && (
+            <Card className="border-amber-300 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950 dark:to-yellow-950 dark:border-amber-700">
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-4">
+                  <div className="rounded-full bg-amber-100 dark:bg-amber-900 p-3 shrink-0">
+                    <Star className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-amber-900 dark:text-amber-100 text-lg">
+                      Tu ticket ha sido resuelto
+                    </h3>
+                    <p className="text-sm text-amber-800 dark:text-amber-200 mt-1">
+                      El técnico ha marcado este ticket como resuelto. Por favor califica el servicio recibido para cerrar el ticket. 
+                      Tu opinión nos ayuda a mejorar.
+                    </p>
+                    <Button 
+                      className="mt-3 bg-amber-600 hover:bg-amber-700 text-white"
+                      size="sm"
+                      onClick={() => setActiveTab('rating')}
+                    >
+                      <Star className="h-4 w-4 mr-2" />
+                      Calificar Servicio
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Tabs para organizar el contenido */}
-          <Tabs defaultValue="timeline" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="timeline">Historial</TabsTrigger>
               <TabsTrigger value="rating">Calificación</TabsTrigger>
@@ -361,6 +418,8 @@ export default function ClientTicketDetailPage() {
                 ticketId={ticket.id}
                 canAddComments={true}
                 canViewInternal={false}
+                refreshKey={timelineRefreshKey}
+                onCommentAdded={() => setFileRefreshKey(k => k + 1)}
               />
             </TabsContent>
             
@@ -371,15 +430,16 @@ export default function ClientTicketDetailPage() {
                 canRate={ticket.status === 'RESOLVED' || ticket.status === 'CLOSED'}
                 showTechnicianStats={false}
                 mode='client'
+                onRatingSubmitted={loadTicket}
               />
             </TabsContent>
             
             <TabsContent value="files" className="space-y-4">
               <CompactFileManager
                 ticketId={ticket.id}
-                attachments={ticket.attachments || []}
                 onUploadComplete={loadTicket}
                 disabled={ticket.status === 'CLOSED'}
+                refreshKey={fileRefreshKey}
               />
             </TabsContent>
           </Tabs>

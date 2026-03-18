@@ -35,7 +35,7 @@ interface AutoAssignmentProps {
     name: string
     email: string
   }
-  onAssignmentComplete?: () => void
+  onAssignmentComplete?: (assignedTechnician?: { id: string; name: string; email: string }) => void
 }
 
 interface AssignmentResult {
@@ -82,7 +82,7 @@ export function AutoAssignment({
           title: 'Éxito',
           description: 'Ticket asignado automáticamente',
         })
-        onAssignmentComplete?.()
+        onAssignmentComplete?.(data.assignedTechnician)
       } else {
         // Leer el body solo una vez
         const errorData = await response.json().catch(() => ({ error: `Error ${response.status}: ${response.statusText}` }))

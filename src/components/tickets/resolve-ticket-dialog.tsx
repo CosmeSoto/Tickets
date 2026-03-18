@@ -12,10 +12,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Loader2, BookOpen } from 'lucide-react'
+import { Loader2, Star, Info } from 'lucide-react'
 import { toast } from 'sonner'
-import { CreateArticleDialog } from '@/components/knowledge/create-article-dialog'
 
 interface ResolveTicketDialogProps {
   ticketId: string
@@ -38,11 +36,8 @@ export function ResolveTicketDialog({
 }: ResolveTicketDialogProps) {
   const [loading, setLoading] = useState(false)
   const [resolutionComment, setResolutionComment] = useState('')
-  const [createArticle, setCreateArticle] = useState(false)
-  const [showArticleDialog, setShowArticleDialog] = useState(false)
 
   const handleResolve = async () => {
-    // Validar comentario
     if (!resolutionComment.trim()) {
       toast.error('Por favor agrega un comentario de resolución')
       return
@@ -50,7 +45,6 @@ export function ResolveTicketDialog({
 
     setLoading(true)
     try {
-      // Resolver ticket
       const response = await fetch(`/api/tickets/${ticketId}`, {
         method: 'PATCH',
         headers: {
@@ -66,16 +60,9 @@ export function ResolveTicketDialog({
         throw new Error('Error al resolver ticket')
       }
 
-      toast.success('Ticket resuelto exitosamente')
-
-      // Si se marcó crear artículo, abrir diálogo
-      if (createArticle) {
-        handleClose()
-        setShowArticleDialog(true)
-      } else {
-        handleClose()
-        onSuccess?.()
-      }
+      toast.success('Ticket resuelto. Se notificará al cliente para que califique el servicio.')
+      handleClose()
+      onSuccess?.()
     } catch (error) {
       toast.error('Error al resolver ticket')
     } finally {
@@ -85,98 +72,67 @@ export function ResolveTicketDialog({
 
   const handleClose = () => {
     setResolutionComment('')
-    setCreateArticle(false)
     onClose()
   }
 
-  const handleArticleSuccess = (articleId: string) => {
-    toast.success('Artículo creado exitosamente')
-    setShowArticleDialog(false)
-    onSuccess?.()
-  }
-
   return (
-    <>
-      <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Resolver Ticket</DialogTitle>
-            <DialogDescription>
-              Marca este ticket como resuelto y documenta la solución
-            </DialogDescription>
-          </DialogHeader>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Resolver Ticket</DialogTitle>
+          <DialogDescription>
+            Marca este ticket como resuelto y documenta la solución
+          </DialogDescription>
+        </DialogHeader>
 
-          <div className="space-y-4">
-            {/* Comentario de resolución */}
-            <div className="space-y-2">
-              <Label htmlFor="resolution">
-                Comentario de Resolución <span className="text-red-500">*</span>
-              </Label>
-              <Textarea
-                id="resolution"
-                value={resolutionComment}
-                onChange={(e) => setResolutionComment(e.target.value)}
-                placeholder="Describe cómo se resolvió el problema..."
-                rows={6}
-                maxLength={1000}
-              />
-              <p className="text-xs text-muted-foreground">
-                {resolutionComment.length}/1000 caracteres
-              </p>
-            </div>
-
-            {/* Checkbox crear artículo */}
-            <div className="flex items-start space-x-3 rounded-lg border p-4 bg-muted/50">
-              <Checkbox
-                id="create-article"
-                checked={createArticle}
-                onCheckedChange={(checked) => setCreateArticle(checked as boolean)}
-              />
-              <div className="flex-1">
-                <Label
-                  htmlFor="create-article"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex items-center gap-2"
-                >
-                  <BookOpen className="h-4 w-4" />
-                  Crear artículo de conocimiento
-                </Label>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Documenta esta solución para ayudar a otros usuarios con problemas similares
-                </p>
-              </div>
-            </div>
-
-            {createArticle && (
-              <div className="rounded-lg border p-4 bg-blue-50 dark:bg-blue-950">
-                <p className="text-sm text-blue-900 dark:text-blue-100">
-                  ℹ️ Después de resolver el ticket, se abrirá un formulario para crear el artículo de conocimiento.
-                </p>
-              </div>
-            )}
+        <div className="space-y-4">
+          {/* Comentario de resolución */}
+          <div className="space-y-2">
+            <Label htmlFor="resolution">
+              Comentario de Resolución <span className="text-red-500">*</span>
+            </Label>
+            <Textarea
+              id="resolution"
+              value={resolutionComment}
+              onChange={(e) => setResolutionComment(e.target.value)}
+              placeholder="Describe cómo se resolvió el problema..."
+              rows={6}
+              maxLength={1000}
+            />
+            <p className="text-xs text-muted-foreground">
+              {resolutionComment.length}/1000 caracteres
+            </p>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={handleClose} disabled={loading}>
-              Cancelar
-            </Button>
-            <Button onClick={handleResolve} disabled={loading}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {createArticle ? 'Resolver y Crear Artículo' : 'Resolver Ticket'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          {/* Info del nuevo flujo */}
+          <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950 p-4 space-y-2">
+            <div className="flex items-start gap-3">
+              <Star className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                  Flujo de cierre con calificación
+                </p>
+                <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
+                  <li>1. El ticket pasará a estado <strong>Resuelto</strong></li>
+                  <li>2. Se notificará al cliente para que califique el servicio</li>
+                  <li>3. Cuando el cliente califique, el ticket se cerrará automáticamente</li>
+                  <li>4. Una vez cerrado, podrás promoverlo a artículo de conocimiento</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
 
-      {/* Diálogo de crear artículo */}
-      <CreateArticleDialog
-        isOpen={showArticleDialog}
-        onClose={() => setShowArticleDialog(false)}
-        ticketId={ticketId}
-        ticketTitle={ticketTitle}
-        ticketDescription={ticketDescription}
-        categoryId={categoryId}
-        onSuccess={handleArticleSuccess}
-      />
-    </>
+        <DialogFooter>
+          <Button variant="outline" onClick={handleClose} disabled={loading}>
+            Cancelar
+          </Button>
+          <Button onClick={handleResolve} disabled={loading}>
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Resolver Ticket
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

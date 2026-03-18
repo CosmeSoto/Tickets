@@ -91,6 +91,22 @@ export async function GET(
       }
     })
 
+    // Recopilar IDs de attachments referenciados en comentarios
+    const commentAttachmentIds = history
+      .filter(e => e.action === 'comment_added' && e.newValue)
+      .flatMap(e => {
+        try { return JSON.parse(e.newValue!) as string[] } catch { return [] }
+      })
+
+    // Cargar attachments de comentarios en una sola query
+    const commentAttachments = commentAttachmentIds.length > 0
+      ? await prisma.attachments.findMany({
+          where: { id: { in: commentAttachmentIds } },
+          select: { id: true, originalName: true, mimeType: true, size: true }
+        })
+      : []
+    const attachmentMap = new Map(commentAttachments.map(a => [a.id, a]))
+
     // Formatear timeline con transformación de eventos
     const timeline = history.map((entry) => {
       const baseEvent = {
@@ -98,6 +114,7 @@ export async function GET(
         type: mapActionToType(entry.action),
         title: generateTitle(entry.action, entry.field, entry.newValue, entry.oldValue),
         description: generateDescription(entry.action, entry.comment, entry.newValue, entry.oldValue),
+        isInternal: entry.field === 'internal_comment',
         user: entry.users
           ? {
               id: entry.users.id,
@@ -108,7 +125,7 @@ export async function GET(
             }
           : null,
         createdAt: entry.createdAt.toISOString(),
-        metadata: parseMetadata(entry.action, entry.newValue, entry.oldValue, resolutionPlan)
+        metadata: parseMetadata(entry.action, entry.newValue, entry.oldValue, resolutionPlan, attachmentMap)
       }
 
       return baseEvent
@@ -134,6 +151,9 @@ function mapActionToType(action: string): string {
     'status_changed': 'status_change',
     'assigned': 'assignment',
     'unassigned': 'assignment',
+    'auto_assigned': 'assignment',
+    'reassigned': 'assignment',
+    'updated': 'status_change',
     'priority_changed': 'priority_change',
     'comment_added': 'comment',
     'resolution_plan_created': 'resolution_plan',
@@ -155,10 +175,13 @@ function generateTitle(action: string, field: string | null, newValue: string | 
   const titles: Record<string, string> = {
     'created': 'Ticket creado',
     'status_changed': 'Estado actualizado',
+    'updated': 'Ticket actualizado',
     'assigned': 'Ticket asignado',
     'unassigned': 'Ticket desasignado',
+    'auto_assigned': 'Ticket asignado automáticamente',
+    'reassigned': 'Ticket reasignado',
     'priority_changed': 'Prioridad cambiada',
-    'comment_added': 'Comentario agregado',
+    'comment_added': field === 'internal_comment' ? 'Comentario interno agregado' : 'Comentario agregado',
     'resolution_plan_created': '📋 Plan de resolución creado',
     'resolution_plan_updated': '📋 Plan de resolución actualizado',
     'resolution_plan_completed': '✅ Plan de resolución completado',
@@ -205,10 +228,31 @@ function generateDescription(action: string, originalComment: string | null, new
 }
 
 // Parsear metadata para eventos específicos
-function parseMetadata(action: string, newValue: string | null, oldValue: string | null, resolutionPlan: any): any {
+function parseMetadata(action: string, newValue: string | null, oldValue: string | null, resolutionPlan: any, attachmentMap?: Map<string, { id: string; originalName: string; mimeType: string; size: number }>): any {
   const metadata: any = {
     oldValue,
     newValue
+  }
+
+  // Para comentarios, adjuntar archivos si existen
+  if (action === 'comment_added' && newValue && attachmentMap) {
+    try {
+      const ids = JSON.parse(newValue) as string[]
+      const attachments = ids
+        .map(id => attachmentMap.get(id))
+        .filter(Boolean)
+        .map(a => ({
+          id: a!.id,
+          name: a!.originalName,
+          size: a!.size,
+          type: a!.mimeType,
+        }))
+      if (attachments.length > 0) {
+        metadata.attachments = attachments
+      }
+    } catch {
+      // newValue no es JSON de IDs, ignorar
+    }
   }
 
   // Para planes de resolución, agregar información completa del plan

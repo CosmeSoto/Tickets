@@ -56,6 +56,7 @@ interface TicketRatingSystemProps {
   canRate?: boolean
   showTechnicianStats?: boolean
   mode?: 'client' | 'admin'
+  onRatingSubmitted?: () => void
 }
 
 export function TicketRatingSystem({ 
@@ -63,7 +64,8 @@ export function TicketRatingSystem({
   technicianId,
   canRate = false, 
   showTechnicianStats = false,
-  mode = 'client'
+  mode = 'client',
+  onRatingSubmitted
 }: TicketRatingSystemProps) {
   const { toast } = useToast()
   const [rating, setRating] = useState<Rating | null>(null)
@@ -139,9 +141,10 @@ export function TicketRatingSystem({
       if (data.success) {
         toast({
           title: "Calificación enviada",
-          description: "Gracias por tu feedback. Nos ayuda a mejorar nuestro servicio."
+          description: "Gracias por tu feedback. El ticket ha sido cerrado automáticamente."
         })
-        loadRatingData() // Recargar datos
+        loadRatingData()
+        onRatingSubmitted?.()
       }
     } catch (err) {
       toast({
@@ -243,19 +246,19 @@ export function TicketRatingSystem({
     <div className="space-y-6">
       {/* Mensaje informativo cuando no se puede calificar aún */}
       {!rating && !canRate && (
-        <Card className="border-blue-200 bg-blue-50">
+        <Card className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
           <CardContent className="pt-6">
             <div className="flex items-start space-x-3">
               <div className="flex-shrink-0">
-                <Star className="h-5 w-5 text-blue-600 mt-0.5" />
+                <Star className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
               </div>
               <div>
-                <h4 className="font-medium text-blue-900 mb-1">
+                <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-1">
                   Calificación no disponible aún
                 </h4>
-                <p className="text-sm text-blue-800">
-                  Podrás calificar este ticket una vez que haya sido <strong>cerrado o resuelto</strong>. 
-                  Tu opinión nos ayuda a mejorar la calidad de nuestro servicio.
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  Podrás calificar este ticket una vez que el técnico lo marque como <strong>resuelto</strong>. 
+                  Tu calificación cerrará el ticket automáticamente.
                 </p>
               </div>
             </div>

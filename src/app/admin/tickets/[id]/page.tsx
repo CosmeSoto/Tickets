@@ -22,6 +22,7 @@ import {
   ArrowLeft,
   Clock,
   User,
+  UserX,
   Tag,
   MessageSquare,
   Paperclip,
@@ -35,6 +36,7 @@ import {
   Pause,
   Lightbulb,
   BookOpen,
+  Loader2,
 } from 'lucide-react'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
 import { AutoAssignment } from '@/components/tickets/auto-assignment'
@@ -43,6 +45,17 @@ import { TicketTimeline } from '@/components/ui/ticket-timeline'
 import { TicketRatingSystem } from '@/components/ui/ticket-rating-system'
 import { TicketResolutionTracker } from '@/components/ui/ticket-resolution-tracker'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 import {
   Tooltip,
   TooltipContent,
@@ -66,46 +79,127 @@ export default function TicketDetailPage() {
   const params = useParams()
   const router = useRouter()
   const { data: session } = useSession()
-  const { getTicket, updateTicket, loading } = useTicketData()
+  const { updateTicket, loading } = useTicketData()
   const { getTechnicians } = useUserData()
   
   const [ticket, setTicket] = useState<Ticket | null>(null)
+  const [ticketLoading, setTicketLoading] = useState(false)
   const [technicians, setTechnicians] = useState<any[]>([])
   const [isEditing, setIsEditing] = useState(false)
+  const [unassigning, setUnassigning] = useState(false)
+  const [timelineRefreshKey, setTimelineRefreshKey] = useState(0)
+  const [fileRefreshKey, setFileRefreshKey] = useState(0)
   const [editForm, setEditForm] = useState({
     title: '',
     description: '',
     status: '' as Ticket['status'],
     priority: '' as Ticket['priority'],
     assigneeId: '',
-    // categoryId y clientId NO son editables - preservan la solicitud original
   })
 
   useEffect(() => {
-    // No intentar cargar ticket si la ruta es "create"
     if (params.id && params.id !== 'create') {
       loadTicket()
       loadTechnicians()
     }
   }, [params.id])
 
+  // Polling para detectar cambios de estado
+  useEffect(() => {
+    const ticketId = params.id as string
+    if (!ticketId || ticketId === 'create') return
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/tickets/${ticketId}`, { cache: 'no-store' })
+        if (!res.ok) return
+        const data = await res.json()
+        if (!data.success || !data.data) return
+        const fresh = data.data
+        setTicket(prev => {
+          if (!prev) return prev
+          if (prev.status !== fresh.status || prev.updatedAt !== fresh.updatedAt) {
+            setEditForm({
+              title: fresh.title,
+              description: fresh.description,
+              status: fresh.status,
+              priority: fresh.priority,
+              assigneeId: fresh.assignee?.id || '',
+            })
+            return fresh
+          }
+          return prev
+        })
+      } catch {}
+    }, 10000)
+    return () => clearInterval(interval)
+  }, [params.id])
+
+  // Fetch directo — independiente del hook para evitar conflictos de estado loading
   const loadTicket = async () => {
-    // Validación adicional
-    if (!params.id || params.id === 'create') {
-      return
+    if (!params.id || params.id === 'create') return
+    setTicketLoading(true)
+    try {
+      const res = await fetch(`/api/tickets/${params.id}`, { cache: 'no-store' })
+      if (!res.ok) return
+      const data = await res.json()
+      if (data.success && data.data) {
+        setTicket(data.data)
+        setEditForm({
+          title: data.data.title,
+          description: data.data.description,
+          status: data.data.status,
+          priority: data.data.priority,
+          assigneeId: data.data.assignee?.id || '',
+        })
+      }
+    } catch (err) {
+      console.error('Error cargando ticket:', err)
+    } finally {
+      setTicketLoading(false)
     }
-    
-    const ticketData = await getTicket(params.id as string)
-    if (ticketData) {
-      setTicket(ticketData)
-      setEditForm({
-        title: ticketData.title,
-        description: ticketData.description,
-        status: ticketData.status,
-        priority: ticketData.priority,
-        assigneeId: ticketData.assignee?.id || '',
-        // categoryId y clientId NO son editables
+  }
+
+  // Callback para cuando se completa una asignación automática
+  const handleAssignmentComplete = async (assignedTechnician?: { id: string; name: string; email: string }) => {
+    // Actualizar estado local inmediatamente si tenemos datos del técnico
+    if (assignedTechnician) {
+      setTicket(prev => prev ? { 
+        ...prev, 
+        assignee: { 
+          id: assignedTechnician.id, 
+          name: assignedTechnician.name, 
+          email: assignedTechnician.email, 
+          role: 'TECHNICIAN' as const,
+          isActive: true
+        },
+        status: 'IN_PROGRESS' as const
+      } : prev)
+    }
+    await loadTicket()
+    setTimelineRefreshKey(k => k + 1)
+  }
+
+  // Desasignar técnico del ticket
+  const handleUnassign = async () => {
+    if (!ticket) return
+    setUnassigning(true)
+    try {
+      const res = await fetch(`/api/tickets/${ticket.id}/assign`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assigneeId: null, comment: 'Técnico desasignado por administrador' }),
       })
+      if (res.ok) {
+        // Actualizar estado local inmediatamente para respuesta instantánea en UI
+        setTicket(prev => prev ? { ...prev, assignee: undefined, status: 'OPEN' as const } : prev)
+        // Luego recargar desde servidor para datos frescos
+        await loadTicket()
+        setTimelineRefreshKey(k => k + 1)
+      }
+    } catch (err) {
+      console.error('Error desasignando técnico:', err)
+    } finally {
+      setUnassigning(false)
     }
   }
 
@@ -117,14 +211,30 @@ export default function TicketDetailPage() {
   const handleSave = async () => {
     if (!ticket) return
 
-    const updatedTicket = await updateTicket(ticket.id, {
-      ...editForm,
-      assigneeId: editForm.assigneeId || undefined,
-    } as any)
-
-    if (updatedTicket) {
-      setIsEditing(false)
-      loadTicket()
+    try {
+      const res = await fetch(`/api/tickets/${ticket.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...editForm,
+          assigneeId: editForm.assigneeId || null,
+        }),
+      })
+      const data = await res.json()
+      if (res.ok && data.success && data.data) {
+        setTicket(data.data)
+        setEditForm({
+          title: data.data.title,
+          description: data.data.description,
+          status: data.data.status,
+          priority: data.data.priority,
+          assigneeId: data.data.assignee?.id || '',
+        })
+        setIsEditing(false)
+        setTimelineRefreshKey(k => k + 1)
+      }
+    } catch (err) {
+      console.error('Error guardando ticket:', err)
     }
   }
 
@@ -146,7 +256,7 @@ export default function TicketDetailPage() {
     return <Badge className={priorityConfig.color}>{priorityConfig.label}</Badge>
   }
 
-  if (loading) {
+  if (ticketLoading && !ticket) {
     return (
       <RoleDashboardLayout title='Cargando...' subtitle='Obteniendo información del ticket'>
         <div className='flex items-center justify-center h-64'>
@@ -235,11 +345,43 @@ export default function TicketDetailPage() {
       {getPriorityBadge(ticket.priority)}
       {session?.user?.role === 'ADMIN' && (
         <>
-          <AutoAssignment
-            ticketId={ticket.id}
-            currentAssignee={ticket.assignee}
-            onAssignmentComplete={loadTicket}
-          />
+          {ticket.assignee ? (
+            // Ya hay técnico asignado → mostrar botón "Sin asignar"
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant='outline' size='sm' disabled={unassigning}>
+                  {unassigning ? (
+                    <Loader2 className='h-4 w-4 mr-2 animate-spin' />
+                  ) : (
+                    <UserX className='h-4 w-4 mr-2' />
+                  )}
+                  <span className='hidden sm:inline'>Sin asignar</span>
+                  <span className='sm:hidden'>Desasignar</span>
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>¿Desasignar técnico?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Se removerá a <strong>{ticket.assignee.name}</strong> de este ticket y el estado volverá a "Abierto".
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleUnassign}>
+                    Confirmar
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          ) : (
+            // Sin técnico → mostrar botón de asignación automática
+            <AutoAssignment
+              ticketId={ticket.id}
+              currentAssignee={ticket.assignee}
+              onAssignmentComplete={handleAssignmentComplete}
+            />
+          )}
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -443,6 +585,8 @@ export default function TicketDetailPage() {
                 ticketId={ticket.id}
                 canAddComments={session?.user?.role === 'ADMIN' || session?.user?.role === 'TECHNICIAN'}
                 canViewInternal={session?.user?.role === 'ADMIN' || session?.user?.role === 'TECHNICIAN'}
+                refreshKey={timelineRefreshKey}
+                onCommentAdded={() => setFileRefreshKey(k => k + 1)}
               />
             </TabsContent>
             
@@ -452,6 +596,7 @@ export default function TicketDetailPage() {
                 canEdit={session?.user?.role === 'ADMIN' || 
                   (session?.user?.role === 'TECHNICIAN' && ticket.assignee?.id === session?.user?.id)}
                 mode={session?.user?.role === 'ADMIN' ? 'admin' : 'technician'}
+                onPlanChange={() => setTimelineRefreshKey(k => k + 1)}
               />
             </TabsContent>
             
@@ -463,6 +608,7 @@ export default function TicketDetailPage() {
                   (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED')}
                 showTechnicianStats={session?.user?.role === 'ADMIN'}
                 mode={session?.user?.role === 'ADMIN' ? 'admin' : 'client'}
+                onRatingSubmitted={loadTicket}
               />
             </TabsContent>
             
@@ -477,10 +623,10 @@ export default function TicketDetailPage() {
                 <CardContent>
                   <CompactFileManager
                     ticketId={ticket.id}
-                    attachments={ticket.attachments || []}
                     onUploadComplete={loadTicket}
                     disabled={ticket.status === 'CLOSED'}
                     maxFileSize={10}
+                    refreshKey={fileRefreshKey}
                   />
                 </CardContent>
               </Card>

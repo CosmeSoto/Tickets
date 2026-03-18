@@ -7,6 +7,7 @@ export interface UploadFileData {
   file: File
   ticketId: string
   uploadedBy: string
+  skipHistory?: boolean
 }
 
 export interface FileValidationResult {
@@ -59,7 +60,7 @@ export class FileService {
   }
 
   static async uploadFile(data: UploadFileData) {
-    const { file, ticketId, uploadedBy } = data
+    const { file, ticketId, uploadedBy, skipHistory = false } = data
 
     // Validar archivo
     const validation = await this.validateFile(file)
@@ -105,17 +106,19 @@ export class FileService {
         },
       })
 
-      // Crear entrada en el historial
-      await prisma.ticket_history.create({
-        data: {
-          id: randomUUID(),
-          action: 'file_uploaded',
-          comment: `Archivo subido: ${file.name}`,
-          ticketId,
-          userId: uploadedBy,
-          createdAt: new Date()
-        },
-      })
+      // Crear entrada en el historial (solo si no se indica lo contrario)
+      if (!skipHistory) {
+        await prisma.ticket_history.create({
+          data: {
+            id: randomUUID(),
+            action: 'file_uploaded',
+            comment: `Archivo subido: ${file.name}`,
+            ticketId,
+            userId: uploadedBy,
+            createdAt: new Date()
+          },
+        })
+      }
 
       return attachment
     } catch (error) {

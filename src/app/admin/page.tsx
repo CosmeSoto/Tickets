@@ -1,5 +1,6 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { UnifiedDashboardBase } from '@/components/dashboard/unified-dashboard-base'
 import { SymmetricStatsCard } from '@/components/shared/stats-card'
 import { ActionCard } from '@/components/common/action-card'
@@ -29,6 +30,7 @@ import { useUnifiedDashboard } from '@/hooks/use-unified-dashboard'
 import { useSystemStatus } from '@/hooks/use-system-status'
 
 export default function AdminDashboard() {
+  const router = useRouter()
   const {
     userName,
     isLoading: dashboardLoading,
@@ -249,7 +251,17 @@ export default function AdminDashboard() {
               <div className='space-y-4'>
                 {recentActivity && recentActivity.length > 0 ? (
                   recentActivity.map(activity => (
-                    <div key={activity.id} className='flex items-start space-x-3 p-3 rounded-lg hover:bg-muted/50 transition-colors'>
+                    <div
+                      key={activity.id}
+                      className={`flex items-start space-x-3 p-3 rounded-lg transition-colors ${
+                        activity.ticketId ? 'cursor-pointer hover:bg-muted/80' : 'hover:bg-muted/50'
+                      }`}
+                      onClick={() => {
+                        if (activity.ticketId) {
+                          router.push(`/admin/tickets/${activity.ticketId}`)
+                        }
+                      }}
+                    >
                       <div className='flex-shrink-0'>
                         {activity.type === 'ticket_created' && (
                           <div className='p-1.5 bg-blue-100 rounded-full'>

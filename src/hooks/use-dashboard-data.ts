@@ -75,6 +75,7 @@ interface RecentActivity {
   description: string
   time: string
   user: string
+  ticketId?: string
 }
 
 interface UseDashboardDataReturn {

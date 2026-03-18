@@ -241,12 +241,25 @@ export function useTicketData() {
 
   // Eliminar ticket
   const deleteTicket = useCallback(async (id: string): Promise<boolean> => {
-    const result = await handleApiCall<{ success: boolean }>(
-      () => fetch(`/api/tickets/${id}`, { method: 'DELETE' }),
-      'Ticket eliminado exitosamente'
-    )
-    return result?.success || false
-  }, [handleApiCall])
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await fetch(`/api/tickets/${id}`, { method: 'DELETE' })
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Error al eliminar el ticket')
+      }
+
+      return true
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Error desconocido'
+      setError(msg)
+      return false
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   return {
     loading,

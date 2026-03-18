@@ -135,6 +135,14 @@ export class AssignmentService {
         console.error('[AUTO-ASSIGN] Error enviando notificaciones:', err)
       })
 
+      // ⭐ Enviar emails de asignación
+      const { 
+        triggerTicketAssignedToTechnicianEmail,
+        triggerTicketAssignedToClientEmail 
+      } = await import('@/lib/email-triggers')
+      triggerTicketAssignedToTechnicianEmail(ticketId)
+      triggerTicketAssignedToClientEmail(ticketId)
+
       return {
         ticket: updatedTicket,
         assignedTechnician: bestTechnician,

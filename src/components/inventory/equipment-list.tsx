@@ -47,13 +47,15 @@ export function EquipmentList({
       // Construir query params
       const params = new URLSearchParams()
       if (filters.search) params.append('search', filters.search)
-      if (filters.type) filters.type.forEach(t => params.append('type', t))
+      if (filters.typeId) filters.typeId.forEach(t => params.append('typeId', t))
       if (filters.status) filters.status.forEach(s => params.append('status', s))
       if (filters.condition) filters.condition.forEach(c => params.append('condition', c))
       params.append('page', page.toString())
       params.append('limit', limit.toString())
 
-      const response = await fetch(`/api/inventory/equipment?${params}`)
+      const response = await fetch(`/api/inventory/equipment?${params}`, {
+        cache: 'no-store',
+      })
       
       if (!response.ok) {
         throw new Error('Error al cargar equipos')

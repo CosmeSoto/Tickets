@@ -260,7 +260,51 @@ export async function POST(
       client: session.user.name,
     })
 
-    // ⭐ NUEVO: Notificar al administrador sobre la nueva calificación
+    // Cerrar ticket automáticamente tras la calificación del cliente
+    if (ticket.status === 'RESOLVED') {
+      await prisma.tickets.update({
+        where: { id: ticketId },
+        data: {
+          status: 'CLOSED',
+          closedAt: new Date(),
+          updatedAt: new Date(),
+        },
+      })
+
+      // Registrar cierre automático en historial
+      await prisma.ticket_history.create({
+        data: {
+          id: randomUUID(),
+          action: 'status_changed',
+          field: 'status',
+          oldValue: 'RESOLVED',
+          newValue: 'CLOSED',
+          comment: 'Ticket cerrado automáticamente tras calificación del cliente',
+          ticketId,
+          userId: session.user.id,
+          createdAt: new Date(),
+        },
+      })
+
+      // Notificar al técnico que el ticket fue cerrado y puede promoverlo a artículo
+      if (ticket.assigneeId) {
+        await prisma.notifications.create({
+          data: {
+            id: randomUUID(),
+            title: 'Ticket cerrado por calificación',
+            message: `El cliente calificó y cerró el ticket: "${ticket.title}" con ${data.rating} estrellas. Ahora puedes promoverlo a artículo de conocimiento.`,
+            type: 'SUCCESS',
+            userId: ticket.assigneeId,
+            ticketId,
+            isRead: false,
+          },
+        })
+      }
+
+      console.log('[RATING] Ticket cerrado automáticamente tras calificación:', ticketId)
+    }
+
+    // Notificar al administrador sobre la nueva calificación
     const { triggerRatingToAdminEmail } = await import('@/lib/email-triggers')
     triggerRatingToAdminEmail(ticketId, data.rating)
 

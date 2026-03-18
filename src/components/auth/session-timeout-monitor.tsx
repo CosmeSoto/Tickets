@@ -21,10 +21,15 @@ export function SessionTimeoutMonitor() {
   const fetchSessionTimeout = useCallback(async () => {
     try {
       console.log('[SESSION] 🔍 Obteniendo configuración de timeout...')
-      const response = await fetch('/api/config/session-timeout')
+      const response = await fetch('/api/config/session-timeout', { cache: 'no-store' })
       if (response.ok) {
         const data = await response.json()
-        if (data.sessionTimeout) {
+        if (data.sessionTimeout && data.sessionTimeout !== sessionTimeoutMinutes.current) {
+          const oldValue = sessionTimeoutMinutes.current
+          sessionTimeoutMinutes.current = data.sessionTimeout
+          console.log(`[SESSION] ⏱️ Timeout actualizado: ${oldValue} → ${data.sessionTimeout} minutos`)
+          return true // Indica que cambió
+        } else if (data.sessionTimeout) {
           sessionTimeoutMinutes.current = data.sessionTimeout
           console.log(`[SESSION] ⏱️ Timeout configurado: ${data.sessionTimeout} minutos`)
         }
@@ -32,6 +37,7 @@ export function SessionTimeoutMonitor() {
     } catch (error) {
       console.error('[SESSION] Error obteniendo timeout:', error)
     }
+    return false
   }, [])
 
   const handleAutoLogout = useCallback(async () => {
@@ -119,6 +125,24 @@ export function SessionTimeoutMonitor() {
         // Iniciar timer de inactividad
         resetInactivityTimer()
       })
+
+      // Re-verificar configuración cada 2 minutos por si el admin la cambió
+      const configInterval = setInterval(async () => {
+        const changed = await fetchSessionTimeout()
+        if (changed) {
+          resetInactivityTimer()
+        }
+      }, 2 * 60 * 1000)
+
+      return () => {
+        clearInterval(configInterval)
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current)
+        }
+        if (warningTimeoutRef.current) {
+          clearTimeout(warningTimeoutRef.current)
+        }
+      }
     } else {
       console.log('[SESSION] ⏸️ No hay sesión activa, monitoreo pausado')
     }
@@ -149,22 +173,32 @@ export function SessionTimeoutMonitor() {
       }, 1000) // Throttle de 1 segundo
     }
 
+    // Re-leer configuración cuando el admin guarda settings
+    const handleSettingsUpdated = () => {
+      console.log('[SESSION] 🔄 Configuración actualizada, re-leyendo timeout...')
+      fetchSessionTimeout().then((changed) => {
+        if (changed) resetInactivityTimer()
+      })
+    }
+
     // Escuchar eventos de actividad del usuario
     window.addEventListener('click', handleActivity)
     window.addEventListener('keypress', handleActivity)
     window.addEventListener('scroll', handleActivity)
     window.addEventListener('mousemove', handleActivity)
+    window.addEventListener('settings-updated', handleSettingsUpdated)
 
     return () => {
       window.removeEventListener('click', handleActivity)
       window.removeEventListener('keypress', handleActivity)
       window.removeEventListener('scroll', handleActivity)
       window.removeEventListener('mousemove', handleActivity)
+      window.removeEventListener('settings-updated', handleSettingsUpdated)
       if (throttleTimeout) {
         clearTimeout(throttleTimeout)
       }
     }
-  }, [status, resetInactivityTimer])
+  }, [status, resetInactivityTimer, fetchSessionTimeout])
 
   // Este componente no renderiza nada
   return null

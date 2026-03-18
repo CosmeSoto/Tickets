@@ -10,6 +10,7 @@ export function EquipmentFormWrapper() {
     <EquipmentForm
       onSuccess={() => {
         router.push('/inventory')
+        router.refresh()
       }}
       onCancel={() => {
         router.back()

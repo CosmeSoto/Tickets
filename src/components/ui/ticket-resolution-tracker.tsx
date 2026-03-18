@@ -98,11 +98,15 @@ interface ResolutionPlan {
 interface TicketResolutionTrackerProps {
   ticketId: string
   canEdit?: boolean
+  mode?: 'admin' | 'technician' | 'client'
+  onPlanChange?: () => void
 }
 
 export function TicketResolutionTracker({ 
   ticketId, 
-  canEdit = false
+  canEdit = false,
+  mode,
+  onPlanChange
 }: TicketResolutionTrackerProps) {
   const { toast } = useToast()
   const [plan, setPlan] = useState<ResolutionPlan | null>(null)
@@ -135,7 +139,7 @@ export function TicketResolutionTracker({
     loadResolutionPlan()
   }, [ticketId])
 
-  const loadResolutionPlan = async () => {
+  const loadResolutionPlan = async (notifyChange = false) => {
     try {
       setLoading(true)
       const response = await fetch(`/api/tickets/${ticketId}/resolution-plan`)
@@ -144,6 +148,7 @@ export function TicketResolutionTracker({
         const data = await response.json()
         if (data.success && data.data) {
           setPlan(data.data)
+          if (notifyChange) onPlanChange?.()
         }
       }
     } catch (err) {
@@ -217,8 +222,8 @@ export function TicketResolutionTracker({
 
       const data = await response.json()
       if (data.success) {
-        // Recargar el plan completo desde el servidor
-        await loadResolutionPlan()
+        // Recargar el plan completo desde el servidor y notificar cambio al timeline
+        await loadResolutionPlan(true)
         
         setShowCreatePlan(false)
         setPlanForm({
@@ -301,7 +306,7 @@ export function TicketResolutionTracker({
 
       const data = await response.json()
       if (data.success) {
-        loadResolutionPlan()
+        loadResolutionPlan(true)
         const taskTitle = newTask.title
         setNewTask({
           title: '',
@@ -346,7 +351,7 @@ export function TicketResolutionTracker({
 
       const data = await response.json()
       if (data.success) {
-        loadResolutionPlan()
+        loadResolutionPlan(true)
         
         // Toast informativo según el estado con título de tarea
         const messages = {
@@ -399,7 +404,7 @@ export function TicketResolutionTracker({
 
       const data = await response.json()
       if (data.success) {
-        loadResolutionPlan()
+        loadResolutionPlan(true)
         setTaskToDelete(null)
         toast({
           title: "Tarea eliminada",
@@ -620,7 +625,7 @@ export function TicketResolutionTracker({
 
       const data = await response.json()
       if (data.success) {
-        await loadResolutionPlan()
+        await loadResolutionPlan(true)
         setShowEditPlan(false)
         toast({
           title: "Plan actualizado",
@@ -651,6 +656,7 @@ export function TicketResolutionTracker({
       if (data.success) {
         setPlan(null)
         setShowDeletePlan(false)
+        onPlanChange?.()
         toast({
           title: "Plan eliminado",
           description: "El plan de resolución ha sido eliminado permanentemente"
@@ -683,7 +689,7 @@ export function TicketResolutionTracker({
 
       const data = await response.json()
       if (data.success) {
-        await loadResolutionPlan()
+        await loadResolutionPlan(true)
         toast({
           title: "Plan activado",
           description: "El plan de resolución está ahora activo"
@@ -717,7 +723,7 @@ export function TicketResolutionTracker({
 
       const data = await response.json()
       if (data.success) {
-        await loadResolutionPlan()
+        await loadResolutionPlan(true)
         toast({
           title: "Plan completado",
           description: "El plan de resolución ha sido marcado como completado exitosamente"

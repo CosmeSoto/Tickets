@@ -1,6 +1,9 @@
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
+  // Excluir pdfkit/fontkit del bundling de Turbopack (incompatibilidad con @swc/helpers)
+  serverExternalPackages: ['pdfkit', 'fontkit'],
+
   // Performance optimizations
   experimental: {
     optimizeCss: true,

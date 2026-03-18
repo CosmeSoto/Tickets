@@ -1,74 +1,148 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import prisma from '@/lib/prisma'
+import { randomUUID } from 'crypto'
+
+// Transiciones válidas por rol
+const TRANSITIONS: Record<string, Record<string, string[]>> = {
+  TECHNICIAN: {
+    OPEN:        ['IN_PROGRESS'],
+    IN_PROGRESS: ['RESOLVED', 'ON_HOLD'],
+    ON_HOLD:     ['IN_PROGRESS'],
+    RESOLVED:    ['IN_PROGRESS'], // puede reabrir
+    CLOSED:      [],              // solo lectura
+  },
+  ADMIN: {
+    OPEN:        ['IN_PROGRESS', 'RESOLVED', 'CLOSED', 'ON_HOLD'],
+    IN_PROGRESS: ['OPEN', 'RESOLVED', 'CLOSED', 'ON_HOLD'],
+    ON_HOLD:     ['OPEN', 'IN_PROGRESS', 'RESOLVED'],
+    RESOLVED:    ['IN_PROGRESS', 'CLOSED'],
+    CLOSED:      ['RESOLVED'],
+  },
+}
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: ticketId } = await params
-    const statusData = await request.json()
+    const session = await getServerSession(authOptions)
+    if (!session) {
+      return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
+    }
 
-    // Validaciones
+    const { id: ticketId } = await params
+    const body = await request.json()
+    const { status: newStatus, comment } = body
+
     const validStatuses = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'ON_HOLD']
-    if (!statusData.status || !validStatuses.includes(statusData.status)) {
+    if (!newStatus || !validStatuses.includes(newStatus)) {
+      return NextResponse.json(
+        { success: false, message: 'Estado inválido' },
+        { status: 400 }
+      )
+    }
+
+    // Obtener ticket actual
+    const ticket = await prisma.tickets.findUnique({
+      where: { id: ticketId },
+      select: { id: true, status: true, assigneeId: true, clientId: true, title: true },
+    })
+
+    if (!ticket) {
+      return NextResponse.json({ success: false, message: 'Ticket no encontrado' }, { status: 404 })
+    }
+
+    const role = session.user.role
+    const currentStatus = ticket.status
+
+    // Verificar permisos de transición
+    if (role === 'CLIENT') {
+      return NextResponse.json(
+        { success: false, message: 'Los clientes no pueden cambiar el estado del ticket' },
+        { status: 403 }
+      )
+    }
+
+    const allowed = TRANSITIONS[role]?.[currentStatus] ?? []
+    if (!allowed.includes(newStatus)) {
       return NextResponse.json(
         {
           success: false,
-          message: 'Estado de ticket inválido. Debe ser uno de: ' + validStatuses.join(', ')
+          message: `Transición no permitida: ${currentStatus} → ${newStatus}`,
         },
         { status: 400 }
       )
     }
 
-    // Simular delay de red
-    await new Promise(resolve => setTimeout(resolve, 300))
-
-    // En producción, actualizar estado en base de datos y crear entrada en timeline
-    const updatedTicket = {
-      id: ticketId,
-      status: statusData.status,
-      updatedAt: new Date().toISOString(),
-      // Si se resuelve, agregar timestamp correspondiente
-      ...(statusData.status === 'RESOLVED' && { resolvedAt: new Date().toISOString() })
+    // Construir datos de actualización
+    const updateData: any = {
+      status: newStatus,
+      updatedAt: new Date(),
     }
+    if (newStatus === 'RESOLVED') updateData.resolvedAt = new Date()
+    if (newStatus === 'CLOSED')   updateData.closedAt   = new Date()
 
-    // También crear entrada en timeline
-    const timelineEntry = {
-      id: `timeline_${Date.now()}`,
-      ticketId,
-      type: 'status_change',
-      title: 'Estado actualizado',
-      description: statusData.comment || `Estado cambiado a ${statusData.status}`,
-      user: {
-        id: 'current_user',
-        name: 'Usuario Actual',
-        email: 'usuario@soporte.com',
-        role: 'TECHNICIAN'
+    // Actualizar ticket en BD
+    const updatedTicket = await prisma.tickets.update({
+      where: { id: ticketId },
+      data: updateData,
+      include: {
+        categories: { select: { id: true, name: true, color: true } },
+        users_tickets_clientIdTousers: { select: { id: true, name: true, email: true } },
+        users_tickets_assigneeIdTousers: { select: { id: true, name: true, email: true } },
       },
-      metadata: {
-        oldValue: 'PREVIOUS_STATUS', // En producción, obtener el estado anterior
-        newValue: statusData.status
+    })
+
+    // Registrar en historial
+    await prisma.ticket_history.create({
+      data: {
+        id: randomUUID(),
+        ticketId,
+        userId: session.user.id,
+        action: 'status_changed',
+        field: 'status',
+        oldValue: currentStatus,
+        newValue: newStatus,
+        comment: comment || null,
+        createdAt: new Date(),
       },
-      createdAt: new Date().toISOString(),
-      isInternal: false
+    })
+
+    // Notificar al cliente cuando el técnico marca como RESOLVED
+    if (newStatus === 'RESOLVED' && ticket.clientId) {
+      await prisma.notifications.create({
+        data: {
+          id: randomUUID(),
+          title: 'Tu ticket ha sido resuelto',
+          message: `El técnico ha marcado el ticket "${ticket.title}" como resuelto. Por favor califica el servicio para cerrarlo.`,
+          type: 'SUCCESS',
+          userId: ticket.clientId,
+          ticketId,
+          isRead: false,
+        },
+      }).catch(() => {}) // no fallar si notificación falla
     }
 
     return NextResponse.json({
       success: true,
       data: {
-        ticket: updatedTicket,
-        timelineEntry
+        id: updatedTicket.id,
+        status: updatedTicket.status,
+        updatedAt: updatedTicket.updatedAt.toISOString(),
+        resolvedAt: updatedTicket.resolvedAt?.toISOString() ?? null,
+        closedAt: updatedTicket.closedAt?.toISOString() ?? null,
+        category: updatedTicket.categories,
+        client: updatedTicket.users_tickets_clientIdTousers,
+        assignee: updatedTicket.users_tickets_assigneeIdTousers,
       },
-      message: 'Estado del ticket actualizado exitosamente'
+      message: `Estado actualizado a ${newStatus}`,
     })
   } catch (error) {
-    console.error('Error in status PATCH API:', error)
+    console.error('[STATUS] Error:', error)
     return NextResponse.json(
-      {
-        success: false,
-        message: 'Error al actualizar el estado del ticket',
-        error: error instanceof Error ? error.message : 'Error desconocido'
-      },
+      { success: false, message: 'Error al actualizar estado' },
       { status: 500 }
     )
   }

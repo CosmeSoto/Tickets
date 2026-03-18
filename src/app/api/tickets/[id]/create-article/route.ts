@@ -87,10 +87,10 @@ export async function POST(
       )
     }
 
-    // Verificar que el ticket esté resuelto
-    if (ticket.status !== 'RESOLVED') {
+    // Verificar que el ticket esté resuelto o cerrado
+    if (ticket.status !== 'RESOLVED' && ticket.status !== 'CLOSED') {
       return NextResponse.json(
-        { error: 'Solo se pueden crear artículos desde tickets resueltos' },
+        { error: 'Solo se pueden crear artículos desde tickets resueltos o cerrados' },
         { status: 400 }
       )
     }
@@ -331,10 +331,10 @@ export async function GET(
       )
     }
 
-    // Verificar que el ticket esté resuelto
-    if (ticket.status !== 'RESOLVED') {
+    // Verificar que el ticket esté resuelto o cerrado
+    if (ticket.status !== 'RESOLVED' && ticket.status !== 'CLOSED') {
       return NextResponse.json(
-        { error: 'Solo se pueden crear artículos desde tickets resueltos' },
+        { error: 'Solo se pueden crear artículos desde tickets resueltos o cerrados' },
         { status: 400 }
       )
     }

@@ -1,5 +1,6 @@
 'use client'
 
+import { use } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useEffect } from 'react'
@@ -7,12 +8,11 @@ import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
 import { EquipmentDetail } from '@/components/inventory/equipment-detail'
 
 interface EquipmentDetailPageProps {
-  params: {
-    id: string
-  }
+  params: Promise<{ id: string }>
 }
 
 export default function EquipmentDetailPage({ params }: EquipmentDetailPageProps) {
+  const { id } = use(params)
   const { data: session, status } = useSession()
   const router = useRouter()
 
@@ -42,7 +42,7 @@ export default function EquipmentDetailPage({ params }: EquipmentDetailPageProps
       subtitle="Información completa del equipo"
     >
       <EquipmentDetail 
-        equipmentId={params.id} 
+        equipmentId={id} 
         userRole={session.user.role}
         userId={session.user.id}
       />

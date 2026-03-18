@@ -117,7 +117,7 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
       serialNumber: equipment.serialNumber,
       brand: equipment.brand,
       model: equipment.model,
-      type: equipment.type,
+      typeId: equipment.typeId,
       status: equipment.status,
       condition: equipment.condition,
       ownershipType: equipment.ownershipType,
@@ -222,7 +222,15 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <form onSubmit={handleSubmit(onSubmit, (validationErrors) => {
+      console.error('Errores de validación:', validationErrors)
+      const firstError = Object.values(validationErrors)[0]
+      toast({
+        title: 'Error de validación',
+        description: firstError?.message as string || 'Revisa los campos del formulario',
+        variant: 'destructive',
+      })
+    })} className="space-y-6">
       {/* Información Básica */}
       <Card>
         <CardHeader>
@@ -306,8 +314,8 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
                         value: type.id,
                         label: type.name,
                       }))}
-                      value={watch('type') || ''}
-                      onValueChange={(value) => setValue('type', value as any, { shouldValidate: true })}
+                      value={watch('typeId') || ''}
+                      onValueChange={(value) => setValue('typeId', value as any, { shouldValidate: true })}
                       placeholder="Buscar tipo de equipo..."
                       searchPlaceholder="Escriba para buscar..."
                       emptyText="No se encontró el tipo"
@@ -326,8 +334,8 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
                   </Link>
                 </div>
               )}
-              {errors.type && (
-                <p className="text-sm text-destructive">{errors.type.message}</p>
+              {errors.typeId && (
+                <p className="text-sm text-destructive">{errors.typeId.message}</p>
               )}
             </div>
 

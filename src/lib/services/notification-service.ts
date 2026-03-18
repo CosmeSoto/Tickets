@@ -21,7 +21,7 @@ export class NotificationService {
     specificType?: 'ticketCreated' | 'ticketAssigned' | 'statusChanged' | 'newComments' | 'ticketUpdates'
   ): Promise<boolean> {
     try {
-      const prefs = await prisma.user_preferences.findUnique({
+      const prefs = await prisma.user_settings.findUnique({
         where: { userId },
         select: {
           emailNotifications: true,
@@ -30,14 +30,38 @@ export class NotificationService {
           ticketAssigned: true,
           statusChanged: true,
           newComments: true,
-          ticketUpdates: true,
+          ticketUpdated: true,
           quietHoursEnabled: true,
           quietHoursStart: true,
           quietHoursEnd: true,
         }
       })
 
-      if (!prefs) return true // Si no hay preferencias, enviar por defecto
+      // Si no hay preferencias, crear defaults y enviar
+      if (!prefs) {
+        console.log(`[NOTIFICATION] No settings for user ${userId}, sending by default`)
+        // Crear settings por defecto en background (no bloquear)
+        prisma.user_settings.create({
+          data: {
+            id: randomUUID(),
+            userId,
+            emailNotifications: true,
+            pushNotifications: true,
+            ticketCreated: true,
+            ticketAssigned: true,
+            statusChanged: true,
+            newComments: true,
+            ticketUpdated: true,
+            updatedAt: new Date(),
+          }
+        }).catch(err => {
+          // Ignorar error si ya existe (race condition)
+          if (!err.message?.includes('Unique constraint')) {
+            console.error('[NOTIFICATION] Error creating default settings:', err)
+          }
+        })
+        return true
+      }
 
       // Verificar horarios silenciosos
       if (prefs.quietHoursEnabled && prefs.quietHoursStart && prefs.quietHoursEnd) {
@@ -99,8 +123,8 @@ export class NotificationService {
             }
             break
           case 'ticketUpdates':
-            if (!prefs.ticketUpdates) {
-              console.log(`[NOTIFICATION] User ${userId} has ticketUpdates notifications disabled`)
+            if (!prefs.ticketUpdated) {
+              console.log(`[NOTIFICATION] User ${userId} has ticketUpdated notifications disabled`)
               return false
             }
             break
@@ -123,7 +147,7 @@ export class NotificationService {
       const shouldSend = await this.shouldNotify(data.userId, 'push', data.specificType)
       
       if (!shouldSend) {
-        console.log(`[NOTIFICATION] Skipping push notification for user ${data.userId}`)
+        console.log(`[NOTIFICATION] Skipping push notification for user ${data.userId} (type: ${data.specificType})`)
         return null
       }
 
@@ -261,7 +285,29 @@ export class NotificationService {
             link: `/technician/tickets/${ticket.id}`,
           },
         })
-        if (techNotification) notifications.push(techNotification)
+        if (techNotification) {
+          notifications.push(techNotification)
+        } else {
+          console.log(`[NOTIFICATION] ⚠️ Notificación para técnico no creada (shouldNotify=false)`)
+        }
+      } else {
+        // Fallback: usar technicianId directamente si el include no cargó el técnico
+        const techNotification = await this.createNotification({
+          userId: technicianId,
+          type: 'INFO',
+          title: 'Nuevo ticket asignado',
+          message: `Se te ha asignado el ticket "${ticket.title}"`,
+          ticketId: ticket.id,
+          specificType: 'ticketAssigned',
+          metadata: {
+            priority: ticket.priority,
+            clientName: ticket.users_tickets_clientIdTousers.name,
+            link: `/technician/tickets/${ticket.id}`,
+          },
+        })
+        if (techNotification) {
+          notifications.push(techNotification)
+        }
       }
 
       // Notificar al cliente
@@ -381,12 +427,12 @@ export class NotificationService {
         throw new Error('Ticket not found')
       }
 
-      // Notificar al cliente
+      // Notificar al cliente con call-to-action para calificar
       const notification = await this.createNotification({
         userId: ticket.clientId,
         type: 'SUCCESS',
-        title: 'Ticket resuelto',
-        message: `Tu ticket "${ticket.title}" ha sido marcado como resuelto`,
+        title: 'Ticket resuelto - Califica el servicio',
+        message: `Tu ticket "${ticket.title}" ha sido resuelto. Por favor califica el servicio recibido para cerrar el ticket.`,
         ticketId: ticket.id,
         specificType: 'statusChanged',
       })

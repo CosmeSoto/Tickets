@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -31,11 +31,16 @@ interface FilePreviewModalProps {
 export function FilePreviewModal({ isOpen, onClose, file }: FilePreviewModalProps) {
   const [imageError, setImageError] = useState(false)
 
+  // Resetear error al cambiar de archivo
+  useEffect(() => {
+    setImageError(false)
+  }, [file?.id])
+
   if (!file) return null
 
-  const isImage = file.mimeType.startsWith('image/')
+  const isImage = (file.mimeType || '').startsWith('image/')
   const isPDF = file.mimeType === 'application/pdf'
-  const isText = file.mimeType.startsWith('text/')
+  const isText = (file.mimeType || '').startsWith('text/')
   
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`

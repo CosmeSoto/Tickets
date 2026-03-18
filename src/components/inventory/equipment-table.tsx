@@ -161,12 +161,6 @@ export function EquipmentTable({
                         Ver código QR
                       </DropdownMenuItem>
                     )}
-                    {canEdit && onEdit && (
-                      <DropdownMenuItem onClick={() => onEdit(item)}>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Editar
-                      </DropdownMenuItem>
-                    )}
                     {canDelete && onDelete && item.status !== 'RETIRED' && (
                       <>
                         <DropdownMenuSeparator />

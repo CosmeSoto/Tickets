@@ -70,7 +70,8 @@ export default function AdminUsersPage() {
     setFilters,
     refresh,
     goToPage,
-    toggleUserStatus
+    toggleUserStatus,
+    removeUserLocally
   } = useUsers({
     pageSize: 20,
     enableCache: true
@@ -246,6 +247,9 @@ export default function AdminUsersPage() {
         })
         setDeleteDialogOpen(false)
         setDeletingUser(null)
+        // Eliminar inmediatamente del estado local sin esperar el fetch
+        removeUserLocally(deletingUser.id)
+        // Recargar en background para sincronizar
         refresh()
       } else {
         toast({

@@ -1,41 +1,24 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
 
-// Tipos básicos para el hook
 export interface NotificationData {
   id: string
-  type: 'TICKET_CREATED' | 'TICKET_ASSIGNED' | 'TICKET_STATUS_CHANGED' | 'COMMENT_ADDED' | 'TICKET_UPDATED'
+  type: 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR'
   title: string
   message: string
-  data: {
-    ticketId?: string
-    userId?: string
-    priority?: string
-    status?: string
-    [key: string]: any
-  }
-  read: boolean
+  isRead: boolean
+  ticketId?: string | null
+  metadata?: Record<string, any>
   createdAt: string
-  userId: string
-}
-
-export interface NotificationPreferences {
-  emailNotifications: boolean
-  pushNotifications: boolean
-  soundEnabled: boolean
-  ticketCreated: boolean
-  ticketAssigned: boolean
-  statusChanged: boolean
-  newComments: boolean
-  ticketUpdated: boolean
-  quietHours: {
-    enabled: boolean
-    startTime: string
-    endTime: string
-  }
+  tickets?: {
+    id: string
+    title: string
+    status: string
+  } | null
 }
 
 interface UseNotificationsOptions {
@@ -44,355 +27,220 @@ interface UseNotificationsOptions {
 }
 
 export function useNotifications(options: UseNotificationsOptions = {}) {
-  const {
-    autoLoad = true,
-    refreshInterval = 2 * 60 * 1000, // 2 minutos por defecto
-  } = options
+  const { autoLoad = true, refreshInterval = 15 * 1000 } = options
 
-  // Estados principales
   const [notifications, setNotifications] = useState<NotificationData[]>([])
-  const [preferences, setPreferences] = useState<NotificationPreferences>({
-    emailNotifications: true,
-    pushNotifications: true,
-    soundEnabled: true,
-    ticketCreated: true,
-    ticketAssigned: true,
-    statusChanged: true,
-    newComments: true,
-    ticketUpdated: true,
-    quietHours: {
-      enabled: false,
-      startTime: '22:00',
-      endTime: '08:00',
-    },
-  })
   const [loading, setLoading] = useState(false)
-  const [loadingPreferences, setLoadingPreferences] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  
-  // Estados de filtros
+  const [filterRead, setFilterRead] = useState<'all' | 'unread' | 'read'>('all')
   const [filterType, setFilterType] = useState<string>('all')
-  const [filterRead, setFilterRead] = useState<string>('all')
   const [searchTerm, setSearchTerm] = useState('')
-  
-  // Estados de UI
-  const [showPreferences, setShowPreferences] = useState(false)
+
+  // Refs para evitar que el polling pise cambios optimistas
+  const deletedIds = useRef<Set<string>>(new Set())
+  const readIds = useRef<Set<string>>(new Set())
+  const pendingOps = useRef(0) // contador de operaciones en vuelo
 
   const { data: session } = useSession()
   const { toast } = useToast()
+  const router = useRouter()
 
-  // Función para cargar notificaciones
-  const loadNotifications = useCallback(async () => {
+  // Cargar notificaciones — respeta los cambios optimistas locales
+  const loadNotifications = useCallback(async (force = false) => {
     if (!session?.user?.id) return
+    // Si hay operaciones en vuelo y no es forzado, no recargar
+    if (!force && pendingOps.current > 0) return
 
     setLoading(true)
     setError(null)
-    
     try {
-      const response = await fetch('/api/notifications', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
+      const res = await fetch('/api/notifications?limit=50', {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' },
       })
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
-      }
-      
-      const data = await response.json()
-      
-      if (data.success && Array.isArray(data.data)) {
-        // Ordenar por fecha (más recientes primero)
-        const sortedNotifications = data.data.sort((a: NotificationData, b: NotificationData) => 
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        )
-        
-        setNotifications(sortedNotifications)
-      } else {
-        throw new Error('Formato de respuesta inválido')
-      }
-      
-    } catch (error) {
-      console.error('[NOTIFICATIONS] Error loading:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Error desconocido'
-      setError(errorMessage)
-      
-      toast({
-        title: 'Error al cargar notificaciones',
-        description: `No se pudieron cargar las notificaciones: ${errorMessage}`,
-        variant: 'destructive',
-      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      const arr: NotificationData[] = Array.isArray(data) ? data : []
+
+      setNotifications(
+        arr
+          // Filtrar las que el usuario ya eliminó localmente
+          .filter(n => !deletedIds.current.has(n.id))
+          // Aplicar estado de lectura local
+          .map(n => readIds.current.has(n.id) ? { ...n, isRead: true } : n)
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error desconocido')
     } finally {
       setLoading(false)
     }
-  }, [session?.user?.id, toast])
+  }, [session?.user?.id])
 
-  // Función para marcar como leída
-  const markAsRead = useCallback(async (notificationId: string) => {
+  // Marcar una como leída
+  const markAsRead = useCallback(async (id: string) => {
+    // Optimistic update inmediato
+    readIds.current.add(id)
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n))
+
+    pendingOps.current++
     try {
-      const response = await fetch(`/api/notifications/${notificationId}/read`, {
-        method: 'PUT',
-        credentials: 'include',
-      })
-      
-      if (response.ok) {
-        setNotifications(prev => 
-          prev.map(notification => 
-            notification.id === notificationId 
-              ? { ...notification, read: true }
-              : notification
-          )
-        )
+      const res = await fetch(`/api/notifications/${id}/read`, { method: 'PATCH' })
+      if (!res.ok) {
+        // Revertir si falla
+        readIds.current.delete(id)
+        setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: false } : n))
       }
-      
-    } catch (error) {
-      console.error('[NOTIFICATIONS] Error marking as read:', error)
+    } catch {
+      readIds.current.delete(id)
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: false } : n))
+    } finally {
+      pendingOps.current--
     }
   }, [])
 
-  // Función para marcar todas como leídas
+  // Marcar todas como leídas
   const markAllAsRead = useCallback(async () => {
-    try {
-      const response = await fetch('/api/notifications/mark-all-read', {
-        method: 'PUT',
-        credentials: 'include',
-      })
-      
-      if (response.ok) {
-        setNotifications(prev => 
-          prev.map(notification => ({ ...notification, read: true }))
-        )
-        
-        toast({
-          title: 'Notificaciones marcadas',
-          description: 'Todas las notificaciones han sido marcadas como leídas',
-        })
-      }
-      
-    } catch (error) {
-      console.error('[NOTIFICATIONS] Error marking all as read:', error)
-      toast({
-        title: 'Error',
-        description: 'No se pudieron marcar las notificaciones como leídas',
-        variant: 'destructive',
-      })
-    }
-  }, [toast])
+    // Optimistic update inmediato
+    setNotifications(prev => {
+      prev.forEach(n => readIds.current.add(n.id))
+      return prev.map(n => ({ ...n, isRead: true }))
+    })
 
-  // Función para eliminar notificación
-  const deleteNotification = useCallback(async (notificationId: string) => {
+    pendingOps.current++
     try {
-      const response = await fetch(`/api/notifications/${notificationId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      })
-      
-      if (response.ok) {
-        setNotifications(prev => 
-          prev.filter(notification => notification.id !== notificationId)
-        )
-        
-        toast({
-          title: 'Notificación eliminada',
-          description: 'La notificación ha sido eliminada',
-        })
+      const res = await fetch('/api/notifications/read-all', { method: 'PATCH' })
+      if (res.ok) {
+        toast({ title: 'Todas marcadas como leídas' })
+      } else {
+        // Revertir
+        readIds.current.clear()
+        await loadNotifications(true)
+        toast({ title: 'Error al marcar', variant: 'destructive' })
       }
-      
-    } catch (error) {
-      console.error('[NOTIFICATIONS] Error deleting:', error)
-      toast({
-        title: 'Error',
-        description: 'No se pudo eliminar la notificación',
-        variant: 'destructive',
-      })
+    } catch {
+      readIds.current.clear()
+      await loadNotifications(true)
+      toast({ title: 'Error al marcar', variant: 'destructive' })
+    } finally {
+      pendingOps.current--
     }
-  }, [toast])
+  }, [toast, loadNotifications])
 
-  // Función para limpiar todas las notificaciones
+  // Eliminar una notificación
+  const deleteNotification = useCallback(async (id: string) => {
+    // Optimistic update inmediato
+    deletedIds.current.add(id)
+    setNotifications(prev => prev.filter(n => n.id !== id))
+
+    pendingOps.current++
+    try {
+      const res = await fetch(`/api/notifications/${id}`, { method: 'DELETE' })
+      if (!res.ok && res.status !== 404 && res.status !== 403) {
+        // Revertir solo si es un error real del servidor (no 404 ni 403)
+        // 404 = ya no existe (éxito silencioso)
+        // 403 = no pertenece al usuario — mantener fuera de la UI igualmente
+        deletedIds.current.delete(id)
+        await loadNotifications(true)
+        toast({ title: 'Error al eliminar', variant: 'destructive' })
+      }
+    } catch {
+      deletedIds.current.delete(id)
+      await loadNotifications(true)
+      toast({ title: 'Error al eliminar', variant: 'destructive' })
+    } finally {
+      pendingOps.current--
+    }
+  }, [toast, loadNotifications])
+
+  // Eliminar todas
   const clearAllNotifications = useCallback(async () => {
+    // Capturar IDs actuales antes de limpiar
+    const currentIds = notifications.map(n => n.id)
+
+    // Optimistic update inmediato
+    currentIds.forEach(id => deletedIds.current.add(id))
+    setNotifications([])
+
+    pendingOps.current++
     try {
-      const response = await fetch('/api/notifications/clear-all', {
-        method: 'DELETE',
-        credentials: 'include',
-      })
-      
-      if (response.ok) {
-        setNotifications([])
-        
-        toast({
-          title: 'Notificaciones eliminadas',
-          description: 'Todas las notificaciones han sido eliminadas',
-        })
-      }
-      
-    } catch (error) {
-      console.error('[NOTIFICATIONS] Error clearing all:', error)
-      toast({
-        title: 'Error',
-        description: 'No se pudieron eliminar las notificaciones',
-        variant: 'destructive',
-      })
+      await Promise.all(currentIds.map(id =>
+        fetch(`/api/notifications/${id}`, { method: 'DELETE' }).catch(() => {})
+      ))
+      toast({ title: 'Notificaciones eliminadas' })
+    } catch {
+      // Si falla, recargar desde servidor
+      currentIds.forEach(id => deletedIds.current.delete(id))
+      await loadNotifications(true)
+      toast({ title: 'Error al eliminar', variant: 'destructive' })
+    } finally {
+      pendingOps.current--
     }
-  }, [toast])
+  }, [notifications, toast, loadNotifications])
+
+  // Navegar al ticket relacionado
+  const navigateToTicket = useCallback((notification: NotificationData) => {
+    if (!notification.ticketId) return
+    const role = session?.user?.role?.toLowerCase() || 'client'
+    const link = notification.metadata?.link || `/${role}/tickets/${notification.ticketId}`
+    markAsRead(notification.id)
+    router.push(link)
+  }, [session?.user?.role, markAsRead, router])
 
   // Notificaciones filtradas
   const filteredNotifications = useMemo(() => {
-    return notifications.filter(notification => {
-      const matchesType = filterType === 'all' || notification.type === filterType
-      const matchesRead = filterRead === 'all' || 
-        (filterRead === 'read' && notification.read) ||
-        (filterRead === 'unread' && !notification.read)
-      const matchesSearch = !searchTerm || 
-        notification.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        notification.message.toLowerCase().includes(searchTerm.toLowerCase())
-      
-      return matchesType && matchesRead && matchesSearch
+    return notifications.filter(n => {
+      const matchRead =
+        filterRead === 'all' ||
+        (filterRead === 'unread' && !n.isRead) ||
+        (filterRead === 'read' && n.isRead)
+      const matchType = filterType === 'all' || n.type === filterType
+      const matchSearch =
+        !searchTerm ||
+        n.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        n.message.toLowerCase().includes(searchTerm.toLowerCase())
+      return matchRead && matchType && matchSearch
     })
-  }, [notifications, filterType, filterRead, searchTerm])
+  }, [notifications, filterRead, filterType, searchTerm])
 
-  // Función para cargar preferencias
-  const loadPreferences = useCallback(async () => {
-    if (!session?.user?.id) return
-
-    setLoadingPreferences(true)
-    
-    try {
-      const response = await fetch('/api/notifications/preferences', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-      })
-      
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success) {
-          setPreferences(data.data)
-        }
-      }
-      
-    } catch (error) {
-      console.error('[NOTIFICATIONS] Error loading preferences:', error)
-    } finally {
-      setLoadingPreferences(false)
-    }
-  }, [session?.user?.id])
-
-  // Función para guardar preferencias
-  const savePreferences = useCallback(async (newPreferences: Partial<NotificationPreferences>) => {
-    if (!session?.user?.id) return
-
-    setLoadingPreferences(true)
-    
-    try {
-      const updatedPreferences = { ...preferences, ...newPreferences }
-      
-      const response = await fetch('/api/notifications/preferences', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updatedPreferences),
-        credentials: 'include',
-      })
-      
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success) {
-          setPreferences(updatedPreferences)
-          
-          toast({
-            title: 'Preferencias guardadas',
-            description: 'Tus preferencias de notificaciones han sido actualizadas',
-          })
-        }
-      } else {
-        throw new Error('Error al guardar preferencias')
-      }
-      
-    } catch (error) {
-      console.error('[NOTIFICATIONS] Error saving preferences:', error)
-      toast({
-        title: 'Error',
-        description: 'No se pudieron guardar las preferencias',
-        variant: 'destructive',
-      })
-    } finally {
-      setLoadingPreferences(false)
-    }
-  }, [session?.user?.id, preferences, toast])
-
-  // Estadísticas básicas
   const stats = useMemo(() => ({
     total: notifications.length,
-    unread: notifications.filter(n => !n.read).length,
-    read: notifications.filter(n => n.read).length,
+    unread: notifications.filter(n => !n.isRead).length,
+    read: notifications.filter(n => n.isRead).length,
     filtered: filteredNotifications.length,
-    hasActiveFilters: filterType !== 'all' || filterRead !== 'all' || searchTerm !== '',
-    byType: {
-      TICKET_CREATED: notifications.filter(n => n.type === 'TICKET_CREATED').length,
-      TICKET_ASSIGNED: notifications.filter(n => n.type === 'TICKET_ASSIGNED').length,
-      TICKET_STATUS_CHANGED: notifications.filter(n => n.type === 'TICKET_STATUS_CHANGED').length,
-      COMMENT_ADDED: notifications.filter(n => n.type === 'COMMENT_ADDED').length,
-      TICKET_UPDATED: notifications.filter(n => n.type === 'TICKET_UPDATED').length,
-    }
-  }), [notifications, filteredNotifications, filterType, filterRead, searchTerm])
+    hasActiveFilters: filterRead !== 'all' || filterType !== 'all' || searchTerm !== '',
+  }), [notifications, filteredNotifications, filterRead, filterType, searchTerm])
 
-  // Cargar notificaciones y preferencias al montar
+  // Carga inicial + polling (respeta operaciones en vuelo)
   useEffect(() => {
-    if (autoLoad && session?.user?.id) {
-      loadNotifications()
-      loadPreferences()
-      
-      if (refreshInterval > 0) {
-        const interval = setInterval(loadNotifications, refreshInterval)
-        return () => clearInterval(interval)
-      }
+    if (!autoLoad || !session?.user?.id) return
+    loadNotifications(true)
+    if (refreshInterval > 0) {
+      const interval = setInterval(() => loadNotifications(false), refreshInterval)
+      return () => clearInterval(interval)
     }
     return undefined
-  }, [autoLoad, session?.user?.id, loadNotifications, loadPreferences, refreshInterval])
+  }, [autoLoad, session?.user?.id, loadNotifications, refreshInterval])
 
   return {
-    // Estados principales
     notifications,
-    preferences,
     loading,
-    loadingPreferences,
     error,
-    
-    // Estados de filtros
-    filterType,
-    setFilterType,
     filterRead,
     setFilterRead,
+    filterType,
+    setFilterType,
     searchTerm,
     setSearchTerm,
-    
-    // Estados de UI
-    showPreferences,
-    setShowPreferences,
-    
-    // Datos procesados
     filteredNotifications,
     stats,
-    pagination: null, // No se usa paginación en el hook
-    
-    // Funciones principales
-    loadNotifications,
-    loadPreferences,
-    savePreferences,
+    loadNotifications: () => loadNotifications(true),
     markAsRead,
     markAllAsRead,
     deleteNotification,
     clearAllNotifications,
-    
-    // Función de utilidad
-    refresh: loadNotifications,
-    
-    // Estado de sesión
+    navigateToTicket,
+    refresh: () => loadNotifications(true),
     isAuthenticated: !!session?.user?.id,
   }
 }

@@ -26,6 +26,7 @@ const settingsSchema = z.object({
   passwordMinLength: z.number().min(6).max(20).optional(),
   requirePasswordChange: z.boolean().optional(),
   maxFileSize: z.number().min(1).max(100).optional(),
+  autoCloseDays: z.number().min(1).max(30).optional(),
   allowedFileTypes: z.array(z.string()).optional(),
   backupEnabled: z.boolean().optional(),
   backupFrequency: z.enum(['daily', 'weekly', 'monthly']).optional(),
@@ -54,6 +55,7 @@ const defaultSettings = {
   passwordMinLength: 8,
   requirePasswordChange: false,
   maxFileSize: 10, // MB
+  autoCloseDays: 3, // Días para auto-cierre de tickets resueltos sin calificación
   allowedFileTypes: [
     'image/jpeg',
     'image/png',
@@ -93,7 +95,8 @@ export async function GET() {
         setting.key === 'maxLoginAttempts' ||
         setting.key === 'passwordMinLength' ||
         setting.key === 'maxFileSize' ||
-        setting.key === 'backupRetention'
+        setting.key === 'backupRetention' ||
+        setting.key === 'autoCloseDays'
       ) {
         ;(settings as any)[setting.key] = parseInt(value)
       } else if (

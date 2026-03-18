@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useToast } from './use-toast'
 
 export interface TimelineEvent {
@@ -20,11 +20,15 @@ export interface TimelineEvent {
     rating?: number
     // Para planes de resolución
     planId?: string
+    planTitle?: string
     status?: string
     totalTasks?: number
+    completedTasks?: number
     estimatedHours?: number
+    actualHours?: number
     startDate?: string
     targetDate?: string
+    completedDate?: string
     // Para tareas
     taskId?: string
     priority?: string
@@ -71,12 +75,17 @@ export function useTimeline(ticketId: string) {
   const [events, setEvents] = useState<TimelineEvent[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Flag para bloquear recargas externas mientras se envía un comentario
+  const submittingRef = useRef(false)
 
-  const loadTimeline = useCallback(async () => {
+  const loadTimeline = useCallback(async (silent = false) => {
     if (!ticketId) return
+    // Si hay un envío en curso, ignorar recargas externas (polling, refreshKey)
+    // para no borrar el evento optimista
+    if (submittingRef.current && silent) return
 
     try {
-      setLoading(true)
+      if (!silent) setLoading(true)
       setError(null)
       
       const response = await fetch(`/api/tickets/${ticketId}/timeline`)
@@ -114,7 +123,7 @@ export function useTimeline(ticketId: string) {
       // Establecer eventos vacíos como fallback
       setEvents([])
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [ticketId, toast])
 
@@ -127,6 +136,8 @@ export function useTimeline(ticketId: string) {
       })
       return false
     }
+
+    submittingRef.current = true // bloquear recargas externas
 
     try {
       const formData = new FormData()
@@ -157,11 +168,10 @@ export function useTimeline(ticketId: string) {
           : ''
         
         toast({
-          title: "Comentario agregado exitosamente",
-          description: `Tu comentario ${commentType} ha sido agregado al historial del ticket${attachmentInfo}`,
-          duration: 4000
+          title: "Comentario agregado",
+          description: `Comentario ${commentType} agregado${attachmentInfo}`,
+          duration: 3000
         })
-        loadTimeline() // Recargar timeline
         return true
       } else {
         throw new Error(data.message || 'Error al agregar comentario')
@@ -174,8 +184,10 @@ export function useTimeline(ticketId: string) {
         description: `No se pudo agregar el comentario. ${errorMessage}. Intenta nuevamente.`
       })
       return false
+    } finally {
+      submittingRef.current = false // liberar bloqueo siempre
     }
-  }, [ticketId, toast, loadTimeline])
+  }, [ticketId, toast])
 
   const updateTicketStatus = useCallback(async (newStatus: string, comment?: string) => {
     try {
@@ -257,9 +269,11 @@ export function useTimeline(ticketId: string) {
     }
   }, [ticketId, toast, loadTimeline])
 
-  // Cargar timeline al montar
+  // Cargar timeline al montar + polling cada 30s para sincronización entre usuarios
   useEffect(() => {
     loadTimeline()
+    const interval = setInterval(() => loadTimeline(true), 30 * 1000)
+    return () => clearInterval(interval)
   }, [loadTimeline])
 
   return {
@@ -269,7 +283,8 @@ export function useTimeline(ticketId: string) {
     loadTimeline,
     addComment,
     updateTicketStatus,
-    assignTicket
+    assignTicket,
+    setEvents,
   }
 }
 

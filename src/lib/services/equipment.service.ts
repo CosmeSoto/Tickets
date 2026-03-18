@@ -1,4 +1,5 @@
 import { PrismaClient, EquipmentStatus, Prisma } from '@prisma/client'
+import { randomUUID } from 'crypto'
 import { QRCodeService } from './qr-code.service'
 import type { 
   Equipment, 
@@ -43,13 +44,13 @@ export class EquipmentService {
           serialNumber: data.serialNumber,
           brand: data.brand,
           model: data.model,
-          type: data.type,
+          typeId: data.typeId,
           status: data.status || 'AVAILABLE',
           condition: data.condition,
           ownershipType: data.ownershipType,
-          purchaseDate: data.purchaseDate ? new Date(data.purchaseDate) : undefined,
+          purchaseDate: data.purchaseDate ? new Date(data.purchaseDate as string | number) : undefined,
           purchasePrice: data.purchasePrice,
-          warrantyExpiration: data.warrantyExpiration ? new Date(data.warrantyExpiration) : undefined,
+          warrantyExpiration: data.warrantyExpiration ? new Date(data.warrantyExpiration as string | number) : undefined,
           specifications: data.specifications || {},
           accessories: data.accessories || [],
           location: data.location,
@@ -61,13 +62,14 @@ export class EquipmentService {
       // Registrar en auditoría
       await prisma.audit_logs.create({
         data: {
+          id: randomUUID(),
           action: 'CREATE',
           entityType: 'equipment',
           entityId: equipment.id,
           userId: userId,
           details: {
             code: equipment.code,
-            type: equipment.type,
+            typeId: equipment.typeId,
             brand: equipment.brand,
             model: equipment.model
           }
@@ -266,7 +268,7 @@ export class EquipmentService {
           ...(data.serialNumber && { serialNumber: data.serialNumber }),
           ...(data.brand && { brand: data.brand }),
           ...(data.model && { model: data.model }),
-          ...(data.type && { type: data.type }),
+          ...(data.typeId && { typeId: data.typeId }),
           ...(data.status && { status: data.status }),
           ...(data.condition && { condition: data.condition }),
           ...(data.ownershipType && { ownershipType: data.ownershipType }),
@@ -284,16 +286,43 @@ export class EquipmentService {
         }
       })
 
-      // Registrar en auditoría
+      // Registrar en auditoría con cambios legibles
+      const changedFields: Record<string, { antes: any; después: any }> = {}
+      const fieldLabels: Record<string, string> = {
+        serialNumber: 'Número de Serie',
+        brand: 'Marca',
+        model: 'Modelo',
+        typeId: 'Tipo',
+        status: 'Estado',
+        condition: 'Condición',
+        ownershipType: 'Tipo de Propiedad',
+        purchaseDate: 'Fecha de Compra',
+        purchasePrice: 'Precio de Compra',
+        warrantyExpiration: 'Vencimiento de Garantía',
+        location: 'Ubicación',
+        notes: 'Notas',
+        accessories: 'Accesorios',
+        specifications: 'Especificaciones',
+      }
+
+      for (const key of Object.keys(data)) {
+        const oldVal = (equipment as any)[key]
+        const newVal = (updated as any)[key]
+        if (JSON.stringify(oldVal) !== JSON.stringify(newVal) && fieldLabels[key]) {
+          changedFields[fieldLabels[key]] = { antes: oldVal ?? '—', después: newVal ?? '—' }
+        }
+      }
+
       await prisma.audit_logs.create({
         data: {
+          id: randomUUID(),
           action: 'UPDATE',
           entityType: 'equipment',
           entityId: id,
           userId: userId,
           details: {
-            before: equipment,
-            after: updated
+            code: updated.code,
+            changes: changedFields,
           }
         }
       })
@@ -334,6 +363,7 @@ export class EquipmentService {
       // Registrar en auditoría
       await prisma.audit_logs.create({
         data: {
+          id: randomUUID(),
           action: 'DELETE',
           entityType: 'equipment',
           entityId: id,
@@ -349,6 +379,144 @@ export class EquipmentService {
       throw error
     }
   }
+
+  /**
+   * Elimina permanentemente un equipo de la base de datos
+   * Solo para administradores. Requiere que el equipo esté RETIRED y sin asignaciones activas.
+   */
+  static async permanentDeleteEquipment(id: string, userId: string): Promise<void> {
+    try {
+      const equipment = await prisma.equipment.findUnique({
+        where: { id },
+        include: {
+          assignments: { where: { isActive: true }, take: 1 },
+          maintenance_records: { take: 1 },
+        }
+      })
+
+      if (!equipment) {
+        throw new Error('Equipo no encontrado')
+      }
+
+      if (equipment.status !== 'RETIRED') {
+        throw new Error('Solo se pueden eliminar permanentemente equipos retirados')
+      }
+
+      if (equipment.assignments.length > 0) {
+        throw new Error('No se puede eliminar un equipo con asignación activa')
+      }
+
+      // Guardar datos para auditoría antes de eliminar
+      const equipmentData = {
+        code: equipment.code,
+        serialNumber: equipment.serialNumber,
+        brand: equipment.brand,
+        model: equipment.model,
+        typeId: equipment.typeId,
+      }
+
+      await prisma.$transaction(async (tx) => {
+        // Eliminar registros relacionados
+        await tx.maintenance_records.deleteMany({ where: { equipmentId: id } })
+        await tx.equipment_assignments.deleteMany({ where: { equipmentId: id } })
+
+        // Eliminar auditorías previas del equipo (se reemplaza con el log de eliminación permanente)
+        // No eliminamos audit_logs para mantener trazabilidad
+
+        // Eliminar equipo
+        await tx.equipment.delete({ where: { id } })
+
+        // Registrar en auditoría
+        await tx.audit_logs.create({
+          data: {
+            id: randomUUID(),
+            action: 'PERMANENT_DELETE',
+            entityType: 'equipment',
+            entityId: id,
+            userId,
+            details: equipmentData,
+          }
+        })
+      })
+    } catch (error) {
+      console.error('Error eliminando permanentemente equipo:', error)
+      throw error
+    }
+  }
+
+
+  /**
+   * Elimina permanentemente un equipo de la base de datos
+   * Solo para administradores. Elimina registros relacionados.
+   */
+  static async permanentDeleteEquipment(id: string, userId: string): Promise<void> {
+    try {
+      const equipment = await prisma.equipment.findUnique({ where: { id } })
+
+      if (!equipment) {
+        throw new Error('Equipo no encontrado')
+      }
+
+      if (equipment.status !== 'RETIRED') {
+        throw new Error('Solo se pueden eliminar permanentemente equipos retirados')
+      }
+
+      const hasActiveAssignment = await prisma.equipment_assignments.findFirst({
+        where: { equipmentId: id, isActive: true }
+      })
+
+      if (hasActiveAssignment) {
+        throw new Error('No se puede eliminar un equipo con asignación activa')
+      }
+
+      // Guardar datos para auditoría antes de eliminar
+      const equipmentData = {
+        code: equipment.code,
+        serialNumber: equipment.serialNumber,
+        brand: equipment.brand,
+        model: equipment.model,
+        typeId: equipment.typeId,
+      }
+
+      await prisma.$transaction(async (tx) => {
+        // Obtener IDs de asignaciones para eliminar actas relacionadas
+        const assignments = await tx.equipment_assignments.findMany({
+          where: { equipmentId: id },
+          select: { id: true }
+        })
+        const assignmentIds = assignments.map(a => a.id)
+
+        // Eliminar actas de entrega y devolución
+        if (assignmentIds.length > 0) {
+          await tx.delivery_acts.deleteMany({ where: { assignmentId: { in: assignmentIds } } })
+          await tx.return_acts.deleteMany({ where: { assignmentId: { in: assignmentIds } } })
+        }
+
+        // Eliminar registros relacionados
+        await tx.maintenance_records.deleteMany({ where: { equipmentId: id } })
+        await tx.equipment_assignments.deleteMany({ where: { equipmentId: id } })
+
+        // Eliminar el equipo
+        await tx.equipment.delete({ where: { id } })
+
+        // Registrar en auditoría
+        await tx.audit_logs.create({
+          data: {
+            id: randomUUID(),
+            action: 'PERMANENT_DELETE',
+            entityType: 'equipment',
+            entityId: id,
+            userId,
+            details: equipmentData,
+          }
+        })
+      })
+    } catch (error) {
+      console.error('Error eliminando equipo permanentemente:', error)
+      throw error
+    }
+  }
+
 
   /**
    * Obtiene el resumen de equipos para el dashboard
@@ -420,6 +588,12 @@ export class EquipmentService {
   private static async buildEquipmentHistory(equipmentId: string): Promise<EquipmentHistoryEvent[]> {
     const history: EquipmentHistoryEvent[] = []
 
+    // Acciones duplicadas del AuditServiceComplete que ya se registran desde el servicio
+    const duplicateActions = new Set([
+      'equipment_created', 'equipment_updated', 'equipment_deleted',
+      'equipment_status_changed', 'assignment_created',
+    ])
+
     // Obtener eventos de auditoría
     const auditLogs = await prisma.audit_logs.findMany({
       where: {
@@ -432,19 +606,96 @@ export class EquipmentService {
       orderBy: { createdAt: 'desc' }
     })
 
+    // Deduplicar: agrupar por timestamp (mismo segundo) y quedarse con el más descriptivo
+    const seen = new Map<string, boolean>()
+
     for (const log of auditLogs) {
+      // Saltar acciones duplicadas del AuditServiceComplete
+      if (duplicateActions.has(log.action)) continue
+
+      // Deduplicar por acción + timestamp (mismo minuto)
+      const timeKey = `${log.action}_${Math.floor(log.createdAt.getTime() / 60000)}`
+      if (seen.has(timeKey)) continue
+      seen.set(timeKey, true)
+
+      const details = log.details as any
+
+      // Construir metadata legible (sin objetos anidados)
+      const metadata: Record<string, string> = {}
+
+      if (log.action === 'UPDATE' && details?.changes) {
+        for (const [field, change] of Object.entries(details.changes as Record<string, any>)) {
+          const antes = this.formatValue(change?.antes)
+          const después = this.formatValue(change?.después)
+          metadata[field] = `${antes} → ${después}`
+        }
+      } else if (log.action === 'ASSIGNED') {
+        if (details?.receiverName) metadata['Asignado a'] = details.receiverName
+        if (details?.assignmentType) {
+          const typeLabels: Record<string, string> = { PERMANENT: 'Permanente', TEMPORARY: 'Temporal', LOAN: 'Préstamo' }
+          metadata['Tipo'] = typeLabels[details.assignmentType] || details.assignmentType
+        }
+      } else if (log.action === 'RETURNED') {
+        if (details?.actualEndDate) metadata['Fecha de devolución'] = new Date(details.actualEndDate).toLocaleDateString('es-ES')
+      }
+
       history.push({
         id: log.id,
-        type: log.action as any,
-        description: this.getAuditLogDescription(log.action, log.details),
+        type: this.mapActionToEventType(log.action),
+        description: this.getAuditLogDescription(log.action, details),
         userId: log.userId || undefined,
         userName: log.users?.name,
         timestamp: log.createdAt,
-        metadata: log.details as any
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined
       })
     }
 
     return history
+  }
+
+  /**
+   * Mapea acciones de auditoría a tipos de evento del historial
+   */
+  private static mapActionToEventType(action: string): string {
+    const map: Record<string, string> = {
+      CREATE: 'CREATED',
+      UPDATE: 'UPDATED',
+      DELETE: 'STATUS_CHANGE',
+      PERMANENT_DELETE: 'STATUS_CHANGE',
+      ASSIGNED: 'ASSIGNED',
+      RETURNED: 'RETURNED',
+      CANCELLED: 'RETURNED',
+      CREATE_MAINTENANCE: 'MAINTENANCE',
+      COMPLETED: 'MAINTENANCE',
+    }
+    return map[action] || 'UPDATED'
+  }
+
+  /**
+   * Formatea un valor para mostrar en el historial de forma legible
+   */
+  private static formatValue(value: any): string {
+    if (value === null || value === undefined || value === '—') return '—'
+    if (value instanceof Date) return new Date(value).toLocaleDateString('es-ES')
+    if (typeof value === 'object') {
+      if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : '—'
+      // Para objetos, intentar mostrar algo legible
+      try {
+        const entries = Object.entries(value)
+        if (entries.length === 0) return '—'
+        return entries.map(([k, v]) => `${k}: ${v}`).join(', ')
+      } catch {
+        return '—'
+      }
+    }
+    // Traducir valores de enums comunes
+    const labels: Record<string, string> = {
+      AVAILABLE: 'Disponible', ASSIGNED: 'Asignado', MAINTENANCE: 'Mantenimiento',
+      DAMAGED: 'Dañado', RETIRED: 'Retirado',
+      NEW: 'Nuevo', LIKE_NEW: 'Como Nuevo', GOOD: 'Bueno', FAIR: 'Regular', POOR: 'Malo',
+      FIXED_ASSET: 'Activo Fijo', RENTAL: 'Alquiler', LOAN: 'Préstamo',
+    }
+    return labels[String(value)] || String(value)
   }
 
   /**
@@ -453,16 +704,40 @@ export class EquipmentService {
   private static getAuditLogDescription(action: string, details: any): string {
     switch (action) {
       case 'CREATE':
-        return `Equipo creado: ${details?.code}`
-      case 'UPDATE':
+        return `Equipo registrado: ${details?.code || ''} — ${details?.brand || ''} ${details?.model || ''}`
+      case 'UPDATE': {
+        const changes = details?.changes
+        if (changes && typeof changes === 'object') {
+          const fields = Object.keys(changes)
+          if (fields.length === 0) return 'Equipo actualizado (sin cambios detectados)'
+          return `Equipo actualizado — Se modificó: ${fields.join(', ')}`
+        }
         return 'Equipo actualizado'
+      }
       case 'DELETE':
-        return 'Equipo retirado'
+        return 'Equipo retirado del inventario'
+      case 'PERMANENT_DELETE':
+        return `Equipo eliminado permanentemente: ${details?.code || ''} (${details?.brand || ''} ${details?.model || ''})`
       case 'ASSIGNED':
-        return `Equipo asignado a ${details?.receiverName}`
+        return `Equipo asignado a ${details?.receiverName || 'un usuario'}`
       case 'RETURNED':
-        return 'Equipo devuelto'
+        return 'Equipo devuelto al inventario'
+      case 'CANCELLED':
+        return `Asignación cancelada${details?.reason ? ': ' + details.reason : ''}`
+      case 'CREATE_MAINTENANCE':
+      case 'MAINTENANCE':
+        return `Mantenimiento ${details?.type === 'PREVENTIVE' ? 'preventivo' : 'correctivo'} registrado`
+      case 'COMPLETED':
+        return 'Mantenimiento completado'
       default:
+        // Manejar acciones con formato snake_case del AuditServiceComplete
+        if (action.includes('_')) {
+          const readable = action
+            .replace('equipment_', 'Equipo ')
+            .replace('assignment_', 'Asignación ')
+            .replace('_', ' ')
+          return readable.charAt(0).toUpperCase() + readable.slice(1)
+        }
         return action
     }
   }

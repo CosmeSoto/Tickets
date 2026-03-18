@@ -1,10 +1,10 @@
 /**
  * Generador de Archivos PDF
- * Usa PDFKit para crear PDFs profesionales
+ * Usa PDFKit para crear PDFs profesionales (importado dinámicamente)
  */
 
-import PDFDocument from 'pdfkit'
 import { Readable } from 'stream'
+import { loadPDFKit } from '@/lib/utils/load-pdfkit'
 
 export interface PDFOptions {
   title: string
@@ -22,8 +22,9 @@ export class PDFGenerator {
     columns: { key: string; label: string; width?: number }[],
     options: PDFOptions
   ): Promise<Buffer> {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       try {
+        const PDFDocument = loadPDFKit()
         const doc = new PDFDocument({
           size: 'A4',
           layout: options.orientation || 'portrait',

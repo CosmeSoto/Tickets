@@ -9,8 +9,6 @@ import {
   Clock,
   AlertCircle,
   CheckCircle,
-  BookOpen,
-  HelpCircle,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -193,26 +191,12 @@ export default function ClientTicketsPage() {
       error={error}
       onRetry={reload}
       headerActions={
-        <div className="flex gap-2">
-          <Link href="/knowledge">
-            <Button variant="outline" size="sm">
-              <BookOpen className="mr-2 h-4 w-4" />
-              Conocimientos
-            </Button>
+        <Button size="sm" asChild>
+          <Link href="/client/tickets/create">
+            <Plus className="h-4 w-4 mr-2" />
+            Nuevo Ticket
           </Link>
-          <Link href="/client/help">
-            <Button variant="outline" size="sm">
-              <HelpCircle className="mr-2 h-4 w-4" />
-              Ayuda
-            </Button>
-          </Link>
-          <Button size="sm" asChild>
-            <Link href="/client/tickets/create">
-              <Plus className="h-4 w-4 mr-2" />
-              Nuevo Ticket
-            </Link>
-          </Button>
-        </div>
+        </Button>
       }
     >
       <div className="space-y-6">

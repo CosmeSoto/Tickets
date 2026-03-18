@@ -4,7 +4,6 @@ import { authOptions } from '@/lib/auth'
 import { EquipmentService } from '@/lib/services/equipment.service'
 import { createEquipmentSchema, equipmentFiltersSchema } from '@/lib/validations/inventory/equipment'
 import { ZodError } from 'zod'
-import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 
 /**
  * GET /api/inventory/equipment
@@ -25,9 +24,9 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const filters = {
       search: searchParams.get('search') || undefined,
-      type: searchParams.getAll('type') || undefined,
-      status: searchParams.getAll('status') || undefined,
-      condition: searchParams.getAll('condition') || undefined,
+      typeId: searchParams.getAll('typeId').length > 0 ? searchParams.getAll('typeId') : undefined,
+      status: searchParams.getAll('status').length > 0 ? searchParams.getAll('status') : undefined,
+      condition: searchParams.getAll('condition').length > 0 ? searchParams.getAll('condition') : undefined,
       assignedTo: searchParams.get('assignedTo') || undefined,
       departmentId: searchParams.get('departmentId') || undefined,
       page: parseInt(searchParams.get('page') || '1'),
@@ -104,19 +103,7 @@ export async function POST(request: NextRequest) {
     )
 
     // Registrar en auditoría
-    await AuditServiceComplete.log({
-      action: AuditActionsComplete.EQUIPMENT_CREATED,
-      entityType: 'equipment',
-      entityId: equipment.id,
-      userId: session.user.id,
-      details: {
-        code: equipment.code,
-        type: validatedData.type,
-        brand: validatedData.brand,
-        model: validatedData.model,
-        serialNumber: validatedData.serialNumber,
-      },
-    })
+    // (ya se registra en EquipmentService.createEquipment)
 
     return NextResponse.json(equipment, { status: 201 })
   } catch (error) {

@@ -87,7 +87,8 @@ async function getRecentActivity(role: string, userId: string) {
         title: `Nuevo ticket: ${ticket.title}`,
         description: `Creado por ${ticket.users_tickets_clientIdTousers?.name || 'Usuario'}`,
         time: formatTimeAgo(ticket.createdAt),
-        user: ticket.users_tickets_clientIdTousers?.name || 'Sistema'
+        user: ticket.users_tickets_clientIdTousers?.name || 'Sistema',
+        ticketId: ticket.id
       })
     })
   }

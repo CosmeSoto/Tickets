@@ -27,10 +27,11 @@ import {
   BookOpen,
   Key,
   ShoppingCart,
-  List,
   Boxes,
   Ruler,
   Monitor,
+  Plus,
+  HelpCircle,
 } from 'lucide-react'
 import { Notifications } from '@/components/ui/notifications'
 import { Button } from '@/components/ui/button'
@@ -127,8 +128,26 @@ const navigationByRole: Record<string, NavItem[]> = {
   ],
   CLIENT: [
     { name: 'Dashboard', href: '/client', icon: LayoutDashboard },
-    { name: 'Mis Tickets', href: '/client/tickets', icon: Ticket },
-    { name: 'Mis Equipos', href: '/inventory', icon: Package },
+    {
+      name: 'Mis Tickets',
+      href: '/client/tickets',
+      icon: Ticket,
+      children: [
+        { name: 'Ver Tickets', href: '/client/tickets', icon: Ticket },
+        { name: 'Crear Ticket', href: '/client/tickets/create', icon: Plus },
+        { name: 'Base de Conocimientos', href: '/knowledge', icon: BookOpen },
+        { name: 'Centro de Ayuda', href: '/client/help', icon: HelpCircle },
+      ],
+    },
+    {
+      name: 'Mis Equipos',
+      href: '/inventory',
+      icon: Package,
+      children: [
+        { name: 'Equipos Asignados', href: '/inventory', icon: Monitor },
+        { name: 'Licencias', href: '/inventory/licenses', icon: Key },
+      ],
+    },
   ],
 }
 
@@ -213,7 +232,6 @@ export function RoleDashboardLayout({
   headerActions,
 }: RoleDashboardLayoutProps) {
   const { data: session } = useSession()
-  const router = useRouter()
   const pathname = usePathname()
 
   if (!session) {

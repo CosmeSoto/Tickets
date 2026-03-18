@@ -1,8 +1,8 @@
-import PDFDocument from 'pdfkit'
+import { loadPDFKit } from '@/lib/utils/load-pdfkit'
 
 // Placeholder para actas de devolución
-// Se implementará completamente en Task 5.1
-export function generateReturnActPDF(act: any, qrCodeDataUrl: string): PDFDocument {
+export async function generateReturnActPDF(act: any, qrCodeDataUrl: string): Promise<any> {
+  const PDFDocument = loadPDFKit()
   const doc = new PDFDocument({
     size: 'LETTER',
     margins: { top: 50, bottom: 50, left: 50, right: 50 },

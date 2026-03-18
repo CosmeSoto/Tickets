@@ -61,10 +61,11 @@ export function EquipmentHistory({ history }: EquipmentHistoryProps) {
                 )}
               </div>
               {event.metadata && Object.keys(event.metadata).length > 0 && (
-                <div className="mt-2 text-xs text-muted-foreground">
+                <div className="mt-2 rounded-md bg-muted/50 p-2 text-xs text-muted-foreground space-y-1">
                   {Object.entries(event.metadata).map(([key, value]) => (
-                    <div key={key}>
-                      <span className="font-medium">{key}:</span> {String(value)}
+                    <div key={key} className="flex gap-2">
+                      <span className="font-medium min-w-[120px]">{key}:</span>
+                      <span>{String(value)}</span>
                     </div>
                   ))}
                 </div>

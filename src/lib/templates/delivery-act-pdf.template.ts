@@ -1,4 +1,5 @@
-import PDFDocument from 'pdfkit'
+// PDFKit se carga via helper para evitar análisis estático de Turbopack
+import { loadPDFKit } from '@/lib/utils/load-pdfkit'
 import type { DeliveryAct } from '@/types/inventory/delivery-act'
 
 const EQUIPMENT_TYPE_LABELS: Record<string, string> = {
@@ -27,7 +28,8 @@ const EQUIPMENT_CONDITION_LABELS: Record<string, string> = {
   POOR: 'Malo',
 }
 
-export function generateDeliveryActPDF(act: DeliveryAct, qrCodeDataUrl: string): typeof PDFDocument.prototype {
+export async function generateDeliveryActPDF(act: DeliveryAct, qrCodeDataUrl: string): Promise<any> {
+  const PDFDocument = loadPDFKit()
   const doc = new PDFDocument({
     size: 'LETTER',
     margins: { top: 50, bottom: 50, left: 50, right: 50 },

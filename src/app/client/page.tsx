@@ -6,7 +6,6 @@ import { ActionGrid } from '@/components/common/action-card'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   Ticket,
   CheckCircle,
@@ -86,16 +85,6 @@ export default function ClientDashboard() {
   const hasOpenTickets = (stats.openTickets || 0) > 0
   const hasUnreadMessages = recentTickets.some(t => t.hasUnreadMessages)
 
-  // Header actions personalizado para cliente
-  const clientHeaderActions = (
-    <Link href='/client/tickets/create'>
-      <Button size='lg' className='bg-primary hover:bg-primary/90'>
-        <Plus className='h-5 w-5 mr-2' />
-        Crear Ticket
-      </Button>
-    </Link>
-  )
-
   return (
     <UnifiedDashboardBase
       userName={userName}
@@ -107,7 +96,6 @@ export default function ClientDashboard() {
       subtitle="Panel de cliente"
       loadingMessage="Cargando tus tickets..."
       onRefresh={refetch}
-      headerActions={clientHeaderActions}
       notificationsMaxVisible={2}
       statusBadge={{
         text: `Soporte: ${supportQuality === 'excellent' ? 'Excelente' : 

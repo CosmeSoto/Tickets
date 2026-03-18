@@ -19,7 +19,7 @@
  * ```
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useToast } from '@/hooks/use-toast'
 
 export interface UseModuleDataOptions<T> {
@@ -48,7 +48,7 @@ export interface UseModuleDataReturn<T> {
   
   // Utilidades
   findById: (id: string) => T | undefined
-  setData: (data: T[]) => void
+  setData: React.Dispatch<React.SetStateAction<T[]>>
 }
 
 interface CacheEntry<T> {
@@ -93,7 +93,7 @@ export function useModuleData<T extends { id: string }>(
         }
       }
 
-      const response = await fetch(endpoint)
+      const response = await fetch(endpoint, { cache: 'no-store' })
       
       if (!response.ok) {
         throw new Error(`Error ${response.status}: ${response.statusText}`)

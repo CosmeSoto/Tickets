@@ -14,12 +14,42 @@ import {
   DollarSign,
   MapPin,
   FileText,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { UserCombobox } from '@/components/ui/user-combobox'
 import { useToast } from '@/hooks/use-toast'
 import { EquipmentHistory } from '@/components/inventory/equipment-history'
 import { formatDate, formatCurrency } from '@/lib/utils'
@@ -85,6 +115,30 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
   const [data, setData] = useState<EquipmentDetailResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [qrCode, setQrCode] = useState<string | null>(null)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [showPermanentDeleteDialog, setShowPermanentDeleteDialog] = useState(false)
+  const [permanentDeleting, setPermanentDeleting] = useState(false)
+
+  // Dialog de asignación
+  const [showAssignDialog, setShowAssignDialog] = useState(false)
+  const [assigning, setAssigning] = useState(false)
+  const [assignForm, setAssignForm] = useState({
+    receiverId: '',
+    assignmentType: 'PERMANENT' as 'PERMANENT' | 'TEMPORARY' | 'LOAN',
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: '',
+    observations: '',
+  })
+
+  // Dialog de mantenimiento
+  const [showMaintenanceDialog, setShowMaintenanceDialog] = useState(false)
+  const [submittingMaintenance, setSubmittingMaintenance] = useState(false)
+  const [maintenanceForm, setMaintenanceForm] = useState({
+    type: 'PREVENTIVE' as 'PREVENTIVE' | 'CORRECTIVE',
+    description: '',
+    scheduledDate: new Date().toISOString().split('T')[0],
+  })
 
   useEffect(() => {
     loadEquipmentDetail()
@@ -132,10 +186,7 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
   }
 
   const handleDelete = async () => {
-    if (!confirm('¿Estás seguro de que deseas retirar este equipo?')) {
-      return
-    }
-
+    setDeleting(true)
     try {
       const response = await fetch(`/api/inventory/equipment/${equipmentId}`, {
         method: 'DELETE',
@@ -159,15 +210,138 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
         description: error instanceof Error ? error.message : 'No se pudo eliminar el equipo',
         variant: 'destructive',
       })
+    } finally {
+      setDeleting(false)
+      setShowDeleteDialog(false)
     }
   }
 
-  const handleAssign = () => {
-    router.push(`/inventory/equipment/${equipmentId}/assign`)
+  const handlePermanentDelete = async () => {
+    setPermanentDeleting(true)
+    try {
+      const response = await fetch(`/api/inventory/equipment/${equipmentId}/permanent`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Error al eliminar equipo')
+      }
+
+      toast({
+        title: 'Equipo eliminado',
+        description: 'El equipo ha sido eliminado permanentemente del sistema',
+      })
+
+      router.push('/inventory')
+    } catch (error) {
+      console.error('Error eliminando permanentemente:', error)
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'No se pudo eliminar el equipo',
+        variant: 'destructive',
+      })
+    } finally {
+      setPermanentDeleting(false)
+      setShowPermanentDeleteDialog(false)
+    }
+  }
+
+  const handleAssign = async () => {
+    setShowAssignDialog(true)
+  }
+
+  const submitAssignment = async () => {
+    if (!assignForm.receiverId) {
+      toast({ title: 'Error', description: 'Selecciona un usuario', variant: 'destructive' })
+      return
+    }
+    setAssigning(true)
+    try {
+      const payload = {
+        equipmentId,
+        receiverId: assignForm.receiverId,
+        assignmentType: assignForm.assignmentType,
+        startDate: assignForm.startDate,
+        endDate: assignForm.endDate || undefined,
+        observations: assignForm.observations || undefined,
+        accessories: data?.equipment?.accessories || [],
+      }
+
+      const response = await fetch('/api/inventory/assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Error al asignar equipo')
+      }
+
+      toast({
+        title: 'Equipo asignado',
+        description: 'El equipo ha sido asignado exitosamente. Se generó un acta de entrega.',
+      })
+
+      setShowAssignDialog(false)
+      loadEquipmentDetail()
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'No se pudo asignar el equipo',
+        variant: 'destructive',
+      })
+    } finally {
+      setAssigning(false)
+    }
   }
 
   const handleMaintenance = () => {
-    router.push(`/inventory/equipment/${equipmentId}/maintenance`)
+    setShowMaintenanceDialog(true)
+  }
+
+  const submitMaintenance = async () => {
+    if (!maintenanceForm.description.trim()) {
+      toast({ title: 'Error', description: 'Describe el mantenimiento', variant: 'destructive' })
+      return
+    }
+    setSubmittingMaintenance(true)
+    try {
+      const response = await fetch('/api/inventory/maintenance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          equipmentId,
+          type: maintenanceForm.type,
+          description: maintenanceForm.description,
+          scheduledDate: maintenanceForm.scheduledDate,
+          technicianId: userId,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Error al registrar mantenimiento')
+      }
+
+      toast({
+        title: 'Mantenimiento registrado',
+        description: 'El equipo ha sido marcado en mantenimiento. El cliente asignado será notificado.',
+      })
+
+      setShowMaintenanceDialog(false)
+      setMaintenanceForm({ type: 'PREVENTIVE', description: '', scheduledDate: new Date().toISOString().split('T')[0] })
+      loadEquipmentDetail()
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'No se pudo registrar el mantenimiento',
+        variant: 'destructive',
+      })
+    } finally {
+      setSubmittingMaintenance(false)
+    }
   }
 
   const handleReportProblem = () => {
@@ -199,7 +373,9 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
   }
 
   const { equipment, currentAssignment, history, maintenanceRecords } = data
-  const canEdit = userRole === 'ADMIN' || userRole === 'TECHNICIAN'
+  const isAdmin = userRole === 'ADMIN'
+  const isRetired = equipment.status === 'RETIRED'
+  const canEdit = (userRole === 'ADMIN' || userRole === 'TECHNICIAN') && !isRetired
   const canDelete = userRole === 'ADMIN'
   const canAssign = (userRole === 'ADMIN' || userRole === 'TECHNICIAN') && equipment.status === 'AVAILABLE'
   const canReportProblem = userRole === 'CLIENT' && currentAssignment?.receiverId === userId
@@ -213,7 +389,7 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
           <div>
             <h1 className="text-3xl font-bold">{equipment.code}</h1>
             <p className="text-muted-foreground">
-              {TYPE_LABELS[equipment.type]} - {equipment.brand} {equipment.model}
+              {equipment.type?.name || 'Sin tipo'} - {equipment.brand} {equipment.model}
             </p>
           </div>
         </div>
@@ -242,14 +418,184 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
               Mantenimiento
             </Button>
           )}
-          {canDelete && equipment.status !== 'ASSIGNED' && (
-            <Button onClick={handleDelete} variant="destructive">
+          {canDelete && !isRetired && equipment.status !== 'ASSIGNED' && (
+            <Button onClick={() => setShowDeleteDialog(true)} variant="destructive">
               <Trash2 className="mr-2 h-4 w-4" />
               Retirar
             </Button>
           )}
+          {isAdmin && isRetired && (
+            <Button
+              onClick={() => setShowPermanentDeleteDialog(true)}
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+              title="Eliminar permanentemente"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              <span className="text-xs">Eliminar definitivamente</span>
+            </Button>
+          )}
         </div>
       </div>
+
+      {/* Dialog de asignación */}
+      <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Asignar Equipo</DialogTitle>
+            <DialogDescription>
+              Asigna el equipo <span className="font-semibold">{equipment.code}</span> a un usuario.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Usuario *</Label>
+              <UserCombobox
+                value={assignForm.receiverId}
+                onValueChange={(v) => setAssignForm(prev => ({ ...prev, receiverId: v }))}
+                placeholder="Buscar usuario por nombre o email..."
+                emptyText="No se encontraron usuarios"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Tipo de Asignación *</Label>
+              <Select value={assignForm.assignmentType} onValueChange={(v) => setAssignForm(prev => ({ ...prev, assignmentType: v as any }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PERMANENT">Permanente</SelectItem>
+                  <SelectItem value="TEMPORARY">Temporal</SelectItem>
+                  <SelectItem value="LOAN">Préstamo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Fecha de Inicio *</Label>
+              <Input type="date" value={assignForm.startDate} onChange={(e) => setAssignForm(prev => ({ ...prev, startDate: e.target.value }))} />
+            </div>
+            {(assignForm.assignmentType === 'TEMPORARY' || assignForm.assignmentType === 'LOAN') && (
+              <div className="space-y-2">
+                <Label>Fecha de Fin *</Label>
+                <Input type="date" value={assignForm.endDate} onChange={(e) => setAssignForm(prev => ({ ...prev, endDate: e.target.value }))} />
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Observaciones</Label>
+              <Textarea value={assignForm.observations} onChange={(e) => setAssignForm(prev => ({ ...prev, observations: e.target.value }))} placeholder="Observaciones adicionales..." />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAssignDialog(false)} disabled={assigning}>Cancelar</Button>
+            <Button onClick={submitAssignment} disabled={assigning}>
+              {assigning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Asignar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de mantenimiento */}
+      <Dialog open={showMaintenanceDialog} onOpenChange={setShowMaintenanceDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Registrar Mantenimiento</DialogTitle>
+            <DialogDescription>
+              Registra un mantenimiento para el equipo <span className="font-semibold">{equipment.code}</span>.
+              {currentAssignment && (
+                <span className="block mt-1 text-yellow-600">
+                  El cliente asignado ({currentAssignment.receiver?.name}) será notificado.
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Tipo de Mantenimiento *</Label>
+              <Select value={maintenanceForm.type} onValueChange={(v) => setMaintenanceForm(prev => ({ ...prev, type: v as any }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PREVENTIVE">Preventivo</SelectItem>
+                  <SelectItem value="CORRECTIVE">Correctivo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Descripción *</Label>
+              <Textarea value={maintenanceForm.description} onChange={(e) => setMaintenanceForm(prev => ({ ...prev, description: e.target.value }))} placeholder="Describe el mantenimiento a realizar..." />
+            </div>
+            <div className="space-y-2">
+              <Label>Fecha Programada *</Label>
+              <Input type="date" value={maintenanceForm.scheduledDate} onChange={(e) => setMaintenanceForm(prev => ({ ...prev, scheduledDate: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowMaintenanceDialog(false)} disabled={submittingMaintenance}>Cancelar</Button>
+            <Button onClick={submitMaintenance} disabled={submittingMaintenance}>
+              {submittingMaintenance && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Registrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de confirmación para retirar */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Retirar equipo</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de que deseas retirar el equipo{' '}
+              <span className="font-semibold">{equipment.code}</span> ({equipment.brand} {equipment.model})?
+              Esta acción cambiará el estado del equipo a &quot;Retirado&quot;.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? 'Retirando...' : 'Sí, retirar equipo'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog de confirmación para eliminación permanente */}
+      <AlertDialog open={showPermanentDeleteDialog} onOpenChange={setShowPermanentDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">Eliminar equipo permanentemente</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  Esta acción es <span className="font-semibold text-destructive">irreversible</span>. Se eliminará
+                  el equipo <span className="font-semibold">{equipment.code}</span> y todos sus registros
+                  asociados (mantenimientos, asignaciones) de forma permanente.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Esta acción quedará registrada en el historial de auditoría.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={permanentDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handlePermanentDelete}
+              disabled={permanentDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {permanentDeleting ? 'Eliminando...' : 'Eliminar permanentemente'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <div className="grid gap-6 md:grid-cols-3">
         {/* Información Principal */}

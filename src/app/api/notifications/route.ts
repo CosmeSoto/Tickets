@@ -26,7 +26,12 @@ export async function GET(request: NextRequest) {
       limit
     )
 
-    return NextResponse.json(notifications)
+    return NextResponse.json(notifications, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'Pragma': 'no-cache',
+      }
+    })
   } catch (error) {
     console.error('Error fetching notifications:', error)
     return NextResponse.json(

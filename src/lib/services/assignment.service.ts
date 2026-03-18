@@ -1,4 +1,5 @@
 import { PrismaClient, Prisma } from '@prisma/client'
+import { randomUUID } from 'crypto'
 import type { 
   Assignment, 
   AssignmentFormData, 
@@ -87,6 +88,7 @@ export class AssignmentService {
         // Registrar en auditoría
         await tx.audit_logs.create({
           data: {
+            id: randomUUID(),
             action: 'ASSIGNED',
             entityType: 'equipment',
             entityId: data.equipmentId,
@@ -269,6 +271,7 @@ export class AssignmentService {
         // Registrar en auditoría
         await tx.audit_logs.create({
           data: {
+            id: randomUUID(),
             action: 'RETURNED',
             entityType: 'equipment',
             entityId: assignment.equipmentId,
@@ -329,6 +332,7 @@ export class AssignmentService {
         // Registrar en auditoría
         await tx.audit_logs.create({
           data: {
+            id: randomUUID(),
             action: 'CANCELLED',
             entityType: 'equipment_assignment',
             entityId: id,

@@ -56,6 +56,11 @@ export function EditUserModal({ isOpen, onClose, onUserUpdated, user, department
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('basic')
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [resetPasswordLoading, setResetPasswordLoading] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [showResetPassword, setShowResetPassword] = useState(false)
+  const [unlockLoading, setUnlockLoading] = useState(false)
+  const [isLocked, setIsLocked] = useState(false)
   
   const [formData, setFormData] = useState<EditUserData>({
     name: '',
@@ -84,6 +89,12 @@ export function EditUserModal({ isOpen, onClose, onUserUpdated, user, department
       setAvatarPreview(user.avatar || null)
       setActiveTab('basic')
       setErrors({})
+      setIsLocked(false)
+      // Verificar si el usuario está bloqueado
+      fetch(`/api/users/${user.id}/reset-password`, { method: 'GET' })
+        .then(r => r.json())
+        .then(data => setIsLocked(data.isLocked || false))
+        .catch(() => setIsLocked(false))
     }
   }, [user, isOpen])
 
@@ -91,7 +102,52 @@ export function EditUserModal({ isOpen, onClose, onUserUpdated, user, department
     setErrors({})
     setAvatarPreview(null)
     setActiveTab('basic')
+    setShowResetPassword(false)
+    setNewPassword('')
     onClose()
+  }
+
+  const handleResetPassword = async () => {
+    if (!user || !newPassword || newPassword.length < 6) return
+    setResetPasswordLoading(true)
+    try {
+      const res = await fetch(`/api/users/${user.id}/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newPassword }),
+      })
+      const result = await res.json()
+      if (res.ok && result.success) {
+        toast({ title: 'Contraseña actualizada', description: result.message })
+        setShowResetPassword(false)
+        setNewPassword('')
+      } else {
+        toast({ title: 'Error', description: result.error || 'No se pudo actualizar la contraseña', variant: 'destructive' })
+      }
+    } catch {
+      toast({ title: 'Error de conexión', description: 'No se pudo conectar con el servidor', variant: 'destructive' })
+    } finally {
+      setResetPasswordLoading(false)
+    }
+  }
+
+  const handleUnlockAccess = async () => {
+    if (!user) return
+    setUnlockLoading(true)
+    try {
+      const res = await fetch(`/api/users/${user.id}/reset-password`, { method: 'DELETE' })
+      const result = await res.json()
+      if (res.ok && result.success) {
+        toast({ title: 'Acceso desbloqueado', description: result.message })
+        setIsLocked(false)
+      } else {
+        toast({ title: 'Error', description: result.error || 'No se pudo desbloquear', variant: 'destructive' })
+      }
+    } catch {
+      toast({ title: 'Error de conexión', description: 'No se pudo conectar con el servidor', variant: 'destructive' })
+    } finally {
+      setUnlockLoading(false)
+    }
   }
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -628,9 +684,65 @@ export function EditUserModal({ isOpen, onClose, onUserUpdated, user, department
         </Tabs>
 
         <DialogFooter className="flex justify-between">
-          <Button type="button" variant="outline" onClick={handleClose} disabled={loading}>
-            Cancelar
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" onClick={handleClose} disabled={loading}>
+              Cancelar
+            </Button>
+            {/* Resetear contraseña */}
+            {!showResetPassword ? (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowResetPassword(true)}
+                  disabled={loading}
+                  className="text-amber-600 border-amber-300 hover:bg-amber-50"
+                >
+                  Resetear Contraseña
+                </Button>
+                {isLocked && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleUnlockAccess}
+                    disabled={unlockLoading || loading}
+                    className="text-green-600 border-green-300 hover:bg-green-50"
+                  >
+                    {unlockLoading ? 'Desbloqueando...' : 'Desbloquear Acceso'}
+                  </Button>
+                )}
+              </>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Input
+                  type="password"
+                  placeholder="Nueva contraseña (mín. 6 caracteres)"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  className="w-52 h-8 text-sm"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleResetPassword}
+                  disabled={resetPasswordLoading || newPassword.length < 6}
+                  className="bg-amber-600 hover:bg-amber-700 text-white"
+                >
+                  {resetPasswordLoading ? 'Guardando...' : 'Confirmar'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setShowResetPassword(false); setNewPassword('') }}
+                >
+                  ✕
+                </Button>
+              </div>
+            )}
+          </div>
           <div className="flex space-x-2">
             {activeTab !== 'basic' && (
               <Button 

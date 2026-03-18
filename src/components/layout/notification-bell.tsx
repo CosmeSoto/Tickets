@@ -22,6 +22,7 @@ interface Notification {
   type: 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR'
   isRead: boolean
   ticketId?: string
+  metadata?: Record<string, any>
   createdAt: string
   tickets?: {
     id: string
@@ -111,9 +112,20 @@ export function NotificationBell() {
       markAsRead(notification.id)
     }
 
+    setIsOpen(false)
+
+    // Navegar según el tipo de notificación
+    const meta = notification.metadata as Record<string, any> | undefined
+    if (meta?.maintenanceId) {
+      router.push(`/inventory/maintenance/${meta.maintenanceId}`)
+      return
+    }
+    if (meta?.equipmentId && !notification.ticketId) {
+      router.push(`/inventory/equipment/${meta.equipmentId}`)
+      return
+    }
+
     if (notification.ticketId) {
-      setIsOpen(false)
-      // Construir la ruta correcta según el rol del usuario
       const role = session?.user?.role?.toLowerCase() || 'client'
       router.push(`/${role}/tickets/${notification.ticketId}`)
     }
@@ -129,7 +141,7 @@ export function NotificationBell() {
       if (!isOpen) {
         fetchNotifications()
       }
-    }, 30000)
+    }, 15000)
 
     return () => clearInterval(interval)
   }, [isOpen])

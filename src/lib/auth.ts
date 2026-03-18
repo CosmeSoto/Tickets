@@ -66,33 +66,16 @@ export const authOptions: NextAuthOptions = {
           })
 
           // Usuario no encontrado
-          if (!user || !user.passwordHash) {
+          if (!user) {
             // NUEVO: Registrar intento fallido
             await SecurityConfigService.recordFailedLogin(credentials.email, ipAddress)
-            
-            // Registrar intento fallido en auditoría
-            try {
-              const { AuditServiceComplete } = await import('./services/audit-service-complete')
-              await AuditServiceComplete.log({
-                action: 'login_failed',
-                entityType: 'user',
-                entityId: 'unknown',
-                userId: 'system',
-                details: {
-                  email: credentials.email,
-                  reason: 'user_not_found',
-                  attemptsRemaining: lockStatus.attemptsRemaining ? lockStatus.attemptsRemaining - 1 : undefined,
-                  timestamp: new Date().toISOString()
-                },
-                result: 'ERROR',
-                errorCode: 'AUTH_USER_NOT_FOUND',
-                errorMessage: 'Usuario no encontrado o sin contraseña configurada'
-              })
-            } catch (auditError) {
-              console.error('[AUTH] Error registrando intento fallido:', auditError)
-            }
-            
             throw new Error('Credenciales inválidas')
+          }
+
+          // Sin contraseña configurada (usuario OAuth o creado sin password)
+          if (!user.passwordHash) {
+            console.error(`[AUTH] Usuario ${credentials.email} no tiene passwordHash configurado`)
+            throw new Error('Esta cuenta no tiene contraseña configurada. Contacta al administrador.')
           }
 
           // Usuario desactivado

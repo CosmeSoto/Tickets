@@ -323,6 +323,12 @@ export async function DELETE(
           error: error.message 
         }, { status: 400 })
       }
+
+      // Exponer el error real para diagnóstico
+      return NextResponse.json({ 
+        success: false,
+        error: error.message 
+      }, { status: 500 })
     }
 
     return NextResponse.json({ 

@@ -43,13 +43,20 @@ const baseEquipmentSchema = z.object({
   
   ownershipType: ownershipTypeSchema,
   
-  purchaseDate: z.coerce.date().optional(),
+  purchaseDate: z.preprocess(
+    (val) => (val === '' || val === undefined || val === null ? undefined : val),
+    z.coerce.date().optional()
+  ),
   
-  purchasePrice: z.number()
-    .positive('El precio debe ser positivo')
-    .optional(),
+  purchasePrice: z.preprocess(
+    (val) => (val === '' || val === undefined || val === null || Number.isNaN(val) ? undefined : val),
+    z.number().positive('El precio debe ser positivo').optional()
+  ),
   
-  warrantyExpiration: z.coerce.date().optional(),
+  warrantyExpiration: z.preprocess(
+    (val) => (val === '' || val === undefined || val === null ? undefined : val),
+    z.coerce.date().optional()
+  ),
   
   specifications: z.record(z.any()).optional(),
   
@@ -69,13 +76,20 @@ const baseEquipmentSchema = z.object({
     .max(100, 'El número de contrato no puede exceder 100 caracteres')
     .optional(),
   
-  rentalStartDate: z.coerce.date().optional(),
+  rentalStartDate: z.preprocess(
+    (val) => (val === '' || val === undefined || val === null ? undefined : val),
+    z.coerce.date().optional()
+  ),
   
-  rentalEndDate: z.coerce.date().optional(),
+  rentalEndDate: z.preprocess(
+    (val) => (val === '' || val === undefined || val === null ? undefined : val),
+    z.coerce.date().optional()
+  ),
   
-  rentalMonthlyCost: z.number()
-    .positive('El costo mensual debe ser positivo')
-    .optional(),
+  rentalMonthlyCost: z.preprocess(
+    (val) => (val === '' || val === undefined || val === null || Number.isNaN(val) ? undefined : val),
+    z.number().positive('El costo mensual debe ser positivo').optional()
+  ),
   
   rentalContactName: z.string()
     .max(255, 'El nombre de contacto no puede exceder 255 caracteres')

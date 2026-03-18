@@ -40,6 +40,7 @@ import {
 import Link from 'next/link'
 import { useToast } from '@/hooks/use-toast'
 import { CategorySelectorWrapper } from '@/features/category-selection'
+import { FilePreviewList } from '@/components/tickets/file-preview-list'
 
 const priorityLabels = {
   LOW: 'Baja',
@@ -437,30 +438,7 @@ export default function CreateClientTicketPage() {
                 </div>
 
                 {selectedFiles.length > 0 && (
-                  <div className='space-y-2 mt-4'>
-                    {selectedFiles.map((file, index) => (
-                      <div
-                        key={index}
-                        className='flex items-center justify-between p-3 bg-muted rounded-lg'
-                      >
-                        <div className='flex items-center space-x-2'>
-                          <File className='h-4 w-4 text-muted-foreground' />
-                          <span className='text-sm'>{file.name}</span>
-                          <span className='text-xs text-muted-foreground'>
-                            ({(file.size / 1024).toFixed(1)} KB)
-                          </span>
-                        </div>
-                        <Button
-                          type='button'
-                          variant='ghost'
-                          size='sm'
-                          onClick={() => removeFile(index)}
-                        >
-                          <X className='h-4 w-4' />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
+                  <FilePreviewList files={selectedFiles} onRemove={removeFile} />
                 )}
               </div>
 

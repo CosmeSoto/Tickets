@@ -9,6 +9,7 @@ import { SLAService } from '@/lib/services/sla-service'
 import { EmailService } from '@/lib/services/email/email-service'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { NotificationService } from '@/lib/services/notification-service'
+import { FileService } from '@/lib/services/file-service'
 
 export async function POST(
   request: NextRequest,
@@ -26,18 +27,23 @@ export async function POST(
     const { id: ticketId } = await params
     const contentType = request.headers.get('content-type')
 
-    let commentData
+    let commentData: { content: string; isInternal: boolean; files: File[] }
     if (contentType?.includes('multipart/form-data')) {
-      // Manejar FormData (con archivos)
       const formData = await request.formData()
+      const files: File[] = []
+      for (const [key, value] of formData.entries()) {
+        if (key.startsWith('attachments') && value instanceof File && value.size > 0) {
+          files.push(value)
+        }
+      }
       commentData = {
         content: formData.get('content') as string,
         isInternal: formData.get('isInternal') === 'true',
-        attachments: [] // En producción, procesar archivos aquí
+        files,
       }
     } else {
-      // Manejar JSON
-      commentData = await request.json()
+      const json = await request.json()
+      commentData = { content: json.content, isInternal: json.isInternal || false, files: [] }
     }
 
     if (!commentData.content?.trim()) {
@@ -92,6 +98,44 @@ export async function POST(
       session.user.id,
       commentData.isInternal || false
     )
+
+    // Subir archivos adjuntos del comentario
+    const uploadedAttachments: { id: string; originalName: string; mimeType: string; size: number }[] = []
+    for (const file of commentData.files) {
+      try {
+        const attachment = await FileService.uploadFile({
+          file,
+          ticketId,
+          uploadedBy: session.user.id,
+          skipHistory: true, // El historial lo maneja el comentario
+        })
+        uploadedAttachments.push({
+          id: attachment.id,
+          originalName: attachment.originalName,
+          mimeType: attachment.mimeType,
+          size: attachment.size,
+        })
+      } catch (err) {
+        console.error('[COMMENT] Error subiendo archivo adjunto:', err)
+      }
+    }
+
+    // Registrar en historial del ticket para que aparezca en el timeline
+    await prisma.ticket_history.create({
+      data: {
+        id: randomUUID(),
+        ticketId,
+        userId: session.user.id,
+        action: 'comment_added',
+        comment: newComment.content,
+        field: commentData.isInternal ? 'internal_comment' : 'comment',
+        // Guardar IDs de adjuntos en newValue como JSON para recuperarlos en el timeline
+        newValue: uploadedAttachments.length > 0 ? JSON.stringify(uploadedAttachments.map(a => a.id)) : null,
+        createdAt: new Date(),
+      }
+    }).catch(err => {
+      console.error('[COMMENT] Error registrando en historial:', err)
+    })
 
     // ⭐ AUDITORÍA: Registrar creación de comentario
     await AuditServiceComplete.log({

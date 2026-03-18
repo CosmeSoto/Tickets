@@ -63,7 +63,7 @@ export class PDFGeneratorService {
       const qrCodeDataUrl = await QRCodeService.generateQRCode(verificationUrl)
 
       // Generar PDF
-      const doc = generateDeliveryActPDF(act as DeliveryAct, qrCodeDataUrl)
+      const doc = await generateDeliveryActPDF(act as DeliveryAct, qrCodeDataUrl)
 
       // Nombre del archivo
       const fileName = `${act.folio.replace(/\//g, '-')}_${Date.now()}.pdf`
@@ -124,7 +124,7 @@ export class PDFGeneratorService {
       const qrCodeDataUrl = await QRCodeService.generateQRCode(verificationUrl)
 
       // Generar PDF
-      const doc = generateReturnActPDF(act, qrCodeDataUrl)
+      const doc = await generateReturnActPDF(act, qrCodeDataUrl)
 
       // Nombre del archivo
       const fileName = `${act.folio.replace(/\//g, '-')}_${Date.now()}.pdf`
