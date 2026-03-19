@@ -66,36 +66,93 @@ export class MaintenanceService {
   }
 
   /**
-   * Completa un mantenimiento
-   * Restaura el estado del equipo según su condición
+   * Completa un mantenimiento.
+   * returnTo: 'available' (bodega) | 'previous_user' (reasignar al último usuario)
    */
   static async completeMaintenance(
     id: string,
-    data: UpdateMaintenanceData,
+    data: UpdateMaintenanceData & { returnTo?: 'available' | 'previous_user' },
     userId: string
-  ): Promise<MaintenanceRecord> {
+  ): Promise<MaintenanceRecord & { reAssigned?: boolean }> {
     try {
       const result = await prisma.$transaction(async (tx) => {
+        const existing = await tx.maintenance_records.findUnique({
+          where: { id },
+          include: {
+            equipment: {
+              include: {
+                assignments: {
+                  where: { isActive: false },
+                  orderBy: { updatedAt: 'desc' },
+                  take: 1,
+                  include: { receiver: true },
+                },
+              },
+            },
+          },
+        })
+        if (!existing) throw new Error('Registro de mantenimiento no encontrado')
+
         // Actualizar registro
         const maintenance = await tx.maintenance_records.update({
           where: { id },
           data: {
             date: data.completedDate || new Date(),
-            cost: data.cost,
-            partsReplaced: data.partsReplaced,
+            ...(data.cost !== undefined && { cost: data.cost }),
+            ...(data.partsReplaced && { partsReplaced: data.partsReplaced }),
           },
-          include: {
-            equipment: true,
-            technician: true,
-            ticket: true,
-          }
+          include: { equipment: true, technician: true, ticket: true },
         })
 
-        // Restaurar estado del equipo a AVAILABLE
-        await tx.equipment.update({
-          where: { id: maintenance.equipmentId },
-          data: { status: 'AVAILABLE' }
-        })
+        let reAssigned = false
+
+        if (data.returnTo === 'previous_user') {
+          // Intentar reasignar al último usuario que lo tuvo
+          const lastAssignment = existing.equipment.assignments?.[0]
+          if (lastAssignment) {
+            await tx.equipment_assignments.create({
+              data: {
+                equipmentId: existing.equipmentId,
+                receiverId: lastAssignment.receiverId,
+                delivererId: userId,
+                assignmentType: lastAssignment.assignmentType,
+                startDate: new Date(),
+                accessories: lastAssignment.accessories,
+                observations: `Reasignado tras mantenimiento completado el ${new Date().toLocaleDateString('es-ES')}`,
+                isActive: true,
+              },
+            })
+            await tx.equipment.update({
+              where: { id: existing.equipmentId },
+              data: { status: 'ASSIGNED' },
+            })
+            await tx.audit_logs.create({
+              data: {
+                id: randomUUID(),
+                action: 'ASSIGNED',
+                entityType: 'equipment',
+                entityId: existing.equipmentId,
+                userId,
+                details: {
+                  receiverId: lastAssignment.receiverId,
+                  receiverName: (lastAssignment.receiver as any)?.name,
+                  assignmentType: lastAssignment.assignmentType,
+                  reason: 'Reasignado tras mantenimiento',
+                },
+              },
+            })
+            reAssigned = true
+          } else {
+            // No hay usuario previo, enviar a bodega
+            await tx.equipment.update({ where: { id: existing.equipmentId }, data: { status: 'AVAILABLE' } })
+          }
+        } else {
+          // Enviar a bodega (AVAILABLE)
+          await tx.equipment.update({
+            where: { id: existing.equipmentId },
+            data: { status: 'AVAILABLE' },
+          })
+        }
 
         // Registrar en auditoría
         await tx.audit_logs.create({
@@ -107,15 +164,16 @@ export class MaintenanceService {
             userId,
             details: {
               cost: data.cost,
-              completedDate: data.completedDate,
-            }
-          }
+              completedDate: (data.completedDate || new Date()).toISOString(),
+              returnTo: data.returnTo || 'available',
+            },
+          },
         })
 
-        return maintenance
+        return { ...maintenance, reAssigned }
       })
 
-      return result as MaintenanceRecord
+      return result as MaintenanceRecord & { reAssigned?: boolean }
     } catch (error) {
       console.error('Error completando mantenimiento:', error)
       throw error

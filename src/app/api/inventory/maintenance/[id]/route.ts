@@ -33,7 +33,8 @@ export async function GET(
 
 /**
  * PATCH /api/inventory/maintenance/[id]
- * Reagenda o completa un mantenimiento
+ * Reagenda o completa un mantenimiento.
+ * CLIENT solo puede usar action='complete'.
  */
 export async function PATCH(
   request: NextRequest,
@@ -44,13 +45,15 @@ export async function PATCH(
     if (!session?.user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
-    if (session.user.role === 'CLIENT') {
-      return NextResponse.json({ error: 'No tienes permisos' }, { status: 403 })
-    }
 
     const { id } = await params
     const body = await request.json()
-    const { action, scheduledDate, description, cost, partsReplaced } = body
+    const { action, scheduledDate, description, cost, partsReplaced, returnTo } = body
+
+    // CLIENT solo puede completar
+    if (session.user.role === 'CLIENT' && action !== 'complete') {
+      return NextResponse.json({ error: 'No tienes permisos' }, { status: 403 })
+    }
 
     if (action === 'reschedule') {
       if (!scheduledDate) {
@@ -67,7 +70,12 @@ export async function PATCH(
     if (action === 'complete') {
       const result = await MaintenanceService.completeMaintenance(
         id,
-        { completedDate: new Date(), cost, partsReplaced },
+        {
+          completedDate: new Date(),
+          cost: cost !== undefined ? parseFloat(cost) : undefined,
+          partsReplaced,
+          returnTo: returnTo || 'available',
+        },
         session.user.id
       )
       return NextResponse.json(result)

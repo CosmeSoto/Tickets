@@ -15,7 +15,8 @@ import {
   MapPin,
   FileText,
   AlertCircle,
-  Loader2
+  Loader2,
+  ExternalLink,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,6 +40,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -471,8 +473,7 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
               {equipment.type?.name || 'Sin tipo'} - {equipment.brand} {equipment.model}
             </p>
           </div>
-        </div>
-        <div className="flex gap-2">
+        </div>        <div className="flex gap-2">
           {canReportProblem && (
             <Button onClick={handleReportProblem} variant="default">
               <AlertCircle className="mr-2 h-4 w-4" />
@@ -523,6 +524,48 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
           )}
         </div>
       </div>
+
+      {/* Banner contextual de estado */}
+      {isInMaintenance && maintenanceRecords && maintenanceRecords.length > 0 && (
+        <Alert className="border-yellow-400 bg-yellow-50">
+          <Wrench className="h-4 w-4 text-yellow-600" />
+          <AlertDescription className="text-yellow-800 flex items-center justify-between">
+            <span>
+              <span className="font-medium">Equipo en mantenimiento.</span>{' '}
+              {userRole === 'CLIENT'
+                ? 'Cuando el equipo esté listo, puedes marcarlo como completado.'
+                : 'Completa el mantenimiento para devolver el equipo a bodega o reasignarlo.'}
+            </span>
+            <a
+              href={`/inventory/maintenance/${maintenanceRecords[0].id}`}
+              className="ml-4 flex items-center gap-1 text-sm font-medium text-yellow-700 underline underline-offset-2 hover:text-yellow-900 flex-shrink-0"
+            >
+              Ver mantenimiento <ExternalLink className="h-3 w-3" />
+            </a>
+          </AlertDescription>
+        </Alert>
+      )}
+      {isAssigned && currentAssignment && (
+        <Alert className="border-blue-300 bg-blue-50">
+          <AlertCircle className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-800">
+            <span className="font-medium">Equipo asignado</span> a{' '}
+            <span className="font-medium">{currentAssignment.receiver?.name}</span> desde el{' '}
+            {new Date(currentAssignment.startDate).toLocaleDateString('es-ES')}.
+            {(userRole === 'ADMIN' || userRole === 'TECHNICIAN') && ' Para reasignarlo, primero devuélvelo a bodega.'}
+          </AlertDescription>
+        </Alert>
+      )}
+      {isRetired && (
+        <Alert className="border-gray-300 bg-gray-50">
+          <AlertCircle className="h-4 w-4 text-gray-500" />
+          <AlertDescription className="text-gray-700">
+            <span className="font-medium">Equipo dado de baja.</span>{' '}
+            Ya no está activo en el inventario.
+            {canPermanentDelete && ' Puedes eliminarlo definitivamente del sistema.'}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Dialog de asignación */}
       <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
@@ -948,21 +991,40 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {maintenanceRecords.map((record: any) => (
-                <div key={record.id} className="flex justify-between items-start border-b pb-4 last:border-0">
-                  <div>
-                    <p className="font-medium">{record.type === 'PREVENTIVE' ? 'Preventivo' : 'Correctivo'}</p>
-                    <p className="text-sm text-muted-foreground">{record.description}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {formatDate(record.date)} - {record.technician?.name}
-                    </p>
-                  </div>
-                  {record.cost && (
-                    <p className="text-sm font-medium">{formatCurrency(record.cost)}</p>
-                  )}
-                </div>
-              ))}
+            <div className="space-y-3">
+              {maintenanceRecords.map((record: any) => {
+                const isActive = equipment.status === 'MAINTENANCE' && record === maintenanceRecords[0]
+                return (
+                  <a
+                    key={record.id}
+                    href={`/inventory/maintenance/${record.id}`}
+                    className={`flex justify-between items-start p-3 rounded-lg border transition-colors hover:bg-muted/50 cursor-pointer ${
+                      isActive ? 'border-yellow-300 bg-yellow-50' : 'border-border'
+                    }`}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm">
+                          {record.type === 'PREVENTIVE' ? 'Preventivo' : 'Correctivo'}
+                        </span>
+                        {isActive && (
+                          <Badge className="bg-yellow-100 text-yellow-800 text-xs">En curso</Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">{record.description}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(record.date)}{record.technician?.name ? ` — ${record.technician.name}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {record.cost && (
+                        <span className="text-sm font-medium">{formatCurrency(record.cost)}</span>
+                      )}
+                      <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                    </div>
+                  </a>
+                )
+              })}
             </div>
           </CardContent>
         </Card>
