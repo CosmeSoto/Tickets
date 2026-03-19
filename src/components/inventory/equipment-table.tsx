@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { MoreHorizontal, Eye, Edit, Trash2, QrCode } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -72,6 +73,7 @@ export function EquipmentTable({
   onDelete,
   onViewQR,
 }: EquipmentTableProps) {
+  const router = useRouter()
   const canEdit = userRole === 'ADMIN' || userRole === 'TECHNICIAN'
   const canDelete = userRole === 'ADMIN'
 
@@ -101,15 +103,12 @@ export function EquipmentTable({
         </TableHeader>
         <TableBody>
           {equipment.map((item) => (
-            <TableRow key={item.id}>
-              <TableCell className="font-medium">
-                <Link
-                  href={`/inventory/equipment/${item.id}`}
-                  className="hover:underline"
-                >
-                  {item.code}
-                </Link>
-              </TableCell>
+            <TableRow
+              key={item.id}
+              className="cursor-pointer hover:bg-muted/50"
+              onClick={() => router.push(`/inventory/equipment/${item.id}`)}
+            >
+              <TableCell className="font-medium">{item.code}</TableCell>
               <TableCell>
                 <div>
                   <div className="font-medium">{item.brand} {item.model}</div>
@@ -138,7 +137,7 @@ export function EquipmentTable({
                   {item.location || '-'}
                 </span>
               </TableCell>
-              <TableCell className="text-right">
+              <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon">
