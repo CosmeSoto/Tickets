@@ -218,8 +218,8 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
       }
 
       toast({
-        title: 'Equipo retirado',
-        description: 'El equipo ha sido marcado como retirado',
+        title: 'Equipo dado de baja',
+        description: 'El equipo ha sido marcado como retirado del inventario activo.',
       })
 
       router.push('/inventory')
@@ -433,10 +433,22 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
   const { equipment, currentAssignment, history, maintenanceRecords } = data
   const isAdmin = userRole === 'ADMIN'
   const isRetired = equipment.status === 'RETIRED'
+  const isAssigned = equipment.status === 'ASSIGNED' || !!currentAssignment
+  const isInMaintenance = equipment.status === 'MAINTENANCE'
+
+  // Editar: ADMIN o TECHNICIAN, mientras no esté retirado
   const canEdit = (userRole === 'ADMIN' || userRole === 'TECHNICIAN') && !isRetired
-  const canDelete = userRole === 'ADMIN'
+  // Asignar: solo si está disponible en bodega
   const canAssign = (userRole === 'ADMIN' || userRole === 'TECHNICIAN') && equipment.status === 'AVAILABLE'
-  const canUnassign = (userRole === 'ADMIN' || userRole === 'TECHNICIAN') && !!currentAssignment
+  // Devolver a bodega: solo si tiene asignación activa
+  const canReturn = (userRole === 'ADMIN' || userRole === 'TECHNICIAN') && isAssigned
+  // Mantenimiento: si no está retirado ni ya en mantenimiento
+  const canMaintenance = (userRole === 'ADMIN' || userRole === 'TECHNICIAN') && !isRetired && !isInMaintenance
+  // Dar de baja: ADMIN, no retirado, sin asignación activa
+  const canRetire = userRole === 'ADMIN' && !isRetired && !isAssigned
+  // Eliminar definitivamente: solo ADMIN y solo si ya está retirado
+  const canPermanentDelete = isAdmin && isRetired
+  // Cliente reportar problema: solo si el equipo le está asignado
   const canReportProblem = userRole === 'CLIENT' && currentAssignment?.receiverId === userId
 
   return (
@@ -471,31 +483,31 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
               Asignar
             </Button>
           )}
-          {canUnassign && (
+          {canReturn && (
             <Button onClick={() => setShowReturnDialog(true)} variant="outline" className="border-orange-300 text-orange-700 hover:bg-orange-50">
               <UserPlus className="mr-2 h-4 w-4 rotate-180" />
-              Devolver Equipo
+              Devolver a Bodega
             </Button>
           )}
-          {canEdit && (
+          {canMaintenance && (
             <Button onClick={handleMaintenance} variant="outline">
               <Wrench className="mr-2 h-4 w-4" />
               Mantenimiento
             </Button>
           )}
-          {canDelete && !isRetired && equipment.status !== 'ASSIGNED' && (
+          {canRetire && (
             <Button onClick={() => setShowDeleteDialog(true)} variant="destructive">
               <Trash2 className="mr-2 h-4 w-4" />
-              Retirar
+              Dar de Baja
             </Button>
           )}
-          {isAdmin && isRetired && (
+          {canPermanentDelete && (
             <Button
               onClick={() => setShowPermanentDeleteDialog(true)}
               variant="ghost"
               size="sm"
               className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-              title="Eliminar permanentemente"
+              title="Eliminar permanentemente del sistema"
             >
               <Trash2 className="mr-2 h-4 w-4" />
               <span className="text-xs">Eliminar definitivamente</span>
@@ -667,24 +679,22 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
         </DialogContent>
       </Dialog>
 
-      {/* Dialog de confirmación para retirar */}
+      {/* Dialog de confirmación para dar de baja */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Retirar equipo</AlertDialogTitle>
+            <AlertDialogTitle>Dar de baja el equipo</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2">
                 <p>
-                  ¿Estás seguro de que deseas retirar el equipo{' '}
-                  <span className="font-semibold">{equipment.code}</span> ({equipment.brand} {equipment.model})?
-                  El estado cambiará a &quot;Retirado&quot; y no podrá asignarse nuevamente.
+                  ¿Confirmas que el equipo{' '}
+                  <span className="font-semibold">{equipment.code}</span> ({equipment.brand} {equipment.model}){' '}
+                  ya no está en uso y debe darse de baja?
                 </p>
-                {currentAssignment && (
-                  <p className="text-sm text-destructive font-medium">
-                    ⚠️ Este equipo tiene una asignación activa con {currentAssignment.receiver?.name}. 
-                    Debes desasignarlo primero antes de retirarlo.
-                  </p>
-                )}
+                <p className="text-sm text-muted-foreground">
+                  El estado cambiará a <span className="font-medium">Retirado</span>. El equipo dejará de aparecer como activo en el inventario.
+                  Podrás eliminarlo definitivamente después si lo necesitas.
+                </p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -692,10 +702,10 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
             <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              disabled={deleting || !!currentAssignment}
+              disabled={deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleting ? 'Retirando...' : 'Sí, retirar equipo'}
+              {deleting ? 'Procesando...' : 'Sí, dar de baja'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

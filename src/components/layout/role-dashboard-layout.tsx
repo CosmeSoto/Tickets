@@ -30,9 +30,7 @@ import {
   Boxes,
   Ruler,
   Monitor,
-  Plus,
   HelpCircle,
-  Bell,
 } from 'lucide-react'
 import { Notifications } from '@/components/ui/notifications'
 import { Button } from '@/components/ui/button'
@@ -97,7 +95,6 @@ const navigationByRole: Record<string, NavItem[]> = {
       ],
     },
     { name: 'Auditoría', href: '/admin/audit', icon: Shield },
-    { name: 'Notificaciones', href: '/admin/notifications', icon: Bell },
     { name: 'Configuración Sistema', href: '/admin/settings', icon: Settings },
   ],
   TECHNICIAN: [
@@ -127,7 +124,6 @@ const navigationByRole: Record<string, NavItem[]> = {
         { name: 'Unidades de Medida', href: '/inventory/units-of-measure', icon: Ruler },
       ],
     },
-    { name: 'Notificaciones', href: '/technician/notifications', icon: Bell },
   ],
   CLIENT: [
     { name: 'Dashboard', href: '/client', icon: LayoutDashboard },
@@ -137,7 +133,6 @@ const navigationByRole: Record<string, NavItem[]> = {
       icon: Ticket,
       children: [
         { name: 'Ver Tickets', href: '/client/tickets', icon: Ticket },
-        { name: 'Crear Ticket', href: '/client/tickets/create', icon: Plus },
         { name: 'Base de Conocimientos', href: '/knowledge', icon: BookOpen },
         { name: 'Centro de Ayuda', href: '/client/help', icon: HelpCircle },
       ],
@@ -151,7 +146,6 @@ const navigationByRole: Record<string, NavItem[]> = {
         { name: 'Licencias/Contratos', href: '/inventory/licenses', icon: Key },
       ],
     },
-    { name: 'Notificaciones', href: '/client/notifications', icon: Bell },
   ],
 }
 
