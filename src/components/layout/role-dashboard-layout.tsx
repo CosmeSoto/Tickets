@@ -32,6 +32,7 @@ import {
   Monitor,
   Plus,
   HelpCircle,
+  Bell,
 } from 'lucide-react'
 import { Notifications } from '@/components/ui/notifications'
 import { Button } from '@/components/ui/button'
@@ -85,17 +86,18 @@ const navigationByRole: Record<string, NavItem[]> = {
       icon: Package,
       children: [
         { name: 'Equipos', href: '/inventory', icon: Monitor },
-        { name: 'Licencias', href: '/inventory/licenses', icon: Key },
+        { name: 'Licencias/Contratos', href: '/inventory/licenses', icon: Key },
         { name: 'Consumibles', href: '/inventory/consumables', icon: ShoppingCart },
         { name: 'Reportes', href: '/inventory/reports', icon: BarChart3 },
         { name: 'Tipos de Equipo', href: '/inventory/equipment-types', icon: Boxes },
-        { name: 'Tipos de Licencia', href: '/inventory/license-types', icon: Key },
+        { name: 'Tipos de Licencias/Contratos', href: '/inventory/license-types', icon: Key },
         { name: 'Tipos de Consumible', href: '/inventory/consumable-types', icon: ShoppingCart },
         { name: 'Unidades de Medida', href: '/inventory/units-of-measure', icon: Ruler },
         { name: 'Configuración', href: '/settings/inventory', icon: Settings },
       ],
     },
     { name: 'Auditoría', href: '/admin/audit', icon: Shield },
+    { name: 'Notificaciones', href: '/admin/notifications', icon: Bell },
     { name: 'Configuración Sistema', href: '/admin/settings', icon: Settings },
   ],
   TECHNICIAN: [
@@ -117,14 +119,15 @@ const navigationByRole: Record<string, NavItem[]> = {
       icon: Package,
       children: [
         { name: 'Equipos', href: '/inventory', icon: Monitor },
-        { name: 'Licencias', href: '/inventory/licenses', icon: Key },
+        { name: 'Licencias/Contratos', href: '/inventory/licenses', icon: Key },
         { name: 'Consumibles', href: '/inventory/consumables', icon: ShoppingCart },
         { name: 'Tipos de Equipo', href: '/inventory/equipment-types', icon: Boxes },
-        { name: 'Tipos de Licencia', href: '/inventory/license-types', icon: Key },
+        { name: 'Tipos de Licencias/Contratos', href: '/inventory/license-types', icon: Key },
         { name: 'Tipos de Consumible', href: '/inventory/consumable-types', icon: ShoppingCart },
         { name: 'Unidades de Medida', href: '/inventory/units-of-measure', icon: Ruler },
       ],
     },
+    { name: 'Notificaciones', href: '/technician/notifications', icon: Bell },
   ],
   CLIENT: [
     { name: 'Dashboard', href: '/client', icon: LayoutDashboard },
@@ -145,9 +148,10 @@ const navigationByRole: Record<string, NavItem[]> = {
       icon: Package,
       children: [
         { name: 'Equipos Asignados', href: '/inventory', icon: Monitor },
-        { name: 'Licencias', href: '/inventory/licenses', icon: Key },
+        { name: 'Licencias/Contratos', href: '/inventory/licenses', icon: Key },
       ],
     },
+    { name: 'Notificaciones', href: '/client/notifications', icon: Bell },
   ],
 }
 

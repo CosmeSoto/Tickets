@@ -131,6 +131,15 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
     observations: '',
   })
 
+  // Dialog de devolución
+  const [showReturnDialog, setShowReturnDialog] = useState(false)
+  const [returning, setReturning] = useState(false)
+  const [returnForm, setReturnForm] = useState({
+    returnDate: new Date().toISOString().split('T')[0],
+    observations: '',
+    condition: '',
+  })
+
   // Dialog de mantenimiento
   const [showMaintenanceDialog, setShowMaintenanceDialog] = useState(false)
   const [submittingMaintenance, setSubmittingMaintenance] = useState(false)
@@ -194,7 +203,18 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
 
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.error || 'Error al eliminar equipo')
+        if (response.status === 409) {
+          // Tiene asignación activa — cerrar diálogo y mostrar mensaje claro
+          setShowDeleteDialog(false)
+          toast({
+            title: 'No se puede retirar el equipo',
+            description: 'El equipo tiene una asignación activa. Primero debes desasignarlo (generar acta de devolución) y luego retirarlo.',
+            variant: 'destructive',
+            duration: 8000,
+          })
+          return
+        }
+        throw new Error(error.error || 'Error al retirar equipo')
       }
 
       toast({
@@ -207,7 +227,7 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
       console.error('Error eliminando equipo:', error)
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'No se pudo eliminar el equipo',
+        description: error instanceof Error ? error.message : 'No se pudo retirar el equipo',
         variant: 'destructive',
       })
     } finally {
@@ -297,6 +317,44 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
     }
   }
 
+  const submitReturn = async () => {
+    if (!currentAssignment) return
+    setReturning(true)
+    try {
+      const response = await fetch(`/api/inventory/assignments/${currentAssignment.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          returnDate: returnForm.returnDate,
+          observations: returnForm.observations || undefined,
+          condition: returnForm.condition || undefined,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Error al devolver equipo')
+      }
+
+      toast({
+        title: 'Equipo devuelto',
+        description: 'El equipo ha sido devuelto al inventario y está disponible nuevamente.',
+      })
+
+      setShowReturnDialog(false)
+      setReturnForm({ returnDate: new Date().toISOString().split('T')[0], observations: '', condition: '' })
+      loadEquipmentDetail()
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'No se pudo devolver el equipo',
+        variant: 'destructive',
+      })
+    } finally {
+      setReturning(false)
+    }
+  }
+
   const handleMaintenance = () => {
     setShowMaintenanceDialog(true)
   }
@@ -378,6 +436,7 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
   const canEdit = (userRole === 'ADMIN' || userRole === 'TECHNICIAN') && !isRetired
   const canDelete = userRole === 'ADMIN'
   const canAssign = (userRole === 'ADMIN' || userRole === 'TECHNICIAN') && equipment.status === 'AVAILABLE'
+  const canUnassign = (userRole === 'ADMIN' || userRole === 'TECHNICIAN') && !!currentAssignment
   const canReportProblem = userRole === 'CLIENT' && currentAssignment?.receiverId === userId
 
   return (
@@ -410,6 +469,12 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
             <Button onClick={handleAssign}>
               <UserPlus className="mr-2 h-4 w-4" />
               Asignar
+            </Button>
+          )}
+          {canUnassign && (
+            <Button onClick={() => setShowReturnDialog(true)} variant="outline" className="border-orange-300 text-orange-700 hover:bg-orange-50">
+              <UserPlus className="mr-2 h-4 w-4 rotate-180" />
+              Devolver Equipo
             </Button>
           )}
           {canEdit && (
@@ -496,6 +561,66 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
         </DialogContent>
       </Dialog>
 
+      {/* Dialog de devolución */}
+      <Dialog open={showReturnDialog} onOpenChange={setShowReturnDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Devolver Equipo</DialogTitle>
+            <DialogDescription>
+              Registra la devolución del equipo <span className="font-semibold">{equipment.code}</span>.
+              {currentAssignment && (
+                <span className="block mt-1">
+                  Actualmente asignado a: <span className="font-medium">{currentAssignment.receiver?.name}</span>
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Fecha de Devolución *</Label>
+              <Input
+                type="date"
+                value={returnForm.returnDate}
+                onChange={(e) => setReturnForm(prev => ({ ...prev, returnDate: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Condición al Devolver</Label>
+              <Select
+                value={returnForm.condition}
+                onValueChange={(v) => setReturnForm(prev => ({ ...prev, condition: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sin cambio de condición..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NEW">Nuevo</SelectItem>
+                  <SelectItem value="LIKE_NEW">Como Nuevo</SelectItem>
+                  <SelectItem value="GOOD">Bueno</SelectItem>
+                  <SelectItem value="FAIR">Regular</SelectItem>
+                  <SelectItem value="POOR">Malo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Observaciones</Label>
+              <Textarea
+                value={returnForm.observations}
+                onChange={(e) => setReturnForm(prev => ({ ...prev, observations: e.target.value }))}
+                placeholder="Estado del equipo al momento de la devolución..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowReturnDialog(false)} disabled={returning}>Cancelar</Button>
+            <Button onClick={submitReturn} disabled={returning}>
+              {returning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Confirmar Devolución
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Dialog de mantenimiento */}
       <Dialog open={showMaintenanceDialog} onOpenChange={setShowMaintenanceDialog}>
         <DialogContent>
@@ -547,17 +672,27 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Retirar equipo</AlertDialogTitle>
-            <AlertDialogDescription>
-              ¿Estás seguro de que deseas retirar el equipo{' '}
-              <span className="font-semibold">{equipment.code}</span> ({equipment.brand} {equipment.model})?
-              Esta acción cambiará el estado del equipo a &quot;Retirado&quot;.
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  ¿Estás seguro de que deseas retirar el equipo{' '}
+                  <span className="font-semibold">{equipment.code}</span> ({equipment.brand} {equipment.model})?
+                  El estado cambiará a &quot;Retirado&quot; y no podrá asignarse nuevamente.
+                </p>
+                {currentAssignment && (
+                  <p className="text-sm text-destructive font-medium">
+                    ⚠️ Este equipo tiene una asignación activa con {currentAssignment.receiver?.name}. 
+                    Debes desasignarlo primero antes de retirarlo.
+                  </p>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              disabled={deleting}
+              disabled={deleting || !!currentAssignment}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleting ? 'Retirando...' : 'Sí, retirar equipo'}

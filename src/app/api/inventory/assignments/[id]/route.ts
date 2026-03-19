@@ -10,6 +10,52 @@ interface RouteParams {
 }
 
 /**
+ * PATCH /api/inventory/assignments/[id]
+ * Devuelve/completa una asignación activa (genera acta de devolución)
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: RouteParams
+) {
+  try {
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
+    if (session.user.role === 'CLIENT') {
+      return NextResponse.json({ error: 'No tienes permisos para devolver equipos' }, { status: 403 })
+    }
+
+    const body = await request.json()
+    const { returnDate, observations, condition } = body
+
+    if (!returnDate) {
+      return NextResponse.json({ error: 'La fecha de devolución es requerida' }, { status: 400 })
+    }
+
+    const assignment = await AssignmentService.returnEquipment(
+      params.id,
+      new Date(returnDate),
+      session.user.id,
+      observations,
+      condition
+    )
+
+    return NextResponse.json(assignment)
+  } catch (error) {
+    console.error('Error en PATCH /api/inventory/assignments/[id]:', error)
+
+    if (error instanceof Error) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+
+    return NextResponse.json({ error: 'Error al devolver equipo' }, { status: 500 })
+  }
+}
+
+/**
  * GET /api/inventory/assignments/[id]
  * Obtiene detalles de una asignación
  */

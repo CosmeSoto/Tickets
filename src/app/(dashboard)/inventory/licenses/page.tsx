@@ -201,6 +201,8 @@ export default function LicensesPage() {
 
   const openEditForm = (license: License) => {
     setEditingLicense(license)
+    // Detectar si era contrato corporativo (guardado en notes)
+    const isEmpresa = license.notes?.includes('[Contrato corporativo:') && !license.assignedToDepartment
     setFormData({
       name: license.name,
       typeId: license.typeId,
@@ -209,9 +211,9 @@ export default function LicensesPage() {
       expirationDate: license.expirationDate?.split('T')[0] || '',
       cost: license.cost?.toString() || '',
       vendor: license.vendor || '',
-      notes: license.notes || '',
+      notes: license.notes?.replace(/\[Contrato corporativo:[^\]]*\]\n?/g, '').trim() || '',
       assignedToUser: license.assignedToUser || '',
-      assignedToDepartment: license.assignedToDepartment || '',
+      assignedToDepartment: isEmpresa ? 'EMPRESA' : (license.assignedToDepartment || ''),
       assignedToEquipment: license.assignedToEquipment || '',
     })
     setShowForm(true)
@@ -233,10 +235,23 @@ export default function LicensesPage() {
       if (formData.expirationDate) body.expirationDate = formData.expirationDate
       if (formData.cost) body.cost = parseFloat(formData.cost)
       if (formData.vendor) body.vendor = formData.vendor
-      if (formData.notes) body.notes = formData.notes
-      if (formData.assignedToUser) body.assignedToUser = formData.assignedToUser
-      if (formData.assignedToDepartment) body.assignedToDepartment = formData.assignedToDepartment
-      if (formData.assignedToEquipment) body.assignedToEquipment = formData.assignedToEquipment
+
+      // Manejar asignación según modo
+      // 'EMPRESA' es un valor especial — se guarda en notas, no en FK
+      if (formData.assignedToDepartment === 'EMPRESA') {
+        body.assignedToDepartment = null
+        body.assignedToUser = null
+        body.assignedToEquipment = null
+        const empresaNote = '[Contrato corporativo: aplica a toda la empresa]'
+        const existingNotes = formData.notes?.replace(/\[Contrato corporativo:[^\]]*\]/g, '').trim() || ''
+        body.notes = [empresaNote, existingNotes].filter(Boolean).join('\n')
+      } else {
+        body.assignedToUser = formData.assignedToUser || null
+        body.assignedToDepartment = formData.assignedToDepartment || null
+        body.assignedToEquipment = formData.assignedToEquipment || null
+        // Limpiar nota de empresa si existía
+        body.notes = (formData.notes || '').replace(/\[Contrato corporativo:[^\]]*\]\n?/g, '').trim() || null
+      }
 
       const url = editingLicense
         ? `/api/inventory/licenses/${editingLicense.id}`
@@ -298,6 +313,9 @@ export default function LicensesPage() {
 
   const getAssignedTo = (license: License) => {
     const parts: string[] = []
+    if (license.notes?.includes('[Contrato corporativo:') && !license.assignedToDepartment) {
+      parts.push('🏢 Toda la empresa')
+    }
     if (license.user) parts.push(license.user.name)
     if (license.department) parts.push(license.department.name)
     if (license.equipment) parts.push(`${license.equipment.code}`)
@@ -495,42 +513,108 @@ export default function LicensesPage() {
               {/* Asignaciones */}
               <div className="border-t pt-4">
                 <Label className="text-base font-semibold">Asignación</Label>
-                <p className="text-xs text-muted-foreground mb-3">Asigna la licencia a un usuario, departamento y/o equipo</p>
-                <div className="space-y-3">
-                  <div>
-                    <Label>Usuario</Label>
-                    <Combobox
-                      options={users.map(u => ({ value: u.id, label: u.name + (u.email ? ` (${u.email})` : '') }))}
-                      value={formData.assignedToUser}
-                      onValueChange={v => setFormData(f => ({ ...f, assignedToUser: v }))}
-                      placeholder="Seleccionar usuario..."
-                      searchPlaceholder="Buscar usuario..."
-                      emptyText="No se encontró el usuario"
-                    />
-                  </div>
-                  <div>
-                    <Label>Departamento</Label>
-                    <Combobox
-                      options={departments.map(d => ({ value: d.id, label: d.name }))}
-                      value={formData.assignedToDepartment}
-                      onValueChange={v => setFormData(f => ({ ...f, assignedToDepartment: v }))}
-                      placeholder="Seleccionar departamento..."
-                      searchPlaceholder="Buscar departamento..."
-                      emptyText="No se encontró el departamento"
-                    />
-                  </div>
-                  <div>
-                    <Label>Equipo</Label>
-                    <Combobox
-                      options={equipmentList.map(e => ({ value: e.id, label: e.name }))}
-                      value={formData.assignedToEquipment}
-                      onValueChange={v => setFormData(f => ({ ...f, assignedToEquipment: v }))}
-                      placeholder="Seleccionar equipo..."
-                      searchPlaceholder="Buscar equipo..."
-                      emptyText="No se encontró el equipo"
-                    />
-                  </div>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Define a quién aplica esta licencia o contrato
+                </p>
+
+                {/* Selector de modo de asignación */}
+                <div className="mb-4">
+                  <Label className="text-sm">Tipo de asignación</Label>
+                  <Select
+                    value={
+                      formData.assignedToEquipment && formData.assignedToUser ? 'user-equipment' :
+                      formData.assignedToEquipment && !formData.assignedToUser ? 'equipment-only' :
+                      formData.assignedToUser && !formData.assignedToDepartment ? 'user-only' :
+                      formData.assignedToDepartment ? 'department' :
+                      'none'
+                    }
+                    onValueChange={(v) => {
+                      // Limpiar campos al cambiar modo
+                      setFormData(f => ({
+                        ...f,
+                        assignedToUser: '',
+                        assignedToDepartment: '',
+                        assignedToEquipment: '',
+                      }))
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar tipo..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin asignar (disponible)</SelectItem>
+                      <SelectItem value="user-only">Usuario — licencia personal (ej: Adobe CC, suscripción)</SelectItem>
+                      <SelectItem value="user-equipment">Usuario + Equipo — instalada en equipo específico (ej: Windows OEM, Office)</SelectItem>
+                      <SelectItem value="equipment-only">Solo Equipo — licencia OEM del equipo</SelectItem>
+                      <SelectItem value="department">Departamento — contrato o licencia compartida (ej: antivirus, ERP)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
+
+                {/* Campos según modo */}
+                {(formData.assignedToUser !== undefined) && (() => {
+                  const mode =
+                    formData.assignedToEquipment && formData.assignedToUser ? 'user-equipment' :
+                    formData.assignedToEquipment && !formData.assignedToUser ? 'equipment-only' :
+                    formData.assignedToUser && !formData.assignedToDepartment ? 'user-only' :
+                    formData.assignedToDepartment ? 'department' :
+                    'none'
+
+                  return (
+                    <div className="space-y-3">
+                      {(mode === 'user-only' || mode === 'user-equipment') && (
+                        <div>
+                          <Label>Usuario *</Label>
+                          <Combobox
+                            options={users.map(u => ({ value: u.id, label: u.name + (u.email ? ` (${u.email})` : '') }))}
+                            value={formData.assignedToUser}
+                            onValueChange={v => setFormData(f => ({ ...f, assignedToUser: v }))}
+                            placeholder="Buscar usuario..."
+                            searchPlaceholder="Nombre o correo..."
+                            emptyText="No se encontró el usuario"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            El departamento del usuario se registra automáticamente en los reportes.
+                          </p>
+                        </div>
+                      )}
+
+                      {(mode === 'user-equipment' || mode === 'equipment-only') && (
+                        <div>
+                          <Label>Equipo *</Label>
+                          <Combobox
+                            options={equipmentList.map(e => ({ value: e.id, label: e.name }))}
+                            value={formData.assignedToEquipment}
+                            onValueChange={v => setFormData(f => ({ ...f, assignedToEquipment: v }))}
+                            placeholder="Buscar equipo..."
+                            searchPlaceholder="Código, marca o modelo..."
+                            emptyText="No se encontró el equipo"
+                          />
+                        </div>
+                      )}
+
+                      {mode === 'department' && (
+                        <div>
+                          <Label>Departamento *</Label>
+                          <Combobox
+                            options={[
+                              { value: 'EMPRESA', label: '🏢 Toda la empresa (contrato corporativo)' },
+                              ...departments.map(d => ({ value: d.id, label: d.name }))
+                            ]}
+                            value={formData.assignedToDepartment}
+                            onValueChange={v => setFormData(f => ({ ...f, assignedToDepartment: v }))}
+                            placeholder="Seleccionar departamento..."
+                            searchPlaceholder="Buscar departamento..."
+                            emptyText="No se encontró el departamento"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Para contratos que cubren múltiples departamentos, usa &quot;Toda la empresa&quot; y detalla en las notas.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
               </div>
 
               <div>

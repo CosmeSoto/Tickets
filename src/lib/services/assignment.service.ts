@@ -295,6 +295,80 @@ export class AssignmentService {
   }
 
   /**
+   * Devuelve un equipo — cierra la asignación activa y restaura estado AVAILABLE
+   */
+  static async returnEquipment(
+    assignmentId: string,
+    returnDate: Date,
+    userId: string,
+    observations?: string,
+    condition?: string
+  ): Promise<Assignment> {
+    try {
+      const assignment = await prisma.equipment_assignments.findUnique({
+        where: { id: assignmentId },
+        include: { equipment: true, receiver: true }
+      })
+
+      if (!assignment) {
+        throw new Error('Asignación no encontrada')
+      }
+
+      if (!assignment.isActive) {
+        throw new Error('La asignación ya está completada')
+      }
+
+      const updated = await prisma.$transaction(async (tx) => {
+        // Cerrar asignación
+        const updatedAssignment = await tx.equipment_assignments.update({
+          where: { id: assignmentId },
+          data: {
+            isActive: false,
+            actualEndDate: returnDate,
+            ...(observations && { observations }),
+          },
+          include: { equipment: true, receiver: true, deliverer: true }
+        })
+
+        // Restaurar estado del equipo a AVAILABLE
+        await tx.equipment.update({
+          where: { id: assignment.equipmentId },
+          data: {
+            status: 'AVAILABLE',
+            ...(condition && { condition }),
+          }
+        })
+
+        // Registrar en auditoría
+        await tx.audit_logs.create({
+          data: {
+            id: randomUUID(),
+            action: 'RETURNED',
+            entityType: 'equipment',
+            entityId: assignment.equipmentId,
+            userId,
+            details: {
+              assignmentId,
+              receiverId: assignment.receiverId,
+              receiverName: (assignment.receiver as any)?.name,
+              actualEndDate: returnDate.toISOString(),
+              observations: observations || null,
+              condition: condition || null,
+            }
+          }
+        })
+
+        return updatedAssignment
+      })
+
+      return updated as Assignment
+    } catch (error) {
+      console.error('Error devolviendo equipo:', error)
+      throw error
+    }
+  }
+
+  /**
    * Cancela una asignación (cuando se rechaza el acta)
    */
   static async cancelAssignment(
