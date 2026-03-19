@@ -33,6 +33,38 @@ npm run dev
 http://localhost:3000
 ```
 
+# Borrar pantalla
+
+clear
+
+# Borrar la caché
+
+rm -rf .next
+
+# 1. Verifica qué archivos han cambiado (opcional, pero recomendado)
+
+git status
+
+# 2. Prepara todos los archivos modificados para ser guardados
+
+git add .
+
+# 3. Guarda los cambios con un mensaje descriptivo
+
+git commit -m "Descripción de lo que trabajaste hoy (ej: Corregido error de login)"
+
+# 4. Sube los cambios al repositorio remoto (GitHub)
+
+git push origin main
+
+# 5. Asegúrate de estar en la rama correcta (usualmente main o master)
+
+git checkout main
+
+# 6. Descarga e integra los cambios más recientes de GitHub
+
+git pull origin main
+
 ## 👤 Credenciales por Defecto
 
 ```
@@ -43,6 +75,7 @@ Contraseña: admin123
 ## ✨ Características Principales
 
 ### Sistema de Tickets
+
 - ✅ Gestión completa de tickets
 - ✅ Sistema de SLA automático
 - ✅ Notificaciones (Email, Teams, In-App)
@@ -54,6 +87,7 @@ Contraseña: admin123
 - ✅ API REST
 
 ### Módulo de Inventario
+
 - ✅ Gestión de equipos (laptops, desktops, impresoras, etc.)
 - ✅ Asignación de equipos a usuarios
 - ✅ Actas de entrega digitales con firma electrónica
