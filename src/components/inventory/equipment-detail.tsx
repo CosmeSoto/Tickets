@@ -341,9 +341,17 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
         description: 'El equipo ha sido devuelto al inventario y está disponible nuevamente.',
       })
 
+      // Cerrar dialog y limpiar form ANTES de recargar para evitar doble submit
       setShowReturnDialog(false)
       setReturnForm({ returnDate: new Date().toISOString().split('T')[0], observations: '', condition: '' })
-      loadEquipmentDetail()
+      // Limpiar datos locales inmediatamente para que los botones se actualicen
+      setData(prev => prev ? {
+        ...prev,
+        currentAssignment: undefined,
+        equipment: { ...prev.equipment, status: 'AVAILABLE' as any }
+      } : prev)
+      // Recargar datos frescos del servidor
+      await loadEquipmentDetail()
     } catch (error) {
       toast({
         title: 'Error',

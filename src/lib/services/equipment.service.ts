@@ -381,73 +381,8 @@ export class EquipmentService {
   }
 
   /**
-   * Elimina permanentemente un equipo de la base de datos
-   * Solo para administradores. Requiere que el equipo esté RETIRED y sin asignaciones activas.
-   */
-  static async permanentDeleteEquipment(id: string, userId: string): Promise<void> {
-    try {
-      const equipment = await prisma.equipment.findUnique({
-        where: { id },
-        include: {
-          assignments: { where: { isActive: true }, take: 1 },
-          maintenance_records: { take: 1 },
-        }
-      })
-
-      if (!equipment) {
-        throw new Error('Equipo no encontrado')
-      }
-
-      if (equipment.status !== 'RETIRED') {
-        throw new Error('Solo se pueden eliminar permanentemente equipos retirados')
-      }
-
-      if (equipment.assignments.length > 0) {
-        throw new Error('No se puede eliminar un equipo con asignación activa')
-      }
-
-      // Guardar datos para auditoría antes de eliminar
-      const equipmentData = {
-        code: equipment.code,
-        serialNumber: equipment.serialNumber,
-        brand: equipment.brand,
-        model: equipment.model,
-        typeId: equipment.typeId,
-      }
-
-      await prisma.$transaction(async (tx) => {
-        // Eliminar registros relacionados
-        await tx.maintenance_records.deleteMany({ where: { equipmentId: id } })
-        await tx.equipment_assignments.deleteMany({ where: { equipmentId: id } })
-
-        // Eliminar auditorías previas del equipo (se reemplaza con el log de eliminación permanente)
-        // No eliminamos audit_logs para mantener trazabilidad
-
-        // Eliminar equipo
-        await tx.equipment.delete({ where: { id } })
-
-        // Registrar en auditoría
-        await tx.audit_logs.create({
-          data: {
-            id: randomUUID(),
-            action: 'PERMANENT_DELETE',
-            entityType: 'equipment',
-            entityId: id,
-            userId,
-            details: equipmentData,
-          }
-        })
-      })
-    } catch (error) {
-      console.error('Error eliminando permanentemente equipo:', error)
-      throw error
-    }
-  }
-
-
-  /**
-   * Elimina permanentemente un equipo de la base de datos
-   * Solo para administradores. Elimina registros relacionados.
+   * Elimina permanentemente un equipo de la base de datos.
+   * Solo ADMIN. Requiere estado RETIRED y sin asignaciones activas.
    */
   static async permanentDeleteEquipment(id: string, userId: string): Promise<void> {
     try {
@@ -469,7 +404,6 @@ export class EquipmentService {
         throw new Error('No se puede eliminar un equipo con asignación activa')
       }
 
-      // Guardar datos para auditoría antes de eliminar
       const equipmentData = {
         code: equipment.code,
         serialNumber: equipment.serialNumber,
@@ -479,27 +413,21 @@ export class EquipmentService {
       }
 
       await prisma.$transaction(async (tx) => {
-        // Obtener IDs de asignaciones para eliminar actas relacionadas
         const assignments = await tx.equipment_assignments.findMany({
           where: { equipmentId: id },
           select: { id: true }
         })
         const assignmentIds = assignments.map(a => a.id)
 
-        // Eliminar actas de entrega y devolución
         if (assignmentIds.length > 0) {
           await tx.delivery_acts.deleteMany({ where: { assignmentId: { in: assignmentIds } } })
           await tx.return_acts.deleteMany({ where: { assignmentId: { in: assignmentIds } } })
         }
 
-        // Eliminar registros relacionados
         await tx.maintenance_records.deleteMany({ where: { equipmentId: id } })
         await tx.equipment_assignments.deleteMany({ where: { equipmentId: id } })
-
-        // Eliminar el equipo
         await tx.equipment.delete({ where: { id } })
 
-        // Registrar en auditoría
         await tx.audit_logs.create({
           data: {
             id: randomUUID(),
