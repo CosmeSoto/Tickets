@@ -44,6 +44,9 @@ services:
       PGADMIN_DEFAULT_PASSWORD: admin123
       PGADMIN_CONFIG_SERVER_MODE: 'False'
       PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+      # Para permitir múltiples dominios especiales:
+      PGADMIN_CONFIG_ALLOW_SPECIAL_EMAIL_DOMAINS: "'local,localhost,test'" 
+
     ports:
       - "8080:80"
     volumes:
