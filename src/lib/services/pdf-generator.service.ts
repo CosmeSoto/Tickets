@@ -12,6 +12,21 @@ const mkdir = promisify(fs.mkdir)
 const writeFile = promisify(fs.writeFile)
 
 /**
+ * Obtiene el logo y nombre de la empresa desde la configuración del sistema
+ */
+async function getSystemBranding(): Promise<{ logoUrl: string | null; companyName: string }> {
+  try {
+    const content = await prisma.landing_page_content.findFirst({ where: { id: 'default' } })
+    return {
+      logoUrl: (content as any)?.companyLogoLightUrl || null,
+      companyName: (content as any)?.companyName || 'Sistema de Gestión de Inventario',
+    }
+  } catch {
+    return { logoUrl: null, companyName: 'Sistema de Gestión de Inventario' }
+  }
+}
+
+/**
  * Servicio para generación de PDFs de actas
  */
 export class PDFGeneratorService {
@@ -62,8 +77,11 @@ export class PDFGeneratorService {
       const verificationUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/inventory/acts/${actId}/verify`
       const qrCodeDataUrl = await QRCodeService.generateQRCode(verificationUrl)
 
+      // Obtener branding del sistema
+      const systemInfo = await getSystemBranding()
+
       // Generar PDF
-      const doc = await generateDeliveryActPDF(act as DeliveryAct, qrCodeDataUrl)
+      const doc = await generateDeliveryActPDF(act as DeliveryAct, qrCodeDataUrl, systemInfo)
 
       // Nombre del archivo
       const fileName = `${act.folio.replace(/\//g, '-')}_${Date.now()}.pdf`

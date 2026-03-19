@@ -1,6 +1,39 @@
 // PDFKit se carga via helper para evitar análisis estático de Turbopack
 import { loadPDFKit } from '@/lib/utils/load-pdfkit'
+import fs from 'fs'
+import path from 'path'
+import https from 'https'
+import http from 'http'
 import type { DeliveryAct } from '@/types/inventory/delivery-act'
+
+/**
+ * Descarga una imagen desde una URL y la retorna como Buffer.
+ * Soporta rutas locales (/uploads/...) y URLs externas.
+ */
+async function fetchImageBuffer(url: string): Promise<Buffer | null> {
+  try {
+    // Ruta local relativa al public/
+    if (url.startsWith('/')) {
+      const localPath = path.join(process.cwd(), 'public', url)
+      if (fs.existsSync(localPath)) {
+        return fs.readFileSync(localPath)
+      }
+      return null
+    }
+    // URL externa
+    return await new Promise((resolve, reject) => {
+      const client = url.startsWith('https') ? https : http
+      client.get(url, (res) => {
+        const chunks: Buffer[] = []
+        res.on('data', (chunk) => chunks.push(chunk))
+        res.on('end', () => resolve(Buffer.concat(chunks)))
+        res.on('error', reject)
+      }).on('error', reject)
+    })
+  } catch {
+    return null
+  }
+}
 
 const EQUIPMENT_TYPE_LABELS: Record<string, string> = {
   LAPTOP: 'Laptop',
@@ -28,7 +61,11 @@ const EQUIPMENT_CONDITION_LABELS: Record<string, string> = {
   POOR: 'Malo',
 }
 
-export async function generateDeliveryActPDF(act: DeliveryAct, qrCodeDataUrl: string): Promise<any> {
+export async function generateDeliveryActPDF(
+  act: DeliveryAct,
+  qrCodeDataUrl: string,
+  systemInfo?: { logoUrl?: string | null; companyName?: string }
+): Promise<any> {
   const PDFDocument = loadPDFKit()
   const doc = new PDFDocument({
     size: 'LETTER',
@@ -69,12 +106,47 @@ export async function generateDeliveryActPDF(act: DeliveryAct, qrCodeDataUrl: st
     yPosition += doc.heightOfString(value, { width: contentWidth }) + 5
   }
 
-  // Header
-  doc.fontSize(18).font('Helvetica-Bold')
-  addText('ACTA DE ENTREGA DE EQUIPO', { align: 'center', lineGap: 10 })
+  // ── HEADER con logo ──────────────────────────────────────────────────────
+  const companyName = systemInfo?.companyName || 'Sistema de Gestión de Inventario'
+  const logoUrl = systemInfo?.logoUrl
 
-  doc.fontSize(14).font('Helvetica')
-  addText(act.folio, { align: 'center', lineGap: 15 })
+  if (logoUrl) {
+    const logoBuffer = await fetchImageBuffer(logoUrl)
+    if (logoBuffer) {
+      const logoHeight = 50
+      const logoWidth = 160
+      // Logo a la izquierda
+      doc.image(logoBuffer, margin, yPosition, { fit: [logoWidth, logoHeight], align: 'left' })
+      // Título a la derecha del logo
+      doc.fontSize(16).font('Helvetica-Bold')
+      doc.text('ACTA DE ENTREGA DE EQUIPO', margin + logoWidth + 20, yPosition + 10, {
+        width: contentWidth - logoWidth - 20,
+        align: 'right',
+      })
+      doc.fontSize(11).font('Helvetica')
+      doc.text(act.folio, margin + logoWidth + 20, yPosition + 32, {
+        width: contentWidth - logoWidth - 20,
+        align: 'right',
+      })
+      yPosition += logoHeight + 15
+    } else {
+      // Sin logo — solo texto centrado
+      doc.fontSize(18).font('Helvetica-Bold')
+      addText('ACTA DE ENTREGA DE EQUIPO', { align: 'center', lineGap: 6 })
+      doc.fontSize(11).font('Helvetica')
+      addText(companyName, { align: 'center', lineGap: 4 })
+      doc.fontSize(14).font('Helvetica')
+      addText(act.folio, { align: 'center', lineGap: 15 })
+    }
+  } else {
+    // Sin logo — solo texto centrado
+    doc.fontSize(18).font('Helvetica-Bold')
+    addText('ACTA DE ENTREGA DE EQUIPO', { align: 'center', lineGap: 6 })
+    doc.fontSize(11).font('Helvetica')
+    addText(companyName, { align: 'center', lineGap: 4 })
+    doc.fontSize(14).font('Helvetica')
+    addText(act.folio, { align: 'center', lineGap: 15 })
+  }
 
   // Línea separadora
   doc.moveTo(margin, yPosition).lineTo(pageWidth - margin, yPosition).stroke()

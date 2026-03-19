@@ -2,39 +2,35 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { MaintenanceService } from '@/lib/services/maintenance.service'
+import prisma from '@/lib/prisma'
+import { randomUUID } from 'crypto'
+import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
 
-/**
- * GET /api/inventory/maintenance/[id]
- * Obtiene detalle de un registro de mantenimiento
- */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
+    if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
     const { id } = await params
     const maintenance = await MaintenanceService.getById(id)
-
-    if (!maintenance) {
-      return NextResponse.json({ error: 'Mantenimiento no encontrado' }, { status: 404 })
-    }
+    if (!maintenance) return NextResponse.json({ error: 'Mantenimiento no encontrado' }, { status: 404 })
 
     return NextResponse.json(maintenance)
   } catch (error) {
-    console.error('Error en GET /api/inventory/maintenance/[id]:', error)
     return NextResponse.json({ error: 'Error al obtener mantenimiento' }, { status: 500 })
   }
 }
 
 /**
  * PATCH /api/inventory/maintenance/[id]
- * Reagenda o completa un mantenimiento.
- * CLIENT solo puede usar action='complete'.
+ * Acciones disponibles según rol:
+ *   approve   — ADMIN/TECHNICIAN: aprueba solicitud REQUESTED → SCHEDULED
+ *   accept    — CLIENT: acepta mantenimiento SCHEDULED → ACCEPTED
+ *   complete  — ADMIN/TECHNICIAN/CLIENT: completa SCHEDULED/ACCEPTED → COMPLETED
+ *   reschedule — ADMIN/TECHNICIAN: cambia fecha
  */
 export async function PATCH(
   request: NextRequest,
@@ -42,23 +38,79 @@ export async function PATCH(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
+    if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
     const { id } = await params
     const body = await request.json()
-    const { action, scheduledDate, description, cost, partsReplaced, returnTo } = body
+    const { action, scheduledDate, description, cost, partsReplaced, returnTo, technicianId, notes } = body
 
-    // CLIENT solo puede completar
-    if (session.user.role === 'CLIENT' && action !== 'complete') {
-      return NextResponse.json({ error: 'No tienes permisos' }, { status: 403 })
+    const isClient = session.user.role === 'CLIENT'
+    const isAdminOrTech = session.user.role === 'ADMIN' || session.user.role === 'TECHNICIAN'
+
+    // Permisos por acción — acciones de gestión requieren permiso de inventario
+    if (action === 'approve' || action === 'reschedule' || action === 'complete') {
+      if (!await canManageInventory(session.user.id, session.user.role)) {
+        return inventoryForbidden()
+      }
+    }
+    if (action === 'approve' && !isAdminOrTech) {
+      return NextResponse.json({ error: 'Solo ADMIN o TECHNICIAN pueden aprobar solicitudes' }, { status: 403 })
+    }
+    if (action === 'accept' && !isClient) {
+      return NextResponse.json({ error: 'Solo el cliente puede aceptar el mantenimiento' }, { status: 403 })
+    }
+    if (action === 'reschedule' && !isAdminOrTech) {
+      return NextResponse.json({ error: 'No tienes permisos para reagendar' }, { status: 403 })
+    }
+    if (action === 'approve') {
+      if (!scheduledDate) return NextResponse.json({ error: 'Fecha requerida para aprobar' }, { status: 400 })
+      const result = await MaintenanceService.approveMaintenance(
+        id,
+        { scheduledDate: new Date(scheduledDate), technicianId, notes },
+        session.user.id
+      )
+
+      // Notificar al solicitante
+      const maintenance = await MaintenanceService.getById(id)
+      if (maintenance?.requestedById) {
+        await prisma.notifications.create({
+          data: {
+            id: randomUUID(),
+            userId: maintenance.requestedById,
+            type: 'SUCCESS',
+            title: `Mantenimiento aprobado — ${maintenance.equipment.code}`,
+            message: `Tu solicitud de mantenimiento fue aprobada. El equipo ${maintenance.equipment.code} entrará en mantenimiento el ${new Date(scheduledDate).toLocaleDateString('es-ES')}.`,
+            metadata: { equipmentId: maintenance.equipmentId, maintenanceId: id },
+          },
+        })
+      }
+
+      return NextResponse.json(result)
+    }
+
+    if (action === 'accept') {
+      const result = await MaintenanceService.acceptMaintenance(id, session.user.id)
+
+      // Notificar al técnico asignado
+      const maintenance = await MaintenanceService.getById(id)
+      if (maintenance?.technicianId) {
+        await prisma.notifications.create({
+          data: {
+            id: randomUUID(),
+            userId: maintenance.technicianId,
+            type: 'INFO',
+            title: `Mantenimiento aceptado — ${maintenance.equipment.code}`,
+            message: `El cliente aceptó el mantenimiento del equipo ${maintenance.equipment.code}.`,
+            metadata: { equipmentId: maintenance.equipmentId, maintenanceId: id },
+          },
+        })
+      }
+
+      return NextResponse.json(result)
     }
 
     if (action === 'reschedule') {
-      if (!scheduledDate) {
-        return NextResponse.json({ error: 'Fecha requerida para reagendar' }, { status: 400 })
-      }
+      if (!scheduledDate) return NextResponse.json({ error: 'Fecha requerida para reagendar' }, { status: 400 })
       const result = await MaintenanceService.reschedule(
         id,
         { scheduledDate: new Date(scheduledDate), description },
@@ -71,19 +123,38 @@ export async function PATCH(
       const result = await MaintenanceService.completeMaintenance(
         id,
         {
-          completedDate: new Date(),
           cost: cost !== undefined ? parseFloat(cost) : undefined,
           partsReplaced,
           returnTo: returnTo || 'available',
+          notes,
         },
         session.user.id
       )
+
+      // Notificar al solicitante/cliente asignado
+      const maintenance = await MaintenanceService.getById(id)
+      const notifyUserId = maintenance?.requestedById || maintenance?.equipment?.assignments?.[0]?.receiver?.id
+      if (notifyUserId) {
+        const destMsg = (result as any).reAssigned
+          ? 'El equipo ha sido reasignado a ti.'
+          : 'El equipo está disponible en bodega.'
+        await prisma.notifications.create({
+          data: {
+            id: randomUUID(),
+            userId: notifyUserId,
+            type: 'SUCCESS',
+            title: `Mantenimiento completado — ${maintenance?.equipment?.code}`,
+            message: `El mantenimiento del equipo ${maintenance?.equipment?.code} ha sido completado. ${destMsg}`,
+            metadata: { equipmentId: maintenance?.equipmentId, maintenanceId: id },
+          },
+        })
+      }
+
       return NextResponse.json(result)
     }
 
-    return NextResponse.json({ error: 'Acción no válida. Use: reschedule, complete' }, { status: 400 })
+    return NextResponse.json({ error: 'Acción no válida. Use: approve, accept, complete, reschedule' }, { status: 400 })
   } catch (error) {
-    console.error('Error en PATCH /api/inventory/maintenance/[id]:', error)
     const message = error instanceof Error ? error.message : 'Error al actualizar mantenimiento'
     return NextResponse.json({ error: message }, { status: 400 })
   }
@@ -91,7 +162,7 @@ export async function PATCH(
 
 /**
  * DELETE /api/inventory/maintenance/[id]
- * Cancela y elimina un mantenimiento
+ * Cancela un mantenimiento (solo ADMIN/TECHNICIAN)
  */
 export async function DELETE(
   request: NextRequest,
@@ -99,19 +170,14 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
-    if (session.user.role === 'CLIENT') {
-      return NextResponse.json({ error: 'No tienes permisos' }, { status: 403 })
-    }
+    if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    if (session.user.role === 'CLIENT') return NextResponse.json({ error: 'No tienes permisos' }, { status: 403 })
 
     const { id } = await params
     await MaintenanceService.cancel(id, session.user.id)
 
-    return NextResponse.json({ message: 'Mantenimiento cancelado y eliminado' })
+    return NextResponse.json({ message: 'Mantenimiento cancelado' })
   } catch (error) {
-    console.error('Error en DELETE /api/inventory/maintenance/[id]:', error)
     const message = error instanceof Error ? error.message : 'Error al cancelar mantenimiento'
     return NextResponse.json({ error: message }, { status: 400 })
   }

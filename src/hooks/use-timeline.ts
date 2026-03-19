@@ -5,7 +5,7 @@ import { useToast } from './use-toast'
 
 export interface TimelineEvent {
   id: string
-  type: 'comment' | 'status_change' | 'assignment' | 'priority_change' | 'resolution' | 'rating' | 'created' | 'resolution_plan' | 'resolution_task'
+  type: 'comment' | 'status_change' | 'assignment' | 'priority_change' | 'resolution' | 'rating' | 'created' | 'resolution_plan' | 'resolution_task' | 'file_uploaded'
   title: string
   description?: string
   user: {
@@ -103,7 +103,17 @@ export function useTimeline(ticketId: string) {
       const data = await response.json()
       
       if (data.success) {
-        setEvents(data.data || [])
+        const incoming: TimelineEvent[] = data.data || []
+        setEvents(prev => {
+          // Conservar eventos optimistas (id empieza con 'optimistic-') que aún no están en el servidor
+          const optimistics = prev.filter(e => e.id.startsWith('optimistic-'))
+          if (optimistics.length === 0) return incoming
+          // Filtrar optimistas que ya tienen su versión real en el servidor
+          const stillPending = optimistics.filter(
+            opt => !incoming.some(e => e.createdAt >= opt.createdAt && e.type === opt.type)
+          )
+          return [...stillPending, ...incoming]
+        })
       } else {
         throw new Error(data.message || 'Error al cargar el historial')
       }
@@ -172,7 +182,7 @@ export function useTimeline(ticketId: string) {
           description: `Comentario ${commentType} agregado${attachmentInfo}`,
           duration: 3000
         })
-        return true
+        return data.data // Devolver datos del comentario creado
       } else {
         throw new Error(data.message || 'Error al agregar comentario')
       }
@@ -269,11 +279,40 @@ export function useTimeline(ticketId: string) {
     }
   }, [ticketId, toast, loadTimeline])
 
-  // Cargar timeline al montar + polling cada 30s para sincronización entre usuarios
+  // Cargar timeline al montar + polling cada 5s (pausado cuando la pestaña no está visible)
   useEffect(() => {
     loadTimeline()
-    const interval = setInterval(() => loadTimeline(true), 30 * 1000)
-    return () => clearInterval(interval)
+
+    let interval: ReturnType<typeof setInterval> | null = null
+
+    const startPolling = () => {
+      if (interval) return
+      interval = setInterval(() => loadTimeline(true), 5 * 1000)
+    }
+
+    const stopPolling = () => {
+      if (interval) {
+        clearInterval(interval)
+        interval = null
+      }
+    }
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        loadTimeline(true) // recargar inmediatamente al volver
+        startPolling()
+      } else {
+        stopPolling()
+      }
+    }
+
+    startPolling()
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      stopPolling()
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
   }, [loadTimeline])
 
   return {

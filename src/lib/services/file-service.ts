@@ -113,6 +113,7 @@ export class FileService {
             id: randomUUID(),
             action: 'file_uploaded',
             comment: `Archivo subido: ${file.name}`,
+            newValue: attachment.id,   // guardar el ID para recuperar el attachment en el timeline
             ticketId,
             userId: uploadedBy,
             createdAt: new Date()

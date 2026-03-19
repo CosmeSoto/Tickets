@@ -1,9 +1,5 @@
 import { Prisma } from '@prisma/client'
 
-/**
- * Tipos para registros de mantenimiento
- */
-
 export type MaintenanceRecord = Prisma.maintenance_recordsGetPayload<{
   include: {
     equipment: true
@@ -12,16 +8,19 @@ export type MaintenanceRecord = Prisma.maintenance_recordsGetPayload<{
   }
 }>
 
+export type MaintenanceStatus = 'REQUESTED' | 'SCHEDULED' | 'ACCEPTED' | 'COMPLETED' | 'CANCELLED'
+
 export interface CreateMaintenanceData {
   equipmentId: string
   type: 'PREVENTIVE' | 'CORRECTIVE'
   description: string
   scheduledDate: Date
-  completedDate?: Date
   cost?: number
   partsReplaced?: string[]
   ticketId?: string
-  technicianId: string
+  technicianId?: string
+  requestedById?: string
+  notes?: string
 }
 
 export interface UpdateMaintenanceData {
@@ -29,15 +28,4 @@ export interface UpdateMaintenanceData {
   cost?: number
   partsReplaced?: string[]
   notes?: string
-}
-
-export interface MaintenanceSummary {
-  id: string
-  type: string
-  description: string
-  scheduledDate: Date
-  completedDate?: Date
-  cost?: number
-  technicianName: string
-  equipmentCode: string
 }

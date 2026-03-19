@@ -5,6 +5,7 @@ import { ConsumableService } from '@/lib/services/consumable.service'
 import { updateConsumableSchema } from '@/lib/validations/inventory/consumable'
 import { ZodError } from 'zod'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
+import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
 
 /**
  * GET /api/inventory/consumables/[id]
@@ -44,8 +45,8 @@ export async function PUT(
     if (!session?.user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
-    if (session.user.role === 'CLIENT') {
-      return NextResponse.json({ error: 'No tienes permisos' }, { status: 403 })
+    if (!await canManageInventory(session.user.id, session.user.role)) {
+      return inventoryForbidden()
     }
 
     const { id } = await params

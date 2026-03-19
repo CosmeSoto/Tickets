@@ -192,10 +192,15 @@ export function TicketTimeline({
     setAttachments([])
     setEvents(prev => [optimisticEvent, ...prev])
 
-    const success = await addComment(commentContent, commentIsInternal, commentAttachments)
-    if (success) {
-      // El flag submittingRef ya se liberó — ahora sí recargamos con datos reales
-      await loadTimeline(true)
+    const result = await addComment(commentContent, commentIsInternal, commentAttachments)
+    if (result) {
+      // Reemplazar el evento optimista con el ID real del servidor
+      // sin necesidad de recargar todo el timeline (evita round-trip GET)
+      setEvents(prev => prev.map(e =>
+        e.id === optimisticId
+          ? { ...e, id: result.id, createdAt: result.createdAt }
+          : e
+      ))
       onCommentAdded?.()
     } else {
       // Revertir: restaurar form y quitar optimista
@@ -219,6 +224,7 @@ export function TicketTimeline({
       resolution_task: <CheckCircle className="h-4 w-4" />,
       rating: <Star className="h-4 w-4" />,
       created: <FileText className="h-4 w-4" />,
+      file_uploaded: <Paperclip className="h-4 w-4" />,
     }
     return icons[type] ?? <Clock className="h-4 w-4" />
   }
@@ -233,6 +239,7 @@ export function TicketTimeline({
       resolution_plan: 'text-indigo-600 bg-indigo-100',
       resolution_task: 'text-cyan-600 bg-cyan-100',
       rating: 'text-yellow-600 bg-yellow-100',
+      file_uploaded: 'text-teal-600 bg-teal-100',
     }
     return colors[type] ?? 'text-muted-foreground bg-muted'
   }
@@ -278,6 +285,21 @@ export function TicketTimeline({
                 />
               ))}
             </div>
+          </div>
+        )
+
+      case 'file_uploaded':
+        if (!metadata.attachments?.length) return null
+        return (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {metadata.attachments.map((file: AttachmentItem) => (
+              <AttachmentChip
+                key={file.id}
+                file={file}
+                ticketId={ticketId}
+                onPreview={openPreview}
+              />
+            ))}
           </div>
         )
 
@@ -594,7 +616,7 @@ export function TicketTimeline({
                         )}
 
                         {/* Descripción para otros eventos */}
-                        {event.type !== 'comment' && event.description && !(event.type === 'resolution_plan' && event.metadata) && (
+                        {event.type !== 'comment' && event.description && !(event.type === 'resolution_plan' && event.metadata) && event.type !== 'file_uploaded' && (
                           <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{event.description}</p>
                         )}
 

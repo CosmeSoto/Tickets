@@ -104,7 +104,11 @@ export function Notifications({
   const handleAction = (notification: NotificationData) => {
     if (!notification.isRead) markAsRead(notification.id)
     if (variant === 'bell') setIsOpen(false)
-    if (notification.ticketId) navigateToTicket(notification)
+    // Navegar si hay cualquier destino disponible
+    const hasDestination = notification.ticketId || notification.metadata?.link ||
+      notification.metadata?.actId || notification.metadata?.maintenanceId ||
+      notification.metadata?.equipmentId
+    if (hasDestination) navigateToTicket(notification)
   }
 
   const handleDismiss = (id: string, e: React.MouseEvent) => {
@@ -294,7 +298,8 @@ function BellNotificationItem({
   onMarkRead: (id: string) => void
   onDismiss: (id: string, e: React.MouseEvent) => void
 }) {
-  const isClickable = !!n.ticketId
+  const isClickable = !!(n.ticketId || n.metadata?.link || n.metadata?.actId ||
+    n.metadata?.maintenanceId || n.metadata?.equipmentId)
 
   return (
     <div

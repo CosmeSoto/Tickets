@@ -88,12 +88,14 @@ export default function ClientTicketDetailPage() {
         setTicket(prev => {
           if (!prev) return prev
           if (prev.status !== fresh.status || prev.updatedAt !== fresh.updatedAt) {
+            // También refrescar el timeline cuando el ticket cambia
+            setTimelineRefreshKey(k => k + 1)
             return fresh
           }
           return prev
         })
       } catch {}
-    }, 10000)
+    }, 5000)
     return () => clearInterval(interval)
   }, [params.id, session?.user?.id])
 
@@ -416,7 +418,7 @@ export default function ClientTicketDetailPage() {
             <TabsContent value="timeline" className="space-y-4">
               <TicketTimeline 
                 ticketId={ticket.id}
-                canAddComments={true}
+                canAddComments={ticket.status !== 'CLOSED'}
                 canViewInternal={false}
                 refreshKey={timelineRefreshKey}
                 onCommentAdded={() => setFileRefreshKey(k => k + 1)}
@@ -430,7 +432,11 @@ export default function ClientTicketDetailPage() {
                 canRate={ticket.status === 'RESOLVED' || ticket.status === 'CLOSED'}
                 showTechnicianStats={false}
                 mode='client'
-                onRatingSubmitted={loadTicket}
+                onRatingSubmitted={() => {
+                  // Actualizar estado local inmediatamente a CLOSED sin refetch
+                  setTicket(prev => prev ? { ...prev, status: 'CLOSED', closedAt: new Date().toISOString() } : prev)
+                  setTimelineRefreshKey(k => k + 1)
+                }}
               />
             </TabsContent>
             

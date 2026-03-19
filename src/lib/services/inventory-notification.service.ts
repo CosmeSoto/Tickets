@@ -83,19 +83,39 @@ export class InventoryNotificationService {
         }
       })
 
-      // Crear notificación in-app para el receptor
+      // Crear notificación in-app para el receptor — lleva a la página autenticada del acta
       await prisma.notifications.create({
         data: {
           id: randomUUID(),
           userId: receiverInfo.id,
           type: 'INVENTORY',
-          title: 'Nueva Acta de Entrega',
-          message: `Tienes un acta de entrega pendiente para el equipo ${equipmentCode}. Expira el ${new Date(act.expirationDate).toLocaleDateString('es-ES')}.`,
+          title: `Acta de entrega pendiente — ${equipmentCode}`,
+          message: `Tienes un acta de entrega pendiente para el equipo ${equipmentCode} (${equipmentDescription}). Debes firmarla antes del ${new Date(act.expirationDate).toLocaleDateString('es-ES')}.`,
           metadata: {
             type: 'delivery_act_created',
             actId: act.id,
             folio: act.folio,
-            link: acceptanceUrl
+            equipmentId: act.assignment?.equipmentId,
+            link: `/inventory/acts/${act.id}`,
+          },
+          isRead: false,
+        }
+      })
+
+      // Notificación al entregador también
+      await prisma.notifications.create({
+        data: {
+          id: randomUUID(),
+          userId: delivererInfo.id,
+          type: 'INVENTORY',
+          title: `Acta generada — ${equipmentCode}`,
+          message: `Se generó el acta ${act.folio} para la entrega de ${equipmentCode} a ${receiverInfo.name}. Pendiente de firma del receptor.`,
+          metadata: {
+            type: 'delivery_act_created',
+            actId: act.id,
+            folio: act.folio,
+            equipmentId: act.assignment?.equipmentId,
+            link: `/inventory/acts/${act.id}`,
           },
           isRead: false,
         }

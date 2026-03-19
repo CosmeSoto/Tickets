@@ -254,6 +254,15 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL('/unauthorized', request.url))
       }
     }
+
+    // Proteger rutas de inventario: solo ADMIN o técnicos con permiso
+    if (path.startsWith('/inventory')) {
+      if (userRole === 'CLIENT') {
+        return NextResponse.redirect(new URL('/unauthorized', request.url))
+      }
+      // La verificación granular de técnicos se hace en cada API route
+      // Aquí solo bloqueamos clientes a nivel de página
+    }
   }
 
   // Log middleware completion

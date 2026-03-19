@@ -139,14 +139,18 @@ export class DeliveryActService {
       await prisma.audit_logs.create({
         data: {
           id: randomUUID(),
-          action: 'CREATE',
+          action: 'ACTA_ENTREGA_CREADA',
           entityType: 'delivery_act',
           entityId: act.id,
           userId: assignment.delivererId,
           details: {
             folio,
-            assignmentId,
-            receiverId: assignment.receiverId,
+            equipo: `${assignment.equipment.code} — ${assignment.equipment.brand} ${assignment.equipment.model}`,
+            numeroSerie: assignment.equipment.serialNumber,
+            entregadoPor: `${assignment.deliverer.name} (${assignment.deliverer.email})`,
+            recibidoPor: `${assignment.receiver.name} (${assignment.receiver.email})`,
+            tipoAsignacion: assignment.assignmentType,
+            expira: expirationDate.toLocaleDateString('es-ES'),
           }
         }
       })
@@ -275,14 +279,18 @@ export class DeliveryActService {
       await prisma.audit_logs.create({
         data: {
           id: randomUUID(),
-          action: 'ACCEPTED',
+          action: 'ACTA_ACEPTADA',
           entityType: 'delivery_act',
           entityId: actId,
           userId: act.receiverInfo.id,
           details: {
             folio: act.folio,
-            signatureHash: signature.hash,
-            ipAddress: signature.ipAddress,
+            equipo: `${(act as any).assignment?.equipment?.code} — ${(act as any).assignment?.equipment?.brand} ${(act as any).assignment?.equipment?.model}`,
+            aceptadoPor: `${act.receiverInfo.name} (${act.receiverInfo.email})`,
+            entregadoPor: `${act.delivererInfo.name} (${act.delivererInfo.email})`,
+            firmaDigital: signature.hash.substring(0, 16) + '...',
+            ipOrigen: signature.ipAddress,
+            fechaAceptacion: signature.timestamp.toLocaleString('es-ES'),
           }
         }
       })
@@ -368,13 +376,17 @@ export class DeliveryActService {
         await tx.audit_logs.create({
           data: {
             id: randomUUID(),
-            action: 'REJECTED',
+            action: 'ACTA_RECHAZADA',
             entityType: 'delivery_act',
             entityId: actId,
             userId: userId,
             details: {
               folio: act.folio,
-              reason,
+              equipo: `${act.assignment?.equipment?.code} — ${act.assignment?.equipment?.brand} ${act.assignment?.equipment?.model}`,
+              rechazadoPor: `${act.receiverInfo.name} (${act.receiverInfo.email})`,
+              entregadoPor: `${act.delivererInfo.name} (${act.delivererInfo.email})`,
+              motivoRechazo: reason,
+              equipoRestauradoA: 'Disponible en bodega',
             }
           }
         })

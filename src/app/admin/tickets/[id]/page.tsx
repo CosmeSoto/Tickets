@@ -583,7 +583,7 @@ export default function TicketDetailPage() {
             <TabsContent value="timeline" className="space-y-4">
               <TicketTimeline 
                 ticketId={ticket.id}
-                canAddComments={session?.user?.role === 'ADMIN' || session?.user?.role === 'TECHNICIAN'}
+                canAddComments={(session?.user?.role === 'ADMIN' || session?.user?.role === 'TECHNICIAN') && ticket.status !== 'CLOSED'}
                 canViewInternal={session?.user?.role === 'ADMIN' || session?.user?.role === 'TECHNICIAN'}
                 refreshKey={timelineRefreshKey}
                 onCommentAdded={() => setFileRefreshKey(k => k + 1)}

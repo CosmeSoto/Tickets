@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
+import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
 
 /**
  * GET /api/inventory/license-types
@@ -44,9 +45,8 @@ export async function POST(request: NextRequest) {
     if (!session?.user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
-
-    if (session.user.role !== 'ADMIN' && session.user.role !== 'TECHNICIAN') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+    if (!await canManageInventory(session.user.id, session.user.role)) {
+      return inventoryForbidden()
     }
 
     const body = await request.json()

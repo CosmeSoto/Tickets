@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
+import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
 
 export async function PUT(
   request: NextRequest,
@@ -11,8 +12,8 @@ export async function PUT(
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    if (session.user.role !== 'ADMIN' && session.user.role !== 'TECHNICIAN') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+    if (!await canManageInventory(session.user.id, session.user.role)) {
+      return inventoryForbidden()
     }
 
     const { id } = await params

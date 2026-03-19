@@ -461,6 +461,7 @@ model users {
   avatar                                            String?
   isActive                                          Boolean                     @default(true)
   isEmailVerified                                   Boolean                     @default(false)
+  canManageInventory                                Boolean                     @default(false)
   lastLogin                                         DateTime?
   oauthProvider                                     String?
   oauthId                                           String?
@@ -496,6 +497,7 @@ model users {
   assignmentsReceived                               equipment_assignments[]     @relation("AssignmentReceiver")
   assignmentsDelivered                              equipment_assignments[]     @relation("AssignmentDeliverer")
   maintenanceRecords                                maintenance_records[]       @relation("MaintenanceTechnician")
+  maintenanceRequests                               maintenance_records[]       @relation("MaintenanceRequester")
   licensesAssigned                                  software_licenses[]         @relation("LicenseUser")
   stockMovements                                    stock_movements[]           @relation("StockMovementUser")
   stockMovementsAssigned                            stock_movements[]           @relation("StockMovementAssignedTo")
@@ -1131,31 +1133,46 @@ model return_acts {
 
 // Maintenance records table
 model maintenance_records {
-  id              String          @id @default(uuid())
-  equipmentId     String          @map("equipment_id")
+  id              String              @id @default(uuid())
+  equipmentId     String              @map("equipment_id")
   type            MaintenanceType
+  status          MaintenanceStatus   @default(SCHEDULED)
   date            DateTime
-  description     String          @db.Text
-  technicianId    String          @map("technician_id")
+  description     String              @db.Text
+  technicianId    String?             @map("technician_id")
+  requestedById   String?             @map("requested_by_id")
+  acceptedAt      DateTime?           @map("accepted_at")
+  completedAt     DateTime?           @map("completed_at")
   cost            Float?
-  partsReplaced   String[]        @map("parts_replaced")
-  ticketId        String?         @map("ticket_id")
-  createdAt       DateTime        @default(now()) @map("created_at")
-  updatedAt       DateTime        @updatedAt @map("updated_at")
+  partsReplaced   String[]            @map("parts_replaced")
+  ticketId        String?             @map("ticket_id")
+  notes           String?             @db.Text
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
   
-  equipment       equipment       @relation(fields: [equipmentId], references: [id])
-  technician      users           @relation("MaintenanceTechnician", fields: [technicianId], references: [id])
-  ticket          tickets?        @relation(fields: [ticketId], references: [id])
+  equipment       equipment           @relation(fields: [equipmentId], references: [id])
+  technician      users?              @relation("MaintenanceTechnician", fields: [technicianId], references: [id])
+  requestedBy     users?              @relation("MaintenanceRequester", fields: [requestedById], references: [id])
+  ticket          tickets?            @relation(fields: [ticketId], references: [id])
   
   @@index([equipmentId, date])
   @@index([technicianId])
   @@index([ticketId])
+  @@index([status])
   @@map("maintenance_records")
 }
 
 enum MaintenanceType {
   PREVENTIVE
   CORRECTIVE
+}
+
+enum MaintenanceStatus {
+  REQUESTED    // Cliente solicitó mantenimiento
+  SCHEDULED    // Admin/Técnico programó (equipo pasa a MAINTENANCE)
+  ACCEPTED     // Cliente aceptó/confirmó
+  COMPLETED    // Técnico completó (equipo vuelve a AVAILABLE o ASSIGNED)
+  CANCELLED    // Cancelado
 }
 
 // License Types (dynamic catalog, like equipment_types)

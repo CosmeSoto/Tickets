@@ -48,7 +48,9 @@ function NotificationCard({
   const cfg = TYPE_CONFIG[notification.type] ?? TYPE_CONFIG.INFO
   const Icon = cfg.icon
   const timeAgo = formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true, locale: es })
-  const isClickable = !!notification.ticketId
+  const isClickable = !!(notification.ticketId || notification.metadata?.link ||
+    notification.metadata?.actId || notification.metadata?.maintenanceId ||
+    notification.metadata?.equipmentId)
 
   return (
     <div
@@ -115,7 +117,13 @@ function NotificationCard({
                 onClick={() => onNavigate(notification)}
               >
                 <Ticket className="h-3 w-3 mr-1" />
-                Ver ticket
+                {notification.metadata?.actId || notification.metadata?.link?.includes('/acts/')
+                  ? 'Ver acta'
+                  : notification.metadata?.maintenanceId || notification.metadata?.link?.includes('/maintenance/')
+                  ? 'Ver mantenimiento'
+                  : notification.metadata?.equipmentId || notification.metadata?.link?.includes('/equipment/')
+                  ? 'Ver equipo'
+                  : 'Ver ticket'}
               </Button>
             )}
             <Button

@@ -5,6 +5,8 @@ import { EquipmentService } from '@/lib/services/equipment.service'
 import { createEquipmentSchema, equipmentFiltersSchema } from '@/lib/validations/inventory/equipment'
 import { ZodError } from 'zod'
 
+import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
+
 /**
  * GET /api/inventory/equipment
  * Lista equipos con filtros y paginación
@@ -72,23 +74,12 @@ export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions)
     
     if (!session?.user) {
-      return NextResponse.json(
-        { error: 'No autenticado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    // Solo ADMIN puede crear equipos (o TECHNICIAN si tiene permiso)
-    if (session.user.role === 'CLIENT') {
-      return NextResponse.json(
-        { error: 'No tienes permisos para crear equipos' },
-        { status: 403 }
-      )
-    }
-
-    // TODO: Verificar si TECHNICIAN tiene permiso technician_can_manage_equipment
-    if (session.user.role === 'TECHNICIAN') {
-      // Por ahora permitimos, luego verificaremos el setting
+    // Verificar permiso de gestión de inventario
+    if (!await canManageInventory(session.user.id, session.user.role)) {
+      return inventoryForbidden()
     }
 
     const body = await request.json()

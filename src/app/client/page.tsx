@@ -3,6 +3,7 @@
 import { UnifiedDashboardBase } from '@/components/dashboard/unified-dashboard-base'
 import { SymmetricStatsCard } from '@/components/shared/stats-card'
 import { ActionGrid } from '@/components/common/action-card'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'

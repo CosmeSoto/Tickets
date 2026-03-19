@@ -178,13 +178,35 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     }
   }, [notifications, toast, loadNotifications])
 
-  // Navegar al ticket relacionado
+  // Navegar a la acción relacionada con la notificación
   const navigateToTicket = useCallback((notification: NotificationData) => {
-    if (!notification.ticketId) return
-    const role = session?.user?.role?.toLowerCase() || 'client'
-    const link = notification.metadata?.link || `/${role}/tickets/${notification.ticketId}`
     markAsRead(notification.id)
-    router.push(link)
+    // Prioridad 1: link explícito en metadata (actas, mantenimiento, inventario)
+    if (notification.metadata?.link) {
+      router.push(notification.metadata.link)
+      return
+    }
+    // Prioridad 2: actId → página del acta autenticada
+    if (notification.metadata?.actId) {
+      router.push(`/inventory/acts/${notification.metadata.actId}`)
+      return
+    }
+    // Prioridad 3: maintenanceId → página de mantenimiento
+    if (notification.metadata?.maintenanceId) {
+      router.push(`/inventory/maintenance/${notification.metadata.maintenanceId}`)
+      return
+    }
+    // Prioridad 4: equipmentId → detalle del equipo
+    if (notification.metadata?.equipmentId) {
+      router.push(`/inventory/equipment/${notification.metadata.equipmentId}`)
+      return
+    }
+    // Prioridad 5: ticketId → ticket según rol
+    if (notification.ticketId) {
+      const role = session?.user?.role?.toLowerCase() || 'client'
+      router.push(`/${role}/tickets/${notification.ticketId}`)
+      return
+    }
   }, [session?.user?.role, markAsRead, router])
 
   // Notificaciones filtradas

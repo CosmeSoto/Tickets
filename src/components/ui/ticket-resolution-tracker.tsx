@@ -116,6 +116,7 @@ export function TicketResolutionTracker({
   const [showCreatePlan, setShowCreatePlan] = useState(false)
   const [showEditPlan, setShowEditPlan] = useState(false)
   const [showDeletePlan, setShowDeletePlan] = useState(false)
+  const [openPlanMenu, setOpenPlanMenu] = useState(false)
   const [planForm, setPlanForm] = useState({
     title: '',
     description: '',
@@ -222,8 +223,9 @@ export function TicketResolutionTracker({
 
       const data = await response.json()
       if (data.success) {
-        // Recargar el plan completo desde el servidor y notificar cambio al timeline
-        await loadResolutionPlan(true)
+        // Actualizar estado local inmediatamente con la respuesta del POST
+        setPlan(data.data)
+        onPlanChange?.()
         
         setShowCreatePlan(false)
         setPlanForm({
@@ -306,7 +308,15 @@ export function TicketResolutionTracker({
 
       const data = await response.json()
       if (data.success) {
-        loadResolutionPlan(true)
+        // Actualizar estado local inmediatamente sin refetch
+        if (plan) {
+          setPlan({
+            ...plan,
+            tasks: [...plan.tasks, data.data],
+            totalTasks: plan.totalTasks + 1
+          })
+          onPlanChange?.()
+        }
         const taskTitle = newTask.title
         setNewTask({
           title: '',
@@ -351,7 +361,15 @@ export function TicketResolutionTracker({
 
       const data = await response.json()
       if (data.success) {
-        loadResolutionPlan(true)
+        // Actualizar estado local inmediatamente sin refetch
+        if (plan) {
+          const updatedTasks = plan.tasks.map(t =>
+            t.id === taskId ? { ...t, status, completedAt: status === 'completed' ? new Date().toISOString() : undefined } : t
+          )
+          const completedTasks = updatedTasks.filter(t => t.status === 'completed').length
+          setPlan({ ...plan, tasks: updatedTasks, completedTasks })
+          onPlanChange?.()
+        }
         
         // Toast informativo según el estado con título de tarea
         const messages = {
@@ -404,7 +422,13 @@ export function TicketResolutionTracker({
 
       const data = await response.json()
       if (data.success) {
-        loadResolutionPlan(true)
+        // Actualizar estado local inmediatamente sin refetch
+        if (plan) {
+          const remainingTasks = plan.tasks.filter(t => t.id !== taskId)
+          const completedTasks = remainingTasks.filter(t => t.status === 'completed').length
+          setPlan({ ...plan, tasks: remainingTasks, totalTasks: remainingTasks.length, completedTasks })
+          onPlanChange?.()
+        }
         setTaskToDelete(null)
         toast({
           title: "Tarea eliminada",
@@ -625,7 +649,8 @@ export function TicketResolutionTracker({
 
       const data = await response.json()
       if (data.success) {
-        await loadResolutionPlan(true)
+        setPlan(data.data)
+        onPlanChange?.()
         setShowEditPlan(false)
         toast({
           title: "Plan actualizado",
@@ -689,7 +714,8 @@ export function TicketResolutionTracker({
 
       const data = await response.json()
       if (data.success) {
-        await loadResolutionPlan(true)
+        setPlan(data.data)
+        onPlanChange?.()
         toast({
           title: "Plan activado",
           description: "El plan de resolución está ahora activo"
@@ -723,7 +749,8 @@ export function TicketResolutionTracker({
 
       const data = await response.json()
       if (data.success) {
-        await loadResolutionPlan(true)
+        setPlan(data.data)
+        onPlanChange?.()
         toast({
           title: "Plan completado",
           description: "El plan de resolución ha sido marcado como completado exitosamente"
@@ -956,7 +983,7 @@ export function TicketResolutionTracker({
                 {getStatusLabel(plan.status)}
               </Badge>
               {canEdit && (
-                <DropdownMenu>
+                <DropdownMenu open={openPlanMenu} onOpenChange={setOpenPlanMenu}>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="sm">
                       <MoreVertical className="h-4 w-4" />
@@ -965,7 +992,7 @@ export function TicketResolutionTracker({
                   <DropdownMenuContent align="end">
                     {plan.status === 'draft' && (
                       <>
-                        <DropdownMenuItem onClick={activatePlan}>
+                        <DropdownMenuItem onClick={() => { setOpenPlanMenu(false); activatePlan() }}>
                           <PlayCircle className="h-4 w-4 mr-2" />
                           Activar Plan
                         </DropdownMenuItem>
@@ -974,7 +1001,7 @@ export function TicketResolutionTracker({
                     )}
                     {plan.status === 'active' && (
                       <>
-                        <DropdownMenuItem onClick={completePlan}>
+                        <DropdownMenuItem onClick={() => { setOpenPlanMenu(false); completePlan() }}>
                           <CheckCircle className="h-4 w-4 mr-2" />
                           Marcar como Completado
                         </DropdownMenuItem>
@@ -982,7 +1009,7 @@ export function TicketResolutionTracker({
                       </>
                     )}
                     <DropdownMenuItem onClick={() => {
-                      // Cargar datos actuales del plan en el formulario
+                      setOpenPlanMenu(false)
                       setPlanForm({
                         title: plan.title,
                         description: plan.description || '',
@@ -999,7 +1026,7 @@ export function TicketResolutionTracker({
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem 
-                      onClick={() => setShowDeletePlan(true)}
+                      onClick={() => { setOpenPlanMenu(false); setShowDeletePlan(true) }}
                       className="text-destructive focus:text-destructive"
                     >
                       <Trash2 className="h-4 w-4 mr-2" />

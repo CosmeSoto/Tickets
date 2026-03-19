@@ -5,6 +5,7 @@ import { LicenseService } from '@/lib/services/license.service'
 import { updateLicenseSchema, assignLicenseSchema } from '@/lib/validations/inventory/license'
 import { ZodError } from 'zod'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
+import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
 
 /**
  * GET /api/inventory/licenses/[id]
@@ -44,8 +45,8 @@ export async function PUT(
     if (!session?.user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
-    if (session.user.role === 'CLIENT') {
-      return NextResponse.json({ error: 'No tienes permisos' }, { status: 403 })
+    if (!await canManageInventory(session.user.id, session.user.role)) {
+      return inventoryForbidden()
     }
 
     const { id } = await params
@@ -123,8 +124,8 @@ export async function PATCH(
     if (!session?.user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
-    if (session.user.role === 'CLIENT') {
-      return NextResponse.json({ error: 'No tienes permisos' }, { status: 403 })
+    if (!await canManageInventory(session.user.id, session.user.role)) {
+      return inventoryForbidden()
     }
 
     const { id } = await params

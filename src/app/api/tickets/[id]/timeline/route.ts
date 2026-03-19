@@ -98,10 +98,16 @@ export async function GET(
         try { return JSON.parse(e.newValue!) as string[] } catch { return [] }
       })
 
+    // También recopilar IDs de file_uploaded (newValue es el ID directo)
+    const fileUploadedIds = history
+      .filter(e => e.action === 'file_uploaded' && e.newValue)
+      .map(e => e.newValue!)
+
     // Cargar attachments de comentarios en una sola query
-    const commentAttachments = commentAttachmentIds.length > 0
+    const allAttachmentIds = [...commentAttachmentIds, ...fileUploadedIds]
+    const commentAttachments = allAttachmentIds.length > 0
       ? await prisma.attachments.findMany({
-          where: { id: { in: commentAttachmentIds } },
+          where: { id: { in: allAttachmentIds } },
           select: { id: true, originalName: true, mimeType: true, size: true }
         })
       : []
@@ -165,6 +171,7 @@ function mapActionToType(action: string): string {
     'resolution_task_deleted': 'resolution_task',
     'rating_submitted': 'rating',
     'resolved': 'resolution',
+    'file_uploaded': 'file_uploaded',
   }
   
   return mapping[action] || 'created'
@@ -191,6 +198,7 @@ function generateTitle(action: string, field: string | null, newValue: string | 
     'resolution_task_deleted': '✓ Tarea eliminada',
     'rating_submitted': '⭐ Calificación recibida',
     'resolved': 'Ticket resuelto',
+    'file_uploaded': 'Archivo adjunto',
   }
   
   return titles[action] || `Cambio en ${field || 'ticket'}`
@@ -252,6 +260,19 @@ function parseMetadata(action: string, newValue: string | null, oldValue: string
       }
     } catch {
       // newValue no es JSON de IDs, ignorar
+    }
+  }
+
+  // Para archivos subidos directamente, recuperar el attachment por su ID
+  if (action === 'file_uploaded' && newValue && attachmentMap) {
+    const a = attachmentMap.get(newValue)
+    if (a) {
+      metadata.attachments = [{
+        id: a.id,
+        name: a.originalName,
+        size: a.size,
+        type: a.mimeType,
+      }]
     }
   }
 

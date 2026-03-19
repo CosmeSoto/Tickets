@@ -91,14 +91,6 @@ export async function POST(
       }
     })
 
-    // Registrar en auditoría
-    await auditCommentCreated(
-      newComment.id,
-      ticketId,
-      session.user.id,
-      commentData.isInternal || false
-    )
-
     // Subir archivos adjuntos del comentario
     const uploadedAttachments: { id: string; originalName: string; mimeType: string; size: number }[] = []
     for (const file of commentData.files) {
@@ -137,101 +129,98 @@ export async function POST(
       console.error('[COMMENT] Error registrando en historial:', err)
     })
 
-    // ⭐ AUDITORÍA: Registrar creación de comentario
-    await AuditServiceComplete.log({
-      action: AuditActionsComplete.COMMENT_ADDED,
-      entityType: 'comment',
-      entityId: newComment.id,
-      userId: session.user.id,
-      details: {
-        ticketId: ticketId,
-        ticketTitle: ticket.title,
-        authorName: newComment.users.name,
-        authorRole: newComment.users.role,
-        isInternal: newComment.isInternal,
-        contentPreview: newComment.content.substring(0, 100)
-      },
-      request: request
-    })
-
-    // ⭐ NUEVO: Registrar primera respuesta en SLA si es un técnico/admin
-    if (session.user.role === 'TECHNICIAN' || session.user.role === 'ADMIN') {
-      await SLAService.recordFirstResponse(ticketId).catch(err => {
-        console.error('[SLA] Error registrando primera respuesta:', err)
+    // ⭐ AUDITORÍA: Registrar creación de comentario (no crítico, en paralelo)
+    const sideEffects: Promise<any>[] = [
+      auditCommentCreated(
+        newComment.id,
+        ticketId,
+        session.user.id,
+        commentData.isInternal || false
+      ).catch(err => {
+        console.error('[AUDIT] Error en auditCommentCreated:', err)
+      }),
+      AuditServiceComplete.log({
+        action: AuditActionsComplete.COMMENT_ADDED,
+        entityType: 'comment',
+        entityId: newComment.id,
+        userId: session.user.id,
+        details: {
+          ticketId: ticketId,
+          ticketTitle: ticket.title,
+          authorName: newComment.users.name,
+          authorRole: newComment.users.role,
+          isInternal: newComment.isInternal,
+          contentPreview: newComment.content.substring(0, 100)
+        },
+        request: request
+      }).catch(err => {
+        console.error('[AUDIT] Error registrando auditoría de comentario:', err)
       })
+    ]
+
+    // Registrar primera respuesta en SLA si es un técnico/admin
+    if (session.user.role === 'TECHNICIAN' || session.user.role === 'ADMIN') {
+      sideEffects.push(
+        SLAService.recordFirstResponse(ticketId).catch(err => {
+          console.error('[SLA] Error registrando primera respuesta:', err)
+        })
+      )
     }
 
-    // ⭐ NUEVO: Disparar webhook de comentario agregado
-    await WebhookService.trigger(WebhookService.EVENTS.COMMENT_ADDED, {
-      commentId: newComment.id,
-      ticketId,
-      author: {
-        id: newComment.users.id,
-        name: newComment.users.name,
-        role: newComment.users.role
-      },
-      content: newComment.content.substring(0, 200), // Primeros 200 caracteres
-      isInternal: newComment.isInternal,
-      createdAt: newComment.createdAt
-    }).catch(err => {
-      console.error('[WEBHOOK] Error disparando evento COMMENT_ADDED:', err)
-    })
-
-    // ⭐ NUEVO: Enviar notificaciones in-app
-    await NotificationService.notifyNewComment(newComment.id).catch(err => {
-      console.error('[NOTIFICATION] Error enviando notificaciones de nuevo comentario:', err)
-    })
-
-    // ⭐ NUEVO: Enviar email al cliente o técnico según quien comentó
-    try {
-      // Obtener información completa del ticket con cliente y técnico
-      const ticketWithUsers = await prisma.tickets.findUnique({
-        where: { id: ticketId },
-        include: {
-          users_tickets_clientIdTousers: {
-            select: {
-              id: true,
-              name: true,
-              email: true
-            }
-          },
-          users_tickets_assigneeIdTousers: {
-            select: {
-              id: true,
-              name: true,
-              email: true
-            }
-          }
-        }
+    // Disparar webhook de comentario agregado
+    sideEffects.push(
+      WebhookService.trigger(WebhookService.EVENTS.COMMENT_ADDED, {
+        commentId: newComment.id,
+        ticketId,
+        author: {
+          id: newComment.users.id,
+          name: newComment.users.name,
+          role: newComment.users.role
+        },
+        content: newComment.content.substring(0, 200),
+        isInternal: newComment.isInternal,
+        createdAt: newComment.createdAt
+      }).catch(err => {
+        console.error('[WEBHOOK] Error disparando evento COMMENT_ADDED:', err)
       })
+    )
 
-      if (ticketWithUsers) {
-        // Determinar quién debe recibir el email
-        let recipient = null
-        let recipientRole = ''
+    // Enviar notificaciones in-app
+    sideEffects.push(
+      NotificationService.notifyNewComment(newComment.id).catch(err => {
+        console.error('[NOTIFICATION] Error enviando notificaciones de nuevo comentario:', err)
+      })
+    )
 
-        if (session.user.role === 'CLIENT') {
-          // Si el cliente comentó, notificar al técnico asignado
-          if (ticketWithUsers.users_tickets_assigneeIdTousers) {
-            recipient = ticketWithUsers.users_tickets_assigneeIdTousers
-            recipientRole = 'técnico'
+    // Email al cliente o técnico según quien comentó (también en paralelo)
+    if (!newComment.isInternal) {
+      sideEffects.push(
+        prisma.tickets.findUnique({
+          where: { id: ticketId },
+          include: {
+            users_tickets_clientIdTousers: { select: { id: true, name: true, email: true } },
+            users_tickets_assigneeIdTousers: { select: { id: true, name: true, email: true } }
           }
-        } else {
-          // Si el técnico/admin comentó, notificar al cliente
-          recipient = ticketWithUsers.users_tickets_clientIdTousers
-          recipientRole = 'cliente'
-        }
-
-        // Enviar email si hay destinatario y el comentario no es interno
-        if (recipient && !newComment.isInternal) {
+        }).then(async (ticketWithUsers) => {
+          if (!ticketWithUsers) return
+          let recipient = null
+          let recipientRole = ''
+          if (session.user.role === 'CLIENT') {
+            if (ticketWithUsers.users_tickets_assigneeIdTousers) {
+              recipient = ticketWithUsers.users_tickets_assigneeIdTousers
+              recipientRole = 'técnico'
+            }
+          } else {
+            recipient = ticketWithUsers.users_tickets_clientIdTousers
+            recipientRole = 'cliente'
+          }
+          if (!recipient) return
           const authorName = newComment.users.name
           const authorRole = session.user.role === 'CLIENT' ? 'cliente' : 'técnico'
-          
           const emailBody = `
             <h2>Nuevo Comentario en tu Ticket</h2>
             <p>Hola ${recipient.name},</p>
             <p>Se ha agregado un nuevo comentario en el ticket <strong>#${ticketId.substring(0, 8)}</strong>.</p>
-            
             <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
               <p style="margin: 0 0 10px 0;"><strong>De:</strong> ${authorName} (${authorRole})</p>
               <p style="margin: 0 0 10px 0;"><strong>Ticket:</strong> ${ticketWithUsers.title}</p>
@@ -239,34 +228,29 @@ export async function POST(
                 <p style="margin: 0; white-space: pre-wrap;">${newComment.content}</p>
               </div>
             </div>
-            
             <div style="margin-top: 30px;">
-              <a href="${process.env.NEXTAUTH_URL}/${session.user.role === 'CLIENT' ? 'technician' : 'client'}/tickets/${ticketId}" 
+              <a href="${process.env.NEXTAUTH_URL}/${session.user.role === 'CLIENT' ? 'technician' : 'client'}/tickets/${ticketId}"
                  style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
                 Ver Ticket y Responder
               </a>
             </div>
-            
-            <p style="margin-top: 30px; color: #6b7280; font-size: 14px;">
-              Puedes responder directamente a este correo o agregar un comentario en el ticket.
-            </p>
           `
-
           await EmailService.queueEmail({
             to: recipient.email,
             subject: `Nuevo comentario en Ticket #${ticketId.substring(0, 8)} - ${ticketWithUsers.title}`,
             html: emailBody,
-            text: `Nuevo Comentario en tu Ticket\n\nHola ${recipient.name},\n\nSe ha agregado un nuevo comentario en el ticket #${ticketId.substring(0, 8)}.\n\nDe: ${authorName} (${authorRole})\nTicket: ${ticketWithUsers.title}\n\nComentario:\n${newComment.content}\n\nVer ticket: ${process.env.NEXTAUTH_URL}/${session.user.role === 'CLIENT' ? 'technician' : 'client'}/tickets/${ticketId}`,
-            replyTo: newComment.users.email // Permitir responder directamente al autor
+            text: `Nuevo comentario de ${authorName} (${authorRole}) en ticket #${ticketId.substring(0, 8)}:\n\n${newComment.content}`,
+            replyTo: newComment.users.email
           }, session.user.id)
-
           console.log(`[API] Email queued for ${recipientRole} ${recipient.email} about new comment ${newComment.id}`)
-        }
-      }
-    } catch (emailError) {
-      // No fallar si el email falla, solo registrar el error
-      console.error('[API] Error sending email for new comment:', emailError)
+        }).catch(err => {
+          console.error('[API] Error sending email for new comment:', err)
+        })
+      )
     }
+
+    // Lanzar todos los side effects en paralelo sin bloquear la respuesta
+    Promise.all(sideEffects)
 
     return NextResponse.json({
       success: true,

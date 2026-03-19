@@ -111,7 +111,7 @@ export default function TechnicianTicketDetailPage() {
           return prev
         })
       } catch {}
-    }, 10000)
+    }, 3000)
     return () => clearInterval(interval)
   }, [ticketId, loading])
 
@@ -148,14 +148,15 @@ export default function TechnicianTicketDetailPage() {
       if (!res.ok || !data.success) {
         throw new Error(data.message || 'Error al actualizar estado')
       }
-      // Recargar ticket completo para tener todos los campos actualizados
-      const refreshed = await getTicket(ticket.id)
-      if (refreshed) {
-        setTicket(refreshed)
-        setNewStatus(refreshed.status as typeof newStatus)
-      } else {
-        setTicket(prev => prev ? { ...prev, status: newStatus } : prev)
-      }
+      // Actualizar estado local inmediatamente con la respuesta del PATCH
+      setTicket(prev => prev ? {
+        ...prev,
+        status: newStatus,
+        updatedAt: data.data.updatedAt,
+        resolvedAt: data.data.resolvedAt ?? prev.resolvedAt,
+        closedAt: data.data.closedAt ?? prev.closedAt,
+      } : prev)
+      setNewStatus(newStatus)
       setTimelineRefreshKey(k => k + 1)
       toast({
         title: 'Estado actualizado',
@@ -530,7 +531,7 @@ export default function TechnicianTicketDetailPage() {
               <TabsContent value="timeline" className="space-y-4">
                 <TicketTimeline 
                   ticketId={ticket.id}
-                  canAddComments={true}
+                  canAddComments={ticket.status !== 'CLOSED'}
                   canViewInternal={true}
                   refreshKey={timelineRefreshKey}
                   onCommentAdded={() => setFileRefreshKey(k => k + 1)}
@@ -550,8 +551,8 @@ export default function TechnicianTicketDetailPage() {
                 <CompactFileManager 
                   ticketId={ticket.id}
                   onAttachmentsChange={loadTicket}
-                  canUpload={true}
-                  canDelete={true}
+                  canUpload={ticket.status !== 'CLOSED'}
+                  canDelete={ticket.status !== 'CLOSED'}
                   refreshKey={fileRefreshKey}
                 />
               </TabsContent>

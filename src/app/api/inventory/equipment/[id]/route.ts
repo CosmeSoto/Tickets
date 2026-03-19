@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { EquipmentService } from '@/lib/services/equipment.service'
 import { updateEquipmentSchema, equipmentIdSchema } from '@/lib/validations/inventory/equipment'
 import { ZodError } from 'zod'
+import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
 
 /**
  * GET /api/inventory/equipment/[id]
@@ -79,18 +80,11 @@ export async function PUT(
     const session = await getServerSession(authOptions)
     
     if (!session?.user) {
-      return NextResponse.json(
-        { error: 'No autenticado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    // Solo ADMIN puede actualizar equipos (o TECHNICIAN si tiene permiso)
-    if (session.user.role === 'CLIENT') {
-      return NextResponse.json(
-        { error: 'No tienes permisos para actualizar equipos' },
-        { status: 403 }
-      )
+    if (!await canManageInventory(session.user.id, session.user.role)) {
+      return inventoryForbidden()
     }
 
     // Validar ID

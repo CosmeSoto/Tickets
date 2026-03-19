@@ -280,7 +280,7 @@ export function createUserColumns({
             )}
             
             {/* Promover a Técnico - Solo para usuarios CLIENT activos */}
-            {onPromoteUser && user.role === 'CLIENT' && user.isActive && (
+            {/* {onPromoteUser && user.role === 'CLIENT' && user.isActive && (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={(e) => {
@@ -291,7 +291,7 @@ export function createUserColumns({
                   <span>Promover a Técnico</span>
                 </DropdownMenuItem>
               </>
-            )}
+            )} en el modulo tickets ya tiene promover*/}
             
             <DropdownMenuSeparator />
             

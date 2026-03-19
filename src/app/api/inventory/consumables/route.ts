@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { ConsumableService } from '@/lib/services/consumable.service'
 import { createConsumableSchema, consumableFiltersSchema } from '@/lib/validations/inventory/consumable'
+import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
 import { ZodError } from 'zod'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 
@@ -53,8 +54,8 @@ export async function POST(request: NextRequest) {
     if (!session?.user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
-    if (session.user.role === 'CLIENT') {
-      return NextResponse.json({ error: 'No tienes permisos para crear consumibles' }, { status: 403 })
+    if (!await canManageInventory(session.user.id, session.user.role)) {
+      return inventoryForbidden()
     }
 
     const body = await request.json()

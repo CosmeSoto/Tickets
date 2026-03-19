@@ -320,10 +320,16 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
   }
 
   const submitReturn = async () => {
-    if (!currentAssignment) return
+    // Usar el currentAssignment del estado actual del data, no del closure
+    const activeAssignment = data?.currentAssignment
+    if (!activeAssignment) {
+      toast({ title: 'Error', description: 'No hay asignación activa para devolver', variant: 'destructive' })
+      setShowReturnDialog(false)
+      return
+    }
     setReturning(true)
     try {
-      const response = await fetch(`/api/inventory/assignments/${currentAssignment.id}`, {
+      const response = await fetch(`/api/inventory/assignments/${activeAssignment.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -376,6 +382,7 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
     }
     setSubmittingMaintenance(true)
     try {
+      const isClient = userRole === 'CLIENT'
       const response = await fetch('/api/inventory/maintenance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -384,7 +391,7 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
           type: maintenanceForm.type,
           description: maintenanceForm.description,
           scheduledDate: maintenanceForm.scheduledDate,
-          technicianId: userId,
+          ...(isClient ? {} : { technicianId: userId }),
         }),
       })
 
@@ -394,8 +401,10 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
       }
 
       toast({
-        title: 'Mantenimiento registrado',
-        description: 'El equipo ha sido marcado en mantenimiento. El cliente asignado será notificado.',
+        title: userRole === 'CLIENT' ? 'Solicitud enviada' : 'Mantenimiento registrado',
+        description: userRole === 'CLIENT'
+          ? 'Tu solicitud de mantenimiento fue enviada. El equipo técnico la revisará pronto.'
+          : 'El equipo ha sido marcado en mantenimiento. El cliente asignado será notificado.',
       })
 
       setShowMaintenanceDialog(false)
@@ -452,8 +461,11 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
   const canAssign = (userRole === 'ADMIN' || userRole === 'TECHNICIAN') && equipment.status === 'AVAILABLE'
   // Devolver a bodega: solo si tiene asignación activa
   const canReturn = (userRole === 'ADMIN' || userRole === 'TECHNICIAN') && isAssigned
-  // Mantenimiento: si no está retirado ni ya en mantenimiento
+  // Mantenimiento (admin/tech): si no está retirado ni ya en mantenimiento
   const canMaintenance = (userRole === 'ADMIN' || userRole === 'TECHNICIAN') && !isRetired && !isInMaintenance
+  // Solicitar mantenimiento (cliente): si tiene el equipo asignado y no hay solicitud/mantenimiento activo
+  const hasActiveMaintenance = isInMaintenance || (maintenanceRecords && maintenanceRecords.some((r: any) => ['REQUESTED', 'SCHEDULED', 'ACCEPTED'].includes(r.status)))
+  const canRequestMaintenance = userRole === 'CLIENT' && currentAssignment?.receiverId === userId && !hasActiveMaintenance
   // Dar de baja: ADMIN, no retirado, sin asignación activa
   const canRetire = userRole === 'ADMIN' && !isRetired && !isAssigned
   // Eliminar definitivamente: solo ADMIN y solo si ya está retirado
@@ -478,6 +490,12 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
             <Button onClick={handleReportProblem} variant="default">
               <AlertCircle className="mr-2 h-4 w-4" />
               Reportar Problema
+            </Button>
+          )}
+          {canRequestMaintenance && !isInMaintenance && (
+            <Button onClick={handleMaintenance} variant="outline" className="border-yellow-300 text-yellow-700 hover:bg-yellow-50">
+              <Wrench className="mr-2 h-4 w-4" />
+              Solicitar Mantenimiento
             </Button>
           )}
           {canEdit && (
@@ -542,6 +560,28 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
             >
               Ver mantenimiento <ExternalLink className="h-3 w-3" />
             </a>
+          </AlertDescription>
+        </Alert>
+      )}
+      {/* Banner de solicitud pendiente para cliente */}
+      {!isInMaintenance && maintenanceRecords && maintenanceRecords.some((r: any) => r.status === 'REQUESTED') && (
+        <Alert className="border-blue-300 bg-blue-50">
+          <AlertCircle className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-800 flex items-center justify-between">
+            <span>
+              <span className="font-medium">Solicitud de mantenimiento pendiente.</span>{' '}
+              {userRole === 'CLIENT'
+                ? 'Tu solicitud está siendo revisada por el equipo técnico.'
+                : 'Hay una solicitud de mantenimiento pendiente de aprobación.'}
+            </span>
+            {maintenanceRecords.find((r: any) => r.status === 'REQUESTED') && (
+              <a
+                href={`/inventory/maintenance/${maintenanceRecords.find((r: any) => r.status === 'REQUESTED').id}`}
+                className="ml-4 flex items-center gap-1 text-sm font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900 flex-shrink-0"
+              >
+                Ver solicitud <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
           </AlertDescription>
         </Alert>
       )}
@@ -688,10 +728,14 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
       <Dialog open={showMaintenanceDialog} onOpenChange={setShowMaintenanceDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Registrar Mantenimiento</DialogTitle>
+            <DialogTitle>
+              {userRole === 'CLIENT' ? 'Solicitar Mantenimiento' : 'Registrar Mantenimiento'}
+            </DialogTitle>
             <DialogDescription>
-              Registra un mantenimiento para el equipo <span className="font-semibold">{equipment.code}</span>.
-              {currentAssignment && (
+              {userRole === 'CLIENT'
+                ? `Solicita mantenimiento para el equipo ${equipment.code}. El equipo técnico revisará tu solicitud.`
+                : `Registra un mantenimiento para el equipo ${equipment.code}.`}
+              {userRole !== 'CLIENT' && currentAssignment && (
                 <span className="block mt-1 text-yellow-600">
                   El cliente asignado ({currentAssignment.receiver?.name}) será notificado.
                 </span>
@@ -994,6 +1038,20 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
             <div className="space-y-3">
               {maintenanceRecords.map((record: any) => {
                 const isActive = equipment.status === 'MAINTENANCE' && record === maintenanceRecords[0]
+                const statusBadge: Record<string, string> = {
+                  REQUESTED: 'bg-blue-100 text-blue-800',
+                  SCHEDULED: 'bg-yellow-100 text-yellow-800',
+                  ACCEPTED: 'bg-purple-100 text-purple-800',
+                  COMPLETED: 'bg-green-100 text-green-800',
+                  CANCELLED: 'bg-gray-100 text-gray-600',
+                }
+                const statusLabel: Record<string, string> = {
+                  REQUESTED: 'Solicitado',
+                  SCHEDULED: 'Programado',
+                  ACCEPTED: 'Aceptado',
+                  COMPLETED: 'Completado',
+                  CANCELLED: 'Cancelado',
+                }
                 return (
                   <a
                     key={record.id}
@@ -1007,8 +1065,10 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
                         <span className="font-medium text-sm">
                           {record.type === 'PREVENTIVE' ? 'Preventivo' : 'Correctivo'}
                         </span>
-                        {isActive && (
-                          <Badge className="bg-yellow-100 text-yellow-800 text-xs">En curso</Badge>
+                        {record.status && (
+                          <Badge className={`text-xs ${statusBadge[record.status] || 'bg-gray-100 text-gray-600'}`}>
+                            {statusLabel[record.status] || record.status}
+                          </Badge>
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground">{record.description}</p>

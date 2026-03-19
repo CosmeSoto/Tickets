@@ -48,6 +48,7 @@ export interface Ticket {
   createdAt: string
   updatedAt: string
   resolvedAt?: string
+  closedAt?: string
   dueDate?: string
   knowledgeArticleId?: string | null
   tags?: string[]

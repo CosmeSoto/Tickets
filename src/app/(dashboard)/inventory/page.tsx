@@ -29,25 +29,25 @@ export default function InventoryPage() {
   const [deleteTarget, setDeleteTarget] = useState<Equipment | null>(null)
   const [deleting, setDeleting] = useState(false)
 
+  const [canCreate, setCanCreate] = useState(false)
+
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login')
+      return
     }
-  }, [status, router])
-
-  if (status === 'loading') {
-    return (
-      <RoleDashboardLayout title="Cargando..." subtitle="Obteniendo información">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
-      </RoleDashboardLayout>
-    )
-  }
-
-  if (!session?.user) return null
-
-  const canCreate = session.user.role === 'ADMIN' || session.user.role === 'TECHNICIAN'
+    if (session?.user?.role === 'CLIENT') {
+      router.push('/unauthorized')
+      return
+    }
+    // Verificar permiso de gestión de inventario
+    if (session?.user) {
+      fetch('/api/inventory/access')
+        .then(r => r.json())
+        .then(d => setCanCreate(d.canManage === true))
+        .catch(() => setCanCreate(session.user!.role === 'ADMIN'))
+    }
+  }, [status, session, router])
 
   const handleCreateNew = () => {
     router.push('/inventory/equipment/new')
@@ -88,6 +88,18 @@ export default function InventoryPage() {
       setDeleting(false)
     }
   }
+
+  if (status === 'loading') {
+    return (
+      <RoleDashboardLayout title="Cargando..." subtitle="Obteniendo información">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      </RoleDashboardLayout>
+    )
+  }
+
+  if (!session?.user) return null
 
   return (
     <RoleDashboardLayout
