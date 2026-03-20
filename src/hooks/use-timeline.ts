@@ -87,11 +87,9 @@ export function useTimeline(ticketId: string) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketId])
 
-  const loadTimeline = useCallback(async (silent = false) => {
+  const loadTimeline = useCallback(async (silent = false, force = false) => {
     const currentTicketId = ticketIdRef.current
     if (!currentTicketId) return
-    // Si hay un envío en curso, ignorar recargas del polling para no borrar el optimista
-    if (submittingRef.current && silent) return
 
     try {
       if (!silent) setLoading(true)
@@ -112,15 +110,7 @@ export function useTimeline(ticketId: string) {
       
       if (data.success) {
         const incoming: TimelineEvent[] = data.data || []
-        setEvents(prev => {
-          // Conservar eventos optimistas que aún no están confirmados en el servidor
-          const optimistics = prev.filter(e => e.id.startsWith('optimistic-'))
-          if (optimistics.length === 0) return incoming
-          const stillPending = optimistics.filter(
-            opt => !incoming.some(e => e.createdAt >= opt.createdAt && e.type === opt.type)
-          )
-          return [...stillPending, ...incoming]
-        })
+        setEvents(incoming)
       } else {
         throw new Error(data.message || 'Error al cargar el historial')
       }
@@ -289,9 +279,8 @@ export function useTimeline(ticketId: string) {
   }, [loadTimeline])
 
   // SSE: recarga inmediata cuando el servidor emite un evento (comment_added, etc.)
-  // Complementa el polling — SSE es el camino rápido, polling es el fallback
   useTicketSSE(ticketId, useCallback(() => {
-    if (!submittingRef.current) loadTimeline(true)
+    loadTimeline(true)
   }, [loadTimeline]))
 
   return {
