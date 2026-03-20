@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useToast } from './use-toast'
-
+import { useTicketSSE } from './use-ticket-sse'
 export interface TimelineEvent {
   id: string
   type: 'comment' | 'status_change' | 'assignment' | 'priority_change' | 'resolution' | 'rating' | 'created' | 'resolution_plan' | 'resolution_task' | 'file_uploaded'
@@ -287,6 +287,12 @@ export function useTimeline(ticketId: string) {
       document.removeEventListener('visibilitychange', handleVisibility)
     }
   }, [loadTimeline])
+
+  // SSE: recarga inmediata cuando el servidor emite un evento (comment_added, etc.)
+  // Complementa el polling — SSE es el camino rápido, polling es el fallback
+  useTicketSSE(ticketId, useCallback(() => {
+    if (!submittingRef.current) loadTimeline(true)
+  }, [loadTimeline]))
 
   return {
     events,

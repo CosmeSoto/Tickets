@@ -10,6 +10,7 @@ import { EmailService } from '@/lib/services/email/email-service'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { NotificationService } from '@/lib/services/notification-service'
 import { FileService } from '@/lib/services/file-service'
+import { TicketEvents } from '@/lib/ticket-events'
 
 export async function POST(
   request: NextRequest,
@@ -251,6 +252,9 @@ export async function POST(
 
     // Lanzar todos los side effects en paralelo sin bloquear la respuesta
     Promise.all(sideEffects)
+
+    // Emitir evento SSE a todos los clientes suscritos a este ticket (instantáneo)
+    TicketEvents.emit(ticketId, { type: 'comment_added' })
 
     return NextResponse.json({
       success: true,
