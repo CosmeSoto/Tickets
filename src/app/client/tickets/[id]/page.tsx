@@ -415,7 +415,8 @@ export default function ClientTicketDetailPage() {
               <TabsTrigger value="files">Archivos</TabsTrigger>
             </TabsList>
             
-            <TabsContent value="timeline" className="space-y-4">
+            {/* forceMount mantiene el componente montado siempre → polling activo */}
+            <TabsContent value="timeline" className="space-y-4" forceMount hidden={activeTab !== 'timeline'}>
               <TicketTimeline 
                 ticketId={ticket.id}
                 canAddComments={ticket.status !== 'CLOSED'}
@@ -433,7 +434,6 @@ export default function ClientTicketDetailPage() {
                 showTechnicianStats={false}
                 mode='client'
                 onRatingSubmitted={() => {
-                  // Actualizar estado local inmediatamente a CLOSED sin refetch
                   setTicket(prev => prev ? { ...prev, status: 'CLOSED', closedAt: new Date().toISOString() } : prev)
                   setTimelineRefreshKey(k => k + 1)
                 }}

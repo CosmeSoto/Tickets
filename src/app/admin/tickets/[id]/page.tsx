@@ -89,6 +89,7 @@ export default function TicketDetailPage() {
   const [unassigning, setUnassigning] = useState(false)
   const [timelineRefreshKey, setTimelineRefreshKey] = useState(0)
   const [fileRefreshKey, setFileRefreshKey] = useState(0)
+  const [activeTab, setActiveTab] = useState('timeline')
   const [editForm, setEditForm] = useState({
     title: '',
     description: '',
@@ -536,7 +537,7 @@ export default function TicketDetailPage() {
           </Card>
 
           {/* Tabs para organizar el contenido */}
-          <Tabs defaultValue="timeline" className="w-full">
+          <Tabs defaultValue="timeline" className="w-full" onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-4">
               <TooltipProvider>
                 <Tooltip>
@@ -580,7 +581,8 @@ export default function TicketDetailPage() {
               </TooltipProvider>
             </TabsList>
             
-            <TabsContent value="timeline" className="space-y-4">
+            {/* forceMount mantiene el componente montado siempre → polling activo */}
+            <TabsContent value="timeline" className="space-y-4" forceMount hidden={activeTab !== 'timeline'}>
               <TicketTimeline 
                 ticketId={ticket.id}
                 canAddComments={(session?.user?.role === 'ADMIN' || session?.user?.role === 'TECHNICIAN') && ticket.status !== 'CLOSED'}
