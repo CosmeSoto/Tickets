@@ -416,7 +416,7 @@ export default function ClientTicketDetailPage() {
             </TabsList>
             
             {/* forceMount mantiene el componente montado siempre → polling activo */}
-            <TabsContent value="timeline" className="space-y-4" forceMount hidden={activeTab !== 'timeline'}>
+            <TabsContent value="timeline" className="space-y-4">
               <TicketTimeline 
                 ticketId={ticket.id}
                 canAddComments={ticket.status !== 'CLOSED'}

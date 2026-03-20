@@ -581,8 +581,8 @@ export default function TicketDetailPage() {
               </TooltipProvider>
             </TabsList>
             
-            {/* forceMount mantiene el componente montado siempre → polling activo */}
-            <TabsContent value="timeline" className="space-y-4" forceMount hidden={activeTab !== 'timeline'}>
+            {/* Timeline: sin forceMount/hidden — Radix maneja el montaje correctamente */}
+            <TabsContent value="timeline" className="space-y-4">
               <TicketTimeline 
                 ticketId={ticket.id}
                 canAddComments={(session?.user?.role === 'ADMIN' || session?.user?.role === 'TECHNICIAN') && ticket.status !== 'CLOSED'}

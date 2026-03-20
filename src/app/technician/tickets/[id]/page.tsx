@@ -529,9 +529,8 @@ export default function TechnicianTicketDetailPage() {
                 )}
               </TabsContent>
               
-              {/* Timeline: siempre montado (forceMount) para mantener el polling activo */}
-              <TabsContent value="timeline" className="space-y-4" forceMount
-                hidden={activeTab !== 'timeline'}>
+              {/* Timeline: siempre montado fuera del sistema de tabs para evitar desmontaje */}
+              <TabsContent value="timeline" className="space-y-4">
                 <TicketTimeline 
                   ticketId={ticket.id}
                   canAddComments={ticket.status !== 'CLOSED'}
