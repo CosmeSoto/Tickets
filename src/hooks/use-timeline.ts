@@ -90,12 +90,14 @@ export function useTimeline(ticketId: string) {
   const loadTimeline = useCallback(async (silent = false, force = false) => {
     const currentTicketId = ticketIdRef.current
     if (!currentTicketId) return
+    console.log(`[TIMELINE-HOOK] loadTimeline ticketId=${currentTicketId} silent=${silent}`)
 
     try {
       if (!silent) setLoading(true)
       setError(null)
       
       const response = await fetch(`/api/tickets/${currentTicketId}/timeline`)
+      console.log(`[TIMELINE-HOOK] response status=${response.status}`)
       
       if (!response.ok) {
         if (response.status === 404) {
@@ -107,12 +109,13 @@ export function useTimeline(ticketId: string) {
       }
 
       const data = await response.json()
+      console.log(`[TIMELINE-HOOK] data.success=${data.success} events=${data.data?.length}`)
       
       if (data.success) {
         const incoming: TimelineEvent[] = data.data || []
         setEvents(incoming)
       } else {
-        throw new Error(data.message || 'Error al cargar el historial')
+        throw new Error(data.message || data.error || 'Error al cargar el historial')
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
