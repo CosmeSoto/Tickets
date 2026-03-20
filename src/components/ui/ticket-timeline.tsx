@@ -194,13 +194,15 @@ export function TicketTimeline({
 
     const result = await addComment(commentContent, commentIsInternal, commentAttachments)
     if (result) {
-      // Reemplazar el evento optimista con el ID real del servidor
-      // sin necesidad de recargar todo el timeline (evita round-trip GET)
+      // Actualizar ID del optimista inmediatamente con el real
       setEvents(prev => prev.map(e =>
         e.id === optimisticId
           ? { ...e, id: result.id, createdAt: result.createdAt }
           : e
       ))
+      // Recargar el timeline completo para traer datos reales del servidor
+      // (adjuntos reales, metadata completa, etc.)
+      loadTimeline(true)
       onCommentAdded?.()
     } else {
       // Revertir: restaurar form y quitar optimista

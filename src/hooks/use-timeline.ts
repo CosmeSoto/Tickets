@@ -75,25 +75,33 @@ export function useTimeline(ticketId: string) {
   const [events, setEvents] = useState<TimelineEvent[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // Flag para bloquear recargas externas mientras se envía un comentario
+  // Refs estables para evitar recrear callbacks en cada render
   const submittingRef = useRef(false)
+  const toastRef = useRef(toast)
+  const ticketIdRef = useRef(ticketId)
+  useEffect(() => { toastRef.current = toast }, [toast])
+  useEffect(() => {
+    ticketIdRef.current = ticketId
+    // Recargar cuando cambia el ticket (navegación entre tickets)
+    if (ticketId) loadTimeline()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticketId])
 
   const loadTimeline = useCallback(async (silent = false) => {
-    if (!ticketId) return
-    // Si hay un envío en curso, ignorar recargas externas (polling, refreshKey)
-    // para no borrar el evento optimista
+    const currentTicketId = ticketIdRef.current
+    if (!currentTicketId) return
+    // Si hay un envío en curso, ignorar recargas del polling para no borrar el optimista
     if (submittingRef.current && silent) return
 
     try {
       if (!silent) setLoading(true)
       setError(null)
       
-      const response = await fetch(`/api/tickets/${ticketId}/timeline`)
+      const response = await fetch(`/api/tickets/${currentTicketId}/timeline`)
       
       if (!response.ok) {
-        // Si es 404, mostrar mensaje más amigable
         if (response.status === 404) {
-          console.warn(`Timeline API not found for ticket ${ticketId}. Using empty timeline.`)
+          console.warn(`Timeline API not found for ticket ${currentTicketId}. Using empty timeline.`)
           setEvents([])
           return
         }
@@ -105,10 +113,9 @@ export function useTimeline(ticketId: string) {
       if (data.success) {
         const incoming: TimelineEvent[] = data.data || []
         setEvents(prev => {
-          // Conservar eventos optimistas (id empieza con 'optimistic-') que aún no están en el servidor
+          // Conservar eventos optimistas que aún no están confirmados en el servidor
           const optimistics = prev.filter(e => e.id.startsWith('optimistic-'))
           if (optimistics.length === 0) return incoming
-          // Filtrar optimistas que ya tienen su versión real en el servidor
           const stillPending = optimistics.filter(
             opt => !incoming.some(e => e.createdAt >= opt.createdAt && e.type === opt.type)
           )
@@ -120,26 +127,24 @@ export function useTimeline(ticketId: string) {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
       setError(errorMessage)
-      
-      // Solo mostrar toast si no es un error de desarrollo (404)
       if (!errorMessage.includes('404')) {
-        toast({
+        toastRef.current({
           variant: "destructive",
           title: "Error",
           description: "No se pudo cargar el historial del ticket"
         })
       }
-      
-      // Establecer eventos vacíos como fallback
       setEvents([])
     } finally {
       if (!silent) setLoading(false)
     }
-  }, [ticketId, toast])
+  // Sin dependencias externas — usa refs para ticketId y toast
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const addComment = useCallback(async (content: string, isInternal: boolean = false, attachments?: File[]) => {
     if (!content.trim()) {
-      toast({
+      toastRef.current({
         variant: "destructive",
         title: "Contenido requerido",
         description: "Debes escribir un comentario antes de enviarlo"
@@ -147,7 +152,7 @@ export function useTimeline(ticketId: string) {
       return false
     }
 
-    submittingRef.current = true // bloquear recargas externas
+    submittingRef.current = true // bloquear recargas del polling
 
     try {
       const formData = new FormData()
@@ -160,7 +165,7 @@ export function useTimeline(ticketId: string) {
         })
       }
 
-      const response = await fetch(`/api/tickets/${ticketId}/comments`, {
+      const response = await fetch(`/api/tickets/${ticketIdRef.current}/comments`, {
         method: 'POST',
         body: formData
       })
@@ -176,19 +181,18 @@ export function useTimeline(ticketId: string) {
         const attachmentInfo = attachments && attachments.length > 0 
           ? ` con ${attachments.length} archivo(s) adjunto(s)` 
           : ''
-        
-        toast({
+        toastRef.current({
           title: "Comentario agregado",
           description: `Comentario ${commentType} agregado${attachmentInfo}`,
           duration: 3000
         })
-        return data.data // Devolver datos del comentario creado
+        return data.data
       } else {
         throw new Error(data.message || 'Error al agregar comentario')
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
-      toast({
+      toastRef.current({
         variant: "destructive",
         title: "Error al agregar comentario",
         description: `No se pudo agregar el comentario. ${errorMessage}. Intenta nuevamente.`
@@ -197,87 +201,56 @@ export function useTimeline(ticketId: string) {
     } finally {
       submittingRef.current = false // liberar bloqueo siempre
     }
-  }, [ticketId, toast])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const updateTicketStatus = useCallback(async (newStatus: string, comment?: string) => {
     try {
-      const response = await fetch(`/api/tickets/${ticketId}/status`, {
+      const response = await fetch(`/api/tickets/${ticketIdRef.current}/status`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          status: newStatus,
-          comment
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus, comment })
       })
-
-      if (!response.ok) {
-        throw new Error('Error al actualizar estado')
-      }
-
+      if (!response.ok) throw new Error('Error al actualizar estado')
       const data = await response.json()
-      
       if (data.success) {
-        toast({
-          title: "Estado actualizado",
-          description: "El estado del ticket se ha actualizado"
-        })
-        loadTimeline() // Recargar timeline
+        toastRef.current({ title: "Estado actualizado", description: "El estado del ticket se ha actualizado" })
+        loadTimeline()
         return true
       } else {
         throw new Error(data.message || 'Error al actualizar estado')
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: errorMessage
-      })
+      toastRef.current({ variant: "destructive", title: "Error", description: errorMessage })
       return false
     }
-  }, [ticketId, toast, loadTimeline])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadTimeline])
 
   const assignTicket = useCallback(async (assigneeId: string | null, comment?: string) => {
     try {
-      const response = await fetch(`/api/tickets/${ticketId}/assign`, {
+      const response = await fetch(`/api/tickets/${ticketIdRef.current}/assign`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          assigneeId,
-          comment
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assigneeId, comment })
       })
-
-      if (!response.ok) {
-        throw new Error('Error al asignar ticket')
-      }
-
+      if (!response.ok) throw new Error('Error al asignar ticket')
       const data = await response.json()
-      
       if (data.success) {
-        toast({
-          title: "Ticket asignado",
-          description: "La asignación del ticket se ha actualizado"
-        })
-        loadTimeline() // Recargar timeline
+        toastRef.current({ title: "Ticket asignado", description: "La asignación del ticket se ha actualizado" })
+        loadTimeline()
         return true
       } else {
         throw new Error(data.message || 'Error al asignar ticket')
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: errorMessage
-      })
+      toastRef.current({ variant: "destructive", title: "Error", description: errorMessage })
       return false
     }
-  }, [ticketId, toast, loadTimeline])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadTimeline])
 
   // Cargar timeline al montar + polling cada 5s (pausado cuando la pestaña no está visible)
   useEffect(() => {
