@@ -260,7 +260,7 @@ export function useTimeline(ticketId: string) {
 
     const startPolling = () => {
       if (interval) return
-      interval = setInterval(() => loadTimeline(true), 5 * 1000)
+      interval = setInterval(() => loadTimeline(true), 3 * 1000)
     }
 
     const stopPolling = () => {
