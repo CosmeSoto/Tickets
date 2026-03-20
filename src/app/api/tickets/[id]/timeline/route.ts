@@ -22,7 +22,6 @@ export async function GET(
 
     const params = await context.params
     const ticketId = params.id
-    console.log(`[TIMELINE] GET ticketId=${ticketId} user=${session.user.id} role=${session.user.role}`)
 
     // Verificar que el ticket existe
     const ticket = await prisma.tickets.findUnique({
@@ -47,10 +46,7 @@ export async function GET(
     const isOwner = ticket.clientId === session.user.id
     const isAssignee = ticket.assigneeId === session.user.id
 
-    console.log(`[TIMELINE] user=${session.user.id} role=${session.user.role} isOwner=${isOwner} isAssignee=${isAssignee} clientId=${ticket.clientId} assigneeId=${ticket.assigneeId}`)
-
     if (!isAdmin && !isTechnician && !isOwner && !isAssignee) {
-      console.log(`[TIMELINE] 403 - sin permisos`)
       return NextResponse.json(
         { success: false, error: 'No tienes permisos para ver este timeline' },
         { status: 403 }

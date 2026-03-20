@@ -95,7 +95,6 @@ export default function BackupsPage() {
   }, [session, status, router])
 
   const loadBackups = async (showToast: boolean = false) => {
-    console.log('🔄 Cargando backups...')
     setLoading(true)
     try {
       const response = await fetch('/api/admin/backups', {
@@ -106,8 +105,6 @@ export default function BackupsPage() {
       })
       if (response.ok) {
         const data = await response.json()
-        console.log('✅ Backups cargados:', data.length, 'elementos')
-        console.log('📋 Lista de backups:', data.map((b: any) => ({ id: b.id, filename: b.filename })))
         setBackups(Array.isArray(data) ? data : [])
         
         if (showToast) {
@@ -191,7 +188,6 @@ export default function BackupsPage() {
   const deleteBackup = async (backupId: string, filename: string) => {
     if (!deletingBackup) return
 
-    console.log('🗑️ Iniciando eliminación de backup:', { backupId, filename })
     setDeleting(true)
     try {
       const response = await fetch(`/api/admin/backups/${backupId}`, {
@@ -200,7 +196,6 @@ export default function BackupsPage() {
 
       if (response.ok) {
         const result = await response.json()
-        console.log('✅ Backup eliminado exitosamente:', result)
         
         toast({
           title: 'Backup eliminado',
@@ -208,19 +203,12 @@ export default function BackupsPage() {
           variant: 'success',
         })
         
-        console.log('🔄 Actualizando lista de backups...')
-        
         // Actualizar la lista inmediatamente removiendo el backup eliminado
-        setBackups(prev => {
-          const updated = prev.filter(b => b.id !== backupId)
-          console.log('📝 Lista actualizada optimísticamente:', updated.length, 'elementos')
-          return updated
-        })
+        setBackups(prev => prev.filter(b => b.id !== backupId))
         setDeletingBackup(null)
         
         // Forzar actualización completa después de un breve delay
         setTimeout(() => {
-          console.log('🔄 Recargando datos del servidor...')
           loadBackups()
           loadStats()
           
@@ -228,14 +216,12 @@ export default function BackupsPage() {
           setTimeout(() => {
             const stillExists = backups.find(b => b.id === backupId)
             if (stillExists) {
-              console.log('⚠️ Backup aún aparece después de eliminación, forzando recarga de página')
               window.location.reload()
             }
           }, 1000)
         }, 100)
       } else {
         const error = await response.json()
-        console.error('Error del servidor:', error)
         
         let errorMessage = 'Error al eliminar backup'
         let shouldRefresh = false

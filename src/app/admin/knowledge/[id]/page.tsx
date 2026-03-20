@@ -102,8 +102,6 @@ export default function AdminKnowledgeDetailPage() {
         limit: 3 
       }
       
-      console.log('[Similar Articles] Sending payload:', payload)
-      
       const response = await fetch(`/api/knowledge/similar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

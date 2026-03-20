@@ -17,22 +17,18 @@ export async function GET(
   }
 
   const { id: ticketId } = await params
-  console.log(`[SSE] Cliente conectado al ticket ${ticketId} (user: ${session.user.id})`)
-
   const encoder = new TextEncoder()
 
   const stream = new ReadableStream({
     start(controller) {
-      // Enviar heartbeat inicial para confirmar conexión
+      // Confirmar conexión
       controller.enqueue(encoder.encode('data: {"type":"connected"}\n\n'))
 
       // Suscribirse a eventos de este ticket
       const unsubscribe = TicketEvents.subscribe(ticketId, (payload) => {
         try {
           controller.enqueue(encoder.encode(payload))
-        } catch {
-          // Stream cerrado
-        }
+        } catch { /* stream cerrado */ }
       })
 
       // Heartbeat cada 25s para mantener la conexión viva
@@ -46,7 +42,6 @@ export async function GET(
 
       // Cleanup cuando el cliente se desconecta
       request.signal.addEventListener('abort', () => {
-        console.log(`[SSE] Cliente desconectado del ticket ${ticketId}`)
         clearInterval(heartbeat)
         unsubscribe()
         try { controller.close() } catch { /* ya cerrado */ }

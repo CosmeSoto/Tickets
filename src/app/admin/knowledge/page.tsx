@@ -138,7 +138,6 @@ export default function AdminKnowledgePage() {
 
   const handleDeleteArticle = (article: Article) => {
     // TODO: Implementar confirmación y eliminación
-    console.log('Delete article:', article.id)
   }
 
   // Configuración de paginación

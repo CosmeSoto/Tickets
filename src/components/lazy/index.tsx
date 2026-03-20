@@ -97,11 +97,6 @@ export const DepartmentFormDialog = dynamic(
 )
 
 // Ticket Components
-export const RateTicketDialog = dynamic(
-  () => import('@/components/tickets/rate-ticket-dialog').then(mod => mod.RateTicketDialog),
-  { loading: () => <Skeleton className="h-64 w-96" />, ssr: false }
-)
-
 export const ResolveTicketDialog = dynamic(
   () => import('@/components/tickets/resolve-ticket-dialog').then(mod => mod.ResolveTicketDialog),
   { loading: () => <Skeleton className="h-64 w-96" />, ssr: false }

@@ -243,7 +243,6 @@ export async function POST(
             text: `Nuevo comentario de ${authorName} (${authorRole}) en ticket #${ticketId.substring(0, 8)}:\n\n${newComment.content}`,
             replyTo: newComment.users.email
           }, session.user.id)
-          console.log(`[API] Email queued for ${recipientRole} ${recipient.email} about new comment ${newComment.id}`)
         }).catch(err => {
           console.error('[API] Error sending email for new comment:', err)
         })

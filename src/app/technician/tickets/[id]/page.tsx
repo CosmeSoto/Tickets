@@ -54,7 +54,6 @@ export default function TechnicianTicketDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [timelineRefreshKey, setTimelineRefreshKey] = useState(0)
   const [fileRefreshKey, setFileRefreshKey] = useState(0)
-  const [activeTab, setActiveTab] = useState<string>('timeline')
   
   // Estados del formulario
   const [newStatus, setNewStatus] = useState<'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | 'ON_HOLD'>('OPEN')
@@ -331,7 +330,7 @@ export default function TechnicianTicketDetailPage() {
             </Card>
 
             {/* Tabs para organizar el contenido */}
-            <Tabs defaultValue="timeline" className="w-full" onValueChange={setActiveTab}>
+            <Tabs defaultValue="timeline" className="w-full">
               <TabsList className="grid w-full grid-cols-4">
                 <TooltipProvider>
                   <Tooltip>

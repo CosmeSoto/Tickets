@@ -254,12 +254,6 @@ export async function POST(
       },
     })
 
-    console.log('[RATING] Nueva calificación creada:', {
-      ticketId,
-      rating: data.rating,
-      client: session.user.name,
-    })
-
     // Cerrar ticket automáticamente tras la calificación del cliente
     if (ticket.status === 'RESOLVED') {
       await prisma.tickets.update({
@@ -301,7 +295,6 @@ export async function POST(
         })
       }
 
-      console.log('[RATING] Ticket cerrado automáticamente tras calificación:', ticketId)
     }
 
     // Notificar al administrador sobre la nueva calificación

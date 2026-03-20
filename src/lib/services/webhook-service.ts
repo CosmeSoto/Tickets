@@ -70,11 +70,8 @@ export class WebhookService {
       })
 
       if (webhooks.length === 0) {
-        console.log(`[WEBHOOK] No hay webhooks suscritos al evento: ${event}`)
         return
       }
-
-      console.log(`[WEBHOOK] Disparando evento ${event} a ${webhooks.length} webhooks`)
 
       // Disparar webhooks en paralelo
       const promises = webhooks.map(webhook =>

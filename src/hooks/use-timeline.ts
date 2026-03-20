@@ -87,17 +87,15 @@ export function useTimeline(ticketId: string) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketId])
 
-  const loadTimeline = useCallback(async (silent = false, force = false) => {
+  const loadTimeline = useCallback(async (silent = false) => {
     const currentTicketId = ticketIdRef.current
     if (!currentTicketId) return
-    console.log(`[TIMELINE-HOOK] loadTimeline ticketId=${currentTicketId} silent=${silent}`)
 
     try {
       if (!silent) setLoading(true)
       setError(null)
       
       const response = await fetch(`/api/tickets/${currentTicketId}/timeline`)
-      console.log(`[TIMELINE-HOOK] response status=${response.status}`)
       
       if (!response.ok) {
         if (response.status === 404) {
@@ -109,7 +107,6 @@ export function useTimeline(ticketId: string) {
       }
 
       const data = await response.json()
-      console.log(`[TIMELINE-HOOK] data.success=${data.success} events=${data.data?.length}`)
       
       if (data.success) {
         const incoming: TimelineEvent[] = data.data || []
@@ -253,10 +250,7 @@ export function useTimeline(ticketId: string) {
 
     const startPolling = () => {
       if (interval) return
-      interval = setInterval(() => {
-        console.log(`[TIMELINE-HOOK] polling tick ticketId=${ticketIdRef.current}`)
-        loadTimeline(true)
-      }, 3 * 1000)
+      interval = setInterval(() => loadTimeline(true), 3 * 1000)
     }
 
     const stopPolling = () => {

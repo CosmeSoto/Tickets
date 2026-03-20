@@ -314,7 +314,6 @@ export class CacheInvalidation {
     // This would typically be handled by Redis TTL, but we can implement
     // additional cleanup logic here if needed
     const stats = cacheService.getStats()
-    console.log('Cache purge completed', stats)
     return stats
   }
 }

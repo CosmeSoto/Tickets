@@ -39,7 +39,6 @@ export class NotificationService {
 
       // Si no hay preferencias, crear defaults y enviar
       if (!prefs) {
-        console.log(`[NOTIFICATION] No settings for user ${userId}, sending by default`)
         // Crear settings por defecto en background (no bloquear)
         prisma.user_settings.create({
           data: {
@@ -72,13 +71,11 @@ export class NotificationService {
         if (prefs.quietHoursStart <= prefs.quietHoursEnd) {
           // Rango normal (ej: 22:00 - 08:00 del día siguiente)
           if (currentTime >= prefs.quietHoursStart && currentTime <= prefs.quietHoursEnd) {
-            console.log(`[NOTIFICATION] User ${userId} is in quiet hours`)
             return false
           }
         } else {
           // Rango que cruza medianoche (ej: 22:00 - 08:00)
           if (currentTime >= prefs.quietHoursStart || currentTime <= prefs.quietHoursEnd) {
-            console.log(`[NOTIFICATION] User ${userId} is in quiet hours`)
             return false
           }
         }
@@ -86,12 +83,10 @@ export class NotificationService {
 
       // Verificar tipo de notificación general
       if (notificationType === 'push' && !prefs.pushNotifications) {
-        console.log(`[NOTIFICATION] User ${userId} has push notifications disabled`)
         return false
       }
 
       if (notificationType === 'email' && !prefs.emailNotifications) {
-        console.log(`[NOTIFICATION] User ${userId} has email notifications disabled`)
         return false
       }
 
@@ -100,31 +95,26 @@ export class NotificationService {
         switch (specificType) {
           case 'ticketCreated':
             if (!prefs.ticketCreated) {
-              console.log(`[NOTIFICATION] User ${userId} has ticketCreated notifications disabled`)
               return false
             }
             break
           case 'ticketAssigned':
             if (!prefs.ticketAssigned) {
-              console.log(`[NOTIFICATION] User ${userId} has ticketAssigned notifications disabled`)
               return false
             }
             break
           case 'statusChanged':
             if (!prefs.statusChanged) {
-              console.log(`[NOTIFICATION] User ${userId} has statusChanged notifications disabled`)
               return false
             }
             break
           case 'newComments':
             if (!prefs.newComments) {
-              console.log(`[NOTIFICATION] User ${userId} has newComments notifications disabled`)
               return false
             }
             break
           case 'ticketUpdates':
             if (!prefs.ticketUpdated) {
-              console.log(`[NOTIFICATION] User ${userId} has ticketUpdated notifications disabled`)
               return false
             }
             break
@@ -147,7 +137,6 @@ export class NotificationService {
       const shouldSend = await this.shouldNotify(data.userId, 'push', data.specificType)
       
       if (!shouldSend) {
-        console.log(`[NOTIFICATION] Skipping push notification for user ${data.userId} (type: ${data.specificType})`)
         return null
       }
 
@@ -287,8 +276,6 @@ export class NotificationService {
         })
         if (techNotification) {
           notifications.push(techNotification)
-        } else {
-          console.log(`[NOTIFICATION] ⚠️ Notificación para técnico no creada (shouldNotify=false)`)
         }
       } else {
         // Fallback: usar technicianId directamente si el include no cargó el técnico

@@ -141,8 +141,6 @@ export default function AdminUsersPage() {
 
   // Aplicar filtros cuando cambien los filtros debounced
   useEffect(() => {
-    console.log('🔄 [AdminUsersPage] Aplicando filtros:', debouncedFilters)
-    
     const apiFilters: any = {}
     
     // Solo agregar filtros si tienen valores válidos (no 'all')
@@ -159,7 +157,6 @@ export default function AdminUsersPage() {
       apiFilters.departmentId = debouncedFilters.department
     }
 
-    console.log('📤 [AdminUsersPage] Filtros enviados a setFilters:', apiFilters)
     setFilters(apiFilters)
   }, [debouncedFilters, setFilters])
 
@@ -350,7 +347,6 @@ export default function AdminUsersPage() {
             onPageChange: (page) => goToPage(page),
             onLimitChange: (limit) => {
               // TODO: Implementar cambio de límite en el hook
-              console.log('Change limit to:', limit)
             }
           }}
           viewMode={viewMode}

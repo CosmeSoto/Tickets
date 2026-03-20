@@ -36,11 +36,7 @@ export const TicketEvents = {
   emit(ticketId: string, event: { type: string; [key: string]: unknown }) {
     const subscribers = getSubscribers()
     const subs = subscribers.get(ticketId)
-    if (!subs || subs.size === 0) {
-      console.log(`[SSE] No hay suscriptores para ticket ${ticketId}`)
-      return
-    }
-    console.log(`[SSE] Emitiendo '${event.type}' a ${subs.size} suscriptor(es) del ticket ${ticketId}`)
+    if (!subs || subs.size === 0) return
     const payload = `data: ${JSON.stringify(event)}\n\n`
     subs.forEach(fn => {
       try { fn(payload) } catch { /* cliente desconectado */ }

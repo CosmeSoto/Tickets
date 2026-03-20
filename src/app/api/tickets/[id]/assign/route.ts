@@ -149,9 +149,6 @@ export async function POST(
     if (mode === 'auto') {
       const body = await request.json()
       
-      console.log('[AUTO-ASSIGN] Iniciando asignación automática para ticket:', ticketId)
-      console.log('[AUTO-ASSIGN] Criterios:', body)
-      
       // ⭐ IMPORTAR Y USAR EL SERVICIO REAL
       const { AssignmentService } = await import('@/lib/services/assignment-service')
       
@@ -161,11 +158,9 @@ export async function POST(
           skillMatch: body.skillMatch !== false,
         })
 
-        console.log('[AUTO-ASSIGN] ✅ Asignación exitosa:', result.assignedTechnician.name)
         return NextResponse.json(result)
       } catch (error) {
-        console.error('[AUTO-ASSIGN] ❌ Error:', error)
-        console.error('[AUTO-ASSIGN] Stack:', error instanceof Error ? error.stack : 'No stack')
+        console.error('[AUTO-ASSIGN] Error:', error instanceof Error ? error.message : error)
         return NextResponse.json(
           {
             error: error instanceof Error ? error.message : 'Error en asignación automática'
