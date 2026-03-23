@@ -26,6 +26,8 @@ export function useTicketSSE(ticketId: string, onUpdate: () => void) {
           // Recargar en cualquier evento relevante (no heartbeat)
           if (data.type && data.type !== 'connected') {
             onUpdateRef.current()
+            // Notificar a otros componentes (ej: notificaciones) que hay actividad en el ticket
+            window.dispatchEvent(new CustomEvent('ticket-updated', { detail: { ticketId, type: data.type } }))
           }
         } catch { /* ignorar mensajes malformados */ }
       }

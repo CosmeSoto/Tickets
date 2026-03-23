@@ -3,7 +3,6 @@
 import { useSystemLogo } from '@/hooks/use-system-logo'
 import { useTheme } from 'next-themes'
 import { Building2 } from 'lucide-react'
-import { useEffect } from 'react'
 
 interface SystemLogoProps {
   className?: string
@@ -21,17 +20,6 @@ export function SystemLogo({ className = '', showText = true, size = 'md' }: Sys
   
   // Seleccionar el logo apropiado
   const logoUrl = isDark ? (darkUrl || lightUrl) : (lightUrl || darkUrl)
-  
-  useEffect(() => {
-    console.log('🎨 SystemLogo render:', {
-      theme: currentTheme,
-      isDark,
-      lightUrl,
-      darkUrl,
-      selectedLogo: logoUrl,
-      loading,
-    })
-  }, [currentTheme, isDark, lightUrl, darkUrl, logoUrl, loading])
   
   // Tamaños
   const sizeClasses = {

@@ -178,6 +178,8 @@ export function useTimeline(ticketId: string) {
         })
         // Recargar inmediatamente para el usuario que envió el comentario
         loadTimeline(true)
+        // Notificar a otros componentes (ej: notificaciones) que hay actividad
+        window.dispatchEvent(new CustomEvent('ticket-updated', { detail: { ticketId: ticketIdRef.current, type: 'comment_added' } }))
         return data.data
       } else {
         throw new Error(data.message || 'Error al agregar comentario')

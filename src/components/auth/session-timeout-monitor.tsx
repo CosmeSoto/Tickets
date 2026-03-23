@@ -20,18 +20,14 @@ export function SessionTimeoutMonitor() {
   // Obtener configuración de timeout desde el servidor
   const fetchSessionTimeout = useCallback(async () => {
     try {
-      console.log('[SESSION] 🔍 Obteniendo configuración de timeout...')
       const response = await fetch('/api/config/session-timeout', { cache: 'no-store' })
       if (response.ok) {
         const data = await response.json()
         if (data.sessionTimeout && data.sessionTimeout !== sessionTimeoutMinutes.current) {
-          const oldValue = sessionTimeoutMinutes.current
           sessionTimeoutMinutes.current = data.sessionTimeout
-          console.log(`[SESSION] ⏱️ Timeout actualizado: ${oldValue} → ${data.sessionTimeout} minutos`)
           return true // Indica que cambió
         } else if (data.sessionTimeout) {
           sessionTimeoutMinutes.current = data.sessionTimeout
-          console.log(`[SESSION] ⏱️ Timeout configurado: ${data.sessionTimeout} minutos`)
         }
       }
     } catch (error) {
@@ -99,19 +95,15 @@ export function SessionTimeoutMonitor() {
     const timeoutMs = sessionTimeoutMinutes.current * 60 * 1000
     const warningMs = timeoutMs - (5 * 60 * 1000) // 5 minutos antes
 
-    console.log(`[SESSION] ⏰ Timer reiniciado. Sesión expirará en ${sessionTimeoutMinutes.current} minutos`)
-
     // Programar advertencia (5 minutos antes del timeout)
     if (warningMs > 0) {
       warningTimeoutRef.current = setTimeout(() => {
-        console.log('[SESSION] ⚠️ Mostrando advertencia de expiración')
         showWarning()
       }, warningMs)
     }
 
     // Programar cierre de sesión
     timeoutRef.current = setTimeout(() => {
-      console.log('[SESSION] ❌ Sesión expirada por inactividad')
       handleAutoLogout()
     }, timeoutMs)
   }, [status, session, handleAutoLogout, showWarning])
@@ -119,10 +111,7 @@ export function SessionTimeoutMonitor() {
   // Iniciar monitoreo cuando hay sesión activa
   useEffect(() => {
     if (status === 'authenticated' && session?.user) {
-      console.log('[SESSION] ✅ Sesión activa detectada, iniciando monitoreo')
-      // Obtener configuración de timeout
       fetchSessionTimeout().then(() => {
-        // Iniciar timer de inactividad
         resetInactivityTimer()
       })
 
@@ -136,15 +125,9 @@ export function SessionTimeoutMonitor() {
 
       return () => {
         clearInterval(configInterval)
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current)
-        }
-        if (warningTimeoutRef.current) {
-          clearTimeout(warningTimeoutRef.current)
-        }
+        if (timeoutRef.current) clearTimeout(timeoutRef.current)
+        if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current)
       }
-    } else {
-      console.log('[SESSION] ⏸️ No hay sesión activa, monitoreo pausado')
     }
 
     // Limpiar al desmontar
@@ -175,7 +158,6 @@ export function SessionTimeoutMonitor() {
 
     // Re-leer configuración cuando el admin guarda settings
     const handleSettingsUpdated = () => {
-      console.log('[SESSION] 🔄 Configuración actualizada, re-leyendo timeout...')
       fetchSessionTimeout().then((changed) => {
         if (changed) resetInactivityTimer()
       })

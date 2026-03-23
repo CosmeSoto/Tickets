@@ -18,15 +18,9 @@ export function useSystemLogo(): SystemLogos {
   })
 
   useEffect(() => {
-    console.log('🔍 useSystemLogo: Fetching logos...')
     fetch('/api/public/landing-page')
       .then(res => res.json())
       .then(data => {
-        console.log('✅ useSystemLogo: Data received:', {
-          lightUrl: data.content?.companyLogoLightUrl,
-          darkUrl: data.content?.companyLogoDarkUrl,
-          companyName: data.content?.companyName,
-        })
         setLogos({
           lightUrl: data.content?.companyLogoLightUrl || null,
           darkUrl: data.content?.companyLogoDarkUrl || null,

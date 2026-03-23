@@ -244,6 +244,14 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     return undefined
   }, [autoLoad, session?.user?.id, loadNotifications, refreshInterval])
 
+  // Recargar inmediatamente cuando llega un evento SSE de ticket
+  useEffect(() => {
+    if (!session?.user?.id) return
+    const handler = () => loadNotifications(true)
+    window.addEventListener('ticket-updated', handler)
+    return () => window.removeEventListener('ticket-updated', handler)
+  }, [session?.user?.id, loadNotifications])
+
   return {
     notifications,
     loading,
