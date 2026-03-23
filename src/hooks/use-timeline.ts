@@ -176,6 +176,8 @@ export function useTimeline(ticketId: string) {
           description: `Comentario ${commentType} agregado${attachmentInfo}`,
           duration: 3000
         })
+        // Recargar inmediatamente para el usuario que envió el comentario
+        loadTimeline(true)
         return data.data
       } else {
         throw new Error(data.message || 'Error al agregar comentario')
@@ -192,7 +194,7 @@ export function useTimeline(ticketId: string) {
       submittingRef.current = false // liberar bloqueo siempre
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [loadTimeline])
 
   const updateTicketStatus = useCallback(async (newStatus: string, comment?: string) => {
     try {

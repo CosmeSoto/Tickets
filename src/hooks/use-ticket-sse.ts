@@ -23,7 +23,8 @@ export function useTicketSSE(ticketId: string, onUpdate: () => void) {
       es.onmessage = (e) => {
         try {
           const data = JSON.parse(e.data)
-          if (data.type !== 'connected') {
+          // Recargar en cualquier evento relevante (no heartbeat)
+          if (data.type && data.type !== 'connected') {
             onUpdateRef.current()
           }
         } catch { /* ignorar mensajes malformados */ }
