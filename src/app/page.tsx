@@ -114,9 +114,9 @@ export default function HomePage() {
       {/* Header */}
       <header className='bg-card shadow-sm border-b border-border'>
         <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
-          <div className='flex justify-between items-center py-6'>
+          <div className='flex justify-between items-center py-4 sm:py-6'>
             <SystemLogo size="md" showText={true} />
-            <div className='flex items-center space-x-4'>
+            <div className='flex items-center gap-2 sm:gap-4'>
               {status === 'authenticated' && session?.user ? (
                 <>
                   <Link
@@ -127,7 +127,7 @@ export default function HomePage() {
                         ? '/technician' 
                         : '/client'
                     }
-                    className='inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700'
+                    className='inline-flex items-center px-3 sm:px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700'
                   >
                     Ir al Dashboard
                   </Link>
@@ -136,15 +136,16 @@ export default function HomePage() {
                 <>
                   <Link
                     href='/login'
-                    className='inline-flex items-center px-4 py-2 border border-border rounded-md shadow-sm text-sm font-medium text-foreground bg-card hover:bg-muted'
+                    className='hidden sm:inline-flex items-center px-4 py-2 border border-border rounded-md shadow-sm text-sm font-medium text-foreground bg-card hover:bg-muted'
                   >
                     Iniciar Sesión
                   </Link>
                   <Link
                     href='/login'
-                    className='inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700'
+                    className='inline-flex items-center px-3 sm:px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700'
                   >
-                    Crear Ticket
+                    <span className='sm:hidden'>Ingresar</span>
+                    <span className='hidden sm:inline'>Crear Ticket</span>
                   </Link>
                 </>
               )}

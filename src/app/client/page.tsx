@@ -169,37 +169,37 @@ export default function ClientDashboard() {
       <div className='mb-8'>
         <Card className='border-2 border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10 hover:shadow-lg transition-all'>
           <CardContent className='p-6'>
-            <div className='flex items-center justify-between'>
-              <div className='flex items-center space-x-4'>
-                <div className='p-4 bg-primary rounded-xl shadow-lg'>
+            <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
+              <div className='flex items-start sm:items-center space-x-4'>
+                <div className='p-4 bg-primary rounded-xl shadow-lg flex-shrink-0'>
                   <Ticket className='h-8 w-8 text-primary-foreground' />
                 </div>
                 <div>
-                  <h3 className='text-2xl font-bold text-foreground'>¿Necesitas ayuda?</h3>
-                  <p className='text-muted-foreground mt-1 max-w-md'>
+                  <h3 className='text-xl sm:text-2xl font-bold text-foreground'>¿Necesitas ayuda?</h3>
+                  <p className='text-muted-foreground mt-1 max-w-md text-sm'>
                     Crea un nuevo ticket y nuestro equipo técnico especializado te ayudará lo antes posible
                   </p>
-                  <div className="flex items-center space-x-4 mt-2 text-sm text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground">
                     <div className="flex items-center">
                       <Clock className="h-4 w-4 mr-1" />
-                      Respuesta promedio: {stats.responseTime || '2h'}
+                      Respuesta: {stats.responseTime || '2h'}
                     </div>
                     <div className="flex items-center">
                       <Star className="h-4 w-4 mr-1 text-yellow-500" />
-                      Satisfacción: {stats.satisfactionRating || 4.5}/5
+                      {stats.satisfactionRating || 4.5}/5
                     </div>
                   </div>
                 </div>
               </div>
-              <div className='flex space-x-3'>
+              <div className='flex flex-col sm:flex-row gap-2 sm:gap-3'>
                 <Link href='/client/tickets'>
-                  <Button variant='outline' size='lg' className="shadow-sm">
+                  <Button variant='outline' size='lg' className="shadow-sm w-full sm:w-auto">
                     <Eye className='h-5 w-5 mr-2' />
                     Ver Mis Tickets
                   </Button>
                 </Link>
                 <Link href='/client/tickets/create'>
-                  <Button size='lg' className='bg-primary hover:bg-primary/90 shadow-lg'>
+                  <Button size='lg' className='bg-primary hover:bg-primary/90 shadow-lg w-full sm:w-auto'>
                     <Plus className='h-5 w-5 mr-2' />
                     Crear Ticket
                   </Button>

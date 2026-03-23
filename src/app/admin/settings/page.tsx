@@ -166,31 +166,42 @@ export default function SettingsPage() {
   }
 
   const testEmailConnection = async () => {
+    if (!settings) return
+
+    // Validar campos antes de enviar
+    if (!settings.smtpHost || !settings.smtpUser || !settings.smtpPassword) {
+      toast({
+        title: 'Campos incompletos',
+        description: 'Completa el servidor SMTP, usuario y contraseña antes de probar.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     try {
       const response = await fetch('/api/admin/settings/test-email', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          smtpHost: settings?.smtpHost,
-          smtpPort: settings?.smtpPort,
-          smtpUser: settings?.smtpUser,
-          smtpPassword: settings?.smtpPassword,
-          smtpSecure: settings?.smtpSecure,
+          smtpHost: settings.smtpHost,
+          smtpPort: Number(settings.smtpPort),
+          smtpUser: settings.smtpUser,
+          smtpPassword: settings.smtpPassword,
+          smtpSecure: settings.smtpSecure,
         }),
       })
 
+      const data = await response.json()
+
       if (response.ok) {
         toast({
-          title: 'Éxito',
-          description: 'Conexión de email configurada correctamente',
+          title: 'Conexión exitosa',
+          description: data.message || 'Email de prueba enviado correctamente',
         })
       } else {
-        const error = await response.json()
         toast({
-          title: 'Error',
-          description: error.error || 'Error en la conexión de email',
+          title: 'Error de conexión SMTP',
+          description: data.error || 'Error en la conexión de email',
           variant: 'destructive',
         })
       }
@@ -198,7 +209,7 @@ export default function SettingsPage() {
       console.error('Error al probar email:', error)
       toast({
         title: 'Error',
-        description: 'Error al probar conexión de email',
+        description: 'No se pudo conectar con el servidor. Verifica tu red.',
         variant: 'destructive',
       })
     }
@@ -257,16 +268,16 @@ export default function SettingsPage() {
       headerActions={headerActions}
     >
       <Tabs value={activeTab} className='space-y-6' onValueChange={setActiveTab}>
-        <TabsList className='grid w-full grid-cols-6'>
-          <TabsTrigger value='general'>General</TabsTrigger>
-          <TabsTrigger value='email'>Email</TabsTrigger>
-          <TabsTrigger value='notifications'>Notificaciones</TabsTrigger>
-          <TabsTrigger value='security'>Seguridad</TabsTrigger>
-          <TabsTrigger value='oauth'>
-            <Key className="h-4 w-4 mr-2" />
+        <TabsList className='flex flex-wrap h-auto gap-1 p-1 w-full'>
+          <TabsTrigger value='general' className='flex-1 min-w-[80px]'>General</TabsTrigger>
+          <TabsTrigger value='email' className='flex-1 min-w-[60px]'>Email</TabsTrigger>
+          <TabsTrigger value='notifications' className='flex-1 min-w-[110px]'>Notificaciones</TabsTrigger>
+          <TabsTrigger value='security' className='flex-1 min-w-[80px]'>Seguridad</TabsTrigger>
+          <TabsTrigger value='oauth' className='flex-1 min-w-[70px]'>
+            <Key className="h-4 w-4 mr-1 hidden sm:inline" />
             OAuth
           </TabsTrigger>
-          <TabsTrigger value='landing'>Página Pública</TabsTrigger>
+          <TabsTrigger value='landing' className='flex-1 min-w-[110px]'>Página Pública</TabsTrigger>
         </TabsList>
 
         {/* Configuración General */}

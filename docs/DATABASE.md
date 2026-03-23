@@ -116,7 +116,7 @@ El seed crea:
 
 1. **Departamento por defecto**: "Soporte Técnico"
 2. **Usuario administrador**:
-   - Email: admin@tickets.com
+   - Email: internet.freecom@gmail.com
    - Contraseña: admin123
    - Rol: ADMIN
 3. **Preferencias de notificación** para el admin

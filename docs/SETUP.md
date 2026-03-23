@@ -92,7 +92,7 @@ Acceder a http://localhost:3000
 
 | Rol   | Email              | Contraseña |
 |-------|--------------------|------------|
-| Admin | admin@tickets.com  | admin123   |
+| Admin | internet.freecom@gmail.com  | admin123   |
 
 ## Resetear Base de Datos
 

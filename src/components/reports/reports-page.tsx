@@ -139,8 +139,8 @@ export default function ReportsPage() {
         <BackToTickets />
         <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
           <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <div className="flex items-center space-x-2">
                   <div className={`h-3 w-3 rounded-full ${loadingReports ? 'bg-yellow-500 animate-pulse' : 'bg-green-500'}`} />
                   <span className="text-sm font-medium">
@@ -153,7 +153,7 @@ export default function ReportsPage() {
                   </Badge>
                 )}
               </div>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center gap-2">
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -386,10 +386,10 @@ export default function ReportsPage() {
                             {technicianReport.slice(0, 5).map(tech => (
                               <div
                                 key={tech.technicianId}
-                                className='flex items-center justify-between p-4 border rounded-lg hover:bg-muted transition-colors'
+                                className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border rounded-lg hover:bg-muted transition-colors'
                               >
                                 <div className='flex items-center space-x-4'>
-                                  <div className='h-12 w-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold'>
+                                  <div className='h-12 w-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0'>
                                     {tech.technicianName.split(' ').map(n => n[0]).join('')}
                                   </div>
                                   <div>
@@ -399,14 +399,14 @@ export default function ReportsPage() {
                                     </p>
                                   </div>
                                 </div>
-                                <div className='flex items-center space-x-6'>
+                                <div className='flex flex-wrap items-center gap-4'>
                                   <div className='text-center'>
                                     <p className='text-lg font-bold text-green-600'>{tech.resolutionRate.toFixed(1)}%</p>
                                     <p className='text-xs text-muted-foreground'>Eficiencia</p>
                                   </div>
                                   <div className='text-center'>
                                     <p className='text-lg font-bold text-purple-600'>{tech.avgResolutionTime}</p>
-                                    <p className='text-xs text-muted-foreground'>Tiempo promedio</p>
+                                    <p className='text-xs text-muted-foreground'>Tiempo prom.</p>
                                   </div>
                                   <div className='text-center'>
                                     <p className='text-lg font-bold text-orange-600'>{tech.inProgress}</p>
@@ -456,10 +456,10 @@ export default function ReportsPage() {
                             {categoryReport.slice(0, 5).map(category => (
                               <div
                                 key={category.categoryId}
-                                className='flex items-center justify-between p-4 border rounded-lg hover:bg-muted transition-colors'
+                                className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border rounded-lg hover:bg-muted transition-colors'
                               >
                                 <div className='flex items-center space-x-4'>
-                                  <div className='h-12 w-12 bg-gradient-to-br from-green-500 to-teal-600 rounded-full flex items-center justify-center text-white font-bold'>
+                                  <div className='h-12 w-12 bg-gradient-to-br from-green-500 to-teal-600 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0'>
                                     {category.categoryName.split(' ').map(n => n[0]).join('').slice(0, 2)}
                                   </div>
                                   <div>
@@ -469,25 +469,25 @@ export default function ReportsPage() {
                                     </p>
                                   </div>
                                 </div>
-                                <div className='flex items-center space-x-6'>
+                                <div className='flex flex-wrap items-center gap-4'>
                                   <div className='text-center'>
                                     <p className='text-lg font-bold text-green-600'>{category.resolutionRate.toFixed(1)}%</p>
                                     <p className='text-xs text-muted-foreground'>Eficiencia</p>
                                   </div>
                                   <div className='text-center'>
                                     <p className='text-lg font-bold text-purple-600'>{category.avgResolutionTime}</p>
-                                    <p className='text-xs text-muted-foreground'>Tiempo promedio</p>
+                                    <p className='text-xs text-muted-foreground'>Tiempo prom.</p>
                                   </div>
                                   <div className='text-center'>
                                     <p className='text-lg font-bold text-blue-600'>{category.totalTickets}</p>
-                                    <p className='text-xs text-muted-foreground'>Volumen total</p>
+                                    <p className='text-xs text-muted-foreground'>Volumen</p>
                                   </div>
-                                  <div className='text-center min-w-[120px]'>
-                                    <p className='text-sm font-medium text-orange-600'>
+                                  <div className='text-center min-w-[100px]'>
+                                    <p className='text-sm font-medium text-orange-600 truncate max-w-[100px]'>
                                       {category.topTechnicians[0]?.name || 'Sin asignar'}
                                     </p>
                                     <p className='text-xs text-muted-foreground'>
-                                      {category.topTechnicians[0] ? `${category.topTechnicians[0].resolved} resueltos` : 'Top especialista'}
+                                      {category.topTechnicians[0] ? `${category.topTechnicians[0].resolved} res.` : 'Top especialista'}
                                     </p>
                                   </div>
                                 </div>

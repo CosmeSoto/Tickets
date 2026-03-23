@@ -443,8 +443,8 @@ export default function ProfilePage() {
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Avatar y Rol - MEJORADO */}
-            <div className="flex items-center space-x-6">
-              <div className="relative group">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6">
+              <div className="relative group flex-shrink-0">
                 <Avatar className="h-20 w-20">
                   <AvatarImage src={currentAvatar || undefined} />
                   <AvatarFallback className="text-lg">
@@ -487,7 +487,7 @@ export default function ProfilePage() {
                   className="hidden"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 text-center sm:text-left">
                 <h3 className="text-xl font-semibold">{session.user.name}</h3>
                 <Badge className={getRoleColor()}>
                   <RoleIcon className="h-3 w-3 mr-1" />

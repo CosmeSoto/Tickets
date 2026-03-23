@@ -9,7 +9,7 @@ async function verifySeed() {
   try {
     // Verificar usuario admin
     const admin = await prisma.users.findUnique({
-      where: { email: 'admin@tickets.com' },
+      where: { email: 'internet.freecom@gmail.com' },
       include: {
         departments: true,
         notification_preferences: true
@@ -75,7 +75,7 @@ async function verifySeed() {
       console.log('   ✅ Seed completado correctamente');
       console.log('\n🎉 La base de datos está lista para usar!');
       console.log('\n👤 Credenciales de acceso:');
-      console.log('   Email: admin@tickets.com');
+      console.log('   Email: internet.freecom@gmail.com');
       console.log('   Contraseña: admin123');
     } else {
       console.log('   ⚠️  Algunos elementos faltan. Ejecuta: npx prisma db seed');

@@ -1,0 +1,117 @@
+services:
+  seed:
+    build:
+      context: .
+      dockerfile: Dockerfile.seed
+    container_name: tickets-seed
+    environment:
+      DATABASE_URL: postgresql://tickets_user:tickets_password@postgres:5432/tickets_db
+    networks:
+      - tickets-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NODE_ENV: production
+        DATABASE_URL: postgresql://tickets_user:tickets_password@postgres:5432/tickets_db
+        REDIS_URL: redis://redis:6379
+        NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+        NEXTAUTH_URL: ${NEXTAUTH_URL}
+    container_name: tickets-app
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://tickets_user:tickets_password@postgres:5432/tickets_db
+      REDIS_URL: redis://redis:6379
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      NEXTAUTH_URL: ${NEXTAUTH_URL}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      STORAGE_PROVIDER: local
+      STORAGE_LOCAL_UPLOAD_PATH: ./uploads
+      STORAGE_LOCAL_PUBLIC_PATH: /uploads
+      LOG_LEVEL: INFO
+    volumes:
+      - app_uploads:/app/uploads
+      - app_logs:/app/logs
+    networks:
+      - tickets-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: tickets-postgres
+    environment:
+      POSTGRES_DB: tickets_db
+      POSTGRES_USER: tickets_user
+      POSTGRES_PASSWORD: tickets_password
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - tickets-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tickets_user -d tickets_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    container_name: tickets-redis
+    volumes:
+      - redis_data:/data
+    networks:
+      - tickets-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    command: redis-server --appendonly yes
+
+  nginx:
+    image: nginx:alpine
+    container_name: tickets-nginx
+    ports:
+      - '80:80'
+    volumes:
+      - ./docker/nginx.local.conf:/etc/nginx/nginx.conf:ro
+      - app_uploads:/var/www/uploads:ro
+    networks:
+      - tickets-network
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  app_uploads:
+  app_logs:
+
+networks:
+  tickets-network:
+    driver: bridge

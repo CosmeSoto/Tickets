@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
@@ -64,6 +64,20 @@ const priorityDescriptions = {
 }
 
 export default function CreateClientTicketPage() {
+  return (
+    <Suspense fallback={
+      <RoleDashboardLayout title='Crear Ticket' subtitle='Nueva solicitud de soporte'>
+        <div className='flex items-center justify-center h-64'>
+          <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-primary'></div>
+        </div>
+      </RoleDashboardLayout>
+    }>
+      <CreateClientTicketContent />
+    </Suspense>
+  )
+}
+
+function CreateClientTicketContent() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()

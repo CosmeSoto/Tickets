@@ -218,7 +218,7 @@ export default function TechnicianStatsPage() {
       <div className="space-y-6">
         <BackToTickets />
         {/* Header Actions */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-foreground">
               Panel de Rendimiento
@@ -231,6 +231,7 @@ export default function TechnicianStatsPage() {
             variant="outline"
             onClick={() => loadStats(true)}
             disabled={isRefreshing}
+            className="self-start sm:self-auto"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
             Actualizar
@@ -362,11 +363,11 @@ export default function TechnicianStatsPage() {
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-3">
                   {categoryStats.map((category, index) => (
                     <div
                       key={index}
-                      className="flex items-center justify-between p-4 border border-border rounded-lg"
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-4 border border-border rounded-lg"
                     >
                       <div className="flex items-center space-x-3">
                         <div
@@ -380,19 +381,17 @@ export default function TechnicianStatsPage() {
                           </p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="flex items-center space-x-2">
-                          <Badge variant="secondary" className="bg-green-100 text-green-800">
-                            {category.resolved} resueltos
-                          </Badge>
-                          <Badge variant="secondary" className="bg-orange-100 text-orange-800">
-                            {category.pending} pendientes
-                          </Badge>
-                        </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="secondary" className="bg-green-100 text-green-800">
+                          {category.resolved} resueltos
+                        </Badge>
+                        <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+                          {category.pending} pendientes
+                        </Badge>
                       </div>
                     </div>
                   ))}
-                </div>
+                  </div>
               )}
             </CardContent>
           </Card>

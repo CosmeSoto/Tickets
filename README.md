@@ -56,11 +56,18 @@ git checkout main
 
 # 6. Descarga e integra los cambios más recientes de GitHub
 git pull origin main
+
+docker compose -f docker-compose.local.yml --env-file .env.production down -v
+docker compose -f docker-compose.local.yml --env-file .env.production up -d --build
+
+DATABASE_URL="postgresql://tickets_user:tickets_password@localhost:5432/tickets_db" npx tsx prisma/seed.ts
+docker compose -f docker-compose.local.yml logs -f app
+
 ```
 ## 👤 Credenciales por Defecto
 
 ```
-Email: admin@tickets.com
+Email: internet.freecom@gmail.com
 Contraseña: admin123
 ```
 

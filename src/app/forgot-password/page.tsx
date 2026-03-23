@@ -227,8 +227,8 @@ export default function ForgotPasswordPage() {
                     <strong>¿Necesitas ayuda?</strong>
                     <br />
                     Contacta a un administrador en{' '}
-                    <a href="mailto:admin@tickets.com" className="underline font-medium">
-                      admin@tickets.com
+                    <a href="mailto:internet.freecom@gmail.com" className="underline font-medium">
+                      internet.freecom@gmail.com
                     </a>
                   </AlertDescription>
                 </Alert>

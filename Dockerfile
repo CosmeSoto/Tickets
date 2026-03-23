@@ -1,10 +1,10 @@
 # Multi-stage build for production optimization
-FROM node:18-alpine AS base
+FROM node:20-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
 # Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat openssl openssl-dev
 WORKDIR /app
 
 # Install dependencies based on the preferred package manager
@@ -21,6 +21,9 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# Install OpenSSL for Prisma generate
+RUN apk add --no-cache openssl openssl-dev
 
 # Set build-time environment variables
 ARG NODE_ENV=production
@@ -49,6 +52,9 @@ ENV NODE_ENV=production
 # Disable telemetry during runtime.
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Install OpenSSL for Prisma
+RUN apk add --no-cache openssl curl
+
 # Create a non-root user
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -65,9 +71,22 @@ RUN chown nextjs:nodejs .next
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Copy Prisma schema and generated client
+# Copy Prisma schema, migrations and generated client
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+
+# Copy tsx and bcryptjs for seed execution
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/tsx ./node_modules/tsx
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/bcryptjs ./node_modules/bcryptjs
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.bin/tsx ./node_modules/.bin/tsx
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/esbuild ./node_modules/esbuild
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@esbuild ./node_modules/@esbuild
+
+# Copy entrypoint script
+COPY --chown=nextjs:nodejs docker/entrypoint.sh ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh
 
 # Create uploads directory
 RUN mkdir -p uploads && chown nextjs:nodejs uploads
@@ -83,4 +102,4 @@ ENV HOSTNAME="0.0.0.0"
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3000/api/health || exit 1
 
-CMD ["node", "server.js"]
+CMD ["./entrypoint.sh"]

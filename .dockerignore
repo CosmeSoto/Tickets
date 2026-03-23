@@ -49,7 +49,8 @@ Thumbs.db
 README.md
 
 # Docker
-Dockerfile*
+Dockerfile
+Dockerfile.seed
 docker-compose*
 .dockerignore
 
@@ -83,7 +84,7 @@ jest.setup.js
 .gitlab-ci.yml
 .travis.yml
 
-# Package manager files
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
+# Package manager files (NO ignorar - necesarios para el build)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml

@@ -31,6 +31,8 @@ import {
   Ruler,
   Monitor,
   HelpCircle,
+  Menu,
+  X,
 } from 'lucide-react'
 import { Notifications } from '@/components/ui/notifications'
 import { Button } from '@/components/ui/button'
@@ -149,10 +151,9 @@ const navigationByRole: Record<string, NavItem[]> = {
   ],
 }
 
-function NavItemComponent({ item, pathname }: { item: NavItem; pathname: string | null }) {
+function NavItemComponent({ item, pathname, onNavigate }: { item: NavItem; pathname: string | null; onNavigate?: () => void }) {
   const hasChildren = item.children && item.children.length > 0
   
-  // Determinar si algún hijo está activo
   const isChildActive = hasChildren && item.children!.some(
     child => pathname === child.href || pathname?.startsWith(child.href + '/')
   )
@@ -167,6 +168,7 @@ function NavItemComponent({ item, pathname }: { item: NavItem; pathname: string 
     return (
       <Link
         href={item.href}
+        onClick={onNavigate}
         className={`flex items-center px-4 py-2.5 text-sm font-medium rounded-lg transition-colors ${
           isActive
             ? 'bg-primary/10 text-primary'
@@ -206,6 +208,7 @@ function NavItemComponent({ item, pathname }: { item: NavItem; pathname: string 
               <Link
                 key={child.href + child.name}
                 href={child.href}
+                onClick={onNavigate}
                 className={`flex items-center px-3 py-2 text-sm rounded-md transition-colors ${
                   isChildItemActive
                     ? 'bg-primary/10 text-primary font-medium'
@@ -231,6 +234,7 @@ export function RoleDashboardLayout({
 }: RoleDashboardLayoutProps) {
   const { data: session } = useSession()
   const pathname = usePathname()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   if (!session) {
     return null
@@ -257,77 +261,107 @@ export function RoleDashboardLayout({
 
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
-      case 'ADMIN':
-        return 'bg-purple-100 text-purple-700 border-purple-200'
-      case 'TECHNICIAN':
-        return 'bg-blue-100 text-blue-700 border-blue-200'
-      case 'CLIENT':
-        return 'bg-green-100 text-green-700 border-green-200'
-      default:
-        return 'bg-gray-100 text-gray-700 border-gray-200'
+      case 'ADMIN': return 'bg-purple-100 text-purple-700 border-purple-200'
+      case 'TECHNICIAN': return 'bg-blue-100 text-blue-700 border-blue-200'
+      case 'CLIENT': return 'bg-green-100 text-green-700 border-green-200'
+      default: return 'bg-gray-100 text-gray-700 border-gray-200'
     }
   }
 
   const getRoleLabel = (role: string) => {
     switch (role) {
-      case 'ADMIN':
-        return 'Administrador'
-      case 'TECHNICIAN':
-        return 'Técnico'
-      case 'CLIENT':
-        return 'Cliente'
-      default:
-        return role
+      case 'ADMIN': return 'Administrador'
+      case 'TECHNICIAN': return 'Técnico'
+      case 'CLIENT': return 'Cliente'
+      default: return role
     }
   }
 
+  const closeSidebar = () => setSidebarOpen(false)
+
   return (
     <div className="min-h-screen bg-background">
+
+      {/* Overlay móvil */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={closeSidebar}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border">
-        {/* Logo */}
-        <div className="flex items-center justify-center h-16 border-b border-border px-4">
-          <Link href={`/${userRole.toLowerCase()}`}>
+      <aside className={`
+        fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border
+        transform transition-transform duration-300 ease-in-out
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        lg:translate-x-0
+      `}>
+        {/* Logo + botón cerrar en móvil */}
+        <div className="flex items-center justify-between h-16 border-b border-border px-4">
+          <Link href={`/${userRole.toLowerCase()}`} onClick={closeSidebar}>
             <SystemLogo size="sm" showText={true} />
           </Link>
+          <button
+            onClick={closeSidebar}
+            className="lg:hidden p-1 rounded-md text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto h-[calc(100vh-4rem)]">
           {navigation.map((item) => (
-            <NavItemComponent key={item.name} item={item} pathname={pathname} />
+            <NavItemComponent
+              key={item.name}
+              item={item}
+              pathname={pathname}
+              onNavigate={closeSidebar}
+            />
           ))}
         </nav>
       </aside>
 
       {/* Main Content */}
-      <div className="pl-64">
+      <div className="lg:pl-64">
         {/* Header */}
         <header className="bg-card border-b border-border sticky top-0 z-40">
-          <div className="px-8 py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                {title && (
-                  <h1 className="text-2xl font-bold text-foreground">{title}</h1>
-                )}
-                {subtitle && (
-                  <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
-                )}
+          <div className="px-4 sm:px-8 py-4">
+            <div className="flex items-center justify-between gap-2">
+
+              {/* Hamburguesa + título */}
+              <div className="flex items-center gap-3 min-w-0">
+                <button
+                  onClick={() => setSidebarOpen(true)}
+                  className="lg:hidden p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent flex-shrink-0"
+                >
+                  <Menu className="h-5 w-5" />
+                </button>
+                <div className="min-w-0">
+                  {title && (
+                    <h1 className="text-lg sm:text-2xl font-bold text-foreground truncate">{title}</h1>
+                  )}
+                  {subtitle && (
+                    <p className="mt-0.5 text-xs sm:text-sm text-muted-foreground truncate hidden sm:block">{subtitle}</p>
+                  )}
+                </div>
               </div>
-              
-              {/* User Menu in Header */}
-              <div className="flex items-center space-x-4">
-                {headerActions && <div>{headerActions}</div>}
+
+              {/* Acciones + notificaciones + avatar */}
+              <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+                {headerActions && (
+                  <div className="hidden sm:block">{headerActions}</div>
+                )}
                 
-                {/* Notification Bell */}
                 <Notifications variant="bell" />
                 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                      <Avatar className="h-10 w-10">
+                    <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0">
+                      <Avatar className="h-9 w-9">
                         <AvatarImage src={session.user.avatar} alt={session.user.name} />
-                        <AvatarFallback className="bg-primary/10 text-primary">
+                        <AvatarFallback className="bg-primary/10 text-primary text-sm">
                           {getInitials(session.user.name)}
                         </AvatarFallback>
                       </Avatar>
@@ -373,11 +407,18 @@ export function RoleDashboardLayout({
                 </DropdownMenu>
               </div>
             </div>
+
+            {/* headerActions en móvil (segunda fila) */}
+            {headerActions && (
+              <div className="sm:hidden mt-2">
+                {headerActions}
+              </div>
+            )}
           </div>
         </header>
 
         {/* Page Content */}
-        <main className="p-8">
+        <main className="p-4 sm:p-8">
           {children}
         </main>
       </div>

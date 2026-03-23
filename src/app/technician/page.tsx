@@ -187,28 +187,30 @@ export default function TechnicianDashboard() {
                   recentTickets.map(ticket => (
                     <div
                       key={ticket.id}
-                      className={`flex items-center justify-between p-4 border rounded-lg hover:shadow-sm transition-all ${
+                      className={`flex flex-col p-4 border rounded-lg hover:shadow-sm transition-all ${
                         ticket.urgencyLevel === 'critical' ? 'border-red-200 bg-red-50/50' :
                         ticket.urgencyLevel === 'high' ? 'border-orange-200 bg-orange-50/50' :
                         'border-border hover:border-primary/20'
                       }`}
                     >
                       <div className='flex-1'>
-                        <div className='flex items-center space-x-3 mb-2'>
-                          <h3 className='font-semibold text-foreground line-clamp-1'>{ticket.title}</h3>
-                          <Badge className={getPriorityColor(ticket.priority)} variant="secondary">
-                            {ticket.priority}
-                          </Badge>
-                          <Badge className={getStatusColor(ticket.status)} variant="secondary">
-                            {ticket.status}
-                          </Badge>
-                          {ticket.isOverdue && (
-                            <Badge variant="destructive" className="text-xs">
-                              Vencido
+                        <div className='flex flex-wrap items-center gap-2 mb-2'>
+                          <h3 className='font-semibold text-foreground line-clamp-1 flex-1 min-w-0'>{ticket.title}</h3>
+                          <div className='flex flex-wrap gap-1'>
+                            <Badge className={getPriorityColor(ticket.priority)} variant="secondary">
+                              {ticket.priority}
                             </Badge>
-                          )}
+                            <Badge className={getStatusColor(ticket.status)} variant="secondary">
+                              {ticket.status}
+                            </Badge>
+                            {ticket.isOverdue && (
+                              <Badge variant="destructive" className="text-xs">
+                                Vencido
+                              </Badge>
+                            )}
+                          </div>
                         </div>
-                        <div className='flex items-center space-x-4 text-sm text-muted-foreground mb-2'>
+                        <div className='flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mb-2'>
                           <div className='flex items-center'>
                             <User className='h-4 w-4 mr-1' />
                             {ticket.client}
@@ -227,7 +229,7 @@ export default function TechnicianDashboard() {
                             {ticket.description}
                           </p>
                         )}
-                        <div className="flex items-center space-x-3 text-xs text-muted-foreground">
+                        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                           {ticket.hasUnreadMessages && (
                             <div className="flex items-center text-blue-600">
                               <MessageSquare className="h-3 w-3 mr-1" />
@@ -238,11 +240,11 @@ export default function TechnicianDashboard() {
                           <span>{ticket.attachmentCount || 0} archivos</span>
                         </div>
                       </div>
-                      <div className='flex items-center space-x-2 ml-4'>
-                        <Button variant='outline' size='sm'>
+                      <div className='flex items-center gap-2 mt-3'>
+                        <Button variant='outline' size='sm' className='flex-shrink-0'>
                           <MessageSquare className='h-4 w-4' />
                         </Button>
-                        <Button size='sm' asChild>
+                        <Button size='sm' asChild className='flex-1 sm:flex-none'>
                           <Link href={`/technician/tickets/${ticket.id}`}>
                             Ver Detalles
                           </Link>

@@ -200,7 +200,7 @@ export function DataTable<T extends { id: string }>({
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             {title && <CardTitle>{title}</CardTitle>}
             {description && (
@@ -210,7 +210,7 @@ export function DataTable<T extends { id: string }>({
             )}
           </div>
           
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center gap-2">
             {/* Botones de acción */}
             {onRefresh && (
               <Button variant="outline" size="sm" onClick={onRefresh} disabled={loading}>
@@ -373,7 +373,7 @@ export function DataTable<T extends { id: string }>({
           </div>
         ) : (
           /* Vista de tabla */
-          <div className="rounded-md border">
+          <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -434,7 +434,7 @@ export function DataTable<T extends { id: string }>({
 
         {/* Paginación */}
         {pagination && (
-          <div className="flex items-center justify-between mt-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mt-6">
             <div className="flex items-center space-x-2">
               <span className="text-sm text-muted-foreground">
                 Mostrando {((pagination.page - 1) * pagination.limit) + 1} a{' '}
@@ -464,8 +464,8 @@ export function DataTable<T extends { id: string }>({
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               
-              <span className="text-sm">
-                Página {pagination.page} de {Math.ceil(pagination.total / pagination.limit)}
+              <span className="text-sm whitespace-nowrap">
+                {pagination.page} / {Math.ceil(pagination.total / pagination.limit)}
               </span>
               
               <Button

@@ -187,7 +187,7 @@ export function ReportsDebug() {
             <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
               <h4 className="font-medium text-yellow-800">⚠️ Sin Sesión</h4>
               <p className="text-sm text-yellow-600">
-                Necesitas iniciar sesión como admin@tickets.com con contraseña admin123
+                Necesitas iniciar sesión como internet.freecom@gmail.com con contraseña admin123
               </p>
             </div>
           )}

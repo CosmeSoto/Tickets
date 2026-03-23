@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 
 export default function TestAuthPage() {
   const { data: session, status } = useSession()
-  const [email, setEmail] = useState('admin@tickets.com')
+  const [email, setEmail] = useState('internet.freecom@gmail.com')
   const [password, setPassword] = useState('admin123')
   const [loading, setLoading] = useState(false)
   const [testResults, setTestResults] = useState<any>({})
