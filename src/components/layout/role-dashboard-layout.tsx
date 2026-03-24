@@ -33,6 +33,9 @@ import {
   HelpCircle,
   Menu,
   X,
+  Database,
+  FileSignature,
+  Tag,
 } from 'lucide-react'
 import { Notifications } from '@/components/ui/notifications'
 import { Button } from '@/components/ui/button'
@@ -89,10 +92,15 @@ const navigationByRole: Record<string, NavItem[]> = {
         { name: 'Licencias/Contratos', href: '/inventory/licenses', icon: Key },
         { name: 'Consumibles', href: '/inventory/consumables', icon: ShoppingCart },
         { name: 'Reportes', href: '/inventory/reports', icon: BarChart3 },
-        { name: 'Tipos de Equipo', href: '/inventory/equipment-types', icon: Boxes },
-        { name: 'Tipos de Licencias/Contratos', href: '/inventory/license-types', icon: Key },
-        { name: 'Tipos de Consumible', href: '/inventory/consumable-types', icon: ShoppingCart },
-        { name: 'Unidades de Medida', href: '/inventory/units-of-measure', icon: Ruler },
+        {
+          name: 'Catálogos', href: '/inventory/equipment-types', icon: Database,
+          children: [
+            { name: 'Tipos de Equipo', href: '/inventory/equipment-types', icon: Boxes },
+            { name: 'Tipos de Licencias/Contratos', href: '/inventory/license-types', icon: FileSignature },
+            { name: 'Tipos de Consumible', href: '/inventory/consumable-types', icon: Tag },
+            { name: 'Unidades de Medida', href: '/inventory/units-of-measure', icon: Ruler },
+          ],
+        },
         { name: 'Configuración', href: '/settings/inventory', icon: Settings },
       ],
     },
@@ -120,10 +128,13 @@ const navigationByRole: Record<string, NavItem[]> = {
         { name: 'Equipos', href: '/inventory', icon: Monitor },
         { name: 'Licencias/Contratos', href: '/inventory/licenses', icon: Key },
         { name: 'Consumibles', href: '/inventory/consumables', icon: ShoppingCart },
-        { name: 'Tipos de Equipo', href: '/inventory/equipment-types', icon: Boxes },
-        { name: 'Tipos de Licencias/Contratos', href: '/inventory/license-types', icon: Key },
-        { name: 'Tipos de Consumible', href: '/inventory/consumable-types', icon: ShoppingCart },
-        { name: 'Unidades de Medida', href: '/inventory/units-of-measure', icon: Ruler },
+        {name: 'Catálogos',href: '/inventory/equipment-types',icon: Database,children: [
+          { name: 'Equipo', href: '/inventory/equipment-types', icon: Boxes },
+          { name: 'Licencias/Contratos', href: '/inventory/license-types', icon: FileSignature },
+          { name: 'Consumible', href: '/inventory/consumable-types', icon: Tag },
+          { name: 'Unidades de Medida', href: '/inventory/units-of-measure', icon: Ruler },
+          ],
+        },
       ],
     },
   ],
@@ -151,31 +162,36 @@ const navigationByRole: Record<string, NavItem[]> = {
   ],
 }
 
-function NavItemComponent({ item, pathname, onNavigate }: { item: NavItem; pathname: string | null; onNavigate?: () => void }) {
+function NavItemComponent({ item, pathname, onNavigate, depth = 0 }: { item: NavItem; pathname: string | null; onNavigate?: () => void; depth?: number }) {
   const hasChildren = item.children && item.children.length > 0
-  
-  const isChildActive = hasChildren && item.children!.some(
-    child => pathname === child.href || pathname?.startsWith(child.href + '/')
-  )
+
+  const isDescendantActive = (navItem: NavItem): boolean => {
+    if (pathname === navItem.href) return true
+    if (navItem.children) return navItem.children.some(isDescendantActive)
+    return false
+  }
+
   const isDirectActive = pathname === item.href || pathname?.startsWith(item.href + '/')
-  const isActive = isDirectActive || isChildActive
+  const isActive = isDirectActive || (hasChildren ? item.children!.some(isDescendantActive) : false)
 
   const [isOpen, setIsOpen] = useState(isActive)
 
   const Icon = item.icon
+  const indent = depth * 12
 
   if (!hasChildren) {
     return (
       <Link
         href={item.href}
         onClick={onNavigate}
-        className={`flex items-center px-4 py-2.5 text-sm font-medium rounded-lg transition-colors ${
+        style={{ paddingLeft: `${16 + indent}px` }}
+        className={`flex items-center pr-4 py-2 text-sm font-medium rounded-lg transition-colors ${
           isActive
             ? 'bg-primary/10 text-primary'
             : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
         }`}
       >
-        <Icon className={`h-5 w-5 mr-3 flex-shrink-0 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
+        <Icon className={`h-4 w-4 mr-2.5 flex-shrink-0 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
         {item.name}
       </Link>
     )
@@ -185,41 +201,28 @@ function NavItemComponent({ item, pathname, onNavigate }: { item: NavItem; pathn
     <div>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center w-full px-4 py-2.5 text-sm font-medium rounded-lg transition-colors ${
+        style={{ paddingLeft: `${16 + indent}px` }}
+        className={`flex items-center w-full pr-4 py-2 text-sm font-medium rounded-lg transition-colors ${
           isActive
             ? 'bg-primary/10 text-primary'
             : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
         }`}
       >
-        <Icon className={`h-5 w-5 mr-3 flex-shrink-0 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
+        <Icon className={`h-4 w-4 mr-2.5 flex-shrink-0 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
         <span className="flex-1 text-left">{item.name}</span>
-        <ChevronDown
-          className={`h-4 w-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
-        />
+        <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
       {isOpen && (
-        <div className="ml-4 mt-1 space-y-0.5 border-l-2 border-border pl-3">
-          {item.children!.map((child) => {
-            const ChildIcon = child.icon
-            const isChildItemActive = pathname === child.href || 
-              (child.href !== '/inventory' && pathname?.startsWith(child.href + '/')) ||
-              (child.href === '/inventory' && pathname === '/inventory')
-            return (
-              <Link
-                key={child.href + child.name}
-                href={child.href}
-                onClick={onNavigate}
-                className={`flex items-center px-3 py-2 text-sm rounded-md transition-colors ${
-                  isChildItemActive
-                    ? 'bg-primary/10 text-primary font-medium'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                }`}
-              >
-                <ChildIcon className={`h-4 w-4 mr-2.5 flex-shrink-0 ${isChildItemActive ? 'text-primary' : 'text-muted-foreground'}`} />
-                {child.name}
-              </Link>
-            )
-          })}
+        <div className="mt-0.5 space-y-0.5 border-l-2 border-border" style={{ marginLeft: `${20 + indent}px`, paddingLeft: '8px' }}>
+          {item.children!.map((child) => (
+            <NavItemComponent
+              key={child.href + child.name}
+              item={child}
+              pathname={pathname}
+              onNavigate={onNavigate}
+              depth={depth + 1}
+            />
+          ))}
         </div>
       )}
     </div>
