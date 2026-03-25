@@ -59,6 +59,9 @@ export async function PATCH(
     if (action === 'accept' && !isClient) {
       return NextResponse.json({ error: 'Solo el cliente puede aceptar el mantenimiento' }, { status: 403 })
     }
+    if (action === 'complete' && isClient) {
+      return NextResponse.json({ error: 'Solo el técnico o administrador puede completar el mantenimiento' }, { status: 403 })
+    }
     if (action === 'reschedule' && !isAdminOrTech) {
       return NextResponse.json({ error: 'No tienes permisos para reagendar' }, { status: 403 })
     }

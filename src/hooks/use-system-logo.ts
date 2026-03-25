@@ -9,6 +9,16 @@ interface SystemLogos {
   loading: boolean
 }
 
+/**
+ * Normaliza URLs de logos: convierte /uploads/... → /api/uploads/...
+ * para que funcionen con el file server dinámico
+ */
+function normalizeLogoUrl(url: string | null | undefined): string | null {
+  if (!url) return null
+  if (url.startsWith('/uploads/')) return url.replace('/uploads/', '/api/uploads/')
+  return url
+}
+
 export function useSystemLogo(): SystemLogos {
   const [logos, setLogos] = useState<SystemLogos>({
     lightUrl: null,
@@ -22,8 +32,8 @@ export function useSystemLogo(): SystemLogos {
       .then(res => res.json())
       .then(data => {
         setLogos({
-          lightUrl: data.content?.companyLogoLightUrl || null,
-          darkUrl: data.content?.companyLogoDarkUrl || null,
+          lightUrl: normalizeLogoUrl(data.content?.companyLogoLightUrl),
+          darkUrl: normalizeLogoUrl(data.content?.companyLogoDarkUrl),
           companyName: data.content?.companyName || 'Sistema de Tickets',
           loading: false,
         })

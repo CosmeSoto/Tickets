@@ -6,14 +6,14 @@ import { z } from 'zod'
 import { randomUUID } from 'crypto'
 
 const settingsSchema = z.object({
-  systemName: z.string().min(1).max(100).optional(),
+  systemName: z.string().max(100).optional(),
   systemDescription: z.string().max(500).optional(),
-  supportEmail: z.string().email().optional(),
-  maxTicketsPerUser: z.number().min(1).max(100).optional(),
+  supportEmail: z.string().email().optional().or(z.literal('')),
+  maxTicketsPerUser: z.coerce.number().min(1).max(100).optional(),
   autoAssignmentEnabled: z.boolean().optional(),
   emailEnabled: z.boolean().optional(),
   smtpHost: z.string().optional(),
-  smtpPort: z.number().optional(),
+  smtpPort: z.coerce.number().optional(),
   smtpUser: z.string().optional(),
   smtpPassword: z.string().optional(),
   smtpSecure: z.boolean().optional(),
@@ -21,17 +21,17 @@ const settingsSchema = z.object({
   notificationsEnabled: z.boolean().optional(),
   emailNotifications: z.boolean().optional(),
   browserNotifications: z.boolean().optional(),
-  sessionTimeout: z.number().min(5).max(1440).optional(),
-  maxLoginAttempts: z.number().min(3).max(10).optional(),
-  passwordMinLength: z.number().min(6).max(20).optional(),
+  sessionTimeout: z.coerce.number().min(5).max(1440).optional(),
+  maxLoginAttempts: z.coerce.number().min(3).max(10).optional(),
+  passwordMinLength: z.coerce.number().min(6).max(20).optional(),
   requirePasswordChange: z.boolean().optional(),
-  maxFileSize: z.number().min(1).max(100).optional(),
-  autoCloseDays: z.number().min(1).max(30).optional(),
+  maxFileSize: z.coerce.number().min(1).max(100).optional(),
+  autoCloseDays: z.coerce.number().min(1).max(30).optional(),
   allowedFileTypes: z.array(z.string()).optional(),
   backupEnabled: z.boolean().optional(),
   backupFrequency: z.enum(['daily', 'weekly', 'monthly']).optional(),
-  backupRetention: z.number().min(7).max(365).optional(),
-}).passthrough() // Permitir campos adicionales
+  backupRetention: z.coerce.number().min(7).max(365).optional(),
+}).passthrough()
 
 // Configuración por defecto
 const defaultSettings = {

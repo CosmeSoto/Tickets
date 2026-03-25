@@ -6,6 +6,8 @@ import { updateLicenseSchema, assignLicenseSchema } from '@/lib/validations/inve
 import { ZodError } from 'zod'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
+import prisma from '@/lib/prisma'
+import { getRenewalAlertStatus } from '@/lib/inventory/renewal-alert'
 
 /**
  * GET /api/inventory/licenses/[id]
@@ -26,7 +28,17 @@ export async function GET(
       return NextResponse.json({ error: 'Licencia no encontrada' }, { status: 404 })
     }
 
-    return NextResponse.json(license)
+    // Fetch supplier separately since getLicenseById doesn't include it
+    const licenseWithSupplier = await prisma.software_licenses.findUnique({
+      where: { id },
+      select: { supplier: { select: { id: true, name: true, taxId: true } } },
+    })
+
+    const renewalAlertStatus = getRenewalAlertStatus(
+      (license as any).renewalDate ? new Date((license as any).renewalDate) : null
+    )
+
+    return NextResponse.json({ ...license, supplier: licenseWithSupplier?.supplier ?? null, renewalAlertStatus })
   } catch (error) {
     console.error('Error en GET /api/inventory/licenses/[id]:', error)
     return NextResponse.json({ error: 'Error al obtener licencia' }, { status: 500 })
@@ -51,15 +63,37 @@ export async function PUT(
 
     const { id } = await params
     const body = await request.json()
-    const validatedData = updateLicenseSchema.parse(body)
-    const license = await LicenseService.updateLicense(id, validatedData, session.user.id)
+    const { supplierId, renewalCost, renewalDate, invoiceNumber, purchaseOrderNumber, ...rest } = body
+
+    // Validar renewalCost
+    if (renewalCost !== undefined && renewalCost !== null && renewalCost < 0) {
+      return NextResponse.json({ error: 'El costo de renovación no puede ser negativo' }, { status: 400 })
+    }
+
+    // Validar supplierId
+    if (supplierId !== undefined && supplierId !== null) {
+      const supplierExists = await prisma.suppliers.findUnique({ where: { id: supplierId }, select: { id: true } })
+      if (!supplierExists) {
+        return NextResponse.json({ error: 'El proveedor especificado no existe' }, { status: 400 })
+      }
+    }
+
+    const validatedData = updateLicenseSchema.parse(rest)
+    const updatePayload: any = { ...validatedData }
+    if (supplierId !== undefined) updatePayload.supplierId = supplierId
+    if (renewalCost !== undefined) updatePayload.renewalCost = renewalCost
+    if (renewalDate !== undefined) updatePayload.renewalDate = renewalDate
+    if (invoiceNumber !== undefined) updatePayload.invoiceNumber = invoiceNumber
+    if (purchaseOrderNumber !== undefined) updatePayload.purchaseOrderNumber = purchaseOrderNumber
+
+    const license = await LicenseService.updateLicense(id, updatePayload, session.user.id)
 
     await AuditServiceComplete.log({
       action: AuditActionsComplete.LICENSE_UPDATED,
       entityType: 'inventory',
       entityId: id,
       userId: session.user.id,
-      details: { updatedFields: Object.keys(validatedData) },
+      details: { updatedFields: Object.keys(updatePayload) },
       ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
     }).catch(err => console.error('[AUDIT] Error registrando actualización de licencia:', err))

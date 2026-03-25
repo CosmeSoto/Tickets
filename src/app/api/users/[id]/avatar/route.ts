@@ -3,8 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { writeFile, unlink } from 'fs/promises'
-import { join } from 'path'
 import { existsSync, mkdirSync } from 'fs'
+import { getUploadDir } from '@/lib/upload-path'
 
 export async function POST(
   request: NextRequest,
@@ -68,7 +68,7 @@ export async function POST(
     }
 
     // Crear directorio de avatares si no existe
-    const uploadsDir = join(process.cwd(), 'public', 'uploads', 'avatars')
+    const uploadsDir = getUploadDir('avatars')
     if (!existsSync(uploadsDir)) {
       mkdirSync(uploadsDir, { recursive: true })
     }
@@ -77,17 +77,19 @@ export async function POST(
     const timestamp = Date.now()
     const extension = file.name.split('.').pop()?.toLowerCase()
     const filename = `${id}-${timestamp}.${extension}`
-    const filepath = join(uploadsDir, filename)
+    const filepath = getUploadDir('avatars', filename)
 
     // Eliminar avatar anterior si existe
     if (user.avatar) {
-      const oldAvatarPath = join(process.cwd(), 'public', user.avatar)
+      // avatar es /uploads/avatars/... → extraer relativo
+      const relative = user.avatar.replace(/^\/uploads\//, '')
+      const oldAvatarPath = getUploadDir(relative)
       try {
         if (existsSync(oldAvatarPath)) {
           await unlink(oldAvatarPath)
         }
-      } catch (error) {
-        console.warn('No se pudo eliminar el avatar anterior:', error)
+      } catch {
+        // ignorar
       }
     }
 
@@ -167,13 +169,14 @@ export async function DELETE(
 
     // Eliminar archivo del servidor si existe
     if (user.avatar) {
-      const avatarPath = join(process.cwd(), 'public', user.avatar)
+      const relative = user.avatar.replace(/^\/uploads\//, '')
+      const avatarPath = getUploadDir(relative)
       try {
         if (existsSync(avatarPath)) {
           await unlink(avatarPath)
         }
-      } catch (error) {
-        console.warn('No se pudo eliminar el archivo del avatar:', error)
+      } catch {
+        // ignorar
       }
     }
 

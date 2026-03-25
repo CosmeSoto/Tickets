@@ -7,6 +7,58 @@ import { randomUUID } from 'crypto'
 import { sendEmail } from '@/lib/email-service'
 
 /**
+ * GET /api/inventory/maintenance
+ * - ADMIN/TECHNICIAN: todos los mantenimientos (con filtros opcionales)
+ * - CLIENT: solo los mantenimientos de equipos que le pertenecen
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+    const { searchParams } = new URL(request.url)
+    const status = searchParams.get('status') || undefined
+    const type = searchParams.get('type') || undefined
+
+    const isClient = session.user.role === 'CLIENT'
+
+    const where: any = {}
+    if (status) where.status = status
+    if (type) where.type = type
+
+    // Cliente solo ve mantenimientos de sus equipos asignados
+    if (isClient) {
+      const myAssignments = await prisma.equipment_assignments.findMany({
+        where: { receiverId: session.user.id, isActive: true },
+        select: { equipmentId: true },
+      })
+      // También incluye mantenimientos que él mismo solicitó
+      const myEquipmentIds = myAssignments.map(a => a.equipmentId)
+      where.OR = [
+        { equipmentId: { in: myEquipmentIds } },
+        { requestedById: session.user.id },
+      ]
+    }
+
+    const records = await prisma.maintenance_records.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        equipment: {
+          select: { id: true, code: true, brand: true, model: true, status: true, type: { select: { name: true } } },
+        },
+        technician: { select: { id: true, name: true } },
+        requestedBy: { select: { id: true, name: true } },
+      },
+    })
+
+    return NextResponse.json(records)
+  } catch (error) {
+    return NextResponse.json({ error: 'Error al obtener mantenimientos' }, { status: 500 })
+  }
+}
+
+/**
  * POST /api/inventory/maintenance
  * - ADMIN/TECHNICIAN: crea mantenimiento SCHEDULED (equipo → MAINTENANCE)
  * - CLIENT: solicita mantenimiento REQUESTED (equipo no cambia)

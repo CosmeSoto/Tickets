@@ -38,8 +38,6 @@ interface SystemSettings {
   systemName: string
   systemDescription: string
   supportEmail: string
-  maxTicketsPerUser: number
-  autoAssignmentEnabled: boolean
 
   // Configuración de email
   emailEnabled: boolean
@@ -64,9 +62,6 @@ interface SystemSettings {
   // Configuración de archivos
   maxFileSize: number
   allowedFileTypes: string[]
-
-  // Configuración de auto-cierre de tickets
-  autoCloseDays: number
 
   // Configuración de backups
   backupEnabled: boolean
@@ -149,7 +144,9 @@ export default function SettingsPage() {
         const error = await response.json()
         toast({
           title: 'Error',
-          description: error.error || 'Error al guardar configuración',
+          description: error.details
+            ? error.details.map((d: any) => `${d.path?.join('.')}: ${d.message}`).join(' | ')
+            : error.error || 'Error al guardar configuración',
           variant: 'destructive',
         })
       }
@@ -324,32 +321,6 @@ export default function SettingsPage() {
                 />
               </div>
 
-              <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                <div>
-                  <Label htmlFor='maxTicketsPerUser'>Máximo Tickets por Usuario</Label>
-                  <Input
-                    id='maxTicketsPerUser'
-                    type='number'
-                    value={settings.maxTicketsPerUser}
-                    onChange={e => {
-                      const value = parseInt(e.target.value)
-                      setSettings({ ...settings, maxTicketsPerUser: isNaN(value) ? 10 : value })
-                    }}
-                    min='1'
-                    max='100'
-                  />
-                </div>
-                <div className='flex items-center space-x-2 pt-6'>
-                  <Switch
-                    id='autoAssignment'
-                    checked={settings.autoAssignmentEnabled}
-                    onCheckedChange={checked =>
-                      setSettings({ ...settings, autoAssignmentEnabled: checked })
-                    }
-                  />
-                  <Label htmlFor='autoAssignment'>Asignación Automática Habilitada</Label>
-                </div>
-              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -644,32 +615,6 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                <div>
-                  <Label htmlFor='autoCloseDays'>Auto-cierre de Tickets Resueltos</Label>
-                  <div className="space-y-2">
-                    <Input
-                      id='autoCloseDays'
-                      type='number'
-                      value={settings.autoCloseDays}
-                      onChange={e => {
-                        const value = parseInt(e.target.value)
-                        setSettings({ ...settings, autoCloseDays: isNaN(value) ? 3 : value })
-                      }}
-                      min='1'
-                      max='30'
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      {settings.autoCloseDays === 1
-                        ? '1 día para que el cliente califique'
-                        : `${settings.autoCloseDays} días para que el cliente califique`
-                      }
-                    </p>
-                    <p className="text-xs text-amber-600">
-                      ⚠️ Los tickets resueltos se cerrarán automáticamente si el cliente no califica dentro de este plazo
-                    </p>
-                  </div>
-                </div>
-
                 {/* Información adicional sobre seguridad */}
                 <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <h4 className="font-medium text-blue-900 mb-2">ℹ️ Información de Seguridad</h4>
@@ -678,7 +623,6 @@ export default function SettingsPage() {
                     <li>• Se mostrará una advertencia 5 minutos antes de cerrar la sesión</li>
                     <li>• Cualquier acción del usuario (click, tecla, scroll) reinicia el contador</li>
                     <li>• Los cambios requieren reiniciar sesión para aplicarse</li>
-                    <li>• Los tickets resueltos sin calificación se cierran automáticamente según el plazo configurado</li>
                   </ul>
                 </div>
               </CardContent>

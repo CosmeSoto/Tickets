@@ -194,6 +194,11 @@ export async function middleware(request: NextRequest) {
       { requestId, metadata: { role: userRole } }
     )
 
+    // Solo ADMIN puede acceder a configuración del sistema
+    if (path.startsWith('/settings') && userRole !== 'ADMIN') {
+      return NextResponse.redirect(new URL('/unauthorized', request.url))
+    }
+
     if (path.startsWith('/admin') && userRole !== 'ADMIN') {
       ApplicationLogger.securityEvent(
         'insufficient_privileges',
@@ -255,13 +260,25 @@ export async function middleware(request: NextRequest) {
       }
     }
 
-    // Proteger rutas de inventario: solo ADMIN o técnicos con permiso
+    // Rutas de inventario:
+    // - ADMIN: acceso total
+    // - TECHNICIAN: acceso total (granularidad en API routes)
+    // - CLIENT: solo puede ver sus equipos asignados, licencias, actas y mantenimientos
+    //   Las rutas de gestión (equipment-types, consumables, reports, settings) están bloqueadas
     if (path.startsWith('/inventory')) {
       if (userRole === 'CLIENT') {
-        return NextResponse.redirect(new URL('/unauthorized', request.url))
+        const clientAllowed = [
+          '/inventory',                    // lista de equipos asignados
+          '/inventory/equipment',          // detalle de equipo
+          '/inventory/licenses',           // sus licencias
+          '/inventory/acts',               // sus actas
+          '/inventory/maintenance',        // sus mantenimientos
+        ]
+        const isAllowed = clientAllowed.some(r => path === r || path.startsWith(r + '/'))
+        if (!isAllowed) {
+          return NextResponse.redirect(new URL('/unauthorized', request.url))
+        }
       }
-      // La verificación granular de técnicos se hace en cada API route
-      // Aquí solo bloqueamos clientes a nivel de página
     }
   }
 

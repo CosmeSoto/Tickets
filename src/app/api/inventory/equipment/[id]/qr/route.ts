@@ -8,7 +8,9 @@ import { ZodError } from 'zod'
 
 /**
  * GET /api/inventory/equipment/[id]/qr
- * Obtiene el código QR de un equipo
+ * Obtiene el código QR de un equipo.
+ * Usa el host del request para que la URL del QR funcione en cualquier red
+ * (localhost, IP local, dominio de producción).
  */
 export async function GET(
   request: NextRequest,
@@ -51,16 +53,23 @@ export async function GET(
       }
     }
 
-    // Generar QR code
+    // Detectar el base URL desde el request para que funcione en cualquier red
+    const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'localhost:3000'
+    const proto = request.headers.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https')
+    const baseUrl = `${proto}://${host}`
+
+    // Generar QR code con la URL correcta para esta red
     const qrCode = await QRCodeService.generateEquipmentQR(
       equipment.id,
-      equipment.code
+      equipment.code,
+      baseUrl
     )
 
     return NextResponse.json({
       qrCode,
       equipmentCode: equipment.code,
-      equipmentId: equipment.id
+      equipmentId: equipment.id,
+      verifyUrl: `${baseUrl}/inventory/equipment/${equipment.id}/verify`,
     })
   } catch (error) {
     console.error('Error en GET /api/inventory/equipment/[id]/qr:', error)

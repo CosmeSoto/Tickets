@@ -501,6 +501,13 @@ model users {
   licensesAssigned                                  software_licenses[]         @relation("LicenseUser")
   stockMovements                                    stock_movements[]           @relation("StockMovementUser")
   stockMovementsAssigned                            stock_movements[]           @relation("StockMovementAssignedTo")
+  equipmentAttachments                              equipment_attachments[]
+
+  // Decommission relations
+  decommissionRequests                              decommission_requests[]     @relation("DecommissionRequester")
+  decommissionReviews                               decommission_requests[]     @relation("DecommissionReviewer")
+  decommissionApprovals                             decommission_acts[]         @relation("DecommissionApprover")
+  decommissionAttachments                           decommission_attachments[]
 
   @@index([departmentId])
   @@index([name, email])
@@ -982,16 +989,26 @@ model equipment {
   rentalContactEmail   String?           @map("rental_contact_email")
   rentalContactPhone   String?           @map("rental_contact_phone")
   rentalNotes          String?           @db.Text @map("rental_notes")
+
+  // Campos financieros y de depreciación
+  supplierId           String?           @map("supplier_id")
+  invoiceNumber        String?           @map("invoice_number") @db.VarChar(100)
+  purchaseOrderNumber  String?           @map("purchase_order_number") @db.VarChar(100)
+  usefulLifeYears      Float?            @map("useful_life_years")
+  residualValue        Float?            @default(0) @map("residual_value")
   
   createdAt            DateTime          @default(now()) @map("created_at")
   updatedAt            DateTime          @updatedAt @map("updated_at")
   
   type                 equipment_types   @relation(fields: [typeId], references: [id])
+  supplier             suppliers?        @relation(fields: [supplierId], references: [id])
   assignments          equipment_assignments[]
   maintenanceRecords   maintenance_records[]
   licenses             software_licenses[]
   consumables          consumables[]
   stockMovements       stock_movements[] @relation("StockMovementEquipment")
+  attachments          equipment_attachments[]
+  decommission_requests decommission_requests[]
   
   @@index([code])
   @@index([serialNumber])
@@ -1000,6 +1017,25 @@ model equipment {
   @@index([rentalProvider])
   @@index([rentalEndDate])
   @@map("equipment")
+}
+
+// Equipment attachments (imágenes y documentos opcionales del equipo)
+model equipment_attachments {
+  id           String    @id @default(uuid())
+  equipmentId  String    @map("equipment_id")
+  filename     String
+  originalName String    @map("original_name")
+  mimeType     String    @map("mime_type")
+  size         Int
+  path         String
+  uploadedBy   String    @map("uploaded_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  equipment    equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  uploader     users     @relation(fields: [uploadedBy], references: [id])
+
+  @@index([equipmentId])
+  @@map("equipment_attachments")
 }
 
 enum EquipmentStatus {
@@ -1207,6 +1243,14 @@ model software_licenses {
   assignedToEquipment   String?         @map("assigned_to_equipment")
   assignedToUser        String?         @map("assigned_to_user")
   assignedToDepartment  String?         @map("assigned_to_department")
+
+  // Campos financieros
+  supplierId            String?         @map("supplier_id")
+  renewalCost           Float?          @map("renewal_cost")
+  renewalDate           DateTime?       @map("renewal_date")
+  invoiceNumber         String?         @map("invoice_number") @db.VarChar(100)
+  purchaseOrderNumber   String?         @map("purchase_order_number") @db.VarChar(100)
+
   createdAt             DateTime        @default(now()) @map("created_at")
   updatedAt             DateTime        @updatedAt @map("updated_at")
 
@@ -1214,6 +1258,8 @@ model software_licenses {
   equipment     equipment?      @relation(fields: [assignedToEquipment], references: [id], onDelete: SetNull, onUpdate: Cascade)
   user          users?          @relation("LicenseUser", fields: [assignedToUser], references: [id], onDelete: SetNull, onUpdate: Cascade)
   department    departments?    @relation(fields: [assignedToDepartment], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  supplier      suppliers?      @relation(fields: [supplierId], references: [id])
+  decommission_requests decommission_requests[]
 
   @@index([typeId, expirationDate])
   @@index([assignedToEquipment])
@@ -1272,12 +1318,14 @@ model consumables {
   location            String?
   notes               String?           @db.Text
   compatibleEquipment String[]          @map("compatible_equipment")
+  supplierId          String?           @map("supplier_id")
   createdAt           DateTime          @default(now()) @map("created_at")
   updatedAt           DateTime          @updatedAt @map("updated_at")
   
   consumableType      consumable_types  @relation(fields: [typeId], references: [id])
   unitOfMeasure       units_of_measure  @relation(fields: [unitOfMeasureId], references: [id])
   assignedEquipment   equipment?        @relation(fields: [assignedEquipmentId], references: [id])
+  supplier            suppliers?        @relation(fields: [supplierId], references: [id])
   movements           stock_movements[]
   
   @@index([typeId, currentStock])
@@ -1314,6 +1362,118 @@ enum MovementType {
   ENTRY
   EXIT
   ADJUSTMENT
+}
+
+// ============================================
+// SUPPLIERS
+// ============================================
+
+enum SupplierType {
+  EQUIPMENT
+  CONSUMABLE
+  LICENSE
+  MIXED
+}
+
+model suppliers {
+  id          String       @id @default(cuid())
+  name        String       @db.VarChar(200)
+  type        SupplierType
+  taxId       String?      @unique @map("tax_id") @db.VarChar(20)
+  email       String?      @db.VarChar(200)
+  phone       String?      @db.VarChar(50)
+  address     String?
+  website     String?
+  contactName String?      @map("contact_name") @db.VarChar(200)
+  isActive    Boolean      @default(true) @map("is_active")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  equipment         equipment[]
+  consumables       consumables[]
+  software_licenses software_licenses[]
+
+  @@index([type, isActive])
+  @@index([name])
+  @@map("suppliers")
+}
+
+// ============================================
+// DECOMMISSION (ACTAS DE BAJA)
+// ============================================
+
+enum DecommissionAssetType {
+  EQUIPMENT
+  LICENSE
+}
+
+enum DecommissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model decommission_requests {
+  id              String                @id @default(cuid())
+  assetType       DecommissionAssetType @map("asset_type")
+  equipmentId     String?               @map("equipment_id")
+  licenseId       String?               @map("license_id")
+  requestedById   String                @map("requested_by_id")
+  reason          String                @db.Text
+  condition       EquipmentCondition?
+  status          DecommissionStatus    @default(PENDING)
+  rejectionReason String?               @db.Text @map("rejection_reason")
+  reviewedById    String?               @map("reviewed_by_id")
+  reviewedAt      DateTime?             @map("reviewed_at")
+  createdAt       DateTime              @default(now()) @map("created_at")
+  updatedAt       DateTime              @updatedAt @map("updated_at")
+
+  equipment    equipment?                 @relation(fields: [equipmentId], references: [id])
+  license      software_licenses?         @relation(fields: [licenseId], references: [id])
+  requester    users                      @relation("DecommissionRequester", fields: [requestedById], references: [id])
+  reviewer     users?                     @relation("DecommissionReviewer", fields: [reviewedById], references: [id])
+  attachments  decommission_attachments[]
+  act          decommission_acts?
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([requestedById])
+  @@index([equipmentId])
+  @@index([licenseId])
+  @@map("decommission_requests")
+}
+
+model decommission_attachments {
+  id           String   @id @default(cuid())
+  requestId    String   @map("request_id")
+  filename     String
+  originalName String   @map("original_name")
+  mimeType     String   @map("mime_type")
+  size         Int
+  path         String
+  uploadedBy   String   @map("uploaded_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  request  decommission_requests @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  uploader users                 @relation(fields: [uploadedBy], references: [id])
+
+  @@index([requestId])
+  @@map("decommission_attachments")
+}
+
+model decommission_acts {
+  id           String   @id @default(cuid())
+  folio        String   @unique
+  requestId    String   @unique @map("request_id")
+  approvedById String   @map("approved_by_id")
+  approvedAt   DateTime @default(now()) @map("approved_at")
+  pdfPath      String?  @map("pdf_path")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  request    decommission_requests @relation(fields: [requestId], references: [id])
+  approvedBy users                 @relation("DecommissionApprover", fields: [approvedById], references: [id])
+
+  @@index([folio])
+  @@map("decommission_acts")
 }
 
 // Folio counters table (for sequential folio generation)

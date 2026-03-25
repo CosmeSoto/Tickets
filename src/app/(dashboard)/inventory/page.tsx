@@ -28,62 +28,41 @@ export default function InventoryPage() {
   const { toast } = useToast()
   const [deleteTarget, setDeleteTarget] = useState<Equipment | null>(null)
   const [deleting, setDeleting] = useState(false)
-
   const [canCreate, setCanCreate] = useState(false)
+
+  const role = session?.user?.role
+  const isClient = role === 'CLIENT'
 
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login')
       return
     }
-    if (session?.user?.role === 'CLIENT') {
-      router.push('/unauthorized')
-      return
-    }
-    // Verificar permiso de gestión de inventario
-    if (session?.user) {
+    // Verificar permiso de gestión de inventario (solo admin/técnico)
+    if (session?.user && !isClient) {
       fetch('/api/inventory/access')
         .then(r => r.json())
         .then(d => setCanCreate(d.canManage === true))
         .catch(() => setCanCreate(session.user!.role === 'ADMIN'))
     }
-  }, [status, session, router])
+  }, [status, session, router, isClient])
 
-  const handleCreateNew = () => {
-    router.push('/inventory/equipment/new')
-  }
-
-  const handleDelete = (equipment: Equipment) => {
-    setDeleteTarget(equipment)
-  }
+  const handleDelete = (equipment: Equipment) => setDeleteTarget(equipment)
 
   const confirmDelete = async () => {
     if (!deleteTarget) return
     setDeleting(true)
-
     try {
-      const response = await fetch(`/api/inventory/equipment/${deleteTarget.id}`, {
-        method: 'DELETE',
-      })
-
+      const response = await fetch(`/api/inventory/equipment/${deleteTarget.id}`, { method: 'DELETE' })
       if (!response.ok) {
         const error = await response.json()
         throw new Error(error.error || 'Error al retirar equipo')
       }
-
-      toast({
-        title: 'Equipo retirado',
-        description: `El equipo ${deleteTarget.code} ha sido retirado exitosamente`,
-      })
-
+      toast({ title: 'Equipo retirado', description: `El equipo ${deleteTarget.code} ha sido retirado exitosamente` })
       setDeleteTarget(null)
       window.location.reload()
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'No se pudo retirar el equipo',
-        variant: 'destructive',
-      })
+      toast({ title: 'Error', description: error instanceof Error ? error.message : 'No se pudo retirar el equipo', variant: 'destructive' })
     } finally {
       setDeleting(false)
     }
@@ -93,7 +72,7 @@ export default function InventoryPage() {
     return (
       <RoleDashboardLayout title="Cargando..." subtitle="Obteniendo información">
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
         </div>
       </RoleDashboardLayout>
     )
@@ -101,10 +80,16 @@ export default function InventoryPage() {
 
   if (!session?.user) return null
 
+  // Título y subtítulo adaptados por rol
+  const title = isClient ? 'Mis Equipos' : 'Inventario de Equipos'
+  const subtitle = isClient
+    ? 'Equipos asignados a tu cuenta'
+    : 'Gestiona el inventario de equipos tecnológicos'
+
   return (
     <RoleDashboardLayout
-      title="Inventario de Equipos"
-      subtitle="Gestiona el inventario de equipos tecnológicos"
+      title={title}
+      subtitle={subtitle}
       headerActions={
         canCreate ? (
           <Link href="/inventory/equipment/new">
@@ -119,8 +104,8 @@ export default function InventoryPage() {
       <div className="space-y-6">
         <EquipmentSummaryWidget userRole={session.user.role} userId={session.user.id} />
         <EquipmentList
-          onCreateNew={canCreate ? handleCreateNew : undefined}
-          onDelete={session.user.role === 'ADMIN' ? handleDelete : undefined}
+          onCreateNew={canCreate ? () => router.push('/inventory/equipment/new') : undefined}
+          onDelete={role === 'ADMIN' ? handleDelete : undefined}
         />
       </div>
 

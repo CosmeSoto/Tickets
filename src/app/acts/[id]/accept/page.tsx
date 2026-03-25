@@ -64,7 +64,7 @@ export default async function ActAcceptancePage({ params, searchParams }: PagePr
       {/* Header */}
       <div className="border-b">
         <div className="container max-w-4xl py-6">
-          <h1 className="text-3xl font-bold">Acta de Entrega de Equipo</h1>
+          <h1 className="text-3xl font-bold">Acta de Entrega</h1>
           <p className="text-muted-foreground mt-2">
             Revisa los detalles del equipo y acepta o rechaza la entrega
           </p>

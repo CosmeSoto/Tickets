@@ -23,7 +23,7 @@ export function generateDeliveryActCreatedEmail(data: DeliveryActCreatedEmailDat
     year: 'numeric',
   })
 
-  const subject = `Acta de Entrega de Equipo - ${act.folio}`
+  const subject = `Acta de Entrega - ${act.folio}`
 
   const html = `
 <!DOCTYPE html>
@@ -35,7 +35,7 @@ export function generateDeliveryActCreatedEmail(data: DeliveryActCreatedEmailDat
 </head>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
   <div style="background-color: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
-    <h1 style="color: #2563eb; margin: 0 0 10px 0; font-size: 24px;">Acta de Entrega de Equipo</h1>
+    <h1 style="color: #2563eb; margin: 0 0 10px 0; font-size: 24px;">Acta de Entrega</h1>
     <p style="color: #6b7280; margin: 0; font-size: 16px;">${act.folio}</p>
   </div>
 
@@ -83,7 +83,7 @@ export function generateDeliveryActCreatedEmail(data: DeliveryActCreatedEmailDat
   `
 
   const text = `
-ACTA DE ENTREGA DE EQUIPO
+ACTA DE ENTREGA
 ${act.folio}
 
 Hola ${receiverName},

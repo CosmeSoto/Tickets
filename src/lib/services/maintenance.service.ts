@@ -47,7 +47,12 @@ export class MaintenanceService {
           entityType: 'maintenance_record',
           entityId: maintenance.id,
           userId,
-          details: { equipmentId: data.equipmentId, type: data.type, scheduledDate: data.scheduledDate },
+          details: {
+            descripcion: `Se programó mantenimiento ${data.type === 'PREVENTIVE' ? 'preventivo' : 'correctivo'} para el equipo ${(maintenance as any).equipment?.code || data.equipmentId}. Fecha: ${new Date(data.scheduledDate).toLocaleDateString('es-EC')}. Motivo: ${data.description}`,
+            equipmentId: data.equipmentId,
+            type: data.type,
+            scheduledDate: data.scheduledDate,
+          },
         },
       })
 
@@ -92,7 +97,12 @@ export class MaintenanceService {
           entityType: 'maintenance_record',
           entityId: maintenance.id,
           userId,
-          details: { equipmentId: data.equipmentId, type: data.type, description: data.description },
+          details: {
+            descripcion: `El usuario solicitó mantenimiento ${data.type === 'PREVENTIVE' ? 'preventivo' : 'correctivo'} para el equipo ${(maintenance as any).equipment?.code || data.equipmentId}. Motivo: ${data.description}. Fecha sugerida: ${new Date(data.scheduledDate).toLocaleDateString('es-EC')}`,
+            equipmentId: data.equipmentId,
+            type: data.type,
+            description: data.description,
+          },
         },
       })
 
@@ -142,7 +152,11 @@ export class MaintenanceService {
           entityType: 'maintenance_record',
           entityId: id,
           userId,
-          details: { scheduledDate: data.scheduledDate, technicianId: data.technicianId || userId },
+          details: {
+            descripcion: `Se aprobó la solicitud de mantenimiento del equipo ${existing.equipment.code}. Fecha programada: ${new Date(data.scheduledDate).toLocaleDateString('es-EC')}. El equipo pasó a estado "En mantenimiento".`,
+            scheduledDate: data.scheduledDate,
+            technicianId: data.technicianId || userId,
+          },
         },
       })
 
@@ -174,7 +188,10 @@ export class MaintenanceService {
           entityType: 'maintenance_record',
           entityId: id,
           userId,
-          details: { acceptedAt: new Date() },
+          details: {
+            descripcion: `El usuario confirmó y aceptó el mantenimiento programado.`,
+            acceptedAt: new Date(),
+          },
         },
       })
 
@@ -257,6 +274,7 @@ export class MaintenanceService {
               entityId: existing.equipmentId,
               userId,
               details: {
+                descripcion: `El equipo ${existing.equipment.code} fue reasignado a ${(lastAssignment.receiver as any)?.name || lastAssignment.receiverId} tras completar el mantenimiento.`,
                 receiverId: lastAssignment.receiverId,
                 receiverName: (lastAssignment.receiver as any)?.name,
                 reason: 'Reasignado tras mantenimiento',
@@ -282,6 +300,7 @@ export class MaintenanceService {
           entityId: id,
           userId,
           details: {
+            descripcion: `Mantenimiento completado para el equipo ${existing.equipment.code}. ${data.returnTo === 'previous_user' ? 'El equipo fue reasignado al usuario anterior.' : 'El equipo quedó disponible en bodega.'}${data.cost ? ` Costo: $${data.cost}.` : ''}${data.partsReplaced?.length ? ` Partes reemplazadas: ${data.partsReplaced.join(', ')}.` : ''}`,
             cost: data.cost,
             completedAt: new Date().toISOString(),
             returnTo: data.returnTo || 'available',
@@ -326,7 +345,11 @@ export class MaintenanceService {
           entityType: 'maintenance_record',
           entityId: id,
           userId,
-          details: { equipmentId: maintenance.equipmentId, previousStatus: maintenance.status },
+          details: {
+            descripcion: `Se canceló el mantenimiento del equipo ${maintenance.equipment.code}. Estado anterior: ${maintenance.status === 'REQUESTED' ? 'Solicitado' : maintenance.status === 'SCHEDULED' ? 'Programado' : 'Aceptado'}.${maintenance.status !== 'REQUESTED' ? ' El equipo volvió a estar disponible.' : ''}`,
+            equipmentId: maintenance.equipmentId,
+            previousStatus: maintenance.status,
+          },
         },
       })
     })
@@ -361,6 +384,7 @@ export class MaintenanceService {
           entityId: id,
           userId,
           details: {
+            descripcion: `Se reagendó el mantenimiento del equipo. Fecha anterior: ${new Date(existing.date).toLocaleDateString('es-EC')}. Nueva fecha: ${new Date(data.scheduledDate).toLocaleDateString('es-EC')}.`,
             previousDate: existing.date.toISOString(),
             newDate: data.scheduledDate.toISOString(),
           },

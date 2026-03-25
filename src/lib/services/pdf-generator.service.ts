@@ -6,23 +6,36 @@ import { QRCodeService } from './qr-code.service'
 import { generateDeliveryActPDF } from '../templates/delivery-act-pdf.template'
 import { generateReturnActPDF } from '../templates/return-act-pdf.template'
 import type { DeliveryAct } from '@/types/inventory/delivery-act'
+import { getUploadDir } from '@/lib/upload-path'
 
 const prisma = new PrismaClient()
 const mkdir = promisify(fs.mkdir)
 const writeFile = promisify(fs.writeFile)
 
 /**
+ * Normaliza URLs de logos: /uploads/... → ruta absoluta en filesystem
+ * /api/uploads/... → ruta absoluta en filesystem
+ */
+function normalizeLogoUrl(url: string | null): string | null {
+  if (!url) return null
+  if (url.startsWith('/api/uploads/')) return url  // ya correcto
+  if (url.startsWith('/uploads/')) return url.replace('/uploads/', '/api/uploads/')
+  return url
+}
+
+/**
  * Obtiene el logo y nombre de la empresa desde la configuración del sistema
  */
-async function getSystemBranding(): Promise<{ logoUrl: string | null; companyName: string }> {
+async function getSystemBranding(): Promise<{ logoUrl: string | null; logoDarkUrl: string | null; companyName: string }> {
   try {
     const content = await prisma.landing_page_content.findFirst({ where: { id: 'default' } })
     return {
-      logoUrl: (content as any)?.companyLogoLightUrl || null,
+      logoUrl: normalizeLogoUrl((content as any)?.companyLogoLightUrl || null),
+      logoDarkUrl: normalizeLogoUrl((content as any)?.companyLogoDarkUrl || null),
       companyName: (content as any)?.companyName || 'Sistema de Gestión de Inventario',
     }
   } catch {
-    return { logoUrl: null, companyName: 'Sistema de Gestión de Inventario' }
+    return { logoUrl: null, logoDarkUrl: null, companyName: 'Sistema de Gestión de Inventario' }
   }
 }
 
@@ -30,9 +43,8 @@ async function getSystemBranding(): Promise<{ logoUrl: string | null; companyNam
  * Servicio para generación de PDFs de actas
  */
 export class PDFGeneratorService {
-  private static readonly UPLOAD_BASE_DIR = path.join(process.cwd(), 'public', 'uploads')
-  private static readonly DELIVERY_ACTS_DIR = path.join(this.UPLOAD_BASE_DIR, 'delivery-acts')
-  private static readonly RETURN_ACTS_DIR = path.join(this.UPLOAD_BASE_DIR, 'return-acts')
+  private static readonly DELIVERY_ACTS_DIR = getUploadDir('delivery-acts')
+  private static readonly RETURN_ACTS_DIR = getUploadDir('return-acts')
 
   /**
    * Asegura que los directorios de uploads existan
@@ -75,7 +87,11 @@ export class PDFGeneratorService {
 
       // Generar QR code para verificación
       const verificationUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/inventory/acts/${actId}/verify`
-      const qrCodeDataUrl = await QRCodeService.generateQRCode(verificationUrl)
+      const qrCodeDataUrl = await QRCodeService.generateActVerificationQR(
+        actId,
+        act.folio,
+        (act as any).verificationHash || actId
+      )
 
       // Obtener branding del sistema
       const systemInfo = await getSystemBranding()
@@ -139,11 +155,17 @@ export class PDFGeneratorService {
 
       // Generar QR code para verificación
       const verificationUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/inventory/return-acts/${actId}/verify`
-      const qrCodeDataUrl = await QRCodeService.generateQRCode(verificationUrl)
+      const qrCodeDataUrl = await QRCodeService.generateActVerificationQR(
+        actId,
+        (act as any).folio || actId,
+        (act as any).verificationHash || actId
+      )
+
+      // Obtener branding del sistema
+      const systemInfo = await getSystemBranding()
 
       // Generar PDF
-      const doc = await generateReturnActPDF(act, qrCodeDataUrl)
-
+      const doc = await generateReturnActPDF(act, qrCodeDataUrl, systemInfo)
       // Nombre del archivo
       const fileName = `${act.folio.replace(/\//g, '-')}_${Date.now()}.pdf`
       const filePath = path.join(this.RETURN_ACTS_DIR, fileName)
@@ -185,12 +207,13 @@ export class PDFGeneratorService {
       })
 
       if (act?.pdfPath) {
-        const oldFilePath = path.join(process.cwd(), 'public', act.pdfPath)
+        // pdfPath es /uploads/delivery-acts/... → extraer segmento relativo a uploads/
+        const relative = act.pdfPath.replace(/^\/uploads\//, '')
+        const oldFilePath = getUploadDir(relative)
         try {
           await promisify(fs.unlink)(oldFilePath)
-        } catch (error) {
+        } catch {
           // Ignorar si el archivo no existe
-          console.warn('No se pudo eliminar el PDF anterior:', error)
         }
       }
 
@@ -241,7 +264,9 @@ export class PDFGeneratorService {
    */
   static async pdfExists(relativePath: string): Promise<boolean> {
     try {
-      const fullPath = path.join(process.cwd(), 'public', relativePath)
+      // relativePath es /uploads/... → extraer segmento relativo a uploads/
+      const relative = relativePath.replace(/^\/uploads\//, '')
+      const fullPath = getUploadDir(relative)
       await promisify(fs.access)(fullPath, fs.constants.F_OK)
       return true
     } catch {

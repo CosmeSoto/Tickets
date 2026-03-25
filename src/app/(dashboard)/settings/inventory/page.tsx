@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
@@ -10,13 +10,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
-import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
-import { Save, Loader2, Users, X } from 'lucide-react'
+import { Save, Loader2, ShieldCheck, Search, X, UserCheck } from 'lucide-react'
 
 interface InventorySettings {
-  technician_can_manage_equipment: boolean
-  inventory_technician_ids: string[]
+  manager_ids: string[]
   act_expiration_days: number
   low_stock_alert_enabled: boolean
   license_alert_enabled: boolean
@@ -24,10 +22,21 @@ interface InventorySettings {
   license_alert_days_second: number
 }
 
-interface Technician {
+interface UserOption {
   id: string
   name: string
   email: string
+  role: string
+}
+
+const ROLE_LABELS: Record<string, string> = {
+  TECHNICIAN: 'Técnico',
+  CLIENT: 'Usuario Final',
+}
+
+const ROLE_COLORS: Record<string, string> = {
+  TECHNICIAN: 'bg-blue-100 text-blue-700',
+  CLIENT: 'bg-gray-100 text-gray-600',
 }
 
 export default function InventorySettingsPage() {
@@ -36,10 +45,10 @@ export default function InventorySettingsPage() {
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [technicians, setTechnicians] = useState<Technician[]>([])
+  const [allUsers, setAllUsers] = useState<UserOption[]>([])
+  const [search, setSearch] = useState('')
   const [settings, setSettings] = useState<InventorySettings>({
-    technician_can_manage_equipment: true,
-    inventory_technician_ids: [],
+    manager_ids: [],
     act_expiration_days: 7,
     low_stock_alert_enabled: true,
     license_alert_enabled: true,
@@ -48,76 +57,74 @@ export default function InventorySettingsPage() {
   })
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/login')
-      return
-    }
-    if (session?.user?.role !== 'ADMIN') {
-      router.push('/unauthorized')
-      return
-    }
-    loadSettings()
-    loadTechnicians()
+    if (status === 'unauthenticated') { router.push('/login'); return }
+    if (status === 'authenticated' && session?.user?.role !== 'ADMIN') { router.push('/unauthorized'); return }
+    if (status === 'authenticated') { loadSettings(); loadAllUsers() }
   }, [session, status, router])
 
   const loadSettings = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/settings/inventory')
-      if (response.ok) {
-        const data = await response.json()
-        // Merge con defaults para campos nuevos
+      const res = await fetch('/api/settings/inventory')
+      if (res.ok) {
+        const data = await res.json()
         setSettings(prev => ({ ...prev, ...data.settings }))
       }
-    } catch (error) {
-      console.error('Error cargando configuración:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  const loadTechnicians = async () => {
-    try {
-      const response = await fetch('/api/users?role=TECHNICIAN&limit=100')
-      if (response.ok) {
-        const data = await response.json()
-        setTechnicians(data.data || [])
-      }
-    } catch (error) {
-      console.error('Error cargando técnicos:', error)
+  const loadAllUsers = async () => {
+    const res = await fetch('/api/users?limit=500&isActive=true')
+    if (res.ok) {
+      const data = await res.json()
+      setAllUsers((data.data || []).filter((u: UserOption) => u.role !== 'ADMIN'))
     }
   }
 
   const handleSave = async () => {
     try {
       setSaving(true)
-      const response = await fetch('/api/settings/inventory', {
+      const res = await fetch('/api/settings/inventory', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings),
       })
-      if (response.ok) {
+      if (res.ok) {
         toast({ title: 'Configuración guardada', description: 'Los cambios se han aplicado correctamente' })
       } else {
-        throw new Error('Error al guardar')
+        throw new Error()
       }
-    } catch (error) {
+    } catch {
       toast({ title: 'Error', description: 'No se pudo guardar la configuración', variant: 'destructive' })
     } finally {
       setSaving(false)
     }
   }
 
-  const toggleTechnician = (techId: string) => {
+  const toggleManager = (userId: string) => {
     setSettings(prev => {
-      const ids = prev.inventory_technician_ids || []
-      if (ids.includes(techId)) {
-        return { ...prev, inventory_technician_ids: ids.filter(id => id !== techId) }
-      } else {
-        return { ...prev, inventory_technician_ids: [...ids, techId] }
+      const ids = prev.manager_ids || []
+      return {
+        ...prev,
+        manager_ids: ids.includes(userId) ? ids.filter(id => id !== userId) : [...ids, userId],
       }
     })
   }
+
+  const selectedManagers = useMemo(
+    () => allUsers.filter(u => settings.manager_ids?.includes(u.id)),
+    [allUsers, settings.manager_ids]
+  )
+
+  const filteredUsers = useMemo(() => {
+    const q = search.toLowerCase()
+    return allUsers.filter(
+      u => !settings.manager_ids?.includes(u.id) &&
+        (u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
+    )
+  }, [allUsers, search, settings.manager_ids])
 
   if (status === 'loading' || loading) {
     return (
@@ -133,82 +140,94 @@ export default function InventorySettingsPage() {
     <RoleDashboardLayout title="Configuración de Inventario" subtitle="Ajustes del módulo de inventario">
       <div className="max-w-4xl mx-auto space-y-6">
 
-        {/* Permisos y Accesos */}
+        {/* Gestores de Inventario */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Permisos y Accesos
+              <ShieldCheck className="h-5 w-5" />
+              Gestores de Inventario
             </CardTitle>
-            <CardDescription>Configura quién puede gestionar el inventario</CardDescription>
+            <CardDescription>
+              Usuarios con permiso para crear, editar y eliminar equipos. El administrador siempre tiene acceso. Sin gestores adicionales, nadie más podrá gestionar el inventario.
+            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="technician-manage">Técnicos pueden gestionar equipos</Label>
-                <p className="text-sm text-muted-foreground">
-                  Permite a los técnicos seleccionados crear, editar y eliminar equipos
-                </p>
-              </div>
-              <Switch
-                id="technician-manage"
-                checked={settings.technician_can_manage_equipment}
-                onCheckedChange={(checked) =>
-                  setSettings({ ...settings, technician_can_manage_equipment: checked })
-                }
-              />
-            </div>
+          <CardContent className="space-y-4">
 
-            {settings.technician_can_manage_equipment && (
-              <div className="space-y-3 pl-1 border-l-2 border-primary/20 ml-1">
-                <Label className="text-sm">Técnicos con acceso a inventario</Label>
-                <p className="text-xs text-muted-foreground">
-                  Si no seleccionas ninguno, todos los técnicos tendrán acceso
-                </p>
-
-                {/* Técnicos seleccionados */}
-                {(settings.inventory_technician_ids?.length || 0) > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {settings.inventory_technician_ids.map(id => {
-                      const tech = technicians.find(t => t.id === id)
-                      return tech ? (
-                        <Badge key={id} variant="secondary" className="gap-1 pr-1">
-                          {tech.name}
-                          <button
-                            type="button"
-                            onClick={() => toggleTechnician(id)}
-                            className="ml-1 hover:bg-muted rounded-full p-0.5"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
+            {/* Gestores activos */}
+            {selectedManagers.length > 0 ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <UserCheck className="h-4 w-4" />
+                  <span>{selectedManagers.length} gestor{selectedManagers.length !== 1 ? 'es' : ''} asignado{selectedManagers.length !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="rounded-md border divide-y">
+                  {selectedManagers.map(user => (
+                    <div key={user.id} className="flex items-center justify-between px-3 py-2">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{user.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                        </div>
+                        <Badge variant="outline" className={`text-xs shrink-0 ${ROLE_COLORS[user.role]}`}>
+                          {ROLE_LABELS[user.role] || user.role}
                         </Badge>
-                      ) : null
-                    })}
-                  </div>
-                )}
-
-                {/* Lista de técnicos */}
-                <div className="max-h-[200px] overflow-y-auto space-y-2 rounded-md border p-3">
-                  {technicians.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No hay técnicos registrados</p>
-                  ) : (
-                    technicians.map(tech => (
-                      <div key={tech.id} className="flex items-center gap-3">
-                        <Checkbox
-                          id={`tech-${tech.id}`}
-                          checked={(settings.inventory_technician_ids || []).includes(tech.id)}
-                          onCheckedChange={() => toggleTechnician(tech.id)}
-                        />
-                        <label htmlFor={`tech-${tech.id}`} className="text-sm cursor-pointer flex-1">
-                          <span className="font-medium">{tech.name}</span>
-                          <span className="text-muted-foreground ml-2">{tech.email}</span>
-                        </label>
                       </div>
-                    ))
-                  )}
+                      <button
+                        type="button"
+                        onClick={() => toggleManager(user.id)}
+                        className="ml-3 p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground shrink-0"
+                        title="Quitar gestor"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </div>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">
+                Sin gestores adicionales — solo el administrador puede gestionar el inventario.
+              </p>
             )}
+
+            {/* Buscador + lista para agregar */}
+            <div className="space-y-2">
+              <Label className="text-sm">Agregar gestor</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por nombre o correo..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+
+              <div className="max-h-[220px] overflow-y-auto rounded-md border divide-y">
+                {filteredUsers.length === 0 ? (
+                  <p className="text-sm text-muted-foreground p-3 text-center">
+                    {search ? 'Sin resultados para esa búsqueda' : 'Todos los usuarios ya son gestores'}
+                  </p>
+                ) : (
+                  filteredUsers.map(user => (
+                    <button
+                      key={user.id}
+                      type="button"
+                      onClick={() => { toggleManager(user.id); setSearch('') }}
+                      className="w-full flex items-center justify-between px-3 py-2 hover:bg-muted/50 text-left"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{user.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                      </div>
+                      <Badge variant="outline" className={`text-xs ml-3 shrink-0 ${ROLE_COLORS[user.role]}`}>
+                        {ROLE_LABELS[user.role] || user.role}
+                      </Badge>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -218,22 +237,20 @@ export default function InventorySettingsPage() {
             <CardTitle>Actas de Entrega</CardTitle>
             <CardDescription>Configuración de actas de entrega y devolución</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="act-expiration">Días para expiración de actas</Label>
-              <Input
-                id="act-expiration"
-                type="number"
-                min="1"
-                max="30"
-                value={settings.act_expiration_days}
-                onChange={(e) => setSettings({ ...settings, act_expiration_days: parseInt(e.target.value) || 7 })}
-                className="w-32"
-              />
-              <p className="text-sm text-muted-foreground">
-                Días que el receptor tiene para aceptar un acta (1-30)
-              </p>
-            </div>
+          <CardContent className="space-y-2">
+            <Label htmlFor="act-expiration">Días para expiración de actas</Label>
+            <Input
+              id="act-expiration"
+              type="number"
+              min="1"
+              max="30"
+              value={settings.act_expiration_days}
+              onChange={(e) => setSettings({ ...settings, act_expiration_days: parseInt(e.target.value) || 7 })}
+              className="w-32"
+            />
+            <p className="text-sm text-muted-foreground">
+              Días que el receptor tiene para aceptar un acta (1–30)
+            </p>
           </CardContent>
         </Card>
 
@@ -241,16 +258,11 @@ export default function InventorySettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Alertas de Consumibles</CardTitle>
-            <CardDescription>Configuración de alertas de stock bajo</CardDescription>
+            <CardDescription>Notificar cuando el stock esté por debajo del mínimo</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="low-stock-alert">Alertas de stock bajo habilitadas</Label>
-                <p className="text-sm text-muted-foreground">
-                  Notificar cuando el stock esté por debajo del mínimo
-                </p>
-              </div>
+              <Label htmlFor="low-stock-alert">Alertas de stock bajo</Label>
               <Switch
                 id="low-stock-alert"
                 checked={settings.low_stock_alert_enabled}
@@ -266,14 +278,9 @@ export default function InventorySettingsPage() {
             <CardTitle>Alertas de Licencias</CardTitle>
             <CardDescription>Configura cuándo recibir alertas de vencimiento</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="license-alert">Alertas de vencimiento habilitadas</Label>
-                <p className="text-sm text-muted-foreground">
-                  Enviar notificaciones antes del vencimiento de licencias
-                </p>
-              </div>
+              <Label htmlFor="license-alert">Alertas de vencimiento</Label>
               <Switch
                 id="license-alert"
                 checked={settings.license_alert_enabled}
@@ -282,7 +289,7 @@ export default function InventorySettingsPage() {
             </div>
 
             {settings.license_alert_enabled && (
-              <div className="grid grid-cols-2 gap-4 pl-1 border-l-2 border-primary/20 ml-1">
+              <div className="grid grid-cols-2 gap-4 pt-2 border-t">
                 <div className="space-y-2">
                   <Label htmlFor="alert-first">Primera alerta (días antes)</Label>
                   <Input
@@ -294,7 +301,6 @@ export default function InventorySettingsPage() {
                     onChange={(e) => setSettings({ ...settings, license_alert_days_first: parseInt(e.target.value) || 30 })}
                     className="w-32"
                   />
-                  <p className="text-xs text-muted-foreground">Ej: 30 = alerta 30 días antes</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="alert-second">Segunda alerta (días antes)</Label>
@@ -307,7 +313,6 @@ export default function InventorySettingsPage() {
                     onChange={(e) => setSettings({ ...settings, license_alert_days_second: parseInt(e.target.value) || 7 })}
                     className="w-32"
                   />
-                  <p className="text-xs text-muted-foreground">Ej: 7 = alerta 7 días antes</p>
                 </div>
               </div>
             )}

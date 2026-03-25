@@ -8,6 +8,7 @@ import { ZodError } from 'zod'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import { getRenewalAlertStatus } from '@/lib/inventory/renewal-alert'
 
 /**
  * GET /api/inventory/licenses
@@ -30,10 +31,86 @@ export async function GET(request: NextRequest) {
       limit: parseInt(searchParams.get('limit') || '10'),
     }
 
-    const validatedFilters = licenseFiltersSchema.parse(filters)
-    const result = await LicenseService.listLicenses(validatedFilters, session.user.role)
+    const supplierId = searchParams.get('supplierId') || undefined
+    const orderByParam = searchParams.get('orderBy') || undefined
 
-    return NextResponse.json(result)
+    const validatedFilters = licenseFiltersSchema.parse(filters)
+
+    // Build where clause manually to support supplierId filter
+    const where: any = {}
+
+    if (validatedFilters.search) {
+      where.OR = [
+        { name: { contains: validatedFilters.search, mode: 'insensitive' } },
+        { vendor: { contains: validatedFilters.search, mode: 'insensitive' } },
+        { notes: { contains: validatedFilters.search, mode: 'insensitive' } },
+      ]
+    }
+
+    if (validatedFilters.typeId && validatedFilters.typeId.length > 0) {
+      where.typeId = { in: validatedFilters.typeId }
+    }
+
+    if (supplierId) {
+      where.supplierId = supplierId
+    }
+
+    if (validatedFilters.assigned === 'assigned') {
+      where.OR = [
+        { assignedToEquipment: { not: null } },
+        { assignedToUser: { not: null } },
+        { assignedToDepartment: { not: null } },
+      ]
+    } else if (validatedFilters.assigned === 'unassigned') {
+      where.assignedToEquipment = null
+      where.assignedToUser = null
+      where.assignedToDepartment = null
+    }
+
+    const now = new Date()
+    if (validatedFilters.expired === 'expired') {
+      where.expirationDate = { lt: now }
+    } else if (validatedFilters.expired === 'active') {
+      where.OR = [{ expirationDate: null }, { expirationDate: { gte: now } }]
+    } else if (validatedFilters.expired === 'expiring') {
+      const thirtyDays = new Date()
+      thirtyDays.setDate(thirtyDays.getDate() + 30)
+      where.expirationDate = { gte: now, lte: thirtyDays }
+    }
+
+    const orderBy = orderByParam === 'renewalDate'
+      ? { renewalDate: 'asc' as const }
+      : { createdAt: 'desc' as const }
+
+    const page = validatedFilters.page || 1
+    const limit = validatedFilters.limit || 10
+
+    const [licenses, total] = await Promise.all([
+      prisma.software_licenses.findMany({
+        where,
+        include: {
+          licenseType: true,
+          equipment: true,
+          user: true,
+          department: true,
+          supplier: { select: { id: true, name: true } },
+        },
+        orderBy,
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.software_licenses.count({ where }),
+    ])
+
+    const processedLicenses = licenses.map(l => {
+      const renewalAlertStatus = getRenewalAlertStatus(l.renewalDate ? new Date(l.renewalDate) : null)
+      const base = session.user.role === 'ADMIN' || session.user.role === 'TECHNICIAN'
+        ? l
+        : { ...l, key: l.key ? '••••••••' : null }
+      return { ...base, renewalAlertStatus }
+    })
+
+    return NextResponse.json({ licenses: processedLicenses, total, page, limit })
   } catch (error) {
     console.error('Error en GET /api/inventory/licenses:', error)
     if (error instanceof ZodError) {

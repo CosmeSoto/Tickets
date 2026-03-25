@@ -6,6 +6,7 @@ import { updateConsumableSchema } from '@/lib/validations/inventory/consumable'
 import { ZodError } from 'zod'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
+import prisma from '@/lib/prisma'
 
 /**
  * GET /api/inventory/consumables/[id]
@@ -21,12 +22,34 @@ export async function GET(
     }
 
     const { id } = await params
-    const consumable = await ConsumableService.getConsumableById(id)
+    const consumable = await prisma.consumables.findUnique({
+      where: { id },
+      include: {
+        consumableType: true,
+        unitOfMeasure: true,
+        assignedEquipment: { select: { id: true, code: true, brand: true, model: true, serialNumber: true } },
+        supplier: { select: { id: true, name: true, taxId: true } },
+        movements: {
+          include: {
+            user: { select: { id: true, name: true, email: true } },
+            assignedToUser: { select: { id: true, name: true, email: true } },
+            assignedToEquipment: { select: { id: true, code: true, brand: true, model: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+        },
+      },
+    })
     if (!consumable) {
       return NextResponse.json({ error: 'Consumible no encontrado' }, { status: 404 })
     }
 
-    return NextResponse.json(consumable)
+    const totalStockValue =
+      consumable.costPerUnit != null && consumable.currentStock != null
+        ? consumable.costPerUnit * consumable.currentStock
+        : null
+
+    return NextResponse.json({ ...consumable, totalStockValue })
   } catch (error) {
     console.error('Error en GET /api/inventory/consumables/[id]:', error)
     return NextResponse.json({ error: 'Error al obtener consumible' }, { status: 500 })
@@ -51,15 +74,30 @@ export async function PUT(
 
     const { id } = await params
     const body = await request.json()
-    const validatedData = updateConsumableSchema.parse(body)
-    const consumable = await ConsumableService.updateConsumable(id, validatedData, session.user.id)
+    const { supplierId, ...rest } = body
+
+    // Validar supplierId si se provee
+    if (supplierId !== undefined && supplierId !== null) {
+      const supplierExists = await prisma.suppliers.findUnique({ where: { id: supplierId }, select: { id: true } })
+      if (!supplierExists) {
+        return NextResponse.json({ error: 'El proveedor especificado no existe' }, { status: 400 })
+      }
+    }
+
+    const validatedData = updateConsumableSchema.parse(rest)
+    const updatePayload: any = { ...validatedData }
+    if (supplierId !== undefined) {
+      updatePayload.supplierId = supplierId
+    }
+
+    const consumable = await ConsumableService.updateConsumable(id, updatePayload, session.user.id)
 
     await AuditServiceComplete.log({
       action: AuditActionsComplete.CONSUMABLE_UPDATED,
       entityType: 'inventory',
       entityId: id,
       userId: session.user.id,
-      details: { updatedFields: Object.keys(validatedData) },
+      details: { updatedFields: Object.keys(updatePayload) },
       ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
     }).catch(err => console.error('[AUDIT] Error registrando actualización de consumible:', err))

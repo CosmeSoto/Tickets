@@ -59,6 +59,8 @@ export function useTheme() {
     setTheme(newTheme)
     localStorage.setItem('theme', newTheme)
     applyTheme(newTheme)
+    // Notificar a componentes en la misma pestaña (storage event no se dispara en la misma pestaña)
+    window.dispatchEvent(new Event('theme-changed'))
 
     // Guardar en base de datos
     try {

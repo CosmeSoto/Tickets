@@ -232,9 +232,8 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
               <ThumbsUp className="mr-2 h-4 w-4" /> Aceptar Mantenimiento
             </Button>
           )}
-          {/* Completar: ADMIN/TECH cuando SCHEDULED o ACCEPTED; CLIENT cuando ACCEPTED */}
-          {((isAdminOrTech && (status === 'SCHEDULED' || status === 'ACCEPTED')) ||
-            (isClient && status === 'ACCEPTED')) && (
+          {/* Completar: solo ADMIN/TECH cuando SCHEDULED o ACCEPTED */}
+          {isAdminOrTech && (status === 'SCHEDULED' || status === 'ACCEPTED') && (
             <Button variant="default" onClick={() => setShowComplete(true)}>
               <CheckCircle className="mr-2 h-4 w-4" /> Completar
             </Button>
@@ -314,7 +313,7 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
           <ThumbsUp className="h-4 w-4 text-purple-600" />
           <AlertDescription className="text-purple-800">
             {isClient
-              ? 'Has aceptado el mantenimiento. Cuando el técnico lo complete, recibirás una notificación.'
+              ? 'Has confirmado el mantenimiento. El técnico lo completará y recibirás una notificación cuando esté listo.'
               : 'El cliente aceptó el mantenimiento. Puedes marcarlo como completado cuando finalice.'}
           </AlertDescription>
         </Alert>

@@ -215,39 +215,35 @@ export class InventoryNotificationService {
   }
 
   /**
-   * Envía notificación cuando se acepta un acta
-   * Envía a ambas partes (deliverer y receiver) con PDF adjunto
+   * Envía notificación cuando se acepta un acta.
+   * Notifica a AMBAS partes: receptor (confirmación) y entregador (alerta de acción completada).
    */
   static async sendActAcceptedNotification(actId: string, pdfPath?: string): Promise<void> {
     try {
       const act = await prisma.delivery_acts.findUnique({
         where: { id: actId },
         include: {
-          assignment: {
-            include: {
-              equipment: true,
-              receiver: true,
-              deliverer: true,
-            }
-          }
+          assignment: { include: { equipment: true, receiver: true, deliverer: true } }
         }
       })
 
-      if (!act) {
-        throw new Error('Acta no encontrada')
-      }
+      if (!act) throw new Error('Acta no encontrada')
 
-      // Parsear campos JSON
       const equipmentSnapshot = parseJsonField<any>(act.equipmentSnapshot)
-      const receiverInfo = parseJsonField<any>(act.receiverInfo)
-      const delivererInfo = parseJsonField<any>(act.delivererInfo)
+      const receiverInfo     = parseJsonField<any>(act.receiverInfo)
+      const delivererInfo    = parseJsonField<any>(act.delivererInfo)
 
-      const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
-      const pdfUrl = pdfPath ? `${baseUrl}${pdfPath}` : undefined
-      const equipmentCode = equipmentSnapshot.code
+      const baseUrl              = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+      const equipmentCode        = equipmentSnapshot.code
       const equipmentDescription = `${equipmentSnapshot.brand} ${equipmentSnapshot.model}`
+      const actLink              = `/inventory/acts/${act.id}`
+      const acceptedAtStr        = act.acceptedAt
+        ? new Date(act.acceptedAt).toLocaleString('es-ES')
+        : new Date().toLocaleString('es-ES')
 
-      // Email para el receptor
+      // ── Emails ────────────────────────────────────────────────────────────
+      const pdfUrl = pdfPath ? `${baseUrl}${pdfPath}` : undefined
+
       const receiverEmailData = generateDeliveryActAcceptedEmail({
         act: { ...act, equipmentSnapshot, receiverInfo, delivererInfo } as DeliveryAct,
         recipientName: receiverInfo.name,
@@ -258,26 +254,6 @@ export class InventoryNotificationService {
         pdfUrl,
       })
 
-      // Email al receptor
-      await prisma.email_queue.create({
-        data: {
-          id: randomUUID(),
-          toEmail: receiverInfo.email,
-          subject: receiverEmailData.subject,
-          body: receiverEmailData.html,
-          status: 'pending',
-          templateName: 'delivery_act_accepted',
-          templateData: JSON.stringify({
-            type: 'delivery_act_accepted',
-            actId: act.id,
-            folio: act.folio,
-            recipient: 'receiver',
-            pdfPath,
-          })
-        }
-      })
-
-      // Email para el entregador
       const delivererEmailData = generateDeliveryActAcceptedEmail({
         act: { ...act, equipmentSnapshot, receiverInfo, delivererInfo } as DeliveryAct,
         recipientName: delivererInfo.name,
@@ -288,60 +264,96 @@ export class InventoryNotificationService {
         pdfUrl,
       })
 
-      // Email al entregador
-      await prisma.email_queue.create({
-        data: {
-          id: randomUUID(),
-          toEmail: delivererInfo.email,
-          subject: delivererEmailData.subject,
-          body: delivererEmailData.html,
-          status: 'pending',
-          templateName: 'delivery_act_accepted',
-          templateData: JSON.stringify({
-            type: 'delivery_act_accepted',
-            actId: act.id,
-            folio: act.folio,
-            recipient: 'deliverer',
-            pdfPath,
-          })
-        }
-      })
+      await Promise.all([
+        prisma.email_queue.create({
+          data: {
+            id: randomUUID(),
+            toEmail: receiverInfo.email,
+            subject: receiverEmailData.subject,
+            body: receiverEmailData.html,
+            status: 'pending',
+            templateName: 'delivery_act_accepted',
+            templateData: JSON.stringify({ type: 'delivery_act_accepted', actId: act.id, folio: act.folio, recipient: 'receiver', pdfPath }),
+          }
+        }),
+        prisma.email_queue.create({
+          data: {
+            id: randomUUID(),
+            toEmail: delivererInfo.email,
+            subject: delivererEmailData.subject,
+            body: delivererEmailData.html,
+            status: 'pending',
+            templateName: 'delivery_act_accepted',
+            templateData: JSON.stringify({ type: 'delivery_act_accepted', actId: act.id, folio: act.folio, recipient: 'deliverer', pdfPath }),
+          }
+        }),
+      ])
 
-      // Notificaciones in-app
+      // ── Notificaciones in-app ─────────────────────────────────────────────
+      // Para el RECEPTOR: confirmación de que firmó
+      // Para el ENTREGADOR (admin/técnico): alerta de que el usuario aceptó
       await prisma.notifications.createMany({
         data: [
           {
             id: randomUUID(),
             userId: receiverInfo.id,
-            type: 'INVENTORY',
-            title: 'Acta Aceptada',
-            message: `Has aceptado el acta de entrega para ${equipmentCode}.`,
+            type: 'SUCCESS',
+            title: `✅ Acta firmada — ${equipmentCode}`,
+            message: `Has aceptado y firmado el acta ${act.folio} para el equipo ${equipmentCode} (${equipmentDescription}). La entrega queda registrada el ${acceptedAtStr}.`,
             metadata: {
               type: 'delivery_act_accepted',
               actId: act.id,
               folio: act.folio,
-              link: `${baseUrl}/inventory/acts/${act.id}`
+              equipmentId: act.assignment?.equipmentId,
+              link: actLink,
             },
             isRead: false,
           },
           {
             id: randomUUID(),
             userId: delivererInfo.id,
-            type: 'INVENTORY',
-            title: 'Acta Aceptada',
-            message: `${receiverInfo.name} ha aceptado el acta ${act.folio}.`,
+            type: 'SUCCESS',
+            title: `✅ Acta aceptada por ${receiverInfo.name}`,
+            message: `${receiverInfo.name} aceptó y firmó el acta ${act.folio} para el equipo ${equipmentCode} (${equipmentDescription}). Fecha de firma: ${acceptedAtStr}. Puedes descargar el PDF desde el acta.`,
             metadata: {
               type: 'delivery_act_accepted',
               actId: act.id,
               folio: act.folio,
-              link: `${baseUrl}/inventory/acts/${act.id}`
+              equipmentId: act.assignment?.equipmentId,
+              link: actLink,
             },
             isRead: false,
-          }
+          },
         ]
       })
 
-      console.log(`Notificaciones de aceptación enviadas para ${act.folio}`)
+      // Si hay admins distintos al entregador, notificarlos también
+      const admins = await prisma.users.findMany({
+        where: { role: 'ADMIN', id: { not: delivererInfo.id } },
+        select: { id: true },
+      })
+
+      if (admins.length > 0) {
+        await prisma.notifications.createMany({
+          data: admins.map(admin => ({
+            id: randomUUID(),
+            userId: admin.id,
+            type: 'INFO' as const,
+            title: `Acta aceptada — ${equipmentCode}`,
+            message: `${receiverInfo.name} aceptó el acta ${act.folio} entregada por ${delivererInfo.name}. Equipo: ${equipmentCode}.`,
+            metadata: {
+              type: 'delivery_act_accepted',
+              actId: act.id,
+              folio: act.folio,
+              equipmentId: act.assignment?.equipmentId,
+              link: actLink,
+            },
+            isRead: false,
+          }))
+        })
+      }
+
+      console.log(`Notificaciones de aceptación enviadas para ${act.folio} → receptor: ${receiverInfo.name}, entregador: ${delivererInfo.name}`)
     } catch (error) {
       console.error('Error enviando notificación de aceptación:', error)
       throw error
@@ -349,42 +361,40 @@ export class InventoryNotificationService {
   }
 
   /**
-   * Envía notificación cuando se rechaza un acta
+   * Envía notificación cuando se rechaza un acta.
+   * Notifica al entregador (admin/técnico) con el motivo del rechazo.
    */
   static async sendActRejectedNotification(actId: string): Promise<void> {
     try {
       const act = await prisma.delivery_acts.findUnique({
         where: { id: actId },
         include: {
-          assignment: {
-            include: {
-              equipment: true,
-              receiver: true,
-              deliverer: true,
-            }
-          }
+          assignment: { include: { equipment: true, receiver: true, deliverer: true } }
         }
       })
 
-      if (!act) {
-        throw new Error('Acta no encontrada')
-      }
+      if (!act) throw new Error('Acta no encontrada')
 
-      // Parsear campos JSON
       const equipmentSnapshot = parseJsonField<any>(act.equipmentSnapshot)
-      const receiverInfo = parseJsonField<any>(act.receiverInfo)
-      const delivererInfo = parseJsonField<any>(act.delivererInfo)
+      const receiverInfo     = parseJsonField<any>(act.receiverInfo)
+      const delivererInfo    = parseJsonField<any>(act.delivererInfo)
 
-      const equipmentCode = equipmentSnapshot.code
+      const baseUrl              = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+      const equipmentCode        = equipmentSnapshot.code
       const equipmentDescription = `${equipmentSnapshot.brand} ${equipmentSnapshot.model}`
+      const actLink              = `/inventory/acts/${act.id}`
+      const rejectedAtStr        = act.rejectedAt
+        ? new Date(act.rejectedAt).toLocaleString('es-ES')
+        : new Date().toLocaleString('es-ES')
+      const motivo               = act.rejectionReason || 'No especificado'
 
-      // Email para el entregador
+      // ── Email al entregador ───────────────────────────────────────────────
       const emailData = generateDeliveryActRejectedEmail({
         act: { ...act, equipmentSnapshot, receiverInfo, delivererInfo } as DeliveryAct,
         recipientName: delivererInfo.name,
         equipmentCode,
         equipmentDescription,
-        rejectionReason: act.rejectionReason || 'No especificado',
+        rejectionReason: motivo,
         rejectedAt: act.rejectedAt!,
       })
 
@@ -396,34 +406,75 @@ export class InventoryNotificationService {
           body: emailData.html,
           status: 'pending',
           templateName: 'delivery_act_rejected',
-          templateData: JSON.stringify({
-            type: 'delivery_act_rejected',
-            actId: act.id,
-            folio: act.folio,
-          })
+          templateData: JSON.stringify({ type: 'delivery_act_rejected', actId: act.id, folio: act.folio }),
         }
       })
 
-      // Notificación in-app para el entregador
-      const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
-      await prisma.notifications.create({
-        data: {
-          id: randomUUID(),
-          userId: delivererInfo.id,
-          type: 'INVENTORY',
-          title: 'Acta Rechazada',
-          message: `${receiverInfo.name} ha rechazado el acta ${act.folio}.`,
-          metadata: {
-            type: 'delivery_act_rejected',
-            actId: act.id,
-            folio: act.folio,
-            link: `${baseUrl}/inventory/acts/${act.id}`
+      // ── Notificaciones in-app ─────────────────────────────────────────────
+      await prisma.notifications.createMany({
+        data: [
+          // Al entregador: alerta de rechazo con motivo
+          {
+            id: randomUUID(),
+            userId: delivererInfo.id,
+            type: 'WARNING' as const,
+            title: `⚠️ Acta rechazada — ${equipmentCode}`,
+            message: `${receiverInfo.name} rechazó el acta ${act.folio} para el equipo ${equipmentCode} (${equipmentDescription}). Motivo: "${motivo}". El equipo volvió a estar disponible. Fecha: ${rejectedAtStr}.`,
+            metadata: {
+              type: 'delivery_act_rejected',
+              actId: act.id,
+              folio: act.folio,
+              equipmentId: act.assignment?.equipmentId,
+              link: actLink,
+            },
+            isRead: false,
           },
-          isRead: false,
-        }
+          // Al receptor: confirmación de que rechazó
+          {
+            id: randomUUID(),
+            userId: receiverInfo.id,
+            type: 'INFO' as const,
+            title: `Rechazo registrado — ${equipmentCode}`,
+            message: `Rechazaste el acta ${act.folio} para el equipo ${equipmentCode}. El entregador ha sido notificado. El equipo volvió a bodega.`,
+            metadata: {
+              type: 'delivery_act_rejected',
+              actId: act.id,
+              folio: act.folio,
+              equipmentId: act.assignment?.equipmentId,
+              link: actLink,
+            },
+            isRead: false,
+          },
+        ]
       })
 
-      console.log(`Notificación de rechazo enviada para ${act.folio}`)
+      // Notificar a admins distintos al entregador
+      const admins = await prisma.users.findMany({
+        where: { role: 'ADMIN', id: { not: delivererInfo.id } },
+        select: { id: true },
+      })
+
+      if (admins.length > 0) {
+        await prisma.notifications.createMany({
+          data: admins.map(admin => ({
+            id: randomUUID(),
+            userId: admin.id,
+            type: 'WARNING' as const,
+            title: `Acta rechazada — ${equipmentCode}`,
+            message: `${receiverInfo.name} rechazó el acta ${act.folio}. Motivo: "${motivo}". Entregador: ${delivererInfo.name}.`,
+            metadata: {
+              type: 'delivery_act_rejected',
+              actId: act.id,
+              folio: act.folio,
+              equipmentId: act.assignment?.equipmentId,
+              link: actLink,
+            },
+            isRead: false,
+          }))
+        })
+      }
+
+      console.log(`Notificaciones de rechazo enviadas para ${act.folio}`)
     } catch (error) {
       console.error('Error enviando notificación de rechazo:', error)
       throw error

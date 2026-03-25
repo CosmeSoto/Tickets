@@ -36,6 +36,10 @@ import {
   Database,
   FileSignature,
   Tag,
+  FileText,
+  ClipboardList,
+  Building2,
+  Trash2,
 } from 'lucide-react'
 import { Notifications } from '@/components/ui/notifications'
 import { Button } from '@/components/ui/button'
@@ -79,6 +83,7 @@ const navigationByRole: Record<string, NavItem[]> = {
         { name: 'Categorías', href: '/admin/categories', icon: FolderTree },
         { name: 'Técnicos', href: '/admin/technicians', icon: Wrench },
         { name: 'Base de Conocimientos', href: '/admin/knowledge', icon: BookOpen },
+        { name: 'Configuración', href: '/settings/tickets', icon: Settings },
       ],
     },
     { name: 'Usuarios', href: '/admin/users', icon: Users },
@@ -89,15 +94,19 @@ const navigationByRole: Record<string, NavItem[]> = {
       icon: Package,
       children: [
         { name: 'Equipos', href: '/inventory', icon: Monitor },
-        { name: 'Licencias/Contratos', href: '/inventory/licenses', icon: Key },
+        { name: 'Mantenimientos', href: '/inventory/maintenance', icon: Wrench },
+        { name: 'Licencias y Contratos', href: '/inventory/licenses', icon: Key },
         { name: 'Consumibles', href: '/inventory/consumables', icon: ShoppingCart },
+        { name: 'Actas de Entrega', href: '/inventory/acts', icon: FileText },
+        { name: 'Actas de Baja', href: '/inventory/decommission', icon: Trash2 },
+        { name: 'Proveedores', href: '/inventory/suppliers', icon: Building2 },
         { name: 'Reportes', href: '/inventory/reports', icon: BarChart3 },
         {
           name: 'Catálogos', href: '/inventory/equipment-types', icon: Database,
           children: [
-            { name: 'Tipos de Equipo', href: '/inventory/equipment-types', icon: Boxes },
-            { name: 'Tipos de Licencias/Contratos', href: '/inventory/license-types', icon: FileSignature },
-            { name: 'Tipos de Consumible', href: '/inventory/consumable-types', icon: Tag },
+            { name: 'Equipo', href: '/inventory/equipment-types', icon: Boxes },
+            { name: 'Licencias y Contratos', href: '/inventory/license-types', icon: FileSignature },
+            { name: 'Consumible', href: '/inventory/consumable-types', icon: Tag },
             { name: 'Unidades de Medida', href: '/inventory/units-of-measure', icon: Ruler },
           ],
         },
@@ -126,8 +135,11 @@ const navigationByRole: Record<string, NavItem[]> = {
       icon: Package,
       children: [
         { name: 'Equipos', href: '/inventory', icon: Monitor },
+        { name: 'Mantenimientos', href: '/inventory/maintenance', icon: Wrench },
         { name: 'Licencias/Contratos', href: '/inventory/licenses', icon: Key },
         { name: 'Consumibles', href: '/inventory/consumables', icon: ShoppingCart },
+        { name: 'Actas de Entrega', href: '/inventory/acts', icon: FileText },
+        { name: 'Actas de Baja', href: '/inventory/decommission', icon: Trash2 },
         {name: 'Catálogos',href: '/inventory/equipment-types',icon: Database,children: [
           { name: 'Equipo', href: '/inventory/equipment-types', icon: Boxes },
           { name: 'Licencias/Contratos', href: '/inventory/license-types', icon: FileSignature },
@@ -156,7 +168,9 @@ const navigationByRole: Record<string, NavItem[]> = {
       icon: Package,
       children: [
         { name: 'Equipos Asignados', href: '/inventory', icon: Monitor },
+        { name: 'Mantenimientos', href: '/inventory/maintenance', icon: Wrench },
         { name: 'Licencias/Contratos', href: '/inventory/licenses', icon: Key },
+        { name: 'Actas de Entrega', href: '/inventory/acts', icon: FileText },
       ],
     },
   ],

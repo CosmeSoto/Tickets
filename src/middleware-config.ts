@@ -11,6 +11,10 @@ export const publicRoutes = [
   '/help',
   '/help/terms',
   '/help/privacy',
+  // Páginas públicas de verificación (accesibles sin login, ej: desde QR)
+  '/inventory/equipment/*/verify',
+  '/api/public',
+  '/api/uploads',
   '/api/auth/signin',
   '/api/auth/signout',
   '/api/auth/callback',
@@ -32,6 +36,7 @@ export const protectedRoutes = [
   '/client',
   '/profile',
   '/settings',
+  '/inventory',
 ]
 
 /**
@@ -39,6 +44,11 @@ export const protectedRoutes = [
  */
 export function isPublicRoute(pathname: string): boolean {
   return publicRoutes.some(route => {
+    // Soporte para wildcard simple: '/inventory/equipment/*/verify'
+    if (route.includes('*')) {
+      const regex = new RegExp('^' + route.replace(/\*/g, '[^/]+') + '(/.*)?$')
+      return regex.test(pathname)
+    }
     if (route.endsWith('*')) {
       return pathname.startsWith(route.slice(0, -1))
     }

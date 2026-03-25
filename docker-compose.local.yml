@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile.seed
     container_name: tickets-seed
     environment:
-      DATABASE_URL: postgresql://tickets_user:tickets_password@postgres:5432/tickets_db
+      DATABASE_URL: postgresql://tickets_user:tickets_password_2024@postgres:5432/tickets_db
     networks:
       - tickets-network
     depends_on:
@@ -19,14 +19,14 @@ services:
       dockerfile: Dockerfile
       args:
         NODE_ENV: production
-        DATABASE_URL: postgresql://tickets_user:tickets_password@postgres:5432/tickets_db
+        DATABASE_URL: postgresql://tickets_user:tickets_password_2024@postgres:5432/tickets_db
         REDIS_URL: redis://redis:6379
         NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
         NEXTAUTH_URL: ${NEXTAUTH_URL}
     container_name: tickets-app
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://tickets_user:tickets_password@postgres:5432/tickets_db
+      DATABASE_URL: postgresql://tickets_user:tickets_password_2024@postgres:5432/tickets_db
       REDIS_URL: redis://redis:6379
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
       NEXTAUTH_URL: ${NEXTAUTH_URL}
@@ -61,7 +61,7 @@ services:
     environment:
       POSTGRES_DB: tickets_db
       POSTGRES_USER: tickets_user
-      POSTGRES_PASSWORD: tickets_password
+      POSTGRES_PASSWORD: tickets_password_2024
     ports:
       - '5432:5432'
     volumes:

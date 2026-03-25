@@ -6,41 +6,31 @@ import { randomUUID } from 'crypto'
  */
 export class QRCodeService {
   /**
-   * Genera un código QR único para un equipo
-   * @param equipmentId ID del equipo
-   * @param equipmentCode Código del equipo
-   * @returns Código QR como string base64
+   * Genera un código QR único para un equipo.
+   * Acepta un baseUrl explícito (detectado desde el request) para que funcione
+   * tanto en localhost como en red local o producción.
    */
   static async generateEquipmentQR(
     equipmentId: string,
-    equipmentCode: string
+    equipmentCode: string,
+    baseUrl?: string
   ): Promise<string> {
     try {
-      // Generar URL de verificación del equipo
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-      const verificationUrl = `${baseUrl}/inventory/equipment/${equipmentId}/verify`
-      
-      // Datos del QR: URL + código del equipo
-      const qrData = JSON.stringify({
-        type: 'equipment',
-        id: equipmentId,
-        code: equipmentCode,
-        url: verificationUrl,
-        timestamp: new Date().toISOString()
-      })
-      
-      // Generar QR code como base64
-      const qrCodeBase64 = await QRCode.toDataURL(qrData, {
+      const resolvedBase = baseUrl
+        || process.env.NEXT_PUBLIC_APP_URL
+        || process.env.NEXTAUTH_URL
+        || 'http://localhost:3000'
+
+      const verificationUrl = `${resolvedBase}/inventory/equipment/${equipmentId}/verify`
+
+      const qrCodeBase64 = await QRCode.toDataURL(verificationUrl, {
         errorCorrectionLevel: 'H',
         type: 'image/png',
         width: 300,
         margin: 2,
-        color: {
-          dark: '#000000',
-          light: '#FFFFFF'
-        }
+        color: { dark: '#000000', light: '#FFFFFF' },
       })
-      
+
       return qrCodeBase64
     } catch (error) {
       console.error('Error generando QR de equipo:', error)

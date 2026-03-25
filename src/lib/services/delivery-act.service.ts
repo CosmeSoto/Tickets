@@ -51,17 +51,19 @@ export class DeliveryActService {
       const assignment = await prisma.equipment_assignments.findUnique({
         where: { id: assignmentId },
         include: {
-          equipment: true,
-          receiver: {
+          equipment: {
             include: {
-              departments: true
+              type: true,
+              supplier: { select: { name: true, taxId: true } },
+              attachments: {
+                where: { mimeType: { startsWith: 'image/' } },
+                orderBy: { createdAt: 'asc' },
+                take: 1,
+              },
             }
           },
-          deliverer: {
-            include: {
-              departments: true
-            }
-          }
+          receiver: { include: { departments: true } },
+          deliverer: { include: { departments: true } },
         }
       })
 
@@ -79,16 +81,31 @@ export class DeliveryActService {
       const expirationDate = new Date()
       expirationDate.setDate(expirationDate.getDate() + 7)
 
-      // Crear snapshot del equipo
+      // Crear snapshot del equipo (incluye campos financieros si existen)
+      const eq = assignment.equipment as any
+      const firstAttachment = eq.attachments?.[0]
+      const equipmentImagePath = firstAttachment
+        ? `/api/uploads/equipment/${eq.id}/${firstAttachment.filename}`
+        : (eq.photoUrl || null)
+
       const equipmentSnapshot = {
-        id: assignment.equipment.id,
-        code: assignment.equipment.code,
-        serialNumber: assignment.equipment.serialNumber,
-        brand: assignment.equipment.brand,
-        model: assignment.equipment.model,
-        type: assignment.equipment.type,
-        condition: assignment.equipment.condition,
-        specifications: assignment.equipment.specifications,
+        id: eq.id,
+        code: eq.code,
+        serialNumber: eq.serialNumber,
+        brand: eq.brand,
+        model: eq.model,
+        type: eq.typeId,
+        typeName: eq.type?.name || '',
+        condition: eq.condition,
+        specifications: eq.specifications,
+        // Campos financieros (opcionales)
+        supplierName: eq.supplier?.name ?? null,
+        supplierTaxId: eq.supplier?.taxId ?? null,
+        purchasePrice: eq.purchasePrice ?? null,
+        purchaseDate: eq.purchaseDate ?? null,
+        invoiceNumber: eq.invoiceNumber ?? null,
+        purchaseOrderNumber: eq.purchaseOrderNumber ?? null,
+        equipmentImagePath,
       }
 
       // Crear info del deliverer
@@ -238,7 +255,6 @@ export class DeliveryActService {
         throw new Error('El acta no está pendiente de aceptación')
       }
 
-      // Verificar que no esté expirada
       if (new Date() > new Date(act.expirationDate)) {
         throw new Error('El acta ha expirado')
       }
@@ -275,7 +291,9 @@ export class DeliveryActService {
         }
       })
 
-      // Registrar en auditoría
+      const equipoLabel = `${(act as any).assignment?.equipment?.code} — ${(act as any).assignment?.equipment?.brand} ${(act as any).assignment?.equipment?.model}`
+
+      // Registrar en auditoría con información completa y legible
       await prisma.audit_logs.create({
         data: {
           id: randomUUID(),
@@ -285,29 +303,27 @@ export class DeliveryActService {
           userId: act.receiverInfo.id,
           details: {
             folio: act.folio,
-            equipo: `${(act as any).assignment?.equipment?.code} — ${(act as any).assignment?.equipment?.brand} ${(act as any).assignment?.equipment?.model}`,
+            equipo: equipoLabel,
             aceptadoPor: `${act.receiverInfo.name} (${act.receiverInfo.email})`,
             entregadoPor: `${act.delivererInfo.name} (${act.delivererInfo.email})`,
-            firmaDigital: signature.hash.substring(0, 16) + '...',
+            firmaDigital: signature.hash.substring(0, 20) + '...',
             ipOrigen: signature.ipAddress,
             fechaAceptacion: signature.timestamp.toLocaleString('es-ES'),
+            descripcion: `${act.receiverInfo.name} aceptó y firmó el acta de entrega del equipo ${(act as any).assignment?.equipment?.code}. La entrega queda registrada oficialmente.`,
           }
         }
       })
 
-      // Generar PDF automáticamente (con reintentos)
-      // Se ejecuta de forma asíncrona para no bloquear la respuesta
-      this.generatePDFWithRetry(actId, 3)
-        .then(pdfPath => {
-          if (pdfPath) {
-            // Enviar notificación de aceptación con PDF a ambas partes
-            return InventoryNotificationService.sendActAcceptedNotification(actId, pdfPath)
-          }
-        })
-        .catch(error => {
-          console.error('Error en proceso post-aceptación:', error)
-          // El error se registra pero no se propaga para no afectar la aceptación
-        })
+      // ── Notificaciones INMEDIATAS al aceptar (no esperan el PDF) ──────────
+      // Se envían de forma asíncrona pero sin bloquear la respuesta
+      InventoryNotificationService.sendActAcceptedNotification(actId).catch(err => {
+        console.error('Error enviando notificaciones de aceptación:', err)
+      })
+
+      // ── Generar PDF en background (no bloquea, no condiciona notificaciones) ──
+      this.generatePDFWithRetry(actId, 3).catch(err => {
+        console.error('Error generando PDF post-aceptación:', err)
+      })
 
       return updated as DeliveryAct
     } catch (error) {
@@ -387,6 +403,7 @@ export class DeliveryActService {
               entregadoPor: `${act.delivererInfo.name} (${act.delivererInfo.email})`,
               motivoRechazo: reason,
               equipoRestauradoA: 'Disponible en bodega',
+              descripcion: `${act.receiverInfo.name} rechazó el acta de entrega del equipo ${act.assignment?.equipment?.code}. El equipo fue devuelto a bodega y la asignación fue cancelada.`,
             }
           }
         })

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { DeliveryActService } from '@/lib/services/delivery-act.service'
 import { DigitalSignatureService } from '@/lib/services/digital-signature.service'
 import { z } from 'zod'
-import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 
 const acceptActSchema = z.object({
   token: z.string().min(1, 'Token es requerido'),
@@ -41,25 +40,12 @@ export async function POST(
     const ipAddress = DigitalSignatureService.extractIpAddress(request.headers)
     const userAgent = DigitalSignatureService.extractUserAgent(request.headers)
 
-    // Aceptar acta
+    // Aceptar acta (incluye auditoría y dispara notificaciones)
     const acceptedAct = await DeliveryActService.acceptAct(
       id,
       ipAddress,
       userAgent
     )
-
-    // Registrar en auditoría
-    await AuditServiceComplete.log({
-      action: AuditActionsComplete.ACT_ACCEPTED,
-      entityType: 'inventory',
-      entityId: id,
-      userId: act.receiverInfo.id,
-      details: {
-        folio: act.folio,
-        equipmentCode: act.equipmentSnapshot.code,
-        ipAddress,
-      },
-    })
 
     return NextResponse.json({
       act: acceptedAct,

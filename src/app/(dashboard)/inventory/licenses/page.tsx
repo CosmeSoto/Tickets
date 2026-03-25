@@ -27,6 +27,7 @@ import { useToast } from '@/hooks/use-toast'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
+import { RenewalAlert } from '@/components/inventory/licenses/RenewalAlert'
 import {
   Plus, Search, Key, AlertTriangle, CheckCircle, Clock, Trash2, Edit, Unlink, Loader2,
 } from 'lucide-react'
@@ -394,7 +395,15 @@ export default function LicensesPage() {
                     {licenses.map(license => (
                       <TableRow key={license.id}>
                         <TableCell>
-                          <div><span className="font-medium">{license.name}</span></div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{license.name}</span>
+                            {(license as any).renewalAlertStatus && (license as any).renewalAlertStatus !== 'none' && (
+                              <RenewalAlert
+                                renewalAlertStatus={(license as any).renewalAlertStatus}
+                                renewalDate={(license as any).renewalDate}
+                              />
+                            )}
+                          </div>
                           {license.vendor && <span className="text-xs text-muted-foreground">{license.vendor}</span>}
                         </TableCell>
                         <TableCell><Badge variant="outline">{license.licenseType?.name || 'Sin tipo'}</Badge></TableCell>

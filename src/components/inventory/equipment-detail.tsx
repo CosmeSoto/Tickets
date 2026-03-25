@@ -18,6 +18,9 @@ import {
   Loader2,
   ExternalLink,
 } from 'lucide-react'
+import { DepreciationCard } from '@/components/inventory/equipment/DepreciationCard'
+import { FinancialInfoSection } from '@/components/inventory/shared/FinancialInfoSection'
+import { DecommissionRequestForm } from '@/components/inventory/decommission/DecommissionRequestForm'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -54,6 +57,7 @@ import {
 import { UserCombobox } from '@/components/ui/user-combobox'
 import { useToast } from '@/hooks/use-toast'
 import { EquipmentHistory } from '@/components/inventory/equipment-history'
+import { EquipmentAttachments } from '@/components/inventory/equipment-attachments'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import type { EquipmentDetailResponse } from '@/types/inventory/equipment'
 
@@ -121,6 +125,7 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
   const [deleting, setDeleting] = useState(false)
   const [showPermanentDeleteDialog, setShowPermanentDeleteDialog] = useState(false)
   const [permanentDeleting, setPermanentDeleting] = useState(false)
+  const [showDecommissionForm, setShowDecommissionForm] = useState(false)
 
   // Dialog de asignación
   const [showAssignDialog, setShowAssignDialog] = useState(false)
@@ -523,9 +528,9 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
             </Button>
           )}
           {canRetire && (
-            <Button onClick={() => setShowDeleteDialog(true)} variant="destructive">
+            <Button onClick={() => setShowDecommissionForm(true)} variant="destructive">
               <Trash2 className="mr-2 h-4 w-4" />
-              Dar de Baja
+              Solicitar Baja
             </Button>
           )}
           {canPermanentDelete && (
@@ -551,7 +556,7 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
             <span>
               <span className="font-medium">Equipo en mantenimiento.</span>{' '}
               {userRole === 'CLIENT'
-                ? 'Cuando el equipo esté listo, puedes marcarlo como completado.'
+                ? 'El equipo está siendo atendido por el equipo técnico. Recibirás una notificación cuando esté listo.'
                 : 'Completa el mantenimiento para devolver el equipo a bodega o reasignarlo.'}
             </span>
             <a
@@ -953,6 +958,27 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
           </CardContent>
         </Card>
 
+        {/* Depreciación e Información Financiera */}
+        {((equipment as any).usefulLifeYears || (equipment as any).supplierId || (equipment as any).purchasePrice || (equipment as any).invoiceNumber) && (
+          <div className="space-y-4">
+            <DepreciationCard
+              purchasePrice={(equipment as any).purchasePrice}
+              purchaseDate={(equipment as any).purchaseDate}
+              usefulLifeYears={(equipment as any).usefulLifeYears}
+              residualValue={(equipment as any).residualValue}
+              depreciation={(equipment as any).depreciation}
+            />
+            <FinancialInfoSection
+              supplierId={(equipment as any).supplierId}
+              invoiceNumber={(equipment as any).invoiceNumber}
+              purchaseOrderNumber={(equipment as any).purchaseOrderNumber}
+              purchasePrice={(equipment as any).purchasePrice}
+              purchaseDate={(equipment as any).purchaseDate}
+              readOnly
+            />
+          </div>
+        )}
+
         {/* QR Code y Asignación Actual */}
         <div className="space-y-6">
           {/* QR Code */}
@@ -1089,6 +1115,32 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
           </CardContent>
         </Card>
       )}
+
+      {/* Archivos Adjuntos */}
+      <EquipmentAttachments
+        equipmentId={equipmentId}
+        canManage={userRole === 'ADMIN' || userRole === 'TECHNICIAN'}
+      />
+
+      {/* Dialog solicitud de baja */}
+      <Dialog open={showDecommissionForm} onOpenChange={setShowDecommissionForm}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Solicitar Baja de Equipo</DialogTitle>
+            <DialogDescription>
+              Esta solicitud será revisada por el administrador antes de proceder.
+            </DialogDescription>
+          </DialogHeader>
+          <DecommissionRequestForm
+            assetType="EQUIPMENT"
+            assetId={equipmentId}
+            assetName={`${equipment.code} — ${equipment.brand} ${equipment.model}`}
+            onSuccess={() => { setShowDecommissionForm(false); loadEquipmentDetail() }}
+            onCancel={() => setShowDecommissionForm(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
+

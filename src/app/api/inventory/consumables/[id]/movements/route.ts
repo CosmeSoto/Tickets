@@ -84,7 +84,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Datos inválidos', details: error.errors }, { status: 400 })
     }
     if (error instanceof Error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      const isStockError = error.message === 'Stock insuficiente para realizar la salida'
+      return NextResponse.json({ error: error.message }, { status: isStockError ? 422 : 400 })
     }
     return NextResponse.json({ error: 'Error al registrar movimiento' }, { status: 500 })
   }

@@ -108,6 +108,7 @@ export class EquipmentService {
       const equipment = await prisma.equipment.findUnique({
         where: { id },
         include: {
+          supplier: { select: { id: true, name: true, taxId: true } },
           type: true,
           assignments: {
             include: {

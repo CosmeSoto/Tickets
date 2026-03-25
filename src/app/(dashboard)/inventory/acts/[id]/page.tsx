@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
@@ -28,7 +28,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 
-interface PageProps { params: { id: string } }
+interface PageProps { params: Promise<{ id: string }> }
 
 const STATUS_CONFIG = {
   PENDING:  { label: 'Pendiente de firma', color: 'bg-yellow-100 text-yellow-800 border-yellow-300', icon: Clock },
@@ -51,7 +51,8 @@ const CONDITION_LABELS: Record<string, string> = {
 function fmtDate(d: string | Date) { return format(new Date(d), "d 'de' MMMM 'de' yyyy", { locale: es }) }
 function fmtDateTime(d: string | Date) { return format(new Date(d), "d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es }) }
 
-export default function ActDetailPage({ params }: PageProps) {
+export default function ActDetailPage({ params: paramsPromise }: PageProps) {
+  const params = use(paramsPromise)
   const { data: session, status } = useSession()
   const router = useRouter()
   const { toast } = useToast()
@@ -61,10 +62,6 @@ export default function ActDetailPage({ params }: PageProps) {
   const [isExpired, setIsExpired] = useState(false)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const [downloadingPdf, setDownloadingPdf] = useState(false)
-  const [showPdfPreview, setShowPdfPreview] = useState(false)
-  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null)
-  const [loadingPreview, setLoadingPreview] = useState(false)
 
   const [showAcceptDialog, setShowAcceptDialog] = useState(false)
   const [showRejectDialog, setShowRejectDialog] = useState(false)
@@ -89,46 +86,17 @@ export default function ActDetailPage({ params }: PageProps) {
     if (session?.user) fetchAct()
   }, [params.id, session, status, router, fetchAct])
 
-  const handleDownloadPdf = async () => {
-    setDownloadingPdf(true)
-    try {
-      const res = await fetch(`/api/inventory/acts/${params.id}/pdf`)
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || 'Error al generar PDF')
-      }
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `Acta_Entrega_${act.folio?.replace(/\//g, '-')}.pdf`
-      a.click()
-      URL.revokeObjectURL(url)
-    } catch (err: any) {
-      toast({ title: 'Error al descargar PDF', description: err.message, variant: 'destructive' })
-    } finally {
-      setDownloadingPdf(false)
-    }
+  const handleDownloadPdf = () => {
+    // Descarga directa via URL — evita blob: URLs que el navegador bloquea en HTTP
+    const a = document.createElement('a')
+    a.href = `/api/inventory/acts/${params.id}/pdf`
+    a.download = `Acta_Entrega_${act?.folio?.replace(/\//g, '-') ?? params.id}.pdf`
+    a.click()
   }
 
-  const handlePreviewPdf = async () => {
-    if (pdfPreviewUrl) { setShowPdfPreview(true); return }
-    setLoadingPreview(true)
-    try {
-      const res = await fetch(`/api/inventory/acts/${params.id}/pdf`)
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || 'Error al generar PDF')
-      }
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      setPdfPreviewUrl(url)
-      setShowPdfPreview(true)
-    } catch (err: any) {
-      toast({ title: 'Error al cargar vista previa', description: err.message, variant: 'destructive' })
-    } finally {
-      setLoadingPreview(false)
-    }
+  const handlePreviewPdf = () => {
+    // Abrir en nueva pestaña directamente desde la API
+    window.open(`/api/inventory/acts/${params.id}/pdf`, '_blank', 'noopener,noreferrer')
   }
 
   const handleAccept = async () => {
@@ -171,9 +139,27 @@ export default function ActDetailPage({ params }: PageProps) {
   }
 
   const copyLink = () => {
-    navigator.clipboard.writeText(`${window.location.origin}/acts/${act.id}/accept?token=${act.acceptanceToken}`)
+    const text = `${window.location.origin}/acts/${act.id}/accept?token=${act.acceptanceToken}`
+    // Fallback para contextos sin HTTPS o sin Clipboard API
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).catch(() => fallbackCopy(text))
+    } else {
+      fallbackCopy(text)
+    }
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  const fallbackCopy = (text: string) => {
+    const el = document.createElement('textarea')
+    el.value = text
+    el.style.position = 'fixed'
+    el.style.opacity = '0'
+    document.body.appendChild(el)
+    el.focus()
+    el.select()
+    document.execCommand('copy')
+    document.body.removeChild(el)
   }
 
   if (!session?.user) return null
@@ -226,7 +212,7 @@ export default function ActDetailPage({ params }: PageProps) {
   return (
     <RoleDashboardLayout
       title={`Acta ${act.folio}`}
-      subtitle="Acta de entrega de equipo"
+      subtitle="Acta de entrega"
       headerActions={
         <div className="flex gap-2 flex-wrap">
           {canDownload && (
@@ -511,18 +497,16 @@ export default function ActDetailPage({ params }: PageProps) {
                 <Button
                   variant="outline"
                   onClick={handlePreviewPdf}
-                  disabled={loadingPreview}
                 >
                   <Eye className="mr-2 h-4 w-4" />
-                  {loadingPreview ? 'Cargando...' : 'Vista previa'}
+                  Vista previa
                 </Button>
                 <Button
                   onClick={handleDownloadPdf}
-                  disabled={downloadingPdf}
                   className="bg-green-600 hover:bg-green-700 text-white"
                 >
                   <Download className="mr-2 h-4 w-4" />
-                  {downloadingPdf ? 'Generando...' : 'Descargar PDF'}
+                  Descargar PDF
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground mt-2">

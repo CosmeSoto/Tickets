@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { writeFile, mkdir } from 'fs/promises'
-import { join } from 'path'
 import { existsSync } from 'fs'
+import { getUploadDir } from '@/lib/upload-path'
 import prisma from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Crear directorio si no existe
-    const uploadDir = join(process.cwd(), 'public', 'uploads', 'landing')
+    const uploadDir = getUploadDir('landing')
     if (!existsSync(uploadDir)) {
       await mkdir(uploadDir, { recursive: true })
     }
@@ -55,15 +55,15 @@ export async function POST(request: NextRequest) {
     const timestamp = Date.now()
     const extension = file.name.split('.').pop()
     const filename = `${type}-${timestamp}.${extension}`
-    const filepath = join(uploadDir, filename)
+    const filepath = getUploadDir('landing', filename)
 
     // Guardar archivo
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
     await writeFile(filepath, buffer)
 
-    // Retornar URL pública
-    const publicUrl = `/uploads/landing/${filename}`
+    // Retornar URL pública — servida via /api/uploads/
+    const publicUrl = `/api/uploads/landing/${filename}`
 
     return NextResponse.json({
       url: publicUrl,
