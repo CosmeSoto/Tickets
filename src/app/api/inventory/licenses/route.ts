@@ -33,6 +33,9 @@ export async function GET(request: NextRequest) {
 
     const supplierId = searchParams.get('supplierId') || undefined
     const orderByParam = searchParams.get('orderBy') || undefined
+    const familyId = searchParams.get('familyId') || undefined
+    const contractType = searchParams.get('contractType') || undefined
+    const licenseScope = searchParams.get('licenseScope') || undefined
 
     const validatedFilters = licenseFiltersSchema.parse(filters)
 
@@ -53,6 +56,18 @@ export async function GET(request: NextRequest) {
 
     if (supplierId) {
       where.supplierId = supplierId
+    }
+
+    if (familyId) {
+      where.licenseType = { familyId }
+    }
+
+    if (contractType) {
+      where.contractType = contractType
+    }
+
+    if (licenseScope) {
+      where.licenseScope = licenseScope
     }
 
     if (validatedFilters.assigned === 'assigned') {
@@ -89,7 +104,7 @@ export async function GET(request: NextRequest) {
       prisma.software_licenses.findMany({
         where,
         include: {
-          licenseType: true,
+          licenseType: { include: { family: true } },
           equipment: true,
           user: true,
           department: true,

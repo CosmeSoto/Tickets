@@ -127,7 +127,7 @@ export class DeliveryActService {
       }
 
       // Crear acta
-      const act = await prisma.delivery_acts.create({
+      const act = await (prisma.delivery_acts.create as any)({
         data: {
           folio,
           assignmentId,
@@ -140,6 +140,7 @@ export class DeliveryActService {
           status: 'PENDING',
           acceptanceToken,
           expirationDate,
+          actType: 'EQUIPMENT_ASSIGNMENT',
         },
         include: {
           assignment: {

@@ -111,3 +111,89 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Error al obtener actas' }, { status: 500 })
   }
 }
+
+import { randomUUID } from 'crypto'
+import { canManageInventory } from '@/lib/inventory-access'
+import { FolioService } from '@/lib/services/folio.service'
+import { DigitalSignatureService } from '@/lib/services/digital-signature.service'
+
+/**
+ * POST /api/inventory/acts
+ * Crea un acta de entrega para los nuevos tipos (MRO_DELIVERY, SERVICE_COMPLETION, ASSET_TRANSFER).
+ * Para EQUIPMENT_ASSIGNMENT usar el flujo existente de asignaciones.
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
+    if (!await canManageInventory(session.user.id, session.user.role)) {
+      return NextResponse.json({ error: 'No tienes permiso para gestionar el inventario' }, { status: 403 })
+    }
+
+    const body = await request.json()
+    const { actType = 'EQUIPMENT_ASSIGNMENT', referenceId, referenceType, description, quantity, warehouseDestId, assignmentId } = body
+
+    if (actType === 'EQUIPMENT_ASSIGNMENT') {
+      return NextResponse.json({ error: 'Para actas de asignación de equipo usa el flujo de asignaciones' }, { status: 400 })
+    }
+
+    if (!referenceId) {
+      return NextResponse.json({ error: 'referenceId es requerido' }, { status: 400 })
+    }
+
+    if (actType === 'MRO_DELIVERY' && !quantity) {
+      return NextResponse.json({ error: 'quantity es requerido para MRO_DELIVERY' }, { status: 400 })
+    }
+    if (actType === 'SERVICE_COMPLETION' && !description) {
+      return NextResponse.json({ error: 'description es requerido para SERVICE_COMPLETION' }, { status: 400 })
+    }
+    if (actType === 'ASSET_TRANSFER' && !warehouseDestId) {
+      return NextResponse.json({ error: 'warehouseDestId es requerido para ASSET_TRANSFER' }, { status: 400 })
+    }
+
+    const folio = await FolioService.generateDeliveryActFolio()
+    const acceptanceToken = DigitalSignatureService.generateAcceptanceToken()
+    const expirationDate = new Date()
+    expirationDate.setDate(expirationDate.getDate() + 7)
+
+    const delivererInfo = { id: session.user.id, name: session.user.name, email: session.user.email, role: session.user.role }
+
+    const act = await (prisma.delivery_acts as any).create({
+      data: {
+        id: randomUUID(),
+        folio,
+        assignmentId: assignmentId ?? null,
+        equipmentSnapshot: {},
+        delivererInfo,
+        receiverInfo: {},
+        accessories: [],
+        termsVersion: '1.0',
+        status: 'PENDING',
+        acceptanceToken,
+        expirationDate,
+        actType,
+        referenceId,
+        referenceType: referenceType ?? actType,
+      },
+    })
+
+    await prisma.audit_logs.create({
+      data: {
+        id: randomUUID(),
+        action: 'ACTA_CREADA',
+        entityType: 'delivery_act',
+        entityId: act.id,
+        userId: session.user.id,
+        details: { folio, actType, referenceId },
+        createdAt: new Date(),
+      },
+    })
+
+    return NextResponse.json({ act }, { status: 201 })
+  } catch {
+    return NextResponse.json({ error: 'Error al crear el acta' }, { status: 500 })
+  }
+}

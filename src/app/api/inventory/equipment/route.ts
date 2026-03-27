@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
       condition: searchParams.getAll('condition').length > 0 ? searchParams.getAll('condition') : undefined,
       assignedTo: searchParams.get('assignedTo') || undefined,
       departmentId: searchParams.get('departmentId') || undefined,
+      familyId: searchParams.get('familyId') || undefined,
       page: parseInt(searchParams.get('page') || '1'),
       limit: parseInt(searchParams.get('limit') || '10'),
     }

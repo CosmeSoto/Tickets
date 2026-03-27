@@ -96,8 +96,15 @@ export async function generateDeliveryActPDF(
   }
 
   // Título y folio a la derecha
+  const actTypeLabels: Record<string, string> = {
+    EQUIPMENT_ASSIGNMENT: 'ACTA DE ENTREGA',
+    MRO_DELIVERY: 'ACTA DE ENTREGA — MATERIALES MRO',
+    SERVICE_COMPLETION: 'ACTA DE ENTREGA — SERVICIO',
+    ASSET_TRANSFER: 'ACTA DE ENTREGA — TRANSFERENCIA',
+  }
+  const actTypeLabel = actTypeLabels[(act as any).actType ?? 'EQUIPMENT_ASSIGNMENT'] ?? 'ACTA DE ENTREGA'
   doc.fontSize(15).font('Helvetica-Bold').fillColor(C.white)
-    .text('ACTA DE ENTREGA', ML + 160, 16, { width: CW - 160, align: 'right' })
+    .text(actTypeLabel, ML + 160, 16, { width: CW - 160, align: 'right' })
   doc.fontSize(10).font('Helvetica').fillColor('#BFDBFE')
     .text(act.folio, ML + 160, 36, { width: CW - 160, align: 'right' })
 

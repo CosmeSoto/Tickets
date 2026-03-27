@@ -502,6 +502,9 @@ model users {
   stockMovements                                    stock_movements[]           @relation("StockMovementUser")
   stockMovementsAssigned                            stock_movements[]           @relation("StockMovementAssignedTo")
   equipmentAttachments                              equipment_attachments[]
+  managedWarehouses                                 warehouses[]                @relation("WarehouseManager")
+  inventoryManagerFamilies                          inventory_manager_families[] @relation("InventoryManagerFamilies")
+  licenseAttachments                                license_attachments[]
 
   // Decommission relations
   decommissionRequests                              decommission_requests[]     @relation("DecommissionRequester")
@@ -950,9 +953,13 @@ model equipment_types {
   createdAt   DateTime    @default(now()) @map("created_at")
   updatedAt   DateTime    @updatedAt @map("updated_at")
   
+  familyId    String?             @map("family_id")
+  family      inventory_families? @relation(fields: [familyId], references: [id])
+
   equipment   equipment[]
   
   @@index([isActive, order])
+  @@index([familyId])
   @@map("equipment_types")
 }
 
@@ -997,11 +1004,29 @@ model equipment {
   usefulLifeYears      Float?            @map("useful_life_years")
   residualValue        Float?            @default(0) @map("residual_value")
   
+  // Bodega
+  warehouseId          String?           @map("warehouse_id")
+
+  // Modalidad de adquisición (alias semántico de ownershipType)
+  acquisitionMode      OwnershipType?    @map("acquisition_mode")
+
+  // Depreciación extendida
+  depreciationRate     Float?            @map("depreciation_rate")
+  depreciationMethod   DepreciationMethod? @map("depreciation_method")
+  totalUnits           Float?            @map("total_units")
+  usedUnits            Float?            @map("used_units")
+
+  // Contratos/servicios
+  contractStartDate    DateTime?         @map("contract_start_date")
+  contractEndDate      DateTime?         @map("contract_end_date")
+  contractRenewalCost  Float?            @map("contract_renewal_cost")
+
   createdAt            DateTime          @default(now()) @map("created_at")
   updatedAt            DateTime          @updatedAt @map("updated_at")
   
   type                 equipment_types   @relation(fields: [typeId], references: [id])
   supplier             suppliers?        @relation(fields: [supplierId], references: [id])
+  warehouse            warehouses?       @relation(fields: [warehouseId], references: [id])
   assignments          equipment_assignments[]
   maintenanceRecords   maintenance_records[]
   licenses             software_licenses[]
@@ -1098,7 +1123,7 @@ enum AssignmentType {
 model delivery_acts {
   id                  String          @id @default(uuid())
   folio               String          @unique
-  assignmentId        String          @unique @map("assignment_id")
+  assignmentId        String?         @unique @map("assignment_id")
   equipmentSnapshot   Json            @map("equipment_snapshot")
   delivererInfo       Json            @map("deliverer_info")
   receiverInfo        Json            @map("receiver_info")
@@ -1116,10 +1141,13 @@ model delivery_acts {
   signatureUserAgent  String?         @map("signature_user_agent")
   verificationHash    String?         @map("verification_hash")
   pdfPath             String?         @map("pdf_path")
+  actType             DeliveryActType @default(EQUIPMENT_ASSIGNMENT) @map("act_type")
+  referenceId         String?         @map("reference_id")
+  referenceType       String?         @map("reference_type")
   createdAt           DateTime        @default(now()) @map("created_at")
   updatedAt           DateTime        @updatedAt @map("updated_at")
   
-  assignment          equipment_assignments @relation(fields: [assignmentId], references: [id])
+  assignment          equipment_assignments? @relation(fields: [assignmentId], references: [id])
   
   @@index([folio])
   @@index([status, expirationDate])
@@ -1223,9 +1251,13 @@ model license_types {
   createdAt   DateTime            @default(now()) @map("created_at")
   updatedAt   DateTime            @updatedAt @map("updated_at")
 
+  familyId    String?             @map("family_id")
+  family      inventory_families? @relation(fields: [familyId], references: [id])
+
   licenses    software_licenses[]
 
   @@index([isActive, order])
+  @@index([familyId])
   @@map("license_types")
 }
 
@@ -1251,6 +1283,9 @@ model software_licenses {
   invoiceNumber         String?         @map("invoice_number") @db.VarChar(100)
   purchaseOrderNumber   String?         @map("purchase_order_number") @db.VarChar(100)
 
+  licenseScope   LicenseScope?   @map("license_scope")
+  contractType   ContractType?   @map("contract_type")
+
   createdAt             DateTime        @default(now()) @map("created_at")
   updatedAt             DateTime        @updatedAt @map("updated_at")
 
@@ -1260,6 +1295,7 @@ model software_licenses {
   department    departments?    @relation(fields: [assignedToDepartment], references: [id], onDelete: SetNull, onUpdate: Cascade)
   supplier      suppliers?      @relation(fields: [supplierId], references: [id])
   decommission_requests decommission_requests[]
+  attachments   license_attachments[]
 
   @@index([typeId, expirationDate])
   @@index([assignedToEquipment])
@@ -1280,9 +1316,13 @@ model consumable_types {
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
 
+  familyId    String?             @map("family_id")
+  family      inventory_families? @relation(fields: [familyId], references: [id])
+
   consumables consumables[]
 
   @@index([isActive, order])
+  @@index([familyId])
   @@map("consumable_types")
 }
 
@@ -1319,6 +1359,7 @@ model consumables {
   notes               String?           @db.Text
   compatibleEquipment String[]          @map("compatible_equipment")
   supplierId          String?           @map("supplier_id")
+  warehouseId         String?           @map("warehouse_id")
   createdAt           DateTime          @default(now()) @map("created_at")
   updatedAt           DateTime          @updatedAt @map("updated_at")
   
@@ -1326,6 +1367,7 @@ model consumables {
   unitOfMeasure       units_of_measure  @relation(fields: [unitOfMeasureId], references: [id])
   assignedEquipment   equipment?        @relation(fields: [assignedEquipmentId], references: [id])
   supplier            suppliers?        @relation(fields: [supplierId], references: [id])
+  warehouse           warehouses?       @relation(fields: [warehouseId], references: [id])
   movements           stock_movements[]
   
   @@index([typeId, currentStock])
@@ -1485,4 +1527,111 @@ model folio_counters {
   
   @@unique([year, type])
   @@map("folio_counters")
+}
+
+// ============================================
+// INVENTORY FAMILIES — Nuevos enums (tarea 1.1)
+// ============================================
+
+enum DeliveryActType {
+  EQUIPMENT_ASSIGNMENT
+  MRO_DELIVERY
+  SERVICE_COMPLETION
+  ASSET_TRANSFER
+}
+
+enum LicenseScope {
+  INDIVIDUAL
+  DEPARTMENT
+  COMPANY
+}
+
+enum ContractType {
+  SOFTWARE
+  SERVICE_EXTERNAL
+  MAINTENANCE
+  INSURANCE
+  SLA
+}
+
+enum DepreciationMethod {
+  LINEAR
+  DECLINING_BALANCE
+  UNITS_OF_PRODUCTION
+}
+
+// ============================================
+// INVENTORY FAMILIES — Modelos nuevos
+// ============================================
+
+model inventory_families {
+  id          String   @id @default(uuid())
+  code        String   @unique @db.VarChar(50)
+  name        String   @db.VarChar(100)
+  description String?  @db.Text
+  icon        String?  @db.VarChar(50)
+  color       String?  @default("#6B7280") @db.VarChar(20)
+  isActive    Boolean  @default(true) @map("is_active")
+  order       Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  equipmentTypes   equipment_types[]
+  consumableTypes  consumable_types[]
+  licenseTypes     license_types[]
+  managerFamilies  inventory_manager_families[]
+
+  @@index([isActive, order])
+  @@map("inventory_families")
+}
+
+model warehouses {
+  id          String   @id @default(uuid())
+  name        String   @db.VarChar(100)
+  location    String?  @db.VarChar(200)
+  description String?  @db.Text
+  managerId   String?  @map("manager_id")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  manager     users?        @relation("WarehouseManager", fields: [managerId], references: [id])
+  equipment   equipment[]
+  consumables consumables[]
+
+  @@index([isActive])
+  @@map("warehouses")
+}
+
+model inventory_manager_families {
+  id        String   @id @default(uuid())
+  managerId String   @map("manager_id")
+  familyId  String   @map("family_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  manager users              @relation("InventoryManagerFamilies", fields: [managerId], references: [id], onDelete: Cascade)
+  family  inventory_families @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@unique([managerId, familyId])
+  @@index([managerId])
+  @@index([familyId])
+  @@map("inventory_manager_families")
+}
+
+model license_attachments {
+  id           String   @id @default(uuid())
+  licenseId    String   @map("license_id")
+  filename     String
+  originalName String   @map("original_name")
+  mimeType     String   @map("mime_type")
+  size         Int
+  path         String
+  uploadedBy   String   @map("uploaded_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  license  software_licenses @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+  uploader users             @relation(fields: [uploadedBy], references: [id])
+
+  @@index([licenseId])
+  @@map("license_attachments")
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import {
@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
+import { FamilyFilterBar } from '@/components/inventory/family-filter-bar'
 
 const REPORT_TYPES = [
   { id: 'equipment-summary', label: 'Resumen de Equipos', icon: Package, description: 'Equipos por estado, tipo y condición' },
@@ -54,6 +55,15 @@ export default function InventoryReportsPage() {
   const [reportData, setReportData] = useState<any>(null)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+  const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(null)
+  const [families, setFamilies] = useState<Array<{ id: string; name: string; icon?: string | null; color?: string | null }>>([])
+
+  useEffect(() => {
+    fetch('/api/inventory/families')
+      .then(r => r.json())
+      .then(d => setFamilies(d.families ?? []))
+      .catch(() => {})
+  }, [])
 
   // Solo ADMIN
   if (session?.user?.role !== 'ADMIN') {
@@ -73,6 +83,7 @@ export default function InventoryReportsPage() {
       const params = new URLSearchParams({ type: selectedReport })
       if (startDate) params.set('startDate', startDate)
       if (endDate) params.set('endDate', endDate)
+      if (selectedFamilyId) params.set('familyId', selectedFamilyId)
 
       const res = await fetch(`/api/inventory/reports?${params}`)
       const json = await res.json()
@@ -102,6 +113,15 @@ export default function InventoryReportsPage() {
   return (
     <RoleDashboardLayout title="Reportes de Inventario" subtitle="Análisis y estadísticas del inventario">
       <div className="space-y-6">
+        {/* Filtro por familia */}
+        {families.length > 0 && (
+          <FamilyFilterBar
+            families={families}
+            selectedId={selectedFamilyId}
+            onChange={setSelectedFamilyId}
+          />
+        )}
+
         {/* Selector de reporte */}
         <Card>
           <CardHeader>

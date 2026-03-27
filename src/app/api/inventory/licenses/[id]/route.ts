@@ -28,17 +28,29 @@ export async function GET(
       return NextResponse.json({ error: 'Licencia no encontrada' }, { status: 404 })
     }
 
-    // Fetch supplier separately since getLicenseById doesn't include it
-    const licenseWithSupplier = await prisma.software_licenses.findUnique({
+    // Fetch supplier, licenseScope, contractType and family separately
+    const licenseWithExtra = await prisma.software_licenses.findUnique({
       where: { id },
-      select: { supplier: { select: { id: true, name: true, taxId: true } } },
+      select: {
+        supplier: { select: { id: true, name: true, taxId: true } },
+        licenseScope: true,
+        contractType: true,
+        licenseType: { include: { family: true } },
+      },
     })
 
     const renewalAlertStatus = getRenewalAlertStatus(
       (license as any).renewalDate ? new Date((license as any).renewalDate) : null
     )
 
-    return NextResponse.json({ ...license, supplier: licenseWithSupplier?.supplier ?? null, renewalAlertStatus })
+    return NextResponse.json({
+      ...license,
+      supplier: licenseWithExtra?.supplier ?? null,
+      licenseScope: licenseWithExtra?.licenseScope ?? null,
+      contractType: licenseWithExtra?.contractType ?? null,
+      licenseType: licenseWithExtra?.licenseType ?? null,
+      renewalAlertStatus,
+    })
   } catch (error) {
     console.error('Error en GET /api/inventory/licenses/[id]:', error)
     return NextResponse.json({ error: 'Error al obtener licencia' }, { status: 500 })
@@ -63,7 +75,7 @@ export async function PUT(
 
     const { id } = await params
     const body = await request.json()
-    const { supplierId, renewalCost, renewalDate, invoiceNumber, purchaseOrderNumber, ...rest } = body
+    const { supplierId, renewalCost, renewalDate, invoiceNumber, purchaseOrderNumber, licenseScope, contractType, ...rest } = body
 
     // Validar renewalCost
     if (renewalCost !== undefined && renewalCost !== null && renewalCost < 0) {
@@ -78,6 +90,27 @@ export async function PUT(
       }
     }
 
+    // Validar XOR para licenseScope INDIVIDUAL
+    if (licenseScope === 'INDIVIDUAL') {
+      const assignedToEquipment = rest.assignedToEquipment ?? body.assignedToEquipment ?? null
+      const assignedToUser = rest.assignedToUser ?? body.assignedToUser ?? null
+      const hasEquipment = assignedToEquipment != null
+      const hasUser = assignedToUser != null
+
+      if (!hasEquipment && !hasUser) {
+        return NextResponse.json(
+          { error: 'Una licencia individual debe estar asignada a un equipo o usuario' },
+          { status: 422 }
+        )
+      }
+      if (hasEquipment && hasUser) {
+        return NextResponse.json(
+          { error: 'Una licencia individual no puede estar asignada a equipo y usuario simultáneamente' },
+          { status: 422 }
+        )
+      }
+    }
+
     const validatedData = updateLicenseSchema.parse(rest)
     const updatePayload: any = { ...validatedData }
     if (supplierId !== undefined) updatePayload.supplierId = supplierId
@@ -85,6 +118,8 @@ export async function PUT(
     if (renewalDate !== undefined) updatePayload.renewalDate = renewalDate
     if (invoiceNumber !== undefined) updatePayload.invoiceNumber = invoiceNumber
     if (purchaseOrderNumber !== undefined) updatePayload.purchaseOrderNumber = purchaseOrderNumber
+    if (licenseScope !== undefined) updatePayload.licenseScope = licenseScope
+    if (contractType !== undefined) updatePayload.contractType = contractType
 
     const license = await LicenseService.updateLicense(id, updatePayload, session.user.id)
 

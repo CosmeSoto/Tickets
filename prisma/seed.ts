@@ -50,6 +50,15 @@ async function main() {
   // 12. LANDING PAGE + SERVICIOS
   await seedLandingPage()
 
+  // 13. FAMILIAS DE INVENTARIO
+  await seedInventoryFamilies()
+
+  // 14. BODEGA POR DEFECTO
+  await seedDefaultWarehouse()
+
+  // 15. MIGRACIÓN CONSERVADORA: tipos existentes → familia TECHNOLOGY
+  await migrateExistingTypesToTechnology()
+
   console.log('\n🎉 Seed completado exitosamente!')
   console.log('\n📋 Credenciales de acceso:')
   console.log('   Email: internet.freecom@gmail.com')
@@ -739,6 +748,51 @@ async function seedLandingPage() {
     })
   }
   console.log('✅ Landing page + 3 servicios')
+}
+
+async function seedInventoryFamilies() {
+  const families = [
+    { code: 'FIXED_ASSETS',   name: 'Activos Fijos e Infraestructura',        icon: 'building-2',  color: '#1D4ED8', order: 1 },
+    { code: 'MAINTENANCE',    name: 'Repuestos y Materiales de Mantenimiento', icon: 'wrench',       color: '#B45309', order: 2 },
+    { code: 'SERVICES',       name: 'Servicios de Operación y Limpieza',       icon: 'sparkles',     color: '#059669', order: 3 },
+    { code: 'SECURITY',       name: 'Seguridad y Protección',                  icon: 'shield',       color: '#DC2626', order: 4 },
+    { code: 'TECHNOLOGY',     name: 'Tecnología y Comunicaciones',             icon: 'monitor',      color: '#7C3AED', order: 5 },
+    { code: 'GREEN_AREAS',    name: 'Áreas Verdes y Exteriores',               icon: 'tree-pine',    color: '#16A34A', order: 6 },
+    { code: 'ADMINISTRATIVE', name: 'Gestión Administrativa y Documental',     icon: 'folder-open',  color: '#0891B2', order: 7 },
+    { code: 'COMMERCIAL',     name: 'Activos de Gestión Comercial',            icon: 'store',        color: '#EA580C', order: 8 },
+  ]
+  for (const f of families) {
+    await prisma.inventory_families.upsert({
+      where: { code: f.code },
+      update: { name: f.name, icon: f.icon, color: f.color, order: f.order },
+      create: { id: randomUUID(), ...f, isActive: true },
+    })
+  }
+  console.log(`✅ ${families.length} familias de inventario`)
+}
+
+async function seedDefaultWarehouse() {
+  const existing = await prisma.warehouses.findFirst({ where: { name: 'Bodega Principal' } })
+  if (!existing) {
+    await prisma.warehouses.create({
+      data: { id: randomUUID(), name: 'Bodega Principal', location: 'Instalaciones principales', isActive: true },
+    })
+    console.log('✅ Bodega Principal creada')
+  } else {
+    console.log('⏭️  Bodega Principal ya existe')
+  }
+}
+
+async function migrateExistingTypesToTechnology() {
+  const techFamily = await prisma.inventory_families.findUnique({ where: { code: 'TECHNOLOGY' } })
+  if (techFamily) {
+    const [eq, co, li] = await Promise.all([
+      prisma.equipment_types.updateMany({ where: { familyId: null }, data: { familyId: techFamily.id } }),
+      prisma.consumable_types.updateMany({ where: { familyId: null }, data: { familyId: techFamily.id } }),
+      prisma.license_types.updateMany({ where: { familyId: null }, data: { familyId: techFamily.id } }),
+    ])
+    console.log(`✅ Migración conservadora: ${eq.count} tipos de equipo, ${co.count} tipos de consumible, ${li.count} tipos de licencia → TECHNOLOGY`)
+  }
 }
 
 main()

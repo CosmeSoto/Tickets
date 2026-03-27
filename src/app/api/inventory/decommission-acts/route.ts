@@ -123,6 +123,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Se requiere al menos una imagen como evidencia' }, { status: 400 })
     }
 
+    // Advertencia: licencia con contractEndDate vigente
+    let warning: string | undefined
+    if (assetType === 'LICENSE' && licenseId) {
+      const lic = await (prisma.software_licenses as any).findUnique({
+        where: { id: licenseId },
+        select: { contractEndDate: true, name: true },
+      })
+      if (lic?.contractEndDate && new Date(lic.contractEndDate) > new Date()) {
+        const endDate = new Date(lic.contractEndDate).toLocaleDateString('es-ES')
+        warning = `La licencia "${lic.name}" tiene un contrato vigente hasta el ${endDate}. Se recomienda esperar al vencimiento antes de solicitar la baja.`
+      }
+    }
+
     // Crear solicitud
     const requestId = randomUUID()
     const decommissionRequest = await prisma.decommission_requests.create({
@@ -211,7 +224,7 @@ export async function POST(request: NextRequest) {
       include: decommissionInclude,
     })
 
-    return NextResponse.json(result, { status: 201 })
+    return NextResponse.json({ ...result, warning }, { status: 201 })
   } catch (error) {
     return NextResponse.json({ error: 'Error al crear solicitud de baja' }, { status: 500 })
   }

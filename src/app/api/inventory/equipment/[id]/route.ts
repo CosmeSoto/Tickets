@@ -6,7 +6,7 @@ import { updateEquipmentSchema, equipmentIdSchema } from '@/lib/validations/inve
 import { ZodError } from 'zod'
 import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
 import { prisma } from '@/lib/prisma'
-import { calculateDepreciation } from '@/lib/inventory/depreciation'
+import { calculateDepreciation, familySupportsDepreciation } from '@/lib/inventory/depreciation'
 
 /**
  * GET /api/inventory/equipment/[id]
@@ -49,7 +49,11 @@ export async function GET(
     const eq = equipmentDetail.equipment as any
     let depreciation: ReturnType<typeof calculateDepreciation> | null = null
 
+    const familyCode = eq.type?.family?.code ?? null
+    const canDepreciate = familyCode ? familySupportsDepreciation(familyCode) : true
+
     if (
+      canDepreciate &&
       eq.usefulLifeYears != null &&
       eq.purchaseDate != null &&
       eq.purchasePrice != null
@@ -58,7 +62,10 @@ export async function GET(
         eq.purchasePrice,
         new Date(eq.purchaseDate),
         eq.usefulLifeYears,
-        eq.residualValue ?? 0
+        eq.residualValue ?? 0,
+        new Date(),
+        eq.depreciationMethod ?? 'LINEAR',
+        { totalUnits: eq.totalUnits, usedUnits: eq.usedUnits }
       )
     }
 
@@ -122,12 +129,30 @@ export async function PUT(
       purchaseOrderNumber = undefined,
       usefulLifeYears = undefined,
       residualValue = undefined,
+      warehouseId = undefined,
+      acquisitionMode = undefined,
+      depreciationRate = undefined,
+      depreciationMethod = undefined,
+      totalUnits = undefined,
+      usedUnits = undefined,
+      contractStartDate = undefined,
+      contractEndDate = undefined,
+      contractRenewalCost = undefined,
     } = body as {
       supplierId?: string | null
       invoiceNumber?: string | null
       purchaseOrderNumber?: string | null
       usefulLifeYears?: number | null
       residualValue?: number | null
+      warehouseId?: string | null
+      acquisitionMode?: string | null
+      depreciationRate?: number | null
+      depreciationMethod?: string | null
+      totalUnits?: number | null
+      usedUnits?: number | null
+      contractStartDate?: string | null
+      contractEndDate?: string | null
+      contractRenewalCost?: number | null
     }
 
     // Validación: usefulLifeYears > 0
@@ -168,6 +193,17 @@ export async function PUT(
       }
     }
 
+    // Validación: warehouseId existente
+    if (warehouseId !== undefined && warehouseId !== null) {
+      const warehouseExists = await prisma.warehouses.findUnique({ where: { id: warehouseId } })
+      if (!warehouseExists) {
+        return NextResponse.json(
+          { error: 'La bodega especificada no existe o está inactiva' },
+          { status: 400 }
+        )
+      }
+    }
+
     // Actualizar equipo (campos base)
     const equipment = await EquipmentService.updateEquipment(
       id,
@@ -182,6 +218,26 @@ export async function PUT(
     if ('purchaseOrderNumber' in body) financialFields.purchaseOrderNumber = purchaseOrderNumber ?? null
     if ('usefulLifeYears' in body) financialFields.usefulLifeYears = usefulLifeYears ?? null
     if ('residualValue' in body) financialFields.residualValue = residualValue ?? null
+    if ('warehouseId' in body) financialFields.warehouseId = warehouseId ?? null
+    if ('acquisitionMode' in body) financialFields.acquisitionMode = acquisitionMode ?? null
+    if ('contractStartDate' in body) financialFields.contractStartDate = contractStartDate ? new Date(contractStartDate) : null
+    if ('contractEndDate' in body) financialFields.contractEndDate = contractEndDate ? new Date(contractEndDate) : null
+    if ('contractRenewalCost' in body) financialFields.contractRenewalCost = contractRenewalCost ?? null
+
+    // Campos de depreciación solo si la familia del activo los soporta
+    const currentEquipment = await prisma.equipment.findUnique({
+      where: { id },
+      select: { type: { include: { family: true } } },
+    })
+    const currentFamilyCode = (currentEquipment?.type as any)?.family?.code ?? null
+    const depreciationAllowed = currentFamilyCode ? familySupportsDepreciation(currentFamilyCode) : true
+
+    if (depreciationAllowed) {
+      if ('depreciationRate' in body) financialFields.depreciationRate = depreciationRate ?? null
+      if ('depreciationMethod' in body) financialFields.depreciationMethod = depreciationMethod ?? null
+      if ('totalUnits' in body) financialFields.totalUnits = totalUnits ?? null
+      if ('usedUnits' in body) financialFields.usedUnits = usedUnits ?? null
+    }
 
     if (Object.keys(financialFields).length > 0) {
       await prisma.equipment.update({

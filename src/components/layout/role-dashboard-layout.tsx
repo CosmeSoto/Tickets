@@ -40,6 +40,8 @@ import {
   ClipboardList,
   Building2,
   Trash2,
+  Layers,
+  Warehouse,
 } from 'lucide-react'
 import { Notifications } from '@/components/ui/notifications'
 import { Button } from '@/components/ui/button'
@@ -104,10 +106,12 @@ const navigationByRole: Record<string, NavItem[]> = {
         {
           name: 'Catálogos', href: '/inventory/equipment-types', icon: Database,
           children: [
+            { name: 'Familias', href: '/inventory/families', icon: Layers },
             { name: 'Equipo', href: '/inventory/equipment-types', icon: Boxes },
-            { name: 'Licencias y Contratos', href: '/inventory/license-types', icon: FileSignature },
+            { name: 'Bodegas', href: '/inventory/warehouses', icon: Warehouse },
+            { name: 'Licencias Contratos', href: '/inventory/license-types', icon: FileSignature },
             { name: 'Consumible', href: '/inventory/consumable-types', icon: Tag },
-            { name: 'Unidades de Medida', href: '/inventory/units-of-measure', icon: Ruler },
+            { name: 'Unidades Medida', href: '/inventory/units-of-measure', icon: Ruler },
           ],
         },
         { name: 'Configuración', href: '/settings/inventory', icon: Settings },

@@ -11,7 +11,8 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
-import { Save, Loader2, ShieldCheck, Search, X, UserCheck } from 'lucide-react'
+import { Save, Loader2, ShieldCheck, Search, X, UserCheck, Layers } from 'lucide-react'
+import { ManagerFamiliesPanel } from '@/components/inventory/manager-families-panel'
 
 interface InventorySettings {
   manager_ids: string[]
@@ -27,6 +28,14 @@ interface UserOption {
   name: string
   email: string
   role: string
+}
+
+interface FamilyOption {
+  id: string
+  name: string
+  icon?: string | null
+  color?: string | null
+  code: string
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -56,10 +65,16 @@ export default function InventorySettingsPage() {
     license_alert_days_second: 7,
   })
 
+  // Familias por gestor
+  const [allFamilies, setAllFamilies] = useState<FamilyOption[]>([])
+  const [selectedManagerId, setSelectedManagerId] = useState<string>('')
+  const [managerFamilyIds, setManagerFamilyIds] = useState<string[]>([])
+  const [loadingManagerFamilies, setLoadingManagerFamilies] = useState(false)
+
   useEffect(() => {
     if (status === 'unauthenticated') { router.push('/login'); return }
     if (status === 'authenticated' && session?.user?.role !== 'ADMIN') { router.push('/unauthorized'); return }
-    if (status === 'authenticated') { loadSettings(); loadAllUsers() }
+    if (status === 'authenticated') { loadSettings(); loadAllUsers(); loadAllFamilies() }
   }, [session, status, router])
 
   const loadSettings = async () => {
@@ -81,6 +96,34 @@ export default function InventorySettingsPage() {
       const data = await res.json()
       setAllUsers((data.data || []).filter((u: UserOption) => u.role !== 'ADMIN'))
     }
+  }
+
+  const loadAllFamilies = async () => {
+    const res = await fetch('/api/inventory/families')
+    if (res.ok) {
+      const data = await res.json()
+      setAllFamilies(data.families ?? data ?? [])
+    }
+  }
+
+  const loadManagerFamilies = async (managerId: string) => {
+    try {
+      setLoadingManagerFamilies(true)
+      const res = await fetch(`/api/inventory/managers/${managerId}/families`)
+      if (res.ok) {
+        const data = await res.json()
+        const families: Array<{ id: string }> = data.families ?? data ?? []
+        setManagerFamilyIds(families.map(f => f.id))
+      }
+    } finally {
+      setLoadingManagerFamilies(false)
+    }
+  }
+
+  const handleManagerSelect = (managerId: string) => {
+    setSelectedManagerId(managerId)
+    setManagerFamilyIds([])
+    if (managerId) loadManagerFamilies(managerId)
   }
 
   const handleSave = async () => {
@@ -315,6 +358,58 @@ export default function InventorySettingsPage() {
                   />
                 </div>
               </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Familias por Gestor */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Layers className="h-5 w-5" />
+              Familias por Gestor
+            </CardTitle>
+            <CardDescription>
+              Asigna qué familias de inventario puede gestionar cada gestor. Selecciona un gestor para ver y editar sus familias asignadas.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="manager-select">Gestor</Label>
+              <select
+                id="manager-select"
+                value={selectedManagerId}
+                onChange={e => handleManagerSelect(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <option value="">Selecciona un gestor...</option>
+                {allUsers
+                  .filter(u => settings.manager_ids?.includes(u.id))
+                  .map(u => (
+                    <option key={u.id} value={u.id}>{u.name} — {u.email}</option>
+                  ))}
+              </select>
+              {settings.manager_ids?.length === 0 && (
+                <p className="text-sm text-muted-foreground italic">
+                  No hay gestores asignados. Agrega gestores en la sección de arriba primero.
+                </p>
+              )}
+            </div>
+
+            {selectedManagerId && (
+              loadingManagerFamilies ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <ManagerFamiliesPanel
+                  key={selectedManagerId}
+                  managerId={selectedManagerId}
+                  allFamilies={allFamilies}
+                  currentFamilyIds={managerFamilyIds}
+                  onSaved={() => loadManagerFamilies(selectedManagerId)}
+                />
+              )
             )}
           </CardContent>
         </Card>

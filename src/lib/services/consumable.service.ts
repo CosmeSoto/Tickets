@@ -3,7 +3,7 @@ import type { Consumable, StockMovement, CreateConsumableData, UpdateConsumableD
 
 
 const consumableInclude = {
-  consumableType: true,
+  consumableType: { include: { family: true } },
   unitOfMeasure: true,
   assignedEquipment: { select: { id: true, code: true, brand: true, model: true, serialNumber: true } },
   movements: {
@@ -138,6 +138,10 @@ export class ConsumableService {
 
     if (filters.typeId && filters.typeId.length > 0) {
       where.typeId = { in: filters.typeId }
+    }
+
+    if (filters.familyId) {
+      where.consumableType = { familyId: filters.familyId }
     }
 
     if (filters.lowStock) {

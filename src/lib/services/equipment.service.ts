@@ -105,11 +105,12 @@ export class EquipmentService {
    */
   static async getEquipmentDetail(id: string): Promise<EquipmentDetailResponse> {
     try {
-      const equipment = await prisma.equipment.findUnique({
+      const equipment = await (prisma.equipment.findUnique as any)({
         where: { id },
         include: {
           supplier: { select: { id: true, name: true, taxId: true } },
-          type: true,
+          type: { include: { family: true } },
+          warehouse: true,
           assignments: {
             include: {
               receiver: { select: { id: true, name: true, email: true } },
@@ -135,7 +136,7 @@ export class EquipmentService {
       }
 
       // Obtener asignación actual
-      const currentAssignment = equipment.assignments.find(a => a.isActive)
+      const currentAssignment = (equipment.assignments as any[]).find((a: any) => a.isActive)
 
       // Construir historial
       const history = await this.buildEquipmentHistory(id)
@@ -144,7 +145,7 @@ export class EquipmentService {
         equipment: equipment as any,
         currentAssignment,
         history,
-        maintenanceRecords: equipment.maintenanceRecords
+        maintenanceRecords: (equipment as any).maintenanceRecords
       }
     } catch (error) {
       console.error('Error obteniendo detalle de equipo:', error)
@@ -181,6 +182,11 @@ export class EquipmentService {
       // Filtros por tipo
       if (filters.typeId && filters.typeId.length > 0) {
         where.typeId = { in: filters.typeId }
+      }
+
+      // Filtro por familia
+      if ((filters as any).familyId) {
+        where.type = { familyId: (filters as any).familyId }
       }
 
       // Filtros por estado
@@ -221,7 +227,7 @@ export class EquipmentService {
           skip,
           take: limit,
           include: {
-            type: true, // Incluir relación con equipment_types
+            type: { include: { family: true } }, // Incluir familia en la respuesta
           },
           orderBy: { createdAt: 'desc' }
         })

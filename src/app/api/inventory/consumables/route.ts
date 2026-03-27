@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
       search: searchParams.get('search') || undefined,
       typeId: searchParams.getAll('typeId').length > 0 ? searchParams.getAll('typeId') : undefined,
       lowStock: searchParams.get('lowStock') === 'true' || undefined,
+      familyId: searchParams.get('familyId') || undefined,
       page: parseInt(searchParams.get('page') || '1'),
       limit: parseInt(searchParams.get('limit') || '10'),
     }

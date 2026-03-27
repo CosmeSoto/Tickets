@@ -28,8 +28,9 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import { RenewalAlert } from '@/components/inventory/licenses/RenewalAlert'
+import { LicenseAttachments } from '@/components/inventory/license-attachments'
 import {
-  Plus, Search, Key, AlertTriangle, CheckCircle, Clock, Trash2, Edit, Unlink, Loader2,
+  Plus, Search, Key, AlertTriangle, CheckCircle, Clock, Trash2, Edit, Unlink, Loader2, ChevronDown, ChevronRight,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -122,6 +123,7 @@ export default function LicensesPage() {
   const [saving, setSaving] = useState(false)
   const [deletingLicense, setDeletingLicense] = useState<License | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [expandedLicenseId, setExpandedLicenseId] = useState<string | null>(null)
 
   const canManage = session?.user?.role === 'ADMIN' || session?.user?.role === 'TECHNICIAN'
 
@@ -382,6 +384,7 @@ export default function LicensesPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-6"></TableHead>
                       <TableHead>Nombre</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead>Clave</TableHead>
@@ -393,46 +396,60 @@ export default function LicensesPage() {
                   </TableHeader>
                   <TableBody>
                     {licenses.map(license => (
-                      <TableRow key={license.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{license.name}</span>
-                            {(license as any).renewalAlertStatus && (license as any).renewalAlertStatus !== 'none' && (
-                              <RenewalAlert
-                                renewalAlertStatus={(license as any).renewalAlertStatus}
-                                renewalDate={(license as any).renewalDate}
-                              />
-                            )}
-                          </div>
-                          {license.vendor && <span className="text-xs text-muted-foreground">{license.vendor}</span>}
-                        </TableCell>
-                        <TableCell><Badge variant="outline">{license.licenseType?.name || 'Sin tipo'}</Badge></TableCell>
-                        <TableCell>
-                          {license.key ? (
-                            <code className="text-xs bg-muted px-2 py-1 rounded">{license.key}</code>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">Sin clave</span>
-                          )}
-                        </TableCell>
-                        <TableCell>{getExpirationBadge(license.expirationDate)}</TableCell>
-                        <TableCell>
-                          {getAssignedTo(license) || <span className="text-xs text-muted-foreground">Sin asignar</span>}
-                        </TableCell>
-                        <TableCell>{license.cost ? `$${license.cost.toLocaleString()}` : '-'}</TableCell>
-                        {canManage && (
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-1">
-                              <Button variant="ghost" size="icon" onClick={() => openEditForm(license)} title="Editar"><Edit className="h-4 w-4" /></Button>
-                              {(license.assignedToEquipment || license.assignedToUser || license.assignedToDepartment) && (
-                                <Button variant="ghost" size="icon" onClick={() => handleUnassign(license)} title="Desasignar"><Unlink className="h-4 w-4" /></Button>
-                              )}
-                              {session?.user?.role === 'ADMIN' && (
-                                <Button variant="ghost" size="icon" onClick={() => handleDelete(license)} title="Eliminar"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      <>
+                        <TableRow key={license.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setExpandedLicenseId(expandedLicenseId === license.id ? null : license.id)}>
+                          <TableCell className="pr-0">
+                            {expandedLicenseId === license.id
+                              ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                              : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{license.name}</span>
+                              {(license as any).renewalAlertStatus && (license as any).renewalAlertStatus !== 'none' && (
+                                <RenewalAlert
+                                  renewalAlertStatus={(license as any).renewalAlertStatus}
+                                  renewalDate={(license as any).renewalDate}
+                                />
                               )}
                             </div>
+                            {license.vendor && <span className="text-xs text-muted-foreground">{license.vendor}</span>}
                           </TableCell>
+                          <TableCell><Badge variant="outline">{license.licenseType?.name || 'Sin tipo'}</Badge></TableCell>
+                          <TableCell>
+                            {license.key ? (
+                              <code className="text-xs bg-muted px-2 py-1 rounded">{license.key}</code>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">Sin clave</span>
+                            )}
+                          </TableCell>
+                          <TableCell>{getExpirationBadge(license.expirationDate)}</TableCell>
+                          <TableCell>
+                            {getAssignedTo(license) || <span className="text-xs text-muted-foreground">Sin asignar</span>}
+                          </TableCell>
+                          <TableCell>{license.cost ? `${license.cost.toLocaleString()}` : '-'}</TableCell>
+                          {canManage && (
+                            <TableCell className="text-right" onClick={e => e.stopPropagation()}>
+                              <div className="flex justify-end gap-1">
+                                <Button variant="ghost" size="icon" onClick={() => openEditForm(license)} title="Editar"><Edit className="h-4 w-4" /></Button>
+                                {(license.assignedToEquipment || license.assignedToUser || license.assignedToDepartment) && (
+                                  <Button variant="ghost" size="icon" onClick={() => handleUnassign(license)} title="Desasignar"><Unlink className="h-4 w-4" /></Button>
+                                )}
+                                {session?.user?.role === 'ADMIN' && (
+                                  <Button variant="ghost" size="icon" onClick={() => handleDelete(license)} title="Eliminar"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                        {expandedLicenseId === license.id && (
+                          <TableRow key={`${license.id}-attachments`}>
+                            <TableCell colSpan={canManage ? 8 : 7} className="bg-muted/30 px-6 py-4">
+                              <LicenseAttachments licenseId={license.id} canManage={canManage} />
+                            </TableCell>
+                          </TableRow>
                         )}
-                      </TableRow>
+                      </>
                     ))}
                   </TableBody>
                 </Table>
