@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
@@ -148,11 +149,13 @@ export default function ConsumableTypesPage() {
             <div className="space-y-2"><Label>Orden</Label><Input type="number" value={formData.order} onChange={e => setFormData({ ...formData, order: parseInt(e.target.value) })} /></div>
             <div className='space-y-2'>
               <Label>Familia</Label>
-              <select value={formData.familyId} onChange={e => setFormData({ ...formData, familyId: e.target.value })}
-                className='flex h-10 w-full rounded-md border border-border bg-card px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'>
-                <option value=''>Sin familia asignada</option>
-                {families.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-              </select>
+              <SearchableSelect
+                options={families.map(f => ({ value: f.id, label: f.name }))}
+                value={formData.familyId}
+                onChange={v => setFormData({ ...formData, familyId: v })}
+                placeholder="Buscar familia..."
+                emptyLabel="Sin familia asignada"
+              />
               <p className='text-xs text-muted-foreground'>Asigna este tipo a una familia para que aparezca filtrado en el formulario de activos</p>
             </div>
             <DialogFooter><Button type="button" variant="outline" onClick={() => setDialogOpen(false)} disabled={submitting}>Cancelar</Button><Button type="submit" disabled={submitting}>{submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}{editingType ? 'Actualizar' : 'Crear'}</Button></DialogFooter>

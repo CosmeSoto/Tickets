@@ -29,8 +29,8 @@ import { useToast } from '@/hooks/use-toast'
 import { Plus, Pencil, Layers, Loader2, ToggleLeft, ToggleRight } from 'lucide-react'
 import { FamilyBadge } from '@/components/inventory/family-badge'
 import { IconPicker } from '@/components/inventory/icon-picker'
-import type { AssetSubtype, FormSection } from '@/lib/inventory/family-config-types'
-import { DEFAULT_FAMILY_CONFIG } from '@/lib/inventory/family-config-types'
+import type { AssetSubtype, FormSection, AcquisitionMode, SectionsByMode, ModeSectionConfig } from '@/lib/inventory/family-config-types'
+import { DEFAULT_FAMILY_CONFIG, DEFAULT_MODE_CONFIG } from '@/lib/inventory/family-config-types'
 
 interface Family {
   id: string
@@ -56,8 +56,70 @@ const SECTION_LABELS: Record<FormSection, string> = {
   WAREHOUSE: 'Bodega',
 }
 
+const SECTION_DESCRIPTIONS: Record<FormSection, string> = {
+  FINANCIAL: 'Precio de compra, fecha de compra, N° de factura',
+  DEPRECIATION: 'Método, vida útil en años, valor residual',
+  CONTRACT: 'Número de contrato, fechas de inicio/fin, costo mensual',
+  STOCK_MRO: 'Stock inicial, stock mínimo, stock máximo',
+  WAREHOUSE: 'Bodega de almacenamiento del activo',
+}
+
+const ACQUISITION_MODES: { value: AcquisitionMode; label: string; help: string }[] = [
+  { value: 'FIXED_ASSET', label: 'Activo Fijo', help: 'Compra directa — se deprecia' },
+  { value: 'RENTAL',      label: 'Arrendamiento', help: 'Pago mensual al proveedor' },
+  { value: 'LOAN',        label: 'Activo de Tercero', help: 'Préstamo sin costo' },
+]
+
 const ALL_SUBTYPES: AssetSubtype[] = ['EQUIPMENT', 'MRO', 'LICENSE']
 const ALL_SECTIONS: FormSection[] = ['FINANCIAL', 'DEPRECIATION', 'CONTRACT', 'STOCK_MRO', 'WAREHOUSE']
+
+/** Tabla reutilizable de secciones visible/obligatoria */
+function SectionTable({
+  sections,
+  visible,
+  required,
+  onToggleVisible,
+  onToggleRequired,
+}: {
+  sections: FormSection[]
+  visible: FormSection[]
+  required: FormSection[]
+  onToggleVisible: (s: FormSection, v: boolean) => void
+  onToggleRequired: (s: FormSection, v: boolean) => void
+}) {
+  return (
+    <table className='w-full text-sm'>
+      <thead>
+        <tr className='border-b'>
+          <th className='text-left py-2 font-medium text-muted-foreground'>Sección</th>
+          <th className='text-left py-2 font-medium text-muted-foreground hidden sm:table-cell'>Campos incluidos</th>
+          <th className='text-center py-2 font-medium text-muted-foreground w-20'>Visible</th>
+          <th className='text-center py-2 font-medium text-muted-foreground w-24'>Obligatoria</th>
+        </tr>
+      </thead>
+      <tbody>
+        {sections.map(section => (
+          <tr key={section} className='border-b last:border-0'>
+            <td className='py-2.5 font-medium'>{SECTION_LABELS[section]}</td>
+            <td className='py-2.5 text-xs text-muted-foreground hidden sm:table-cell'>{SECTION_DESCRIPTIONS[section]}</td>
+            <td className='py-2.5 text-center'>
+              <Checkbox
+                checked={visible.includes(section)}
+                onCheckedChange={checked => onToggleVisible(section, !!checked)}
+              />
+            </td>
+            <td className='py-2.5 text-center'>
+              <Checkbox
+                checked={required.includes(section)}
+                onCheckedChange={checked => onToggleRequired(section, !!checked)}
+              />
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
 
 interface FamilyFormState {
   name: string
@@ -68,6 +130,7 @@ interface FamilyFormState {
   visibleSections: FormSection[]
   requiredSections: FormSection[]
   requireFinancialForNew: boolean
+  sectionsByMode: SectionsByMode
 }
 
 const DEFAULT_FORM: FamilyFormState = {
@@ -79,6 +142,7 @@ const DEFAULT_FORM: FamilyFormState = {
   visibleSections: DEFAULT_FAMILY_CONFIG.visibleSections,
   requiredSections: DEFAULT_FAMILY_CONFIG.requiredSections,
   requireFinancialForNew: true,
+  sectionsByMode: {},
 }
 
 export default function FamiliesPage() {
@@ -95,6 +159,8 @@ export default function FamiliesPage() {
   const [loadingConfig, setLoadingConfig] = useState(false)
   const [togglingFamily, setTogglingFamily] = useState<Family | null>(null)
   const [toggling, setToggling] = useState(false)
+  // Tab activo en la config de secciones por modalidad
+  const [activeModeTab, setActiveModeTab] = useState<AcquisitionMode>('FIXED_ASSET')
 
   useEffect(() => {
     if (status === 'loading') return
@@ -133,9 +199,9 @@ export default function FamiliesPage() {
       allowedSubtypes: DEFAULT_FAMILY_CONFIG.allowedSubtypes,
       visibleSections: DEFAULT_FAMILY_CONFIG.visibleSections,
       requiredSections: DEFAULT_FAMILY_CONFIG.requiredSections,
+      sectionsByMode: {},
     })
     setSheetOpen(true)
-    // Cargar config existente en paralelo
     setLoadingConfig(true)
     try {
       const res = await fetch(`/api/inventory/family-config/${family.id}`)
@@ -147,6 +213,7 @@ export default function FamiliesPage() {
           visibleSections: cfg.visibleSections ?? DEFAULT_FAMILY_CONFIG.visibleSections,
           requiredSections: cfg.requiredSections ?? DEFAULT_FAMILY_CONFIG.requiredSections,
           requireFinancialForNew: cfg.requireFinancialForNew ?? true,
+          sectionsByMode: cfg.sectionsByMode ?? {},
         }))
       }
     } catch { /* usa defaults */ } finally {
@@ -188,6 +255,36 @@ export default function FamiliesPage() {
     }
   }
 
+  // Helpers para sectionsByMode
+  const getModeConfig = (mode: AcquisitionMode): ModeSectionConfig =>
+    form.sectionsByMode[mode] ?? { ...DEFAULT_MODE_CONFIG }
+
+  const setModeVisible = (mode: AcquisitionMode, section: FormSection, checked: boolean) => {
+    const current = getModeConfig(mode)
+    const visible = checked
+      ? [...current.visible, section]
+      : current.visible.filter(s => s !== section)
+    const required = checked ? current.required : current.required.filter(s => s !== section)
+    setForm(prev => ({
+      ...prev,
+      sectionsByMode: { ...prev.sectionsByMode, [mode]: { visible, required } },
+    }))
+  }
+
+  const setModeRequired = (mode: AcquisitionMode, section: FormSection, checked: boolean) => {
+    const current = getModeConfig(mode)
+    const required = checked
+      ? [...current.required, section]
+      : current.required.filter(s => s !== section)
+    const visible = checked && !current.visible.includes(section)
+      ? [...current.visible, section]
+      : current.visible
+    setForm(prev => ({
+      ...prev,
+      sectionsByMode: { ...prev.sectionsByMode, [mode]: { visible, required } },
+    }))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (form.allowedSubtypes.length === 0) {
@@ -220,6 +317,10 @@ export default function FamiliesPage() {
           visibleSections: form.visibleSections,
           requiredSections: form.requiredSections,
           requireFinancialForNew: form.requireFinancialForNew,
+          // Solo enviar sectionsByMode si EQUIPMENT está permitido y hay config por modalidad
+          sectionsByMode: form.allowedSubtypes.includes('EQUIPMENT') && Object.keys(form.sectionsByMode).length > 0
+            ? form.sectionsByMode
+            : null,
         }),
       })
 
@@ -357,7 +458,7 @@ export default function FamiliesPage() {
 
       {/* Dialog unificado: datos + configuración */}
       <Dialog open={sheetOpen} onOpenChange={setSheetOpen}>
-        <DialogContent className='max-w-lg max-h-[90vh] overflow-y-auto'>
+        <DialogContent className='max-w-2xl max-h-[90vh] overflow-y-auto'>
           <DialogHeader className='mb-2'>
             <DialogTitle>{editingFamily ? 'Editar Familia' : 'Nueva Familia'}</DialogTitle>
             <DialogDescription>
@@ -453,34 +554,52 @@ export default function FamiliesPage() {
                   {/* Secciones */}
                   <div className='space-y-2'>
                     <p className='text-xs font-medium text-muted-foreground uppercase tracking-wide'>Secciones del formulario</p>
-                    <table className='w-full text-sm'>
-                      <thead>
-                        <tr className='border-b'>
-                          <th className='text-left py-2 font-medium text-muted-foreground'>Sección</th>
-                          <th className='text-center py-2 font-medium text-muted-foreground w-20'>Visible</th>
-                          <th className='text-center py-2 font-medium text-muted-foreground w-24'>Obligatoria</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {ALL_SECTIONS.map(section => (
-                          <tr key={section} className='border-b last:border-0'>
-                            <td className='py-2.5'>{SECTION_LABELS[section]}</td>
-                            <td className='py-2.5 text-center'>
-                              <Checkbox
-                                checked={form.visibleSections.includes(section)}
-                                onCheckedChange={checked => toggleVisible(section, !!checked)}
-                              />
-                            </td>
-                            <td className='py-2.5 text-center'>
-                              <Checkbox
-                                checked={form.requiredSections.includes(section)}
-                                onCheckedChange={checked => toggleRequired(section, !!checked)}
-                              />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+
+                    {/* Si EQUIPMENT está permitido → tabs por modalidad */}
+                    {form.allowedSubtypes.includes('EQUIPMENT') ? (
+                      <div className='space-y-3'>
+                        <p className='text-xs text-muted-foreground'>
+                          Configura qué secciones son visibles u obligatorias según la modalidad de adquisición del equipo.
+                        </p>
+                        {/* Tabs de modalidad */}
+                        <div className='flex gap-1 rounded-lg bg-muted p-1'>
+                          {ACQUISITION_MODES.map(m => (
+                            <button
+                              key={m.value}
+                              type='button'
+                              onClick={() => setActiveModeTab(m.value)}
+                              className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
+                                activeModeTab === m.value
+                                  ? 'bg-background text-foreground shadow-sm'
+                                  : 'text-muted-foreground hover:text-foreground'
+                              }`}
+                            >
+                              {m.label}
+                            </button>
+                          ))}
+                        </div>
+                        <p className='text-xs text-muted-foreground italic'>
+                          {ACQUISITION_MODES.find(m => m.value === activeModeTab)?.help}
+                        </p>
+                        {/* Tabla para la modalidad activa */}
+                        <SectionTable
+                          sections={ALL_SECTIONS}
+                          visible={getModeConfig(activeModeTab).visible}
+                          required={getModeConfig(activeModeTab).required}
+                          onToggleVisible={(s, v) => setModeVisible(activeModeTab, s, v)}
+                          onToggleRequired={(s, v) => setModeRequired(activeModeTab, s, v)}
+                        />
+                      </div>
+                    ) : (
+                      /* Sin EQUIPMENT → tabla global simple */
+                      <SectionTable
+                        sections={ALL_SECTIONS}
+                        visible={form.visibleSections}
+                        required={form.requiredSections}
+                        onToggleVisible={(s, v) => toggleVisible(s, v)}
+                        onToggleRequired={(s, v) => toggleRequired(s, v)}
+                      />
+                    )}
                     <p className='text-xs text-muted-foreground'>
                       Marcar como Obligatoria activa Visible automáticamente.
                     </p>

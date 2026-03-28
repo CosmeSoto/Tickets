@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
 
-export type { AssetSubtype, FormSection, FamilyConfig } from './family-config-types'
-export { DEFAULT_FAMILY_CONFIG } from './family-config-types'
+export type { AssetSubtype, FormSection, FamilyConfig, AcquisitionMode, SectionsByMode, ModeSectionConfig } from './family-config-types'
+export { DEFAULT_FAMILY_CONFIG, DEFAULT_MODE_CONFIG, resolveSectionsForMode } from './family-config-types'
 import type { AssetSubtype, FormSection, FamilyConfig } from './family-config-types'
 import { DEFAULT_FAMILY_CONFIG } from './family-config-types'
 

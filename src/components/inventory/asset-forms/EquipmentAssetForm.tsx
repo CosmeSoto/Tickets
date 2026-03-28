@@ -1,13 +1,17 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select'
+import { SimpleSelect } from '@/components/ui/simple-select'
+import { FileUploadZone } from '@/components/ui/file-upload-zone'
 import { ContractSection, type ContractData } from '@/components/inventory/contract-section'
 import type { FamilyConfig } from '@/lib/inventory/family-config-types'
-import { X, Plus, Upload, Search } from 'lucide-react'
+import { resolveSectionsForMode } from '@/lib/inventory/family-config-types'
+import { X, Plus } from 'lucide-react'
 
 interface EquipmentAssetFormProps {
   familyId: string
@@ -19,12 +23,10 @@ interface EquipmentAssetFormProps {
   maxFileSizeMB?: number
 }
 
-interface SelectOption { id: string; name: string }
-
 const ACQUISITION_MODES = [
-  { value: 'FIXED_ASSET', label: 'Activo Fijo',       help: 'Lo compraste, es tuyo, se deprecia.' },
-  { value: 'RENTAL',      label: 'Arrendamiento',     help: 'Pagas mensualidad; el proveedor sigue siendo el dueño.' },
-  { value: 'LOAN',        label: 'Activo de Tercero', help: 'Te lo prestan sin costo; el propietario conserva la titularidad.' },
+  { value: 'FIXED_ASSET', label: 'Compra directa (Activo Fijo)', help: 'Lo compraste — es propiedad de la empresa, se deprecia.' },
+  { value: 'RENTAL',      label: 'Arrendamiento',                help: 'Pagas mensualidad; el proveedor sigue siendo el dueño.' },
+  { value: 'LOAN',        label: 'Activo de Tercero',            help: 'Te lo prestan sin costo; el propietario conserva la titularidad.' },
 ]
 
 const DEPRECIATION_METHODS = [
@@ -32,57 +34,6 @@ const DEPRECIATION_METHODS = [
   { value: 'DECLINING_BALANCE',   label: 'Saldo Decreciente' },
   { value: 'UNITS_OF_PRODUCTION', label: 'Unidades de Producción' },
 ]
-
-function SearchSelect({ options, value, onChange, placeholder = 'Seleccionar...', disabled }: {
-  options: SelectOption[]; value: string; onChange: (v: string) => void
-  placeholder?: string; disabled?: boolean
-}) {
-  const [open, setOpen] = useState(false)
-  const [q, setQ] = useState('')
-  const ref = useRef<HTMLDivElement>(null)
-  const filtered = q ? options.filter(o => o.name.toLowerCase().includes(q.toLowerCase())) : options
-  const selected = options.find(o => o.id === value)
-
-  useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
-    document.addEventListener('mousedown', h)
-    return () => document.removeEventListener('mousedown', h)
-  }, [])
-
-  return (
-    <div ref={ref} className="relative">
-      <button type="button" disabled={disabled} onClick={() => setOpen(o => !o)}
-        className="flex h-10 w-full items-center justify-between rounded-md border border-border bg-card px-3 py-2 text-sm disabled:opacity-50">
-        <span className={selected ? 'text-foreground' : 'text-muted-foreground'}>{selected?.name ?? placeholder}</span>
-        <Search className="h-3.5 w-3.5 text-muted-foreground" />
-      </button>
-      {open && (
-        <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md">
-          <div className="flex items-center gap-2 border-b px-3 py-2">
-            <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <input autoFocus className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-              placeholder="Buscar..." value={q} onChange={e => setQ(e.target.value)} />
-            {q && <button type="button" onClick={() => setQ('')}><X className="h-3 w-3" /></button>}
-          </div>
-          <div className="max-h-52 overflow-y-auto py-1">
-            <button type="button" onClick={() => { onChange(''); setOpen(false); setQ('') }}
-              className="w-full text-left px-3 py-2 text-sm text-muted-foreground hover:bg-accent">
-              {placeholder}
-            </button>
-            {filtered.map(o => (
-              <button key={o.id} type="button"
-                onClick={() => { onChange(o.id); setOpen(false); setQ('') }}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-accent ${o.id === value ? 'bg-accent/50 font-medium' : ''}`}>
-                {o.name}
-              </button>
-            ))}
-            {filtered.length === 0 && <p className="px-3 py-2 text-sm text-muted-foreground">Sin resultados</p>}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
 
 export function EquipmentAssetForm({
   familyId, familyConfig, onSubmit, onBack, submitting, submitError, maxFileSizeMB = 10,
@@ -93,7 +44,7 @@ export function EquipmentAssetForm({
   const [brand, setBrand] = useState('')
   const [model, setModel] = useState('')
   const [equipmentTypeId, setEquipmentTypeId] = useState('')
-  const [equipmentTypes, setEquipmentTypes] = useState<SelectOption[]>([])
+  const [equipmentTypes, setEquipmentTypes] = useState<SearchableSelectOption[]>([])
   const [condition, setCondition] = useState('NEW')
   const [equipmentStatus, setEquipmentStatus] = useState('AVAILABLE')
   const [accessories, setAccessories] = useState<string[]>([])
@@ -102,7 +53,7 @@ export function EquipmentAssetForm({
   const [specValue, setSpecValue] = useState('')
   const [specifications, setSpecifications] = useState<Record<string, string>>({})
   const [supplierId, setSupplierId] = useState('')
-  const [suppliers, setSuppliers] = useState<SelectOption[]>([])
+  const [suppliers, setSuppliers] = useState<SearchableSelectOption[]>([])
   const [contractData, setContractData] = useState<ContractData | null>(null)
   const [purchaseDate, setPurchaseDate] = useState('')
   const [purchasePrice, setPurchasePrice] = useState('')
@@ -111,13 +62,16 @@ export function EquipmentAssetForm({
   const [usefulLifeYears, setUsefulLifeYears] = useState('')
   const [residualValue, setResidualValue] = useState('')
   const [warehouseId, setWarehouseId] = useState('')
-  const [warehouses, setWarehouses] = useState<SelectOption[]>([])
+  const [warehouses, setWarehouses] = useState<SearchableSelectOption[]>([])
+  const [assignedUserId, setAssignedUserId] = useState('')
+  const [assignableUsers, setAssignableUsers] = useState<SearchableSelectOption[]>([])
   const [notes, setNotes] = useState('')
   const [attachments, setAttachments] = useState<File[]>([])
   const [priceError, setPriceError] = useState('')
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const isVisible = (s: string) => familyConfig.visibleSections.includes(s as never)
+  // Resolver secciones según modalidad activa (sectionsByMode tiene prioridad sobre global)
+  const resolvedSections = resolveSectionsForMode(familyConfig, acquisitionMode)
+  const isVisible = (s: string) => resolvedSections.visible.includes(s as never)
 
   useEffect(() => {
     fetch(`/api/inventory/equipment-types?familyId=${familyId}`)
@@ -132,6 +86,15 @@ export function EquipmentAssetForm({
     }
   }, [acquisitionMode])
 
+  useEffect(() => {
+    if (equipmentStatus === 'ASSIGNED') {
+      fetch('/api/users?limit=200').then(r => r.json()).then(d => {
+        const list = d.data ?? d.users ?? []
+        setAssignableUsers(list.map((u: { id: string; name?: string; email?: string }) => ({ id: u.id, name: u.name ?? u.email ?? u.id })))
+      })
+    }
+  }, [equipmentStatus])
+
   const addAccessory = () => {
     const v = accessoryInput.trim()
     if (v && !accessories.includes(v)) { setAccessories(p => [...p, v]); setAccessoryInput('') }
@@ -142,26 +105,15 @@ export function EquipmentAssetForm({
     if (k && v) { setSpecifications(p => ({ ...p, [k]: v })); setSpecKey(''); setSpecValue('') }
   }
 
-  const addFiles = (files: FileList | null) => {
-    if (!files) return
-    setAttachments(prev => {
-      const next = [...prev]
-      Array.from(files).forEach(f => {
-        if (f.size > maxFileSizeMB * 1024 * 1024) return
-        if (!next.find(x => x.name === f.name && x.size === f.size)) next.push(f)
-      })
-      return next
-    })
-  }
-
   const supplierLabel = acquisitionMode === 'RENTAL' ? 'Proveedor del Arrendamiento' : acquisitionMode === 'LOAN' ? 'Propietario del Bien' : 'Proveedor'
   const supplierRequired = acquisitionMode === 'RENTAL' || acquisitionMode === 'LOAN'
-  const showFinancial = isVisible('FINANCIAL') || condition === 'NEW'
+  const requireFinancialForNew = familyConfig.requireFinancialForNew ?? true
+  const showFinancial = isVisible('FINANCIAL') || (requireFinancialForNew && condition === 'NEW')
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setPriceError('')
-    if (condition === 'NEW' && !purchasePrice) {
+    if (requireFinancialForNew && condition === 'NEW' && !purchasePrice) {
       setPriceError('El precio de compra es obligatorio para activos nuevos')
       return
     }
@@ -189,7 +141,8 @@ export function EquipmentAssetForm({
       depreciationMethod: depreciationMethod || undefined,
       usefulLifeYears: usefulLifeYears ? parseFloat(usefulLifeYears) : undefined,
       residualValue: residualValue ? parseFloat(residualValue) : undefined,
-      warehouseId: warehouseId || undefined,
+      warehouseId: equipmentStatus !== 'ASSIGNED' ? (warehouseId || undefined) : undefined,
+      assignedUserId: equipmentStatus === 'ASSIGNED' ? (assignedUserId || undefined) : undefined,
       notes: notes || undefined,
     }
     onSubmit(payload)
@@ -197,13 +150,17 @@ export function EquipmentAssetForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
+      {/* Botón atrás superior */}
+      <button type="button" onClick={onBack} className="text-sm text-muted-foreground hover:text-foreground">← Atrás</button>
+
       {/* Modalidad */}
       <div className="space-y-1">
-        <Label>Modalidad de Adquisición</Label>
-        <select value={acquisitionMode} onChange={e => setAcquisitionMode(e.target.value as typeof acquisitionMode)}
-          className="flex h-10 w-full rounded-md border border-border bg-card px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          {ACQUISITION_MODES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-        </select>
+        <Label>¿Cómo se adquirió este equipo?</Label>
+        <SimpleSelect
+          value={acquisitionMode}
+          onChange={e => setAcquisitionMode(e.target.value as typeof acquisitionMode)}
+          options={ACQUISITION_MODES}
+        />
         <p className="text-xs text-muted-foreground">{ACQUISITION_MODES.find(m => m.value === acquisitionMode)?.help}</p>
       </div>
 
@@ -234,33 +191,31 @@ export function EquipmentAssetForm({
       {/* Tipo de equipo */}
       <div className="space-y-1">
         <Label>Tipo de Equipo</Label>
-        <SearchSelect options={equipmentTypes} value={equipmentTypeId} onChange={setEquipmentTypeId} placeholder="Buscar tipo de equipo..." />
+        <SearchableSelect options={equipmentTypes} value={equipmentTypeId} onChange={setEquipmentTypeId} placeholder="Buscar tipo de equipo..." />
       </div>
 
       {/* Condición / Estado */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label>Condición <span className="text-destructive">*</span></Label>
-          <select value={condition} onChange={e => setCondition(e.target.value)}
-            className="flex h-10 w-full rounded-md border border-border bg-card px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <SimpleSelect value={condition} onChange={e => setCondition(e.target.value)}>
             <option value="NEW">Nuevo</option>
             <option value="LIKE_NEW">Como Nuevo</option>
             <option value="GOOD">Bueno</option>
             <option value="FAIR">Regular</option>
             <option value="POOR">Malo</option>
-          </select>
-          {condition === 'NEW' && <p className="text-xs text-amber-600 dark:text-amber-400">Activo nuevo — información financiera obligatoria.</p>}
+          </SimpleSelect>
+          {condition === 'NEW' && requireFinancialForNew && <p className="text-xs text-amber-600 dark:text-amber-400">Activo nuevo — información financiera obligatoria.</p>}
         </div>
         <div className="space-y-1">
           <Label>Estado</Label>
-          <select value={equipmentStatus} onChange={e => setEquipmentStatus(e.target.value)}
-            className="flex h-10 w-full rounded-md border border-border bg-card px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <SimpleSelect value={equipmentStatus} onChange={e => setEquipmentStatus(e.target.value)}>
             <option value="AVAILABLE">Disponible</option>
             <option value="ASSIGNED">Asignado</option>
             <option value="MAINTENANCE">En Mantenimiento</option>
             <option value="DAMAGED">Dañado</option>
             <option value="RETIRED">Retirado</option>
-          </select>
+          </SimpleSelect>
         </div>
       </div>
 
@@ -309,7 +264,7 @@ export function EquipmentAssetForm({
       {/* Proveedor */}
       <div className="space-y-1">
         <Label>{supplierLabel} {supplierRequired && <span className="text-destructive">*</span>}</Label>
-        <SearchSelect options={suppliers} value={supplierId} onChange={setSupplierId} placeholder="Buscar proveedor..." />
+        <SearchableSelect options={suppliers} value={supplierId} onChange={setSupplierId} placeholder="Buscar proveedor..." />
       </div>
 
       {/* Contrato — solo RENTAL */}
@@ -323,11 +278,11 @@ export function EquipmentAssetForm({
       {showFinancial && (
         <fieldset className="rounded-lg border border-border p-4 space-y-3">
           <legend className="px-2 text-sm font-semibold text-foreground">
-            Información Financiera {condition === 'NEW' && <span className="text-destructive">*</span>}
+            Información Financiera {requireFinancialForNew && condition === 'NEW' && <span className="text-destructive">*</span>}
           </legend>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label>Precio de Compra {condition === 'NEW' && <span className="text-destructive">*</span>}</Label>
+              <Label>Precio de Compra {requireFinancialForNew && condition === 'NEW' && <span className="text-destructive">*</span>}</Label>
               <Input type="number" min="0" step="0.01" value={purchasePrice} onChange={e => setPurchasePrice(e.target.value)} placeholder="0.00" />
               {priceError && <p className="text-xs text-destructive">{priceError}</p>}
             </div>
@@ -350,10 +305,9 @@ export function EquipmentAssetForm({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1 col-span-2">
               <Label>Método</Label>
-              <select value={depreciationMethod} onChange={e => setDepreciationMethod(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-border bg-card px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                {DEPRECIATION_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-              </select>
+              <SimpleSelect value={depreciationMethod} onChange={e => setDepreciationMethod(e.target.value)}
+                options={DEPRECIATION_METHODS}
+              />
             </div>
             <div className="space-y-1">
               <Label>Vida Útil (años)</Label>
@@ -367,11 +321,19 @@ export function EquipmentAssetForm({
         </fieldset>
       )}
 
-      {/* Sección BODEGA */}
-      {isVisible('WAREHOUSE') && (
+      {/* Asignado a usuario — solo cuando estado es ASSIGNED */}
+      {equipmentStatus === 'ASSIGNED' && (
+        <div className="space-y-1">
+          <Label>Asignar a <span className="text-destructive">*</span></Label>
+          <SearchableSelect options={assignableUsers} value={assignedUserId} onChange={setAssignedUserId} placeholder="Buscar usuario..." />
+        </div>
+      )}
+
+      {/* Sección BODEGA — oculta si está asignado */}
+      {isVisible('WAREHOUSE') && equipmentStatus !== 'ASSIGNED' && (
         <div className="space-y-1">
           <Label>Bodega</Label>
-          <SearchSelect options={warehouses} value={warehouseId} onChange={setWarehouseId} placeholder="Buscar bodega..." />
+          <SearchableSelect options={warehouses} value={warehouseId} onChange={setWarehouseId} placeholder="Buscar bodega..." />
         </div>
       )}
 
@@ -382,30 +344,7 @@ export function EquipmentAssetForm({
       </div>
 
       {/* Adjuntos */}
-      <div className="space-y-2">
-        <Label>Imágenes y Adjuntos</Label>
-        <div
-          className="flex flex-col items-center justify-center rounded-md border-2 border-dashed border-border p-5 cursor-pointer hover:border-primary/50 transition-colors"
-          onClick={() => fileInputRef.current?.click()}
-          onDragOver={e => e.preventDefault()}
-          onDrop={e => { e.preventDefault(); addFiles(e.dataTransfer.files) }}
-        >
-          <Upload className="h-7 w-7 text-muted-foreground mb-1" />
-          <p className="text-sm text-muted-foreground">Arrastra archivos o <span className="text-primary font-medium">haz clic</span></p>
-          <p className="text-xs text-muted-foreground mt-0.5">Máx. {maxFileSizeMB} MB por archivo</p>
-        </div>
-        <input ref={fileInputRef} type="file" multiple className="hidden" onChange={e => addFiles(e.target.files)} />
-        {attachments.length > 0 && (
-          <div className="space-y-1">
-            {attachments.map((f, i) => (
-              <div key={i} className="flex items-center justify-between rounded-md border border-border px-3 py-1.5 text-sm">
-                <span className="truncate">{f.name}</span>
-                <button type="button" onClick={() => setAttachments(p => p.filter((_, j) => j !== i))}><X className="h-3.5 w-3.5 text-muted-foreground" /></button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <FileUploadZone files={attachments} onChange={setAttachments} maxFileSizeMB={maxFileSizeMB} />
 
       {submitError && <p className="text-sm text-destructive">{submitError}</p>}
 

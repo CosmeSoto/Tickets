@@ -86,8 +86,6 @@ const navigationByRole: Record<string, NavItem[]> = {
         { name: 'Configuración', href: '/settings/tickets', icon: Settings },
       ],
     },
-    { name: 'Usuarios', href: '/admin/users', icon: Users },
-    { name: 'Departamentos', href: '/admin/departments', icon: Building },
     {
       name: 'Inventario',
       href: '/inventory',
@@ -95,6 +93,7 @@ const navigationByRole: Record<string, NavItem[]> = {
       children: [
         { name: 'Equipos', href: '/inventory', icon: Monitor },
         { name: 'Mantenimientos', href: '/inventory/maintenance', icon: Wrench },
+        { name: 'Contratos', href: '/inventory/contracts', icon: FileSignature },
         { name: 'Actas de Entrega', href: '/inventory/acts', icon: FileText },
         { name: 'Actas de Baja', href: '/inventory/decommission', icon: Trash2 },
         { name: 'Proveedores', href: '/inventory/suppliers', icon: Building2 },
@@ -113,6 +112,8 @@ const navigationByRole: Record<string, NavItem[]> = {
         { name: 'Configuración', href: '/settings/inventory', icon: Settings },
       ],
     },
+    { name: 'Departamentos', href: '/admin/departments', icon: Building },
+    { name: 'Usuarios', href: '/admin/users', icon: Users },
     { name: 'Auditoría', href: '/admin/audit', icon: Shield },
     { name: 'Configuración Sistema', href: '/admin/settings', icon: Settings },
   ],
@@ -136,6 +137,7 @@ const navigationByRole: Record<string, NavItem[]> = {
       children: [
         { name: 'Equipos', href: '/inventory', icon: Monitor },
         { name: 'Mantenimientos', href: '/inventory/maintenance', icon: Wrench },
+        { name: 'Contratos', href: '/inventory/contracts', icon: FileSignature },
         { name: 'Actas de Entrega', href: '/inventory/acts', icon: FileText },
         { name: 'Actas de Baja', href: '/inventory/decommission', icon: Trash2 },
         {name: 'Catálogos',href: '/inventory/equipment-types',icon: Database,children: [

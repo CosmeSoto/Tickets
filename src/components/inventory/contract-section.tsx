@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 
 export interface ContractData {
   action: 'create' | 'link'
@@ -213,19 +214,14 @@ export function ContractSection({
           {loadingContracts ? (
             <p className="text-sm text-muted-foreground">Cargando contratos...</p>
           ) : (
-            <select
+            <SearchableSelect
               id="existingContract"
+              options={existingContracts.map(c => ({ value: c.id, label: c.contractNumber ?? c.name }))}
               value={selectedContractId}
-              onChange={(e) => setSelectedContractId(e.target.value)}
-              className="flex h-10 w-full rounded-md border border-border bg-card px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <option value="">Seleccionar contrato...</option>
-              {existingContracts.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.contractNumber ?? c.name}
-                </option>
-              ))}
-            </select>
+              onChange={setSelectedContractId}
+              placeholder="Buscar contrato..."
+              emptyLabel="Seleccionar contrato..."
+            />
           )}
           {!loadingContracts && existingContracts.length === 0 && (
             <p className="text-xs text-muted-foreground">

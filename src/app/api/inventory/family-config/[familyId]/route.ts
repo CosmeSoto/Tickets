@@ -8,11 +8,12 @@ import {
   validateSectionsInvariant,
   type AssetSubtype,
   type FormSection,
+  type SectionsByMode,
 } from '@/lib/inventory/family-config'
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { familyId: string } }
+  { params }: { params: Promise<{ familyId: string }> }
 ) {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
@@ -29,7 +30,7 @@ export async function GET(
     }
   }
 
-  const { familyId } = params
+  const { familyId } = await params
 
   try {
     const config = await prisma.inventory_family_config.findUnique({ where: { familyId } })
@@ -41,7 +42,8 @@ export async function GET(
       allowedSubtypes: config.allowedSubtypes,
       visibleSections: config.visibleSections,
       requiredSections: config.requiredSections,
-      requireFinancialForNew: (config as any).requireFinancialForNew ?? true,
+      requireFinancialForNew: config.requireFinancialForNew,
+      sectionsByMode: config.sectionsByMode ?? undefined,
     })
   } catch (err) {
     console.error('[family-config GET]', err)
@@ -51,7 +53,7 @@ export async function GET(
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { familyId: string } }
+  { params }: { params: Promise<{ familyId: string }> }
 ) {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
@@ -67,30 +69,44 @@ export async function PUT(
     )
   }
 
-  const { familyId } = params
+  const { familyId } = await params
   const body = await req.json()
   const {
     allowedSubtypes,
     visibleSections,
     requiredSections,
     requireFinancialForNew = true,
+    sectionsByMode,
   } = body as {
     allowedSubtypes: AssetSubtype[]
     visibleSections: FormSection[]
     requiredSections: FormSection[]
     requireFinancialForNew?: boolean
+    sectionsByMode?: SectionsByMode
   }
 
   if (!Array.isArray(allowedSubtypes) || allowedSubtypes.length < 1) {
     return NextResponse.json({ error: 'Una familia debe permitir al menos un subtipo de activo' }, { status: 422 })
   }
 
+  // Validar invariante global
   const sectionsCheck = validateSectionsInvariant(visibleSections ?? [], requiredSections ?? [])
   if (!sectionsCheck.valid) {
-    return NextResponse.json(
-      { error: 'Las secciones obligatorias deben ser un subconjunto de las secciones visibles' },
-      { status: 422 }
-    )
+    return NextResponse.json({ error: sectionsCheck.error }, { status: 422 })
+  }
+
+  // Validar invariante por modalidad
+  if (sectionsByMode) {
+    for (const [mode, cfg] of Object.entries(sectionsByMode)) {
+      if (!cfg) continue
+      const check = validateSectionsInvariant(cfg.visible ?? [], cfg.required ?? [])
+      if (!check.valid) {
+        return NextResponse.json(
+          { error: `Modalidad ${mode}: ${check.error}` },
+          { status: 422 }
+        )
+      }
+    }
   }
 
   try {
@@ -101,14 +117,17 @@ export async function PUT(
         visibleSections: visibleSections ?? [],
         requiredSections: requiredSections ?? [],
         requireFinancialForNew,
-      } as any,
+        sectionsByMode: sectionsByMode ?? null,
+      },
       create: {
+        id: randomUUID(),
         familyId,
         allowedSubtypes,
         visibleSections: visibleSections ?? [],
         requiredSections: requiredSections ?? [],
         requireFinancialForNew,
-      } as any,
+        sectionsByMode: sectionsByMode ?? null,
+      },
     })
 
     await prisma.audit_logs.create({
@@ -126,22 +145,12 @@ export async function PUT(
       allowedSubtypes: config.allowedSubtypes,
       visibleSections: config.visibleSections,
       requiredSections: config.requiredSections,
-      requireFinancialForNew: (config as any).requireFinancialForNew ?? true,
+      requireFinancialForNew: config.requireFinancialForNew,
+      sectionsByMode: config.sectionsByMode ?? undefined,
     })
   } catch (err) {
     console.error('[family-config PUT]', err)
     const msg = err instanceof Error ? err.message : 'Error al guardar la configuración'
-    // Si la tabla no existe aún (BD no migrada), devolver los datos sin error para no bloquear al usuario
-    if (msg.includes('does not exist') || msg.includes('relation') || msg.includes('P2021') || msg.includes('P2002')) {
-      return NextResponse.json({
-        familyId,
-        allowedSubtypes,
-        visibleSections: visibleSections ?? [],
-        requiredSections: requiredSections ?? [],
-        requireFinancialForNew,
-        _warning: 'Configuración no persistida — reconstruye el contenedor para aplicar la migración',
-      })
-    }
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }

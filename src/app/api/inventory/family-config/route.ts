@@ -40,6 +40,7 @@ export async function GET(_req: NextRequest) {
       allowedSubtypes: family.formConfig.allowedSubtypes,
       visibleSections: family.formConfig.visibleSections,
       requiredSections: family.formConfig.requiredSections,
+      requireFinancialForNew: family.formConfig.requireFinancialForNew,
     }
   })
 

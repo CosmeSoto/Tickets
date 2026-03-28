@@ -39,6 +39,7 @@ import { FamilyFilterBar } from '@/components/inventory/family-filter-bar'
 const REPORT_TYPES = [
   { id: 'equipment-summary', label: 'Resumen de Equipos', icon: Package, description: 'Equipos por estado, tipo y condición' },
   { id: 'assignments', label: 'Historial de Asignaciones', icon: FileText, description: 'Asignaciones realizadas en el período' },
+  { id: 'acts-history', label: 'Historial de Actas', icon: FileText, description: 'Todas las actas de entrega, devolución y baja en el período' },
   { id: 'pending-acts', label: 'Actas Pendientes', icon: Clock, description: 'Actas de entrega/devolución pendientes' },
   { id: 'maintenance-costs', label: 'Costos de Mantenimiento', icon: Wrench, description: 'Gastos de mantenimiento por período' },
   { id: 'consumable-usage', label: 'Uso de Consumibles', icon: ShoppingCart, description: 'Movimientos de stock en el período' },
@@ -225,6 +226,8 @@ function ReportResults({ reportType, data }: { reportType: string; data: any }) 
   switch (reportType) {
     case 'equipment-summary':
       return <EquipmentSummaryReport data={data} />
+    case 'acts-history':
+      return <ActsHistoryReport data={data} />
     case 'pending-acts':
       return <PendingActsReport data={data} />
     case 'inventory-value':
@@ -242,6 +245,92 @@ function ReportResults({ reportType, data }: { reportType: string; data: any }) 
     default:
       return <GenericReport data={data} />
   }
+}
+
+function ActsHistoryReport({ data }: { data: any }) {
+  const TYPE_LABELS: Record<string, string> = {
+    'Acta de Entrega': 'Entrega',
+    'Acta de Devolución': 'Devolución',
+    'Solicitud de Baja': 'Baja',
+  }
+  const TYPE_COLORS: Record<string, string> = {
+    'Acta de Entrega':    'bg-blue-100 text-blue-800',
+    'Acta de Devolución': 'bg-amber-100 text-amber-800',
+    'Solicitud de Baja':  'bg-red-100 text-red-800',
+  }
+  const STATUS_LABELS: Record<string, string> = {
+    PENDING: 'Pendiente', ACCEPTED: 'Aceptada', APPROVED: 'Aprobada',
+    REJECTED: 'Rechazada', EXPIRED: 'Expirada', CANCELLED: 'Cancelada',
+  }
+  const STATUS_COLORS: Record<string, string> = {
+    PENDING: 'bg-yellow-100 text-yellow-800',
+    ACCEPTED: 'bg-green-100 text-green-800',
+    APPROVED: 'bg-green-100 text-green-800',
+    REJECTED: 'bg-red-100 text-red-800',
+    EXPIRED: 'bg-muted text-muted-foreground',
+    CANCELLED: 'bg-muted text-muted-foreground',
+  }
+
+  const rows: any[] = data?.rows ?? []
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <FileText className="h-5 w-5" />
+          Historial de Actas
+        </CardTitle>
+        <CardDescription>
+          {data?.total ?? 0} actas en el período —
+          {' '}{data?.byType?.delivery ?? 0} entregas ·
+          {' '}{data?.byType?.return ?? 0} devoluciones ·
+          {' '}{data?.byType?.decommission ?? 0} bajas
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4 text-center">No hay actas en el período seleccionado.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm divide-y divide-border">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="px-3 py-2 text-left font-medium text-muted-foreground">Tipo</th>
+                  <th className="px-3 py-2 text-left font-medium text-muted-foreground">Folio</th>
+                  <th className="px-3 py-2 text-left font-medium text-muted-foreground">Equipo</th>
+                  <th className="px-3 py-2 text-left font-medium text-muted-foreground hidden md:table-cell">Persona</th>
+                  <th className="px-3 py-2 text-left font-medium text-muted-foreground">Estado</th>
+                  <th className="px-3 py-2 text-left font-medium text-muted-foreground hidden lg:table-cell">Fecha</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border bg-card">
+                {rows.map((row: any, i: number) => (
+                  <tr key={i} className="hover:bg-muted/40">
+                    <td className="px-3 py-2">
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_COLORS[row.tipo] ?? 'bg-muted text-muted-foreground'}`}>
+                        {TYPE_LABELS[row.tipo] ?? row.tipo}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{row.folio ?? '—'}</td>
+                    <td className="px-3 py-2 font-medium max-w-[200px] truncate">{row.equipo}</td>
+                    <td className="px-3 py-2 text-muted-foreground hidden md:table-cell">{row.persona}</td>
+                    <td className="px-3 py-2">
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[row.estado] ?? 'bg-muted text-muted-foreground'}`}>
+                        {STATUS_LABELS[row.estado] ?? row.estado}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground hidden lg:table-cell">
+                      {new Date(row.fecha).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
 }
 
 function EquipmentSummaryReport({ data }: { data: any }) {

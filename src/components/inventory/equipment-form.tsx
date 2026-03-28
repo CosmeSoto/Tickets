@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Loader2, Plus, X, Package, Settings, ExternalLink, ImageIcon, Upload, Eye, Download } from 'lucide-react'
+import { Loader2, Plus, X, Package, Settings, ExternalLink, ImageIcon } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,6 +22,7 @@ import { useToast } from '@/hooks/use-toast'
 import { createEquipmentSchema, type CreateEquipmentInput } from '@/lib/validations/inventory/equipment'
 import type { Equipment, EquipmentFormData } from '@/types/inventory/equipment'
 import { EquipmentAttachments } from '@/components/inventory/equipment-attachments'
+import { FileUploadZone } from '@/components/ui/file-upload-zone'
 
 interface EquipmentFormProps {
   equipment?: Equipment
@@ -73,8 +74,7 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
   const [newSpecKey, setNewSpecKey] = useState('')
   const [newSpecValue, setNewSpecValue] = useState('')
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
-  const [maxFileSize, setMaxFileSize] = useState(10) // MB — se sobreescribe con config del sistema
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [maxFileSize, setMaxFileSize] = useState(10)
 
   useEffect(() => {
     fetch('/api/admin/settings')
@@ -778,74 +778,15 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
           {isEditing && equipment?.id ? (
             <EquipmentAttachments equipmentId={equipment.id} canManage={true} />
           ) : (
-            <div className="space-y-2">
-              <div
-                className="flex items-center gap-3 rounded-md border border-dashed border-muted-foreground/30 px-4 py-3 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors"
-                onClick={() => fileInputRef.current?.click()}
-                onDragOver={e => e.preventDefault()}
-                onDrop={e => {
-                  e.preventDefault()
-                  const valid = Array.from(e.dataTransfer.files).filter(f => {
-                    if (f.size > maxFileSize * 1024 * 1024) {
-                      toast({ title: 'Archivo muy grande', description: `"${f.name}" supera ${maxFileSize}MB`, variant: 'destructive' })
-                      return false
-                    }
-                    return true
-                  })
-                  setPendingFiles(prev => [...prev, ...valid])
-                }}
-              >
-                <Upload className="h-5 w-5 text-muted-foreground shrink-0" />
-                <div>
-                  <p className="text-sm font-medium">Arrastra archivos o haz clic para seleccionar</p>
-                  <p className="text-xs text-muted-foreground">Imágenes, PDF, documentos — máx. {maxFileSize}MB</p>
-                </div>
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt"
-                className="hidden"
-                onChange={e => {
-                  if (!e.target.files) return
-                  const valid = Array.from(e.target.files).filter(f => {
-                    if (f.size > maxFileSize * 1024 * 1024) {
-                      toast({ title: 'Archivo muy grande', description: `"${f.name}" supera ${maxFileSize}MB`, variant: 'destructive' })
-                      return false
-                    }
-                    return true
-                  })
-                  setPendingFiles(prev => [...prev, ...valid])
-                  e.target.value = ''
-                }}
-              />
-              {pendingFiles.length > 0 && (
-                <div className="space-y-1.5">
-                  {pendingFiles.map((file, i) => (
-                    <div key={i} className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm">
-                      {file.type.startsWith('image/') ? (
-                        <img src={URL.createObjectURL(file)} alt={file.name} className="h-8 w-8 rounded object-cover shrink-0" />
-                      ) : (
-                        <ImageIcon className="h-8 w-8 text-muted-foreground shrink-0" />
-                      )}
-                      <span className="flex-1 truncate text-xs">{file.name}</span>
-                      <span className="text-xs text-muted-foreground shrink-0">{(file.size / 1024).toFixed(0)}KB</span>
-                      {file.type.startsWith('image/') && (
-                        <Button type="button" variant="ghost" size="icon" className="h-6 w-6 shrink-0"
-                          onClick={() => window.open(URL.createObjectURL(file), '_blank')}>
-                          <Eye className="h-3 w-3" />
-                        </Button>
-                      )}
-                      <Button type="button" variant="ghost" size="icon" className="h-6 w-6 shrink-0 hover:text-destructive"
-                        onClick={() => setPendingFiles(prev => prev.filter((_, idx) => idx !== i))}>
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <FileUploadZone
+              files={pendingFiles}
+              onChange={setPendingFiles}
+              maxFileSizeMB={maxFileSize}
+              accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt"
+              onSizeError={(name, max) =>
+                toast({ title: 'Archivo muy grande', description: `"${name}" supera ${max}MB`, variant: 'destructive' })
+              }
+            />
           )}
         </CardContent>
       </Card>

@@ -1,189 +1,175 @@
-/**
- * Componente SearchableSelect - Select con búsqueda integrada
- * Optimizado para listas grandes con virtualización y debounce
- */
-
 'use client'
 
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
-import { Check, ChevronsUpDown, Search, X } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
+/**
+ * SearchableSelect — selector con buscador integrado, uso global.
+ *
+ * Acepta opciones en dos formatos:
+ *   - { value: string; label: string }   ← formato estándar
+ *   - { id: string; name: string }       ← compatibilidad con APIs existentes
+ *
+ * Uso básico:
+ *   <SearchableSelect
+ *     options={items}          // { id, name } o { value, label }
+ *     value={selectedId}
+ *     onChange={setSelectedId}
+ *     placeholder="Buscar..."
+ *     emptyLabel="Sin asignar" // texto de la opción vacía (omitir para ocultar)
+ *   />
+ */
+
+import { useState, useEffect, useRef } from 'react'
+import { Search, ChevronDown, X } from 'lucide-react'
 
 export interface SearchableSelectOption {
-  value: string
-  label: string
-  description?: string
-  icon?: React.ReactNode
+  value?: string
+  label?: string
+  id?: string
+  name?: string
 }
 
 interface SearchableSelectProps {
   options: SearchableSelectOption[]
-  value?: string
-  onValueChange: (value: string) => void
+  value: string
+  onChange: (value: string) => void
   placeholder?: string
-  emptyText?: string
-  searchPlaceholder?: string
+  /** Texto de la opción "vacía". Si no se pasa, no se muestra opción vacía. */
+  emptyLabel?: string
   disabled?: boolean
   className?: string
-  allowClear?: boolean
+}
+
+function normalize(opt: SearchableSelectOption): { value: string; label: string } {
+  return {
+    value: (opt.value ?? opt.id ?? ''),
+    label: (opt.label ?? opt.name ?? ''),
+  }
 }
 
 export function SearchableSelect({
   options,
   value,
-  onValueChange,
-  placeholder = 'Seleccionar...',
-  emptyText = 'No se encontraron resultados',
-  searchPlaceholder = 'Buscar...',
+  onChange,
+  placeholder = 'Buscar...',
+  emptyLabel,
   disabled = false,
-  className,
-  allowClear = true,
+  className = '',
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [query, setQuery] = useState('')
+  const ref = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
-  // Filtrar opciones basado en búsqueda
-  const filteredOptions = useMemo(() => {
-    if (!searchQuery) return options
+  const normalized = options.map(normalize)
+  const selected = normalized.find(o => o.value === value)
 
-    const query = searchQuery.toLowerCase()
-    return options.filter(
-      (option) =>
-        option.label.toLowerCase().includes(query) ||
-        option.description?.toLowerCase().includes(query) ||
-        option.value.toLowerCase().includes(query)
-    )
-  }, [options, searchQuery])
+  const filtered = query.trim()
+    ? normalized.filter(o => o.label.toLowerCase().includes(query.toLowerCase()))
+    : normalized
 
-  // Encontrar la opción seleccionada
-  const selectedOption = useMemo(
-    () => options.find((option) => option.value === value),
-    [options, value]
-  )
-
-  // Manejar selección
-  const handleSelect = useCallback(
-    (selectedValue: string) => {
-      if (selectedValue === value) {
-        // Si se selecciona el mismo valor, deseleccionar si allowClear está habilitado
-        if (allowClear) {
-          onValueChange('')
-        }
-      } else {
-        onValueChange(selectedValue)
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false)
+        setQuery('')
       }
-      setOpen(false)
-      setSearchQuery('')
-    },
-    [value, onValueChange, allowClear]
-  )
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
-  // Limpiar selección
-  const handleClear = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation()
-      onValueChange('')
-      setSearchQuery('')
-    },
-    [onValueChange]
-  )
+  const handleOpen = () => {
+    if (disabled) return
+    setOpen(true)
+    setTimeout(() => inputRef.current?.focus(), 50)
+  }
+
+  const handleSelect = (val: string) => {
+    onChange(val)
+    setOpen(false)
+    setQuery('')
+  }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className={cn(
-            'w-full justify-between',
-            !value && 'text-muted-foreground',
-            className
+    <div ref={ref} className={`relative ${className}`}>
+      {/* Trigger */}
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={handleOpen}
+        className="flex h-10 w-full items-center justify-between rounded-md border border-border bg-card px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <span className={selected ? 'text-foreground truncate' : 'text-muted-foreground truncate'}>
+          {selected ? selected.label : (emptyLabel ?? placeholder)}
+        </span>
+        <div className="flex shrink-0 items-center gap-1 ml-2">
+          {value && (
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={e => { e.stopPropagation(); handleSelect('') }}
+              onKeyDown={e => { if (e.key === 'Enter') { e.stopPropagation(); handleSelect('') } }}
+              className="rounded p-0.5 hover:bg-muted"
+            >
+              <X className="h-3.5 w-3.5 text-muted-foreground" />
+            </span>
           )}
-          disabled={disabled}
-        >
-          <span className="truncate">
-            {selectedOption ? selectedOption.label : placeholder}
-          </span>
-          <div className="flex items-center space-x-1 ml-2">
-            {value && allowClear && !disabled && (
-              <X
-                className="h-4 w-4 shrink-0 opacity-50 hover:opacity-100"
-                onClick={handleClear}
-              />
-            )}
-            <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
-          </div>
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-full p-0" align="start">
-        <Command shouldFilter={false}>
-          <div className="flex items-center border-b px-3">
-            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+        </div>
+      </button>
+
+      {/* Dropdown */}
+      {open && (
+        <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md">
+          {/* Buscador */}
+          <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
             <input
-              placeholder={searchPlaceholder}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              ref={inputRef}
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder={placeholder}
+              className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
-            {searchQuery && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0"
-                onClick={() => setSearchQuery('')}
-              >
-                <X className="h-3 w-3" />
-              </Button>
+            {query && (
+              <button type="button" onClick={() => setQuery('')}>
+                <X className="h-3 w-3 text-muted-foreground" />
+              </button>
             )}
           </div>
-          <CommandList>
-            <CommandEmpty>{emptyText}</CommandEmpty>
-            <CommandGroup>
-              {filteredOptions.map((option) => (
-                <CommandItem
-                  key={option.value}
-                  value={option.value}
-                  onSelect={() => handleSelect(option.value)}
-                  className="cursor-pointer"
+
+          {/* Opciones */}
+          <ul className="max-h-56 overflow-y-auto py-1">
+            {/* Opción vacía opcional */}
+            {emptyLabel !== undefined && (
+              <li>
+                <button
+                  type="button"
+                  onClick={() => handleSelect('')}
+                  className={`w-full px-3 py-2 text-left text-sm hover:bg-accent ${!value ? 'font-medium text-foreground' : 'text-muted-foreground'}`}
                 >
-                  <Check
-                    className={cn(
-                      'mr-2 h-4 w-4',
-                      value === option.value ? 'opacity-100' : 'opacity-0'
-                    )}
-                  />
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2">
-                      {option.icon}
-                      <span>{option.label}</span>
-                    </div>
-                    {option.description && (
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {option.description}
-                      </p>
-                    )}
-                  </div>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+                  {emptyLabel}
+                </button>
+              </li>
+            )}
+
+            {filtered.length === 0 ? (
+              <li className="px-3 py-2 text-sm text-muted-foreground">Sin resultados</li>
+            ) : (
+              filtered.map(opt => (
+                <li key={opt.value}>
+                  <button
+                    type="button"
+                    onClick={() => handleSelect(opt.value)}
+                    className={`w-full px-3 py-2 text-left text-sm hover:bg-accent ${opt.value === value ? 'bg-accent/50 font-medium text-foreground' : 'text-foreground'}`}
+                  >
+                    {opt.label}
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+      )}
+    </div>
   )
 }

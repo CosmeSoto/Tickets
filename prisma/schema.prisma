@@ -1664,6 +1664,10 @@ model inventory_family_config {
   visibleSections       FormSection[]  @map("visible_sections")
   requiredSections      FormSection[]  @map("required_sections")
   requireFinancialForNew Boolean       @default(true) @map("require_financial_for_new")
+  /// Config de secciones por modalidad de adquisición para EQUIPMENT.
+  /// Estructura: { FIXED_ASSET?: { visible: FormSection[], required: FormSection[] }, RENTAL?: {...}, LOAN?: {...} }
+  /// Si es null, se usan visibleSections/requiredSections como fallback global.
+  sectionsByMode        Json?          @map("sections_by_mode")
   createdAt             DateTime      @default(now()) @map("created_at")
   updatedAt             DateTime      @updatedAt @map("updated_at")
 

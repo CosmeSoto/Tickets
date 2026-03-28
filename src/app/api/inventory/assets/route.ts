@@ -19,6 +19,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl
   const familyIdParam = searchParams.get('familyId') ?? undefined
   const subtypeParam = searchParams.get('subtype') ?? undefined
+  const searchQuery = searchParams.get('search')?.trim().toLowerCase() ?? ''
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1)
   const pageSizeRaw = parseInt(searchParams.get('pageSize') ?? '20', 10) || 20
 
@@ -164,10 +165,14 @@ export async function GET(req: NextRequest) {
     createdAt: item.createdAt.toISOString(),
   }))
 
-  // Combinar, ordenar por createdAt DESC y paginar
-  const allItems = [...mappedEquipment, ...mappedConsumables, ...mappedLicenses].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  )
+  // Combinar, filtrar por búsqueda, ordenar por createdAt DESC y paginar
+  const allItems = [...mappedEquipment, ...mappedConsumables, ...mappedLicenses]
+    .filter(item =>
+      !searchQuery ||
+      item.name.toLowerCase().includes(searchQuery) ||
+      (item.code ?? '').toLowerCase().includes(searchQuery)
+    )
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
   const total = allItems.length
   const totalPages = Math.ceil(total / pageSize)

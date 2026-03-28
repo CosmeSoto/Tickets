@@ -1,12 +1,15 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { SearchableSelect } from '@/components/ui/searchable-select'
+import { SimpleSelect } from '@/components/ui/simple-select'
+import { FileUploadZone } from '@/components/ui/file-upload-zone'
 import type { FamilyConfig } from '@/lib/inventory/family-config-types'
-import { X, Upload, Search } from 'lucide-react'
+import { X } from 'lucide-react'
 
 interface MROAssetFormProps {
   familyId: string
@@ -18,63 +21,10 @@ interface MROAssetFormProps {
   maxFileSizeMB?: number
 }
 
-interface SelectOption { id: string; name: string }
-
 const ACQUISITION_MODES = [
-  { value: 'FIXED_ASSET', label: 'Activo Fijo',      help: 'Lo compraste, es tuyo.' },
-  { value: 'RENTAL',      label: 'Arrendamiento',    help: 'Suministro por proveedor externo.' },
+  { value: 'FIXED_ASSET', label: 'Compra directa',        help: 'Lo adquiriste — es propiedad de la empresa.' },
+  { value: 'RENTAL',      label: 'Suministro por proveedor', help: 'El proveedor lo suministra periódicamente.' },
 ]
-
-function SearchSelect({ options, value, onChange, placeholder = 'Seleccionar...', disabled }: {
-  options: SelectOption[]; value: string; onChange: (v: string) => void
-  placeholder?: string; disabled?: boolean
-}) {
-  const [open, setOpen] = useState(false)
-  const [q, setQ] = useState('')
-  const ref = useRef<HTMLDivElement>(null)
-  const filtered = q ? options.filter(o => o.name.toLowerCase().includes(q.toLowerCase())) : options
-  const selected = options.find(o => o.id === value)
-
-  useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
-    document.addEventListener('mousedown', h)
-    return () => document.removeEventListener('mousedown', h)
-  }, [])
-
-  return (
-    <div ref={ref} className="relative">
-      <button type="button" disabled={disabled} onClick={() => setOpen(o => !o)}
-        className="flex h-10 w-full items-center justify-between rounded-md border border-border bg-card px-3 py-2 text-sm disabled:opacity-50">
-        <span className={selected ? 'text-foreground' : 'text-muted-foreground'}>{selected?.name ?? placeholder}</span>
-        <Search className="h-3.5 w-3.5 text-muted-foreground" />
-      </button>
-      {open && (
-        <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md">
-          <div className="flex items-center gap-2 border-b px-3 py-2">
-            <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <input autoFocus className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-              placeholder="Buscar..." value={q} onChange={e => setQ(e.target.value)} />
-            {q && <button type="button" onClick={() => setQ('')}><X className="h-3 w-3" /></button>}
-          </div>
-          <div className="max-h-52 overflow-y-auto py-1">
-            <button type="button" onClick={() => { onChange(''); setOpen(false); setQ('') }}
-              className="w-full text-left px-3 py-2 text-sm text-muted-foreground hover:bg-accent">
-              {placeholder}
-            </button>
-            {filtered.map(o => (
-              <button key={o.id} type="button"
-                onClick={() => { onChange(o.id); setOpen(false); setQ('') }}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-accent ${o.id === value ? 'bg-accent/50 font-medium' : ''}`}>
-                {o.name}
-              </button>
-            ))}
-            {filtered.length === 0 && <p className="px-3 py-2 text-sm text-muted-foreground">Sin resultados</p>}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
 
 export function MROAssetForm({
   familyId, familyConfig, onSubmit, onBack, submitting, submitError, maxFileSizeMB = 10,
@@ -95,7 +45,6 @@ export function MROAssetForm({
   const [warehouses, setWarehouses] = useState<SelectOption[]>([])
   const [notes, setNotes] = useState('')
   const [attachments, setAttachments] = useState<File[]>([])
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const isVisible = (s: string) => familyConfig.visibleSections.includes(s as never)
 
@@ -113,18 +62,6 @@ export function MROAssetForm({
       fetch('/api/inventory/suppliers').then(r => r.json()).then(d => setSuppliers(d.suppliers ?? []))
     }
   }, [acquisitionMode])
-
-  const addFiles = (files: FileList | null) => {
-    if (!files) return
-    setAttachments(prev => {
-      const next = [...prev]
-      Array.from(files).forEach(f => {
-        if (f.size > maxFileSizeMB * 1024 * 1024) return
-        if (!next.find(x => x.name === f.name && x.size === f.size)) next.push(f)
-      })
-      return next
-    })
-  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -146,57 +83,62 @@ export function MROAssetForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
+      {/* Botón atrás superior */}
+      <button type="button" onClick={onBack} className="text-sm text-muted-foreground hover:text-foreground">← Atrás</button>
+
       {/* Modalidad */}
       <div className="space-y-1">
-        <Label>Modalidad de Adquisición</Label>
-        <select value={acquisitionMode} onChange={e => setAcquisitionMode(e.target.value as typeof acquisitionMode)}
-          className="flex h-10 w-full rounded-md border border-border bg-card px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          {ACQUISITION_MODES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-        </select>
+        <Label>¿Cómo se obtiene este material?</Label>
+        <SimpleSelect
+          value={acquisitionMode}
+          onChange={e => setAcquisitionMode(e.target.value as typeof acquisitionMode)}
+          options={ACQUISITION_MODES}
+        />
         <p className="text-xs text-muted-foreground">{ACQUISITION_MODES.find(m => m.value === acquisitionMode)?.help}</p>
       </div>
 
       {/* Nombre */}
       <div className="space-y-1">
-        <Label>Nombre <span className="text-destructive">*</span></Label>
-        <Input value={name} onChange={e => setName(e.target.value)} required placeholder="Ej: Tornillo M6" />
+        <Label>Nombre del material <span className="text-destructive">*</span></Label>
+        <Input value={name} onChange={e => setName(e.target.value)} required placeholder="Ej: Tornillo M6, Tóner HP 85A, Papel A4..." />
       </div>
 
       {/* Tipo de material */}
       <div className="space-y-1">
-        <Label>Tipo de Material</Label>
-        <SearchSelect options={consumableTypes} value={consumableTypeId} onChange={setConsumableTypeId} placeholder="Buscar tipo..." />
+        <Label>Categoría <span className="text-xs font-normal text-muted-foreground">(opcional)</span></Label>
+        <SearchableSelect options={consumableTypes} value={consumableTypeId} onChange={setConsumableTypeId} placeholder="Ej: Lubricante, Herramienta, Papel..." />
+        <p className="text-xs text-muted-foreground">Agrupa el material con otros del mismo tipo para facilitar búsquedas y reportes.</p>
       </div>
 
       {/* Unidad de medida */}
       <div className="space-y-1">
-        <Label>Unidad de Medida</Label>
-        <SearchSelect options={unitsOfMeasure} value={unitOfMeasureId} onChange={setUnitOfMeasureId} placeholder="Buscar unidad..." />
+        <Label>¿En qué se mide? <span className="text-xs font-normal text-muted-foreground">(opcional)</span></Label>
+        <SearchableSelect options={unitsOfMeasure} value={unitOfMeasureId} onChange={setUnitOfMeasureId} placeholder="Ej: Unidad, Litro, Kg, Metro..." />
       </div>
 
-      {/* Proveedor — solo RENTAL */}
+      {/* Proveedor — solo suministro */}
       {acquisitionMode === 'RENTAL' && (
         <div className="space-y-1">
-          <Label>Proveedor del Suministro <span className="text-destructive">*</span></Label>
-          <SearchSelect options={suppliers} value={supplierId} onChange={setSupplierId} placeholder="Buscar proveedor..." />
+          <Label>Proveedor <span className="text-destructive">*</span></Label>
+          <SearchableSelect options={suppliers} value={supplierId} onChange={setSupplierId} placeholder="Buscar proveedor..." />
         </div>
       )}
 
       {/* Sección STOCK_MRO */}
       {isVisible('STOCK_MRO') && (
         <fieldset className="rounded-lg border border-border p-4 space-y-3">
-          <legend className="px-2 text-sm font-semibold text-foreground">Stock</legend>
+          <legend className="px-2 text-sm font-semibold text-foreground">Cantidades en stock</legend>
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
-              <Label>Stock Inicial</Label>
+              <Label>Cantidad inicial</Label>
               <Input type="number" min="0" value={initialStock} onChange={e => setInitialStock(e.target.value)} placeholder="0" />
             </div>
             <div className="space-y-1">
-              <Label>Stock Mínimo</Label>
+              <Label>Alerta cuando baje de</Label>
               <Input type="number" min="0" value={minStock} onChange={e => setMinStock(e.target.value)} placeholder="0" />
             </div>
             <div className="space-y-1">
-              <Label>Stock Máximo</Label>
+              <Label>Máximo a mantener</Label>
               <Input type="number" min="0" value={maxStock} onChange={e => setMaxStock(e.target.value)} placeholder="0" />
             </div>
           </div>
@@ -206,7 +148,7 @@ export function MROAssetForm({
       {/* Sección FINANCIAL */}
       {isVisible('FINANCIAL') && (
         <div className="space-y-1">
-          <Label>Costo por Unidad</Label>
+          <Label>Precio por unidad <span className="text-xs font-normal text-muted-foreground">(opcional)</span></Label>
           <Input type="number" min="0" step="0.01" value={costPerUnit} onChange={e => setCostPerUnit(e.target.value)} placeholder="0.00" />
         </div>
       )}
@@ -215,7 +157,7 @@ export function MROAssetForm({
       {isVisible('WAREHOUSE') && (
         <div className="space-y-1">
           <Label>Bodega</Label>
-          <SearchSelect options={warehouses} value={warehouseId} onChange={setWarehouseId} placeholder="Buscar bodega..." />
+          <SearchableSelect options={warehouses} value={warehouseId} onChange={setWarehouseId} placeholder="Buscar bodega..." />
         </div>
       )}
 
@@ -226,30 +168,7 @@ export function MROAssetForm({
       </div>
 
       {/* Adjuntos */}
-      <div className="space-y-2">
-        <Label>Adjuntos</Label>
-        <div
-          className="flex flex-col items-center justify-center rounded-md border-2 border-dashed border-border p-5 cursor-pointer hover:border-primary/50 transition-colors"
-          onClick={() => fileInputRef.current?.click()}
-          onDragOver={e => e.preventDefault()}
-          onDrop={e => { e.preventDefault(); addFiles(e.dataTransfer.files) }}
-        >
-          <Upload className="h-7 w-7 text-muted-foreground mb-1" />
-          <p className="text-sm text-muted-foreground">Arrastra archivos o <span className="text-primary font-medium">haz clic</span></p>
-          <p className="text-xs text-muted-foreground mt-0.5">Máx. {maxFileSizeMB} MB por archivo</p>
-        </div>
-        <input ref={fileInputRef} type="file" multiple className="hidden" onChange={e => addFiles(e.target.files)} />
-        {attachments.length > 0 && (
-          <div className="space-y-1">
-            {attachments.map((f, i) => (
-              <div key={i} className="flex items-center justify-between rounded-md border border-border px-3 py-1.5 text-sm">
-                <span className="truncate">{f.name}</span>
-                <button type="button" onClick={() => setAttachments(p => p.filter((_, j) => j !== i))}><X className="h-3.5 w-3.5 text-muted-foreground" /></button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <FileUploadZone files={attachments} onChange={setAttachments} maxFileSizeMB={maxFileSizeMB} label="Adjuntos" />
 
       {submitError && <p className="text-sm text-destructive">{submitError}</p>}
 
