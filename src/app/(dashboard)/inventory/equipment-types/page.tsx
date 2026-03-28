@@ -39,6 +39,7 @@ import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
 import { Plus, Pencil, Trash2, Loader2, Box } from 'lucide-react'
 import { IconPicker } from '@/components/inventory/icon-picker'
+import { FamilyBadge } from '@/components/inventory/family-badge'
 
 interface EquipmentType {
   id: string
@@ -48,7 +49,11 @@ interface EquipmentType {
   icon?: string
   isActive: boolean
   order: number
+  familyId?: string | null
+  family?: { id: string; name: string; icon?: string | null; color?: string | null } | null
 }
+
+interface Family { id: string; name: string; icon?: string | null; color?: string | null }
 
 export default function EquipmentTypesPage() {
   const { data: session, status } = useSession()
@@ -62,6 +67,7 @@ export default function EquipmentTypesPage() {
   const [submitting, setSubmitting] = useState(false)
   const [deletingType, setDeletingType] = useState<EquipmentType | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [families, setFamilies] = useState<Family[]>([])
 
   // Form state
   const [formData, setFormData] = useState({
@@ -69,7 +75,8 @@ export default function EquipmentTypesPage() {
     name: '',
     description: '',
     icon: '',
-    order: 999
+    order: 999,
+    familyId: '',
   })
 
   useEffect(() => {
@@ -87,6 +94,7 @@ export default function EquipmentTypesPage() {
     }
 
     fetchTypes()
+    fetch('/api/inventory/families').then(r => r.json()).then(d => setFamilies(d.families ?? []))
   }, [session, status, router])
 
   const fetchTypes = async () => {
@@ -116,17 +124,12 @@ export default function EquipmentTypesPage() {
         name: type.name,
         description: type.description || '',
         icon: type.icon || '',
-        order: type.order
+        order: type.order,
+        familyId: type.familyId || '',
       })
     } else {
       setEditingType(null)
-      setFormData({
-        code: '',
-        name: '',
-        description: '',
-        icon: '',
-        order: 999
-      })
+      setFormData({ code: '', name: '', description: '', icon: '', order: 999, familyId: '' })
     }
     setDialogOpen(true)
   }
@@ -262,6 +265,7 @@ export default function EquipmentTypesPage() {
               <TableRow>
                 <TableHead>Código</TableHead>
                 <TableHead>Nombre</TableHead>
+                <TableHead>Familia</TableHead>
                 <TableHead>Descripción</TableHead>
                 <TableHead>Ícono</TableHead>
                 <TableHead>Orden</TableHead>
@@ -278,9 +282,16 @@ export default function EquipmentTypesPage() {
                 </TableRow>
               ) : (
                 types.map((type) => (
-                  <TableRow key={type.id}>
+                  <TableRow
+                    key={type.id}
+                    className='cursor-pointer hover:bg-muted/50'
+                    onClick={() => handleOpenDialog(type)}
+                  >
                     <TableCell className='font-mono text-sm'>{type.code}</TableCell>
                     <TableCell className='font-medium'>{type.name}</TableCell>
+                    <TableCell>
+                      {type.family ? <FamilyBadge family={type.family} size='sm' /> : <span className='text-xs text-muted-foreground'>Sin familia</span>}
+                    </TableCell>
                     <TableCell className='text-sm text-muted-foreground'>
                       {type.description || '-'}
                     </TableCell>
@@ -293,19 +304,11 @@ export default function EquipmentTypesPage() {
                     </TableCell>
                     <TableCell className='text-right'>
                       <div className='flex justify-end gap-2'>
-                        <Button
-                          variant='ghost'
-                          size='sm'
-                          onClick={() => handleOpenDialog(type)}
-                        >
+                        <Button variant='ghost' size='sm' onClick={(e) => { e.stopPropagation(); handleOpenDialog(type) }}>
                           <Pencil className='h-4 w-4' />
                         </Button>
                         {session?.user?.role === 'ADMIN' && (
-                          <Button
-                            variant='ghost'
-                            size='sm'
-                            onClick={() => handleDelete(type)}
-                          >
+                          <Button variant='ghost' size='sm' onClick={(e) => { e.stopPropagation(); handleDelete(type) }}>
                             <Trash2 className='h-4 w-4 text-destructive' />
                           </Button>
                         )}
@@ -391,6 +394,19 @@ export default function EquipmentTypesPage() {
               <p className='text-xs text-muted-foreground'>
                 Orden de aparición en el dropdown (menor número = primero)
               </p>
+            </div>
+
+            <div className='space-y-2'>
+              <Label>Familia</Label>
+              <select
+                value={formData.familyId}
+                onChange={e => setFormData({ ...formData, familyId: e.target.value })}
+                className='flex h-10 w-full rounded-md border border-border bg-card px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+              >
+                <option value=''>Sin familia asignada</option>
+                {families.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+              </select>
+              <p className='text-xs text-muted-foreground'>Asigna este tipo a una familia para que aparezca filtrado en el formulario de activos</p>
             </div>
 
             <DialogFooter>

@@ -107,7 +107,7 @@ export default function UnitsOfMeasurePage() {
               {units.length === 0 ? (
                 <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No hay unidades registradas</TableCell></TableRow>
               ) : units.map(unit => (
-                <TableRow key={unit.id}>
+                <TableRow key={unit.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleOpenDialog(unit)}>
                   <TableCell className="font-mono text-sm">{unit.code}</TableCell>
                   <TableCell className="font-medium">{unit.name}</TableCell>
                   <TableCell><Badge variant="outline">{unit.symbol}</Badge></TableCell>
@@ -116,8 +116,8 @@ export default function UnitsOfMeasurePage() {
                   <TableCell><Badge variant={unit.isActive ? 'default' : 'secondary'}>{unit.isActive ? 'Activo' : 'Inactivo'}</Badge></TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(unit)}><Pencil className="h-4 w-4" /></Button>
-                      {session?.user?.role === 'ADMIN' && <Button variant="ghost" size="sm" onClick={() => setDeletingUnit(unit)}><Trash2 className="h-4 w-4 text-destructive" /></Button>}
+                      <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleOpenDialog(unit) }}><Pencil className="h-4 w-4" /></Button>
+                      {session?.user?.role === 'ADMIN' && <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setDeletingUnit(unit) }}><Trash2 className="h-4 w-4 text-destructive" /></Button>}
                     </div>
                   </TableCell>
                 </TableRow>

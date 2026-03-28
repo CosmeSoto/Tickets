@@ -172,3 +172,29 @@ export const DEFAULT_USEFUL_LIFE_YEARS: Record<string, number> = {
   SERVICES: 0,         // Servicios: no deprecia
   ADMINISTRATIVE: 0,   // Documentos: no deprecia
 }
+
+/**
+ * Calcula el valor libro de un activo a partir de sus campos de BD.
+ * Retorna null si el activo no es depreciable (sin purchasePrice o usefulLifeYears).
+ */
+export function calculateBookValue(asset: {
+  purchasePrice: number | null
+  purchaseDate: Date | null
+  usefulLifeYears: number | null
+  residualValue: number | null
+  depreciationMethod: string | null
+  totalUnits: number | null
+  usedUnits: number | null
+}): number | null {
+  if (!asset.purchasePrice || !asset.purchaseDate || !asset.usefulLifeYears) return null
+  const result = calculateDepreciation(
+    asset.purchasePrice,
+    asset.purchaseDate,
+    asset.usefulLifeYears,
+    asset.residualValue ?? 0,
+    new Date(),
+    (asset.depreciationMethod as DepreciationMethod) ?? 'LINEAR',
+    { totalUnits: asset.totalUnits ?? undefined, usedUnits: asset.usedUnits ?? undefined }
+  )
+  return result.bookValue
+}

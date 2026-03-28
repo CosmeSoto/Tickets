@@ -142,7 +142,7 @@ export default function SuppliersPage() {
             ) : suppliers.length === 0 ? (
               <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No se encontraron proveedores</TableCell></TableRow>
             ) : suppliers.map(s => (
-              <TableRow key={s.id}>
+              <TableRow key={s.id} className="cursor-pointer hover:bg-muted/50" onClick={() => { setEditingSupplier(s); setFormOpen(true) }}>
                 <TableCell className="font-medium">{s.name}</TableCell>
                 <TableCell>
                   <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_COLORS[s.type] || ''}`}>
@@ -159,11 +159,11 @@ export default function SuppliersPage() {
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1">
-                    <Button variant="ghost" size="icon" title="Editar" onClick={() => { setEditingSupplier(s); setFormOpen(true) }}>
+                    <Button variant="ghost" size="icon" title="Editar" onClick={(e) => { e.stopPropagation(); setEditingSupplier(s); setFormOpen(true) }}>
                       <Pencil className="h-4 w-4" />
                     </Button>
                     {s.isActive && (
-                      <Button variant="ghost" size="icon" title="Desactivar" onClick={() => setDeactivatingSupplier(s)}>
+                      <Button variant="ghost" size="icon" title="Desactivar" onClick={(e) => { e.stopPropagation(); setDeactivatingSupplier(s) }}>
                         <PowerOff className="h-4 w-4 text-destructive" />
                       </Button>
                     )}

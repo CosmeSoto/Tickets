@@ -43,8 +43,8 @@ export function FamilyFilterBar({ families, selectedId, onChange }: FamilyFilter
         onClick={() => onChange(null)}
         className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 ${
           selectedId === null || selectedId === undefined
-            ? 'bg-gray-800 text-white'
-            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            ? 'bg-foreground text-background'
+            : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'
         }`}
       >
         Todos
@@ -61,12 +61,14 @@ export function FamilyFilterBar({ families, selectedId, onChange }: FamilyFilter
             key={family.id}
             type="button"
             onClick={() => onChange(family.id)}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
             style={
               isActive
                 ? { backgroundColor: color + '20', color, outlineColor: color }
-                : { backgroundColor: '#F3F4F6', color: '#4B5563' }
+                : undefined
             }
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 ${
+              isActive ? '' : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+            }`}
           >
             {IconComponent && (
               <IconComponent style={{ width: 14, height: 14 }} />

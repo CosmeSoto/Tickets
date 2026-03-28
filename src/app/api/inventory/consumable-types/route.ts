@@ -14,11 +14,14 @@ export async function GET(request: NextRequest) {
     }
 
     const includeInactive = request.nextUrl.searchParams.get('includeInactive') === 'true'
+    const familyId = request.nextUrl.searchParams.get('familyId')
     const isAdmin = session.user.role === 'ADMIN'
     const where = isAdmin && includeInactive ? {} : { isActive: true }
+    const whereWithFamily = familyId ? { ...where, familyId } : where
 
     const types = await prisma.consumable_types.findMany({
-      where,
+      where: whereWithFamily,
+      include: { family: { select: { id: true, name: true, icon: true, color: true } } },
       orderBy: [{ order: 'asc' }, { name: 'asc' }],
     })
 
@@ -39,7 +42,7 @@ export async function POST(request: NextRequest) {
       return inventoryForbidden()
     }
 
-    const { code, name, description, icon, order } = await request.json()
+    const { code, name, description, icon, order, familyId } = await request.json()
     if (!code || !name) {
       return NextResponse.json({ error: 'Código y nombre son requeridos' }, { status: 400 })
     }
@@ -50,7 +53,7 @@ export async function POST(request: NextRequest) {
     }
 
     const newType = await prisma.consumable_types.create({
-      data: { id: randomUUID(), code: code.toUpperCase(), name, description, icon, order: order || 999, isActive: true },
+      data: { id: randomUUID(), code: code.toUpperCase(), name, description, icon, order: order || 999, isActive: true, ...(familyId ? { familyId } : {}) },
     })
 
     await AuditServiceComplete.log({

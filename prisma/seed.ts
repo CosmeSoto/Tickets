@@ -573,22 +573,51 @@ async function seedCategoriesFromExcel(deptInfraId: string, deptSoporteId: strin
 }
 
 async function seedEquipmentTypes() {
+  // Los tipos se asignan a familias después de que las familias existan
+  // Primero creamos todos los tipos, luego en migrateExistingTypesToTechnology
+  // se asignan los que no tienen familia a TECHNOLOGY
   const types = [
-    { code: 'LAPTOP', name: 'Laptop', icon: 'Laptop', order: 1 },
-    { code: 'DESKTOP', name: 'Desktop', icon: 'Monitor', order: 2 },
-    { code: 'MONITOR', name: 'Monitor', icon: 'Monitor', order: 3 },
-    { code: 'PRINTER', name: 'Impresora', icon: 'Printer', order: 4 },
-    { code: 'PHONE', name: 'Teléfono', icon: 'Phone', order: 5 },
-    { code: 'TABLET', name: 'Tablet', icon: 'Tablet', order: 6 },
-    { code: 'KEYBOARD', name: 'Teclado', icon: 'Keyboard', order: 7 },
-    { code: 'MOUSE', name: 'Mouse', icon: 'Mouse', order: 8 },
-    { code: 'HEADSET', name: 'Audífonos', icon: 'Headphones', order: 9 },
-    { code: 'WEBCAM', name: 'Webcam', icon: 'Camera', order: 10 },
-    { code: 'DOCKING_STATION', name: 'Docking Station', icon: 'Cpu', order: 11 },
-    { code: 'UPS', name: 'UPS', icon: 'Battery', order: 12 },
-    { code: 'ROUTER', name: 'Router', icon: 'Router', order: 13 },
-    { code: 'SWITCH', name: 'Switch de Red', icon: 'Wifi', order: 14 },
-    { code: 'OTHER', name: 'Otro', icon: 'Box', order: 15 },
+    // TECHNOLOGY
+    { code: 'LAPTOP',          name: 'Laptop',           icon: 'Laptop',      order: 1 },
+    { code: 'DESKTOP',         name: 'Desktop',          icon: 'Monitor',     order: 2 },
+    { code: 'MONITOR',         name: 'Monitor',          icon: 'Monitor',     order: 3 },
+    { code: 'PRINTER',         name: 'Impresora',        icon: 'Printer',     order: 4 },
+    { code: 'PHONE',           name: 'Teléfono',         icon: 'Phone',       order: 5 },
+    { code: 'TABLET',          name: 'Tablet',           icon: 'Tablet',      order: 6 },
+    { code: 'KEYBOARD',        name: 'Teclado',          icon: 'Keyboard',    order: 7 },
+    { code: 'MOUSE',           name: 'Mouse',            icon: 'Mouse',       order: 8 },
+    { code: 'HEADSET',         name: 'Audífonos',        icon: 'Headphones',  order: 9 },
+    { code: 'WEBCAM',          name: 'Webcam',           icon: 'Camera',      order: 10 },
+    { code: 'DOCKING_STATION', name: 'Docking Station',  icon: 'Cpu',         order: 11 },
+    { code: 'UPS',             name: 'UPS',              icon: 'Battery',     order: 12 },
+    { code: 'ROUTER',          name: 'Router',           icon: 'Router',      order: 13 },
+    { code: 'SWITCH',          name: 'Switch de Red',    icon: 'Wifi',        order: 14 },
+    { code: 'SERVER',          name: 'Servidor',         icon: 'Server',      order: 15 },
+    // FIXED_ASSETS (infraestructura)
+    { code: 'AC_UNIT',         name: 'Aire Acondicionado', icon: 'Wind',      order: 20 },
+    { code: 'GENERATOR',       name: 'Generador',        icon: 'Zap',         order: 21 },
+    { code: 'ELEVATOR',        name: 'Ascensor',         icon: 'Building2',   order: 22 },
+    { code: 'WATER_PUMP',      name: 'Bomba de Agua',    icon: 'Droplets',    order: 23 },
+    { code: 'COMPRESSOR',      name: 'Compresor',        icon: 'Gauge',       order: 24 },
+    // SECURITY
+    { code: 'IP_CAMERA',       name: 'Cámara IP',        icon: 'Camera',      order: 30 },
+    { code: 'DVR_NVR',         name: 'DVR/NVR',          icon: 'HardDrive',   order: 31 },
+    { code: 'ACCESS_CONTROL',  name: 'Control de Acceso', icon: 'Fingerprint', order: 32 },
+    { code: 'MOTION_SENSOR',   name: 'Sensor de Movimiento', icon: 'Eye',     order: 33 },
+    { code: 'ALARM_PANEL',     name: 'Panel de Alarma',  icon: 'AlertTriangle', order: 34 },
+    // MAINTENANCE
+    { code: 'POWER_TOOL',      name: 'Herramienta Eléctrica', icon: 'Zap',   order: 40 },
+    { code: 'HAND_TOOL',       name: 'Herramienta Manual', icon: 'Wrench',    order: 41 },
+    { code: 'MEASURING_TOOL',  name: 'Equipo de Medición', icon: 'Ruler',     order: 42 },
+    // SERVICES
+    { code: 'CLEANING_MACHINE', name: 'Equipo de Limpieza', icon: 'Sparkles', order: 50 },
+    { code: 'COFFEE_MACHINE',  name: 'Máquina de Café',  icon: 'Coffee',      order: 51 },
+    // COMMERCIAL
+    { code: 'POS_TERMINAL',    name: 'Terminal POS',     icon: 'CreditCard',  order: 60 },
+    { code: 'CASH_REGISTER',   name: 'Caja Registradora', icon: 'DollarSign', order: 61 },
+    { code: 'BARCODE_READER',  name: 'Lector de Código de Barras', icon: 'Tag', order: 62 },
+    // General
+    { code: 'OTHER',           name: 'Otro',             icon: 'Box',         order: 99 },
   ]
   for (const t of types) {
     await prisma.equipment_types.upsert({
@@ -602,21 +631,33 @@ async function seedEquipmentTypes() {
 
 async function seedLicenseTypes() {
   const types = [
-    { code: 'WINDOWS', name: 'Windows', icon: 'Monitor', order: 1 },
-    { code: 'OFFICE_365', name: 'Office 365', icon: 'FileText', order: 2 },
-    { code: 'ANTIVIRUS', name: 'Antivirus', icon: 'Shield', order: 3 },
-    { code: 'ADOBE', name: 'Adobe', icon: 'Palette', order: 4 },
-    { code: 'AUTOCAD', name: 'AutoCAD', icon: 'PenTool', order: 5 },
-    { code: 'GOOGLE_WORKSPACE', name: 'Google Workspace', icon: 'Cloud', order: 6 },
-    { code: 'SLACK', name: 'Slack', icon: 'MessageSquare', order: 7 },
-    { code: 'ZOOM', name: 'Zoom', icon: 'Video', order: 8 },
-    { code: 'JIRA', name: 'Jira', icon: 'Trello', order: 9 },
-    { code: 'GITHUB', name: 'GitHub', icon: 'Github', order: 10 },
-    { code: 'SAAS', name: 'SaaS (Otro)', icon: 'Globe', order: 11 },
-    { code: 'PERPETUAL', name: 'Licencia Perpetua', icon: 'Key', order: 12 },
-    { code: 'SUBSCRIPTION', name: 'Suscripción', icon: 'RefreshCw', order: 13 },
-    { code: 'OEM', name: 'OEM', icon: 'Cpu', order: 14 },
-    { code: 'OTHER', name: 'Otro', icon: 'Box', order: 15 },
+    // TECHNOLOGY — software
+    { code: 'WINDOWS',          name: 'Windows',              icon: 'Monitor',     order: 1 },
+    { code: 'OFFICE_365',       name: 'Office 365',           icon: 'FileText',    order: 2 },
+    { code: 'ANTIVIRUS',        name: 'Antivirus',            icon: 'Shield',      order: 3 },
+    { code: 'ADOBE',            name: 'Adobe',                icon: 'Paintbrush',  order: 4 },
+    { code: 'AUTOCAD',          name: 'AutoCAD',              icon: 'Ruler',       order: 5 },
+    { code: 'GOOGLE_WORKSPACE', name: 'Google Workspace',     icon: 'Cloud',       order: 6 },
+    { code: 'SLACK',            name: 'Slack',                icon: 'Globe',       order: 7 },
+    { code: 'ZOOM',             name: 'Zoom',                 icon: 'Monitor',     order: 8 },
+    { code: 'GITHUB',           name: 'GitHub',               icon: 'Code',        order: 9 },
+    { code: 'SAAS',             name: 'SaaS (Otro)',          icon: 'Globe',       order: 10 },
+    { code: 'PERPETUAL',        name: 'Licencia Perpetua',    icon: 'Key',         order: 11 },
+    { code: 'SUBSCRIPTION',     name: 'Suscripción',          icon: 'RefreshCw',   order: 12 },
+    { code: 'OEM',              name: 'OEM',                  icon: 'Cpu',         order: 13 },
+    // FIXED_ASSETS — contratos de servicio
+    { code: 'MAINTENANCE_CONTRACT', name: 'Contrato de Mantenimiento', icon: 'Wrench', order: 20 },
+    { code: 'SERVICE_CONTRACT', name: 'Contrato de Servicio', icon: 'ClipboardList', order: 21 },
+    { code: 'ASSET_INSURANCE',  name: 'Seguro de Activos',    icon: 'ShieldCheck', order: 22 },
+    // SERVICES — contratos operativos
+    { code: 'CLEANING_CONTRACT', name: 'Contrato de Limpieza', icon: 'Sparkles',  order: 30 },
+    { code: 'CATERING_CONTRACT', name: 'Contrato de Cafetería', icon: 'Package',  order: 31 },
+    { code: 'SECURITY_CONTRACT', name: 'Contrato de Seguridad', icon: 'Shield',   order: 32 },
+    // COMMERCIAL
+    { code: 'POS_LICENSE',      name: 'Licencia Software POS', icon: 'CreditCard', order: 40 },
+    { code: 'LEASE_CONTRACT',   name: 'Contrato de Arrendamiento', icon: 'Building2', order: 41 },
+    // General
+    { code: 'OTHER',            name: 'Otro',                 icon: 'Box',         order: 99 },
   ]
   for (const t of types) {
     await prisma.license_types.upsert({
@@ -630,17 +671,36 @@ async function seedLicenseTypes() {
 
 async function seedConsumableTypes() {
   const types = [
-    { code: 'TONER', name: 'Tóner', icon: 'Printer', order: 1 },
-    { code: 'INK', name: 'Tinta', icon: 'Droplet', order: 2 },
-    { code: 'PAPER', name: 'Papel', icon: 'FileText', order: 3 },
-    { code: 'CABLE', name: 'Cable', icon: 'Cable', order: 4 },
-    { code: 'BATTERY', name: 'Batería', icon: 'Battery', order: 5 },
-    { code: 'CLEANING', name: 'Limpieza', icon: 'Sparkles', order: 6 },
-    { code: 'ADAPTER', name: 'Adaptador', icon: 'Plug', order: 7 },
-    { code: 'STORAGE', name: 'Almacenamiento', icon: 'HardDrive', order: 8 },
-    { code: 'PERIPHERAL', name: 'Periférico', icon: 'Mouse', order: 9 },
-    { code: 'TOOL', name: 'Herramienta', icon: 'Wrench', order: 10 },
-    { code: 'OTHER', name: 'Otro', icon: 'Box', order: 99 },
+    // TECHNOLOGY / MAINTENANCE — insumos tecnológicos
+    { code: 'TONER',       name: 'Tóner',              icon: 'Printer',    order: 1 },
+    { code: 'INK',         name: 'Tinta',              icon: 'Droplets',   order: 2 },
+    { code: 'PAPER',       name: 'Papel',              icon: 'FileText',   order: 3 },
+    { code: 'CABLE',       name: 'Cable',              icon: 'Cable',      order: 4 },
+    { code: 'BATTERY',     name: 'Batería',            icon: 'Battery',    order: 5 },
+    { code: 'ADAPTER',     name: 'Adaptador',          icon: 'Usb',        order: 6 },
+    { code: 'STORAGE',     name: 'Almacenamiento',     icon: 'HardDrive',  order: 7 },
+    { code: 'PERIPHERAL',  name: 'Periférico',         icon: 'Mouse',      order: 8 },
+    // MAINTENANCE — repuestos y herramientas
+    { code: 'SPARE_PART',  name: 'Repuesto Mecánico',  icon: 'Wrench',     order: 10 },
+    { code: 'LUBRICANT',   name: 'Lubricante',         icon: 'Droplets',   order: 11 },
+    { code: 'FILTER',      name: 'Filtro',             icon: 'Settings',   order: 12 },
+    { code: 'FASTENER',    name: 'Tornillo/Perno',     icon: 'Settings',   order: 13 },
+    { code: 'TOOL',        name: 'Herramienta',        icon: 'Wrench',     order: 14 },
+    // SERVICES — insumos operativos
+    { code: 'CLEANING',    name: 'Producto de Limpieza', icon: 'Sparkles', order: 20 },
+    { code: 'CATERING',    name: 'Insumo de Cafetería', icon: 'Package',   order: 21 },
+    { code: 'HYGIENE',     name: 'Higiene (papel, jabón)', icon: 'Sparkles', order: 22 },
+    { code: 'DISINFECTANT', name: 'Desinfectante',     icon: 'Sparkles',   order: 23 },
+    // SECURITY
+    { code: 'SECURITY_BATTERY', name: 'Batería de Respaldo', icon: 'Battery', order: 30 },
+    { code: 'SECURITY_CABLE',   name: 'Cable de Red/Seguridad', icon: 'Cable', order: 31 },
+    // GREEN_AREAS
+    { code: 'FERTILIZER', name: 'Fertilizante',        icon: 'Leaf',       order: 40 },
+    { code: 'PESTICIDE',  name: 'Pesticida',           icon: 'Leaf',       order: 41 },
+    { code: 'SUBSTRATE',  name: 'Sustrato',            icon: 'TreePine',   order: 42 },
+    { code: 'SEED',       name: 'Semilla',             icon: 'Flower2',    order: 43 },
+    // General
+    { code: 'OTHER',      name: 'Otro',                icon: 'Box',        order: 99 },
   ]
   for (const t of types) {
     await prisma.consumable_types.upsert({
@@ -752,14 +812,14 @@ async function seedLandingPage() {
 
 async function seedInventoryFamilies() {
   const families = [
-    { code: 'FIXED_ASSETS',   name: 'Activos Fijos e Infraestructura',        icon: 'building-2',  color: '#1D4ED8', order: 1 },
-    { code: 'MAINTENANCE',    name: 'Repuestos y Materiales de Mantenimiento', icon: 'wrench',       color: '#B45309', order: 2 },
-    { code: 'SERVICES',       name: 'Servicios de Operación y Limpieza',       icon: 'sparkles',     color: '#059669', order: 3 },
-    { code: 'SECURITY',       name: 'Seguridad y Protección',                  icon: 'shield',       color: '#DC2626', order: 4 },
-    { code: 'TECHNOLOGY',     name: 'Tecnología y Comunicaciones',             icon: 'monitor',      color: '#7C3AED', order: 5 },
-    { code: 'GREEN_AREAS',    name: 'Áreas Verdes y Exteriores',               icon: 'tree-pine',    color: '#16A34A', order: 6 },
-    { code: 'ADMINISTRATIVE', name: 'Gestión Administrativa y Documental',     icon: 'folder-open',  color: '#0891B2', order: 7 },
-    { code: 'COMMERCIAL',     name: 'Activos de Gestión Comercial',            icon: 'store',        color: '#EA580C', order: 8 },
+    { code: 'FIXED_ASSETS',   name: 'Activos Fijos e Infraestructura',        icon: 'Building2',    color: '#1D4ED8', order: 1 },
+    { code: 'MAINTENANCE',    name: 'Repuestos y Materiales de Mantenimiento', icon: 'Wrench',       color: '#B45309', order: 2 },
+    { code: 'SERVICES',       name: 'Servicios de Operación y Limpieza',       icon: 'Sparkles',     color: '#059669', order: 3 },
+    { code: 'SECURITY',       name: 'Seguridad y Protección',                  icon: 'Shield',       color: '#DC2626', order: 4 },
+    { code: 'TECHNOLOGY',     name: 'Tecnología y Comunicaciones',             icon: 'Monitor',      color: '#7C3AED', order: 5 },
+    { code: 'GREEN_AREAS',    name: 'Áreas Verdes y Exteriores',               icon: 'TreePine',     color: '#16A34A', order: 6 },
+    { code: 'ADMINISTRATIVE', name: 'Gestión Administrativa y Documental',     icon: 'FolderOpen',   color: '#0891B2', order: 7 },
+    { code: 'COMMERCIAL',     name: 'Activos de Gestión Comercial',            icon: 'Store',        color: '#EA580C', order: 8 },
   ]
   for (const f of families) {
     await prisma.inventory_families.upsert({
@@ -784,15 +844,63 @@ async function seedDefaultWarehouse() {
 }
 
 async function migrateExistingTypesToTechnology() {
-  const techFamily = await prisma.inventory_families.findUnique({ where: { code: 'TECHNOLOGY' } })
-  if (techFamily) {
-    const [eq, co, li] = await Promise.all([
-      prisma.equipment_types.updateMany({ where: { familyId: null }, data: { familyId: techFamily.id } }),
-      prisma.consumable_types.updateMany({ where: { familyId: null }, data: { familyId: techFamily.id } }),
-      prisma.license_types.updateMany({ where: { familyId: null }, data: { familyId: techFamily.id } }),
-    ])
-    console.log(`✅ Migración conservadora: ${eq.count} tipos de equipo, ${co.count} tipos de consumible, ${li.count} tipos de licencia → TECHNOLOGY`)
+  const families = await prisma.inventory_families.findMany({ select: { id: true, code: true } })
+  const fam = (code: string) => families.find(f => f.code === code)?.id
+
+  // Tipos de equipo por familia
+  const equipmentByFamily: Record<string, string[]> = {
+    'TECHNOLOGY':     ['LAPTOP','DESKTOP','MONITOR','PRINTER','PHONE','TABLET','KEYBOARD','MOUSE','HEADSET','WEBCAM','DOCKING_STATION','UPS','ROUTER','SWITCH','SERVER'],
+    'FIXED_ASSETS':   ['AC_UNIT','GENERATOR','ELEVATOR','WATER_PUMP','COMPRESSOR'],
+    'SECURITY':       ['IP_CAMERA','DVR_NVR','ACCESS_CONTROL','MOTION_SENSOR','ALARM_PANEL'],
+    'MAINTENANCE':    ['POWER_TOOL','HAND_TOOL','MEASURING_TOOL'],
+    'SERVICES':       ['CLEANING_MACHINE','COFFEE_MACHINE'],
+    'COMMERCIAL':     ['POS_TERMINAL','CASH_REGISTER','BARCODE_READER'],
   }
+  for (const [familyCode, typeCodes] of Object.entries(equipmentByFamily)) {
+    const familyId = fam(familyCode)
+    if (!familyId) continue
+    await prisma.equipment_types.updateMany({ where: { code: { in: typeCodes } }, data: { familyId } })
+  }
+  // Tipos sin familia → TECHNOLOGY
+  const techId = fam('TECHNOLOGY')
+  if (techId) {
+    await prisma.equipment_types.updateMany({ where: { familyId: null }, data: { familyId: techId } })
+  }
+
+  // Tipos de licencia por familia
+  const licenseByFamily: Record<string, string[]> = {
+    'TECHNOLOGY':   ['WINDOWS','OFFICE_365','ANTIVIRUS','ADOBE','AUTOCAD','GOOGLE_WORKSPACE','SLACK','ZOOM','GITHUB','SAAS','PERPETUAL','SUBSCRIPTION','OEM'],
+    'FIXED_ASSETS': ['MAINTENANCE_CONTRACT','SERVICE_CONTRACT','ASSET_INSURANCE'],
+    'SERVICES':     ['CLEANING_CONTRACT','CATERING_CONTRACT','SECURITY_CONTRACT'],
+    'COMMERCIAL':   ['POS_LICENSE','LEASE_CONTRACT'],
+  }
+  for (const [familyCode, typeCodes] of Object.entries(licenseByFamily)) {
+    const familyId = fam(familyCode)
+    if (!familyId) continue
+    await prisma.license_types.updateMany({ where: { code: { in: typeCodes } }, data: { familyId } })
+  }
+  if (techId) {
+    await prisma.license_types.updateMany({ where: { familyId: null }, data: { familyId: techId } })
+  }
+
+  // Tipos de consumible por familia
+  const consumableByFamily: Record<string, string[]> = {
+    'TECHNOLOGY':   ['TONER','INK','PAPER','CABLE','BATTERY','ADAPTER','STORAGE','PERIPHERAL'],
+    'MAINTENANCE':  ['SPARE_PART','LUBRICANT','FILTER','FASTENER','TOOL'],
+    'SERVICES':     ['CLEANING','CATERING','HYGIENE','DISINFECTANT'],
+    'SECURITY':     ['SECURITY_BATTERY','SECURITY_CABLE'],
+    'GREEN_AREAS':  ['FERTILIZER','PESTICIDE','SUBSTRATE','SEED'],
+  }
+  for (const [familyCode, typeCodes] of Object.entries(consumableByFamily)) {
+    const familyId = fam(familyCode)
+    if (!familyId) continue
+    await prisma.consumable_types.updateMany({ where: { code: { in: typeCodes } }, data: { familyId } })
+  }
+  if (techId) {
+    await prisma.consumable_types.updateMany({ where: { familyId: null }, data: { familyId: techId } })
+  }
+
+  console.log('✅ Tipos asignados a sus familias correspondientes')
 }
 
 main()

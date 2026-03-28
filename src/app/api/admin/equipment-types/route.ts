@@ -29,10 +29,8 @@ export async function GET(request: NextRequest) {
 
     const types = await prisma.equipment_types.findMany({
       where,
-      orderBy: [
-        { order: 'asc' },
-        { name: 'asc' }
-      ]
+      include: { family: { select: { id: true, name: true, icon: true, color: true } } },
+      orderBy: [{ order: 'asc' }, { name: 'asc' }],
     })
 
     return NextResponse.json(types, { status: 200 })
@@ -73,7 +71,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { code, name, description, icon, order } = body
+    const { code, name, description, icon, order, familyId } = body
 
     // Validaciones
     if (!code || !name) {
@@ -102,8 +100,10 @@ export async function POST(request: NextRequest) {
         description,
         icon,
         order: order || 999,
-        isActive: true
-      }
+        isActive: true,
+        ...(familyId ? { familyId } : {}),
+      },
+      include: { family: { select: { id: true, name: true, icon: true, color: true } } },
     })
 
     await AuditServiceComplete.log({

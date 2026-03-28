@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
 import { Button } from '@/components/ui/button'
@@ -90,6 +91,9 @@ function getExpirationBadge(date: string | null) {
 }
 
 export default function LicensesPage() {
+  const router = useRouter()
+  useEffect(() => { router.replace('/inventory?subtype=LICENSE') }, [router])
+
   const { data: session } = useSession()
   const { toast } = useToast()
 

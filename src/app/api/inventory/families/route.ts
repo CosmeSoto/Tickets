@@ -115,9 +115,8 @@ export async function POST(request: NextRequest) {
         entityId: family.id,
         userId: session.user.id,
         details: { name: family.name },
-        createdAt: new Date(),
       },
-    })
+    }).catch(err => console.warn('[audit] families POST:', err?.message))
 
     return NextResponse.json({ family }, { status: 201 })
   } catch {

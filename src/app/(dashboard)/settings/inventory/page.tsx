@@ -45,7 +45,7 @@ const ROLE_LABELS: Record<string, string> = {
 
 const ROLE_COLORS: Record<string, string> = {
   TECHNICIAN: 'bg-blue-100 text-blue-700',
-  CLIENT: 'bg-gray-100 text-gray-600',
+  CLIENT: 'bg-muted text-muted-foreground',
 }
 
 export default function InventorySettingsPage() {

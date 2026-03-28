@@ -96,6 +96,57 @@ export async function POST(
       return newAct
     })
 
+    // Lógica post-baja: verificar contrato vinculado al equipo dado de baja
+    let contractWarning: { contractWarning: true; contractId: string; contractNumber: string } | undefined
+    let lastAssetForContract: { lastAssetForContract: true; contractId: string; contractNumber: string } | undefined
+
+    if (decommissionRequest.assetType === 'EQUIPMENT' && decommissionRequest.equipmentId) {
+      const equipmentWithContract = await prisma.equipment.findUnique({
+        where: { id: decommissionRequest.equipmentId },
+        select: { contractId: true },
+      })
+
+      if (equipmentWithContract?.contractId) {
+        const contractId = equipmentWithContract.contractId
+
+        const [activeCount, contractRecord] = await Promise.all([
+          prisma.equipment.count({
+            where: {
+              contractId,
+              status: { not: 'RETIRED' },
+            },
+          }),
+          (prisma.software_licenses as any).findUnique({
+            where: { id: contractId },
+            select: { name: true },
+          }),
+        ])
+
+        const contractNumber: string = contractRecord?.name ?? contractId
+
+        if (activeCount > 0) {
+          contractWarning = { contractWarning: true, contractId, contractNumber }
+        } else {
+          lastAssetForContract = { lastAssetForContract: true, contractId, contractNumber }
+        }
+      }
+    }
+
+    // Audit log de baja con info de contrato
+    await prisma.audit_logs.create({
+      data: {
+        id: randomUUID(),
+        action: 'DECOMMISSION',
+        entityType: 'asset',
+        entityId: decommissionRequest.equipmentId ?? decommissionRequest.licenseId ?? requestId,
+        userId: session.user.id,
+        details: {
+          contractId: contractWarning?.contractId ?? lastAssetForContract?.contractId ?? null,
+        },
+        createdAt: new Date(),
+      },
+    }).catch(() => {})
+
     // Generar PDF (fuera de la transacción — fallo no revierte la aprobación)
     try {
       const systemContent = await prisma.landing_page_content.findFirst({ where: { id: 'default' } })
@@ -196,7 +247,12 @@ export async function POST(
       },
     }).catch(() => {})
 
-    return NextResponse.json({ act, folio: act.folio })
+    return NextResponse.json({
+      act,
+      folio: act.folio,
+      ...contractWarning,
+      ...lastAssetForContract,
+    })
   } catch (error) {
     return NextResponse.json({ error: 'Error al aprobar la solicitud de baja' }, { status: 500 })
   }

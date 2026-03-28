@@ -182,7 +182,7 @@ export async function DELETE(
 
 /**
  * PATCH /api/inventory/licenses/[id]
- * Asignar/desasignar licencia
+ * Asignar/desasignar licencia o cerrar contrato
  */
 export async function PATCH(
   request: NextRequest,
@@ -199,6 +199,28 @@ export async function PATCH(
 
     const { id } = await params
     const body = await request.json()
+
+    // Cerrar contrato: marcar como vencido
+    if (body.isActive === false) {
+      const existing = await prisma.software_licenses.findUnique({ where: { id }, select: { id: true, name: true } })
+      if (!existing) {
+        return NextResponse.json({ error: 'Contrato no encontrado' }, { status: 404 })
+      }
+      const closed = await prisma.software_licenses.update({
+        where: { id },
+        data: { expirationDate: new Date() },
+      })
+      await AuditServiceComplete.log({
+        action: AuditActionsComplete.LICENSE_UPDATED,
+        entityType: 'inventory',
+        entityId: id,
+        userId: session.user.id,
+        details: { action: 'CONTRACT_CLOSED', name: existing.name },
+        ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+        userAgent: request.headers.get('user-agent') || 'unknown',
+      }).catch(() => {})
+      return NextResponse.json(closed)
+    }
 
     if (body.action === 'unassign') {
       const license = await LicenseService.unassignLicense(id, session.user.id)

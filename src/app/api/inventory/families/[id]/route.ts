@@ -117,14 +117,14 @@ export async function PUT(
         entityId: family.id,
         userId: session.user.id,
         details: { name: family.name },
-        createdAt: new Date(),
       },
-    })
+    }).catch(err => console.warn('[audit] families PUT:', err?.message))
 
     return NextResponse.json({ family })
-  } catch {
+  } catch (err) {
+    console.error('[PUT /api/inventory/families/[id]]', err)
     return NextResponse.json(
-      { error: 'Error al editar la familia' },
+      { error: err instanceof Error ? err.message : 'Error al editar la familia' },
       { status: 500 }
     )
   }
@@ -173,9 +173,8 @@ export async function PATCH(
         entityId: family.id,
         userId: session.user.id,
         details: { isActive: family.isActive },
-        createdAt: new Date(),
       },
-    })
+    }).catch(err => console.warn('[audit] families PATCH:', err?.message))
 
     return NextResponse.json({ family })
   } catch {
@@ -242,9 +241,8 @@ export async function DELETE(
         entityId: id,
         userId: session.user.id,
         details: { name: existing.name },
-        createdAt: new Date(),
       },
-    })
+    }).catch(err => console.warn('[audit] families DELETE:', err?.message))
 
     return new NextResponse(null, { status: 204 })
   } catch {

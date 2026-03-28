@@ -19,6 +19,7 @@ import {
   CheckCircle,
   Clock,
   TrendingUp,
+  Layers,
 } from 'lucide-react'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -44,6 +45,10 @@ const REPORT_TYPES = [
   { id: 'license-expiration', label: 'Vencimiento de Licencias', icon: Key, description: 'Licencias próximas a vencer' },
   { id: 'inventory-value', label: 'Valor del Inventario', icon: DollarSign, description: 'Valor total y depreciación de activos' },
   { id: 'rental-equipment', label: 'Equipos en Renta', icon: Building, description: 'Equipos rentados y costos mensuales' },
+  { id: 'inventory-by-family', label: 'Inventario por Familia', icon: Layers, description: 'Conteo de activos por subtipo agrupados por familia' },
+  { id: 'assets-by-acquisition', label: 'Activos por Modalidad', icon: TrendingUp, description: 'Distribución por modalidad de adquisición (Fijo/Renta/Préstamo)' },
+  { id: 'contracts-status', label: 'Estado de Contratos', icon: FileText, description: 'Contratos vigentes, por vencer y vencidos' },
+  { id: 'stock-movements', label: 'Movimientos de Stock MRO', icon: ShoppingCart, description: 'Entradas, salidas y ajustes de materiales MRO' },
 ]
 
 export default function InventoryReportsPage() {
@@ -99,13 +104,28 @@ export default function InventoryReportsPage() {
     }
   }
 
-  const exportToJSON = () => {
-    if (!reportData) return
-    const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' })
+  const exportToCSV = () => {
+    if (!reportData?.data) return
+    const data = reportData.data
+    const rows = data.rows ?? data.contracts ?? data.movements ?? data.equipment ?? []
+    if (!Array.isArray(rows) || rows.length === 0) {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `reporte-${selectedReport}-${new Date().toISOString().split('T')[0]}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      return
+    }
+    const headers = Object.keys(rows[0]).join(',')
+    const csvRows = rows.map((r: any) => Object.values(r).map((v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','))
+    const csv = [headers, ...csvRows].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `reporte-${selectedReport}-${new Date().toISOString().split('T')[0]}.json`
+    a.download = `reporte-${selectedReport}-${new Date().toISOString().split('T')[0]}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -164,9 +184,9 @@ export default function InventoryReportsPage() {
                 Generar
               </Button>
               {reportData && (
-                <Button variant="outline" onClick={exportToJSON}>
+                <Button variant="outline" onClick={exportToCSV}>
                   <Download className="h-4 w-4 mr-2" />
-                  Exportar JSON
+                  Exportar CSV
                 </Button>
               )}
             </div>
@@ -211,6 +231,14 @@ function ReportResults({ reportType, data }: { reportType: string; data: any }) 
       return <InventoryValueReport data={data} />
     case 'license-expiration':
       return <LicenseExpirationReport data={data} />
+    case 'inventory-by-family':
+      return <InventoryByFamilyReport data={data} />
+    case 'assets-by-acquisition':
+      return <AssetsByAcquisitionReport data={data} />
+    case 'contracts-status':
+      return <ContractsStatusReport data={data} />
+    case 'stock-movements':
+      return <StockMovementsReport data={data} />
     default:
       return <GenericReport data={data} />
   }
@@ -413,6 +441,125 @@ function GenericReport({ data }: { data: any }) {
         <pre className="bg-muted p-4 rounded-lg overflow-auto max-h-[500px] text-xs">
           {JSON.stringify(data, null, 2)}
         </pre>
+      </CardContent>
+    </Card>
+  )
+}
+
+function InventoryByFamilyReport({ data }: { data: any }) {
+  const rows: Array<{ familyName: string; EQUIPMENT: number; MRO: number; LICENSE: number; total: number }> = data?.rows ?? []
+  return (
+    <Card>
+      <CardHeader><CardTitle>Inventario por Familia</CardTitle></CardHeader>
+      <CardContent>
+        <table className="w-full text-sm">
+          <thead><tr className="border-b"><th className="text-left py-2">Familia</th><th className="text-center py-2">Equipos</th><th className="text-center py-2">MRO</th><th className="text-center py-2">Licencias</th><th className="text-center py-2">Total</th></tr></thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i} className="border-b last:border-0">
+                <td className="py-2">{r.familyName}</td>
+                <td className="py-2 text-center">{r.EQUIPMENT}</td>
+                <td className="py-2 text-center">{r.MRO}</td>
+                <td className="py-2 text-center">{r.LICENSE}</td>
+                <td className="py-2 text-center font-medium">{r.total}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </CardContent>
+    </Card>
+  )
+}
+
+function AssetsByAcquisitionReport({ data }: { data: any }) {
+  const modeLabels: Record<string, string> = { FIXED_ASSET: 'Activo Fijo', RENTAL: 'Arrendamiento', LOAN: 'Activo de Tercero' }
+  const rows: Array<{ acquisitionMode: string; count: number; totalValue: number }> = data?.rows ?? []
+  return (
+    <Card>
+      <CardHeader><CardTitle>Activos por Modalidad de Adquisición</CardTitle></CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {rows.map((r, i) => (
+            <div key={i} className="flex justify-between items-center p-2 bg-muted rounded">
+              <span className="text-sm font-medium">{modeLabels[r.acquisitionMode] ?? r.acquisitionMode}</span>
+              <div className="flex gap-4 text-sm">
+                <span>{r.count} activos</span>
+                {r.totalValue > 0 && <span className="text-muted-foreground">${r.totalValue.toLocaleString()}</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function ContractsStatusReport({ data }: { data: any }) {
+  const contracts: Array<{ id: string; name: string; expirationDate: string | null; status: string }> = data?.contracts ?? []
+  return (
+    <Card>
+      <CardHeader><CardTitle>Estado de Contratos</CardTitle></CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="text-center p-3 bg-green-50 dark:bg-green-950 rounded-lg">
+            <p className="text-2xl font-bold text-green-600">{data?.summary?.active ?? 0}</p>
+            <p className="text-sm text-muted-foreground">Vigentes</p>
+          </div>
+          <div className="text-center p-3 bg-yellow-50 dark:bg-yellow-950 rounded-lg">
+            <p className="text-2xl font-bold text-yellow-600">{data?.summary?.expiringSoon ?? 0}</p>
+            <p className="text-sm text-muted-foreground">Por vencer</p>
+          </div>
+          <div className="text-center p-3 bg-red-50 dark:bg-red-950 rounded-lg">
+            <p className="text-2xl font-bold text-red-600">{data?.summary?.expired ?? 0}</p>
+            <p className="text-sm text-muted-foreground">Vencidos</p>
+          </div>
+        </div>
+        <div className="space-y-2">
+          {contracts.slice(0, 20).map(c => (
+            <div key={c.id} className="flex justify-between items-center p-2 bg-muted rounded text-sm">
+              <span className="font-medium">{c.name}</span>
+              <Badge variant={c.status === 'expired' ? 'destructive' : c.status === 'expiring' ? 'outline' : 'secondary'}>
+                {c.expirationDate ? new Date(c.expirationDate).toLocaleDateString('es-CL') : 'Sin fecha'}
+              </Badge>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function StockMovementsReport({ data }: { data: any }) {
+  const movements: Array<{ id: string; name: string; type: string; quantity: number; createdAt: string }> = data?.movements ?? []
+  const typeLabels: Record<string, string> = { ENTRY: 'Entrada', EXIT: 'Salida', ADJUSTMENT: 'Ajuste' }
+  return (
+    <Card>
+      <CardHeader><CardTitle>Movimientos de Stock MRO</CardTitle></CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="text-center p-3 bg-green-50 dark:bg-green-950 rounded-lg">
+            <p className="text-2xl font-bold text-green-600">{data?.summary?.entries ?? 0}</p>
+            <p className="text-sm text-muted-foreground">Entradas</p>
+          </div>
+          <div className="text-center p-3 bg-red-50 dark:bg-red-950 rounded-lg">
+            <p className="text-2xl font-bold text-red-600">{data?.summary?.exits ?? 0}</p>
+            <p className="text-sm text-muted-foreground">Salidas</p>
+          </div>
+          <div className="text-center p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
+            <p className="text-2xl font-bold text-blue-600">{data?.summary?.adjustments ?? 0}</p>
+            <p className="text-sm text-muted-foreground">Ajustes</p>
+          </div>
+        </div>
+        <div className="space-y-1">
+          {movements.slice(0, 20).map(m => (
+            <div key={m.id} className="flex justify-between items-center p-2 bg-muted rounded text-sm">
+              <span>{m.name}</span>
+              <Badge variant="outline">{typeLabels[m.type] ?? m.type}</Badge>
+              <span className="font-medium">{m.quantity}</span>
+              <span className="text-muted-foreground">{new Date(m.createdAt).toLocaleDateString('es-CL')}</span>
+            </div>
+          ))}
+        </div>
       </CardContent>
     </Card>
   )

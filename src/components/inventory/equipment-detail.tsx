@@ -80,7 +80,7 @@ const STATUS_COLORS: Record<string, string> = {
   ASSIGNED: 'bg-blue-500',
   MAINTENANCE: 'bg-yellow-500',
   DAMAGED: 'bg-red-500',
-  RETIRED: 'bg-gray-500',
+  RETIRED: 'bg-muted-foreground',
 }
 
 const CONDITION_LABELS: Record<string, string> = {
@@ -602,9 +602,9 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
         </Alert>
       )}
       {isRetired && (
-        <Alert className="border-gray-300 bg-gray-50">
-          <AlertCircle className="h-4 w-4 text-gray-500" />
-          <AlertDescription className="text-gray-700">
+        <Alert className="border-border bg-muted">
+          <AlertCircle className="h-4 w-4 text-muted-foreground" />
+          <AlertDescription className="text-muted-foreground">
             <span className="font-medium">Equipo dado de baja.</span>{' '}
             Ya no está activo en el inventario.
             {canPermanentDelete && ' Puedes eliminarlo definitivamente del sistema.'}
@@ -1069,7 +1069,7 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
                   SCHEDULED: 'bg-yellow-100 text-yellow-800',
                   ACCEPTED: 'bg-purple-100 text-purple-800',
                   COMPLETED: 'bg-green-100 text-green-800',
-                  CANCELLED: 'bg-gray-100 text-gray-600',
+                  CANCELLED: 'bg-muted text-muted-foreground',
                 }
                 const statusLabel: Record<string, string> = {
                   REQUESTED: 'Solicitado',
@@ -1092,7 +1092,7 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
                           {record.type === 'PREVENTIVE' ? 'Preventivo' : 'Correctivo'}
                         </span>
                         {record.status && (
-                          <Badge className={`text-xs ${statusBadge[record.status] || 'bg-gray-100 text-gray-600'}`}>
+                          <Badge className={`text-xs ${statusBadge[record.status] || 'bg-muted text-muted-foreground'}`}>
                             {statusLabel[record.status] || record.status}
                           </Badge>
                         )}

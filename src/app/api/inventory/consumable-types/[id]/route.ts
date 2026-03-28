@@ -17,7 +17,7 @@ export async function PUT(
     }
 
     const { id } = await params
-    const { name, description, icon, order, isActive } = await request.json()
+    const { name, description, icon, order, isActive, familyId } = await request.json()
 
     const existing = await prisma.consumable_types.findUnique({ where: { id } })
     if (!existing) {
@@ -32,7 +32,9 @@ export async function PUT(
         ...(icon !== undefined && { icon }),
         ...(order !== undefined && { order }),
         ...(isActive !== undefined && { isActive }),
+        ...(familyId !== undefined && { familyId: familyId || null }),
       },
+      include: { family: { select: { id: true, name: true, icon: true, color: true } } },
     })
 
     await AuditServiceComplete.log({

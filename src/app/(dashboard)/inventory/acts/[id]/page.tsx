@@ -34,7 +34,7 @@ const STATUS_CONFIG = {
   PENDING:  { label: 'Pendiente de firma', color: 'bg-yellow-100 text-yellow-800 border-yellow-300', icon: Clock },
   ACCEPTED: { label: 'Aceptada y firmada', color: 'bg-green-100 text-green-800 border-green-300',   icon: CheckCircle },
   REJECTED: { label: 'Rechazada',          color: 'bg-red-100 text-red-800 border-red-300',          icon: XCircle },
-  EXPIRED:  { label: 'Expirada',           color: 'bg-gray-100 text-gray-600 border-gray-300',       icon: AlertTriangle },
+  EXPIRED:  { label: 'Expirada',           color: 'bg-muted text-muted-foreground border-border',       icon: AlertTriangle },
 }
 
 const EQUIPMENT_TYPE_LABELS: Record<string, string> = {

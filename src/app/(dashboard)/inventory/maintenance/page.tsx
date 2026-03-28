@@ -32,7 +32,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
   SCHEDULED: { label: 'Programado',  color: 'bg-yellow-100 text-yellow-800', icon: <Calendar className="h-3 w-3" /> },
   ACCEPTED:  { label: 'Aceptado',    color: 'bg-purple-100 text-purple-800', icon: <ThumbsUp className="h-3 w-3" /> },
   COMPLETED: { label: 'Completado',  color: 'bg-green-100 text-green-800',   icon: <CheckCircle className="h-3 w-3" /> },
-  CANCELLED: { label: 'Cancelado',   color: 'bg-gray-100 text-gray-600',     icon: <XCircle className="h-3 w-3" /> },
+  CANCELLED: { label: 'Cancelado',   color: 'bg-muted text-muted-foreground',     icon: <XCircle className="h-3 w-3" /> },
 }
 
 const TYPE_LABELS: Record<string, string> = { PREVENTIVE: 'Preventivo', CORRECTIVE: 'Correctivo' }

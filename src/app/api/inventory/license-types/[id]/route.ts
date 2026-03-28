@@ -25,7 +25,7 @@ export async function PUT(
 
     const { id } = await params
     const body = await request.json()
-    const { name, description, icon, order, isActive } = body
+    const { name, description, icon, order, isActive, familyId } = body
 
     const existing = await prisma.license_types.findUnique({ where: { id } })
     if (!existing) {
@@ -40,7 +40,9 @@ export async function PUT(
         ...(icon !== undefined && { icon }),
         ...(order !== undefined && { order }),
         ...(isActive !== undefined && { isActive }),
+        ...(familyId !== undefined && { familyId: familyId || null }),
       },
+      include: { family: { select: { id: true, name: true, icon: true, color: true } } },
     })
 
     await AuditServiceComplete.log({

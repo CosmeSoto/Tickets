@@ -14,6 +14,11 @@ import {
 } from '@/components/ui/alert-dialog'
 import { useToast } from '@/hooks/use-toast'
 
+interface ContractDialogState {
+  contractId: string
+  contractNumber: string
+}
+
 const CONDITION_LABELS: Record<string, string> = {
   NEW: 'Nuevo', LIKE_NEW: 'Como Nuevo', GOOD: 'Bueno', FAIR: 'Regular', POOR: 'Malo',
 }
@@ -38,6 +43,8 @@ export function DecommissionApprovalPanel({ request, isAdmin, onActionComplete }
   const [rejectionError, setRejectionError] = useState('')
   const [loading, setLoading] = useState(false)
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
+  const [lastContractDialog, setLastContractDialog] = useState<ContractDialogState | null>(null)
+  const [closingContract, setClosingContract] = useState(false)
 
   const assetName = request.equipment
     ? `${request.equipment.code} — ${request.equipment.brand} ${request.equipment.model}`
@@ -51,12 +58,49 @@ export function DecommissionApprovalPanel({ request, isAdmin, onActionComplete }
       if (!res.ok) throw new Error(json.error || 'Error al aprobar')
       toast({ title: 'Solicitud aprobada', description: `Folio generado: ${json.folio}` })
       setApproveOpen(false)
-      onActionComplete?.()
+
+      if (json.lastAssetForContract) {
+        setLastContractDialog({ contractId: json.contractId, contractNumber: json.contractNumber })
+      } else if (json.contractWarning) {
+        toast({
+          title: 'Contrato vinculado',
+          description: `Este equipo está vinculado al contrato ${json.contractNumber}. El contrato seguirá activo para los demás equipos asociados.`,
+        })
+        onActionComplete?.()
+      } else {
+        onActionComplete?.()
+      }
     } catch (err: any) {
       toast({ title: 'Error', description: err.message, variant: 'destructive' })
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleCloseContract = async () => {
+    if (!lastContractDialog) return
+    setClosingContract(true)
+    try {
+      const res = await fetch(`/api/inventory/licenses/${lastContractDialog.contractId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: false }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Error al cerrar el contrato')
+      toast({ title: 'Contrato cerrado', description: `El contrato ${lastContractDialog.contractNumber} fue cerrado.` })
+    } catch (err: any) {
+      toast({ title: 'Error al cerrar contrato', description: err.message, variant: 'destructive' })
+    } finally {
+      setClosingContract(false)
+      setLastContractDialog(null)
+      onActionComplete?.()
+    }
+  }
+
+  const handleKeepContract = () => {
+    setLastContractDialog(null)
+    onActionComplete?.()
   }
 
   const handleReject = async () => {
@@ -238,6 +282,27 @@ export function DecommissionApprovalPanel({ request, isAdmin, onActionComplete }
           <img src={selectedImage} alt="Evidencia" className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain" />
         </div>
       )}
+
+      {/* AlertDialog: último equipo del contrato */}
+      <AlertDialog open={!!lastContractDialog} onOpenChange={open => { if (!open) handleKeepContract() }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Último equipo del contrato</AlertDialogTitle>
+            <AlertDialogDescription>
+              Este era el último equipo vinculado al contrato <strong>{lastContractDialog?.contractNumber}</strong>. ¿Deseas cerrar el contrato también?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleKeepContract} disabled={closingContract}>
+              No, mantener contrato activo
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleCloseContract} disabled={closingContract}>
+              {closingContract && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Sí, cerrar contrato
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

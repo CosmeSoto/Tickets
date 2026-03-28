@@ -58,7 +58,7 @@ export function FamilySelector({
             className={`flex flex-col items-center gap-2 rounded-lg border-2 p-4 text-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ${
               isSelected
                 ? 'shadow-sm'
-                : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+                : 'border-border bg-card hover:border-muted-foreground/30 hover:bg-accent'
             }`}
             style={
               isSelected
@@ -80,7 +80,7 @@ export function FamilySelector({
               )}
             </span>
             <span
-              className="text-sm font-medium leading-tight"
+              className={`text-sm font-medium leading-tight ${isSelected ? '' : 'text-foreground'}`}
               style={isSelected ? { color } : undefined}
             >
               {family.name}

@@ -16,9 +16,15 @@ import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
 import { Plus, Pencil, Trash2, Loader2, ShoppingCart } from 'lucide-react'
 import { IconPicker } from '@/components/inventory/icon-picker'
+import { FamilyBadge } from '@/components/inventory/family-badge'
+
+interface Family {
+  id: string; name: string; icon?: string | null; color?: string | null
+}
 
 interface ConsumableType {
   id: string; code: string; name: string; description?: string; icon?: string; isActive: boolean; order: number
+  familyId?: string | null; family?: Family | null
 }
 
 export default function ConsumableTypesPage() {
@@ -33,13 +39,15 @@ export default function ConsumableTypesPage() {
   const [submitting, setSubmitting] = useState(false)
   const [deletingType, setDeletingType] = useState<ConsumableType | null>(null)
   const [deleting, setDeleting] = useState(false)
-  const [formData, setFormData] = useState({ code: '', name: '', description: '', icon: '', order: 999 })
+  const [families, setFamilies] = useState<Family[]>([])
+  const [formData, setFormData] = useState({ code: '', name: '', description: '', icon: '', order: 999, familyId: '' })
 
   useEffect(() => {
     if (status === 'loading') return
     if (!session) { router.push('/login'); return }
     if (session.user.role !== 'ADMIN' && session.user.role !== 'TECHNICIAN') { router.push('/unauthorized'); return }
     fetchTypes()
+    fetch('/api/inventory/families').then(r => r.json()).then(d => setFamilies(d.families ?? []))
   }, [session, status, router])
 
   const fetchTypes = async () => {
@@ -53,10 +61,10 @@ export default function ConsumableTypesPage() {
   const handleOpenDialog = (type?: ConsumableType) => {
     if (type) {
       setEditingType(type)
-      setFormData({ code: type.code, name: type.name, description: type.description || '', icon: type.icon || '', order: type.order })
+      setFormData({ code: type.code, name: type.name, description: type.description || '', icon: type.icon || '', order: type.order, familyId: type.familyId || '' })
     } else {
       setEditingType(null)
-      setFormData({ code: '', name: '', description: '', icon: '', order: 999 })
+      setFormData({ code: '', name: '', description: '', icon: '', order: 999, familyId: '' })
     }
     setDialogOpen(true)
   }
@@ -103,22 +111,23 @@ export default function ConsumableTypesPage() {
         </CardHeader>
         <CardContent>
           <Table>
-            <TableHeader><TableRow><TableHead>Código</TableHead><TableHead>Nombre</TableHead><TableHead>Descripción</TableHead><TableHead>Ícono</TableHead><TableHead>Orden</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Código</TableHead><TableHead>Nombre</TableHead><TableHead>Familia</TableHead><TableHead>Descripción</TableHead><TableHead>Ícono</TableHead><TableHead>Orden</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
             <TableBody>
               {types.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No hay tipos registrados</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">No hay tipos registrados</TableCell></TableRow>
               ) : types.map(type => (
-                <TableRow key={type.id}>
+                <TableRow key={type.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleOpenDialog(type)}>
                   <TableCell className="font-mono text-sm">{type.code}</TableCell>
                   <TableCell className="font-medium">{type.name}</TableCell>
+                  <TableCell>{type.family ? <FamilyBadge family={type.family} size='sm' /> : <span className='text-xs text-muted-foreground'>Sin familia</span>}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{type.description || '-'}</TableCell>
                   <TableCell className="text-sm">{type.icon || '-'}</TableCell>
                   <TableCell>{type.order}</TableCell>
                   <TableCell><Badge variant={type.isActive ? 'default' : 'secondary'}>{type.isActive ? 'Activo' : 'Inactivo'}</Badge></TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(type)}><Pencil className="h-4 w-4" /></Button>
-                      {session?.user?.role === 'ADMIN' && <Button variant="ghost" size="sm" onClick={() => setDeletingType(type)}><Trash2 className="h-4 w-4 text-destructive" /></Button>}
+                      <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleOpenDialog(type) }}><Pencil className="h-4 w-4" /></Button>
+                      {session?.user?.role === 'ADMIN' && <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setDeletingType(type) }}><Trash2 className="h-4 w-4 text-destructive" /></Button>}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -137,6 +146,15 @@ export default function ConsumableTypesPage() {
             <div className="space-y-2"><Label>Descripción</Label><Textarea value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} rows={3} /></div>
             <IconPicker value={formData.icon} onChange={icon => setFormData({ ...formData, icon })} />
             <div className="space-y-2"><Label>Orden</Label><Input type="number" value={formData.order} onChange={e => setFormData({ ...formData, order: parseInt(e.target.value) })} /></div>
+            <div className='space-y-2'>
+              <Label>Familia</Label>
+              <select value={formData.familyId} onChange={e => setFormData({ ...formData, familyId: e.target.value })}
+                className='flex h-10 w-full rounded-md border border-border bg-card px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'>
+                <option value=''>Sin familia asignada</option>
+                {families.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+              </select>
+              <p className='text-xs text-muted-foreground'>Asigna este tipo a una familia para que aparezca filtrado en el formulario de activos</p>
+            </div>
             <DialogFooter><Button type="button" variant="outline" onClick={() => setDialogOpen(false)} disabled={submitting}>Cancelar</Button><Button type="submit" disabled={submitting}>{submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}{editingType ? 'Actualizar' : 'Crear'}</Button></DialogFooter>
           </form>
         </DialogContent>

@@ -213,7 +213,7 @@ export default function WarehousesPage() {
                 </TableRow>
               ) : (
                 warehouses.map((warehouse) => (
-                  <TableRow key={warehouse.id}>
+                  <TableRow key={warehouse.id} className='cursor-pointer hover:bg-muted/50' onClick={() => handleOpenDialog(warehouse)}>
                     <TableCell className='font-medium'>{warehouse.name}</TableCell>
                     <TableCell>
                       {warehouse.location ? (
@@ -242,10 +242,10 @@ export default function WarehousesPage() {
                     </TableCell>
                     <TableCell className='text-right'>
                       <div className='flex justify-end gap-2'>
-                        <Button variant='ghost' size='sm' onClick={() => handleOpenDialog(warehouse)}>
+                        <Button variant='ghost' size='sm' onClick={(e) => { e.stopPropagation(); handleOpenDialog(warehouse) }}>
                           <Pencil className='h-4 w-4' />
                         </Button>
-                        <Button variant='ghost' size='sm' onClick={() => setTogglingWarehouse(warehouse)}>
+                        <Button variant='ghost' size='sm' onClick={(e) => { e.stopPropagation(); setTogglingWarehouse(warehouse) }}>
                           {warehouse.isActive
                             ? <ToggleRight className='h-4 w-4 text-green-600' />
                             : <ToggleLeft className='h-4 w-4 text-muted-foreground' />}

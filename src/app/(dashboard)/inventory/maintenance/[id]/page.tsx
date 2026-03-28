@@ -52,7 +52,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
   SCHEDULED:  { label: 'Programado',   color: 'bg-yellow-100 text-yellow-800', icon: <Calendar className="h-4 w-4" /> },
   ACCEPTED:   { label: 'Aceptado',     color: 'bg-purple-100 text-purple-800', icon: <ThumbsUp className="h-4 w-4" /> },
   COMPLETED:  { label: 'Completado',   color: 'bg-green-100 text-green-800',  icon: <CheckCircle className="h-4 w-4" /> },
-  CANCELLED:  { label: 'Cancelado',    color: 'bg-gray-100 text-gray-600',    icon: <XCircle className="h-4 w-4" /> },
+  CANCELLED:  { label: 'Cancelado',    color: 'bg-muted text-muted-foreground',    icon: <XCircle className="h-4 w-4" /> },
 }
 
 // Pasos del flujo para mostrar progreso visual
@@ -327,9 +327,9 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
         </Alert>
       )}
       {status === 'CANCELLED' && (
-        <Alert className="border-gray-300 bg-gray-50">
-          <XCircle className="h-4 w-4 text-gray-500" />
-          <AlertDescription className="text-gray-700">Este mantenimiento fue cancelado.</AlertDescription>
+        <Alert className="border-border bg-muted">
+          <XCircle className="h-4 w-4 text-muted-foreground" />
+          <AlertDescription className="text-muted-foreground">Este mantenimiento fue cancelado.</AlertDescription>
         </Alert>
       )}
 

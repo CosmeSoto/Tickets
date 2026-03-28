@@ -23,8 +23,12 @@ export async function GET(request: NextRequest) {
 
     const where = isAdmin && includeInactive ? {} : { isActive: true }
 
+    const familyId = searchParams.get('familyId')
+    const whereWithFamily = familyId ? { ...where, familyId } : where
+
     const types = await prisma.license_types.findMany({
-      where,
+      where: whereWithFamily,
+      include: { family: { select: { id: true, name: true, icon: true, color: true } } },
       orderBy: [{ order: 'asc' }, { name: 'asc' }],
     })
 
@@ -50,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { code, name, description, icon } = body
+    const { code, name, description, icon, familyId } = body
 
     if (!code || !name) {
       return NextResponse.json({ error: 'Código y nombre son requeridos' }, { status: 400 })
@@ -73,6 +77,7 @@ export async function POST(request: NextRequest) {
         icon,
         isActive: true,
         order: 999,
+        ...(familyId ? { familyId } : {}),
       },
     })
 

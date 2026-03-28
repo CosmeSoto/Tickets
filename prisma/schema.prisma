@@ -1021,12 +1021,16 @@ model equipment {
   contractEndDate      DateTime?         @map("contract_end_date")
   contractRenewalCost  Float?            @map("contract_renewal_cost")
 
+  // Vínculo a contrato en software_licenses (para RENTAL/LOAN)
+  contractId           String?           @map("contract_id")
+
   createdAt            DateTime          @default(now()) @map("created_at")
   updatedAt            DateTime          @updatedAt @map("updated_at")
   
   type                 equipment_types   @relation(fields: [typeId], references: [id])
   supplier             suppliers?        @relation(fields: [supplierId], references: [id])
   warehouse            warehouses?       @relation(fields: [warehouseId], references: [id])
+  contract             software_licenses? @relation("EquipmentContract", fields: [contractId], references: [id], onDelete: SetNull)
   assignments          equipment_assignments[]
   maintenanceRecords   maintenance_records[]
   licenses             software_licenses[]
@@ -1296,6 +1300,7 @@ model software_licenses {
   supplier      suppliers?      @relation(fields: [supplierId], references: [id])
   decommission_requests decommission_requests[]
   attachments   license_attachments[]
+  linkedEquipment equipment[]   @relation("EquipmentContract")
 
   @@index([typeId, expirationDate])
   @@index([assignedToEquipment])
@@ -1538,6 +1543,21 @@ enum DeliveryActType {
   MRO_DELIVERY
   SERVICE_COMPLETION
   ASSET_TRANSFER
+  CONTRACT_RENEWAL
+}
+
+enum AssetSubtype {
+  EQUIPMENT
+  MRO
+  LICENSE
+}
+
+enum FormSection {
+  FINANCIAL
+  DEPRECIATION
+  CONTRACT
+  STOCK_MRO
+  WAREHOUSE
 }
 
 enum LicenseScope {
@@ -1580,6 +1600,7 @@ model inventory_families {
   consumableTypes  consumable_types[]
   licenseTypes     license_types[]
   managerFamilies  inventory_manager_families[]
+  formConfig       inventory_family_config?
 
   @@index([isActive, order])
   @@map("inventory_families")
@@ -1634,4 +1655,20 @@ model license_attachments {
 
   @@index([licenseId])
   @@map("license_attachments")
+}
+
+model inventory_family_config {
+  id                    String        @id @default(uuid())
+  familyId              String        @unique @map("family_id")
+  allowedSubtypes       AssetSubtype[] @map("allowed_subtypes")
+  visibleSections       FormSection[]  @map("visible_sections")
+  requiredSections      FormSection[]  @map("required_sections")
+  requireFinancialForNew Boolean       @default(true) @map("require_financial_for_new")
+  createdAt             DateTime      @default(now()) @map("created_at")
+  updatedAt             DateTime      @updatedAt @map("updated_at")
+
+  family                inventory_families @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@index([familyId])
+  @@map("inventory_family_config")
 }

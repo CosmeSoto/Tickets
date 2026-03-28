@@ -41,7 +41,7 @@ export function EquipmentHistory({ history }: EquipmentHistoryProps) {
     <div className="space-y-4">
       {history.map((event) => {
         const Icon = EVENT_ICONS[event.type] || Clock
-        const colorClass = EVENT_COLORS[event.type] || 'text-gray-500'
+        const colorClass = EVENT_COLORS[event.type] || 'text-muted-foreground'
 
         return (
           <div key={event.id} className="flex gap-4">
