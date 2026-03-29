@@ -9,7 +9,15 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Dialog,
   DialogContent,
@@ -21,6 +29,13 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import { Info } from 'lucide-react'
+import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
@@ -31,6 +46,14 @@ import { FamilyBadge } from '@/components/inventory/family-badge'
 import { IconPicker } from '@/components/inventory/icon-picker'
 import type { AssetSubtype, FormSection, AcquisitionMode, SectionsByMode, ModeSectionConfig } from '@/lib/inventory/family-config-types'
 import { DEFAULT_FAMILY_CONFIG, DEFAULT_MODE_CONFIG } from '@/lib/inventory/family-config-types'
+
+type DepreciationMethod = 'LINEAR' | 'DECLINING_BALANCE' | 'UNITS_OF_PRODUCTION'
+
+const DEPRECIATION_METHOD_LABELS: Record<DepreciationMethod, string> = {
+  LINEAR: 'Línea Recta',
+  DECLINING_BALANCE: 'Saldo Decreciente',
+  UNITS_OF_PRODUCTION: 'Unidades de Producción',
+}
 
 interface Family {
   id: string
@@ -73,6 +96,22 @@ const ACQUISITION_MODES: { value: AcquisitionMode; label: string; help: string }
 const ALL_SUBTYPES: AssetSubtype[] = ['EQUIPMENT', 'MRO', 'LICENSE']
 const ALL_SECTIONS: FormSection[] = ['FINANCIAL', 'DEPRECIATION', 'CONTRACT', 'STOCK_MRO', 'WAREHOUSE']
 
+/** Tooltip de ayuda reutilizable */
+function HelpTip({ text }: { text: string }) {
+  return (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Info className='h-3.5 w-3.5 text-muted-foreground cursor-help shrink-0' />
+        </TooltipTrigger>
+        <TooltipContent side='right' className='max-w-[220px] text-xs'>
+          {text}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
+}
+
 /** Tabla reutilizable de secciones visible/obligatoria */
 function SectionTable({
   sections,
@@ -93,13 +132,23 @@ function SectionTable({
         <tr className='border-b'>
           <th className='text-left py-2 font-medium text-muted-foreground'>Sección</th>
           <th className='text-left py-2 font-medium text-muted-foreground hidden sm:table-cell'>Campos incluidos</th>
-          <th className='text-center py-2 font-medium text-muted-foreground w-20'>Visible</th>
-          <th className='text-center py-2 font-medium text-muted-foreground w-24'>Obligatoria</th>
+          <th className='text-center py-2 font-medium text-muted-foreground w-20'>
+            <span className='flex items-center justify-center gap-1'>
+              Visible
+              <HelpTip text='El usuario verá esta sección en el formulario, pero no es obligatorio completarla.' />
+            </span>
+          </th>
+          <th className='text-center py-2 font-medium text-muted-foreground w-24'>
+            <span className='flex items-center justify-center gap-1'>
+              Obligatoria
+              <HelpTip text='El usuario debe completar esta sección para poder guardar el activo. Activar esto también activa Visible.' />
+            </span>
+          </th>
         </tr>
       </thead>
       <tbody>
         {sections.map(section => (
-          <tr key={section} className='border-b last:border-0'>
+          <tr key={section} className='border-b last:border-0 hover:bg-muted/30'>
             <td className='py-2.5 font-medium'>{SECTION_LABELS[section]}</td>
             <td className='py-2.5 text-xs text-muted-foreground hidden sm:table-cell'>{SECTION_DESCRIPTIONS[section]}</td>
             <td className='py-2.5 text-center'>
@@ -131,6 +180,14 @@ interface FamilyFormState {
   requiredSections: FormSection[]
   requireFinancialForNew: boolean
   sectionsByMode: SectionsByMode
+  // Depreciación por defecto
+  defaultDepreciationMethod: DepreciationMethod | null
+  defaultUsefulLifeYears: number | null
+  defaultResidualValuePct: number | null
+  // Comportamientos
+  codePrefix: string
+  autoApproveDecommission: boolean
+  requireDeliveryAct: boolean
 }
 
 const DEFAULT_FORM: FamilyFormState = {
@@ -143,6 +200,12 @@ const DEFAULT_FORM: FamilyFormState = {
   requiredSections: DEFAULT_FAMILY_CONFIG.requiredSections,
   requireFinancialForNew: true,
   sectionsByMode: {},
+  defaultDepreciationMethod: null,
+  defaultUsefulLifeYears: null,
+  defaultResidualValuePct: null,
+  codePrefix: '',
+  autoApproveDecommission: false,
+  requireDeliveryAct: true,
 }
 
 export default function FamiliesPage() {
@@ -200,6 +263,12 @@ export default function FamiliesPage() {
       visibleSections: DEFAULT_FAMILY_CONFIG.visibleSections,
       requiredSections: DEFAULT_FAMILY_CONFIG.requiredSections,
       sectionsByMode: {},
+      defaultDepreciationMethod: null,
+      defaultUsefulLifeYears: null,
+      defaultResidualValuePct: null,
+      codePrefix: '',
+      autoApproveDecommission: false,
+      requireDeliveryAct: true,
     })
     setSheetOpen(true)
     setLoadingConfig(true)
@@ -214,6 +283,12 @@ export default function FamiliesPage() {
           requiredSections: cfg.requiredSections ?? DEFAULT_FAMILY_CONFIG.requiredSections,
           requireFinancialForNew: cfg.requireFinancialForNew ?? true,
           sectionsByMode: cfg.sectionsByMode ?? {},
+          defaultDepreciationMethod: cfg.defaultDepreciationMethod ?? null,
+          defaultUsefulLifeYears: cfg.defaultUsefulLifeYears ?? null,
+          defaultResidualValuePct: cfg.defaultResidualValuePct ?? null,
+          codePrefix: cfg.codePrefix ?? '',
+          autoApproveDecommission: cfg.autoApproveDecommission ?? false,
+          requireDeliveryAct: cfg.requireDeliveryAct ?? true,
         }))
       }
     } catch { /* usa defaults */ } finally {
@@ -321,6 +396,14 @@ export default function FamiliesPage() {
           sectionsByMode: form.allowedSubtypes.includes('EQUIPMENT') && Object.keys(form.sectionsByMode).length > 0
             ? form.sectionsByMode
             : null,
+          // Depreciación por defecto
+          defaultDepreciationMethod: form.defaultDepreciationMethod,
+          defaultUsefulLifeYears: form.defaultUsefulLifeYears,
+          defaultResidualValuePct: form.defaultResidualValuePct,
+          // Comportamientos
+          codePrefix: form.codePrefix || null,
+          autoApproveDecommission: form.autoApproveDecommission,
+          requireDeliveryAct: form.requireDeliveryAct,
         }),
       })
 
@@ -458,8 +541,9 @@ export default function FamiliesPage() {
 
       {/* Dialog unificado: datos + configuración */}
       <Dialog open={sheetOpen} onOpenChange={setSheetOpen}>
-        <DialogContent className='max-w-2xl max-h-[90vh] overflow-y-auto'>
-          <DialogHeader className='mb-2'>
+        <DialogContent className='max-w-4xl w-full max-h-[90vh] flex flex-col p-0 gap-0'>
+          {/* Header fijo */}
+          <DialogHeader className='px-6 pt-6 pb-4 border-b shrink-0'>
             <DialogTitle>{editingFamily ? 'Editar Familia' : 'Nueva Familia'}</DialogTitle>
             <DialogDescription>
               {editingFamily
@@ -468,165 +552,321 @@ export default function FamiliesPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className='space-y-6'>
-            {/* ── Datos básicos ── */}
-            <div className='space-y-4'>
-              <p className='text-sm font-semibold text-foreground'>Datos básicos</p>
+          <form onSubmit={handleSubmit} className='flex flex-col flex-1 min-h-0'>
+            {/* Cuerpo en dos columnas */}
+            <div className='flex flex-1 min-h-0 divide-x'>
 
-              <div className='space-y-1.5'>
-                <Label htmlFor='name'>Nombre <span className='text-destructive'>*</span></Label>
-                <Input
-                  id='name'
-                  value={form.name}
-                  onChange={e => setField('name', e.target.value)}
-                  placeholder='Ej: Activos Fijos e Infraestructura'
-                  required
-                />
-              </div>
+              {/* ── Columna izquierda: Datos básicos (fija, no scrollea) ── */}
+              <div className='w-72 shrink-0 flex flex-col px-6 py-5 space-y-4 overflow-y-auto'>
+                <p className='text-xs font-semibold text-muted-foreground uppercase tracking-wide'>Datos básicos</p>
 
-              <IconPicker value={form.icon} onChange={v => setField('icon', v)} />
-
-              <div className='space-y-1.5'>
-                <Label>Color</Label>
-                <div className='flex items-center gap-2'>
-                  <input
-                    type='color'
-                    value={form.color}
-                    onChange={e => setField('color', e.target.value)}
-                    className='h-9 w-14 cursor-pointer rounded border border-input bg-background p-1'
-                  />
+                <div className='space-y-1.5'>
+                  <Label htmlFor='name'>Nombre <span className='text-destructive'>*</span></Label>
                   <Input
-                    value={form.color}
-                    onChange={e => setField('color', e.target.value)}
-                    placeholder='#6B7280'
-                    className='font-mono'
+                    id='name'
+                    value={form.name}
+                    onChange={e => setField('name', e.target.value)}
+                    placeholder='Ej: Activos Fijos'
+                    required
                   />
                 </div>
-              </div>
 
-              <div className='space-y-1.5'>
-                <Label htmlFor='order'>Orden</Label>
-                <Input
-                  id='order'
-                  type='number'
-                  value={form.order}
-                  onChange={e => setField('order', parseInt(e.target.value) || 999)}
-                />
-                <p className='text-xs text-muted-foreground'>Menor número = aparece primero en los selectores</p>
-              </div>
-            </div>
+                <IconPicker value={form.icon} onChange={v => setField('icon', v)} />
 
-            <Separator />
-
-            {/* ── Configuración del formulario ── */}
-            <div className='space-y-4'>
-              <p className='text-sm font-semibold text-foreground'>Configuración del formulario</p>
-
-              {loadingConfig ? (
-                <div className='flex items-center gap-2 text-sm text-muted-foreground'>
-                  <Loader2 className='h-4 w-4 animate-spin' />
-                  Cargando configuración...
-                </div>
-              ) : (
-                <>
-                  {/* Subtipos */}
-                  <div className='space-y-2'>
-                    <p className='text-xs font-medium text-muted-foreground uppercase tracking-wide'>Subtipos permitidos</p>
-                    <div className='space-y-2'>
-                      {ALL_SUBTYPES.map(subtype => (
-                        <div key={subtype} className='flex items-center gap-2'>
-                          <Checkbox
-                            id={`sub-${subtype}`}
-                            checked={form.allowedSubtypes.includes(subtype)}
-                            onCheckedChange={() => toggleSubtype(subtype)}
-                          />
-                          <Label htmlFor={`sub-${subtype}`} className='cursor-pointer font-normal'>
-                            {SUBTYPE_LABELS[subtype]}
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                    {form.allowedSubtypes.length === 0 && (
-                      <p className='text-xs text-destructive'>Selecciona al menos un subtipo</p>
-                    )}
+                <div className='space-y-1.5'>
+                  <Label>Color</Label>
+                  <div className='flex items-center gap-2'>
+                    <input
+                      type='color'
+                      value={form.color}
+                      onChange={e => setField('color', e.target.value)}
+                      className='h-9 w-14 cursor-pointer rounded border border-input bg-background p-1'
+                    />
+                    <Input
+                      value={form.color}
+                      onChange={e => setField('color', e.target.value)}
+                      placeholder='#6B7280'
+                      className='font-mono'
+                    />
                   </div>
+                </div>
 
-                  {/* Secciones */}
-                  <div className='space-y-2'>
-                    <p className='text-xs font-medium text-muted-foreground uppercase tracking-wide'>Secciones del formulario</p>
+                <div className='space-y-1.5'>
+                  <Label htmlFor='order'>Orden</Label>
+                  <Input
+                    id='order'
+                    type='number'
+                    value={form.order}
+                    onChange={e => setField('order', parseInt(e.target.value) || 999)}
+                  />
+                  <p className='text-xs text-muted-foreground'>Menor número = aparece primero</p>
+                </div>
 
-                    {/* Si EQUIPMENT está permitido → tabs por modalidad */}
-                    {form.allowedSubtypes.includes('EQUIPMENT') ? (
-                      <div className='space-y-3'>
-                        <p className='text-xs text-muted-foreground'>
-                          Configura qué secciones son visibles u obligatorias según la modalidad de adquisición del equipo.
-                        </p>
-                        {/* Tabs de modalidad */}
-                        <div className='flex gap-1 rounded-lg bg-muted p-1'>
-                          {ACQUISITION_MODES.map(m => (
-                            <button
-                              key={m.value}
-                              type='button'
-                              onClick={() => setActiveModeTab(m.value)}
-                              className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
-                                activeModeTab === m.value
-                                  ? 'bg-background text-foreground shadow-sm'
-                                  : 'text-muted-foreground hover:text-foreground'
-                              }`}
-                            >
-                              {m.label}
-                            </button>
-                          ))}
+                {/* Preview de la familia */}
+                {form.name && (
+                  <div className='pt-2'>
+                    <p className='text-xs text-muted-foreground mb-2'>Vista previa</p>
+                    <FamilyBadge
+                      family={{ id: '', code: '', name: form.name, icon: form.icon, color: form.color, order: form.order, isActive: true }}
+                      size='sm'
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* ── Columna derecha: Configuración del formulario (scrolleable) ── */}
+              <div className='flex-1 overflow-y-auto px-6 py-5 space-y-5'>
+                <p className='text-xs font-semibold text-muted-foreground uppercase tracking-wide'>Configuración del formulario</p>
+
+                {loadingConfig ? (
+                  <div className='flex items-center gap-2 text-sm text-muted-foreground'>
+                    <Loader2 className='h-4 w-4 animate-spin' />
+                    Cargando configuración...
+                  </div>
+                ) : (
+                  <>
+                    {/* Subtipos */}
+                    <div className='space-y-2'>
+                      <div className='flex items-center gap-1.5'>
+                        <p className='text-xs font-semibold text-muted-foreground uppercase tracking-wide'>¿Qué tipos de activo acepta?</p>
+                        <HelpTip text='Define qué categorías de activo se pueden registrar bajo esta familia. Si solo hay uno, el formulario lo selecciona automáticamente.' />
+                      </div>
+                      <div className='flex flex-wrap gap-x-6 gap-y-2 rounded-md border border-border bg-muted/20 px-3 py-2.5'>
+                        {ALL_SUBTYPES.map(subtype => (
+                          <div key={subtype} className='flex items-center gap-2'>
+                            <Checkbox
+                              id={`sub-${subtype}`}
+                              checked={form.allowedSubtypes.includes(subtype)}
+                              onCheckedChange={() => toggleSubtype(subtype)}
+                            />
+                            <Label htmlFor={`sub-${subtype}`} className='cursor-pointer font-normal'>
+                              {SUBTYPE_LABELS[subtype]}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                      {form.allowedSubtypes.length === 0 && (
+                        <p className='text-xs text-destructive'>Selecciona al menos un subtipo</p>
+                      )}
+                    </div>
+
+                    <Separator />
+
+                    {/* Secciones */}
+                    <div className='space-y-2'>
+                      <div className='flex items-center gap-1.5'>
+                        <p className='text-xs font-semibold text-muted-foreground uppercase tracking-wide'>¿Qué secciones aparecen en el formulario?</p>
+                        <HelpTip text='Controla qué bloques de campos ve el usuario al registrar un activo de esta familia. "Visible" = aparece pero es opcional. "Obligatoria" = debe completarse para guardar.' />
+                      </div>
+
+                      {form.allowedSubtypes.includes('EQUIPMENT') ? (
+                        <div className='space-y-3'>
+                          <p className='text-xs text-muted-foreground'>
+                            Para equipos físicos puedes configurar las secciones por modalidad de adquisición. Selecciona la pestaña y ajusta cada una.
+                          </p>
+                          <div className='flex gap-1 rounded-lg bg-muted p-1'>
+                            {ACQUISITION_MODES.map(m => (
+                              <button
+                                key={m.value}
+                                type='button'
+                                onClick={() => setActiveModeTab(m.value)}
+                                className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
+                                  activeModeTab === m.value
+                                    ? 'bg-background text-foreground shadow-sm'
+                                    : 'text-muted-foreground hover:text-foreground'
+                                }`}
+                              >
+                                {m.label}
+                              </button>
+                            ))}
+                          </div>
+                          <p className='text-xs text-muted-foreground italic bg-muted/40 rounded px-2 py-1'>
+                            {ACQUISITION_MODES.find(m => m.value === activeModeTab)?.help}
+                          </p>
+                          <SectionTable
+                            sections={ALL_SECTIONS}
+                            visible={getModeConfig(activeModeTab).visible}
+                            required={getModeConfig(activeModeTab).required}
+                            onToggleVisible={(s, v) => setModeVisible(activeModeTab, s, v)}
+                            onToggleRequired={(s, v) => setModeRequired(activeModeTab, s, v)}
+                          />
                         </div>
-                        <p className='text-xs text-muted-foreground italic'>
-                          {ACQUISITION_MODES.find(m => m.value === activeModeTab)?.help}
-                        </p>
-                        {/* Tabla para la modalidad activa */}
+                      ) : (
                         <SectionTable
                           sections={ALL_SECTIONS}
-                          visible={getModeConfig(activeModeTab).visible}
-                          required={getModeConfig(activeModeTab).required}
-                          onToggleVisible={(s, v) => setModeVisible(activeModeTab, s, v)}
-                          onToggleRequired={(s, v) => setModeRequired(activeModeTab, s, v)}
+                          visible={form.visibleSections}
+                          required={form.requiredSections}
+                          onToggleVisible={(s, v) => toggleVisible(s, v)}
+                          onToggleRequired={(s, v) => toggleRequired(s, v)}
+                        />
+                      )}
+                    </div>
+
+                    <Separator />
+
+                    {/* Comportamiento financiero */}
+                    <div className='space-y-3'>
+                      <div className='flex items-center gap-1.5'>
+                        <p className='text-xs font-semibold text-muted-foreground uppercase tracking-wide'>Reglas de registro</p>
+                        <HelpTip text='Comportamientos especiales que se aplican al registrar activos de esta familia.' />
+                      </div>
+
+                      <div className='rounded-md border border-border p-3 space-y-1'>
+                        <div className='flex items-start gap-2'>
+                          <Checkbox
+                            id='requireFinancialForNew'
+                            checked={form.requireFinancialForNew}
+                            onCheckedChange={checked => setField('requireFinancialForNew', !!checked)}
+                            className='mt-0.5'
+                          />
+                          <div>
+                            <Label htmlFor='requireFinancialForNew' className='cursor-pointer font-medium text-sm'>
+                              Exigir precio de compra en activos nuevos
+                            </Label>
+                            <p className='text-xs text-muted-foreground mt-0.5'>
+                              Si está activo, al registrar un activo con condición "Nuevo" el precio de compra será obligatorio.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    {/* Depreciación por defecto */}
+                    <div className='space-y-3'>
+                      <div className='flex items-center gap-1.5'>
+                        <p className='text-xs font-semibold text-muted-foreground uppercase tracking-wide'>Depreciación por defecto</p>
+                        <HelpTip text='Valores que se pre-rellenan automáticamente en el formulario de activos al seleccionar esta familia. El usuario puede cambiarlos.' />
+                      </div>
+                      <p className='text-xs text-muted-foreground -mt-1'>
+                        Estos valores se sugieren al registrar un equipo de esta familia. El usuario puede ajustarlos.
+                      </p>
+
+                      <div className='space-y-1.5'>
+                        <Label htmlFor='defaultDepreciationMethod'>Método por defecto</Label>
+                        <Select
+                          value={form.defaultDepreciationMethod ?? 'NONE'}
+                          onValueChange={v => setField('defaultDepreciationMethod', (v === 'NONE' ? null : v) as DepreciationMethod | null)}
+                        >
+                          <SelectTrigger id='defaultDepreciationMethod'>
+                            <SelectValue placeholder='Sin método por defecto' />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value='NONE'>Sin método por defecto</SelectItem>
+                            {(Object.keys(DEPRECIATION_METHOD_LABELS) as DepreciationMethod[]).map(m => (
+                              <SelectItem key={m} value={m}>{DEPRECIATION_METHOD_LABELS[m]}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className='grid grid-cols-2 gap-3'>
+                        <div className='space-y-1.5'>
+                          <div className='flex items-center gap-1'>
+                            <Label htmlFor='defaultUsefulLifeYears' className='text-sm'>Vida útil sugerida (años)</Label>
+                            <HelpTip text='Ej: laptops 3-5 años, servidores 5-7 años, mobiliario 10 años.' />
+                          </div>
+                          <Input
+                            id='defaultUsefulLifeYears'
+                            type='number'
+                            min={1}
+                            max={100}
+                            value={form.defaultUsefulLifeYears ?? ''}
+                            onChange={e => setField('defaultUsefulLifeYears', e.target.value ? Number(e.target.value) : null)}
+                            placeholder='Ej: 5'
+                          />
+                        </div>
+                        <div className='space-y-1.5'>
+                          <div className='flex items-center gap-1'>
+                            <Label htmlFor='defaultResidualValuePct' className='text-sm'>Valor residual sugerido (%)</Label>
+                            <HelpTip text='Porcentaje del precio de compra que se sugiere como valor residual. Ej: 10 → un equipo de $1,000 tendrá valor residual sugerido de $100.' />
+                          </div>
+                          <Input
+                            id='defaultResidualValuePct'
+                            type='number'
+                            min={0}
+                            max={100}
+                            value={form.defaultResidualValuePct ?? ''}
+                            onChange={e => setField('defaultResidualValuePct', e.target.value ? Number(e.target.value) : null)}
+                            placeholder='Ej: 10'
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    {/* Comportamientos de flujo */}
+                    <div className='space-y-3'>
+                      <div className='flex items-center gap-1.5'>
+                        <p className='text-xs font-semibold text-muted-foreground uppercase tracking-wide'>Comportamientos de flujo</p>
+                        <HelpTip text='Controlan cómo se procesan las asignaciones y bajas de activos de esta familia.' />
+                      </div>
+
+                      <div className='space-y-1.5'>
+                        <div className='flex items-center gap-1'>
+                          <Label htmlFor='codePrefix' className='text-sm'>Prefijo de código</Label>
+                          <HelpTip text='Si se define, los códigos de activos de esta familia usarán este prefijo en lugar del código de la familia. Máx. 10 caracteres alfanuméricos.' />
+                        </div>
+                        <Input
+                          id='codePrefix'
+                          value={form.codePrefix}
+                          onChange={e => setField('codePrefix', e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 10))}
+                          placeholder='Ej: TEC (dejar vacío para usar el código de familia)'
+                          maxLength={10}
                         />
                       </div>
-                    ) : (
-                      /* Sin EQUIPMENT → tabla global simple */
-                      <SectionTable
-                        sections={ALL_SECTIONS}
-                        visible={form.visibleSections}
-                        required={form.requiredSections}
-                        onToggleVisible={(s, v) => toggleVisible(s, v)}
-                        onToggleRequired={(s, v) => toggleRequired(s, v)}
-                      />
-                    )}
-                    <p className='text-xs text-muted-foreground'>
-                      Marcar como Obligatoria activa Visible automáticamente.
-                    </p>
-                  </div>
 
-                  {/* Comportamiento para activos nuevos */}
-                  <div className='rounded-md border border-border p-3 space-y-1'>
-                    <div className='flex items-center gap-2'>
-                      <Checkbox
-                        id='requireFinancialForNew'
-                        checked={form.requireFinancialForNew}
-                        onCheckedChange={checked => setField('requireFinancialForNew', !!checked)}
-                      />
-                      <Label htmlFor='requireFinancialForNew' className='cursor-pointer font-medium'>
-                        Exigir información financiera para activos nuevos
-                      </Label>
+                      <div className='rounded-md border border-border p-3 space-y-1.5'>
+                        <div className='flex items-center justify-between gap-3'>
+                          <div className='flex items-center gap-1.5 min-w-0'>
+                            <Label htmlFor='autoApproveDecommission' className='cursor-pointer font-medium text-sm leading-snug'>
+                              Baja automática sin aprobación
+                            </Label>
+                            <HelpTip text='Cuando está activo, al solicitar la baja de un activo de esta familia se genera el acta de baja de inmediato, sin esperar revisión del administrador.' />
+                          </div>
+                          <Switch
+                            id='autoApproveDecommission'
+                            checked={form.autoApproveDecommission}
+                            onCheckedChange={checked => setField('autoApproveDecommission', checked)}
+                          />
+                        </div>
+                        <p className='text-xs text-muted-foreground'>
+                          {form.autoApproveDecommission
+                            ? '✓ Las bajas se aprueban automáticamente y generan acta de inmediato.'
+                            : 'Las bajas quedan pendientes hasta que un administrador las apruebe.'}
+                        </p>
+                      </div>
+
+                      <div className='rounded-md border border-border p-3 space-y-1.5'>
+                        <div className='flex items-center justify-between gap-3'>
+                          <div className='flex items-center gap-1.5 min-w-0'>
+                            <Label htmlFor='requireDeliveryAct' className='cursor-pointer font-medium text-sm leading-snug'>
+                              Requiere acta de entrega
+                            </Label>
+                            <HelpTip text='Cuando está activo, al asignar un activo de esta familia se genera un acta de entrega que el receptor debe firmar digitalmente.' />
+                          </div>
+                          <Switch
+                            id='requireDeliveryAct'
+                            checked={form.requireDeliveryAct}
+                            onCheckedChange={checked => setField('requireDeliveryAct', checked)}
+                          />
+                        </div>
+                        <p className='text-xs text-muted-foreground'>
+                          {form.requireDeliveryAct
+                            ? '✓ La asignación genera un acta de entrega con firma digital del receptor.'
+                            : 'La asignación se activa directamente, sin acta de entrega.'}
+                        </p>
+                      </div>
                     </div>
-                    <p className='text-xs text-muted-foreground pl-6'>
-                      Si está activo, cuando el usuario registre un activo con condición "Nuevo", la sección Financiero se mostrará siempre y el precio de compra será obligatorio, independientemente de la configuración de secciones.
-                    </p>
-                  </div>
-                </>
-              )}
+                  </>
+                )}
+              </div>
             </div>
 
-            {/* ── Acciones ── */}
-            <div className='flex gap-3 justify-end pt-2'>
+            {/* Footer fijo con acciones */}
+            <div className='flex gap-3 justify-end px-6 py-4 border-t shrink-0'>
               <Button type='button' variant='outline' onClick={() => setSheetOpen(false)} disabled={submitting}>
                 Cancelar
               </Button>

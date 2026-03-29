@@ -12,6 +12,7 @@ const publicRoutes = [
   '/help',
   '/help/terms',
   '/help/privacy',
+  '/inventory/equipment/public',
 ]
 
 // Rutas protegidas que requieren autenticación

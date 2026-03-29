@@ -34,13 +34,18 @@ export async function generateAssetCode(
 ): Promise<string> {
   const year = new Date().getFullYear()
 
-  // Obtener código de la familia
+  // Obtener código de la familia y prefijo personalizado
   const family = await prisma.inventory_families.findUnique({
     where: { id: familyId },
-    select: { code: true },
+    select: {
+      code: true,
+      formConfig: { select: { codePrefix: true } },
+    },
   })
 
-  const familyCode = (family?.code ?? 'INV').slice(0, 6).toUpperCase()
+  const familyCode = family?.formConfig?.codePrefix?.trim()
+    ? family.formConfig.codePrefix.trim().toUpperCase()
+    : (family?.code ?? 'INV').slice(0, 6).toUpperCase()
   const subtypePrefix = SUBTYPE_PREFIX[subtype] ?? subtype.slice(0, 3).toUpperCase()
   const modePrefix = MODE_PREFIX[acquisitionMode ?? 'FIXED_ASSET'] ?? 'FA'
 

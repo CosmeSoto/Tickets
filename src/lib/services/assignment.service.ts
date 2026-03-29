@@ -33,7 +33,7 @@ export class AssignmentService {
       }
 
       if (equipment.status !== 'AVAILABLE') {
-        throw new Error('El equipo no está disponible para asignación')
+        throw new Error(`El equipo no está disponible para asignación (estado actual: ${equipment.status})`)
       }
 
       // Verificar que no haya asignación activa
@@ -56,6 +56,13 @@ export class AssignmentService {
       if (!receiver) {
         throw new Error('Usuario receptor no encontrado')
       }
+
+      // Leer configuración de familia para requireDeliveryAct
+      const familyConfig = await prisma.inventory_family_config.findFirst({
+        where: { family: { equipmentTypes: { some: { id: equipment.typeId } } } },
+        select: { requireDeliveryAct: true },
+      })
+      const requireDeliveryAct = familyConfig?.requireDeliveryAct ?? true
 
       // Crear asignación en transacción
       const assignment = await prisma.$transaction(async (tx) => {
@@ -85,11 +92,11 @@ export class AssignmentService {
           data: { status: 'ASSIGNED' }
         })
 
-        // Registrar en auditoría
+        // Registrar en auditoría con información de requireDeliveryAct
         await tx.audit_logs.create({
           data: {
             id: randomUUID(),
-            action: 'ASSIGNED',
+            action: 'ASSIGNMENT_CREATED',
             entityType: 'equipment',
             entityId: data.equipmentId,
             userId: delivererId,
@@ -98,6 +105,7 @@ export class AssignmentService {
               receiverId: data.receiverId,
               receiverName: receiver.name,
               assignmentType: data.assignmentType,
+              deliveryActSkipped: !requireDeliveryAct,
             }
           }
         })

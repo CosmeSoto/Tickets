@@ -744,6 +744,14 @@ async function seedInventorySettings() {
     { key: 'inventory.license_alert_enabled', value: 'true', description: 'Habilitar alertas de vencimiento de licencias' },
     { key: 'inventory.license_alert_days_first', value: '30', description: 'Días antes para primera alerta de licencias' },
     { key: 'inventory.license_alert_days_second', value: '7', description: 'Días antes para segunda alerta de licencias' },
+    // Nuevas claves — ciclo de vida del inventario
+    { key: 'inventory.mro_expiry_alert_days', value: '30', description: 'Días antes de caducidad MRO para primera alerta' },
+    { key: 'inventory.mro_expiry_alert_days_urgent', value: '7', description: 'Días antes de caducidad MRO para alerta urgente' },
+    { key: 'inventory.default_warehouse_id', value: '', description: 'ID de bodega por defecto para nuevos activos' },
+    { key: 'inventory.warranty_alert_days', value: '30', description: 'Días antes de vencimiento de garantía para alerta' },
+    { key: 'inventory.contract_alert_days', value: '30', description: 'Días antes de vencimiento de contrato para alerta' },
+    { key: 'inventory.mro_expiry_alert_enabled', value: 'true', description: 'Habilita alertas de caducidad MRO' },
+    { key: 'inventory.warranty_alert_enabled', value: 'true', description: 'Habilita alertas de garantía de equipos' },
   ]
   for (const s of settings) {
     await prisma.system_settings.upsert({
@@ -757,15 +765,15 @@ async function seedInventorySettings() {
 
 async function seedFolioCounters() {
   const year = new Date().getFullYear()
-  const existing = await prisma.folio_counters.count({ where: { year } })
-  if (existing > 0) { console.log(`⏭️  Contadores de folio ya existen para ${year}`); return }
-  await prisma.folio_counters.createMany({
-    data: [
-      { id: randomUUID(), year, type: 'ACT', lastNumber: 0 },
-      { id: randomUUID(), year, type: 'DEV', lastNumber: 0 },
-    ],
-  })
-  console.log('✅ Contadores de folio')
+  const types = ['ACT', 'DEV', 'BAJ']
+  for (const type of types) {
+    await prisma.folio_counters.upsert({
+      where: { year_type: { year, type } },
+      update: {},
+      create: { id: randomUUID(), year, type, lastNumber: 0 },
+    })
+  }
+  console.log(`✅ Contadores de folio (ACT, DEV, BAJ) para ${year}`)
 }
 
 async function seedLandingPage() {

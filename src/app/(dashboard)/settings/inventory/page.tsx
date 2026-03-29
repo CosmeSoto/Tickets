@@ -10,9 +10,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/hooks/use-toast'
-import { Save, Loader2, ShieldCheck, Search, X, UserCheck, Layers } from 'lucide-react'
-import { ManagerFamiliesPanel } from '@/components/inventory/manager-families-panel'
+import {
+  Save, Loader2, ShieldCheck, Search, X, ChevronDown, ChevronRight,
+  Bell, FileText, Layers, UserPlus,
+} from 'lucide-react'
+import { FamilyBadge } from '@/components/inventory/family-badge'
 
 interface InventorySettings {
   manager_ids: string[]
@@ -21,6 +26,12 @@ interface InventorySettings {
   license_alert_enabled: boolean
   license_alert_days_first: number
   license_alert_days_second: number
+  mro_expiry_alert_enabled: boolean
+  mro_expiry_alert_days: number
+  mro_expiry_alert_days_urgent: number
+  warranty_alert_enabled: boolean
+  warranty_alert_days: number
+  contract_alert_days: number
 }
 
 interface UserOption {
@@ -48,6 +59,147 @@ const ROLE_COLORS: Record<string, string> = {
   CLIENT: 'bg-muted text-muted-foreground',
 }
 
+// ── Subcomponente: familias de un gestor (inline, expandible) ──────────────
+function ManagerRow({
+  user,
+  allFamilies,
+  onRemove,
+}: {
+  user: UserOption
+  allFamilies: FamilyOption[]
+  onRemove: (id: string) => void
+}) {
+  const { toast } = useToast()
+  const [expanded, setExpanded] = useState(false)
+  const [familyIds, setFamilyIds] = useState<string[]>([])
+  const [loaded, setLoaded] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  const loadFamilies = async () => {
+    if (loaded) return
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/inventory/managers/${user.id}/families`)
+      if (res.ok) {
+        const data = await res.json()
+        const families: Array<{ id: string }> = data.families ?? data ?? []
+        setFamilyIds(families.map(f => f.id))
+        setLoaded(true)
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const toggle = () => {
+    if (!expanded) loadFamilies()
+    setExpanded(v => !v)
+  }
+
+  const toggleFamily = (id: string) =>
+    setFamilyIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+
+  const saveFamilies = async () => {
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/inventory/managers/${user.id}/families`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ familyIds }),
+      })
+      if (!res.ok) throw new Error()
+      toast({ title: 'Familias actualizadas', description: `Familias de ${user.name} guardadas.` })
+    } catch {
+      toast({ title: 'Error', description: 'No se pudieron guardar las familias', variant: 'destructive' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="rounded-md border overflow-hidden">
+      {/* Fila del gestor */}
+      <div className="flex items-center gap-3 px-3 py-2.5 bg-muted/30">
+        <button
+          type="button"
+          onClick={toggle}
+          className="flex items-center gap-2 flex-1 min-w-0 text-left"
+        >
+          {expanded
+            ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+            : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
+          <div className="min-w-0">
+            <p className="text-sm font-medium truncate">{user.name}</p>
+            <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+          </div>
+        </button>
+        <Badge variant="outline" className={`text-xs shrink-0 ${ROLE_COLORS[user.role]}`}>
+          {ROLE_LABELS[user.role] || user.role}
+        </Badge>
+        <button
+          type="button"
+          onClick={() => onRemove(user.id)}
+          className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-destructive shrink-0"
+          title="Quitar gestor"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Panel de familias expandible */}
+      {expanded && (
+        <div className="px-4 py-3 border-t space-y-3 bg-background">
+          {loading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Cargando familias...
+            </div>
+          ) : allFamilies.length === 0 ? (
+            <p className="text-sm text-muted-foreground italic">No hay familias disponibles.</p>
+          ) : (
+            <>
+              <p className="text-xs text-muted-foreground">
+                Selecciona las familias que este gestor puede administrar:
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {allFamilies.map(family => (
+                  <div
+                    key={family.id}
+                    className="flex items-center gap-2 rounded border px-2.5 py-1.5 hover:bg-muted/50 cursor-pointer"
+                    onClick={() => toggleFamily(family.id)}
+                  >
+                    <Checkbox
+                      id={`${user.id}-fam-${family.id}`}
+                      checked={familyIds.includes(family.id)}
+                      onCheckedChange={() => toggleFamily(family.id)}
+                      onClick={e => e.stopPropagation()}
+                    />
+                    <Label
+                      htmlFor={`${user.id}-fam-${family.id}`}
+                      className="cursor-pointer flex-1"
+                      onClick={e => e.preventDefault()}
+                    >
+                      <FamilyBadge family={family} size="sm" />
+                    </Label>
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-end pt-1">
+                <Button size="sm" onClick={saveFamilies} disabled={saving}>
+                  {saving && <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />}
+                  Guardar familias
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Página principal ──────────────────────────────────────────────────────
 export default function InventorySettingsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -55,7 +207,9 @@ export default function InventorySettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [allUsers, setAllUsers] = useState<UserOption[]>([])
+  const [allFamilies, setAllFamilies] = useState<FamilyOption[]>([])
   const [search, setSearch] = useState('')
+  const [showSearch, setShowSearch] = useState(false)
   const [settings, setSettings] = useState<InventorySettings>({
     manager_ids: [],
     act_expiration_days: 7,
@@ -63,13 +217,13 @@ export default function InventorySettingsPage() {
     license_alert_enabled: true,
     license_alert_days_first: 30,
     license_alert_days_second: 7,
+    mro_expiry_alert_enabled: true,
+    mro_expiry_alert_days: 30,
+    mro_expiry_alert_days_urgent: 7,
+    warranty_alert_enabled: true,
+    warranty_alert_days: 30,
+    contract_alert_days: 30,
   })
-
-  // Familias por gestor
-  const [allFamilies, setAllFamilies] = useState<FamilyOption[]>([])
-  const [selectedManagerId, setSelectedManagerId] = useState<string>('')
-  const [managerFamilyIds, setManagerFamilyIds] = useState<string[]>([])
-  const [loadingManagerFamilies, setLoadingManagerFamilies] = useState(false)
 
   useEffect(() => {
     if (status === 'unauthenticated') { router.push('/login'); return }
@@ -106,26 +260,6 @@ export default function InventorySettingsPage() {
     }
   }
 
-  const loadManagerFamilies = async (managerId: string) => {
-    try {
-      setLoadingManagerFamilies(true)
-      const res = await fetch(`/api/inventory/managers/${managerId}/families`)
-      if (res.ok) {
-        const data = await res.json()
-        const families: Array<{ id: string }> = data.families ?? data ?? []
-        setManagerFamilyIds(families.map(f => f.id))
-      }
-    } finally {
-      setLoadingManagerFamilies(false)
-    }
-  }
-
-  const handleManagerSelect = (managerId: string) => {
-    setSelectedManagerId(managerId)
-    setManagerFamilyIds([])
-    if (managerId) loadManagerFamilies(managerId)
-  }
-
   const handleSave = async () => {
     try {
       setSaving(true)
@@ -135,7 +269,7 @@ export default function InventorySettingsPage() {
         body: JSON.stringify(settings),
       })
       if (res.ok) {
-        toast({ title: 'Configuración guardada', description: 'Los cambios se han aplicado correctamente' })
+        toast({ title: 'Configuración guardada', description: 'Los cambios se han aplicado correctamente.' })
       } else {
         throw new Error()
       }
@@ -183,7 +317,7 @@ export default function InventorySettingsPage() {
     <RoleDashboardLayout title="Configuración de Inventario" subtitle="Ajustes del módulo de inventario">
       <div className="max-w-4xl mx-auto space-y-6">
 
-        {/* Gestores de Inventario */}
+        {/* ── 1. Gestores y sus familias (unificado) ── */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -191,238 +325,309 @@ export default function InventorySettingsPage() {
               Gestores de Inventario
             </CardTitle>
             <CardDescription>
-              Usuarios con permiso para crear, editar y eliminar equipos. El administrador siempre tiene acceso. Sin gestores adicionales, nadie más podrá gestionar el inventario.
+              Usuarios con permiso para gestionar el inventario. Expande cada gestor para asignarle las familias que puede administrar.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
 
-            {/* Gestores activos */}
+            {/* Lista de gestores con familias inline */}
             {selectedManagers.length > 0 ? (
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <UserCheck className="h-4 w-4" />
-                  <span>{selectedManagers.length} gestor{selectedManagers.length !== 1 ? 'es' : ''} asignado{selectedManagers.length !== 1 ? 's' : ''}</span>
+                {selectedManagers.map(user => (
+                  <ManagerRow
+                    key={user.id}
+                    user={user}
+                    allFamilies={allFamilies}
+                    onRemove={toggleManager}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-md border border-dashed p-6 text-center">
+                <Layers className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground">
+                  Sin gestores asignados. Solo el administrador puede gestionar el inventario.
+                </p>
+              </div>
+            )}
+
+            <Separator />
+
+            {/* Agregar gestor */}
+            {!showSearch ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowSearch(true)}
+                className="w-full"
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                Agregar gestor
+              </Button>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      autoFocus
+                      placeholder="Buscar por nombre o correo..."
+                      value={search}
+                      onChange={e => setSearch(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setShowSearch(false); setSearch('') }}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
-                <div className="rounded-md border divide-y">
-                  {selectedManagers.map(user => (
-                    <div key={user.id} className="flex items-center justify-between px-3 py-2">
-                      <div className="flex items-center gap-3 min-w-0">
+                <div className="max-h-[200px] overflow-y-auto rounded-md border divide-y">
+                  {filteredUsers.length === 0 ? (
+                    <p className="text-sm text-muted-foreground p-3 text-center">
+                      {search ? 'Sin resultados' : 'Todos los usuarios ya son gestores'}
+                    </p>
+                  ) : (
+                    filteredUsers.map(user => (
+                      <button
+                        key={user.id}
+                        type="button"
+                        onClick={() => { toggleManager(user.id); setSearch('') }}
+                        className="w-full flex items-center justify-between px-3 py-2 hover:bg-muted/50 text-left"
+                      >
                         <div className="min-w-0">
                           <p className="text-sm font-medium truncate">{user.name}</p>
                           <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                         </div>
-                        <Badge variant="outline" className={`text-xs shrink-0 ${ROLE_COLORS[user.role]}`}>
+                        <Badge variant="outline" className={`text-xs ml-3 shrink-0 ${ROLE_COLORS[user.role]}`}>
                           {ROLE_LABELS[user.role] || user.role}
                         </Badge>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => toggleManager(user.id)}
-                        className="ml-3 p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground shrink-0"
-                        title="Quitar gestor"
-                      >
-                        <X className="h-4 w-4" />
                       </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground italic">
-                Sin gestores adicionales — solo el administrador puede gestionar el inventario.
-              </p>
-            )}
-
-            {/* Buscador + lista para agregar */}
-            <div className="space-y-2">
-              <Label className="text-sm">Agregar gestor</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por nombre o correo..."
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-
-              <div className="max-h-[220px] overflow-y-auto rounded-md border divide-y">
-                {filteredUsers.length === 0 ? (
-                  <p className="text-sm text-muted-foreground p-3 text-center">
-                    {search ? 'Sin resultados para esa búsqueda' : 'Todos los usuarios ya son gestores'}
-                  </p>
-                ) : (
-                  filteredUsers.map(user => (
-                    <button
-                      key={user.id}
-                      type="button"
-                      onClick={() => { toggleManager(user.id); setSearch('') }}
-                      className="w-full flex items-center justify-between px-3 py-2 hover:bg-muted/50 text-left"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{user.name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-                      </div>
-                      <Badge variant="outline" className={`text-xs ml-3 shrink-0 ${ROLE_COLORS[user.role]}`}>
-                        {ROLE_LABELS[user.role] || user.role}
-                      </Badge>
-                    </button>
-                  ))
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Actas de Entrega */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Actas de Entrega</CardTitle>
-            <CardDescription>Configuración de actas de entrega y devolución</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <Label htmlFor="act-expiration">Días para expiración de actas</Label>
-            <Input
-              id="act-expiration"
-              type="number"
-              min="1"
-              max="30"
-              value={settings.act_expiration_days}
-              onChange={(e) => setSettings({ ...settings, act_expiration_days: parseInt(e.target.value) || 7 })}
-              className="w-32"
-            />
-            <p className="text-sm text-muted-foreground">
-              Días que el receptor tiene para aceptar un acta (1–30)
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Alertas de Consumibles */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Alertas de Consumibles</CardTitle>
-            <CardDescription>Notificar cuando el stock esté por debajo del mínimo</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <Label htmlFor="low-stock-alert">Alertas de stock bajo</Label>
-              <Switch
-                id="low-stock-alert"
-                checked={settings.low_stock_alert_enabled}
-                onCheckedChange={(checked) => setSettings({ ...settings, low_stock_alert_enabled: checked })}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Alertas de Licencias */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Alertas de Licencias</CardTitle>
-            <CardDescription>Configura cuándo recibir alertas de vencimiento</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="license-alert">Alertas de vencimiento</Label>
-              <Switch
-                id="license-alert"
-                checked={settings.license_alert_enabled}
-                onCheckedChange={(checked) => setSettings({ ...settings, license_alert_enabled: checked })}
-              />
-            </div>
-
-            {settings.license_alert_enabled && (
-              <div className="grid grid-cols-2 gap-4 pt-2 border-t">
-                <div className="space-y-2">
-                  <Label htmlFor="alert-first">Primera alerta (días antes)</Label>
-                  <Input
-                    id="alert-first"
-                    type="number"
-                    min="1"
-                    max="90"
-                    value={settings.license_alert_days_first}
-                    onChange={(e) => setSettings({ ...settings, license_alert_days_first: parseInt(e.target.value) || 30 })}
-                    className="w-32"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="alert-second">Segunda alerta (días antes)</Label>
-                  <Input
-                    id="alert-second"
-                    type="number"
-                    min="1"
-                    max="90"
-                    value={settings.license_alert_days_second}
-                    onChange={(e) => setSettings({ ...settings, license_alert_days_second: parseInt(e.target.value) || 7 })}
-                    className="w-32"
-                  />
+                    ))
+                  )}
                 </div>
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Familias por Gestor */}
+        {/* ── 2. Alertas (agrupadas) ── */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Layers className="h-5 w-5" />
-              Familias por Gestor
+              <Bell className="h-5 w-5" />
+              Alertas Automáticas
             </CardTitle>
             <CardDescription>
-              Asigna qué familias de inventario puede gestionar cada gestor. Selecciona un gestor para ver y editar sus familias asignadas.
+              Configura cuándo el sistema debe notificarte sobre stock bajo y vencimientos.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="manager-select">Gestor</Label>
-              <select
-                id="manager-select"
-                value={selectedManagerId}
-                onChange={e => handleManagerSelect(e.target.value)}
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                <option value="">Selecciona un gestor...</option>
-                {allUsers
-                  .filter(u => settings.manager_ids?.includes(u.id))
-                  .map(u => (
-                    <option key={u.id} value={u.id}>{u.name} — {u.email}</option>
-                  ))}
-              </select>
-              {settings.manager_ids?.length === 0 && (
-                <p className="text-sm text-muted-foreground italic">
-                  No hay gestores asignados. Agrega gestores en la sección de arriba primero.
-                </p>
+          <CardContent className="space-y-5">
+
+            {/* Stock bajo */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Alertas de stock bajo</p>
+                <p className="text-xs text-muted-foreground">Notificar cuando un consumible esté por debajo del mínimo</p>
+              </div>
+              <Switch
+                checked={settings.low_stock_alert_enabled}
+                onCheckedChange={checked => setSettings({ ...settings, low_stock_alert_enabled: checked })}
+              />
+            </div>
+
+            <Separator />
+
+            {/* Licencias y contratos */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Alertas de vencimiento de licencias y contratos</p>
+                  <p className="text-xs text-muted-foreground">Notificar antes de que expiren licencias o contratos</p>
+                </div>
+                <Switch
+                  checked={settings.license_alert_enabled}
+                  onCheckedChange={checked => setSettings({ ...settings, license_alert_enabled: checked })}
+                />
+              </div>
+
+              {settings.license_alert_enabled && (
+                <div className="grid grid-cols-2 gap-4 pl-1 pt-1 border-l-2 border-muted ml-1">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="alert-first" className="text-xs">Primera alerta (días antes)</Label>
+                    <Input
+                      id="alert-first"
+                      type="number"
+                      min="1"
+                      max="365"
+                      value={settings.license_alert_days_first}
+                      onChange={e => setSettings({ ...settings, license_alert_days_first: parseInt(e.target.value) || 30 })}
+                      className="w-28 h-8 text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">Ej: 30 días antes</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="alert-second" className="text-xs">Segunda alerta (días antes)</Label>
+                    <Input
+                      id="alert-second"
+                      type="number"
+                      min="1"
+                      max="365"
+                      value={settings.license_alert_days_second}
+                      onChange={e => setSettings({ ...settings, license_alert_days_second: parseInt(e.target.value) || 7 })}
+                      className="w-28 h-8 text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">Ej: 7 días antes (urgente)</p>
+                  </div>
+                  <div className="space-y-1.5 col-span-2">
+                    <Label htmlFor="contract-alert-days" className="text-xs">Días de anticipación para alertas de contratos</Label>
+                    <Input
+                      id="contract-alert-days"
+                      type="number"
+                      min="1"
+                      max="365"
+                      value={settings.contract_alert_days}
+                      onChange={e => setSettings({ ...settings, contract_alert_days: parseInt(e.target.value) || 30 })}
+                      className="w-28 h-8 text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">Días antes del vencimiento para enviar alerta de contrato</p>
+                  </div>
+                </div>
               )}
             </div>
 
-            {selectedManagerId && (
-              loadingManagerFamilies ? (
-                <div className="flex items-center justify-center py-6">
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <Separator />
+
+            {/* Alertas de Caducidad MRO */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Alertas de Caducidad MRO</p>
+                  <p className="text-xs text-muted-foreground">Habilitar alertas de caducidad de materiales MRO</p>
                 </div>
-              ) : (
-                <ManagerFamiliesPanel
-                  key={selectedManagerId}
-                  managerId={selectedManagerId}
-                  allFamilies={allFamilies}
-                  currentFamilyIds={managerFamilyIds}
-                  onSaved={() => loadManagerFamilies(selectedManagerId)}
+                <Switch
+                  checked={settings.mro_expiry_alert_enabled}
+                  onCheckedChange={checked => setSettings({ ...settings, mro_expiry_alert_enabled: checked })}
                 />
-              )
-            )}
+              </div>
+
+              {settings.mro_expiry_alert_enabled && (
+                <div className="grid grid-cols-2 gap-4 pl-1 pt-1 border-l-2 border-muted ml-1">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="mro-alert-days" className="text-xs">Días para primera alerta</Label>
+                    <Input
+                      id="mro-alert-days"
+                      type="number"
+                      min="1"
+                      max="365"
+                      value={settings.mro_expiry_alert_days}
+                      onChange={e => setSettings({ ...settings, mro_expiry_alert_days: parseInt(e.target.value) || 30 })}
+                      className="w-28 h-8 text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">Ej: 30 días antes de caducar</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="mro-alert-days-urgent" className="text-xs">Días para alerta urgente</Label>
+                    <Input
+                      id="mro-alert-days-urgent"
+                      type="number"
+                      min="1"
+                      max="365"
+                      value={settings.mro_expiry_alert_days_urgent}
+                      onChange={e => setSettings({ ...settings, mro_expiry_alert_days_urgent: parseInt(e.target.value) || 7 })}
+                      className="w-28 h-8 text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">Ej: 7 días antes (urgente)</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <Separator />
+
+            {/* Alertas de Garantía de Equipos */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Alertas de Garantía de Equipos</p>
+                  <p className="text-xs text-muted-foreground">Habilitar alertas de vencimiento de garantía</p>
+                </div>
+                <Switch
+                  checked={settings.warranty_alert_enabled}
+                  onCheckedChange={checked => setSettings({ ...settings, warranty_alert_enabled: checked })}
+                />
+              </div>
+
+              {settings.warranty_alert_enabled && (
+                <div className="pl-1 pt-1 border-l-2 border-muted ml-1">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="warranty-alert-days" className="text-xs">Días de anticipación para alerta</Label>
+                    <Input
+                      id="warranty-alert-days"
+                      type="number"
+                      min="1"
+                      max="365"
+                      value={settings.warranty_alert_days}
+                      onChange={e => setSettings({ ...settings, warranty_alert_days: parseInt(e.target.value) || 30 })}
+                      className="w-28 h-8 text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">Días antes del vencimiento de garantía para notificar</p>
+                  </div>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
-        <div className="flex justify-end">
+        {/* ── 3. Actas de entrega ── */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Actas de Entrega
+            </CardTitle>
+            <CardDescription>
+              Tiempo que tiene el receptor para aceptar un acta antes de que expire.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="act-expiration" className="text-sm">Días para aceptar un acta</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="act-expiration"
+                    type="number"
+                    min="1"
+                    max="30"
+                    value={settings.act_expiration_days}
+                    onChange={e => setSettings({ ...settings, act_expiration_days: parseInt(e.target.value) || 7 })}
+                    className="w-24"
+                  />
+                  <span className="text-sm text-muted-foreground">días</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Si el receptor no acepta en este plazo, el acta expira y la asignación se cancela.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Guardar */}
+        <div className="flex justify-end pb-4">
           <Button onClick={handleSave} disabled={saving}>
-            {saving ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Guardando...</>
-            ) : (
-              <><Save className="mr-2 h-4 w-4" />Guardar Cambios</>
-            )}
+            {saving
+              ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Guardando...</>
+              : <><Save className="mr-2 h-4 w-4" />Guardar cambios</>}
           </Button>
         </div>
+
       </div>
     </RoleDashboardLayout>
   )

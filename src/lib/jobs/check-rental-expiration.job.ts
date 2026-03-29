@@ -220,10 +220,17 @@ export class CheckRentalExpirationJob {
     console.log('[CheckRentalExpirationJob] Iniciando ejecución del job...')
 
     try {
+      const [firstSetting, secondSetting] = await Promise.all([
+        prisma.system_settings.findUnique({ where: { key: 'inventory.license_alert_days_first' } }),
+        prisma.system_settings.findUnique({ where: { key: 'inventory.license_alert_days_second' } }),
+      ])
+      const daysFirst = firstSetting ? parseInt(firstSetting.value, 10) : 30
+      const daysSecond = secondSetting ? parseInt(secondSetting.value, 10) : 7
+
       // Enviar alertas para diferentes períodos
-      const alerts30DaysSent = await this.sendExpirationNotifications(30)
+      const alerts30DaysSent = await this.sendExpirationNotifications(daysFirst)
       const alerts15DaysSent = await this.sendExpirationNotifications(15)
-      const alerts7DaysSent = await this.sendExpirationNotifications(7)
+      const alerts7DaysSent = await this.sendExpirationNotifications(daysSecond)
       const alerts1DaySent = await this.sendExpirationNotifications(1)
 
       const result = {

@@ -7,6 +7,7 @@ import { randomUUID } from 'crypto'
 import { getFamilyConfig, validateSubtypeForFamily } from '@/lib/inventory/family-config'
 import { validateSupplierRequirement, validateContractRequirement } from '@/lib/inventory/asset-validation'
 import { generateAssetCode } from '@/lib/inventory/asset-code-generator'
+import { calculateConsumableStatus } from '@/lib/inventory/consumable-status'
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -233,9 +234,12 @@ export async function POST(req: NextRequest) {
     depreciationMethod,
     // MRO
     unitOfMeasureId,
+    currentStock,
+    minStock,
+    maxStock,
+    expirationDate,
     // LICENSE
     key,
-    expirationDate,
     cost,
   } = body
 
@@ -288,10 +292,18 @@ export async function POST(req: NextRequest) {
     ? String(code).trim()
     : await generateAssetCode(familyId, subtype, acquisitionMode)
 
+  // Resolver bodega por defecto una sola vez
+  let defaultWarehouseId: string | undefined
+  const defaultWarehouseSetting = await prisma.system_settings.findUnique({
+    where: { key: 'inventory.default_warehouse_id' },
+  })
+  if (defaultWarehouseSetting?.value) defaultWarehouseId = defaultWarehouseSetting.value
+
   // Enrutar creación según subtype
   let asset: { id: string; [key: string]: unknown }
 
   if (subtype === 'EQUIPMENT') {
+    const resolvedEquipmentWarehouseId = warehouseId ?? defaultWarehouseId
     asset = await prisma.equipment.create({
       data: {
         id: randomUUID(),
@@ -310,22 +322,30 @@ export async function POST(req: NextRequest) {
         usefulLifeYears: usefulLifeYears ?? undefined,
         residualValue: residualValue ?? undefined,
         depreciationMethod: depreciationMethod ?? undefined,
-        warehouseId: warehouseId ?? undefined,
+        warehouseId: resolvedEquipmentWarehouseId,
         qrCode: randomUUID(),
       },
     })
   } else if (subtype === 'MRO') {
+    const resolvedWarehouseId = warehouseId ?? defaultWarehouseId
+    const initialStatus = calculateConsumableStatus(
+      currentStock ?? 0,
+      minStock ?? 0,
+      expirationDate ? new Date(expirationDate) : null
+    )
     asset = await prisma.consumables.create({
       data: {
         id: randomUUID(),
         name: name ?? '',
         typeId: typeId ?? '',
         unitOfMeasureId: unitOfMeasureId ?? '',
-        currentStock: 0,
-        minStock: 0,
-        maxStock: 0,
+        currentStock: currentStock ?? 0,
+        minStock: minStock ?? 0,
+        maxStock: maxStock ?? 0,
         supplierId: supplierId ?? undefined,
-        warehouseId: warehouseId ?? undefined,
+        warehouseId: resolvedWarehouseId,
+        status: initialStatus,
+        expirationDate: expirationDate ? new Date(expirationDate) : undefined,
       },
     })
   } else if (subtype === 'LICENSE') {
@@ -352,7 +372,18 @@ export async function POST(req: NextRequest) {
       entityType: 'asset',
       entityId: asset.id,
       userId,
-      details: { subtype, familyId, acquisitionMode: acquisitionMode ?? null },
+      details: {
+        subtype,
+        familyId,
+        acquisitionMode: acquisitionMode ?? null,
+        ...(subtype === 'MRO' && {
+          warehouseId: warehouseId ?? defaultWarehouseId,
+          initialStock: currentStock ?? 0,
+        }),
+        ...(subtype === 'EQUIPMENT' && {
+          warehouseId: warehouseId ?? defaultWarehouseId,
+        }),
+      },
     },
   })
 

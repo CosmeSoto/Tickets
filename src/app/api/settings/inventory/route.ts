@@ -11,6 +11,12 @@ const inventorySettingsSchema = z.object({
   license_alert_enabled: z.boolean(),
   license_alert_days_first: z.number().min(1).max(90),
   license_alert_days_second: z.number().min(1).max(90),
+  mro_expiry_alert_days:        z.number().min(1).max(365).optional(),
+  mro_expiry_alert_days_urgent: z.number().min(1).max(365).optional(),
+  warranty_alert_days:          z.number().min(1).max(365).optional(),
+  contract_alert_days:          z.number().min(1).max(365).optional(),
+  mro_expiry_alert_enabled:     z.boolean().optional(),
+  warranty_alert_enabled:       z.boolean().optional(),
 })
 
 const DEFAULT_SETTINGS: Record<string, string> = {
@@ -20,11 +26,17 @@ const DEFAULT_SETTINGS: Record<string, string> = {
   license_alert_enabled: 'true',
   license_alert_days_first: '30',
   license_alert_days_second: '7',
+  mro_expiry_alert_days:        '30',
+  mro_expiry_alert_days_urgent: '7',
+  warranty_alert_days:          '30',
+  contract_alert_days:          '30',
+  mro_expiry_alert_enabled:     'true',
+  warranty_alert_enabled:       'true',
 }
 
 const JSON_FIELDS = ['manager_ids']
-const BOOLEAN_FIELDS = ['low_stock_alert_enabled', 'license_alert_enabled']
-const NUMBER_FIELDS = ['act_expiration_days', 'license_alert_days_first', 'license_alert_days_second']
+const BOOLEAN_FIELDS = ['low_stock_alert_enabled', 'license_alert_enabled', 'mro_expiry_alert_enabled', 'warranty_alert_enabled']
+const NUMBER_FIELDS = ['act_expiration_days', 'license_alert_days_first', 'license_alert_days_second', 'mro_expiry_alert_days', 'mro_expiry_alert_days_urgent', 'warranty_alert_days', 'contract_alert_days']
 
 export async function GET(_request: NextRequest) {
   try {
@@ -104,6 +116,12 @@ function getSettingDescription(key: string): string {
     license_alert_enabled: 'Habilita alertas de vencimiento de licencias',
     license_alert_days_first: 'Días antes para primera alerta de licencias',
     license_alert_days_second: 'Días antes para segunda alerta de licencias',
+    mro_expiry_alert_days:        'Días antes de caducidad MRO para primera alerta',
+    mro_expiry_alert_days_urgent: 'Días antes de caducidad MRO para alerta urgente',
+    warranty_alert_days:          'Días antes de vencimiento de garantía para alerta',
+    contract_alert_days:          'Días antes de vencimiento de contrato para alerta',
+    mro_expiry_alert_enabled:     'Habilita alertas de caducidad MRO',
+    warranty_alert_enabled:       'Habilita alertas de garantía de equipos',
   }
   return descriptions[key] || ''
 }

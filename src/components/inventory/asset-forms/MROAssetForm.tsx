@@ -52,7 +52,13 @@ export function MROAssetForm({
     fetch(`/api/inventory/consumable-types?familyId=${familyId}`)
       .then(r => r.json()).then(d => setConsumableTypes(d.types ?? d ?? []))
     fetch('/api/inventory/units-of-measure')
-      .then(r => r.json()).then(d => setUnitsOfMeasure(d.units ?? []))
+      .then(r => r.json()).then(d => {
+        const units = Array.isArray(d) ? d : (d.units ?? [])
+        setUnitsOfMeasure(units.map((u: { id: string; name: string; symbol: string }) => ({
+          id: u.id,
+          name: `${u.name} (${u.symbol})`,
+        })))
+      })
     fetch('/api/inventory/warehouses')
       .then(r => r.json()).then(d => setWarehouses(d.warehouses ?? d ?? []))
   }, [familyId])

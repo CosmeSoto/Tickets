@@ -1215,6 +1215,7 @@ model maintenance_records {
   partsReplaced   String[]            @map("parts_replaced")
   ticketId        String?             @map("ticket_id")
   notes           String?             @db.Text
+  previousStatus  EquipmentStatus?    @map("previous_status")
   createdAt       DateTime            @default(now()) @map("created_at")
   updatedAt       DateTime            @updatedAt @map("updated_at")
   
@@ -1365,6 +1366,9 @@ model consumables {
   compatibleEquipment String[]          @map("compatible_equipment")
   supplierId          String?           @map("supplier_id")
   warehouseId         String?           @map("warehouse_id")
+  status              ConsumableStatus  @default(ACTIVE)
+  expirationDate      DateTime?         @map("expiration_date")
+  expiryAlertSentAt   DateTime?         @map("expiry_alert_sent_at")
   createdAt           DateTime          @default(now()) @map("created_at")
   updatedAt           DateTime          @updatedAt @map("updated_at")
   
@@ -1580,6 +1584,14 @@ enum DepreciationMethod {
   UNITS_OF_PRODUCTION
 }
 
+enum ConsumableStatus {
+  ACTIVE
+  LOW_STOCK
+  OUT_OF_STOCK
+  EXPIRED
+  RETIRED
+}
+
 // ============================================
 // INVENTORY FAMILIES — Modelos nuevos
 // ============================================
@@ -1668,6 +1680,12 @@ model inventory_family_config {
   /// Estructura: { FIXED_ASSET?: { visible: FormSection[], required: FormSection[] }, RENTAL?: {...}, LOAN?: {...} }
   /// Si es null, se usan visibleSections/requiredSections como fallback global.
   sectionsByMode        Json?          @map("sections_by_mode")
+  defaultDepreciationMethod  DepreciationMethod?  @map("default_depreciation_method")
+  defaultUsefulLifeYears     Float?               @map("default_useful_life_years")
+  defaultResidualValuePct    Float?               @map("default_residual_value_pct")
+  codePrefix                 String?              @map("code_prefix") @db.VarChar(10)
+  autoApproveDecommission    Boolean              @default(false) @map("auto_approve_decommission")
+  requireDeliveryAct         Boolean              @default(true)  @map("require_delivery_act")
   createdAt             DateTime      @default(now()) @map("created_at")
   updatedAt             DateTime      @updatedAt @map("updated_at")
 

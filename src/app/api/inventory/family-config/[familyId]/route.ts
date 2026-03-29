@@ -35,7 +35,16 @@ export async function GET(
   try {
     const config = await prisma.inventory_family_config.findUnique({ where: { familyId } })
     if (!config) {
-      return NextResponse.json({ familyId, ...DEFAULT_FAMILY_CONFIG })
+      return NextResponse.json({
+        familyId,
+        ...DEFAULT_FAMILY_CONFIG,
+        defaultDepreciationMethod: null,
+        defaultUsefulLifeYears: null,
+        defaultResidualValuePct: null,
+        codePrefix: null,
+        autoApproveDecommission: false,
+        requireDeliveryAct: true,
+      })
     }
     return NextResponse.json({
       familyId: config.familyId,
@@ -44,10 +53,26 @@ export async function GET(
       requiredSections: config.requiredSections,
       requireFinancialForNew: config.requireFinancialForNew,
       sectionsByMode: config.sectionsByMode ?? undefined,
+      // Nuevos campos
+      defaultDepreciationMethod: config.defaultDepreciationMethod ?? null,
+      defaultUsefulLifeYears:    config.defaultUsefulLifeYears ?? null,
+      defaultResidualValuePct:   config.defaultResidualValuePct ?? null,
+      codePrefix:                config.codePrefix ?? null,
+      autoApproveDecommission:   config.autoApproveDecommission,
+      requireDeliveryAct:        config.requireDeliveryAct,
     })
   } catch (err) {
     console.error('[family-config GET]', err)
-    return NextResponse.json({ familyId, ...DEFAULT_FAMILY_CONFIG })
+    return NextResponse.json({
+      familyId,
+      ...DEFAULT_FAMILY_CONFIG,
+      defaultDepreciationMethod: null,
+      defaultUsefulLifeYears: null,
+      defaultResidualValuePct: null,
+      codePrefix: null,
+      autoApproveDecommission: false,
+      requireDeliveryAct: true,
+    })
   }
 }
 
@@ -77,12 +102,25 @@ export async function PUT(
     requiredSections,
     requireFinancialForNew = true,
     sectionsByMode,
+    // Nuevos campos
+    defaultDepreciationMethod,
+    defaultUsefulLifeYears,
+    defaultResidualValuePct,
+    codePrefix,
+    autoApproveDecommission = false,
+    requireDeliveryAct = true,
   } = body as {
     allowedSubtypes: AssetSubtype[]
     visibleSections: FormSection[]
     requiredSections: FormSection[]
     requireFinancialForNew?: boolean
     sectionsByMode?: SectionsByMode
+    defaultDepreciationMethod?: string | null
+    defaultUsefulLifeYears?: number | null
+    defaultResidualValuePct?: number | null
+    codePrefix?: string | null
+    autoApproveDecommission?: boolean
+    requireDeliveryAct?: boolean
   }
 
   if (!Array.isArray(allowedSubtypes) || allowedSubtypes.length < 1) {
@@ -109,6 +147,11 @@ export async function PUT(
     }
   }
 
+  // Validar codePrefix
+  if (codePrefix !== undefined && codePrefix !== null && !/^[a-zA-Z0-9]{0,10}$/.test(codePrefix)) {
+    return NextResponse.json({ error: 'El prefijo de código debe ser alfanumérico y tener máximo 10 caracteres' }, { status: 422 })
+  }
+
   try {
     const config = await prisma.inventory_family_config.upsert({
       where: { familyId },
@@ -118,6 +161,12 @@ export async function PUT(
         requiredSections: requiredSections ?? [],
         requireFinancialForNew,
         sectionsByMode: sectionsByMode ?? null,
+        defaultDepreciationMethod: defaultDepreciationMethod ?? null,
+        defaultUsefulLifeYears: defaultUsefulLifeYears ?? null,
+        defaultResidualValuePct: defaultResidualValuePct ?? null,
+        codePrefix: codePrefix ?? null,
+        autoApproveDecommission,
+        requireDeliveryAct,
       },
       create: {
         id: randomUUID(),
@@ -127,6 +176,12 @@ export async function PUT(
         requiredSections: requiredSections ?? [],
         requireFinancialForNew,
         sectionsByMode: sectionsByMode ?? null,
+        defaultDepreciationMethod: defaultDepreciationMethod ?? null,
+        defaultUsefulLifeYears: defaultUsefulLifeYears ?? null,
+        defaultResidualValuePct: defaultResidualValuePct ?? null,
+        codePrefix: codePrefix ?? null,
+        autoApproveDecommission,
+        requireDeliveryAct,
       },
     })
 
@@ -137,6 +192,14 @@ export async function PUT(
         entityType: 'inventory_family_config',
         entityId: familyId,
         userId,
+        details: {
+          defaultDepreciationMethod,
+          defaultUsefulLifeYears,
+          defaultResidualValuePct,
+          codePrefix,
+          autoApproveDecommission,
+          requireDeliveryAct,
+        },
       },
     }).catch(err => console.warn('[audit] family-config PUT:', err?.message))
 
@@ -147,6 +210,13 @@ export async function PUT(
       requiredSections: config.requiredSections,
       requireFinancialForNew: config.requireFinancialForNew,
       sectionsByMode: config.sectionsByMode ?? undefined,
+      // Nuevos campos
+      defaultDepreciationMethod: config.defaultDepreciationMethod ?? null,
+      defaultUsefulLifeYears:    config.defaultUsefulLifeYears ?? null,
+      defaultResidualValuePct:   config.defaultResidualValuePct ?? null,
+      codePrefix:                config.codePrefix ?? null,
+      autoApproveDecommission:   config.autoApproveDecommission,
+      requireDeliveryAct:        config.requireDeliveryAct,
     })
   } catch (err) {
     console.error('[family-config PUT]', err)

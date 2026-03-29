@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -11,10 +11,18 @@ import { FileUploadZone } from '@/components/ui/file-upload-zone'
 import { ContractSection, type ContractData } from '@/components/inventory/contract-section'
 import type { FamilyConfig } from '@/lib/inventory/family-config-types'
 import { resolveSectionsForMode } from '@/lib/inventory/family-config-types'
-import { X, Plus } from 'lucide-react'
+import {
+  calculateDepreciation,
+  familySupportsDepreciation,
+  getRecommendedDepreciationMethod,
+  DEFAULT_USEFUL_LIFE_YEARS,
+  type DepreciationMethod,
+} from '@/lib/inventory/depreciation'
+import { X, Plus, ChevronDown, ChevronUp } from 'lucide-react'
 
 interface EquipmentAssetFormProps {
   familyId: string
+  familyCode?: string
   familyConfig: FamilyConfig
   onSubmit: (payload: Record<string, unknown>) => void
   onBack: () => void
@@ -35,8 +43,20 @@ const DEPRECIATION_METHODS = [
   { value: 'UNITS_OF_PRODUCTION', label: 'Unidades de Producción' },
 ]
 
+const DEPRECIATION_METHOD_HELP: Record<string, string> = {
+  LINEAR:              'Deprecia el mismo monto cada año durante la vida útil del activo.',
+  DECLINING_BALANCE:   'Deprecia un porcentaje mayor en los primeros años, reduciendo el valor más rápido.',
+  UNITS_OF_PRODUCTION: 'Deprecia según el uso real del activo (horas, unidades producidas, etc.).',
+}
+
+interface FamilyDepreciationConfig {
+  defaultDepreciationMethod: string | null
+  defaultUsefulLifeYears: number | null
+  defaultResidualValuePct: number | null
+}
+
 export function EquipmentAssetForm({
-  familyId, familyConfig, onSubmit, onBack, submitting, submitError, maxFileSizeMB = 10,
+  familyId, familyCode, familyConfig, onSubmit, onBack, submitting, submitError, maxFileSizeMB = 10,
 }: EquipmentAssetFormProps) {
   const [acquisitionMode, setAcquisitionMode] = useState<'FIXED_ASSET' | 'RENTAL' | 'LOAN'>('FIXED_ASSET')
   const [code, setCode] = useState('')
@@ -69,9 +89,16 @@ export function EquipmentAssetForm({
   const [attachments, setAttachments] = useState<File[]>([])
   const [priceError, setPriceError] = useState('')
 
+  // Task 19.1: family depreciation config from API
+  const [familyDepConfig, setFamilyDepConfig] = useState<FamilyDepreciationConfig | null>(null)
+  const [depreciationPreviewOpen, setDepreciationPreviewOpen] = useState(false)
+
   // Resolver secciones según modalidad activa (sectionsByMode tiene prioridad sobre global)
   const resolvedSections = resolveSectionsForMode(familyConfig, acquisitionMode)
   const isVisible = (s: string) => resolvedSections.visible.includes(s as never)
+
+  // Task 19.1: determine if family supports depreciation
+  const supportsDepreciation = familyCode ? familySupportsDepreciation(familyCode) : true
 
   useEffect(() => {
     fetch(`/api/inventory/equipment-types?familyId=${familyId}`)
@@ -79,6 +106,38 @@ export function EquipmentAssetForm({
     fetch('/api/inventory/warehouses')
       .then(r => r.json()).then(d => setWarehouses(d.warehouses ?? d ?? []))
   }, [familyId])
+
+  // Task 19.1: fetch family-config depreciation defaults when familyId changes
+  useEffect(() => {
+    fetch(`/api/inventory/family-config/${familyId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then((data: (FamilyDepreciationConfig & Record<string, unknown>) | null) => {
+        if (!data) return
+        const cfg: FamilyDepreciationConfig = {
+          defaultDepreciationMethod: data.defaultDepreciationMethod ?? null,
+          defaultUsefulLifeYears: data.defaultUsefulLifeYears ?? null,
+          defaultResidualValuePct: data.defaultResidualValuePct ?? null,
+        }
+        setFamilyDepConfig(cfg)
+
+        // Pre-fill depreciation fields
+        if (cfg.defaultDepreciationMethod) {
+          setDepreciationMethod(cfg.defaultDepreciationMethod)
+        } else if (familyCode) {
+          setDepreciationMethod(getRecommendedDepreciationMethod(familyCode))
+        }
+
+        if (cfg.defaultUsefulLifeYears != null) {
+          setUsefulLifeYears(String(cfg.defaultUsefulLifeYears))
+        } else if (familyCode && DEFAULT_USEFUL_LIFE_YEARS[familyCode] != null) {
+          const defaultYears = DEFAULT_USEFUL_LIFE_YEARS[familyCode]
+          if (defaultYears > 0) setUsefulLifeYears(String(defaultYears))
+        }
+
+        // residualValue will be auto-calculated when purchasePrice is entered (task 19.2)
+      })
+      .catch(() => {})
+  }, [familyId, familyCode])
 
   useEffect(() => {
     if (acquisitionMode === 'RENTAL' || acquisitionMode === 'LOAN') {
@@ -94,6 +153,39 @@ export function EquipmentAssetForm({
       })
     }
   }, [equipmentStatus])
+
+  // Task 19.2: auto-calculate suggested residual value when purchasePrice changes
+  const suggestedResidualValue = useMemo(() => {
+    const price = parseFloat(purchasePrice)
+    if (!price || !familyDepConfig?.defaultResidualValuePct) return null
+    return Math.round(price * (familyDepConfig.defaultResidualValuePct / 100) * 100) / 100
+  }, [purchasePrice, familyDepConfig])
+
+  // Task 19.3: real-time depreciation preview
+  const depreciationPreview = useMemo(() => {
+    const price = parseFloat(purchasePrice)
+    const years = parseFloat(usefulLifeYears)
+    const residual = parseFloat(residualValue) || 0
+    if (!price || !purchaseDate || !years || years <= 0) return null
+
+    const purchaseDateObj = new Date(purchaseDate)
+    if (isNaN(purchaseDateObj.getTime())) return null
+
+    const method = depreciationMethod as DepreciationMethod
+    const checkYears = [1, 3, 5].filter(y => y <= years)
+    // Always include the last year if not already included
+    if (!checkYears.includes(Math.floor(years)) && years < 5) {
+      checkYears.push(Math.floor(years))
+      checkYears.sort((a, b) => a - b)
+    }
+
+    return checkYears.map(year => {
+      const refDate = new Date(purchaseDateObj)
+      refDate.setFullYear(refDate.getFullYear() + year)
+      const result = calculateDepreciation(price, purchaseDateObj, years, residual, refDate, method)
+      return { year, bookValue: result.bookValue }
+    })
+  }, [purchasePrice, purchaseDate, usefulLifeYears, residualValue, depreciationMethod])
 
   const addAccessory = () => {
     const v = accessoryInput.trim()
@@ -298,26 +390,76 @@ export function EquipmentAssetForm({
         </fieldset>
       )}
 
-      {/* Sección DEPRECIACIÓN */}
-      {isVisible('DEPRECIATION') && (
+      {/* Sección DEPRECIACIÓN — oculta si la familia no soporta depreciación (Task 19.1) */}
+      {isVisible('DEPRECIATION') && supportsDepreciation && (
         <fieldset className="rounded-lg border border-border p-4 space-y-3">
           <legend className="px-2 text-sm font-semibold text-foreground">Depreciación</legend>
           <div className="grid grid-cols-2 gap-3">
+            {/* Método de depreciación */}
             <div className="space-y-1 col-span-2">
-              <Label>Método</Label>
+              <Label>Método de Depreciación</Label>
               <SimpleSelect value={depreciationMethod} onChange={e => setDepreciationMethod(e.target.value)}
                 options={DEPRECIATION_METHODS}
               />
+              {/* Task 19.2: help text per method */}
+              {DEPRECIATION_METHOD_HELP[depreciationMethod] && (
+                <p className="text-xs text-muted-foreground">{DEPRECIATION_METHOD_HELP[depreciationMethod]}</p>
+              )}
             </div>
+
+            {/* Vida útil */}
             <div className="space-y-1">
               <Label>Vida Útil (años)</Label>
               <Input type="number" min="1" value={usefulLifeYears} onChange={e => setUsefulLifeYears(e.target.value)} />
+              {/* Task 19.2: help text */}
+              <p className="text-xs text-muted-foreground">Ej: laptops 3-5 años, servidores 5-7 años, mobiliario 10 años.</p>
             </div>
+
+            {/* Valor residual */}
             <div className="space-y-1">
               <Label>Valor Residual</Label>
               <Input type="number" min="0" step="0.01" value={residualValue} onChange={e => setResidualValue(e.target.value)} placeholder="0.00" />
+              {/* Task 19.2: help text */}
+              <p className="text-xs text-muted-foreground">Valor estimado del activo al final de su vida útil.</p>
+              {/* Task 19.2: suggested residual value based on defaultResidualValuePct */}
+              {suggestedResidualValue != null && !residualValue && (
+                <button
+                  type="button"
+                  className="text-xs text-primary hover:underline"
+                  onClick={() => setResidualValue(String(suggestedResidualValue))}
+                >
+                  Sugerido: ${suggestedResidualValue.toLocaleString('es-CL')} ({familyDepConfig?.defaultResidualValuePct}% del precio)
+                </button>
+              )}
             </div>
           </div>
+
+          {/* Task 19.3: real-time depreciation preview */}
+          {depreciationPreview && depreciationPreview.length > 0 && (
+            <div className="mt-2 rounded-md border border-border bg-muted/30">
+              <button
+                type="button"
+                className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium"
+                onClick={() => setDepreciationPreviewOpen(p => !p)}
+              >
+                <span>Vista previa de depreciación</span>
+                {depreciationPreviewOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </button>
+              {depreciationPreviewOpen && (
+                <div className="border-t border-border px-3 py-2 space-y-1">
+                  <p className="text-xs text-muted-foreground mb-2">Valor libro estimado (solo informativo, no afecta el guardado):</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {depreciationPreview.map(({ year, bookValue }) => (
+                      <div key={year} className="rounded-md bg-background border border-border p-2 text-center">
+                        <p className="text-xs text-muted-foreground">Año {year}</p>
+                        <p className="text-sm font-semibold">${bookValue.toLocaleString('es-CL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </fieldset>
       )}
 

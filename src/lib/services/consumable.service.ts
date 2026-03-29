@@ -1,4 +1,6 @@
+import { randomUUID } from 'crypto'
 import prisma from '@/lib/prisma'
+import { calculateConsumableStatus } from '@/lib/inventory/consumable-status'
 import type { Consumable, StockMovement, CreateConsumableData, UpdateConsumableData, CreateStockMovementData, ConsumableSummary } from '@/types/inventory/consumable'
 
 
@@ -72,14 +74,20 @@ export class ConsumableService {
       const consumable = await tx.consumables.findUnique({ where: { id: data.consumableId } })
       if (!consumable) throw new Error('Consumible no encontrado')
 
+      // Bloquear EXIT sobre MRO caducado
+      if (data.type === 'EXIT' && consumable.status === 'EXPIRED') {
+        throw new Error('No se puede consumir un material caducado')
+      }
+
       let newStock = consumable.currentStock
       switch (data.type) {
         case 'ENTRY': newStock += data.quantity; break
-        case 'EXIT':
-          newStock -= data.quantity
-          if (newStock < 0) throw new Error('Stock insuficiente para realizar la salida')
-          break
+        case 'EXIT': newStock -= data.quantity; break
         case 'ADJUSTMENT': newStock = data.quantity; break
+      }
+
+      if (newStock < 0) {
+        throw new Error(`Stock insuficiente: disponible ${consumable.currentStock}, solicitado ${data.quantity}`)
       }
 
       const movement = await tx.stock_movements.create({
@@ -100,7 +108,32 @@ export class ConsumableService {
         },
       })
 
-      await tx.consumables.update({ where: { id: data.consumableId }, data: { currentStock: newStock } })
+      // Recalcular status tras el movimiento
+      const newStatus = calculateConsumableStatus(
+        newStock,
+        consumable.minStock,
+        consumable.expirationDate
+      )
+      await tx.consumables.update({
+        where: { id: data.consumableId },
+        data: { currentStock: newStock, status: newStatus },
+      })
+
+      await tx.audit_logs.create({
+        data: {
+          id: randomUUID(),
+          action: 'STOCK_MOVEMENT',
+          entityType: 'asset',
+          entityId: data.consumableId,
+          userId,
+          details: {
+            type: data.type,
+            quantity: data.quantity,
+            previousStock: consumable.currentStock,
+            newStock,
+          },
+        },
+      })
 
       return movement
     })

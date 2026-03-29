@@ -135,6 +135,7 @@ export function UnifiedAssetForm({ onSuccess, onCancel, defaultFamilyId }: Unifi
           {selectedSubtype === 'EQUIPMENT' && (
             <EquipmentAssetForm
               familyId={selectedFamilyId!}
+              familyCode={families.find(f => f.id === selectedFamilyId)?.code}
               familyConfig={familyConfig}
               onSubmit={handleSubtypeSubmit}
               onBack={handleBack}

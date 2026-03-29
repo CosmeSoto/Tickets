@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
@@ -17,7 +18,6 @@ interface Props {
   onClose: () => void
   onCreated: () => void
   isClient: boolean
-  /** Si se pasa, el equipo queda fijo (desde la página de detalle del equipo) */
   preselectedEquipmentId?: string
   preselectedEquipmentLabel?: string
 }
@@ -29,11 +29,21 @@ interface EquipmentOption {
   model: string
 }
 
+interface FamilyOption {
+  id: string
+  name: string
+}
+
 export function NewMaintenanceDialog({
   open, onClose, onCreated, isClient, preselectedEquipmentId, preselectedEquipmentLabel,
 }: Props) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
+
+  const [familyList, setFamilyList] = useState<FamilyOption[]>([])
+  const [selectedFamilyId, setSelectedFamilyId] = useState('_all')
+  const [loadingFamilies, setLoadingFamilies] = useState(false)
+
   const [equipmentList, setEquipmentList] = useState<EquipmentOption[]>([])
   const [loadingEquipment, setLoadingEquipment] = useState(false)
 
@@ -43,32 +53,52 @@ export function NewMaintenanceDialog({
   const [scheduledDate, setScheduledDate] = useState('')
   const [notes, setNotes] = useState('')
 
-  // Cargar equipos disponibles para el selector
+  // Cargar familias al abrir (solo admin/técnico)
+  useEffect(() => {
+    if (!open || preselectedEquipmentId || isClient) return
+    setLoadingFamilies(true)
+    fetch('/api/inventory/families', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(data => setFamilyList((data.families ?? data ?? []).map((f: any) => ({ id: f.id, name: f.name }))))
+      .catch(() => {})
+      .finally(() => setLoadingFamilies(false))
+  }, [open, preselectedEquipmentId, isClient])
+
+  // Cargar equipos al abrir o al cambiar familia
   useEffect(() => {
     if (!open || preselectedEquipmentId) return
     setLoadingEquipment(true)
+    setEquipmentId('')
 
-    const url = isClient
-      ? '/api/inventory/equipment?limit=100'
-      : '/api/inventory/equipment?limit=100'
+    const params = new URLSearchParams({ limit: '100' })
+    if (selectedFamilyId !== '_all') params.set('familyId', selectedFamilyId)
 
-    fetch(url, { cache: 'no-store' })
+    fetch(`/api/inventory/equipment?${params}`, { cache: 'no-store' })
       .then(r => r.json())
       .then(data => {
-        const items: EquipmentOption[] = (data.equipment || data || []).map((e: any) => ({
+        setEquipmentList((data.equipment || data || []).map((e: any) => ({
           id: e.id,
           code: e.code,
           brand: e.brand,
           model: e.model,
-        }))
-        setEquipmentList(items)
+        })))
       })
       .catch(() => {})
       .finally(() => setLoadingEquipment(false))
-  }, [open, isClient, preselectedEquipmentId])
+  }, [open, selectedFamilyId, preselectedEquipmentId, isClient])
+
+  const handleClose = () => {
+    setSelectedFamilyId('_all')
+    setEquipmentId('')
+    setType('PREVENTIVE')
+    setDescription('')
+    setScheduledDate('')
+    setNotes('')
+    onClose()
+  }
 
   const handleSubmit = async () => {
-    if (!equipmentId || !type || !description || !scheduledDate) {
+    if (!equipmentId || !description || !scheduledDate) {
       toast({ title: 'Campos requeridos', description: 'Completa todos los campos obligatorios.', variant: 'destructive' })
       return
     }
@@ -89,6 +119,7 @@ export function NewMaintenanceDialog({
           ? 'Tu solicitud fue enviada al equipo técnico para su aprobación.'
           : 'El mantenimiento fue programado y el equipo está en estado de mantenimiento.',
       })
+      handleClose()
       onCreated()
     } catch (e) {
       toast({ title: 'Error', description: e instanceof Error ? e.message : 'Error', variant: 'destructive' })
@@ -100,7 +131,7 @@ export function NewMaintenanceDialog({
   const minDate = new Date().toISOString().split('T')[0]
 
   return (
-    <Dialog open={open} onOpenChange={v => { if (!v) onClose() }}>
+    <Dialog open={open} onOpenChange={v => { if (!v) handleClose() }}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -115,39 +146,51 @@ export function NewMaintenanceDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Equipo */}
           {preselectedEquipmentId ? (
             <div>
               <Label>Equipo</Label>
               <Input value={preselectedEquipmentLabel || preselectedEquipmentId} disabled />
             </div>
           ) : (
-            <div>
-              <Label>Equipo *</Label>
-              {loadingEquipment ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
-                  <Loader2 className="h-4 w-4 animate-spin" /> Cargando equipos...
+            <div className="space-y-3">
+              {/* Paso 1: Familia — solo admin/técnico */}
+              {!isClient && (
+                <div>
+                  <Label>
+                    Familia
+                    <span className="ml-1 text-xs font-normal text-muted-foreground">— filtra los equipos</span>
+                  </Label>
+                  {loadingFamilies ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground py-1.5">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando familias...
+                    </div>
+                  ) : (
+                    <SearchableSelect
+                      options={[{ id: '_all', name: 'Todas las familias' }, ...familyList]}
+                      value={selectedFamilyId}
+                      onChange={setSelectedFamilyId}
+                      placeholder="Buscar familia..."
+                    />
+                  )}
                 </div>
-              ) : (
-                <Select value={equipmentId} onValueChange={setEquipmentId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={isClient ? 'Selecciona tu equipo' : 'Selecciona un equipo'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {equipmentList.length === 0 ? (
-                      <SelectItem value="_none" disabled>
-                        {isClient ? 'No tienes equipos asignados' : 'No hay equipos disponibles'}
-                      </SelectItem>
-                    ) : (
-                      equipmentList.map(e => (
-                        <SelectItem key={e.id} value={e.id}>
-                          {e.code} — {e.brand} {e.model}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
               )}
+
+              {/* Paso 2: Equipo */}
+              <div>
+                <Label>Equipo *</Label>
+                {loadingEquipment ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Cargando equipos...
+                  </div>
+                ) : (
+                  <SearchableSelect
+                    options={equipmentList.map(e => ({ id: e.id, name: `${e.code} — ${e.brand} ${e.model}` }))}
+                    value={equipmentId}
+                    onChange={setEquipmentId}
+                    placeholder={isClient ? 'Buscar tu equipo...' : 'Buscar por código, marca o modelo...'}
+                  />
+                )}
+              </div>
             </div>
           )}
 
@@ -175,16 +218,14 @@ export function NewMaintenanceDialog({
             </Select>
           </div>
 
-          {/* Descripción / Motivo */}
+          {/* Descripción */}
           <div>
             <Label>{isClient ? 'Motivo de la solicitud *' : 'Descripción del trabajo *'}</Label>
             <Textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
               rows={3}
-              placeholder={isClient
-                ? 'Describe el problema o motivo del mantenimiento...'
-                : 'Describe el trabajo a realizar...'}
+              placeholder={isClient ? 'Describe el problema o motivo...' : 'Describe el trabajo a realizar...'}
             />
           </div>
 
@@ -204,7 +245,7 @@ export function NewMaintenanceDialog({
             )}
           </div>
 
-          {/* Notas adicionales */}
+          {/* Notas */}
           <div>
             <Label>Notas adicionales (opcional)</Label>
             <Textarea
@@ -217,7 +258,7 @@ export function NewMaintenanceDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={loading}>Cancelar</Button>
+          <Button variant="outline" onClick={handleClose} disabled={loading}>Cancelar</Button>
           <Button onClick={handleSubmit} disabled={loading || !equipmentId || !description || !scheduledDate}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isClient ? 'Enviar Solicitud' : 'Programar Mantenimiento'}

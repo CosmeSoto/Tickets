@@ -7,6 +7,7 @@ import { randomUUID } from 'crypto'
 import { writeFile, mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import { getUploadDir } from '@/lib/upload-path'
+import { FolioService } from '@/lib/services/folio.service'
 
 const decommissionInclude = {
   requester: { select: { id: true, name: true, email: true } },
@@ -95,11 +96,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'La condición del equipo es requerida' }, { status: 400 })
     }
 
-    // Validar equipo no ASSIGNED
+    // Validar equipo: no debe tener asignación activa
     if (assetType === 'EQUIPMENT' && equipmentId) {
       const equipment = await prisma.equipment.findUnique({ where: { id: equipmentId }, select: { status: true, code: true } })
       if (!equipment) return NextResponse.json({ error: 'Equipo no encontrado' }, { status: 404 })
-      if (equipment.status === 'ASSIGNED') {
+
+      const activeAssignment = await prisma.equipment_assignments.findFirst({
+        where: { equipmentId, isActive: true },
+      })
+      if (activeAssignment) {
         return NextResponse.json({
           error: 'No se puede solicitar la baja de un equipo que está asignado. Primero debe registrar su devolución',
         }, { status: 422 })
@@ -136,20 +141,114 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Leer configuración de familia para autoApproveDecommission (solo para equipos)
+    let autoApproveDecommission = false
+    let familyId: string | null = null
+    if (assetType === 'EQUIPMENT' && equipmentId) {
+      const equipmentWithFamily = await prisma.equipment.findUnique({
+        where: { id: equipmentId },
+        select: { type: { select: { familyId: true } } },
+      })
+      familyId = equipmentWithFamily?.type?.familyId ?? null
+      if (familyId) {
+        const familyConfig = await prisma.inventory_family_config.findUnique({
+          where: { familyId },
+          select: { autoApproveDecommission: true },
+        })
+        autoApproveDecommission = familyConfig?.autoApproveDecommission ?? false
+      }
+    }
+
     // Crear solicitud
     const requestId = randomUUID()
-    const decommissionRequest = await prisma.decommission_requests.create({
-      data: {
-        id: requestId,
-        assetType: assetType as any,
-        equipmentId: equipmentId || null,
-        licenseId: licenseId || null,
-        requestedById: session.user.id,
-        reason: reason.trim(),
-        condition: condition as any || null,
-        status: 'PENDING',
-      },
-    })
+
+    if (autoApproveDecommission && assetType === 'EQUIPMENT' && equipmentId) {
+      // Auto-aprobación: crear request APPROVED + decommission_act + cambiar status a RETIRED en una transacción
+      const folio = await FolioService.generateDecommissionActFolio()
+      const actId = randomUUID()
+
+      await prisma.$transaction(async (tx) => {
+        await tx.decommission_requests.create({
+          data: {
+            id: requestId,
+            assetType: assetType as any,
+            equipmentId,
+            licenseId: null,
+            requestedById: session.user.id,
+            reason: reason.trim(),
+            condition: condition as any || null,
+            status: 'APPROVED',
+            reviewedById: session.user.id,
+            reviewedAt: new Date(),
+          },
+        })
+
+        await tx.decommission_acts.create({
+          data: {
+            id: actId,
+            folio,
+            requestId,
+            approvedById: session.user.id,
+            approvedAt: new Date(),
+          },
+        })
+
+        await tx.equipment.update({
+          where: { id: equipmentId },
+          data: { status: 'RETIRED' },
+        })
+      })
+
+      // Audit log con autoApproved y reason
+      await prisma.audit_logs.create({
+        data: {
+          id: randomUUID(),
+          action: 'DECOMMISSION',
+          entityType: 'asset',
+          entityId: equipmentId,
+          userId: session.user.id,
+          details: {
+            autoApproved: true,
+            reason: reason.trim(),
+            familyId,
+            folio,
+          },
+          createdAt: new Date(),
+        },
+      }).catch(() => {})
+    } else {
+      // Flujo normal: crear request con status = PENDING
+      await prisma.decommission_requests.create({
+        data: {
+          id: requestId,
+          assetType: assetType as any,
+          equipmentId: equipmentId || null,
+          licenseId: licenseId || null,
+          requestedById: session.user.id,
+          reason: reason.trim(),
+          condition: condition as any || null,
+          status: 'PENDING',
+        },
+      })
+
+      // Audit log para solicitud pendiente
+      await prisma.audit_logs.create({
+        data: {
+          id: randomUUID(),
+          action: 'DECOMMISSION',
+          entityType: 'asset',
+          entityId: equipmentId ?? licenseId ?? requestId,
+          userId: session.user.id,
+          details: {
+            autoApproved: false,
+            reason: reason.trim(),
+            familyId,
+            requestId,
+          },
+          createdAt: new Date(),
+        },
+      }).catch(() => {})
+    }
 
     // Guardar imágenes adjuntas
     if (files.length > 0) {
@@ -190,23 +289,25 @@ export async function POST(request: NextRequest) {
 
     const requesterName = session.user.name || session.user.email || 'Usuario'
 
-    // Notificar a todos los ADMIN
-    const admins = await prisma.users.findMany({ where: { role: 'ADMIN' }, select: { id: true } })
-    for (const admin of admins) {
-      await prisma.notifications.create({
-        data: {
-          id: randomUUID(),
-          userId: admin.id,
-          type: 'WARNING',
-          title: 'Nueva Solicitud de Baja',
-          message: `${requesterName} solicitó la baja de "${assetName}". Motivo: ${reason.trim().substring(0, 100)}`,
-          metadata: { link: `/inventory/decommission/${requestId}` },
-          isRead: false,
-        },
-      }).catch(() => {})
+    // Notificar a todos los ADMIN (solo si es PENDING — si fue auto-aprobado, no requiere revisión)
+    if (!autoApproveDecommission) {
+      const admins = await prisma.users.findMany({ where: { role: 'ADMIN' }, select: { id: true } })
+      for (const admin of admins) {
+        await prisma.notifications.create({
+          data: {
+            id: randomUUID(),
+            userId: admin.id,
+            type: 'WARNING',
+            title: 'Nueva Solicitud de Baja',
+            message: `${requesterName} solicitó la baja de "${assetName}". Motivo: ${reason.trim().substring(0, 100)}`,
+            metadata: { link: `/inventory/decommission/${requestId}` },
+            isRead: false,
+          },
+        }).catch(() => {})
+      }
     }
 
-    // Audit log
+    // Audit log de creación (legacy — mantenido para compatibilidad)
     await prisma.audit_logs.create({
       data: {
         id: randomUUID(),

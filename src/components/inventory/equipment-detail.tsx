@@ -740,6 +740,12 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
               {userRole === 'CLIENT'
                 ? `Solicita mantenimiento para el equipo ${equipment.code}. El equipo técnico revisará tu solicitud.`
                 : `Registra un mantenimiento para el equipo ${equipment.code}.`}
+              {equipment.type?.family?.name && (
+                <span className="block mt-1 text-xs text-muted-foreground">
+                  Familia: <span className="font-medium">{equipment.type.family.name}</span>
+                  {equipment.type?.name ? ` · Tipo: ${equipment.type.name}` : ''}
+                </span>
+              )}
               {userRole !== 'CLIENT' && currentAssignment && (
                 <span className="block mt-1 text-yellow-600">
                   El cliente asignado ({currentAssignment.receiver?.name}) será notificado.

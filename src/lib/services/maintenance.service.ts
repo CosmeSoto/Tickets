@@ -18,6 +18,11 @@ export class MaintenanceService {
    */
   static async createMaintenance(data: CreateMaintenanceData, userId: string): Promise<MaintenanceRecord> {
     const result = await prisma.$transaction(async (tx) => {
+      const equipment = await tx.equipment.findUnique({
+        where: { id: data.equipmentId },
+        select: { status: true },
+      })
+
       const maintenance = await tx.maintenance_records.create({
         data: {
           equipmentId: data.equipmentId,
@@ -31,6 +36,7 @@ export class MaintenanceService {
           requestedById: data.requestedById,
           status: 'SCHEDULED',
           notes: data.notes,
+          previousStatus: equipment?.status ?? null,
         },
         include: { equipment: true, technician: true, ticket: true },
       })
@@ -43,7 +49,7 @@ export class MaintenanceService {
       await tx.audit_logs.create({
         data: {
           id: randomUUID(),
-          action: 'MAINTENANCE_SCHEDULED',
+          action: 'MAINTENANCE_START',
           entityType: 'maintenance_record',
           entityId: maintenance.id,
           userId,
@@ -52,6 +58,7 @@ export class MaintenanceService {
             equipmentId: data.equipmentId,
             type: data.type,
             scheduledDate: data.scheduledDate,
+            previousStatus: equipment?.status ?? null,
           },
         },
       })
@@ -136,6 +143,7 @@ export class MaintenanceService {
           date: data.scheduledDate,
           technicianId: data.technicianId || userId,
           notes: data.notes,
+          previousStatus: existing.equipment.status,
         },
         include: { equipment: true, technician: true, ticket: true },
       })
@@ -148,7 +156,7 @@ export class MaintenanceService {
       await tx.audit_logs.create({
         data: {
           id: randomUUID(),
-          action: 'MAINTENANCE_APPROVED',
+          action: 'MAINTENANCE_START',
           entityType: 'maintenance_record',
           entityId: id,
           userId,
@@ -156,6 +164,7 @@ export class MaintenanceService {
             descripcion: `Se aprobó la solicitud de mantenimiento del equipo ${existing.equipment.code}. Fecha programada: ${new Date(data.scheduledDate).toLocaleDateString('es-EC')}. El equipo pasó a estado "En mantenimiento".`,
             scheduledDate: data.scheduledDate,
             technicianId: data.technicianId || userId,
+            previousStatus: existing.equipment.status,
           },
         },
       })
@@ -286,16 +295,17 @@ export class MaintenanceService {
           await tx.equipment.update({ where: { id: existing.equipmentId }, data: { status: 'AVAILABLE' } })
         }
       } else {
+        const statusToRestore = (existing as any).previousStatus ?? 'AVAILABLE'
         await tx.equipment.update({
           where: { id: existing.equipmentId },
-          data: { status: 'AVAILABLE' },
+          data: { status: statusToRestore },
         })
       }
 
       await tx.audit_logs.create({
         data: {
           id: randomUUID(),
-          action: 'MAINTENANCE_COMPLETED',
+          action: 'MAINTENANCE_END',
           entityType: 'maintenance_record',
           entityId: id,
           userId,
@@ -304,6 +314,8 @@ export class MaintenanceService {
             cost: data.cost,
             completedAt: new Date().toISOString(),
             returnTo: data.returnTo || 'available',
+            previousStatus: (existing as any).previousStatus ?? null,
+            restoredStatus: data.returnTo === 'previous_user' ? 'ASSIGNED' : ((existing as any).previousStatus ?? 'AVAILABLE'),
           },
         },
       })

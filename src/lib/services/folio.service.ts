@@ -25,10 +25,18 @@ export class FolioService {
   }
 
   /**
+   * Genera un folio único para acta de baja
+   * Formato: BAJ-YYYY-NNNNN
+   */
+  static async generateDecommissionActFolio(): Promise<string> {
+    return this.generateFolio('BAJ')
+  }
+
+  /**
    * Genera un folio secuencial único
    * Thread-safe usando transacciones de Prisma
    */
-  private static async generateFolio(type: 'ACT' | 'DEV'): Promise<string> {
+  private static async generateFolio(type: 'ACT' | 'DEV' | 'BAJ'): Promise<string> {
     const currentYear = new Date().getFullYear()
 
     try {
@@ -107,7 +115,7 @@ export class FolioService {
   /**
    * Obtiene el último número de folio para un año y tipo
    */
-  static async getLastFolioNumber(year: number, type: 'ACT' | 'DEV'): Promise<number> {
+  static async getLastFolioNumber(year: number, type: 'ACT' | 'DEV' | 'BAJ'): Promise<number> {
     try {
       const counter = await prisma.folio_counters.findUnique({
         where: {
@@ -128,7 +136,7 @@ export class FolioService {
   /**
    * Reinicia el contador de folios para un año (solo para testing/admin)
    */
-  static async resetCounter(year: number, type: 'ACT' | 'DEV'): Promise<void> {
+  static async resetCounter(year: number, type: 'ACT' | 'DEV' | 'BAJ'): Promise<void> {
     try {
       await prisma.folio_counters.upsert({
         where: {
