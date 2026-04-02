@@ -28,10 +28,7 @@ async function main() {
   // 5. USUARIO ADMINISTRADOR
   const adminId = await seedAdmin(deptMap.get('Administración')!)
 
-  // 6. TÉCNICOS DE EJEMPLO
-  const techMap = await seedTechnicians(deptMap, familyMap)
-
-  // 7. CONFIGURACIÓN DEL SITIO
+  // 6. CONFIGURACIÓN DEL SITIO
   await seedSiteConfig()
 
   // 8. POLÍTICAS DE SLA (globales + por familia TECHNOLOGY)
@@ -67,15 +64,12 @@ async function main() {
   // 18. LANDING PAGE
   await seedLandingPage()
 
-  // 19. TICKETS DE EJEMPLO
-  await seedSampleTickets(familyMap, deptMap, techMap, adminId)
-
-  // 20. ARTÍCULOS DE BASE DE CONOCIMIENTOS
+  // 19. ARTÍCULOS DE BASE DE CONOCIMIENTOS
   await seedKnowledgeArticles(familyMap, deptMap, adminId)
 
   console.log('\n🎉 Seed completado exitosamente!')
   console.log('\n📋 Credenciales de acceso:')
-  console.log('   Email: admin@sistema.com')
+  console.log('   Email: internet.freecom@gmail.com')
   console.log('   Contraseña: admin123')
 }
 
@@ -258,10 +252,10 @@ async function seedDepartments(familyMap: Map<string, string>): Promise<Map<stri
 async function seedAdmin(deptAdminId: string): Promise<string> {
   const adminPassword = await bcrypt.hash('admin123', 12)
   const admin = await prisma.users.upsert({
-    where: { email: 'admin@sistema.com' },
+    where: { email: 'internet.freecom@gmail.com' },
     update: {},
     create: {
-      id: randomUUID(), email: 'admin@sistema.com', name: 'Administrador del Sistema',
+      id: randomUUID(), email: 'internet.freecom@gmail.com', name: 'Administrador del Sistema',
       passwordHash: adminPassword, role: UserRole.ADMIN, departmentId: deptAdminId,
       phone: '+593999999999', isActive: true, isEmailVerified: true, createdAt: now, updatedAt: now,
     },
@@ -279,51 +273,8 @@ async function seedAdmin(deptAdminId: string): Promise<string> {
     update: {},
     create: { id: randomUUID(), userId: admin.id, theme: 'light', language: 'es', timezone: 'America/Guayaquil', updatedAt: now },
   })
-  console.log('✅ Administrador (admin@sistema.com / admin123)')
+  console.log('✅ Administrador (internet.freecom@gmail.com / admin123)')
   return admin.id
-}
-
-// ============================================
-// 6. TÉCNICOS DE EJEMPLO
-// ============================================
-
-async function seedTechnicians(deptMap: Map<string, string>, familyMap: Map<string, string>): Promise<Map<string, string>> {
-  const techPassword = await bcrypt.hash('tech123', 12)
-  const technicians = [
-    { email: 'tecnico1@empresa.com',   name: 'Carlos Técnico TI',             dept: 'Tecnologías de la Información', families: ['TECHNOLOGY'] },
-    { email: 'tecnico2@empresa.com',   name: 'María Técnico TI',              dept: 'Soporte Técnico',               families: ['TECHNOLOGY'] },
-    { email: 'tecnico3@empresa.com',   name: 'Pedro Técnico Infraestructura', dept: 'Mantenimiento',                 families: ['FIXED_ASSETS', 'ADMINISTRATIVE'] },
-  ]
-  const map = new Map<string, string>()
-  for (const t of technicians) {
-    const tech = await prisma.users.upsert({
-      where: { email: t.email },
-      update: {},
-      create: {
-        id: randomUUID(), email: t.email, name: t.name,
-        passwordHash: techPassword, role: UserRole.TECHNICIAN,
-        departmentId: deptMap.get(t.dept)!, isActive: true, isEmailVerified: true,
-        createdAt: now, updatedAt: now,
-      },
-    })
-    map.set(t.email, tech.id)
-    // Asignar familias
-    for (const familyCode of t.families) {
-      const familyId = familyMap.get(familyCode)!
-      await prisma.technician_family_assignments.upsert({
-        where: { technicianId_familyId: { technicianId: tech.id, familyId } },
-        update: { isActive: true },
-        create: { id: randomUUID(), technicianId: tech.id, familyId, isActive: true },
-      })
-    }
-    await prisma.user_settings.upsert({
-      where: { userId: tech.id },
-      update: {},
-      create: { id: randomUUID(), userId: tech.id, theme: 'light', language: 'es', timezone: 'America/Guayaquil', updatedAt: now },
-    })
-  }
-  console.log(`✅ ${technicians.length} técnicos con asignaciones de familia`)
-  return map
 }
 
 // ============================================
@@ -334,7 +285,7 @@ async function seedSiteConfig() {
   const configs = [
     { key: 'site_name',          value: 'Sistema de Tickets Multi-Familia', description: 'Nombre del sitio web' },
     { key: 'company_name',       value: 'Mi Empresa',                       description: 'Nombre de la empresa' },
-    { key: 'support_email',      value: 'admin@sistema.com',                description: 'Email de soporte técnico' },
+    { key: 'support_email',      value: 'internet.freecom@gmail.com',                description: 'Email de soporte técnico' },
     { key: 'max_file_size',      value: '10485760',                         description: 'Tamaño máximo de archivo en bytes (10MB)' },
     { key: 'allowed_file_types', value: 'pdf,doc,docx,txt,png,jpg,jpeg,gif', description: 'Tipos de archivo permitidos' },
   ]
@@ -388,9 +339,6 @@ async function seedSLAPolicies(familyMap: Map<string, string>) {
 
 async function seedCategories(deptMap: Map<string, string>) {
   const deptInfraId    = deptMap.get('Tecnologías de la Información')!
-  const deptSoporteId  = deptMap.get('Soporte Técnico')!
-  const deptSeguridad  = deptMap.get('Seguridad Informática')!
-  const deptUsuarios   = deptMap.get('Usuarios y Privilegios')!
   const deptTelefonia  = deptMap.get('Telefonía')!
 
   // ==================== INFRAESTRUCTURA TI ====================
@@ -403,56 +351,6 @@ async function seedCategories(deptMap: Map<string, string>) {
   const impresion  = await upsertCategory({ name: 'Impresión', description: 'Impresoras, fotocopiadoras', level: 2, parentId: fallaInfra.id, departmentId: deptInfraId, order: 4, color: '#EC4899' })
   const solicInfraN2 = await upsertCategory({ name: 'Solicitud o Requerimiento', description: 'Solicitudes generales de infraestructura', level: 2, parentId: solicInfra.id, departmentId: deptInfraId, order: 1, color: '#3B82F6' })
   const energiaSolic = await upsertCategory({ name: 'Energía Regulada', description: 'Solicitudes de energía regulada', level: 2, parentId: solicInfra.id, departmentId: deptInfraId, order: 2, color: '#F59E0B' })
-
-  await upsertCategory({ name: 'Pérdida de Conexión', description: 'Sin conexión de red', level: 3, parentId: networking.id, departmentId: deptInfraId, order: 1, color: '#EF4444' })
-  await upsertCategory({ name: 'Daño de Equipos Comunicaciones', description: 'Equipos de red dañados', level: 3, parentId: networking.id, departmentId: deptInfraId, order: 2, color: '#EF4444' })
-  await upsertCategory({ name: 'Pérdida de Rutas Comunicación', description: 'Rutas de red perdidas', level: 3, parentId: networking.id, departmentId: deptInfraId, order: 3, color: '#EF4444' })
-  await upsertCategory({ name: 'Pérdida de Comunicación Inalámbrica', description: 'WiFi caído', level: 3, parentId: networking.id, departmentId: deptInfraId, order: 4, color: '#EF4444' })
-  await upsertCategory({ name: 'Firewall', description: 'Problemas con firewall', level: 3, parentId: networking.id, departmentId: deptInfraId, order: 5, color: '#EF4444' })
-  await upsertCategory({ name: 'Central Telefónica', description: 'Problemas con PBX', level: 3, parentId: networking.id, departmentId: deptInfraId, order: 6, color: '#EF4444' })
-  await upsertCategory({ name: 'VPN', description: 'Problemas con VPN', level: 3, parentId: networking.id, departmentId: deptInfraId, order: 7, color: '#EF4444' })
-  await upsertCategory({ name: 'Plataforma Intermitente', description: 'Office 365 intermitente', level: 3, parentId: office365.id, departmentId: deptInfraId, order: 1, color: '#EF4444' })
-  await upsertCategory({ name: 'Atasco de Papel', description: 'Impresora atascada', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 1, color: '#EF4444' })
-  await upsertCategory({ name: 'Baja Calidad de Imagen', description: 'Impresión con baja calidad', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 2, color: '#EF4444' })
-  await upsertCategory({ name: 'Impresora sin Conexión/Red', description: 'Impresora sin conexión', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 3, color: '#EF4444' })
-  await upsertCategory({ name: 'Creación de SSID', description: 'Solicitud de nueva red WiFi', level: 3, parentId: solicInfraN2.id, departmentId: deptInfraId, order: 1, color: '#3B82F6' })
-  await upsertCategory({ name: 'VPN', description: 'Solicitud de acceso VPN', level: 3, parentId: solicInfraN2.id, departmentId: deptInfraId, order: 2, color: '#3B82F6' })
-  await upsertCategory({ name: 'Creación de Cuenta', description: 'Solicitud de creación de cuenta', level: 3, parentId: solicInfraN2.id, departmentId: deptInfraId, order: 3, color: '#3B82F6' })
-  await upsertCategory({ name: 'Reseteo Contraseña', description: 'Solicitud de reseteo de contraseña', level: 3, parentId: solicInfraN2.id, departmentId: deptInfraId, order: 4, color: '#3B82F6' })
-  await upsertCategory({ name: 'Nuevos Equipos', description: 'Solicitud de nuevos equipos de energía', level: 3, parentId: energiaSolic.id, departmentId: deptInfraId, order: 1, color: '#3B82F6' })
-  await upsertCategory({ name: 'Mantenimiento', description: 'Solicitud de mantenimiento', level: 3, parentId: energiaSolic.id, departmentId: deptInfraId, order: 2, color: '#3B82F6' })
-
-  // ==================== SOPORTE TÉCNICO ====================
-  const fallaSoporte = await upsertCategory({ name: 'Falla o Error', description: 'Incidentes en soporte técnico', level: 1, parentId: null, departmentId: deptSoporteId, order: 1, color: '#EF4444' })
-  const solicSoporte = await upsertCategory({ name: 'Solicitud o Requerimiento', description: 'Solicitudes de soporte técnico', level: 1, parentId: null, departmentId: deptSoporteId, order: 2, color: '#3B82F6' })
-  const equipos = await upsertCategory({ name: 'Equipos', description: 'Computadoras, laptops', level: 2, parentId: fallaSoporte.id, departmentId: deptSoporteId, order: 1, color: '#10B981' })
-  const solicSoporteN2 = await upsertCategory({ name: 'Solicitud o Requerimiento', description: 'Solicitudes generales de soporte', level: 2, parentId: solicSoporte.id, departmentId: deptSoporteId, order: 1, color: '#3B82F6' })
-  await upsertCategory({ name: 'Verificación de Partes', description: 'Verificación de hardware', level: 3, parentId: equipos.id, departmentId: deptSoporteId, order: 1, color: '#EF4444' })
-  await upsertCategory({ name: 'Reparación de Equipos', description: 'Reparación de hardware', level: 3, parentId: equipos.id, departmentId: deptSoporteId, order: 2, color: '#EF4444' })
-  await upsertCategory({ name: 'Instalar Software Base', description: 'Instalación de SO y software base', level: 3, parentId: equipos.id, departmentId: deptSoporteId, order: 3, color: '#EF4444' })
-  await upsertCategory({ name: 'Renovación de Equipo', description: 'Solicitud de renovación', level: 3, parentId: solicSoporteN2.id, departmentId: deptSoporteId, order: 1, color: '#3B82F6' })
-  await upsertCategory({ name: 'Adquisición Equipos', description: 'Solicitud de compra de equipos', level: 3, parentId: solicSoporteN2.id, departmentId: deptSoporteId, order: 2, color: '#3B82F6' })
-
-  // ==================== SEGURIDAD INFORMÁTICA ====================
-  const incidentes = await upsertCategory({ name: 'Incidentes', description: 'Incidentes de seguridad', level: 1, parentId: null, departmentId: deptSeguridad, order: 1, color: '#EF4444' })
-  const reqSeguridad = await upsertCategory({ name: 'Requerimientos', description: 'Requerimientos de seguridad', level: 1, parentId: null, departmentId: deptSeguridad, order: 2, color: '#3B82F6' })
-  await upsertCategory({ name: 'Ataques Informáticos', description: 'Cyberataques, malware', level: 3, parentId: incidentes.id, departmentId: deptSeguridad, order: 1, color: '#EF4444' })
-  await upsertCategory({ name: 'Accesos no Autorizados', description: 'Acceso no autorizado a sistemas', level: 3, parentId: incidentes.id, departmentId: deptSeguridad, order: 2, color: '#EF4444' })
-  await upsertCategory({ name: 'Divulgación de Información Confidencial', description: 'Fuga de información', level: 3, parentId: incidentes.id, departmentId: deptSeguridad, order: 3, color: '#EF4444' })
-  await upsertCategory({ name: 'Definición de Políticas de Seguridad', description: 'Creación de políticas', level: 3, parentId: reqSeguridad.id, departmentId: deptSeguridad, order: 1, color: '#3B82F6' })
-  await upsertCategory({ name: 'Aprobación del Servicio VPN', description: 'Aprobación de acceso VPN', level: 3, parentId: reqSeguridad.id, departmentId: deptSeguridad, order: 2, color: '#3B82F6' })
-
-  // ==================== USUARIOS Y PRIVILEGIOS ====================
-  const fallaUsuarios = await upsertCategory({ name: 'Falla o Error', description: 'Problemas con usuarios', level: 1, parentId: null, departmentId: deptUsuarios, order: 1, color: '#EF4444' })
-  const solicUsuarios = await upsertCategory({ name: 'Solicitud o Requerimiento', description: 'Solicitudes de usuarios', level: 1, parentId: null, departmentId: deptUsuarios, order: 2, color: '#3B82F6' })
-  const m365Fallas = await upsertCategory({ name: 'Microsoft 365', description: 'Problemas con M365', level: 2, parentId: fallaUsuarios.id, departmentId: deptUsuarios, order: 1, color: '#8B5CF6' })
-  const m365Solic  = await upsertCategory({ name: 'Microsoft 365', description: 'Solicitudes M365', level: 2, parentId: solicUsuarios.id, departmentId: deptUsuarios, order: 1, color: '#8B5CF6' })
-  const vpnUsuarios = await upsertCategory({ name: 'VPN', description: 'Solicitudes de VPN', level: 2, parentId: solicUsuarios.id, departmentId: deptUsuarios, order: 2, color: '#10B981' })
-  await upsertCategory({ name: 'Error al Iniciar Sesión en M365', description: 'No puede iniciar sesión', level: 3, parentId: m365Fallas.id, departmentId: deptUsuarios, order: 1, color: '#EF4444' })
-  await upsertCategory({ name: 'Creación de Usuario M365', description: 'Solicitud de nuevo usuario', level: 3, parentId: m365Solic.id, departmentId: deptUsuarios, order: 1, color: '#3B82F6' })
-  await upsertCategory({ name: 'Desactivación de Usuarios en M365', description: 'Desactivar usuario M365', level: 3, parentId: m365Solic.id, departmentId: deptUsuarios, order: 2, color: '#3B82F6' })
-  await upsertCategory({ name: 'Creación de Usuario VPN', description: 'Nuevo usuario VPN', level: 3, parentId: vpnUsuarios.id, departmentId: deptUsuarios, order: 1, color: '#3B82F6' })
-  await upsertCategory({ name: 'Baja de Usuario VPN', description: 'Eliminar usuario VPN', level: 3, parentId: vpnUsuarios.id, departmentId: deptUsuarios, order: 2, color: '#3B82F6' })
 
   // ==================== TELEFONÍA ====================
   const fallaTelefonia = await upsertCategory({ name: 'Falla o Error', description: 'Problemas con telefonía', level: 1, parentId: null, departmentId: deptTelefonia, order: 1, color: '#EF4444' })
@@ -663,14 +561,10 @@ async function seedFolioCounters() {
 // ============================================
 
 async function seedTicketCodeCounters(familyMap: Map<string, string>) {
-  // Sequences match the sample tickets created in seedSampleTickets:
-  // TECHNOLOGY: 2 tickets (TI-2026-0001, TI-2026-0002) → lastSequence: 3 (next available)
-  // FIXED_ASSETS: 1 ticket (INF-2026-0001) → lastSequence: 1
-  // ADMINISTRATIVE: 1 ticket (ADM-2026-0001) → lastSequence: 1
   const familiesWithSeq: Array<{ code: string; lastSequence: number }> = [
-    { code: 'TECHNOLOGY',     lastSequence: 3 },
-    { code: 'FIXED_ASSETS',   lastSequence: 1 },
-    { code: 'ADMINISTRATIVE', lastSequence: 1 },
+    { code: 'TECHNOLOGY',     lastSequence: 0 },
+    { code: 'FIXED_ASSETS',   lastSequence: 0 },
+    { code: 'ADMINISTRATIVE', lastSequence: 0 },
     { code: 'COMMERCIAL',     lastSequence: 0 },
     { code: 'SECURITY',       lastSequence: 0 },
     { code: 'MAINTENANCE',    lastSequence: 0 },
@@ -684,7 +578,7 @@ async function seedTicketCodeCounters(familyMap: Map<string, string>) {
       create: { id: randomUUID(), familyId, year: 2026, lastSequence },
     })
   }
-  console.log(`✅ Contadores de código de ticket para 2026 (TI:3, INF:1, ADM:1)`)
+  console.log(`✅ Contadores de código de ticket para 2026 (todos en 0)`)
 }
 
 // ============================================
@@ -747,70 +641,7 @@ async function seedLandingPage() {
 }
 
 // ============================================
-// 19. TICKETS DE EJEMPLO
-// ============================================
-
-async function seedSampleTickets(
-  familyMap: Map<string, string>,
-  deptMap: Map<string, string>,
-  techMap: Map<string, string>,
-  adminId: string
-) {
-  // Obtener una categoría de cada familia para los tickets de ejemplo
-  const tiCategory = await prisma.categories.findFirst({
-    where: { departments: { familyId: familyMap.get('TECHNOLOGY') }, level: 1 },
-  })
-  // FIXED_ASSETS and ADMINISTRATIVE don't have their own categories seeded,
-  // so we use TECHNOLOGY categories as fallback for sample tickets
-  const infCategory = await prisma.categories.findFirst({
-    where: { departments: { familyId: familyMap.get('FIXED_ASSETS') }, level: 1 },
-  }) ?? tiCategory
-  const admCategory = await prisma.categories.findFirst({
-    where: { departments: { familyId: familyMap.get('ADMINISTRATIVE') }, level: 1 },
-  }) ?? tiCategory
-
-  if (!tiCategory) {
-    console.log('⏭️  Categorías no encontradas para tickets de ejemplo')
-    return
-  }
-
-  const tech1Id = techMap.get('tecnico1@empresa.com')!
-  const tech2Id = techMap.get('tecnico3@empresa.com')!
-  const tech3Id = techMap.get('tecnico3@empresa.com')!
-
-  // Actualizar contadores antes de crear tickets
-  const tiFamily   = familyMap.get('TECHNOLOGY')!
-  const infFamily  = familyMap.get('FIXED_ASSETS')!
-  const admFamily  = familyMap.get('ADMINISTRATIVE')!
-
-  const sampleTickets = [
-    { ticketCode: `TI-2026-0001`,  familyId: tiFamily,  categoryId: tiCategory.id,  assigneeId: tech1Id, title: 'Falla en conexión de red - Piso 3',       description: 'Los equipos del piso 3 no tienen acceso a internet desde esta mañana.', priority: 'HIGH'   as const },
-    { ticketCode: `TI-2026-0002`,  familyId: tiFamily,  categoryId: tiCategory.id,  assigneeId: tech1Id, title: 'Solicitud de creación de usuario M365',    description: 'Nuevo empleado requiere cuenta en Microsoft 365.', priority: 'MEDIUM' as const },
-    { ticketCode: `INF-2026-0001`, familyId: infFamily, categoryId: infCategory.id, assigneeId: tech2Id, title: 'Mantenimiento preventivo aire acondicionado', description: 'Solicitud de mantenimiento preventivo del sistema de climatización.', priority: 'LOW'    as const },
-    { ticketCode: `ADM-2026-0001`, familyId: admFamily, categoryId: admCategory.id, assigneeId: tech3Id, title: 'Solicitud de reporte de nómina',            description: 'Se requiere reporte de nómina del mes anterior en formato Excel.', priority: 'MEDIUM' as const },
-  ]
-
-  for (const t of sampleTickets) {
-    const existing = await prisma.tickets.findFirst({ where: { ticketCode: t.ticketCode } })
-    if (!existing) {
-      const ticket = await prisma.tickets.create({
-        data: {
-          id: randomUUID(), ...t,
-          clientId: adminId, createdById: adminId,
-          status: 'OPEN', source: 'ADMIN', codeIsManual: false,
-          createdAt: now, updatedAt: now,
-        },
-      })
-      await prisma.ticket_history.create({
-        data: { id: randomUUID(), action: 'created', comment: 'Ticket creado por seed', ticketId: ticket.id, userId: adminId, createdAt: now },
-      })
-    }
-  }
-  console.log(`✅ ${sampleTickets.length} tickets de ejemplo (TI-2026-0001, TI-2026-0002, INF-2026-0001, ADM-2026-0001)`)
-}
-
-// ============================================
-// 20. ARTÍCULOS DE BASE DE CONOCIMIENTOS
+// 19. ARTÍCULOS DE BASE DE CONOCIMIENTOS
 // ============================================
 
 async function seedKnowledgeArticles(
