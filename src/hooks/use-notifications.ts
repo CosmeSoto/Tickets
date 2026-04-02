@@ -36,18 +36,17 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
   const [filterType, setFilterType] = useState<string>('all')
   const [searchTerm, setSearchTerm] = useState('')
 
-  // Refs para evitar que el polling pise cambios optimistas
   const deletedIds = useRef<Set<string>>(new Set())
   const readIds = useRef<Set<string>>(new Set())
-  const pendingOps = useRef(0) // contador de operaciones en vuelo
+  const pendingOps = useRef(0)
 
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const { toast } = useToast()
   const router = useRouter()
 
-  // Cargar notificaciones — respeta los cambios optimistas locales
   const loadNotifications = useCallback(async (force = false) => {
-    if (!session?.user?.id) return
+    // No hacer fetch si no hay sesión activa
+    if (status !== 'authenticated' || !session?.user?.id) return
     // Si hay operaciones en vuelo y no es forzado, no recargar
     if (!force && pendingOps.current > 0) return
 
@@ -233,24 +232,24 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     hasActiveFilters: filterRead !== 'all' || filterType !== 'all' || searchTerm !== '',
   }), [notifications, filteredNotifications, filterRead, filterType, searchTerm])
 
-  // Carga inicial + polling (respeta operaciones en vuelo)
+  // Carga inicial + polling — solo cuando hay sesión activa
   useEffect(() => {
-    if (!autoLoad || !session?.user?.id) return
+    if (!autoLoad || status !== 'authenticated' || !session?.user?.id) return
     loadNotifications(true)
     if (refreshInterval > 0) {
       const interval = setInterval(() => loadNotifications(false), refreshInterval)
       return () => clearInterval(interval)
     }
     return undefined
-  }, [autoLoad, session?.user?.id, loadNotifications, refreshInterval])
+  }, [autoLoad, status, session?.user?.id, loadNotifications, refreshInterval])
 
-  // Recargar inmediatamente cuando llega un evento SSE de ticket
+  // Recargar cuando llega un evento SSE de ticket
   useEffect(() => {
-    if (!session?.user?.id) return
+    if (status !== 'authenticated' || !session?.user?.id) return
     const handler = () => loadNotifications(true)
     window.addEventListener('ticket-updated', handler)
     return () => window.removeEventListener('ticket-updated', handler)
-  }, [session?.user?.id, loadNotifications])
+  }, [status, session?.user?.id, loadNotifications])
 
   return {
     notifications,

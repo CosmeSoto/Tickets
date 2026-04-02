@@ -32,15 +32,15 @@ interface Notification {
 }
 
 export function NotificationBell() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const router = useRouter()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  // Fetch notifications
   const fetchNotifications = async () => {
+    if (status !== 'authenticated') return
     try {
       const response = await fetch('/api/notifications?limit=20')
       if (response.ok) {
@@ -52,8 +52,8 @@ export function NotificationBell() {
     }
   }
 
-  // Fetch unread count
   const fetchUnreadCount = async () => {
+    if (status !== 'authenticated') return
     try {
       const response = await fetch('/api/notifications/unread-count')
       if (response.ok) {
@@ -131,28 +131,27 @@ export function NotificationBell() {
     }
   }
 
-  // Polling every 30 seconds
+  // Polling every 15 seconds — solo cuando hay sesión activa
   useEffect(() => {
+    if (status !== 'authenticated') return
     fetchNotifications()
     fetchUnreadCount()
 
     const interval = setInterval(() => {
       fetchUnreadCount()
-      if (!isOpen) {
-        fetchNotifications()
-      }
+      if (!isOpen) fetchNotifications()
     }, 15000)
 
     return () => clearInterval(interval)
-  }, [isOpen])
+  }, [isOpen, status])
 
-  // Refresh when popover opens
+  // Refresh when popover opens — solo si hay sesión
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && status === 'authenticated') {
       fetchNotifications()
       fetchUnreadCount()
     }
-  }, [isOpen])
+  }, [isOpen, status])
 
   const getTypeColor = (type: string) => {
     switch (type) {
