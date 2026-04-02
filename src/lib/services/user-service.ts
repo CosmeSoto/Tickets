@@ -357,6 +357,7 @@ export class UserService {
     if (data.phone !== undefined) updateData.phone = data.phone
     if (data.avatar !== undefined) updateData.avatar = data.avatar
     if (data.isActive !== undefined) updateData.isActive = data.isActive
+    if ((data as any).canManageInventory !== undefined) updateData.canManageInventory = (data as any).canManageInventory
     
     // Manejar departmentId explícitamente
     if (data.departmentId !== undefined) {

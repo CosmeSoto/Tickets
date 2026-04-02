@@ -47,6 +47,7 @@ interface EditUserData {
   departmentId: string
   phone: string
   isActive: boolean
+  canManageInventory: boolean
   avatar?: File
 }
 
@@ -84,6 +85,7 @@ export function EditUserModal({ isOpen, onClose, onUserUpdated, user, department
         departmentId: typeof user.department === 'object' ? user.department?.id || '' : user.department || '',
         phone: user.phone || '',
         isActive: user.isActive,
+        canManageInventory: (user as any).canManageInventory ?? false,
         avatar: undefined
       })
       setAvatarPreview(user.avatar || null)
@@ -224,7 +226,8 @@ export function EditUserModal({ isOpen, onClose, onUserUpdated, user, department
         role: formData.role,
         departmentId: formData.departmentId || null,
         phone: formData.phone.trim() || null,
-        isActive: formData.isActive
+        isActive: formData.isActive,
+        canManageInventory: formData.canManageInventory,
       }
 
       const response = await fetch(`/api/users/${user.id}`, {
@@ -439,6 +442,26 @@ export function EditUserModal({ isOpen, onClose, onUserUpdated, user, department
                   )}
                 </div>
               </div>
+            </div>
+
+            {/* Permiso de gestor de inventario */}
+            <div className="rounded-lg border p-3 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Gestor de Inventario</p>
+                <p className="text-xs text-muted-foreground">
+                  Permite a este usuario gestionar activos, consumibles y configuración de inventario.
+                  Aplica a cualquier rol (Admin siempre tiene acceso).
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                id="edit-can-manage-inventory"
+                checked={formData.canManageInventory}
+                onChange={(e) => setFormData({ ...formData, canManageInventory: e.target.checked })}
+                disabled={formData.role === 'ADMIN'}
+                className="h-4 w-4 rounded border-border disabled:opacity-50"
+                title={formData.role === 'ADMIN' ? 'Los administradores siempre tienen acceso' : ''}
+              />
             </div>
           </TabsContent>
 

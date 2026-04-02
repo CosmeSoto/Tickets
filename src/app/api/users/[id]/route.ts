@@ -16,6 +16,7 @@ const updateUserSchema = z.object({
   phone: z.string().nullable().optional(),
   avatar: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
+  canManageInventory: z.boolean().optional(),
   assignedCategories: z.array(z.object({
     categoryId: z.string(),
     priority: z.number().min(1).max(10),
