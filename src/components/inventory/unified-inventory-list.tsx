@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { FamilyFilterBar } from '@/components/inventory/family-filter-bar'
 import { FamilyBadge } from '@/components/inventory/family-badge'
 import { SubtypeBadge } from '@/components/inventory/subtype-badge'
@@ -87,6 +88,7 @@ function formatDate(iso: string) {
 
 export function UnifiedInventoryList({ initialFamilyId }: UnifiedInventoryListProps) {
   const router = useRouter()
+  const { status } = useSession()
   const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(initialFamilyId ?? null)
   const [selectedSubtype, setSelectedSubtype] = useState<AssetSubtype | ''>('')
   const [search, setSearch] = useState('')
@@ -105,14 +107,17 @@ export function UnifiedInventoryList({ initialFamilyId }: UnifiedInventoryListPr
   }, [search])
 
   useEffect(() => {
-    fetch('/api/inventory/families')
+    if (status !== 'authenticated') return
+    const controller = new AbortController()
+    fetch('/api/inventory/families', { signal: controller.signal })
       .then(r => r.json())
       .then(data => {
         if (Array.isArray(data)) setFamilies(data)
         else if (Array.isArray(data?.families)) setFamilies(data.families)
       })
       .catch(() => {})
-  }, [])
+    return () => controller.abort()
+  }, [status])
 
   const fetchAssets = useCallback(
     async (familyId: string | null, subtype: AssetSubtype | '', q: string, currentPage: number) => {
@@ -136,8 +141,9 @@ export function UnifiedInventoryList({ initialFamilyId }: UnifiedInventoryListPr
   )
 
   useEffect(() => {
+    if (status !== 'authenticated') return
     fetchAssets(selectedFamilyId, selectedSubtype, debouncedSearch, page)
-  }, [selectedFamilyId, selectedSubtype, debouncedSearch, page, fetchAssets])
+  }, [selectedFamilyId, selectedSubtype, debouncedSearch, page, fetchAssets, status])
 
   function handleFamilyChange(familyId: string | null) {
     setSelectedFamilyId(familyId)
