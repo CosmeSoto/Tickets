@@ -19,6 +19,7 @@ import {
   TechnicianFamilyAssignment,
   type AssignedTechnician,
 } from '@/components/families/technician-family-assignment'
+import { TechnicianManagementPanel } from '@/components/families/technician-management-panel'
 
 // ---- Types ----
 
@@ -145,12 +146,21 @@ export function TabPersonal({ familyId, technicians, managers, onPersonnelChange
   return (
     <div className="space-y-6">
       {/* Técnicos — componente compartido con /admin/technicians */}
-      <TechnicianFamilyAssignment
-        mode="by-family"
-        familyId={familyId}
-        assignedTechnicians={technicians}
-        onChanged={onPersonnelChanged}
-      />
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold">Técnicos de Tickets</p>
+            <p className="text-xs text-muted-foreground">Asignación de técnicos a esta familia</p>
+          </div>
+          <TechnicianManagementPanel onChanged={onPersonnelChanged} />
+        </div>
+        <TechnicianFamilyAssignment
+          mode="by-family"
+          familyId={familyId}
+          assignedTechnicians={technicians}
+          onChanged={onPersonnelChanged}
+        />
+      </div>
 
       {/* Gestores de Inventario */}
       <Card>

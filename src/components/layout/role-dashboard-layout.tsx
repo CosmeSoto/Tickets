@@ -81,7 +81,6 @@ const navigationByRole: Record<string, NavItem[]> = {
         { name: 'Todos los Tickets', href: '/admin/tickets', icon: Ticket },
         { name: 'Reportes', href: '/admin/reports', icon: BarChart3 },
         { name: 'Categorías', href: '/admin/categories', icon: FolderTree },
-        { name: 'Técnicos', href: '/admin/technicians', icon: Wrench },
         { name: 'Base de Conocimientos', href: '/admin/knowledge', icon: BookOpen },
         { name: 'Configuración', href: '/settings/tickets', icon: Settings },
       ],
