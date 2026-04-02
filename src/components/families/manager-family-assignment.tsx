@@ -247,12 +247,13 @@ function ByFamilyView({ familyId, assignedManagers, onChanged }: ByFamilyProps) 
   const loadManagers = useCallback(async () => {
     setLoadingUsers(true)
     try {
+      // Todos los usuarios activos pueden ser gestores de inventario de una familia.
+      // No filtramos por canManageInventory — ese flag se activa automáticamente
+      // al asignar a una familia si el usuario no lo tiene aún.
       const res = await fetch('/api/users?isActive=true&limit=500')
       if (res.ok) {
         const data = await res.json()
-        setAllManagers(
-          (data.data ?? []).filter((u: ManagerOption) => u.canManageInventory === true)
-        )
+        setAllManagers(data.data ?? [])
       }
     } catch {
       // silencioso
@@ -414,19 +415,24 @@ function ByFamilyView({ familyId, assignedManagers, onChanged }: ByFamilyProps) 
                       <p className="text-xs text-muted-foreground mt-0.5">{user.email}</p>
                     </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleAssign(user.id)}
-                    disabled={assigningId === user.id}
-                    className="h-7 px-2"
-                  >
-                    {assigningId === user.id ? (
-                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <UserPlus className="h-3.5 w-3.5" />
-                    )}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs hidden sm:inline-flex">
+                      {(user as any).role === 'ADMIN' ? 'Admin' : (user as any).role === 'TECHNICIAN' ? 'Técnico' : 'Cliente'}
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleAssign(user.id)}
+                      disabled={assigningId === user.id}
+                      className="h-7 px-2"
+                    >
+                      {assigningId === user.id ? (
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <UserPlus className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>

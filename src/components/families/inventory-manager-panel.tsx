@@ -197,13 +197,9 @@ function InventoryManagerDialog({
                 </p>
                 {!search && (
                   <p className="text-xs mt-1">
-                    Activa el permiso "Puede gestionar inventario" en un usuario desde{' '}
-                    <button
-                      className="underline hover:text-foreground"
-                      onClick={() => router.push('/admin/users')}
-                    >
-                      Usuarios
-                    </button>
+                    Asigna un usuario como gestor desde la sección{' '}
+                    <span className="font-medium">"Gestores de Inventario"</span>{' '}
+                    de esta familia. Al asignarlo, obtendrá acceso automáticamente.
                   </p>
                 )}
               </div>

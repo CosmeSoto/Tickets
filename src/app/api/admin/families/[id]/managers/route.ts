@@ -39,24 +39,38 @@ export async function POST(
       )
     }
 
-    const assignment = await prisma.inventory_manager_families.create({
-      data: {
-        id: randomUUID(),
-        managerId: userId,
-        familyId: id,
-      },
-      include: {
-        manager: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-            canManageInventory: true,
-            isActive: true,
+    const assignment = await prisma.$transaction(async (tx) => {
+      // Crear la asignación a la familia
+      const created = await tx.inventory_manager_families.create({
+        data: {
+          id: randomUUID(),
+          managerId: userId,
+          familyId: id,
+        },
+        include: {
+          manager: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+              canManageInventory: true,
+              isActive: true,
+            },
           },
         },
-      },
+      })
+
+      // Activar canManageInventory automáticamente si no lo tiene
+      // (ADMIN siempre lo tiene implícito, pero actualizamos igual para consistencia)
+      if (!created.manager.canManageInventory) {
+        await tx.users.update({
+          where: { id: userId },
+          data: { canManageInventory: true },
+        })
+      }
+
+      return created
     })
 
     return NextResponse.json(assignment, { status: 201 })
