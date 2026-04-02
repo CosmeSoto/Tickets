@@ -59,7 +59,7 @@ export function InventoryManagerPanel({ onChanged }: InventoryManagerPanelProps)
         className="gap-2"
       >
         <Package className="h-4 w-4" />
-        Gestionar Gestores
+        Ver gestores del sistema
       </Button>
 
       <InventoryManagerDialog
@@ -138,10 +138,10 @@ function InventoryManagerDialog({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Package className="h-5 w-5" />
-              Gestores de Inventario
+              Gestores de Inventario del Sistema
             </DialogTitle>
             <DialogDescription className="flex items-center justify-between">
-              <span>Usuarios con acceso de gestión de inventario y sus familias asignadas</span>
+              <span>Todos los usuarios con acceso de gestión de inventario y sus familias asignadas. Para activar el permiso a un usuario, ve a Usuarios.</span>
               <Button
                 variant="ghost"
                 size="sm"

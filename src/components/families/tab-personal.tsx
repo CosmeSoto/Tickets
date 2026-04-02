@@ -47,15 +47,16 @@ function getInitials(name: string): string {
 
 export function TabPersonal({ familyId, technicians, managers, onPersonnelChanged }: TabPersonalProps) {
   return (
-    <div className="space-y-6">
-      {/* Técnicos de Tickets */}
+    <div className="space-y-8">
+
+      {/* ── Sección 1: Técnicos de esta familia ── */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold">Técnicos de Tickets</p>
-            <p className="text-xs text-muted-foreground">Asignación de técnicos a esta familia</p>
-          </div>
-          <TechnicianManagementPanel onChanged={onPersonnelChanged} />
+        <div>
+          <h3 className="text-sm font-semibold">Técnicos de Tickets</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Técnicos del sistema que atienden tickets de <strong>esta familia</strong>.
+            Solo los técnicos asignados aquí reciben tickets de esta familia.
+          </p>
         </div>
         <TechnicianFamilyAssignment
           mode="by-family"
@@ -63,16 +64,20 @@ export function TabPersonal({ familyId, technicians, managers, onPersonnelChange
           assignedTechnicians={technicians}
           onChanged={onPersonnelChanged}
         />
+        <div className="flex items-center gap-2 pt-1">
+          <span className="text-xs text-muted-foreground">¿Necesitas crear o editar un técnico?</span>
+          <TechnicianManagementPanel onChanged={onPersonnelChanged} />
+        </div>
       </div>
 
-      {/* Gestores de Inventario */}
+      {/* ── Sección 2: Gestores de inventario de esta familia ── */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold">Gestores de Inventario</p>
-            <p className="text-xs text-muted-foreground">Asignación de gestores a esta familia</p>
-          </div>
-          <InventoryManagerPanel onChanged={onPersonnelChanged} />
+        <div>
+          <h3 className="text-sm font-semibold">Gestores de Inventario</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Usuarios que pueden gestionar los activos de inventario de <strong>esta familia</strong>.
+            Pueden ser técnicos, clientes o cualquier usuario con el permiso activado.
+          </p>
         </div>
         <ManagerFamilyAssignment
           mode="by-family"
@@ -80,7 +85,12 @@ export function TabPersonal({ familyId, technicians, managers, onPersonnelChange
           assignedManagers={managers}
           onChanged={onPersonnelChanged}
         />
+        <div className="flex items-center gap-2 pt-1">
+          <span className="text-xs text-muted-foreground">¿Necesitas ver todos los gestores del sistema?</span>
+          <InventoryManagerPanel onChanged={onPersonnelChanged} />
+        </div>
       </div>
+
     </div>
   )
 }

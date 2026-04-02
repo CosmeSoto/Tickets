@@ -55,7 +55,7 @@ export function TechnicianManagementPanel({ onChanged }: TechnicianManagementPan
         className="gap-2"
       >
         <Users className="h-4 w-4" />
-        Gestionar Técnicos
+        Administrar usuarios técnicos
       </Button>
 
       <TechnicianManagementDialog
@@ -138,10 +138,11 @@ function TechnicianManagementDialog({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
-              Gestión de Técnicos
+              Usuarios Técnicos del Sistema
             </DialogTitle>
             <DialogDescription>
-              Administración global de técnicos — promover, editar y despromover usuarios
+              Lista global de todos los técnicos — aquí puedes promover usuarios, editar datos o despromover.
+              La asignación de técnicos a cada familia se hace en la sección de arriba.
             </DialogDescription>
           </DialogHeader>
 
