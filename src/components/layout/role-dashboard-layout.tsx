@@ -115,7 +115,35 @@ const navigationByRole: Record<string, NavItem[]> = {
     { name: 'Auditoría', href: '/admin/audit', icon: Shield },
     { name: 'Configuración Sistema', href: '/admin/settings', icon: Settings },
   ],
+
+  // Técnico SIN gestión de inventario: tickets + sus equipos asignados
   TECHNICIAN: [
+    { name: 'Dashboard', href: '/technician', icon: LayoutDashboard },
+    {
+      name: 'Tickets',
+      href: '/technician/tickets',
+      icon: Ticket,
+      children: [
+        { name: 'Mis Tickets', href: '/technician/tickets', icon: Ticket },
+        { name: 'Estadísticas', href: '/technician/stats', icon: BarChart3 },
+        { name: 'Categorías', href: '/technician/categories', icon: FolderTree },
+        { name: 'Base de Conocimientos', href: '/technician/knowledge', icon: BookOpen },
+      ],
+    },
+    {
+      name: 'Mis Equipos',
+      href: '/inventory',
+      icon: Package,
+      children: [
+        { name: 'Equipos Asignados', href: '/inventory', icon: Monitor },
+        { name: 'Mantenimientos', href: '/inventory/maintenance', icon: Wrench },
+        { name: 'Actas de Entrega', href: '/inventory/acts', icon: FileText },
+      ],
+    },
+  ],
+
+  // Técnico CON gestión de inventario: tickets + inventario operativo de sus familias
+  TECHNICIAN_MANAGER: [
     { name: 'Dashboard', href: '/technician', icon: LayoutDashboard },
     {
       name: 'Tickets',
@@ -138,16 +166,12 @@ const navigationByRole: Record<string, NavItem[]> = {
         { name: 'Contratos', href: '/inventory/contracts', icon: FileSignature },
         { name: 'Actas de Entrega', href: '/inventory/acts', icon: FileText },
         { name: 'Actas de Baja', href: '/inventory/decommission', icon: Trash2 },
-        {name: 'Catálogos',href: '/inventory/equipment-types',icon: Database,children: [
-          { name: 'Equipo', href: '/inventory/equipment-types', icon: Boxes },
-          { name: 'Tipos de Licencia', href: '/inventory/license-types', icon: FileSignature },
-          { name: 'Tipos de Material MRO', href: '/inventory/consumable-types', icon: Tag },
-          { name: 'Unidades de Medida', href: '/inventory/units-of-measure', icon: Ruler },
-          ],
-        },
+        { name: 'Reportes', href: '/inventory/reports', icon: BarChart3 },
       ],
     },
   ],
+
+  // Cliente: sus tickets + sus equipos asignados + mantenimientos
   CLIENT: [
     { name: 'Dashboard', href: '/client', icon: LayoutDashboard },
     {
@@ -254,8 +278,15 @@ export function RoleDashboardLayout({
     return null
   }
 
-  const userRole = session.user.role as keyof typeof navigationByRole
-  const navigation = navigationByRole[userRole] || []
+  const userRole = session.user.role as string
+
+  // Técnico con gestión de inventario → menú extendido
+  const navKey =
+    userRole === 'TECHNICIAN' && (session.user as any).canManageInventory
+      ? 'TECHNICIAN_MANAGER'
+      : userRole
+
+  const navigation = navigationByRole[navKey] || []
 
   const handleLogout = async () => {
     await signOut({ 
@@ -285,7 +316,7 @@ export function RoleDashboardLayout({
   const getRoleLabel = (role: string) => {
     switch (role) {
       case 'ADMIN': return 'Administrador'
-      case 'TECHNICIAN': return 'Técnico'
+      case 'TECHNICIAN': return (session.user as any).canManageInventory ? 'Técnico · Gestor' : 'Técnico'
       case 'CLIENT': return 'Cliente'
       default: return role
     }
@@ -313,7 +344,7 @@ export function RoleDashboardLayout({
       `}>
         {/* Logo + botón cerrar en móvil */}
         <div className="flex items-center justify-between h-16 border-b border-border px-4">
-          <Link href={`/${userRole.toLowerCase()}`} onClick={closeSidebar}>
+          <Link href={`/${userRole.toLowerCase() === 'technician_manager' ? 'technician' : userRole.toLowerCase()}`} onClick={closeSidebar}>
             <SystemLogo size="sm" showText={true} />
           </Link>
           <button

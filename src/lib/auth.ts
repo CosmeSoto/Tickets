@@ -333,7 +333,7 @@ export const authOptions: NextAuthOptions = {
                 where: { email: user.email! },
                 include: {
                   departments: true
-                }
+                },
               })
 
               if (dbUser) {
@@ -342,6 +342,7 @@ export const authOptions: NextAuthOptions = {
                 token.department = dbUser.departments?.name || undefined
                 token.phone = dbUser.phone || undefined
                 token.avatar = dbUser.avatar || user.image || undefined
+                token.canManageInventory = dbUser.canManageInventory ?? false
                 token.isOAuth = true
               } else {
                 // Usuario no encontrado, usar valores por defecto
@@ -355,13 +356,23 @@ export const authOptions: NextAuthOptions = {
               token.isOAuth = true
             }
           } else {
-            // Para credenciales
+            // Para credenciales — leer canManageInventory de la BD
             token.role = user.role || 'CLIENT'
             token.departmentId = user.departmentId
             token.department = user.department
             token.phone = user.phone
             token.avatar = user.avatar
             token.isOAuth = false
+            // Leer canManageInventory directamente de la BD
+            try {
+              const dbUser = await prisma.users.findUnique({
+                where: { id: user.id },
+                select: { canManageInventory: true },
+              })
+              token.canManageInventory = dbUser?.canManageInventory ?? false
+            } catch {
+              token.canManageInventory = false
+            }
           }
         }
         
@@ -388,6 +399,7 @@ export const authOptions: NextAuthOptions = {
           session.user.phone = token.phone as string | undefined
           session.user.avatar = token.avatar as string | undefined
           session.user.isOAuth = (token.isOAuth as boolean) || false
+          ;(session.user as any).canManageInventory = (token.canManageInventory as boolean) || false
           
           // IMPORTANTE: Pasar loginTime a la sesión para el monitor de timeout
           if (token.loginTime) {
