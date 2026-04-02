@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { Bell, Check, CheckCheck, Eye } from 'lucide-react'
+import { Bell, Check, CheckCheck } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -14,6 +14,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { formatTimeAgo } from '@/hooks/use-users'
+import { safeFetch } from '@/lib/auth-fetch'
 
 interface Notification {
   id: string
@@ -41,28 +42,14 @@ export function NotificationBell() {
 
   const fetchNotifications = async () => {
     if (status !== 'authenticated') return
-    try {
-      const response = await fetch('/api/notifications?limit=20')
-      if (response.ok) {
-        const data = await response.json()
-        setNotifications(data)
-      }
-    } catch (error) {
-      console.error('Error fetching notifications:', error)
-    }
+    const res = await safeFetch('/api/notifications?limit=20')
+    if (res?.ok) setNotifications(await res.json())
   }
 
   const fetchUnreadCount = async () => {
     if (status !== 'authenticated') return
-    try {
-      const response = await fetch('/api/notifications/unread-count')
-      if (response.ok) {
-        const data = await response.json()
-        setUnreadCount(data.count)
-      }
-    } catch (error) {
-      console.error('Error fetching unread count:', error)
-    }
+    const res = await safeFetch('/api/notifications/unread-count')
+    if (res?.ok) setUnreadCount((await res.json()).count)
   }
 
   // Mark as read

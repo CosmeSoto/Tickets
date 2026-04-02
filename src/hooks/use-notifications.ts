@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
+import { safeFetch } from '@/lib/auth-fetch'
 
 export interface NotificationData {
   id: string
@@ -47,25 +48,22 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
   const loadNotifications = useCallback(async (force = false) => {
     // No hacer fetch si no hay sesión activa
     if (status !== 'authenticated' || !session?.user?.id) return
-    // Si hay operaciones en vuelo y no es forzado, no recargar
     if (!force && pendingOps.current > 0) return
 
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/notifications?limit=50', {
+      const res = await safeFetch('/api/notifications?limit=50', {
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache' },
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      if (!res) return // sesión expirada — silencioso
       const data = await res.json()
       const arr: NotificationData[] = Array.isArray(data) ? data : []
 
       setNotifications(
         arr
-          // Filtrar las que el usuario ya eliminó localmente
           .filter(n => !deletedIds.current.has(n.id))
-          // Aplicar estado de lectura local
           .map(n => readIds.current.has(n.id) ? { ...n, isRead: true } : n)
           .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       )
@@ -74,7 +72,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     } finally {
       setLoading(false)
     }
-  }, [session?.user?.id])
+  }, [status, session?.user?.id])
 
   // Marcar una como leída
   const markAsRead = useCallback(async (id: string) => {

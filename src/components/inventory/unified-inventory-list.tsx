@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+import { safeFetch } from '@/lib/auth-fetch'
 import { FamilyFilterBar } from '@/components/inventory/family-filter-bar'
 import { FamilyBadge } from '@/components/inventory/family-badge'
 import { SubtypeBadge } from '@/components/inventory/subtype-badge'
@@ -108,15 +109,13 @@ export function UnifiedInventoryList({ initialFamilyId }: UnifiedInventoryListPr
 
   useEffect(() => {
     if (status !== 'authenticated') return
-    const controller = new AbortController()
-    fetch('/api/inventory/families', { signal: controller.signal })
-      .then(r => r.json())
+    safeFetch('/api/inventory/families')
+      .then(r => r?.json())
       .then(data => {
+        if (!data) return
         if (Array.isArray(data)) setFamilies(data)
         else if (Array.isArray(data?.families)) setFamilies(data.families)
       })
-      .catch(() => {})
-    return () => controller.abort()
   }, [status])
 
   const fetchAssets = useCallback(
@@ -127,8 +126,8 @@ export function UnifiedInventoryList({ initialFamilyId }: UnifiedInventoryListPr
         if (familyId) params.set('familyId', familyId)
         if (subtype) params.set('subtype', subtype)
         if (q.trim()) params.set('search', q.trim())
-        const res = await fetch(`/api/inventory/assets?${params.toString()}`)
-        if (!res.ok) return
+        const res = await safeFetch(`/api/inventory/assets?${params.toString()}`)
+        if (!res?.ok) return
         const data: UnifiedAssetsResponse = await res.json()
         setAssets(data.items)
         setTotal(data.total)
