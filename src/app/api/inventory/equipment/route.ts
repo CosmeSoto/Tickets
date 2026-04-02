@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { EquipmentService } from '@/lib/services/equipment.service'
 import { createEquipmentSchema, equipmentFiltersSchema } from '@/lib/validations/inventory/equipment'
 import { ZodError } from 'zod'
+import { prisma } from '@/lib/prisma'
 
 import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
 
@@ -87,6 +88,25 @@ export async function POST(request: NextRequest) {
 
     // Validar datos
     const validatedData = createEquipmentSchema.parse(body)
+
+    // Validar que el departamento exista y esté activo
+    const department = await prisma.departments.findUnique({
+      where: { id: validatedData.departmentId }
+    })
+
+    if (!department) {
+      return NextResponse.json(
+        { error: 'El departamento especificado no existe' },
+        { status: 400 }
+      )
+    }
+
+    if (!department.isActive) {
+      return NextResponse.json(
+        { error: 'El departamento seleccionado no está activo' },
+        { status: 400 }
+      )
+    }
 
     // Crear equipo
     const equipment = await EquipmentService.createEquipment(

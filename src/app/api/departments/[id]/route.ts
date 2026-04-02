@@ -11,6 +11,7 @@ const departmentSchema = z.object({
   color: z.string().regex(/^#[0-9A-F]{6}$/i).optional(),
   isActive: z.boolean().optional(),
   order: z.number().int().min(0).optional(),
+  familyId: z.string().nullable().optional(),
 })
 
 // GET /api/departments/[id] - Obtener departamento
@@ -95,6 +96,25 @@ export async function PUT(
         return NextResponse.json(
           { success: false, error: 'Ya existe un departamento con ese nombre' },
           { status: 400 }
+        )
+      }
+    }
+
+    // Si cambia familyId, validar que no haya tickets abiertos en ese departamento
+    if (validatedData.familyId !== undefined && validatedData.familyId !== existing.familyId) {
+      const openTicketsCount = await prisma.tickets.count({
+        where: {
+          categories: { departmentId: id },
+          status: { in: ['OPEN', 'IN_PROGRESS'] },
+        },
+      })
+      if (openTicketsCount > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `No se puede cambiar la familia del departamento porque tiene ${openTicketsCount} ticket(s) abierto(s) o en progreso`,
+          },
+          { status: 409 }
         )
       }
     }

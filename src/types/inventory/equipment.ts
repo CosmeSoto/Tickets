@@ -15,6 +15,19 @@ export interface EquipmentTypeInfo {
   order: number
 }
 
+// Department info embedded in equipment
+export interface EquipmentDepartmentInfo {
+  id: string
+  name: string
+  familyId: string | null
+  family?: {
+    id: string
+    name: string
+    code: string
+    color?: string
+  } | null
+}
+
 // Equipment interface
 export interface Equipment {
   id: string
@@ -24,6 +37,8 @@ export interface Equipment {
   model: string
   typeId: string
   type?: EquipmentTypeInfo
+  departmentId?: string
+  department?: EquipmentDepartmentInfo | null
   status: EquipmentStatus
   condition: EquipmentCondition
   ownershipType: OwnershipType
@@ -47,6 +62,8 @@ export interface Equipment {
   rentalNotes?: string
   createdAt: Date
   updatedAt: Date
+  // Active assignment (populated when fetched from detail endpoint)
+  currentAssignment?: { id: string; isActive: boolean } | null
 }
 
 // Equipment with relations
@@ -63,6 +80,7 @@ export interface EquipmentFormData {
   brand: string
   model: string
   typeId: string
+  departmentId: string
   status?: EquipmentStatus
   condition: EquipmentCondition
   ownershipType: OwnershipType
@@ -92,6 +110,7 @@ export interface EquipmentFilters {
   status?: EquipmentStatus[]
   condition?: EquipmentCondition[]
   assignedTo?: string
+  familyId?: string
   departmentId?: string
 }
 

@@ -82,7 +82,7 @@ export async function PUT(
 
     // Validar que todos los familyIds existan
     if (familyIds.length > 0) {
-      const existingFamilies = await prisma.inventory_families.findMany({
+      const existingFamilies = await prisma.families.findMany({
         where: { id: { in: familyIds } },
         select: { id: true },
       })

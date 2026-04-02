@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { AssignmentService } from '@/lib/services/assignment.service'
 import { DeliveryActService } from '@/lib/services/delivery-act.service'
+import { InventoryDepartmentService } from '@/lib/services/inventory-department.service'
 import { createAssignmentSchema } from '@/lib/validations/inventory/assignment'
 import { ZodError } from 'zod'
 
@@ -33,6 +34,21 @@ export async function POST(request: NextRequest) {
 
     // Validar datos
     const validatedData = createAssignmentSchema.parse(body)
+
+    // Validar que el receptor pertenezca al mismo departamento que el equipo
+    const deptValidation = await InventoryDepartmentService.validateAssignmentDepartment(
+      validatedData.equipmentId,
+      validatedData.receiverId
+    )
+
+    if (deptValidation.valid === false) {
+      return NextResponse.json(
+        {
+          error: `El receptor pertenece al departamento '${deptValidation.receiverDeptName}' pero el equipo pertenece al departamento '${deptValidation.requiredDeptName}'`,
+        },
+        { status: 422 }
+      )
+    }
 
     // Crear asignación
     const assignment = await AssignmentService.createAssignment(

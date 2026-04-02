@@ -16,9 +16,30 @@ export function formatDate(date: Date | string | null | undefined): string {
   
   return new Intl.DateTimeFormat('es-ES', {
     year: 'numeric',
-    month: 'short',
+    month: 'long',
     day: 'numeric',
   }).format(d)
+}
+
+/**
+ * Obtiene las iniciales de un nombre completo (máximo 2 caracteres, mayúsculas)
+ */
+export function getInitials(name: string): string {
+  if (!name) return ''
+  const parts = name.trim().split(/\s+/)
+  return parts
+    .slice(0, 2)
+    .map((p) => p[0].toUpperCase())
+    .join('')
+}
+
+/**
+ * Trunca un texto a la longitud máxima indicada, añadiendo "..." si se trunca
+ */
+export function truncateText(text: string, maxLength: number): string {
+  if (maxLength === 0) return '...'
+  if (text.length <= maxLength) return text
+  return text.slice(0, maxLength) + '...'
 }
 
 /**

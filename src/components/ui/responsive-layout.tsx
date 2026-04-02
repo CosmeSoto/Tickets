@@ -325,7 +325,7 @@ export const Section: React.FC<SectionProps> = ({
         <div className="flex items-center justify-between">
           <div>
             {title && (
-              <h2 className="text-2xl font-bold tracking-tight text-foreground">
+              <h2 className="text-2xl font-bold tracking-tight text-gray-900">
                 {title}
               </h2>
             )}

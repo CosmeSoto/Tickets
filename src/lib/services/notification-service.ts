@@ -177,6 +177,7 @@ export class NotificationService {
   /**
    * Notificar cuando se crea un ticket
    * - Notifica a todos los admins
+   * - Notifica a técnicos activos asignados a la familia del ticket
    */
   static async notifyTicketCreated(ticketId: string) {
     try {
@@ -205,15 +206,32 @@ export class NotificationService {
         select: { id: true, name: true, email: true },
       })
 
-      if (admins.length === 0) {
+      // Obtener técnicos filtrados por familia del ticket
+      const technicianWhere: any = {
+        role: 'TECHNICIAN',
+        isActive: true,
+      }
+      if (ticket.familyId) {
+        technicianWhere.technician_family_assignments = {
+          some: { familyId: ticket.familyId, isActive: true },
+        }
+      }
+      const technicians = await prisma.users.findMany({
+        where: technicianWhere,
+        select: { id: true, name: true, email: true },
+      })
+
+      const recipients = [...admins, ...technicians]
+
+      if (recipients.length === 0) {
         return []
       }
 
-      // Crear notificaciones para todos los admins
+      // Crear notificaciones para admins y técnicos de la familia
       const notifications = await Promise.all(
-        admins.map(async (admin) => {
+        recipients.map(async (recipient) => {
           return await this.createNotification({
-            userId: admin.id,
+            userId: recipient.id,
             type: 'INFO',
             title: 'Nuevo ticket creado',
             message: `${ticket.users_tickets_clientIdTousers.name} ha creado el ticket "${ticket.title}"`,
@@ -222,6 +240,7 @@ export class NotificationService {
             metadata: {
               priority: ticket.priority,
               category: ticket.categories.name,
+              familyId: ticket.familyId,
             },
           })
         })
@@ -230,6 +249,90 @@ export class NotificationService {
       return notifications
     } catch (error) {
       console.error('[NOTIFICATION] Error en notifyTicketCreated:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Notificar cuando un ticket cambia de familia
+   * - Notifica al cliente del ticket
+   * - Notifica al técnico asignado (si existe)
+   * - Notifica a todos los admins activos
+   */
+  static async notifyFamilyChange(
+    ticketId: string,
+    oldFamilyId: string,
+    newFamilyId: string
+  ): Promise<void> {
+    try {
+      const ticket = await prisma.tickets.findUnique({
+        where: { id: ticketId },
+        include: {
+          users_tickets_clientIdTousers: {
+            select: { id: true, name: true, email: true },
+          },
+          users_tickets_assigneeIdTousers: {
+            select: { id: true, name: true, email: true },
+          },
+        },
+      })
+
+      if (!ticket) {
+        throw new Error('Ticket not found')
+      }
+
+      // Obtener nombres de las familias anterior y nueva
+      const [oldFamily, newFamily] = await Promise.all([
+        prisma.families.findUnique({ where: { id: oldFamilyId }, select: { name: true } }),
+        prisma.families.findUnique({ where: { id: newFamilyId }, select: { name: true } }),
+      ])
+
+      const oldFamilyName = oldFamily?.name ?? oldFamilyId
+      const newFamilyName = newFamily?.name ?? newFamilyId
+
+      const title = 'Familia del ticket actualizada'
+      const message = `El ticket "${ticket.title}" ha sido movido de la familia "${oldFamilyName}" a "${newFamilyName}"`
+
+      const recipientIds: string[] = []
+
+      // Cliente del ticket
+      recipientIds.push(ticket.clientId)
+
+      // Técnico asignado (si existe y es diferente al cliente)
+      if (ticket.assigneeId && ticket.assigneeId !== ticket.clientId) {
+        recipientIds.push(ticket.assigneeId)
+      }
+
+      // Todos los admins activos
+      const admins = await prisma.users.findMany({
+        where: { role: 'ADMIN', isActive: true },
+        select: { id: true },
+      })
+      for (const admin of admins) {
+        if (!recipientIds.includes(admin.id)) {
+          recipientIds.push(admin.id)
+        }
+      }
+
+      await Promise.all(
+        recipientIds.map((userId) =>
+          this.createNotification({
+            userId,
+            type: NotificationType.TICKET_FAMILY_CHANGE,
+            title,
+            message,
+            ticketId: ticket.id,
+            metadata: {
+              oldFamilyId,
+              newFamilyId,
+              oldFamilyName,
+              newFamilyName,
+            },
+          })
+        )
+      )
+    } catch (error) {
+      console.error('[NOTIFICATION] Error en notifyFamilyChange:', error)
       throw error
     }
   }

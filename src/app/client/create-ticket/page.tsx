@@ -60,6 +60,11 @@ export default function CreateTicketPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [createdTicketId, setCreatedTicketId] = useState<string | null>(null)
+
+  // --- Family selection (Step 0) ---
+  const [families, setFamilies] = useState<Array<{ id: string; name: string; code: string; color?: string; description?: string }>>([])
+  const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(null)
+  const [familyStep, setFamilyStep] = useState<'loading' | 'select' | 'done'>('loading')
   
   // Estados para selección en cascada de categorías
   const [selectedCategories, setSelectedCategories] = useState<{
@@ -112,17 +117,52 @@ export default function CreateTicketPage() {
       return
     }
 
-    loadCategories()
+    // Load families first
+    loadFamilies()
   }, [session, status, router])
 
-  const loadCategories = async () => {
+  const loadFamilies = async () => {
     try {
-      const response = await fetch('/api/categories?isActive=true')
+      const response = await fetch('/api/families?ticketsEnabled=true')
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success && Array.isArray(result.data)) {
+          const enabledFamilies = result.data.filter((f: any) => f.isActive)
+          setFamilies(enabledFamilies)
+          if (enabledFamilies.length === 1) {
+            // Auto-select single family and skip step
+            setSelectedFamilyId(enabledFamilies[0].id)
+            setFamilyStep('done')
+            await loadCategories(enabledFamilies[0].id)
+          } else if (enabledFamilies.length === 0) {
+            // No families — load all categories as fallback
+            setFamilyStep('done')
+            await loadCategories(null)
+          } else {
+            setFamilyStep('select')
+            setIsLoading(false)
+          }
+          return
+        }
+      }
+    } catch (error) {
+      console.error('Error loading families:', error)
+    }
+    // Fallback: skip family step
+    setFamilyStep('done')
+    await loadCategories(null)
+  }
+
+  const loadCategories = async (familyId: string | null) => {
+    try {
+      const url = familyId
+        ? `/api/categories?isActive=true&familyId=${familyId}`
+        : '/api/categories?isActive=true'
+      const response = await fetch(url)
       if (response.ok) {
         const result = await response.json()
         if (result.success && result.data) {
           setCategories(result.data)
-          // Inicializar categorías de nivel 1
           const level1Categories = result.data.filter((cat: Category) => cat.level === 1)
           setAvailableCategories(prev => ({
             ...prev,
@@ -140,6 +180,13 @@ export default function CreateTicketPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleFamilySelect = async (familyId: string) => {
+    setSelectedFamilyId(familyId)
+    setFamilyStep('done')
+    setIsLoading(true)
+    await loadCategories(familyId)
   }
 
   // Manejar selección de categoría en cascada
@@ -269,7 +316,10 @@ export default function CreateTicketPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          ...(selectedFamilyId ? { familyId: selectedFamilyId } : {}),
+        }),
       })
 
       if (response.ok) {
@@ -316,6 +366,49 @@ export default function CreateTicketPage() {
       <RoleDashboardLayout title='Crear Ticket' subtitle='Nueva solicitud de soporte'>
         <div className='flex items-center justify-center h-64'>
           <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600'></div>
+        </div>
+      </RoleDashboardLayout>
+    )
+  }
+
+  // Step 0: Family selection
+  if (familyStep === 'select') {
+    return (
+      <RoleDashboardLayout title='Crear Ticket' subtitle='Selecciona el área de soporte'>
+        <div className='max-w-2xl mx-auto'>
+          <Card>
+            <CardHeader>
+              <CardTitle className='flex items-center'>
+                <Ticket className='h-5 w-5 mr-2 text-blue-600' />
+                ¿A qué área pertenece tu solicitud?
+              </CardTitle>
+              <CardDescription>
+                Selecciona la familia de soporte para tu ticket
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+                {families.map(family => (
+                  <button
+                    key={family.id}
+                    onClick={() => handleFamilySelect(family.id)}
+                    className='flex items-start space-x-3 p-4 border-2 rounded-lg hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-all text-left'
+                  >
+                    {family.color && (
+                      <div className='w-4 h-4 rounded-full flex-shrink-0 mt-1' style={{ backgroundColor: family.color }} />
+                    )}
+                    <div>
+                      <p className='font-semibold text-foreground'>{family.name}</p>
+                      {family.description && (
+                        <p className='text-xs text-muted-foreground mt-1'>{family.description}</p>
+                      )}
+                      <Badge variant='outline' className='text-xs mt-2'>{family.code}</Badge>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </RoleDashboardLayout>
     )
@@ -376,6 +469,31 @@ export default function CreateTicketPage() {
               Completa el formulario con los detalles de tu problema o solicitud. Nuestro equipo te
               ayudará lo antes posible.
             </CardDescription>
+            {selectedFamilyId && families.length > 1 && (
+              <div className='flex items-center space-x-2 mt-2'>
+                {(() => {
+                  const fam = families.find(f => f.id === selectedFamilyId)
+                  return fam ? (
+                    <div className='flex items-center space-x-2'>
+                      {fam.color && <div className='w-3 h-3 rounded-full' style={{ backgroundColor: fam.color }} />}
+                      <Badge variant='outline'>{fam.name}</Badge>
+                      <button
+                        type='button'
+                        className='text-xs text-blue-600 underline'
+                        onClick={() => {
+                          setSelectedFamilyId(null)
+                          setFamilyStep('select')
+                          setSelectedCategories({})
+                          setAvailableCategories({ level1: [], level2: [], level3: [], level4: [] })
+                        }}
+                      >
+                        Cambiar
+                      </button>
+                    </div>
+                  ) : null
+                })()}
+              </div>
+            )}
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className='space-y-6'>

@@ -18,7 +18,14 @@ import {
   DEFAULT_USEFUL_LIFE_YEARS,
   type DepreciationMethod,
 } from '@/lib/inventory/depreciation'
-import { X, Plus, ChevronDown, ChevronUp } from 'lucide-react'
+import { X, Plus, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react'
+
+interface Department {
+  id: string
+  name: string
+  familyId: string | null
+  isActive: boolean
+}
 
 interface EquipmentAssetFormProps {
   familyId: string
@@ -89,6 +96,11 @@ export function EquipmentAssetForm({
   const [attachments, setAttachments] = useState<File[]>([])
   const [priceError, setPriceError] = useState('')
 
+  // Department selector
+  const [departmentId, setDepartmentId] = useState('')
+  const [departments, setDepartments] = useState<Department[]>([])
+  const [loadingDepartments, setLoadingDepartments] = useState(true)
+
   // Task 19.1: family depreciation config from API
   const [familyDepConfig, setFamilyDepConfig] = useState<FamilyDepreciationConfig | null>(null)
   const [depreciationPreviewOpen, setDepreciationPreviewOpen] = useState(false)
@@ -105,6 +117,20 @@ export function EquipmentAssetForm({
       .then(r => r.json()).then(d => setEquipmentTypes(d.types ?? []))
     fetch('/api/inventory/warehouses')
       .then(r => r.json()).then(d => setWarehouses(d.warehouses ?? d ?? []))
+  }, [familyId])
+
+  // Load active departments filtered by familyId
+  useEffect(() => {
+    setLoadingDepartments(true)
+    fetch('/api/departments?isActive=true')
+      .then(r => r.json())
+      .then(d => {
+        const all: Department[] = d.data ?? []
+        // Filter by the family of this form
+        setDepartments(all.filter(dept => dept.familyId === familyId))
+      })
+      .catch(() => {})
+      .finally(() => setLoadingDepartments(false))
   }, [familyId])
 
   // Task 19.1: fetch family-config depreciation defaults when familyId changes
@@ -216,6 +242,7 @@ export function EquipmentAssetForm({
       brand: brand || undefined,
       model: model || undefined,
       typeId: equipmentTypeId || undefined,
+      departmentId: departmentId || undefined,
       condition,
       status: equipmentStatus,
       accessories: accessories.length ? accessories : undefined,
@@ -284,6 +311,28 @@ export function EquipmentAssetForm({
       <div className="space-y-1">
         <Label>Tipo de Equipo</Label>
         <SearchableSelect options={equipmentTypes} value={equipmentTypeId} onChange={setEquipmentTypeId} placeholder="Buscar tipo de equipo..." />
+      </div>
+
+      {/* Departamento */}
+      <div className="space-y-1">
+        <Label>Departamento <span className="text-destructive">*</span></Label>
+        {loadingDepartments ? (
+          <div className="h-9 rounded-md border border-input bg-background flex items-center px-3 text-sm text-muted-foreground">
+            Cargando departamentos...
+          </div>
+        ) : departments.length === 0 ? (
+          <div className="flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            No hay departamentos activos para esta familia
+          </div>
+        ) : (
+          <SearchableSelect
+            options={departments.map(d => ({ id: d.id, name: d.name }))}
+            value={departmentId}
+            onChange={setDepartmentId}
+            placeholder="Buscar departamento..."
+          />
+        )}
       </div>
 
       {/* Condición / Estado */}

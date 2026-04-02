@@ -60,6 +60,7 @@ export class DeliveryActService {
                 orderBy: { createdAt: 'asc' },
                 take: 1,
               },
+              department: { include: { family: true } },
             }
           },
           receiver: { include: { departments: true } },
@@ -106,6 +107,11 @@ export class DeliveryActService {
         invoiceNumber: eq.invoiceNumber ?? null,
         purchaseOrderNumber: eq.purchaseOrderNumber ?? null,
         equipmentImagePath,
+        // Jerarquía departamento-familia
+        departmentId: eq.department?.id ?? null,
+        departmentName: eq.department?.name ?? null,
+        familyId: eq.department?.family?.id ?? null,
+        familyName: eq.department?.family?.name ?? null,
       }
 
       // Crear info del deliverer

@@ -38,7 +38,12 @@ export default function EditEquipmentPage({ params }: EditEquipmentPageProps) {
       const response = await fetch(`/api/inventory/equipment/${id}`)
       if (response.ok) {
         const data = await response.json()
-        setEquipment(data.equipment || data)
+        const eq = data.equipment || data
+        // Attach currentAssignment so the form can detect active assignments
+        if (data.currentAssignment) {
+          eq.currentAssignment = data.currentAssignment
+        }
+        setEquipment(eq)
       }
     } catch (error) {
       console.error('Error cargando equipo:', error)

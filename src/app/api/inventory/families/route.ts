@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
       isAdmin && request.nextUrl.searchParams.get('includeInactive') === 'true'
 
     if (isAdmin) {
-      const families = await prisma.inventory_families.findMany({
+      const families = await prisma.families.findMany({
         where: includeInactive ? undefined : { isActive: true },
         orderBy: { order: 'asc' },
       })
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       ? String(code).toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '')
       : name.trim().toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '')
 
-    const family = await prisma.inventory_families.create({
+    const family = await prisma.families.create({
       data: {
         id: randomUUID(),
         code: familyCode,

@@ -15,6 +15,18 @@ import {
 import { EquipmentStatus, EquipmentCondition } from '@prisma/client'
 import type { EquipmentFilters as EquipmentFiltersType, EquipmentTypeInfo } from '@/types/inventory/equipment'
 
+interface FamilyOption {
+  id: string
+  name: string
+  code: string
+}
+
+interface DepartmentOption {
+  id: string
+  name: string
+  familyId: string | null
+}
+
 interface EquipmentFiltersProps {
   filters: EquipmentFiltersType
   onFiltersChange: (filters: EquipmentFiltersType) => void
@@ -45,6 +57,10 @@ export function EquipmentFilters({
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [equipmentTypes, setEquipmentTypes] = useState<EquipmentTypeInfo[]>([])
   const [loadingTypes, setLoadingTypes] = useState(true)
+  const [families, setFamilies] = useState<FamilyOption[]>([])
+  const [loadingFamilies, setLoadingFamilies] = useState(true)
+  const [allDepartments, setAllDepartments] = useState<DepartmentOption[]>([])
+  const [loadingDepartments, setLoadingDepartments] = useState(true)
 
   // Cargar tipos de equipo desde la API
   useEffect(() => {
@@ -63,6 +79,47 @@ export function EquipmentFilters({
     }
     fetchTypes()
   }, [])
+
+  // Cargar familias desde la API de inventario
+  useEffect(() => {
+    async function fetchFamilies() {
+      try {
+        const response = await fetch('/api/inventory/families')
+        if (response.ok) {
+          const data = await response.json()
+          setFamilies(data.families ?? [])
+        }
+      } catch (error) {
+        console.error('Error cargando familias:', error)
+      } finally {
+        setLoadingFamilies(false)
+      }
+    }
+    fetchFamilies()
+  }, [])
+
+  // Cargar todos los departamentos activos
+  useEffect(() => {
+    async function fetchDepartments() {
+      try {
+        const response = await fetch('/api/departments?isActive=true')
+        if (response.ok) {
+          const data = await response.json()
+          setAllDepartments(data.data ?? [])
+        }
+      } catch (error) {
+        console.error('Error cargando departamentos:', error)
+      } finally {
+        setLoadingDepartments(false)
+      }
+    }
+    fetchDepartments()
+  }, [])
+
+  // Departamentos filtrados según la familia seleccionada
+  const filteredDepartments = filters.familyId
+    ? allDepartments.filter(d => d.familyId === filters.familyId)
+    : allDepartments
 
   const handleSearchChange = (value: string) => {
     onFiltersChange({ ...filters, search: value || undefined })
@@ -92,17 +149,41 @@ export function EquipmentFilters({
     }
   }
 
+  const handleFamilyChange = (value: string) => {
+    if (value === 'all') {
+      // Al limpiar familia, también limpiar departamento
+      onFiltersChange({ ...filters, familyId: undefined, departmentId: undefined })
+    } else {
+      // Al cambiar familia, limpiar departamento
+      onFiltersChange({ ...filters, familyId: value, departmentId: undefined })
+    }
+  }
+
+  const handleDepartmentChange = (value: string) => {
+    if (value === 'all') {
+      onFiltersChange({ ...filters, departmentId: undefined })
+    } else {
+      onFiltersChange({ ...filters, departmentId: value })
+    }
+  }
+
   const activeFiltersCount = [
     filters.search,
     filters.typeId?.length,
     filters.status?.length,
     filters.condition?.length,
+    filters.familyId,
+    filters.departmentId,
   ].filter(Boolean).length
 
-  // Obtener nombre del tipo seleccionado
-  const getTypeName = (typeId: string) => {
-    return equipmentTypes.find(t => t.id === typeId)?.name || typeId
-  }
+  const getTypeName = (typeId: string) =>
+    equipmentTypes.find(t => t.id === typeId)?.name || typeId
+
+  const getFamilyName = (familyId: string) =>
+    families.find(f => f.id === familyId)?.name || familyId
+
+  const getDepartmentName = (departmentId: string) =>
+    allDepartments.find(d => d.id === departmentId)?.name || departmentId
 
   return (
     <div className="space-y-4">
@@ -134,7 +215,60 @@ export function EquipmentFilters({
 
       {/* Filtros avanzados */}
       {showAdvanced && (
-        <div className="grid gap-4 rounded-lg border p-4 md:grid-cols-3">
+        <div className="grid gap-4 rounded-lg border p-4 md:grid-cols-2 lg:grid-cols-3">
+          {/* Familia */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Familia</label>
+            <Select
+              value={filters.familyId || 'all'}
+              onValueChange={handleFamilyChange}
+              disabled={loadingFamilies}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={loadingFamilies ? 'Cargando...' : 'Todas las familias'} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas las familias</SelectItem>
+                {families.map((family) => (
+                  <SelectItem key={family.id} value={family.id}>
+                    {family.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Departamento */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Departamento</label>
+            <Select
+              value={filters.departmentId || 'all'}
+              onValueChange={handleDepartmentChange}
+              disabled={loadingDepartments}
+            >
+              <SelectTrigger>
+                <SelectValue
+                  placeholder={
+                    loadingDepartments
+                      ? 'Cargando...'
+                      : filters.familyId
+                      ? 'Todos los departamentos'
+                      : 'Todos los departamentos'
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los departamentos</SelectItem>
+                {filteredDepartments.map((dept) => (
+                  <SelectItem key={dept.id} value={dept.id}>
+                    {dept.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Tipo */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Tipo</label>
             <Select
@@ -156,6 +290,7 @@ export function EquipmentFilters({
             </Select>
           </div>
 
+          {/* Estado */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Estado</label>
             <Select
@@ -176,6 +311,7 @@ export function EquipmentFilters({
             </Select>
           </div>
 
+          {/* Condición */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Condición</label>
             <Select
@@ -207,6 +343,24 @@ export function EquipmentFilters({
               <X
                 className="h-3 w-3 cursor-pointer"
                 onClick={() => handleSearchChange('')}
+              />
+            </Badge>
+          )}
+          {filters.familyId && (
+            <Badge variant="secondary" className="gap-1">
+              Familia: {getFamilyName(filters.familyId)}
+              <X
+                className="h-3 w-3 cursor-pointer"
+                onClick={() => handleFamilyChange('all')}
+              />
+            </Badge>
+          )}
+          {filters.departmentId && (
+            <Badge variant="secondary" className="gap-1">
+              Departamento: {getDepartmentName(filters.departmentId)}
+              <X
+                className="h-3 w-3 cursor-pointer"
+                onClick={() => handleDepartmentChange('all')}
               />
             </Badge>
           )}

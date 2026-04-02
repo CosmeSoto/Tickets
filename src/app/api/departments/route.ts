@@ -13,6 +13,7 @@ const departmentSchema = z.object({
   color: z.string().regex(/^#[0-9A-F]{6}$/i, 'Color inválido').optional(),
   isActive: z.boolean().optional(),
   order: z.number().int().min(0).optional(),
+  familyId: z.string().nullable().optional(),
 })
 
 // GET /api/departments - Listar departamentos
@@ -55,6 +56,10 @@ export async function GET(request: NextRequest) {
     if (isActive !== null) {
       where.isActive = isActive === 'true'
     }
+    const familyId = searchParams.get('familyId')
+    if (familyId) {
+      where.familyId = familyId
+    }
 
     const departments = await prisma.departments.findMany({
       where,
@@ -63,6 +68,14 @@ export async function GET(request: NextRequest) {
         { name: 'asc' }
       ],
       include: {
+        family: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            color: true,
+          }
+        },
         _count: {
           select: {
             users: true,
@@ -127,6 +140,7 @@ export async function POST(request: NextRequest) {
         color: validatedData.color || '#3B82F6',
         isActive: validatedData.isActive ?? true,
         order: validatedData.order ?? 0,
+        familyId: validatedData.familyId ?? null,
         createdAt: new Date(),
         updatedAt: new Date(),
       },

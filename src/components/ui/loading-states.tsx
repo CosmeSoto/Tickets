@@ -218,7 +218,7 @@ export const LoadingButton = React.forwardRef<HTMLButtonElement, LoadingButtonPr
             size={size === 'sm' ? 'xs' : 'sm'} 
             variant="white" 
             className="mr-2" 
-            label={loadingText}
+            label=""
           />
         )}
         {isLoading ? loadingText : children}
@@ -439,10 +439,10 @@ export const CardSkeleton = React.forwardRef<HTMLDivElement, CardSkeletonProps>(
             <Skeleton className="h-16 rounded-lg" />
           </div>
           <div className="flex justify-between">
-            <Skeleton className="h-8 w-20" />
+            <Skeleton className="h-8 w-20 rounded-full" />
             <div className="flex space-x-2">
-              <Skeleton className="h-8 w-16" />
-              <Skeleton className="h-8 w-16" />
+              <Skeleton className="h-8 w-16 rounded-full" />
+              <Skeleton className="h-8 w-16 rounded-full" />
             </div>
           </div>
         </CardContent>
@@ -593,7 +593,7 @@ export const InlineLoading = React.forwardRef<HTMLDivElement, InlineLoadingProps
         aria-label={text}
         data-testid={testId}
       >
-        <LoadingSpinner size={size} className="mr-2" label={text} />
+        <LoadingSpinner size={size} className="mr-2" label="" />
         <span className={size === 'sm' ? 'text-sm' : 'text-base'}>{text}</span>
       </div>
     )
@@ -670,10 +670,33 @@ export function ProgressIndicator({
 }
 
 // ============================================================================
+// PAGE LOADING (standalone, compatible con tests)
+// ============================================================================
+
+export interface PageLoadingProps {
+  message?: string
+  className?: string
+}
+
+export const PageLoading: React.FC<PageLoadingProps> = ({ message = 'Cargando...', className }) => {
+  return (
+    <div
+      className={cn('min-h-screen bg-gray-50 flex items-center justify-center', className)}
+      role="status"
+      aria-label={message}
+    >
+      <div className="flex flex-col items-center space-y-4">
+        <LoadingSpinner size="xl" variant="primary" label="" />
+        <p className="text-muted-foreground font-medium text-center">{message}</p>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
 // LEGACY COMPATIBILITY EXPORTS
 // ============================================================================
 
 // For backward compatibility with existing code
 export const SkeletonCard = CardSkeleton
 export const SkeletonTable = TableSkeleton
-export const PageLoading = LoadingState

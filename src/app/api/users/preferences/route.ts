@@ -7,37 +7,32 @@ import { randomUUID } from 'crypto'
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-
     if (!session) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // Obtener preferencias del usuario
-    const userPrefs = await prisma.user_preferences.findUnique({
-      where: { userId: session.user.id }
+    const settings = await prisma.user_settings.findUnique({
+      where: { userId: session.user.id },
+      select: { theme: true, timezone: true, language: true }
     })
 
     return NextResponse.json({
       success: true,
       preferences: {
-        theme: userPrefs?.theme || 'system',
-        timezone: userPrefs?.timezone || 'America/Guayaquil',
-        language: userPrefs?.language || 'es'
+        theme: settings?.theme || 'system',
+        timezone: settings?.timezone || 'America/Guayaquil',
+        language: settings?.language || 'es'
       }
     })
   } catch (error) {
     console.error('[CRITICAL] Error fetching user preferences:', error)
-    return NextResponse.json({ 
-      success: false,
-      error: 'Error interno del servidor' 
-    }, { status: 500 })
+    return NextResponse.json({ success: false, error: 'Error interno del servidor' }, { status: 500 })
   }
 }
 
 export async function PUT(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-
     if (!session) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
@@ -45,8 +40,7 @@ export async function PUT(request: NextRequest) {
     const body = await request.json()
     const { theme, timezone, language } = body
 
-    // Actualizar o crear preferencias del usuario
-    await prisma.user_preferences.upsert({
+    await prisma.user_settings.upsert({
       where: { userId: session.user.id },
       update: {
         ...(theme && { theme }),
@@ -57,25 +51,16 @@ export async function PUT(request: NextRequest) {
       create: {
         id: randomUUID(),
         userId: session.user.id,
-        theme: theme || 'system',
-        timezone: 'America/Guayaquil',
-        language: 'es',
-        profileVisible: true,
-        activityVisible: true,
-        createdAt: new Date(),
+        theme: theme || 'light',
+        timezone: timezone || 'America/Guayaquil',
+        language: language || 'es',
         updatedAt: new Date()
       }
     })
 
-    return NextResponse.json({
-      success: true,
-      message: 'Preferencias actualizadas exitosamente'
-    })
+    return NextResponse.json({ success: true, message: 'Preferencias actualizadas exitosamente' })
   } catch (error) {
     console.error('[CRITICAL] Error updating user preferences:', error)
-    return NextResponse.json({ 
-      success: false,
-      error: 'Error interno del servidor' 
-    }, { status: 500 })
+    return NextResponse.json({ success: false, error: 'Error interno del servidor' }, { status: 500 })
   }
 }

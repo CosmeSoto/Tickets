@@ -1,6 +1,7 @@
 'use client'
 
-import { Plus, FolderTree, RefreshCw, Search, ChevronDown, ChevronRight, List, Edit, Trash2, Ticket, Users } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
+import { Plus, FolderTree, RefreshCw, Search, ChevronDown, ChevronRight, List, Edit, Trash2, Ticket, Users, Layers } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -18,7 +19,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import {
   AlertDialog,
@@ -47,6 +47,18 @@ import { CategoryStatsPanel } from './category-stats-panel'
 import { getCategoryLevelIcon } from '@/lib/constants/category-constants'
 
 export default function CategoriesPage() {
+  const [familyFilter, setFamilyFilter] = useState('all')
+  const [families, setFamilies] = useState<Array<{ id: string; name: string; code: string; color?: string }>>([])
+
+  useEffect(() => {
+    fetch('/api/families?active=true')
+      .then(r => r.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.data)) setFamilies(data.data)
+      })
+      .catch(() => {})
+  }, [])
+
   const {
     // Estados principales
     categories,
@@ -111,8 +123,21 @@ export default function CategoriesPage() {
   })
 
   // Obtener datos paginados
-  const paginatedCategories = pagination ? pagination.currentItems : filteredCategories
+  // Apply family filter on top of existing filters
+  const familyFilteredCategories = useMemo(() => {
+    if (familyFilter === 'all') return filteredCategories
+    return filteredCategories.filter((cat: any) => {
+      const deptFamilyId = cat.departments?.familyId ?? cat.department?.familyId
+      return deptFamilyId === familyFilter
+    })
+  }, [filteredCategories, familyFilter])
 
+  const paginatedCategories = pagination
+    ? familyFilteredCategories.slice(
+        (pagination.currentPage - 1) * pagination.pageSize,
+        pagination.currentPage * pagination.pageSize
+      )
+    : familyFilteredCategories
   // Configuración de paginación para DataTableAdvanced
   const paginationConfig = pagination ? {
     page: pagination.currentPage,
@@ -472,6 +497,27 @@ export default function CategoriesPage() {
                     <SelectItem value='all'>Todos</SelectItem>
                     <SelectItem value='active'>Activas</SelectItem>
                     <SelectItem value='inactive'>Inactivas</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={familyFilter} onValueChange={setFamilyFilter}>
+                  <SelectTrigger className='w-full sm:w-[180px]'>
+                    <SelectValue placeholder='Familia' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='all'>
+                      <div className='flex items-center space-x-2'>
+                        <Layers className='h-4 w-4' />
+                        <span>Todas las familias</span>
+                      </div>
+                    </SelectItem>
+                    {families.map(f => (
+                      <SelectItem key={f.id} value={f.id}>
+                        <div className='flex items-center space-x-2'>
+                          {f.color && <div className='w-2 h-2 rounded-full' style={{ backgroundColor: f.color }} />}
+                          <span>{f.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

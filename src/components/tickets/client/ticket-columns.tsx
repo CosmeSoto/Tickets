@@ -6,9 +6,10 @@
 
 'use client'
 
-import { Calendar, Clock, MessageSquare, Paperclip, User, Eye } from 'lucide-react'
+import { Calendar, Clock, MessageSquare, Paperclip, User, Eye, Hash, Layers, PenLine } from 'lucide-react'
 import { StatusBadge, PriorityBadge } from '@/components/ui/status-badge'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import type { Column } from '@/components/ui/data-table'
 import type { Ticket as TicketType } from '@/hooks/use-ticket-data'
 import { formatTimeAgo } from '@/hooks/use-ticket-data'
@@ -29,9 +30,44 @@ export function createClientTicketColumns({
           <div className="font-medium text-foreground truncate max-w-[200px]">
             {ticket.title}
           </div>
-          <div className="text-sm text-muted-foreground">#{ticket.id.slice(-8)}</div>
+          {/* ticketCode badge */}
+          {(ticket as any).ticketCode ? (
+            <div className="flex items-center space-x-1 mt-1">
+              <Badge
+                variant="outline"
+                className="text-xs font-mono px-1.5 py-0 border-blue-300 text-blue-700 dark:text-blue-300"
+              >
+                <Hash className="h-3 w-3 mr-0.5" />
+                {(ticket as any).ticketCode}
+              </Badge>
+              {(ticket as any).codeIsManual && (
+                <Badge variant="secondary" className="text-xs px-1 py-0">
+                  <PenLine className="h-3 w-3 mr-0.5" />
+                  Manual
+                </Badge>
+              )}
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground">#{ticket.id.slice(-8)}</div>
+          )}
         </div>
       ),
+    },
+    {
+      key: 'family',
+      label: 'Familia',
+      render: (ticket: TicketType) => {
+        const family = (ticket as any).families ?? (ticket as any).family
+        if (!family) return <span className="text-muted-foreground text-xs">—</span>
+        return (
+          <div className="flex items-center space-x-1">
+            {family.color && (
+              <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: family.color }} />
+            )}
+            <span className="text-xs font-medium">{family.name}</span>
+          </div>
+        )
+      },
     },
     {
       key: 'status',

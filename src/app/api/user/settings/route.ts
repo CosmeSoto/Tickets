@@ -61,11 +61,6 @@ export async function GET(request: NextRequest) {
       where: { userId },
     })
 
-    // Buscar preferencias de privacidad
-    let preferences = await prisma.user_preferences.findUnique({
-      where: { userId },
-    })
-
     // Si no existe, crear con valores por defecto
     if (!settings) {
       const now = new Date()
@@ -97,62 +92,33 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Si no existen preferencias, crear con valores por defecto
-    if (!preferences) {
-      const now = new Date()
-      preferences = await prisma.user_preferences.create({
-        data: {
-          id: randomUUID(),
-          userId,
-          theme: 'system',
-          timezone: 'America/Guayaquil',
-          language: 'es',
-          profileVisible: true,
-          activityVisible: true,
-          updatedAt: now,
-        },
-      })
-    }
-
     return NextResponse.json({
       success: true,
       settings: {
-        // Notificaciones básicas
         emailNotifications: settings.emailNotifications,
         pushNotifications: settings.pushNotifications,
-
-        // Notificaciones intermedias
         ticketUpdates: settings.ticketUpdates,
         systemAlerts: settings.systemAlerts,
         weeklyReport: settings.weeklyReport,
-
-        // Notificaciones avanzadas
         soundEnabled: settings.soundEnabled,
         ticketCreated: settings.ticketCreated,
         ticketAssigned: settings.ticketAssigned,
         statusChanged: settings.statusChanged,
         newComments: settings.newComments,
         ticketUpdated: settings.ticketUpdated,
-
-        // Horarios silenciosos
         quietHours: {
           enabled: settings.quietHoursEnabled,
           startTime: settings.quietHoursStart,
           endTime: settings.quietHoursEnd,
         },
-
-        // Configuraciones de técnico
         autoAssignEnabled: settings.autoAssignEnabled,
         maxConcurrentTickets: settings.maxConcurrentTickets,
-
-        // Preferencias generales
         theme: settings.theme,
         language: settings.language,
         timezone: settings.timezone,
-
-        // Privacidad
-        profileVisible: preferences.profileVisible,
-        activityVisible: preferences.activityVisible,
+        // Privacidad — valores por defecto (migrado de user_preferences)
+        profileVisible: true,
+        activityVisible: true,
       },
     })
   } catch (error) {
@@ -261,32 +227,6 @@ export async function PUT(request: NextRequest) {
       },
     })
 
-    // Actualizar o crear preferencias de privacidad
-    const preferencesUpdateData: any = {
-      updatedAt: new Date(),
-    }
-    
-    if (data.profileVisible !== undefined) preferencesUpdateData.profileVisible = data.profileVisible
-    if (data.activityVisible !== undefined) preferencesUpdateData.activityVisible = data.activityVisible
-    if (data.theme !== undefined) preferencesUpdateData.theme = data.theme
-    if (data.timezone !== undefined) preferencesUpdateData.timezone = data.timezone
-    if (data.language !== undefined) preferencesUpdateData.language = data.language
-
-    const preferences = await prisma.user_preferences.upsert({
-      where: { userId },
-      update: preferencesUpdateData,
-      create: {
-        id: randomUUID(),
-        userId,
-        theme: data.theme ?? 'system',
-        timezone: data.timezone ?? 'America/Guayaquil',
-        language: data.language ?? 'es',
-        profileVisible: data.profileVisible ?? true,
-        activityVisible: data.activityVisible ?? true,
-        updatedAt: new Date(),
-      },
-    })
-
     return NextResponse.json({
       success: true,
       message: 'Configuración actualizada correctamente',
@@ -312,8 +252,8 @@ export async function PUT(request: NextRequest) {
         theme: settings.theme,
         language: settings.language,
         timezone: settings.timezone,
-        profileVisible: preferences.profileVisible,
-        activityVisible: preferences.activityVisible,
+        profileVisible: data.profileVisible ?? true,
+        activityVisible: data.activityVisible ?? true,
       },
     })
   } catch (error) {

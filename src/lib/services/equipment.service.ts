@@ -45,6 +45,7 @@ export class EquipmentService {
           brand: data.brand,
           model: data.model,
           typeId: data.typeId,
+          departmentId: data.departmentId,
           status: data.status || 'AVAILABLE',
           condition: data.condition,
           ownershipType: data.ownershipType,
@@ -184,9 +185,14 @@ export class EquipmentService {
         where.typeId = { in: filters.typeId }
       }
 
-      // Filtro por familia
+      // Filtro por familia (a través del departamento del equipo, no del tipo)
       if ((filters as any).familyId) {
-        where.type = { familyId: (filters as any).familyId }
+        where.department = { familyId: (filters as any).familyId }
+      }
+
+      // Filtro por departamento
+      if (filters.departmentId) {
+        where.departmentId = filters.departmentId
       }
 
       // Filtros por estado

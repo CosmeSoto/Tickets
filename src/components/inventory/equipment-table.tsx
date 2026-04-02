@@ -95,6 +95,7 @@ export function EquipmentTable({
             <TableHead>Código</TableHead>
             <TableHead>Equipo</TableHead>
             <TableHead>Tipo</TableHead>
+            <TableHead>Departamento</TableHead>
             <TableHead>Estado</TableHead>
             <TableHead>Condición</TableHead>
             <TableHead>Ubicación</TableHead>
@@ -121,6 +122,18 @@ export function EquipmentTable({
                 <Badge variant="outline">
                   {item.type?.name || 'Sin tipo'}
                 </Badge>
+              </TableCell>
+              <TableCell>
+                {item.department ? (
+                  <div>
+                    <div className="text-sm font-medium">{item.department.name}</div>
+                    {item.department.family && (
+                      <div className="text-xs text-muted-foreground">{item.department.family.name}</div>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-sm text-muted-foreground">—</span>
+                )}
               </TableCell>
               <TableCell>
                 <Badge className={STATUS_COLORS[item.status]}>

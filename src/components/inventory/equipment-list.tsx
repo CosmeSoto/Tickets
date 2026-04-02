@@ -50,6 +50,8 @@ export function EquipmentList({
       if (filters.typeId) filters.typeId.forEach(t => params.append('typeId', t))
       if (filters.status) filters.status.forEach(s => params.append('status', s))
       if (filters.condition) filters.condition.forEach(c => params.append('condition', c))
+      if (filters.familyId) params.append('familyId', filters.familyId)
+      if (filters.departmentId) params.append('departmentId', filters.departmentId)
       params.append('page', page.toString())
       params.append('limit', limit.toString())
 

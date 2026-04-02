@@ -125,13 +125,16 @@ model departments {
   color       String?      @default("#3B82F6")
   isActive    Boolean      @default(true)
   order       Int          @default(0)
+  familyId    String?      @map("family_id")
   createdAt   DateTime     @default(now())
   updatedAt   DateTime
+  family      families?    @relation(fields: [familyId], references: [id])
   categories  categories[]
   users       users[]
   licenses    software_licenses[]
 
   @@index([isActive, order])
+  @@index([familyId])
 }
 
 model notification_preferences {
@@ -290,45 +293,6 @@ model ticket_ratings {
   @@index([technicianId, createdAt(sort: Desc)])
 }
 
-model ticket_resolution_plans {
-  id                      String                    @id
-  ticketId                String                    @unique
-  title                   String
-  description             String?
-  diagnosis               String?
-  solution                String?
-  estimatedTime           Int?
-  actualTime              Int?
-  startedAt               DateTime?
-  completedAt             DateTime?
-  status                  ResolutionStatus          @default(PENDING)
-  createdAt               DateTime                  @default(now())
-  updatedAt               DateTime
-  tickets                 tickets                   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  ticket_resolution_tasks ticket_resolution_tasks[]
-
-  @@index([status, createdAt(sort: Desc)])
-  @@index([ticketId])
-}
-
-model ticket_resolution_tasks {
-  id                      String                  @id
-  planId                  String
-  title                   String
-  description             String?
-  order                   Int
-  status                  TaskStatus              @default(PENDING)
-  startedAt               DateTime?
-  completedAt             DateTime?
-  notes                   String?
-  createdAt               DateTime                @default(now())
-  updatedAt               DateTime
-  ticket_resolution_plans ticket_resolution_plans @relation(fields: [planId], references: [id], onDelete: Cascade)
-
-  @@index([planId, order])
-  @@index([status])
-}
-
 model tickets {
   id                               String                      @id
   title                            String
@@ -347,6 +311,9 @@ model tickets {
   actualTime                       Int?
   tags                             String[]
   source                           TicketSource                @default(WEB)
+  ticketCode                       String?                     @unique @map("ticket_code") @db.VarChar(30)
+  familyId                         String?                     @map("family_id")
+  codeIsManual                     Boolean                     @default(false) @map("code_is_manual")
   createdAt                        DateTime                    @default(now())
   updatedAt                        DateTime
   attachments                      attachments[]
@@ -354,13 +321,13 @@ model tickets {
   notifications                    notifications[]
   ticket_history                   ticket_history[]
   ticket_ratings                   ticket_ratings?
-  ticket_resolution_plans          ticket_resolution_plans?
   knowledge_article                knowledge_articles?         @relation("knowledge_articles_source")
   resolution_plans                 resolution_plans[]
   ticket_knowledge_articles        ticket_knowledge_articles[]
   sla_violations                   sla_violations[]
   ticket_sla_metrics               ticket_sla_metrics?
   maintenance_records              maintenance_records[]
+  family                           families?                   @relation(fields: [familyId], references: [id])
   users_tickets_assigneeIdTousers  users?                      @relation("tickets_assigneeIdTousers", fields: [assigneeId], references: [id])
   categories                       categories                  @relation(fields: [categoryId], references: [id])
   users_tickets_clientIdTousers    users                       @relation("tickets_clientIdTousers", fields: [clientId], references: [id])
@@ -373,19 +340,8 @@ model tickets {
   @@index([source, status])
   @@index([status, priority])
   @@index([title, description])
-}
-
-model user_preferences {
-  id              String   @id
-  userId          String   @unique
-  theme           String   @default("system")
-  timezone        String   @default("America/Guayaquil")
-  language        String   @default("es")
-  profileVisible  Boolean  @default(true)
-  activityVisible Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime
-  users           users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([familyId, status])
+  @@index([ticketCode])
 }
 
 model user_settings {
@@ -482,7 +438,6 @@ model users {
   tickets_tickets_assigneeIdTousers                 tickets[]                   @relation("tickets_assigneeIdTousers")
   tickets_tickets_clientIdTousers                   tickets[]                   @relation("tickets_clientIdTousers")
   tickets_tickets_createdByIdTousers                tickets[]                   @relation("tickets_createdByIdTousers")
-  user_preferences                                  user_preferences?
   user_settings                                     user_settings?
   knowledge_articles                                knowledge_articles[]        @relation("knowledge_articles_author")
   article_votes                                     article_votes[]
@@ -511,6 +466,7 @@ model users {
   decommissionReviews                               decommission_requests[]     @relation("DecommissionReviewer")
   decommissionApprovals                             decommission_acts[]         @relation("DecommissionApprover")
   decommissionAttachments                           decommission_attachments[]
+  technicianFamilyAssignments                       technician_family_assignments[]
 
   @@index([departmentId])
   @@index([name, email])
@@ -547,6 +503,7 @@ model knowledge_articles {
   tags                      String[]
   sourceTicketId            String?                     @unique
   authorId                  String
+  familyId                  String?                     @map("family_id")
   views                     Int                         @default(0)
   helpfulVotes              Int                         @default(0)
   notHelpfulVotes           Int                         @default(0)
@@ -556,6 +513,7 @@ model knowledge_articles {
   category                  categories                  @relation(fields: [categoryId], references: [id])
   author                    users                       @relation("knowledge_articles_author", fields: [authorId], references: [id])
   sourceTicket              tickets?                    @relation("knowledge_articles_source", fields: [sourceTicketId], references: [id])
+  family                    families?                   @relation(fields: [familyId], references: [id])
   votes                     article_votes[]
   ticket_knowledge_articles ticket_knowledge_articles[]
 
@@ -564,6 +522,7 @@ model knowledge_articles {
   @@index([views(sort: Desc)])
   @@index([helpfulVotes(sort: Desc)])
   @@index([title, content])
+  @@index([familyId, isPublished])
 }
 
 model article_votes {
@@ -585,6 +544,7 @@ enum NotificationType {
   WARNING
   ERROR
   INVENTORY
+  TICKET_FAMILY_CHANGE
 }
 
 enum ResolutionStatus {
@@ -760,6 +720,7 @@ model sla_policies {
   name                String               @db.VarChar(100)
   description         String?              @db.Text
   categoryId          String?              @map("category_id")
+  familyId            String?              @map("family_id")
   priority            String               @db.VarChar(20)
   responseTimeHours   Int                  @map("response_time_hours")
   resolutionTimeHours Int                  @map("resolution_time_hours")
@@ -771,10 +732,12 @@ model sla_policies {
   createdAt           DateTime             @default(now()) @map("created_at")
   updatedAt           DateTime             @default(now()) @updatedAt @map("updated_at")
   category            categories?          @relation("SLAPolicyCategory", fields: [categoryId], references: [id])
+  family              families?            @relation(fields: [familyId], references: [id])
   sla_violations      sla_violations[]
   ticket_sla_metrics  ticket_sla_metrics[]
 
   @@index([isActive, categoryId, priority])
+  @@index([isActive, familyId, priority])
   @@map("sla_policies")
 }
 
@@ -954,7 +917,7 @@ model equipment_types {
   updatedAt   DateTime    @updatedAt @map("updated_at")
   
   familyId    String?             @map("family_id")
-  family      inventory_families? @relation(fields: [familyId], references: [id])
+  family      families?           @relation(fields: [familyId], references: [id])
 
   equipment   equipment[]
   
@@ -1257,7 +1220,7 @@ model license_types {
   updatedAt   DateTime            @updatedAt @map("updated_at")
 
   familyId    String?             @map("family_id")
-  family      inventory_families? @relation(fields: [familyId], references: [id])
+  family      families?           @relation(fields: [familyId], references: [id])
 
   licenses    software_licenses[]
 
@@ -1323,7 +1286,7 @@ model consumable_types {
   updatedAt   DateTime      @updatedAt @map("updated_at")
 
   familyId    String?             @map("family_id")
-  family      inventory_families? @relation(fields: [familyId], references: [id])
+  family      families?           @relation(fields: [familyId], references: [id])
 
   consumables consumables[]
 
@@ -1596,7 +1559,7 @@ enum ConsumableStatus {
 // INVENTORY FAMILIES — Modelos nuevos
 // ============================================
 
-model inventory_families {
+model families {
   id          String   @id @default(uuid())
   code        String   @unique @db.VarChar(50)
   name        String   @db.VarChar(100)
@@ -1608,6 +1571,16 @@ model inventory_families {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  // Relaciones de tickets
+  departments                  departments[]
+  tickets                      tickets[]
+  ticketFamilyConfig           ticket_family_config?
+  technicianFamilyAssignments  technician_family_assignments[]
+  ticketCodeCounters           ticket_code_counters[]
+  sla_policies                 sla_policies[]
+  knowledge_articles           knowledge_articles[]
+
+  // Relaciones de inventario (sin cambios estructurales)
   equipmentTypes   equipment_types[]
   consumableTypes  consumable_types[]
   licenseTypes     license_types[]
@@ -1615,7 +1588,7 @@ model inventory_families {
   formConfig       inventory_family_config?
 
   @@index([isActive, order])
-  @@map("inventory_families")
+  @@map("families")
 }
 
 model warehouses {
@@ -1642,8 +1615,8 @@ model inventory_manager_families {
   familyId  String   @map("family_id")
   createdAt DateTime @default(now()) @map("created_at")
 
-  manager users              @relation("InventoryManagerFamilies", fields: [managerId], references: [id], onDelete: Cascade)
-  family  inventory_families @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  manager users    @relation("InventoryManagerFamilies", fields: [managerId], references: [id], onDelete: Cascade)
+  family  families @relation(fields: [familyId], references: [id], onDelete: Cascade)
 
   @@unique([managerId, familyId])
   @@index([managerId])
@@ -1689,8 +1662,64 @@ model inventory_family_config {
   createdAt             DateTime      @default(now()) @map("created_at")
   updatedAt             DateTime      @updatedAt @map("updated_at")
 
-  family                inventory_families @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  family                families @relation(fields: [familyId], references: [id], onDelete: Cascade)
 
   @@index([familyId])
   @@map("inventory_family_config")
+}
+
+// ============================================
+// TICKET MULTI-FAMILY TABLES
+// ============================================
+
+model ticket_family_config {
+  id                          String   @id @default(uuid())
+  familyId                    String   @unique @map("family_id")
+  ticketsEnabled              Boolean  @default(true) @map("tickets_enabled")
+  codePrefix                  String?  @db.VarChar(10) @map("code_prefix")
+  isDefault                   Boolean  @default(false) @map("is_default")
+  autoAssignRespectsFamilies  Boolean  @default(true) @map("auto_assign_respects_families")
+  alertVolumeThreshold        Int?     @map("alert_volume_threshold")
+  businessHoursStart          String   @default("09:00:00") @map("business_hours_start") @db.VarChar(8)
+  businessHoursEnd            String   @default("18:00:00") @map("business_hours_end") @db.VarChar(8)
+  businessDays                String   @default("MON,TUE,WED,THU,FRI") @map("business_days") @db.VarChar(50)
+  createdAt                   DateTime @default(now()) @map("created_at")
+  updatedAt                   DateTime @updatedAt @map("updated_at")
+
+  family families @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@index([familyId])
+  @@index([ticketsEnabled])
+  @@map("ticket_family_config")
+}
+
+model technician_family_assignments {
+  id           String   @id @default(uuid())
+  technicianId String   @map("technician_id")
+  familyId     String   @map("family_id")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  technician users    @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+  family     families @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@unique([technicianId, familyId])
+  @@index([technicianId, isActive])
+  @@index([familyId, isActive])
+  @@map("technician_family_assignments")
+}
+
+model ticket_code_counters {
+  id           String   @id @default(uuid())
+  familyId     String   @map("family_id")
+  year         Int
+  lastSequence Int      @default(0) @map("last_sequence")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  family families @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@unique([familyId, year])
+  @@index([familyId, year])
+  @@map("ticket_code_counters")
 }

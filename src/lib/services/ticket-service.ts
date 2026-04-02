@@ -3,6 +3,8 @@ import { TicketStatus, TicketPriority, UserRole } from '@prisma/client'
 import { NotificationService } from './notification-service'
 import { ApplicationLogger } from '@/lib/logging'
 import { randomUUID } from 'crypto'
+import { TicketCodeService } from './ticket-code.service'
+import { TicketFamilyConfigService } from './ticket-family-config.service'
 
 export interface TicketFilters {
   status?: TicketStatus
@@ -11,6 +13,7 @@ export interface TicketFilters {
   assigneeId?: string
   clientId?: string
   search?: string
+  familyId?: string
 }
 
 export interface PaginationParams {
@@ -24,6 +27,9 @@ export interface CreateTicketData {
   priority: TicketPriority
   categoryId: string
   clientId: string
+  assigneeId?: string
+  ticketCode?: string
+  isAdmin?: boolean
 }
 
 export interface UpdateTicketData {
@@ -33,6 +39,7 @@ export interface UpdateTicketData {
   status?: TicketStatus
   assigneeId?: string
   categoryId?: string
+  familyId?: string
 }
 
 export class TicketService {
@@ -60,6 +67,7 @@ export class TicketService {
       if (filters.categoryId) where.categoryId = filters.categoryId
       if (filters.assigneeId) where.assigneeId = filters.assigneeId
       if (filters.clientId) where.clientId = filters.clientId
+      if (filters.familyId) where.familyId = filters.familyId
       if (filters.search) {
         where.OR = [
           { title: { contains: filters.search, mode: 'insensitive' } },
@@ -74,6 +82,7 @@ export class TicketService {
             users_tickets_clientIdTousers: { select: { id: true, name: true, email: true } },
             users_tickets_assigneeIdTousers: { select: { id: true, name: true, email: true } },
             categories: { select: { id: true, name: true, color: true } },
+            family: { select: { id: true, name: true, code: true, color: true } },
             _count: { select: { comments: true, attachments: true } },
           },
           orderBy: { createdAt: 'desc' },
@@ -153,15 +162,54 @@ export class TicketService {
 
       ApplicationLogger.databaseOperationStart('create', 'tickets')
 
+      // 1. Resolver familyId desde categoryId → department → familyId
+      const category = await prisma.categories.findUnique({
+        where: { id: data.categoryId },
+        include: { departments: { select: { familyId: true } } },
+      })
+      const familyId =
+        category?.departments?.familyId ??
+        (await TicketFamilyConfigService.getDefaultFamily())?.id ??
+        undefined
+
+      // 2. Generar ticketCode (automático o manual si es ADMIN)
+      let ticketCode: string | undefined
+      let codeIsManual = false
+
+      if (data.ticketCode && data.isAdmin && familyId) {
+        const validation = await TicketCodeService.validateManualCode(data.ticketCode, familyId)
+        if (!validation.valid) {
+          throw new Error(validation.error ?? 'Código de ticket inválido')
+        }
+        ticketCode = data.ticketCode
+        codeIsManual = true
+        // Actualizar contador si la secuencia manual es mayor al actual
+        const parts = ticketCode.split('-')
+        const sequence = parseInt(parts[parts.length - 1], 10)
+        const year = parseInt(parts[parts.length - 2], 10)
+        if (!isNaN(sequence) && !isNaN(year)) {
+          await TicketCodeService.updateCounterIfNeeded(familyId, year, sequence)
+        }
+      } else if (familyId) {
+        ticketCode = await TicketCodeService.generateCode(familyId, new Date().getFullYear())
+      }
+
+      // Extraer campos propios del servicio antes de pasar a Prisma
+      const { ticketCode: _tc, isAdmin: _ia, ...ticketData } = data
+
       const ticket = await prisma.tickets.create({
         data: {
-          ...data,
+          ...ticketData,
           id: randomUUID(),
           updatedAt: new Date(),
+          ...(familyId && { familyId }),
+          ...(ticketCode && { ticketCode }),
+          codeIsManual,
         },
         include: {
           users_tickets_clientIdTousers: { select: { id: true, name: true, email: true } },
           categories: { select: { id: true, name: true, color: true } },
+          family: { select: { id: true, name: true, code: true, color: true } },
         },
       })
 
@@ -216,6 +264,32 @@ export class TicketService {
         throw new Error('Ticket no encontrado')
       }
 
+      // Recalcular familyId si cambia categoryId
+      if (data.categoryId && data.categoryId !== currentTicket.categoryId) {
+        const newCategory = await prisma.categories.findUnique({
+          where: { id: data.categoryId },
+          include: { departments: { select: { familyId: true } } },
+        })
+        data.familyId = newCategory?.departments?.familyId ?? currentTicket.familyId ?? undefined
+      }
+
+      // Validar que el assigneeId tenga technician_family_assignments activo para la familia del ticket
+      const effectiveFamilyId = data.familyId ?? currentTicket.familyId
+      if (data.assigneeId && effectiveFamilyId) {
+        const assignment = await prisma.technician_family_assignments.findFirst({
+          where: {
+            technicianId: data.assigneeId,
+            familyId: effectiveFamilyId,
+            isActive: true,
+          },
+        })
+        if (!assignment) {
+          throw new Error(
+            'El técnico no tiene asignación activa para la familia de este ticket'
+          )
+        }
+      }
+
       ApplicationLogger.databaseOperationStart('update', 'tickets')
 
       const ticket = await prisma.tickets.update({
@@ -228,10 +302,35 @@ export class TicketService {
           users_tickets_clientIdTousers: { select: { id: true, name: true, email: true } },
           users_tickets_assigneeIdTousers: { select: { id: true, name: true, email: true } },
           categories: { select: { id: true, name: true, color: true } },
+          family: { select: { id: true, name: true, code: true, color: true } },
         },
       })
 
       ApplicationLogger.databaseOperationComplete('update', 'tickets', performance.now(), 1)
+
+      // Notificar cambio de familia si aplica
+      const newFamilyId = data.familyId
+      if (newFamilyId && newFamilyId !== currentTicket.familyId && currentTicket.familyId) {
+        await NotificationService.notifyFamilyChange(id, currentTicket.familyId, newFamilyId).catch(
+          (err) => console.error('[TicketService] notifyFamilyChange error:', err)
+        )
+        // Registrar en audit_logs
+        await prisma.audit_logs.create({
+          data: {
+            id: randomUUID(),
+            action: 'TICKET_FAMILY_CHANGED',
+            entityType: 'ticket',
+            entityId: id,
+            userId,
+            details: {
+              oldFamilyId: currentTicket.familyId,
+              newFamilyId,
+              familyId: newFamilyId,
+            },
+            createdAt: new Date(),
+          },
+        }).catch((err) => console.error('[TicketService] audit_log family change error:', err))
+      }
 
       // Crear entradas en el historial para cada cambio
       const changes = []

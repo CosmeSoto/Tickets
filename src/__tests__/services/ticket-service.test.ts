@@ -1,7 +1,7 @@
 // Mock Prisma and NotificationService
-jest.mock('@/lib/prisma', () => ({
-  prisma: {
-    ticket: {
+jest.mock('@/lib/prisma', () => {
+  const mockPrisma = {
+    tickets: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
       create: jest.fn(),
@@ -9,22 +9,52 @@ jest.mock('@/lib/prisma', () => ({
       delete: jest.fn(),
       count: jest.fn(),
     },
-    user: {
+    users: {
       findUnique: jest.fn(),
     },
-    category: {
+    categories: {
       findUnique: jest.fn(),
     },
-    ticketHistory: {
+    ticket_history: {
+      create: jest.fn(),
+      createMany: jest.fn(),
+      findMany: jest.fn(),
+    },
+    technician_family_assignments: {
+      findFirst: jest.fn(),
+    },
+    audit_logs: {
       create: jest.fn(),
     },
-  },
-}))
+  }
+  return {
+    __esModule: true,
+    default: mockPrisma,
+    prisma: mockPrisma,
+  }
+})
 
 jest.mock('@/lib/services/notification-service', () => ({
   NotificationService: {
     createNotification: jest.fn(),
     notifyTicketCreated: jest.fn(),
+  },
+}))
+
+jest.mock('@/lib/services/ticket-code.service', () => ({
+  TicketCodeService: {
+    generateCode: jest.fn().mockResolvedValue('TI-2026-0001'),
+    validateManualCode: jest.fn().mockResolvedValue({ valid: true }),
+    updateCounterIfNeeded: jest.fn().mockResolvedValue(undefined),
+  },
+}))
+
+jest.mock('@/lib/services/ticket-family-config.service', () => ({
+  TicketFamilyConfigService: {
+    getDefaultFamily: jest.fn().mockResolvedValue(null),
+    getEnabledFamilies: jest.fn().mockResolvedValue([]),
+    getByFamilyId: jest.fn().mockResolvedValue(null),
+    update: jest.fn().mockResolvedValue(null),
   },
 }))
 
@@ -53,7 +83,7 @@ import { TicketService } from '@/lib/services/ticket-service'
 import prisma from '@/lib/prisma'
 import { TicketStatus, TicketPriority } from '@prisma/client'
 
-const mockPrismaClient = prisma as jest.Mocked<typeof prisma>
+const mockPrisma = prisma as any
 
 describe('TicketService', () => {
   beforeEach(() => {
@@ -77,12 +107,12 @@ describe('TicketService', () => {
     ]
 
     it('should get tickets without filters', async () => {
-      mockPrismaClient.ticket.findMany.mockResolvedValue(mockTickets)
-      mockPrismaClient.ticket.count.mockResolvedValue(1)
+      mockPrisma.tickets.findMany.mockResolvedValue(mockTickets)
+      mockPrisma.tickets.count.mockResolvedValue(1)
 
       const result = await TicketService.getTickets({}, { page: 1, limit: 10 })
 
-      expect(mockPrismaClient.ticket.findMany).toHaveBeenCalledWith(
+      expect(mockPrisma.tickets.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {},
           include: expect.any(Object),
@@ -96,12 +126,12 @@ describe('TicketService', () => {
     })
 
     it('should filter tickets by status', async () => {
-      mockPrismaClient.ticket.findMany.mockResolvedValue(mockTickets)
-      mockPrismaClient.ticket.count.mockResolvedValue(1)
+      mockPrisma.tickets.findMany.mockResolvedValue(mockTickets)
+      mockPrisma.tickets.count.mockResolvedValue(1)
 
       await TicketService.getTickets({ status: TicketStatus.OPEN }, { page: 1, limit: 10 })
 
-      expect(mockPrismaClient.ticket.findMany).toHaveBeenCalledWith(
+      expect(mockPrisma.tickets.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { status: TicketStatus.OPEN },
         })
@@ -109,12 +139,12 @@ describe('TicketService', () => {
     })
 
     it('should filter tickets by search term', async () => {
-      mockPrismaClient.ticket.findMany.mockResolvedValue(mockTickets)
-      mockPrismaClient.ticket.count.mockResolvedValue(1)
+      mockPrisma.tickets.findMany.mockResolvedValue(mockTickets)
+      mockPrisma.tickets.count.mockResolvedValue(1)
 
       await TicketService.getTickets({ search: 'test' }, { page: 1, limit: 10 })
 
-      expect(mockPrismaClient.ticket.findMany).toHaveBeenCalledWith(
+      expect(mockPrisma.tickets.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
             OR: [
@@ -142,11 +172,11 @@ describe('TicketService', () => {
     }
 
     it('should get ticket by id', async () => {
-      mockPrismaClient.ticket.findUnique.mockResolvedValue(mockTicket)
+      mockPrisma.tickets.findUnique.mockResolvedValue(mockTicket)
 
       const result = await TicketService.getTicketById('1')
 
-      expect(mockPrismaClient.ticket.findUnique).toHaveBeenCalledWith(
+      expect(mockPrisma.tickets.findUnique).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: '1' },
           include: expect.any(Object),
@@ -156,7 +186,7 @@ describe('TicketService', () => {
     })
 
     it('should return null for non-existent ticket', async () => {
-      mockPrismaClient.ticket.findUnique.mockResolvedValue(null)
+      mockPrisma.tickets.findUnique.mockResolvedValue(null)
 
       const result = await TicketService.getTicketById('999')
 
@@ -183,24 +213,19 @@ describe('TicketService', () => {
         updatedAt: new Date(),
       }
 
-      // Mock category exists
-      mockPrismaClient.category.findUnique.mockResolvedValue({
+      // Mock category exists (con departments para resolver familyId)
+      mockPrisma.categories.findUnique.mockResolvedValue({
         id: '1',
         name: 'Test Category',
+        departments: { familyId: null },
       })
 
-      // Mock user exists
-      mockPrismaClient.user.findUnique.mockResolvedValue({
-        id: '1',
-        name: 'Test User',
-        email: 'test@example.com',
-      })
-
-      mockPrismaClient.ticket.create.mockResolvedValue(mockCreatedTicket)
+      mockPrisma.tickets.create.mockResolvedValue(mockCreatedTicket)
+      mockPrisma.ticket_history.create.mockResolvedValue({})
 
       const result = await TicketService.createTicket(createData)
 
-      expect(mockPrismaClient.ticket.create).toHaveBeenCalled()
+      expect(mockPrisma.tickets.create).toHaveBeenCalled()
       expect(result).toEqual(mockCreatedTicket)
     })
   })

@@ -33,7 +33,7 @@ export async function GET(
 
     const { id } = await params
 
-    const family = await prisma.inventory_families.findUnique({
+    const family = await prisma.families.findUnique({
       where: { id },
     })
 

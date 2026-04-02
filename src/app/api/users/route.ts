@@ -84,6 +84,7 @@ export async function GET(request: NextRequest) {
         phone: true,
         avatar: true,
         isActive: true,
+        canManageInventory: true,
         createdAt: true,
         lastLogin: true,
         _count: {

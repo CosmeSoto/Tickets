@@ -122,6 +122,31 @@ export async function PUT(
     // Validar datos base
     const validatedData = updateEquipmentSchema.parse(body)
 
+    // Validación: si se envía departmentId diferente al actual, verificar que no haya asignación activa
+    if (validatedData.departmentId !== undefined) {
+      const currentEquipmentDept = await prisma.equipment.findUnique({
+        where: { id },
+        select: { departmentId: true },
+      })
+
+      if (!currentEquipmentDept) {
+        return NextResponse.json({ error: 'Equipo no encontrado' }, { status: 404 })
+      }
+
+      if (validatedData.departmentId !== currentEquipmentDept.departmentId) {
+        const activeAssignment = await prisma.equipment_assignments.findFirst({
+          where: { equipmentId: id, isActive: true },
+        })
+
+        if (activeAssignment) {
+          return NextResponse.json(
+            { error: 'No se puede cambiar el departamento: el equipo tiene una asignación activa vigente' },
+            { status: 409 }
+          )
+        }
+      }
+    }
+
     // Extraer y validar campos financieros nuevos
     const {
       supplierId = undefined,
@@ -213,6 +238,7 @@ export async function PUT(
 
     // Persistir campos financieros nuevos si se proporcionaron
     const financialFields: Record<string, unknown> = {}
+    if ('departmentId' in body && validatedData.departmentId !== undefined) financialFields.departmentId = validatedData.departmentId
     if ('supplierId' in body) financialFields.supplierId = supplierId ?? null
     if ('invoiceNumber' in body) financialFields.invoiceNumber = invoiceNumber ?? null
     if ('purchaseOrderNumber' in body) financialFields.purchaseOrderNumber = purchaseOrderNumber ?? null

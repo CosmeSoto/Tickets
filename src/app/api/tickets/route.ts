@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { randomUUID } from 'crypto'
 import { WebhookService } from '@/lib/services/webhook-service'
 import { SLAService } from '@/lib/services/sla-service'
 import { EmailService } from '@/lib/services/email/email-service'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { NotificationService } from '@/lib/services/notification-service'
+import { TicketService } from '@/lib/services/ticket-service'
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search')
     const assigneeId = searchParams.get('assigneeId')
     const categoryId = searchParams.get('categoryId')
+    const familyId = searchParams.get('familyId')
 
     // Construir filtros para Prisma
     const where: any = {}
@@ -49,13 +50,22 @@ export async function GET(request: NextRequest) {
       where.categoryId = categoryId
     }
 
+    if (familyId) {
+      where.familyId = familyId
+    }
+
     if (search) {
-      where.OR = [
+      const searchConditions: any[] = [
         { title: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } },
         { users_tickets_clientIdTousers: { name: { contains: search, mode: 'insensitive' } } },
-        { users_tickets_clientIdTousers: { email: { contains: search, mode: 'insensitive' } } }
+        { users_tickets_clientIdTousers: { email: { contains: search, mode: 'insensitive' } } },
       ]
+      // Búsqueda parcial por ticketCode si el patrón parece un código (contiene guión)
+      if (search.includes('-')) {
+        searchConditions.push({ ticketCode: { contains: search, mode: 'insensitive' } })
+      }
+      where.OR = searchConditions
     }
 
     // Filtrar por rol del usuario
@@ -97,6 +107,14 @@ export async function GET(request: NextRequest) {
               level: true
             }
           },
+          family: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+              color: true
+            }
+          },
           _count: {
             select: {
               comments: true,
@@ -119,6 +137,7 @@ export async function GET(request: NextRequest) {
       client: ticket.users_tickets_clientIdTousers,
       assignee: ticket.users_tickets_assigneeIdTousers,
       category: ticket.categories,
+      family: ticket.family,
     }))
 
     return NextResponse.json({
@@ -138,7 +157,8 @@ export async function GET(request: NextRequest) {
           priority,
           search,
           assigneeId,
-          categoryId
+          categoryId,
+          familyId
         }
       }
     })
@@ -236,64 +256,17 @@ export async function POST(request: NextRequest) {
       clientId = ticketData.clientId
     }
 
-    // Crear nuevo ticket
-    const newTicket = await prisma.tickets.create({
-      data: {
-        id: randomUUID(),
-        title: ticketData.title,
-        description: ticketData.description,
-        priority: ticketData.priority || 'MEDIUM',
-        clientId: clientId,
-        categoryId: ticketData.categoryId,
-        assigneeId: ticketData.assigneeId || null,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      include: {
-        users_tickets_clientIdTousers: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            departmentId: true
-          }
-        },
-        users_tickets_assigneeIdTousers: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            departmentId: true
-          }
-        },
-        categories: {
-          select: {
-            id: true,
-            name: true,
-            color: true,
-            level: true
-          }
-        },
-        _count: {
-          select: {
-            comments: true,
-            attachments: true
-          }
-        }
-      }
-    })
-
-    // Crear entrada en el historial
-    await prisma.ticket_history.create({
-      data: {
-        id: randomUUID(),
-        action: 'created',
-        comment: 'Ticket creado',
-        ticketId: newTicket.id,
-        userId: session.user.id,
-        createdAt: new Date()
-      }
-    })
+    // Crear nuevo ticket usando TicketService (maneja familyId, ticketCode, codeIsManual)
+    const newTicket = await TicketService.createTicket({
+      title: ticketData.title,
+      description: ticketData.description,
+      priority: ticketData.priority || 'MEDIUM',
+      clientId,
+      categoryId: ticketData.categoryId,
+      assigneeId: ticketData.assigneeId || undefined,
+      ...(ticketData.ticketCode && session.user.role === 'ADMIN' && { ticketCode: ticketData.ticketCode }),
+      isAdmin: session.user.role === 'ADMIN',
+    }) as any
 
     // ⭐ AUDITORÍA: Registrar creación de ticket
     await AuditServiceComplete.log({
@@ -372,6 +345,7 @@ export async function POST(request: NextRequest) {
       client: newTicket.users_tickets_clientIdTousers,
       assignee: newTicket.users_tickets_assigneeIdTousers,
       category: newTicket.categories,
+      family: (newTicket as any).family,
     }
 
     return NextResponse.json({

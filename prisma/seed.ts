@@ -4,64 +4,78 @@ import { randomUUID } from 'crypto'
 
 const prisma = new PrismaClient()
 const now = new Date()
+const year = now.getFullYear()
+
+// ============================================
+// MAIN
+// ============================================
 
 async function main() {
-  console.log('🌱 Iniciando seed de la base de datos...\n')
+  console.log('🌱 Iniciando seed multi-familia desde cero...\n')
 
-  // 1. DEPARTAMENTOS
-  const deptMap = await seedDepartments()
+  // 1. FAMILIAS GLOBALES (primero — todo depende de ellas)
+  const familyMap = await seedFamilies()
 
-  // 2. USUARIO ADMINISTRADOR
-  await seedAdmin(deptMap.get('Administración')!)
+  // 2. CONFIGURACIONES DE TICKETS POR FAMILIA
+  await seedTicketFamilyConfigs(familyMap)
 
-  // 3. CONFIGURACIÓN DEL SITIO
+  // 3. CONFIGURACIONES DE INVENTARIO POR FAMILIA
+  await seedInventoryFamilyConfigs(familyMap)
+
+  // 4. DEPARTAMENTOS (con familyId directo)
+  const deptMap = await seedDepartments(familyMap)
+
+  // 5. USUARIO ADMINISTRADOR
+  const adminId = await seedAdmin(deptMap.get('Administración')!)
+
+  // 6. TÉCNICOS DE EJEMPLO
+  const techMap = await seedTechnicians(deptMap, familyMap)
+
+  // 7. CONFIGURACIÓN DEL SITIO
   await seedSiteConfig()
 
-  // 4. POLÍTICAS DE SLA
-  await seedSLAPolicies()
+  // 8. POLÍTICAS DE SLA (globales + por familia TECHNOLOGY)
+  await seedSLAPolicies(familyMap)
 
-  // 5. CATEGORÍAS
-  await seedCategoriesFromExcel(
-    deptMap.get('Tecnologías de la Información')!,
-    deptMap.get('Soporte Técnico')!,
-    deptMap.get('Seguridad Informática')!,
-    deptMap.get('Usuarios y Privilegios')!,
-    deptMap.get('Telefonía')!
-  )
+  // 9. CATEGORÍAS (todas bajo TECHNOLOGY)
+  await seedCategories(deptMap)
 
-  // 6. TIPOS DE EQUIPO
-  await seedEquipmentTypes()
+  // 10. TIPOS DE EQUIPO (con familyId directo)
+  await seedEquipmentTypes(familyMap)
 
-  // 7. TIPOS DE LICENCIA
-  await seedLicenseTypes()
+  // 11. TIPOS DE LICENCIA (con familyId directo)
+  await seedLicenseTypes(familyMap)
 
-  // 8. TIPOS DE CONSUMIBLE
-  await seedConsumableTypes()
+  // 12. TIPOS DE CONSUMIBLE (con familyId directo)
+  await seedConsumableTypes(familyMap)
 
-  // 9. UNIDADES DE MEDIDA
+  // 13. UNIDADES DE MEDIDA
   await seedUnitsOfMeasure()
 
-  // 10. CONFIGURACIONES DE INVENTARIO
+  // 14. CONFIGURACIONES DE INVENTARIO (system_settings)
   await seedInventorySettings()
 
-  // 11. CONTADORES DE FOLIO
+  // 15. CONTADORES DE FOLIO
   await seedFolioCounters()
 
-  // 12. LANDING PAGE + SERVICIOS
-  await seedLandingPage()
+  // 16. CONTADORES DE CÓDIGO DE TICKET
+  await seedTicketCodeCounters(familyMap)
 
-  // 13. FAMILIAS DE INVENTARIO
-  await seedInventoryFamilies()
-
-  // 14. BODEGA POR DEFECTO
+  // 17. BODEGA POR DEFECTO
   await seedDefaultWarehouse()
 
-  // 15. MIGRACIÓN CONSERVADORA: tipos existentes → familia TECHNOLOGY
-  await migrateExistingTypesToTechnology()
+  // 18. LANDING PAGE
+  await seedLandingPage()
+
+  // 19. TICKETS DE EJEMPLO
+  await seedSampleTickets(familyMap, deptMap, techMap, adminId)
+
+  // 20. ARTÍCULOS DE BASE DE CONOCIMIENTOS
+  await seedKnowledgeArticles(familyMap, deptMap, adminId)
 
   console.log('\n🎉 Seed completado exitosamente!')
   console.log('\n📋 Credenciales de acceso:')
-  console.log('   Email: internet.freecom@gmail.com')
+  console.log('   Email: admin@sistema.com')
   console.log('   Contraseña: admin123')
 }
 
@@ -69,9 +83,6 @@ async function main() {
 // HELPERS
 // ============================================
 
-/**
- * Busca categoría por nombre+parentId+level. Si existe la actualiza, si no la crea.
- */
 async function upsertCategory(data: {
   name: string; description: string; level: number;
   parentId: string | null; departmentId: string; order: number; color: string;
@@ -91,53 +102,166 @@ async function upsertCategory(data: {
 }
 
 // ============================================
-// SEED FUNCTIONS
+// 1. FAMILIAS GLOBALES
 // ============================================
 
-async function seedDepartments(): Promise<Map<string, string>> {
-  const departments = [
-    // Administrativos
-    { name: 'Administración', description: 'Departamento de Administración del Sistema', color: '#3B82F6', order: 1 },
-    { name: 'Contabilidad', description: 'Departamento de Contabilidad y Finanzas', color: '#EF4444', order: 2 },
-    { name: 'Compras', description: 'Departamento de Compras y Adquisiciones', color: '#06B6D4', order: 3 },
-    
-    // Recursos Humanos
-    { name: 'Recursos Humanos', description: 'Departamento de Talento Humano y RRHH', color: '#8B5CF6', order: 4 },
-    { name: 'Seguridad y Salud Ocupacional', description: 'Departamento de SSO - Seguridad y Salud en el Trabajo', color: '#14B8A6', order: 5 },
-    
-    // Tecnológicos
-    { name: 'Tecnologías de la Información', description: 'Departamento de TI - Infraestructura y Sistemas', color: '#10B981', order: 6 },
-    { name: 'Soporte Técnico', description: 'Departamento de Soporte y Mesa de Ayuda', color: '#F59E0B', order: 7 },
-    { name: 'Seguridad Informática', description: 'Departamento de Seguridad de la Información', color: '#DC2626', order: 8 },
-    { name: 'Usuarios y Privilegios', description: 'Departamento de Gestión de Usuarios y Accesos', color: '#6366F1', order: 9 },
-    { name: 'Telefonía', description: 'Departamento de Telefonía y Comunicaciones', color: '#0EA5E9', order: 10 },
-    
-    // Operativos
-    { name: 'Comercial', description: 'Departamento Comercial y Ventas', color: '#F97316', order: 11 },
-    { name: 'Marketing', description: 'Departamento de Marketing y Publicidad', color: '#EC4899', order: 12 },
-    { name: 'Arquitectura', description: 'Departamento de Arquitectura y Diseño', color: '#6366F1', order: 13 },
-    { name: 'Mantenimiento', description: 'Departamento de Mantenimiento e Infraestructura', color: '#84CC16', order: 14 },
+async function seedFamilies(): Promise<Map<string, string>> {
+  const families = [
+    { code: 'TECHNOLOGY',     name: 'Tecnología y Comunicaciones',     icon: 'Monitor',     color: '#3B82F6', order: 1 },
+    { code: 'FIXED_ASSETS',   name: 'Activos Fijos e Infraestructura', icon: 'Building2',   color: '#F59E0B', order: 2 },
+    { code: 'MAINTENANCE',    name: 'Mantenimiento',                   icon: 'Wrench',      color: '#10B981', order: 3 },
+    { code: 'SERVICES',       name: 'Servicios Generales',             icon: 'Settings',    color: '#8B5CF6', order: 4 },
+    { code: 'SECURITY',       name: 'Seguridad',                       icon: 'Shield',      color: '#EF4444', order: 5 },
+    { code: 'GREEN_AREAS',    name: 'Áreas Verdes',                    icon: 'Leaf',        color: '#22C55E', order: 6 },
+    { code: 'ADMINISTRATIVE', name: 'Gestión Administrativa',          icon: 'Briefcase',   color: '#6B7280', order: 7 },
+    { code: 'COMMERCIAL',     name: 'Comercial y Marketing',           icon: 'TrendingUp',  color: '#EC4899', order: 8 },
   ]
   const map = new Map<string, string>()
-  for (const dept of departments) {
-    const d = await prisma.departments.upsert({
-      where: { name: dept.name },
-      update: { description: dept.description, color: dept.color, order: dept.order },
-      create: { id: randomUUID(), ...dept, createdAt: now, updatedAt: now },
+  for (const f of families) {
+    const family = await prisma.families.upsert({
+      where: { code: f.code },
+      update: { name: f.name, icon: f.icon, color: f.color, order: f.order },
+      create: { id: randomUUID(), ...f, isActive: true },
     })
-    map.set(dept.name, d.id)
+    map.set(f.code, family.id)
   }
-  console.log(`✅ ${departments.length} departamentos`)
+  console.log(`✅ ${families.length} familias globales`)
   return map
 }
 
-async function seedAdmin(deptAdminId: string) {
+// ============================================
+// 2. CONFIGURACIONES DE TICKETS POR FAMILIA
+// ============================================
+
+async function seedTicketFamilyConfigs(familyMap: Map<string, string>) {
+  // Familias con tickets habilitados
+  const enabledFamilies = [
+    { code: 'TECHNOLOGY',     prefix: 'TI',   isDefault: true  },
+    { code: 'FIXED_ASSETS',   prefix: 'INF',  isDefault: false },
+    { code: 'MAINTENANCE',    prefix: 'MNT',  isDefault: false },
+    { code: 'SERVICES',       prefix: 'SRV',  isDefault: false },
+    { code: 'SECURITY',       prefix: 'SEG',  isDefault: false },
+    { code: 'ADMINISTRATIVE', prefix: 'ADM',  isDefault: false },
+    { code: 'COMMERCIAL',     prefix: 'COM',  isDefault: false },
+  ]
+  // GREEN_AREAS: ticketsEnabled = false
+  const disabledFamilies = ['GREEN_AREAS']
+
+  for (const f of enabledFamilies) {
+    const familyId = familyMap.get(f.code)!
+    await prisma.ticket_family_config.upsert({
+      where: { familyId },
+      update: { codePrefix: f.prefix, isDefault: f.isDefault, ticketsEnabled: true },
+      create: {
+        id: randomUUID(), familyId,
+        ticketsEnabled: true, codePrefix: f.prefix, isDefault: f.isDefault,
+        autoAssignRespectsFamilies: true, alertVolumeThreshold: 50,
+        businessHoursStart: '08:00:00', businessHoursEnd: '17:00:00',
+        businessDays: 'MON,TUE,WED,THU,FRI',
+      },
+    })
+  }
+  for (const code of disabledFamilies) {
+    const familyId = familyMap.get(code)!
+    await prisma.ticket_family_config.upsert({
+      where: { familyId },
+      update: { ticketsEnabled: false },
+      create: {
+        id: randomUUID(), familyId, ticketsEnabled: false,
+        codePrefix: code.slice(0, 5), isDefault: false,
+        autoAssignRespectsFamilies: true,
+        businessHoursStart: '08:00:00', businessHoursEnd: '17:00:00',
+        businessDays: 'MON,TUE,WED,THU,FRI',
+      },
+    })
+  }
+  console.log('✅ Configuraciones de tickets por familia')
+}
+
+// ============================================
+// 3. CONFIGURACIONES DE INVENTARIO POR FAMILIA
+// ============================================
+
+async function seedInventoryFamilyConfigs(familyMap: Map<string, string>) {
+  const configs: Record<string, { allowedSubtypes: any[]; visibleSections: any[]; requiredSections: any[] }> = {
+    TECHNOLOGY:     { allowedSubtypes: ['EQUIPMENT','LICENSE','MRO'], visibleSections: ['FINANCIAL','DEPRECIATION','CONTRACT','WAREHOUSE'], requiredSections: ['FINANCIAL'] },
+    FIXED_ASSETS:   { allowedSubtypes: ['EQUIPMENT','LICENSE','MRO'], visibleSections: ['FINANCIAL','DEPRECIATION','CONTRACT','WAREHOUSE'], requiredSections: ['FINANCIAL','DEPRECIATION'] },
+    MAINTENANCE:    { allowedSubtypes: ['MRO'],                       visibleSections: ['FINANCIAL','STOCK_MRO','WAREHOUSE'],              requiredSections: ['FINANCIAL'] },
+    SERVICES:       { allowedSubtypes: ['MRO','LICENSE'],             visibleSections: ['FINANCIAL','CONTRACT','STOCK_MRO'],              requiredSections: [] },
+    SECURITY:       { allowedSubtypes: ['EQUIPMENT','MRO'],           visibleSections: ['FINANCIAL','DEPRECIATION','WAREHOUSE'],          requiredSections: ['FINANCIAL'] },
+    GREEN_AREAS:    { allowedSubtypes: ['MRO'],                       visibleSections: ['FINANCIAL','STOCK_MRO'],                         requiredSections: [] },
+    ADMINISTRATIVE: { allowedSubtypes: ['EQUIPMENT','LICENSE'],       visibleSections: ['FINANCIAL','CONTRACT'],                          requiredSections: [] },
+    COMMERCIAL:     { allowedSubtypes: ['EQUIPMENT','LICENSE'],       visibleSections: ['FINANCIAL','DEPRECIATION','CONTRACT'],           requiredSections: ['FINANCIAL'] },
+  }
+  for (const [code, cfg] of Object.entries(configs)) {
+    const familyId = familyMap.get(code)!
+    await prisma.inventory_family_config.upsert({
+      where: { familyId },
+      update: { allowedSubtypes: cfg.allowedSubtypes as any, visibleSections: cfg.visibleSections as any, requiredSections: cfg.requiredSections as any },
+      create: {
+        id: randomUUID(), familyId,
+        allowedSubtypes: cfg.allowedSubtypes as any,
+        visibleSections: cfg.visibleSections as any,
+        requiredSections: cfg.requiredSections as any,
+        requireFinancialForNew: true,
+        autoApproveDecommission: false,
+        requireDeliveryAct: true,
+      },
+    })
+  }
+  console.log('✅ Configuraciones de inventario por familia')
+}
+
+// ============================================
+// 4. DEPARTAMENTOS (con familyId directo)
+// ============================================
+
+async function seedDepartments(familyMap: Map<string, string>): Promise<Map<string, string>> {
+  const departments = [
+    // ADMINISTRATIVE
+    { name: 'Administración',              description: 'Departamento de Administración del Sistema',    color: '#3B82F6', order: 1,  familyCode: 'ADMINISTRATIVE' },
+    { name: 'Contabilidad',                description: 'Departamento de Contabilidad y Finanzas',       color: '#EF4444', order: 2,  familyCode: 'ADMINISTRATIVE' },
+    { name: 'Compras',                     description: 'Departamento de Compras y Adquisiciones',       color: '#06B6D4', order: 3,  familyCode: 'ADMINISTRATIVE' },
+    { name: 'Recursos Humanos',            description: 'Departamento de Talento Humano y RRHH',         color: '#8B5CF6', order: 4,  familyCode: 'ADMINISTRATIVE' },
+    { name: 'Seguridad y Salud Ocupacional', description: 'Departamento de SSO',                        color: '#14B8A6', order: 5,  familyCode: 'ADMINISTRATIVE' },
+    // TECHNOLOGY
+    { name: 'Tecnologías de la Información', description: 'Departamento de TI - Infraestructura y Sistemas', color: '#10B981', order: 6, familyCode: 'TECHNOLOGY' },
+    { name: 'Soporte Técnico',             description: 'Departamento de Soporte y Mesa de Ayuda',       color: '#F59E0B', order: 7,  familyCode: 'TECHNOLOGY' },
+    { name: 'Seguridad Informática',       description: 'Departamento de Seguridad de la Información',   color: '#DC2626', order: 8,  familyCode: 'TECHNOLOGY' },
+    { name: 'Usuarios y Privilegios',      description: 'Departamento de Gestión de Usuarios y Accesos', color: '#6366F1', order: 9,  familyCode: 'TECHNOLOGY' },
+    { name: 'Telefonía',                   description: 'Departamento de Telefonía y Comunicaciones',    color: '#0EA5E9', order: 10, familyCode: 'TECHNOLOGY' },
+    // COMMERCIAL
+    { name: 'Comercial',                   description: 'Departamento Comercial y Ventas',               color: '#F97316', order: 11, familyCode: 'COMMERCIAL' },
+    { name: 'Marketing',                   description: 'Departamento de Marketing y Publicidad',        color: '#EC4899', order: 12, familyCode: 'COMMERCIAL' },
+    // FIXED_ASSETS
+    { name: 'Arquitectura',                description: 'Departamento de Arquitectura y Diseño',         color: '#6366F1', order: 13, familyCode: 'FIXED_ASSETS' },
+    { name: 'Mantenimiento',               description: 'Departamento de Mantenimiento e Infraestructura', color: '#84CC16', order: 14, familyCode: 'FIXED_ASSETS' },
+  ]
+  const map = new Map<string, string>()
+  for (const dept of departments) {
+    const familyId = familyMap.get(dept.familyCode)!
+    const d = await prisma.departments.upsert({
+      where: { name: dept.name },
+      update: { description: dept.description, color: dept.color, order: dept.order, familyId },
+      create: { id: randomUUID(), name: dept.name, description: dept.description, color: dept.color, order: dept.order, familyId, createdAt: now, updatedAt: now },
+    })
+    map.set(dept.name, d.id)
+  }
+  console.log(`✅ ${departments.length} departamentos con familyId`)
+  return map
+}
+
+// ============================================
+// 5. ADMINISTRADOR
+// ============================================
+
+async function seedAdmin(deptAdminId: string): Promise<string> {
   const adminPassword = await bcrypt.hash('admin123', 12)
   const admin = await prisma.users.upsert({
-    where: { email: 'internet.freecom@gmail.com' },
+    where: { email: 'admin@sistema.com' },
     update: {},
     create: {
-      id: randomUUID(), email: 'internet.freecom@gmail.com', name: 'Administrador del Sistema',
+      id: randomUUID(), email: 'admin@sistema.com', name: 'Administrador del Sistema',
       passwordHash: adminPassword, role: UserRole.ADMIN, departmentId: deptAdminId,
       phone: '+593999999999', isActive: true, isEmailVerified: true, createdAt: now, updatedAt: now,
     },
@@ -150,15 +274,68 @@ async function seedAdmin(deptAdminId: string) {
       ticketCreated: true, ticketUpdated: true, ticketAssigned: true, ticketResolved: true, commentAdded: true,
     },
   })
-  console.log('✅ Usuario administrador (internet.freecom@gmail.com / admin123)')
+  await prisma.user_settings.upsert({
+    where: { userId: admin.id },
+    update: {},
+    create: { id: randomUUID(), userId: admin.id, theme: 'light', language: 'es', timezone: 'America/Guayaquil', updatedAt: now },
+  })
+  console.log('✅ Administrador (admin@sistema.com / admin123)')
+  return admin.id
 }
+
+// ============================================
+// 6. TÉCNICOS DE EJEMPLO
+// ============================================
+
+async function seedTechnicians(deptMap: Map<string, string>, familyMap: Map<string, string>): Promise<Map<string, string>> {
+  const techPassword = await bcrypt.hash('tech123', 12)
+  const technicians = [
+    { email: 'tecnico1@empresa.com',   name: 'Carlos Técnico TI',             dept: 'Tecnologías de la Información', families: ['TECHNOLOGY'] },
+    { email: 'tecnico2@empresa.com',   name: 'María Técnico TI',              dept: 'Soporte Técnico',               families: ['TECHNOLOGY'] },
+    { email: 'tecnico3@empresa.com',   name: 'Pedro Técnico Infraestructura', dept: 'Mantenimiento',                 families: ['FIXED_ASSETS', 'ADMINISTRATIVE'] },
+  ]
+  const map = new Map<string, string>()
+  for (const t of technicians) {
+    const tech = await prisma.users.upsert({
+      where: { email: t.email },
+      update: {},
+      create: {
+        id: randomUUID(), email: t.email, name: t.name,
+        passwordHash: techPassword, role: UserRole.TECHNICIAN,
+        departmentId: deptMap.get(t.dept)!, isActive: true, isEmailVerified: true,
+        createdAt: now, updatedAt: now,
+      },
+    })
+    map.set(t.email, tech.id)
+    // Asignar familias
+    for (const familyCode of t.families) {
+      const familyId = familyMap.get(familyCode)!
+      await prisma.technician_family_assignments.upsert({
+        where: { technicianId_familyId: { technicianId: tech.id, familyId } },
+        update: { isActive: true },
+        create: { id: randomUUID(), technicianId: tech.id, familyId, isActive: true },
+      })
+    }
+    await prisma.user_settings.upsert({
+      where: { userId: tech.id },
+      update: {},
+      create: { id: randomUUID(), userId: tech.id, theme: 'light', language: 'es', timezone: 'America/Guayaquil', updatedAt: now },
+    })
+  }
+  console.log(`✅ ${technicians.length} técnicos con asignaciones de familia`)
+  return map
+}
+
+// ============================================
+// 7. CONFIGURACIÓN DEL SITIO
+// ============================================
 
 async function seedSiteConfig() {
   const configs = [
-    { key: 'site_name', value: 'Sistema de Tickets', description: 'Nombre del sitio web' },
-    { key: 'company_name', value: 'Mi Empresa', description: 'Nombre de la empresa' },
-    { key: 'support_email', value: 'internet.freecom@gmail.com', description: 'Email de soporte técnico' },
-    { key: 'max_file_size', value: '10485760', description: 'Tamaño máximo de archivo en bytes (10MB)' },
+    { key: 'site_name',          value: 'Sistema de Tickets Multi-Familia', description: 'Nombre del sitio web' },
+    { key: 'company_name',       value: 'Mi Empresa',                       description: 'Nombre de la empresa' },
+    { key: 'support_email',      value: 'admin@sistema.com',                description: 'Email de soporte técnico' },
+    { key: 'max_file_size',      value: '10485760',                         description: 'Tamaño máximo de archivo en bytes (10MB)' },
     { key: 'allowed_file_types', value: 'pdf,doc,docx,txt,png,jpg,jpeg,gif', description: 'Tipos de archivo permitidos' },
   ]
   for (const c of configs) {
@@ -171,587 +348,289 @@ async function seedSiteConfig() {
   console.log(`✅ ${configs.length} configuraciones del sitio`)
 }
 
-async function seedSLAPolicies() {
+// ============================================
+// 8. POLÍTICAS DE SLA
+// ============================================
+
+async function seedSLAPolicies(familyMap: Map<string, string>) {
   const existing = await prisma.sla_policies.count()
   if (existing > 0) { console.log(`⏭️  SLA ya existe (${existing})`); return }
-  const policies = [
-    { name: 'SLA Urgente - 24/7', priority: 'URGENT', responseTimeHours: 1, resolutionTimeHours: 4, businessHoursOnly: false, businessHoursStart: '00:00:00', businessHoursEnd: '23:59:59', businessDays: 'MON,TUE,WED,THU,FRI,SAT,SUN' },
-    { name: 'SLA Alta Prioridad', priority: 'HIGH', responseTimeHours: 4, resolutionTimeHours: 24, businessHoursOnly: true, businessHoursStart: '09:00:00', businessHoursEnd: '18:00:00', businessDays: 'MON,TUE,WED,THU,FRI' },
-    { name: 'SLA Prioridad Media', priority: 'MEDIUM', responseTimeHours: 8, resolutionTimeHours: 48, businessHoursOnly: true, businessHoursStart: '09:00:00', businessHoursEnd: '18:00:00', businessDays: 'MON,TUE,WED,THU,FRI' },
-    { name: 'SLA Baja Prioridad', priority: 'LOW', responseTimeHours: 24, resolutionTimeHours: 72, businessHoursOnly: true, businessHoursStart: '09:00:00', businessHoursEnd: '18:00:00', businessDays: 'MON,TUE,WED,THU,FRI' },
+
+  const techFamilyId = familyMap.get('TECHNOLOGY')!
+
+  // SLA globales (sin familia — fallback para todas las familias)
+  const globalPolicies = [
+    { name: 'Global - Urgente 24/7',    priority: 'URGENT', responseTimeHours: 2,  resolutionTimeHours: 8,  businessHoursOnly: false, businessHoursStart: '00:00:00', businessHoursEnd: '23:59:59', businessDays: 'MON,TUE,WED,THU,FRI,SAT,SUN' },
+    { name: 'Global - Alta Prioridad',  priority: 'HIGH',   responseTimeHours: 8,  resolutionTimeHours: 48, businessHoursOnly: true,  businessHoursStart: '08:00:00', businessHoursEnd: '17:00:00', businessDays: 'MON,TUE,WED,THU,FRI' },
+    { name: 'Global - Prioridad Media', priority: 'MEDIUM', responseTimeHours: 24, resolutionTimeHours: 72, businessHoursOnly: true,  businessHoursStart: '08:00:00', businessHoursEnd: '17:00:00', businessDays: 'MON,TUE,WED,THU,FRI' },
+    { name: 'Global - Baja Prioridad',  priority: 'LOW',    responseTimeHours: 48, resolutionTimeHours: 120, businessHoursOnly: true, businessHoursStart: '08:00:00', businessHoursEnd: '17:00:00', businessDays: 'MON,TUE,WED,THU,FRI' },
   ]
-  for (const p of policies) {
-    await prisma.sla_policies.create({ data: { id: randomUUID(), ...p, isActive: true, createdAt: now } })
+  for (const p of globalPolicies) {
+    await prisma.sla_policies.create({ data: { id: randomUUID(), ...p, isActive: true } })
   }
-  console.log(`✅ ${policies.length} políticas de SLA`)
+
+  // SLA estrictos para TECHNOLOGY
+  const techPolicies = [
+    { name: 'TI - Urgente 24/7',    priority: 'URGENT', responseTimeHours: 1, resolutionTimeHours: 4,  businessHoursOnly: false, businessHoursStart: '00:00:00', businessHoursEnd: '23:59:59', businessDays: 'MON,TUE,WED,THU,FRI,SAT,SUN', familyId: techFamilyId },
+    { name: 'TI - Alta Prioridad',  priority: 'HIGH',   responseTimeHours: 2, resolutionTimeHours: 8,  businessHoursOnly: true,  businessHoursStart: '08:00:00', businessHoursEnd: '17:00:00', businessDays: 'MON,TUE,WED,THU,FRI', familyId: techFamilyId },
+    { name: 'TI - Prioridad Media', priority: 'MEDIUM', responseTimeHours: 4, resolutionTimeHours: 24, businessHoursOnly: true,  businessHoursStart: '08:00:00', businessHoursEnd: '17:00:00', businessDays: 'MON,TUE,WED,THU,FRI', familyId: techFamilyId },
+    { name: 'TI - Baja Prioridad',  priority: 'LOW',    responseTimeHours: 8, resolutionTimeHours: 48, businessHoursOnly: true,  businessHoursStart: '08:00:00', businessHoursEnd: '17:00:00', businessDays: 'MON,TUE,WED,THU,FRI', familyId: techFamilyId },
+  ]
+  for (const p of techPolicies) {
+    await prisma.sla_policies.create({ data: { id: randomUUID(), ...p, isActive: true } })
+  }
+  console.log(`✅ ${globalPolicies.length} SLA globales + ${techPolicies.length} SLA para TECHNOLOGY`)
 }
 
-async function seedCategoriesFromExcel(deptInfraId: string, deptSoporteId: string, deptSeguridadId: string, deptUsuariosId: string, deptTelefoniaId: string) {
-  
-  // ==================== INFRAESTRUCTURA ====================
-  
-  // Nivel 1 - Infraestructura
-  const fallaErrorInfra = await upsertCategory({ 
-    name: 'Falla o Error', 
-    description: 'Incidentes y fallas en infraestructura', 
-    level: 1, 
-    parentId: null, 
-    departmentId: deptInfraId, 
-    order: 1, 
-    color: '#EF4444' 
-  })
-  
-  const solicitudRequerimientoInfra = await upsertCategory({ 
-    name: 'Solicitud o Requerimiento', 
-    description: 'Solicitudes y requerimientos de infraestructura', 
-    level: 1, 
-    parentId: null, 
-    departmentId: deptInfraId, 
-    order: 2, 
-    color: '#3B82F6' 
-  })
+// ============================================
+// 9. CATEGORÍAS (todas bajo TECHNOLOGY)
+// ============================================
 
-  // Nivel 2 - Infraestructura (Falla o Error)
-  const networking = await upsertCategory({ 
-    name: 'Networking', 
-    description: 'Redes, conectividad, comunicaciones, firewall, VPN, central telefónica', 
-    level: 2, 
-    parentId: fallaErrorInfra.id, 
-    departmentId: deptInfraId, 
-    order: 1, 
-    color: '#10B981' 
-  })
-  
-  const energiaRegulada = await upsertCategory({ 
-    name: 'Energía Regulada', 
-    description: 'UPS, baterías, energía eléctrica, estabilizadores', 
-    level: 2, 
-    parentId: fallaErrorInfra.id, 
-    departmentId: deptInfraId, 
-    order: 2, 
-    color: '#F59E0B' 
-  })
-  
-  const gestionOffice365 = await upsertCategory({ 
-    name: 'Gestión de Usuarios Office 365', 
-    description: 'Plataforma Microsoft 365, Teams, licencias, cuentas', 
-    level: 2, 
-    parentId: fallaErrorInfra.id, 
-    departmentId: deptInfraId, 
-    order: 3, 
-    color: '#8B5CF6' 
-  })
+async function seedCategories(deptMap: Map<string, string>) {
+  const deptInfraId    = deptMap.get('Tecnologías de la Información')!
+  const deptSoporteId  = deptMap.get('Soporte Técnico')!
+  const deptSeguridad  = deptMap.get('Seguridad Informática')!
+  const deptUsuarios   = deptMap.get('Usuarios y Privilegios')!
+  const deptTelefonia  = deptMap.get('Telefonía')!
 
-  const impresion = await upsertCategory({ 
-    name: 'Impresión', 
-    description: 'Impresoras, fotocopiadoras, problemas de impresión', 
-    level: 2, 
-    parentId: fallaErrorInfra.id, 
-    departmentId: deptInfraId, 
-    order: 4, 
-    color: '#EC4899' 
-  })
+  // ==================== INFRAESTRUCTURA TI ====================
+  const fallaInfra = await upsertCategory({ name: 'Falla o Error', description: 'Incidentes y fallas en infraestructura', level: 1, parentId: null, departmentId: deptInfraId, order: 1, color: '#EF4444' })
+  const solicInfra = await upsertCategory({ name: 'Solicitud o Requerimiento', description: 'Solicitudes de infraestructura', level: 1, parentId: null, departmentId: deptInfraId, order: 2, color: '#3B82F6' })
 
-  // Nivel 2 - Infraestructura (Solicitud o Requerimiento)
-  const solicitudRequerimientoN2Infra = await upsertCategory({ 
-    name: 'Solicitud o Requerimiento', 
-    description: 'Solicitudes generales de infraestructura', 
-    level: 2, 
-    parentId: solicitudRequerimientoInfra.id, 
-    departmentId: deptInfraId, 
-    order: 1, 
-    color: '#3B82F6' 
-  })
-  
-  const energiaReguladaSolicitud = await upsertCategory({ 
-    name: 'Energía Regulada', 
-    description: 'Solicitudes de energía regulada, UPS, baterías', 
-    level: 2, 
-    parentId: solicitudRequerimientoInfra.id, 
-    departmentId: deptInfraId, 
-    order: 2, 
-    color: '#F59E0B' 
-  })
+  const networking = await upsertCategory({ name: 'Networking', description: 'Redes, conectividad, firewall, VPN', level: 2, parentId: fallaInfra.id, departmentId: deptInfraId, order: 1, color: '#10B981' })
+  const energiaReg = await upsertCategory({ name: 'Energía Regulada', description: 'UPS, baterías, energía eléctrica', level: 2, parentId: fallaInfra.id, departmentId: deptInfraId, order: 2, color: '#F59E0B' })
+  const office365  = await upsertCategory({ name: 'Gestión de Usuarios Office 365', description: 'Microsoft 365, Teams, licencias', level: 2, parentId: fallaInfra.id, departmentId: deptInfraId, order: 3, color: '#8B5CF6' })
+  const impresion  = await upsertCategory({ name: 'Impresión', description: 'Impresoras, fotocopiadoras', level: 2, parentId: fallaInfra.id, departmentId: deptInfraId, order: 4, color: '#EC4899' })
+  const solicInfraN2 = await upsertCategory({ name: 'Solicitud o Requerimiento', description: 'Solicitudes generales de infraestructura', level: 2, parentId: solicInfra.id, departmentId: deptInfraId, order: 1, color: '#3B82F6' })
+  const energiaSolic = await upsertCategory({ name: 'Energía Regulada', description: 'Solicitudes de energía regulada', level: 2, parentId: solicInfra.id, departmentId: deptInfraId, order: 2, color: '#F59E0B' })
 
-  // Nivel 3 - Networking (Fallas)
-  await upsertCategory({ name: 'Pérdida de Conexión', description: 'Sin conexión de red, caída de conectividad', level: 3, parentId: networking.id, departmentId: deptInfraId, order: 1, color: '#EF4444' })
-  await upsertCategory({ name: 'Daño de Equipos Comunicaciones', description: 'Equipos de red dañados, switch, router', level: 3, parentId: networking.id, departmentId: deptInfraId, order: 2, color: '#EF4444' })
-  await upsertCategory({ name: 'Pérdida de Rutas Comunicación', description: 'Rutas de red perdidas, routing', level: 3, parentId: networking.id, departmentId: deptInfraId, order: 3, color: '#EF4444' })
-  await upsertCategory({ name: 'Pérdida de Comunicación Inalámbrica', description: 'WiFi caído, señal inalámbrica', level: 3, parentId: networking.id, departmentId: deptInfraId, order: 4, color: '#EF4444' })
-  await upsertCategory({ name: 'Firewall', description: 'Problemas con firewall, bloqueo de puertos', level: 3, parentId: networking.id, departmentId: deptInfraId, order: 5, color: '#EF4444' })
-  await upsertCategory({ name: 'Central Telefónica', description: 'Problemas con PBX, central telefónica', level: 3, parentId: networking.id, departmentId: deptInfraId, order: 6, color: '#EF4444' })
-  await upsertCategory({ name: 'VPN', description: 'Problemas con VPN, túnel VPN caído', level: 3, parentId: networking.id, departmentId: deptInfraId, order: 7, color: '#EF4444' })
-
-  // Nivel 3 - Solicitudes Infraestructura
-  await upsertCategory({ name: 'Creación de SSID', description: 'Solicitud de nueva red WiFi, SSID', level: 3, parentId: solicitudRequerimientoN2Infra.id, departmentId: deptInfraId, order: 1, color: '#3B82F6' })
-  await upsertCategory({ name: 'VPN', description: 'Solicitud de acceso VPN, configuración VPN', level: 3, parentId: solicitudRequerimientoN2Infra.id, departmentId: deptInfraId, order: 2, color: '#3B82F6' })
-  await upsertCategory({ name: 'Fortinet', description: 'Solicitud relacionada con Fortinet, firewall Fortinet', level: 3, parentId: solicitudRequerimientoN2Infra.id, departmentId: deptInfraId, order: 3, color: '#3B82F6' })
-  await upsertCategory({ name: 'Reportes', description: 'Solicitud de reportes de infraestructura', level: 3, parentId: solicitudRequerimientoN2Infra.id, departmentId: deptInfraId, order: 4, color: '#3B82F6' })
-  await upsertCategory({ name: 'Creación de Cuenta', description: 'Solicitud de creación de cuenta de usuario', level: 3, parentId: solicitudRequerimientoN2Infra.id, departmentId: deptInfraId, order: 5, color: '#3B82F6' })
-  await upsertCategory({ name: 'Reseteo Contraseña', description: 'Solicitud de reseteo de contraseña', level: 3, parentId: solicitudRequerimientoN2Infra.id, departmentId: deptInfraId, order: 6, color: '#3B82F6' })
-
-  // Nivel 3 - Energía Regulada (Solicitudes)
-  await upsertCategory({ name: 'Nuevos Equipos', description: 'Solicitud de nuevos equipos de energía', level: 3, parentId: energiaReguladaSolicitud.id, departmentId: deptInfraId, order: 1, color: '#3B82F6' })
-  await upsertCategory({ name: 'Mantenimiento', description: 'Solicitud de mantenimiento de equipos', level: 3, parentId: energiaReguladaSolicitud.id, departmentId: deptInfraId, order: 2, color: '#3B82F6' })
-  await upsertCategory({ name: 'Reemplazo de Partes', description: 'Solicitud de reemplazo de componentes', level: 3, parentId: energiaReguladaSolicitud.id, departmentId: deptInfraId, order: 3, color: '#3B82F6' })
-
-  // Nivel 3 - Office 365
-  await upsertCategory({ name: 'Plataforma Intermitente', description: 'Office 365 intermitente, inestable', level: 3, parentId: gestionOffice365.id, departmentId: deptInfraId, order: 1, color: '#EF4444' })
-
-  // Nivel 3 - Impresión (Fallas)
-  await upsertCategory({ name: 'Atasco de Papel', description: 'Impresora atascada, papel trabado', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 1, color: '#EF4444' })
-  await upsertCategory({ name: 'Baja Calidad de Imagen', description: 'Impresión con baja calidad, borrosa', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 2, color: '#EF4444' })
-  await upsertCategory({ name: 'Cable de Impresora Dañado', description: 'Cable de red o USB dañado', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 3, color: '#EF4444' })
-  await upsertCategory({ name: 'Impresora Bloqueada', description: 'Impresora bloqueada, cola de impresión', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 4, color: '#EF4444' })
-  await upsertCategory({ name: 'Impresora sin Conexión/Red', description: 'Impresora sin conexión de red', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 5, color: '#EF4444' })
-  await upsertCategory({ name: 'La Impresora no Digitaliza/Escanea', description: 'Escáner no funciona', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 6, color: '#EF4444' })
-  await upsertCategory({ name: 'Impresora hace Ruido Anormal', description: 'Impresora hace ruido anormal', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 14, color: '#EF4444' })
-
+  await upsertCategory({ name: 'Pérdida de Conexión', description: 'Sin conexión de red', level: 3, parentId: networking.id, departmentId: deptInfraId, order: 1, color: '#EF4444' })
+  await upsertCategory({ name: 'Daño de Equipos Comunicaciones', description: 'Equipos de red dañados', level: 3, parentId: networking.id, departmentId: deptInfraId, order: 2, color: '#EF4444' })
+  await upsertCategory({ name: 'Pérdida de Rutas Comunicación', description: 'Rutas de red perdidas', level: 3, parentId: networking.id, departmentId: deptInfraId, order: 3, color: '#EF4444' })
+  await upsertCategory({ name: 'Pérdida de Comunicación Inalámbrica', description: 'WiFi caído', level: 3, parentId: networking.id, departmentId: deptInfraId, order: 4, color: '#EF4444' })
+  await upsertCategory({ name: 'Firewall', description: 'Problemas con firewall', level: 3, parentId: networking.id, departmentId: deptInfraId, order: 5, color: '#EF4444' })
+  await upsertCategory({ name: 'Central Telefónica', description: 'Problemas con PBX', level: 3, parentId: networking.id, departmentId: deptInfraId, order: 6, color: '#EF4444' })
+  await upsertCategory({ name: 'VPN', description: 'Problemas con VPN', level: 3, parentId: networking.id, departmentId: deptInfraId, order: 7, color: '#EF4444' })
+  await upsertCategory({ name: 'Plataforma Intermitente', description: 'Office 365 intermitente', level: 3, parentId: office365.id, departmentId: deptInfraId, order: 1, color: '#EF4444' })
+  await upsertCategory({ name: 'Atasco de Papel', description: 'Impresora atascada', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 1, color: '#EF4444' })
+  await upsertCategory({ name: 'Baja Calidad de Imagen', description: 'Impresión con baja calidad', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 2, color: '#EF4444' })
+  await upsertCategory({ name: 'Impresora sin Conexión/Red', description: 'Impresora sin conexión', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 3, color: '#EF4444' })
+  await upsertCategory({ name: 'Creación de SSID', description: 'Solicitud de nueva red WiFi', level: 3, parentId: solicInfraN2.id, departmentId: deptInfraId, order: 1, color: '#3B82F6' })
+  await upsertCategory({ name: 'VPN', description: 'Solicitud de acceso VPN', level: 3, parentId: solicInfraN2.id, departmentId: deptInfraId, order: 2, color: '#3B82F6' })
+  await upsertCategory({ name: 'Creación de Cuenta', description: 'Solicitud de creación de cuenta', level: 3, parentId: solicInfraN2.id, departmentId: deptInfraId, order: 3, color: '#3B82F6' })
+  await upsertCategory({ name: 'Reseteo Contraseña', description: 'Solicitud de reseteo de contraseña', level: 3, parentId: solicInfraN2.id, departmentId: deptInfraId, order: 4, color: '#3B82F6' })
+  await upsertCategory({ name: 'Nuevos Equipos', description: 'Solicitud de nuevos equipos de energía', level: 3, parentId: energiaSolic.id, departmentId: deptInfraId, order: 1, color: '#3B82F6' })
+  await upsertCategory({ name: 'Mantenimiento', description: 'Solicitud de mantenimiento', level: 3, parentId: energiaSolic.id, departmentId: deptInfraId, order: 2, color: '#3B82F6' })
 
   // ==================== SOPORTE TÉCNICO ====================
-  
-  // Nivel 1 - Soporte Técnico
-  const fallaErrorSoporte = await upsertCategory({ 
-    name: 'Falla o Error', 
-    description: 'Incidentes y fallas en soporte técnico', 
-    level: 1, 
-    parentId: null, 
-    departmentId: deptSoporteId, 
-    order: 1, 
-    color: '#EF4444' 
-  })
-  
-  const solicitudRequerimientoSoporte = await upsertCategory({ 
-    name: 'Solicitud o Requerimiento', 
-    description: 'Solicitudes y requerimientos de soporte técnico', 
-    level: 1, 
-    parentId: null, 
-    departmentId: deptSoporteId, 
-    order: 2, 
-    color: '#3B82F6' 
-  })
+  const fallaSoporte = await upsertCategory({ name: 'Falla o Error', description: 'Incidentes en soporte técnico', level: 1, parentId: null, departmentId: deptSoporteId, order: 1, color: '#EF4444' })
+  const solicSoporte = await upsertCategory({ name: 'Solicitud o Requerimiento', description: 'Solicitudes de soporte técnico', level: 1, parentId: null, departmentId: deptSoporteId, order: 2, color: '#3B82F6' })
+  const equipos = await upsertCategory({ name: 'Equipos', description: 'Computadoras, laptops', level: 2, parentId: fallaSoporte.id, departmentId: deptSoporteId, order: 1, color: '#10B981' })
+  const solicSoporteN2 = await upsertCategory({ name: 'Solicitud o Requerimiento', description: 'Solicitudes generales de soporte', level: 2, parentId: solicSoporte.id, departmentId: deptSoporteId, order: 1, color: '#3B82F6' })
+  await upsertCategory({ name: 'Verificación de Partes', description: 'Verificación de hardware', level: 3, parentId: equipos.id, departmentId: deptSoporteId, order: 1, color: '#EF4444' })
+  await upsertCategory({ name: 'Reparación de Equipos', description: 'Reparación de hardware', level: 3, parentId: equipos.id, departmentId: deptSoporteId, order: 2, color: '#EF4444' })
+  await upsertCategory({ name: 'Instalar Software Base', description: 'Instalación de SO y software base', level: 3, parentId: equipos.id, departmentId: deptSoporteId, order: 3, color: '#EF4444' })
+  await upsertCategory({ name: 'Renovación de Equipo', description: 'Solicitud de renovación', level: 3, parentId: solicSoporteN2.id, departmentId: deptSoporteId, order: 1, color: '#3B82F6' })
+  await upsertCategory({ name: 'Adquisición Equipos', description: 'Solicitud de compra de equipos', level: 3, parentId: solicSoporteN2.id, departmentId: deptSoporteId, order: 2, color: '#3B82F6' })
 
-  // Nivel 2 - Soporte Técnico
-  const equipos = await upsertCategory({ 
-    name: 'Equipos', 
-    description: 'Computadoras, laptops, equipos de cómputo', 
-    level: 2, 
-    parentId: fallaErrorSoporte.id, 
-    departmentId: deptSoporteId, 
-    order: 1, 
-    color: '#10B981' 
-  })
-  
-  const solicitudRequerimientoN2Soporte = await upsertCategory({ 
-    name: 'Solicitud o Requerimiento', 
-    description: 'Solicitudes generales de soporte', 
-    level: 2, 
-    parentId: solicitudRequerimientoSoporte.id, 
-    departmentId: deptSoporteId, 
-    order: 1, 
-    color: '#3B82F6' 
-  })
-
-  // Nivel 3 - Equipos (Fallas)
-  await upsertCategory({ name: 'Verificación de Partes', description: 'Verificación de componentes, hardware', level: 3, parentId: equipos.id, departmentId: deptSoporteId, order: 1, color: '#EF4444' })
-  await upsertCategory({ name: 'Preparación Equipos', description: 'Preparación de equipos nuevos', level: 3, parentId: equipos.id, departmentId: deptSoporteId, order: 2, color: '#EF4444' })
-  await upsertCategory({ name: 'Revisión Equipos', description: 'Revisión técnica de equipos', level: 3, parentId: equipos.id, departmentId: deptSoporteId, order: 3, color: '#EF4444' })
-  await upsertCategory({ name: 'Instalar Software Base', description: 'Instalación de sistema operativo y software base', level: 3, parentId: equipos.id, departmentId: deptSoporteId, order: 4, color: '#EF4444' })
-  await upsertCategory({ name: 'Reparación de Equipos', description: 'Reparación de hardware, componentes', level: 3, parentId: equipos.id, departmentId: deptSoporteId, order: 5, color: '#EF4444' })
-
-  // Nivel 3 - Solicitudes Soporte
-  await upsertCategory({ name: 'Renovación de Equipo', description: 'Solicitud de renovación de equipo', level: 3, parentId: solicitudRequerimientoN2Soporte.id, departmentId: deptSoporteId, order: 1, color: '#3B82F6' })
-  await upsertCategory({ name: 'Adquisición Equipos', description: 'Solicitud de compra de equipos', level: 3, parentId: solicitudRequerimientoN2Soporte.id, departmentId: deptSoporteId, order: 2, color: '#3B82F6' })
-  await upsertCategory({ name: 'Adquisición de Impresoras', description: 'Solicitud de compra de impresoras', level: 3, parentId: solicitudRequerimientoN2Soporte.id, departmentId: deptSoporteId, order: 3, color: '#3B82F6' })
-
-
-  // ==================== SEGURIDAD DE LA INFORMACIÓN ====================
-  
-  // Nivel 1 - Seguridad
-  const incidentes = await upsertCategory({ 
-    name: 'Incidentes', 
-    description: 'Incidentes de seguridad de la información', 
-    level: 1, 
-    parentId: null, 
-    departmentId: deptSeguridadId, 
-    order: 1, 
-    color: '#EF4444' 
-  })
-  
-  const requerimientosSeguridad = await upsertCategory({ 
-    name: 'Requerimientos', 
-    description: 'Requerimientos de seguridad de la información', 
-    level: 1, 
-    parentId: null, 
-    departmentId: deptSeguridadId, 
-    order: 2, 
-    color: '#3B82F6' 
-  })
-
-  // Nivel 3 - Incidentes (sin nivel 2 intermedio)
-  await upsertCategory({ name: 'Divulgación no Autorizada de Información Confidencial', description: 'Fuga de información, datos confidenciales', level: 3, parentId: incidentes.id, departmentId: deptSeguridadId, order: 1, color: '#EF4444' })
-  await upsertCategory({ name: 'Sensibilización y Entrenamiento a Usuarios', description: 'Capacitación en seguridad', level: 3, parentId: incidentes.id, departmentId: deptSeguridadId, order: 2, color: '#EF4444' })
-  await upsertCategory({ name: 'Sucesivos Intentos Fallidos de Login', description: 'Múltiples intentos de acceso fallidos', level: 3, parentId: incidentes.id, departmentId: deptSeguridadId, order: 3, color: '#EF4444' })
-  await upsertCategory({ name: 'Ataques Informáticos', description: 'Cyberataques, hacking, malware', level: 3, parentId: incidentes.id, departmentId: deptSeguridadId, order: 4, color: '#EF4444' })
-  await upsertCategory({ name: 'Accesos o Intentos no Autorizados', description: 'Acceso no autorizado a sistemas', level: 3, parentId: incidentes.id, departmentId: deptSeguridadId, order: 5, color: '#EF4444' })
-
-  // Nivel 3 - Requerimientos Seguridad
-  await upsertCategory({ name: 'Informes de Validación de Alta de Cuentas Usuarias', description: 'Validación de nuevas cuentas', level: 3, parentId: requerimientosSeguridad.id, departmentId: deptSeguridadId, order: 1, color: '#3B82F6' })
-  await upsertCategory({ name: 'Informes sobre Validación de Baja de Cuentas Usuarias', description: 'Validación de cuentas eliminadas', level: 3, parentId: requerimientosSeguridad.id, departmentId: deptSeguridadId, order: 2, color: '#3B82F6' })
-  await upsertCategory({ name: 'Informe sobre Validación de Modificación de Cuentas Usuarias', description: 'Validación de cambios en cuentas', level: 3, parentId: requerimientosSeguridad.id, departmentId: deptSeguridadId, order: 3, color: '#3B82F6' })
-  await upsertCategory({ name: 'Definición de Políticas de Seguridad de la Información', description: 'Creación de políticas de seguridad', level: 3, parentId: requerimientosSeguridad.id, departmentId: deptSeguridadId, order: 4, color: '#3B82F6' })
-  await upsertCategory({ name: 'Aprobación del Servicio VPN', description: 'Aprobación de acceso VPN', level: 3, parentId: requerimientosSeguridad.id, departmentId: deptSeguridadId, order: 5, color: '#3B82F6' })
-
+  // ==================== SEGURIDAD INFORMÁTICA ====================
+  const incidentes = await upsertCategory({ name: 'Incidentes', description: 'Incidentes de seguridad', level: 1, parentId: null, departmentId: deptSeguridad, order: 1, color: '#EF4444' })
+  const reqSeguridad = await upsertCategory({ name: 'Requerimientos', description: 'Requerimientos de seguridad', level: 1, parentId: null, departmentId: deptSeguridad, order: 2, color: '#3B82F6' })
+  await upsertCategory({ name: 'Ataques Informáticos', description: 'Cyberataques, malware', level: 3, parentId: incidentes.id, departmentId: deptSeguridad, order: 1, color: '#EF4444' })
+  await upsertCategory({ name: 'Accesos no Autorizados', description: 'Acceso no autorizado a sistemas', level: 3, parentId: incidentes.id, departmentId: deptSeguridad, order: 2, color: '#EF4444' })
+  await upsertCategory({ name: 'Divulgación de Información Confidencial', description: 'Fuga de información', level: 3, parentId: incidentes.id, departmentId: deptSeguridad, order: 3, color: '#EF4444' })
+  await upsertCategory({ name: 'Definición de Políticas de Seguridad', description: 'Creación de políticas', level: 3, parentId: reqSeguridad.id, departmentId: deptSeguridad, order: 1, color: '#3B82F6' })
+  await upsertCategory({ name: 'Aprobación del Servicio VPN', description: 'Aprobación de acceso VPN', level: 3, parentId: reqSeguridad.id, departmentId: deptSeguridad, order: 2, color: '#3B82F6' })
 
   // ==================== USUARIOS Y PRIVILEGIOS ====================
-  
-  // Nivel 1 - Usuarios y Privilegios
-  const fallaErrorUsuarios = await upsertCategory({ 
-    name: 'Falla o Error', 
-    description: 'Problemas con usuarios y privilegios', 
-    level: 1, 
-    parentId: null, 
-    departmentId: deptUsuariosId, 
-    order: 1, 
-    color: '#EF4444' 
-  })
-  
-  const solicitudRequerimientoUsuarios = await upsertCategory({ 
-    name: 'Solicitud o Requerimiento', 
-    description: 'Solicitudes de usuarios y privilegios', 
-    level: 1, 
-    parentId: null, 
-    departmentId: deptUsuariosId, 
-    order: 2, 
-    color: '#3B82F6' 
-  })
-
-  // Nivel 2 - Usuarios y Privilegios (Fallas)
-  const m365Fallas = await upsertCategory({ 
-    name: 'Microsoft 365', 
-    description: 'Problemas con Office 365, Microsoft 365', 
-    level: 2, 
-    parentId: fallaErrorUsuarios.id, 
-    departmentId: deptUsuariosId, 
-    order: 1, 
-    color: '#8B5CF6' 
-  })
-
-  // Nivel 2 - Usuarios y Privilegios (Solicitudes)
-  const m365Solicitudes = await upsertCategory({ 
-    name: 'Microsoft 365', 
-    description: 'Solicitudes relacionadas con M365', 
-    level: 2, 
-    parentId: solicitudRequerimientoUsuarios.id, 
-    departmentId: deptUsuariosId, 
-    order: 1, 
-    color: '#8B5CF6' 
-  })
-  
-  const vpnUsuarios = await upsertCategory({ 
-    name: 'VPN', 
-    description: 'Solicitudes de VPN, acceso remoto', 
-    level: 2, 
-    parentId: solicitudRequerimientoUsuarios.id, 
-    departmentId: deptUsuariosId, 
-    order: 2, 
-    color: '#10B981' 
-  })
-
-  // Nivel 3 - M365 Fallas
-  await upsertCategory({ name: 'Error al Iniciar Sesión en M365', description: 'No puede iniciar sesión en Microsoft 365', level: 3, parentId: m365Fallas.id, departmentId: deptUsuariosId, order: 1, color: '#EF4444' })
-  await upsertCategory({ name: 'Servicio no Disponible en M365', description: 'Servicio M365 caído, no disponible', level: 3, parentId: m365Fallas.id, departmentId: deptUsuariosId, order: 2, color: '#EF4444' })
-
-  // Nivel 3 - M365 Solicitudes
-  await upsertCategory({ name: 'Cambio de Contraseña Correo', description: 'Solicitud de cambio de contraseña de correo', level: 3, parentId: m365Solicitudes.id, departmentId: deptUsuariosId, order: 1, color: '#3B82F6' })
-  await upsertCategory({ name: 'Creación de Usuario M365', description: 'Solicitud de nuevo usuario en M365', level: 3, parentId: m365Solicitudes.id, departmentId: deptUsuariosId, order: 2, color: '#3B82F6' })
-  await upsertCategory({ name: 'Desactivación de Usuarios en M365', description: 'Solicitud de desactivar usuario M365', level: 3, parentId: m365Solicitudes.id, departmentId: deptUsuariosId, order: 3, color: '#3B82F6' })
-
-  // Nivel 3 - VPN Solicitudes
-  await upsertCategory({ name: 'Creación de Usuario VPN', description: 'Solicitud de nuevo usuario VPN', level: 3, parentId: vpnUsuarios.id, departmentId: deptUsuariosId, order: 1, color: '#3B82F6' })
-  await upsertCategory({ name: 'Baja de Usuario VPN', description: 'Solicitud de eliminar usuario VPN', level: 3, parentId: vpnUsuarios.id, departmentId: deptUsuariosId, order: 2, color: '#3B82F6' })
-  await upsertCategory({ name: 'Modificación Perfil y Privilegios Acceso VPN', description: 'Cambio de permisos VPN', level: 3, parentId: vpnUsuarios.id, departmentId: deptUsuariosId, order: 3, color: '#3B82F6' })
-
+  const fallaUsuarios = await upsertCategory({ name: 'Falla o Error', description: 'Problemas con usuarios', level: 1, parentId: null, departmentId: deptUsuarios, order: 1, color: '#EF4444' })
+  const solicUsuarios = await upsertCategory({ name: 'Solicitud o Requerimiento', description: 'Solicitudes de usuarios', level: 1, parentId: null, departmentId: deptUsuarios, order: 2, color: '#3B82F6' })
+  const m365Fallas = await upsertCategory({ name: 'Microsoft 365', description: 'Problemas con M365', level: 2, parentId: fallaUsuarios.id, departmentId: deptUsuarios, order: 1, color: '#8B5CF6' })
+  const m365Solic  = await upsertCategory({ name: 'Microsoft 365', description: 'Solicitudes M365', level: 2, parentId: solicUsuarios.id, departmentId: deptUsuarios, order: 1, color: '#8B5CF6' })
+  const vpnUsuarios = await upsertCategory({ name: 'VPN', description: 'Solicitudes de VPN', level: 2, parentId: solicUsuarios.id, departmentId: deptUsuarios, order: 2, color: '#10B981' })
+  await upsertCategory({ name: 'Error al Iniciar Sesión en M365', description: 'No puede iniciar sesión', level: 3, parentId: m365Fallas.id, departmentId: deptUsuarios, order: 1, color: '#EF4444' })
+  await upsertCategory({ name: 'Creación de Usuario M365', description: 'Solicitud de nuevo usuario', level: 3, parentId: m365Solic.id, departmentId: deptUsuarios, order: 1, color: '#3B82F6' })
+  await upsertCategory({ name: 'Desactivación de Usuarios en M365', description: 'Desactivar usuario M365', level: 3, parentId: m365Solic.id, departmentId: deptUsuarios, order: 2, color: '#3B82F6' })
+  await upsertCategory({ name: 'Creación de Usuario VPN', description: 'Nuevo usuario VPN', level: 3, parentId: vpnUsuarios.id, departmentId: deptUsuarios, order: 1, color: '#3B82F6' })
+  await upsertCategory({ name: 'Baja de Usuario VPN', description: 'Eliminar usuario VPN', level: 3, parentId: vpnUsuarios.id, departmentId: deptUsuarios, order: 2, color: '#3B82F6' })
 
   // ==================== TELEFONÍA ====================
-  
-  // Nivel 1 - Telefonía
-  const fallaErrorTelefonia = await upsertCategory({ 
-    name: 'Falla o Error', 
-    description: 'Problemas con telefonía', 
-    level: 1, 
-    parentId: null, 
-    departmentId: deptTelefoniaId, 
-    order: 1, 
-    color: '#EF4444' 
-  })
-  
-  const solicitudRequerimientoTelefonia = await upsertCategory({ 
-    name: 'Solicitud o Requerimiento', 
-    description: 'Solicitudes de telefonía', 
-    level: 1, 
-    parentId: null, 
-    departmentId: deptTelefoniaId, 
-    order: 2, 
-    color: '#3B82F6' 
-  })
+  const fallaTelefonia = await upsertCategory({ name: 'Falla o Error', description: 'Problemas con telefonía', level: 1, parentId: null, departmentId: deptTelefonia, order: 1, color: '#EF4444' })
+  const solicTelefonia = await upsertCategory({ name: 'Solicitud o Requerimiento', description: 'Solicitudes de telefonía', level: 1, parentId: null, departmentId: deptTelefonia, order: 2, color: '#3B82F6' })
+  const dañoBocina = await upsertCategory({ name: 'Daño de Bocina', description: 'Bocina dañada', level: 2, parentId: fallaTelefonia.id, departmentId: deptTelefonia, order: 1, color: '#EF4444' })
+  const noFuncExt  = await upsertCategory({ name: 'No Funciona la Extensión', description: 'Extensión no funciona', level: 2, parentId: fallaTelefonia.id, departmentId: deptTelefonia, order: 2, color: '#EF4444' })
+  const solicExt   = await upsertCategory({ name: 'Solicitud de Extensión', description: 'Nueva extensión', level: 2, parentId: solicTelefonia.id, departmentId: deptTelefonia, order: 1, color: '#3B82F6' })
 
-  // Nivel 2 - Telefonía (Fallas)
-  const dañoBocina = await upsertCategory({ 
-    name: 'Daño de Bocina', 
-    description: 'Bocina del teléfono dañada', 
-    level: 2, 
-    parentId: fallaErrorTelefonia.id, 
-    departmentId: deptTelefoniaId, 
-    order: 1, 
-    color: '#EF4444' 
-  })
-  
-  const dañoExtension = await upsertCategory({ 
-    name: 'Daño de Extensión', 
-    description: 'Extensión telefónica dañada', 
-    level: 2, 
-    parentId: fallaErrorTelefonia.id, 
-    departmentId: deptTelefoniaId, 
-    order: 2, 
-    color: '#EF4444' 
-  })
-  
-  const noFuncionaExtension = await upsertCategory({ 
-    name: 'No Funciona la Extensión', 
-    description: 'Extensión no funciona', 
-    level: 2, 
-    parentId: fallaErrorTelefonia.id, 
-    departmentId: deptTelefoniaId, 
-    order: 3, 
-    color: '#EF4444' 
-  })
-  
-  const problemasLlamadas = await upsertCategory({ 
-    name: 'Problemas con Llamadas Entrantes y Salientes', 
-    description: 'Problemas con llamadas', 
-    level: 2, 
-    parentId: fallaErrorTelefonia.id, 
-    departmentId: deptTelefoniaId, 
-    order: 4, 
-    color: '#EF4444' 
-  })
-  
-  const telefonoSinRed = await upsertCategory({ 
-    name: 'Teléfono sin Red', 
-    description: 'Teléfono sin conexión de red', 
-    level: 2, 
-    parentId: fallaErrorTelefonia.id, 
-    departmentId: deptTelefoniaId, 
-    order: 5, 
-    color: '#EF4444' 
-  })
-
-  // Nivel 2 - Telefonía (Solicitudes)
-  const cambioExtension = await upsertCategory({ 
-    name: 'Cambio de Extensión', 
-    description: 'Solicitud de cambio de extensión', 
-    level: 2, 
-    parentId: solicitudRequerimientoTelefonia.id, 
-    departmentId: deptTelefoniaId, 
-    order: 1, 
-    color: '#3B82F6' 
-  })
-  
-  const solicitudExtension = await upsertCategory({ 
-    name: 'Solicitud de Extensión', 
-    description: 'Solicitud de nueva extensión', 
-    level: 2, 
-    parentId: solicitudRequerimientoTelefonia.id, 
-    departmentId: deptTelefoniaId, 
-    order: 2, 
-    color: '#3B82F6' 
-  })
-
-  console.log('✅ Categorías desde Excel creadas exitosamente')
-  console.log('📊 Total: 5 departamentos con jerarquía N1 → N2 → N3')
+  console.log('✅ Categorías (todas bajo familia TECHNOLOGY)')
 }
 
-async function seedEquipmentTypes() {
-  // Los tipos se asignan a familias después de que las familias existan
-  // Primero creamos todos los tipos, luego en migrateExistingTypesToTechnology
-  // se asignan los que no tienen familia a TECHNOLOGY
+// ============================================
+// 10. TIPOS DE EQUIPO (con familyId directo)
+// ============================================
+
+async function seedEquipmentTypes(familyMap: Map<string, string>) {
+  const fam = (code: string) => familyMap.get(code)!
   const types = [
     // TECHNOLOGY
-    { code: 'LAPTOP',          name: 'Laptop',           icon: 'Laptop',      order: 1 },
-    { code: 'DESKTOP',         name: 'Desktop',          icon: 'Monitor',     order: 2 },
-    { code: 'MONITOR',         name: 'Monitor',          icon: 'Monitor',     order: 3 },
-    { code: 'PRINTER',         name: 'Impresora',        icon: 'Printer',     order: 4 },
-    { code: 'PHONE',           name: 'Teléfono',         icon: 'Phone',       order: 5 },
-    { code: 'TABLET',          name: 'Tablet',           icon: 'Tablet',      order: 6 },
-    { code: 'KEYBOARD',        name: 'Teclado',          icon: 'Keyboard',    order: 7 },
-    { code: 'MOUSE',           name: 'Mouse',            icon: 'Mouse',       order: 8 },
-    { code: 'HEADSET',         name: 'Audífonos',        icon: 'Headphones',  order: 9 },
-    { code: 'WEBCAM',          name: 'Webcam',           icon: 'Camera',      order: 10 },
-    { code: 'DOCKING_STATION', name: 'Docking Station',  icon: 'Cpu',         order: 11 },
-    { code: 'UPS',             name: 'UPS',              icon: 'Battery',     order: 12 },
-    { code: 'ROUTER',          name: 'Router',           icon: 'Router',      order: 13 },
-    { code: 'SWITCH',          name: 'Switch de Red',    icon: 'Wifi',        order: 14 },
-    { code: 'SERVER',          name: 'Servidor',         icon: 'Server',      order: 15 },
-    // FIXED_ASSETS (infraestructura)
-    { code: 'AC_UNIT',         name: 'Aire Acondicionado', icon: 'Wind',      order: 20 },
-    { code: 'GENERATOR',       name: 'Generador',        icon: 'Zap',         order: 21 },
-    { code: 'ELEVATOR',        name: 'Ascensor',         icon: 'Building2',   order: 22 },
-    { code: 'WATER_PUMP',      name: 'Bomba de Agua',    icon: 'Droplets',    order: 23 },
-    { code: 'COMPRESSOR',      name: 'Compresor',        icon: 'Gauge',       order: 24 },
+    { code: 'LAPTOP',          name: 'Laptop',              icon: 'Laptop',       order: 1,  familyId: fam('TECHNOLOGY') },
+    { code: 'DESKTOP',         name: 'Desktop',             icon: 'Monitor',      order: 2,  familyId: fam('TECHNOLOGY') },
+    { code: 'MONITOR',         name: 'Monitor',             icon: 'Monitor',      order: 3,  familyId: fam('TECHNOLOGY') },
+    { code: 'PRINTER',         name: 'Impresora',           icon: 'Printer',      order: 4,  familyId: fam('TECHNOLOGY') },
+    { code: 'PHONE',           name: 'Teléfono',            icon: 'Phone',        order: 5,  familyId: fam('TECHNOLOGY') },
+    { code: 'TABLET',          name: 'Tablet',              icon: 'Tablet',       order: 6,  familyId: fam('TECHNOLOGY') },
+    { code: 'KEYBOARD',        name: 'Teclado',             icon: 'Keyboard',     order: 7,  familyId: fam('TECHNOLOGY') },
+    { code: 'MOUSE',           name: 'Mouse',               icon: 'Mouse',        order: 8,  familyId: fam('TECHNOLOGY') },
+    { code: 'HEADSET',         name: 'Audífonos',           icon: 'Headphones',   order: 9,  familyId: fam('TECHNOLOGY') },
+    { code: 'WEBCAM',          name: 'Webcam',              icon: 'Camera',       order: 10, familyId: fam('TECHNOLOGY') },
+    { code: 'DOCKING_STATION', name: 'Docking Station',     icon: 'Cpu',          order: 11, familyId: fam('TECHNOLOGY') },
+    { code: 'UPS',             name: 'UPS',                 icon: 'Battery',      order: 12, familyId: fam('TECHNOLOGY') },
+    { code: 'ROUTER',          name: 'Router',              icon: 'Router',       order: 13, familyId: fam('TECHNOLOGY') },
+    { code: 'SWITCH',          name: 'Switch de Red',       icon: 'Wifi',         order: 14, familyId: fam('TECHNOLOGY') },
+    { code: 'SERVER',          name: 'Servidor',            icon: 'Server',       order: 15, familyId: fam('TECHNOLOGY') },
+    // FIXED_ASSETS
+    { code: 'AC_UNIT',         name: 'Aire Acondicionado',  icon: 'Wind',         order: 20, familyId: fam('FIXED_ASSETS') },
+    { code: 'GENERATOR',       name: 'Generador',           icon: 'Zap',          order: 21, familyId: fam('FIXED_ASSETS') },
+    { code: 'ELEVATOR',        name: 'Ascensor',            icon: 'Building2',    order: 22, familyId: fam('FIXED_ASSETS') },
+    { code: 'WATER_PUMP',      name: 'Bomba de Agua',       icon: 'Droplets',     order: 23, familyId: fam('FIXED_ASSETS') },
+    { code: 'COMPRESSOR',      name: 'Compresor',           icon: 'Gauge',        order: 24, familyId: fam('FIXED_ASSETS') },
     // SECURITY
-    { code: 'IP_CAMERA',       name: 'Cámara IP',        icon: 'Camera',      order: 30 },
-    { code: 'DVR_NVR',         name: 'DVR/NVR',          icon: 'HardDrive',   order: 31 },
-    { code: 'ACCESS_CONTROL',  name: 'Control de Acceso', icon: 'Fingerprint', order: 32 },
-    { code: 'MOTION_SENSOR',   name: 'Sensor de Movimiento', icon: 'Eye',     order: 33 },
-    { code: 'ALARM_PANEL',     name: 'Panel de Alarma',  icon: 'AlertTriangle', order: 34 },
+    { code: 'IP_CAMERA',       name: 'Cámara IP',           icon: 'Camera',       order: 30, familyId: fam('SECURITY') },
+    { code: 'DVR_NVR',         name: 'DVR/NVR',             icon: 'HardDrive',    order: 31, familyId: fam('SECURITY') },
+    { code: 'ACCESS_CONTROL',  name: 'Control de Acceso',   icon: 'Fingerprint',  order: 32, familyId: fam('SECURITY') },
+    { code: 'ALARM_PANEL',     name: 'Panel de Alarma',     icon: 'AlertTriangle', order: 33, familyId: fam('SECURITY') },
     // MAINTENANCE
-    { code: 'POWER_TOOL',      name: 'Herramienta Eléctrica', icon: 'Zap',   order: 40 },
-    { code: 'HAND_TOOL',       name: 'Herramienta Manual', icon: 'Wrench',    order: 41 },
-    { code: 'MEASURING_TOOL',  name: 'Equipo de Medición', icon: 'Ruler',     order: 42 },
+    { code: 'POWER_TOOL',      name: 'Herramienta Eléctrica', icon: 'Zap',        order: 40, familyId: fam('MAINTENANCE') },
+    { code: 'HAND_TOOL',       name: 'Herramienta Manual',  icon: 'Wrench',       order: 41, familyId: fam('MAINTENANCE') },
+    { code: 'MEASURING_TOOL',  name: 'Equipo de Medición',  icon: 'Ruler',        order: 42, familyId: fam('MAINTENANCE') },
     // SERVICES
-    { code: 'CLEANING_MACHINE', name: 'Equipo de Limpieza', icon: 'Sparkles', order: 50 },
-    { code: 'COFFEE_MACHINE',  name: 'Máquina de Café',  icon: 'Coffee',      order: 51 },
+    { code: 'CLEANING_MACHINE', name: 'Equipo de Limpieza', icon: 'Sparkles',     order: 50, familyId: fam('SERVICES') },
+    { code: 'COFFEE_MACHINE',  name: 'Máquina de Café',     icon: 'Coffee',       order: 51, familyId: fam('SERVICES') },
     // COMMERCIAL
-    { code: 'POS_TERMINAL',    name: 'Terminal POS',     icon: 'CreditCard',  order: 60 },
-    { code: 'CASH_REGISTER',   name: 'Caja Registradora', icon: 'DollarSign', order: 61 },
-    { code: 'BARCODE_READER',  name: 'Lector de Código de Barras', icon: 'Tag', order: 62 },
+    { code: 'POS_TERMINAL',    name: 'Terminal POS',        icon: 'CreditCard',   order: 60, familyId: fam('COMMERCIAL') },
+    { code: 'CASH_REGISTER',   name: 'Caja Registradora',   icon: 'DollarSign',   order: 61, familyId: fam('COMMERCIAL') },
+    { code: 'BARCODE_READER',  name: 'Lector de Código de Barras', icon: 'Tag',   order: 62, familyId: fam('COMMERCIAL') },
     // General
-    { code: 'OTHER',           name: 'Otro',             icon: 'Box',         order: 99 },
+    { code: 'OTHER',           name: 'Otro',                icon: 'Box',          order: 99, familyId: fam('TECHNOLOGY') },
   ]
   for (const t of types) {
     await prisma.equipment_types.upsert({
       where: { code: t.code },
-      update: { name: t.name, icon: t.icon, order: t.order },
-      create: { id: randomUUID(), ...t, isActive: true, createdAt: now, updatedAt: now },
+      update: { name: t.name, icon: t.icon, order: t.order, familyId: t.familyId },
+      create: { id: randomUUID(), ...t, isActive: true },
     })
   }
-  console.log(`✅ ${types.length} tipos de equipo`)
+  console.log(`✅ ${types.length} tipos de equipo con familyId`)
 }
 
-async function seedLicenseTypes() {
+// ============================================
+// 11. TIPOS DE LICENCIA (con familyId directo)
+// ============================================
+
+async function seedLicenseTypes(familyMap: Map<string, string>) {
+  const fam = (code: string) => familyMap.get(code)!
   const types = [
-    // TECHNOLOGY — software
-    { code: 'WINDOWS',          name: 'Windows',              icon: 'Monitor',     order: 1 },
-    { code: 'OFFICE_365',       name: 'Office 365',           icon: 'FileText',    order: 2 },
-    { code: 'ANTIVIRUS',        name: 'Antivirus',            icon: 'Shield',      order: 3 },
-    { code: 'ADOBE',            name: 'Adobe',                icon: 'Paintbrush',  order: 4 },
-    { code: 'AUTOCAD',          name: 'AutoCAD',              icon: 'Ruler',       order: 5 },
-    { code: 'GOOGLE_WORKSPACE', name: 'Google Workspace',     icon: 'Cloud',       order: 6 },
-    { code: 'SLACK',            name: 'Slack',                icon: 'Globe',       order: 7 },
-    { code: 'ZOOM',             name: 'Zoom',                 icon: 'Monitor',     order: 8 },
-    { code: 'GITHUB',           name: 'GitHub',               icon: 'Code',        order: 9 },
-    { code: 'SAAS',             name: 'SaaS (Otro)',          icon: 'Globe',       order: 10 },
-    { code: 'PERPETUAL',        name: 'Licencia Perpetua',    icon: 'Key',         order: 11 },
-    { code: 'SUBSCRIPTION',     name: 'Suscripción',          icon: 'RefreshCw',   order: 12 },
-    { code: 'OEM',              name: 'OEM',                  icon: 'Cpu',         order: 13 },
-    // FIXED_ASSETS — contratos de servicio
-    { code: 'MAINTENANCE_CONTRACT', name: 'Contrato de Mantenimiento', icon: 'Wrench', order: 20 },
-    { code: 'SERVICE_CONTRACT', name: 'Contrato de Servicio', icon: 'ClipboardList', order: 21 },
-    { code: 'ASSET_INSURANCE',  name: 'Seguro de Activos',    icon: 'ShieldCheck', order: 22 },
-    // SERVICES — contratos operativos
-    { code: 'CLEANING_CONTRACT', name: 'Contrato de Limpieza', icon: 'Sparkles',  order: 30 },
-    { code: 'CATERING_CONTRACT', name: 'Contrato de Cafetería', icon: 'Package',  order: 31 },
-    { code: 'SECURITY_CONTRACT', name: 'Contrato de Seguridad', icon: 'Shield',   order: 32 },
-    // COMMERCIAL
-    { code: 'POS_LICENSE',      name: 'Licencia Software POS', icon: 'CreditCard', order: 40 },
-    { code: 'LEASE_CONTRACT',   name: 'Contrato de Arrendamiento', icon: 'Building2', order: 41 },
-    // General
-    { code: 'OTHER',            name: 'Otro',                 icon: 'Box',         order: 99 },
+    { code: 'WINDOWS',           name: 'Windows',                    icon: 'Monitor',      order: 1,  familyId: fam('TECHNOLOGY') },
+    { code: 'OFFICE_365',        name: 'Office 365',                 icon: 'FileText',     order: 2,  familyId: fam('TECHNOLOGY') },
+    { code: 'ANTIVIRUS',         name: 'Antivirus',                  icon: 'Shield',       order: 3,  familyId: fam('TECHNOLOGY') },
+    { code: 'ADOBE',             name: 'Adobe',                      icon: 'Paintbrush',   order: 4,  familyId: fam('TECHNOLOGY') },
+    { code: 'AUTOCAD',           name: 'AutoCAD',                    icon: 'Ruler',        order: 5,  familyId: fam('TECHNOLOGY') },
+    { code: 'GOOGLE_WORKSPACE',  name: 'Google Workspace',           icon: 'Cloud',        order: 6,  familyId: fam('TECHNOLOGY') },
+    { code: 'SAAS',              name: 'SaaS (Otro)',                 icon: 'Globe',        order: 7,  familyId: fam('TECHNOLOGY') },
+    { code: 'SUBSCRIPTION',      name: 'Suscripción',                icon: 'RefreshCw',    order: 8,  familyId: fam('TECHNOLOGY') },
+    { code: 'PERPETUAL',         name: 'Licencia Perpetua',          icon: 'Key',          order: 9,  familyId: fam('TECHNOLOGY') },
+    { code: 'MAINTENANCE_CONTRACT', name: 'Contrato de Mantenimiento', icon: 'Wrench',     order: 20, familyId: fam('FIXED_ASSETS') },
+    { code: 'SERVICE_CONTRACT',  name: 'Contrato de Servicio',       icon: 'ClipboardList', order: 21, familyId: fam('FIXED_ASSETS') },
+    { code: 'ASSET_INSURANCE',   name: 'Seguro de Activos',          icon: 'ShieldCheck',  order: 22, familyId: fam('FIXED_ASSETS') },
+    { code: 'CLEANING_CONTRACT', name: 'Contrato de Limpieza',       icon: 'Sparkles',     order: 30, familyId: fam('SERVICES') },
+    { code: 'SECURITY_CONTRACT', name: 'Contrato de Seguridad',      icon: 'Shield',       order: 31, familyId: fam('SECURITY') },
+    { code: 'POS_LICENSE',       name: 'Licencia Software POS',      icon: 'CreditCard',   order: 40, familyId: fam('COMMERCIAL') },
+    { code: 'OTHER',             name: 'Otro',                       icon: 'Box',          order: 99, familyId: fam('TECHNOLOGY') },
   ]
   for (const t of types) {
     await prisma.license_types.upsert({
       where: { code: t.code },
-      update: { name: t.name, icon: t.icon, order: t.order },
-      create: { id: randomUUID(), ...t, isActive: true, createdAt: now, updatedAt: now },
+      update: { name: t.name, icon: t.icon, order: t.order, familyId: t.familyId },
+      create: { id: randomUUID(), ...t, isActive: true },
     })
   }
-  console.log(`✅ ${types.length} tipos de licencia`)
+  console.log(`✅ ${types.length} tipos de licencia con familyId`)
 }
 
-async function seedConsumableTypes() {
+// ============================================
+// 12. TIPOS DE CONSUMIBLE (con familyId directo)
+// ============================================
+
+async function seedConsumableTypes(familyMap: Map<string, string>) {
+  const fam = (code: string) => familyMap.get(code)!
   const types = [
-    // TECHNOLOGY / MAINTENANCE — insumos tecnológicos
-    { code: 'TONER',       name: 'Tóner',              icon: 'Printer',    order: 1 },
-    { code: 'INK',         name: 'Tinta',              icon: 'Droplets',   order: 2 },
-    { code: 'PAPER',       name: 'Papel',              icon: 'FileText',   order: 3 },
-    { code: 'CABLE',       name: 'Cable',              icon: 'Cable',      order: 4 },
-    { code: 'BATTERY',     name: 'Batería',            icon: 'Battery',    order: 5 },
-    { code: 'ADAPTER',     name: 'Adaptador',          icon: 'Usb',        order: 6 },
-    { code: 'STORAGE',     name: 'Almacenamiento',     icon: 'HardDrive',  order: 7 },
-    { code: 'PERIPHERAL',  name: 'Periférico',         icon: 'Mouse',      order: 8 },
-    // MAINTENANCE — repuestos y herramientas
-    { code: 'SPARE_PART',  name: 'Repuesto Mecánico',  icon: 'Wrench',     order: 10 },
-    { code: 'LUBRICANT',   name: 'Lubricante',         icon: 'Droplets',   order: 11 },
-    { code: 'FILTER',      name: 'Filtro',             icon: 'Settings',   order: 12 },
-    { code: 'FASTENER',    name: 'Tornillo/Perno',     icon: 'Settings',   order: 13 },
-    { code: 'TOOL',        name: 'Herramienta',        icon: 'Wrench',     order: 14 },
-    // SERVICES — insumos operativos
-    { code: 'CLEANING',    name: 'Producto de Limpieza', icon: 'Sparkles', order: 20 },
-    { code: 'CATERING',    name: 'Insumo de Cafetería', icon: 'Package',   order: 21 },
-    { code: 'HYGIENE',     name: 'Higiene (papel, jabón)', icon: 'Sparkles', order: 22 },
-    { code: 'DISINFECTANT', name: 'Desinfectante',     icon: 'Sparkles',   order: 23 },
-    // SECURITY
-    { code: 'SECURITY_BATTERY', name: 'Batería de Respaldo', icon: 'Battery', order: 30 },
-    { code: 'SECURITY_CABLE',   name: 'Cable de Red/Seguridad', icon: 'Cable', order: 31 },
-    // GREEN_AREAS
-    { code: 'FERTILIZER', name: 'Fertilizante',        icon: 'Leaf',       order: 40 },
-    { code: 'PESTICIDE',  name: 'Pesticida',           icon: 'Leaf',       order: 41 },
-    { code: 'SUBSTRATE',  name: 'Sustrato',            icon: 'TreePine',   order: 42 },
-    { code: 'SEED',       name: 'Semilla',             icon: 'Flower2',    order: 43 },
-    // General
-    { code: 'OTHER',      name: 'Otro',                icon: 'Box',        order: 99 },
+    { code: 'TONER',      name: 'Tóner',              icon: 'Printer',   order: 1,  familyId: fam('TECHNOLOGY') },
+    { code: 'INK',        name: 'Tinta',              icon: 'Droplets',  order: 2,  familyId: fam('TECHNOLOGY') },
+    { code: 'PAPER',      name: 'Papel',              icon: 'FileText',  order: 3,  familyId: fam('TECHNOLOGY') },
+    { code: 'CABLE',      name: 'Cable',              icon: 'Cable',     order: 4,  familyId: fam('TECHNOLOGY') },
+    { code: 'BATTERY',    name: 'Batería',            icon: 'Battery',   order: 5,  familyId: fam('TECHNOLOGY') },
+    { code: 'STORAGE',    name: 'Almacenamiento',     icon: 'HardDrive', order: 6,  familyId: fam('TECHNOLOGY') },
+    { code: 'SPARE_PART', name: 'Repuesto Mecánico',  icon: 'Wrench',    order: 10, familyId: fam('MAINTENANCE') },
+    { code: 'LUBRICANT',  name: 'Lubricante',         icon: 'Droplets',  order: 11, familyId: fam('MAINTENANCE') },
+    { code: 'FILTER',     name: 'Filtro',             icon: 'Settings',  order: 12, familyId: fam('MAINTENANCE') },
+    { code: 'TOOL',       name: 'Herramienta',        icon: 'Wrench',    order: 13, familyId: fam('MAINTENANCE') },
+    { code: 'CLEANING',   name: 'Producto de Limpieza', icon: 'Sparkles', order: 20, familyId: fam('SERVICES') },
+    { code: 'HYGIENE',    name: 'Higiene',            icon: 'Sparkles',  order: 21, familyId: fam('SERVICES') },
+    { code: 'SECURITY_BATTERY', name: 'Batería de Respaldo', icon: 'Battery', order: 30, familyId: fam('SECURITY') },
+    { code: 'FERTILIZER', name: 'Fertilizante',       icon: 'Leaf',      order: 40, familyId: fam('GREEN_AREAS') },
+    { code: 'PESTICIDE',  name: 'Pesticida',          icon: 'Leaf',      order: 41, familyId: fam('GREEN_AREAS') },
+    { code: 'SEED',       name: 'Semilla',            icon: 'Flower2',   order: 42, familyId: fam('GREEN_AREAS') },
+    { code: 'OTHER',      name: 'Otro',               icon: 'Box',       order: 99, familyId: fam('TECHNOLOGY') },
   ]
   for (const t of types) {
     await prisma.consumable_types.upsert({
       where: { code: t.code },
-      update: { name: t.name, icon: t.icon, order: t.order },
-      create: { id: randomUUID(), ...t, isActive: true, createdAt: now, updatedAt: now },
+      update: { name: t.name, icon: t.icon, order: t.order, familyId: t.familyId },
+      create: { id: randomUUID(), ...t, isActive: true },
     })
   }
-  console.log(`✅ ${types.length} tipos de consumible`)
+  console.log(`✅ ${types.length} tipos de consumible con familyId`)
 }
+
+// ============================================
+// 13. UNIDADES DE MEDIDA
+// ============================================
 
 async function seedUnitsOfMeasure() {
   const units = [
-    { code: 'UNIT', name: 'Unidad', symbol: 'ud', order: 1 },
-    { code: 'BOX', name: 'Caja', symbol: 'caja', order: 2 },
-    { code: 'PACK', name: 'Paquete', symbol: 'paq', order: 3 },
-    { code: 'REAM', name: 'Resma', symbol: 'resma', order: 4 },
-    { code: 'ROLL', name: 'Rollo', symbol: 'rollo', order: 5 },
-    { code: 'METER', name: 'Metro', symbol: 'm', order: 6 },
-    { code: 'LITER', name: 'Litro', symbol: 'L', order: 7 },
-    { code: 'KG', name: 'Kilogramo', symbol: 'kg', order: 8 },
-    { code: 'SET', name: 'Juego', symbol: 'juego', order: 9 },
-    { code: 'PAIR', name: 'Par', symbol: 'par', order: 10 },
+    { code: 'UNIT',  name: 'Unidad',    symbol: 'ud',    order: 1 },
+    { code: 'BOX',   name: 'Caja',      symbol: 'caja',  order: 2 },
+    { code: 'PACK',  name: 'Paquete',   symbol: 'paq',   order: 3 },
+    { code: 'REAM',  name: 'Resma',     symbol: 'resma', order: 4 },
+    { code: 'METER', name: 'Metro',     symbol: 'm',     order: 5 },
+    { code: 'LITER', name: 'Litro',     symbol: 'L',     order: 6 },
+    { code: 'KG',    name: 'Kilogramo', symbol: 'kg',    order: 7 },
+    { code: 'SET',   name: 'Juego',     symbol: 'juego', order: 8 },
   ]
   for (const u of units) {
     await prisma.units_of_measure.upsert({
       where: { code: u.code },
       update: { name: u.name, symbol: u.symbol, order: u.order },
-      create: { id: randomUUID(), ...u, isActive: true, createdAt: now, updatedAt: now },
+      create: { id: randomUUID(), ...u, isActive: true },
     })
   }
   console.log(`✅ ${units.length} unidades de medida`)
 }
 
+// ============================================
+// 14. CONFIGURACIONES DE INVENTARIO
+// ============================================
+
 async function seedInventorySettings() {
   const settings = [
-    { key: 'inventory.technician_can_manage_equipment', value: 'true', description: 'Permite a los técnicos gestionar equipos' },
-    { key: 'inventory.inventory_technician_ids', value: '[]', description: 'IDs de técnicos con acceso al inventario' },
-    { key: 'inventory.act_expiration_days', value: '7', description: 'Días de expiración para actas' },
-    { key: 'inventory.low_stock_alert_enabled', value: 'true', description: 'Habilitar alertas de stock bajo' },
-    { key: 'inventory.license_alert_enabled', value: 'true', description: 'Habilitar alertas de vencimiento de licencias' },
-    { key: 'inventory.license_alert_days_first', value: '30', description: 'Días antes para primera alerta de licencias' },
-    { key: 'inventory.license_alert_days_second', value: '7', description: 'Días antes para segunda alerta de licencias' },
-    // Nuevas claves — ciclo de vida del inventario
-    { key: 'inventory.mro_expiry_alert_days', value: '30', description: 'Días antes de caducidad MRO para primera alerta' },
-    { key: 'inventory.mro_expiry_alert_days_urgent', value: '7', description: 'Días antes de caducidad MRO para alerta urgente' },
-    { key: 'inventory.default_warehouse_id', value: '', description: 'ID de bodega por defecto para nuevos activos' },
-    { key: 'inventory.warranty_alert_days', value: '30', description: 'Días antes de vencimiento de garantía para alerta' },
-    { key: 'inventory.contract_alert_days', value: '30', description: 'Días antes de vencimiento de contrato para alerta' },
-    { key: 'inventory.mro_expiry_alert_enabled', value: 'true', description: 'Habilita alertas de caducidad MRO' },
-    { key: 'inventory.warranty_alert_enabled', value: 'true', description: 'Habilita alertas de garantía de equipos' },
+    { key: 'inventory.act_expiration_days',          value: '7',    description: 'Días de expiración para actas' },
+    { key: 'inventory.low_stock_alert_enabled',      value: 'true', description: 'Habilitar alertas de stock bajo' },
+    { key: 'inventory.license_alert_enabled',        value: 'true', description: 'Habilitar alertas de vencimiento de licencias' },
+    { key: 'inventory.license_alert_days_first',     value: '30',   description: 'Días antes para primera alerta de licencias' },
+    { key: 'inventory.license_alert_days_second',    value: '7',    description: 'Días antes para segunda alerta de licencias' },
+    { key: 'inventory.warranty_alert_days',          value: '30',   description: 'Días antes de vencimiento de garantía' },
+    { key: 'inventory.mro_expiry_alert_enabled',     value: 'true', description: 'Habilita alertas de caducidad MRO' },
+    { key: 'inventory.warranty_alert_enabled',       value: 'true', description: 'Habilita alertas de garantía de equipos' },
+    { key: 'inventory.default_warehouse_id',         value: '',     description: 'ID de bodega por defecto' },
   ]
   for (const s of settings) {
     await prisma.system_settings.upsert({
@@ -763,8 +642,11 @@ async function seedInventorySettings() {
   console.log(`✅ ${settings.length} configuraciones de inventario`)
 }
 
+// ============================================
+// 15. CONTADORES DE FOLIO
+// ============================================
+
 async function seedFolioCounters() {
-  const year = new Date().getFullYear()
   const types = ['ACT', 'DEV', 'BAJ']
   for (const type of types) {
     await prisma.folio_counters.upsert({
@@ -776,68 +658,38 @@ async function seedFolioCounters() {
   console.log(`✅ Contadores de folio (ACT, DEV, BAJ) para ${year}`)
 }
 
-async function seedLandingPage() {
-  // Contenido principal
-  const existingContent = await prisma.landing_page_content.count()
-  if (existingContent === 0) {
-    await prisma.landing_page_content.create({
-      data: {
-        id: randomUUID(),
-        heroTitle: 'Soporte Técnico Profesional',
-        heroSubtitle: 'Resolvemos tus problemas técnicos de manera rápida y eficiente',
-        heroCtaPrimary: 'Crear Ticket de Soporte',
-        heroCtaPrimaryUrl: '/login',
-        heroCtaSecondary: 'Ver Servicios',
-        heroCtaSecondaryUrl: '#servicios',
-        servicesTitle: 'Nuestros Servicios',
-        servicesSubtitle: 'Ofrecemos soporte técnico integral para todas tus necesidades tecnológicas',
-        servicesEnabled: true,
-        companyName: 'Sistema de Tickets',
-        companyTagline: 'Soporte técnico profesional',
-        footerText: `© ${new Date().getFullYear()} Sistema de Tickets. Todos los derechos reservados.`,
-        metaTitle: 'Sistema de Tickets - Soporte Técnico Profesional',
-        metaDescription: 'Sistema profesional de gestión de tickets de soporte técnico',
-        showStats: false, showTestimonials: false, showFaq: false,
-      },
-    })
-  }
+// ============================================
+// 16. CONTADORES DE CÓDIGO DE TICKET
+// ============================================
 
-  // Servicios de la landing page
-  const services = [
-    { id: 'service-1', order: 1, enabled: true, icon: 'Wrench', iconColor: 'blue', title: 'Soporte Técnico', description: 'Atención y resolución de incidencias técnicas a través de nuestro sistema de tickets con seguimiento en tiempo real.' },
-    { id: 'service-2', order: 2, enabled: true, icon: 'Server', iconColor: 'green', title: 'Gestión de Inventario', description: 'Control y administración de equipos tecnológicos, asignaciones y actas de entrega digitales.' },
-    { id: 'service-3', order: 3, enabled: true, icon: 'Shield', iconColor: 'orange', title: 'Licencias de Software', description: 'Administración centralizada de licencias de software con alertas de vencimiento y renovación.' },
+async function seedTicketCodeCounters(familyMap: Map<string, string>) {
+  // Sequences match the sample tickets created in seedSampleTickets:
+  // TECHNOLOGY: 2 tickets (TI-2026-0001, TI-2026-0002) → lastSequence: 3 (next available)
+  // FIXED_ASSETS: 1 ticket (INF-2026-0001) → lastSequence: 1
+  // ADMINISTRATIVE: 1 ticket (ADM-2026-0001) → lastSequence: 1
+  const familiesWithSeq: Array<{ code: string; lastSequence: number }> = [
+    { code: 'TECHNOLOGY',     lastSequence: 3 },
+    { code: 'FIXED_ASSETS',   lastSequence: 1 },
+    { code: 'ADMINISTRATIVE', lastSequence: 1 },
+    { code: 'COMMERCIAL',     lastSequence: 0 },
+    { code: 'SECURITY',       lastSequence: 0 },
+    { code: 'MAINTENANCE',    lastSequence: 0 },
+    { code: 'SERVICES',       lastSequence: 0 },
   ]
-  for (const s of services) {
-    await prisma.landing_page_services.upsert({
-      where: { id: s.id },
-      update: { title: s.title, description: s.description, icon: s.icon, iconColor: s.iconColor, order: s.order },
-      create: s,
+  for (const { code, lastSequence } of familiesWithSeq) {
+    const familyId = familyMap.get(code)!
+    await prisma.ticket_code_counters.upsert({
+      where: { familyId_year: { familyId, year: 2026 } },
+      update: { lastSequence },
+      create: { id: randomUUID(), familyId, year: 2026, lastSequence },
     })
   }
-  console.log('✅ Landing page + 3 servicios')
+  console.log(`✅ Contadores de código de ticket para 2026 (TI:3, INF:1, ADM:1)`)
 }
 
-async function seedInventoryFamilies() {
-  const families = [
-    { code: 'FIXED_ASSETS',   name: 'Activos Fijos e Infraestructura',        icon: 'Building2',    color: '#1D4ED8', order: 1 },
-    { code: 'MAINTENANCE',    name: 'Repuestos y Materiales de Mantenimiento', icon: 'Wrench',       color: '#B45309', order: 2 },
-    { code: 'SERVICES',       name: 'Servicios de Operación y Limpieza',       icon: 'Sparkles',     color: '#059669', order: 3 },
-    { code: 'SECURITY',       name: 'Seguridad y Protección',                  icon: 'Shield',       color: '#DC2626', order: 4 },
-    { code: 'TECHNOLOGY',     name: 'Tecnología y Comunicaciones',             icon: 'Monitor',      color: '#7C3AED', order: 5 },
-    { code: 'GREEN_AREAS',    name: 'Áreas Verdes y Exteriores',               icon: 'TreePine',     color: '#16A34A', order: 6 },
-    { code: 'ADMINISTRATIVE', name: 'Gestión Administrativa y Documental',     icon: 'FolderOpen',   color: '#0891B2', order: 7 },
-    { code: 'COMMERCIAL',     name: 'Activos de Gestión Comercial',            icon: 'Store',        color: '#EA580C', order: 8 },
-  ]
-  for (const f of families) {
-    await prisma.inventory_families.upsert({
-      where: { code: f.code },
-      update: { name: f.name, icon: f.icon, color: f.color, order: f.order },
-      create: { id: randomUUID(), ...f, isActive: true },
-    })
-  }
-  console.log(`✅ ${families.length} familias de inventario`)
-}
+// ============================================
+// 17. BODEGA POR DEFECTO
+// ============================================
 
 async function seedDefaultWarehouse() {
   const existing = await prisma.warehouses.findFirst({ where: { name: 'Bodega Principal' } })
@@ -851,65 +703,210 @@ async function seedDefaultWarehouse() {
   }
 }
 
-async function migrateExistingTypesToTechnology() {
-  const families = await prisma.inventory_families.findMany({ select: { id: true, code: true } })
-  const fam = (code: string) => families.find(f => f.code === code)?.id
+// ============================================
+// 18. LANDING PAGE
+// ============================================
 
-  // Tipos de equipo por familia
-  const equipmentByFamily: Record<string, string[]> = {
-    'TECHNOLOGY':     ['LAPTOP','DESKTOP','MONITOR','PRINTER','PHONE','TABLET','KEYBOARD','MOUSE','HEADSET','WEBCAM','DOCKING_STATION','UPS','ROUTER','SWITCH','SERVER'],
-    'FIXED_ASSETS':   ['AC_UNIT','GENERATOR','ELEVATOR','WATER_PUMP','COMPRESSOR'],
-    'SECURITY':       ['IP_CAMERA','DVR_NVR','ACCESS_CONTROL','MOTION_SENSOR','ALARM_PANEL'],
-    'MAINTENANCE':    ['POWER_TOOL','HAND_TOOL','MEASURING_TOOL'],
-    'SERVICES':       ['CLEANING_MACHINE','COFFEE_MACHINE'],
-    'COMMERCIAL':     ['POS_TERMINAL','CASH_REGISTER','BARCODE_READER'],
+async function seedLandingPage() {
+  const existingContent = await prisma.landing_page_content.count()
+  if (existingContent === 0) {
+    await prisma.landing_page_content.create({
+      data: {
+        id: randomUUID(),
+        heroTitle: 'Soporte Multi-Área Profesional',
+        heroSubtitle: 'Gestión de tickets para todas las áreas de tu organización',
+        heroCtaPrimary: 'Crear Ticket de Soporte',
+        heroCtaPrimaryUrl: '/login',
+        heroCtaSecondary: 'Ver Servicios',
+        heroCtaSecondaryUrl: '#servicios',
+        servicesTitle: 'Nuestros Servicios',
+        servicesSubtitle: 'Soporte técnico integral para todas las áreas',
+        servicesEnabled: true,
+        companyName: 'Sistema de Tickets Multi-Familia',
+        companyTagline: 'Soporte profesional para toda la organización',
+        footerText: `© ${year} Sistema de Tickets. Todos los derechos reservados.`,
+        metaTitle: 'Sistema de Tickets Multi-Familia',
+        metaDescription: 'Sistema profesional de gestión de tickets multi-área',
+        showStats: false, showTestimonials: false, showFaq: false,
+      },
+    })
   }
-  for (const [familyCode, typeCodes] of Object.entries(equipmentByFamily)) {
-    const familyId = fam(familyCode)
-    if (!familyId) continue
-    await prisma.equipment_types.updateMany({ where: { code: { in: typeCodes } }, data: { familyId } })
+  const services = [
+    { id: 'service-1', order: 1, enabled: true, icon: 'Wrench',  iconColor: 'blue',   title: 'Soporte TI',          description: 'Atención de incidencias tecnológicas con seguimiento en tiempo real.' },
+    { id: 'service-2', order: 2, enabled: true, icon: 'Server',  iconColor: 'green',  title: 'Gestión de Inventario', description: 'Control de equipos, asignaciones y actas de entrega digitales.' },
+    { id: 'service-3', order: 3, enabled: true, icon: 'Building2', iconColor: 'orange', title: 'Infraestructura',    description: 'Soporte para activos fijos, mantenimiento e infraestructura.' },
+  ]
+  for (const s of services) {
+    await prisma.landing_page_services.upsert({
+      where: { id: s.id },
+      update: { title: s.title, description: s.description },
+      create: s,
+    })
   }
-  // Tipos sin familia → TECHNOLOGY
-  const techId = fam('TECHNOLOGY')
-  if (techId) {
-    await prisma.equipment_types.updateMany({ where: { familyId: null }, data: { familyId: techId } })
-  }
-
-  // Tipos de licencia por familia
-  const licenseByFamily: Record<string, string[]> = {
-    'TECHNOLOGY':   ['WINDOWS','OFFICE_365','ANTIVIRUS','ADOBE','AUTOCAD','GOOGLE_WORKSPACE','SLACK','ZOOM','GITHUB','SAAS','PERPETUAL','SUBSCRIPTION','OEM'],
-    'FIXED_ASSETS': ['MAINTENANCE_CONTRACT','SERVICE_CONTRACT','ASSET_INSURANCE'],
-    'SERVICES':     ['CLEANING_CONTRACT','CATERING_CONTRACT','SECURITY_CONTRACT'],
-    'COMMERCIAL':   ['POS_LICENSE','LEASE_CONTRACT'],
-  }
-  for (const [familyCode, typeCodes] of Object.entries(licenseByFamily)) {
-    const familyId = fam(familyCode)
-    if (!familyId) continue
-    await prisma.license_types.updateMany({ where: { code: { in: typeCodes } }, data: { familyId } })
-  }
-  if (techId) {
-    await prisma.license_types.updateMany({ where: { familyId: null }, data: { familyId: techId } })
-  }
-
-  // Tipos de consumible por familia
-  const consumableByFamily: Record<string, string[]> = {
-    'TECHNOLOGY':   ['TONER','INK','PAPER','CABLE','BATTERY','ADAPTER','STORAGE','PERIPHERAL'],
-    'MAINTENANCE':  ['SPARE_PART','LUBRICANT','FILTER','FASTENER','TOOL'],
-    'SERVICES':     ['CLEANING','CATERING','HYGIENE','DISINFECTANT'],
-    'SECURITY':     ['SECURITY_BATTERY','SECURITY_CABLE'],
-    'GREEN_AREAS':  ['FERTILIZER','PESTICIDE','SUBSTRATE','SEED'],
-  }
-  for (const [familyCode, typeCodes] of Object.entries(consumableByFamily)) {
-    const familyId = fam(familyCode)
-    if (!familyId) continue
-    await prisma.consumable_types.updateMany({ where: { code: { in: typeCodes } }, data: { familyId } })
-  }
-  if (techId) {
-    await prisma.consumable_types.updateMany({ where: { familyId: null }, data: { familyId: techId } })
-  }
-
-  console.log('✅ Tipos asignados a sus familias correspondientes')
+  console.log('✅ Landing page')
 }
+
+// ============================================
+// 19. TICKETS DE EJEMPLO
+// ============================================
+
+async function seedSampleTickets(
+  familyMap: Map<string, string>,
+  deptMap: Map<string, string>,
+  techMap: Map<string, string>,
+  adminId: string
+) {
+  // Obtener una categoría de cada familia para los tickets de ejemplo
+  const tiCategory = await prisma.categories.findFirst({
+    where: { departments: { familyId: familyMap.get('TECHNOLOGY') }, level: 1 },
+  })
+  // FIXED_ASSETS and ADMINISTRATIVE don't have their own categories seeded,
+  // so we use TECHNOLOGY categories as fallback for sample tickets
+  const infCategory = await prisma.categories.findFirst({
+    where: { departments: { familyId: familyMap.get('FIXED_ASSETS') }, level: 1 },
+  }) ?? tiCategory
+  const admCategory = await prisma.categories.findFirst({
+    where: { departments: { familyId: familyMap.get('ADMINISTRATIVE') }, level: 1 },
+  }) ?? tiCategory
+
+  if (!tiCategory) {
+    console.log('⏭️  Categorías no encontradas para tickets de ejemplo')
+    return
+  }
+
+  const tech1Id = techMap.get('tecnico1@empresa.com')!
+  const tech2Id = techMap.get('tecnico3@empresa.com')!
+  const tech3Id = techMap.get('tecnico3@empresa.com')!
+
+  // Actualizar contadores antes de crear tickets
+  const tiFamily   = familyMap.get('TECHNOLOGY')!
+  const infFamily  = familyMap.get('FIXED_ASSETS')!
+  const admFamily  = familyMap.get('ADMINISTRATIVE')!
+
+  const sampleTickets = [
+    { ticketCode: `TI-2026-0001`,  familyId: tiFamily,  categoryId: tiCategory.id,  assigneeId: tech1Id, title: 'Falla en conexión de red - Piso 3',       description: 'Los equipos del piso 3 no tienen acceso a internet desde esta mañana.', priority: 'HIGH'   as const },
+    { ticketCode: `TI-2026-0002`,  familyId: tiFamily,  categoryId: tiCategory.id,  assigneeId: tech1Id, title: 'Solicitud de creación de usuario M365',    description: 'Nuevo empleado requiere cuenta en Microsoft 365.', priority: 'MEDIUM' as const },
+    { ticketCode: `INF-2026-0001`, familyId: infFamily, categoryId: infCategory.id, assigneeId: tech2Id, title: 'Mantenimiento preventivo aire acondicionado', description: 'Solicitud de mantenimiento preventivo del sistema de climatización.', priority: 'LOW'    as const },
+    { ticketCode: `ADM-2026-0001`, familyId: admFamily, categoryId: admCategory.id, assigneeId: tech3Id, title: 'Solicitud de reporte de nómina',            description: 'Se requiere reporte de nómina del mes anterior en formato Excel.', priority: 'MEDIUM' as const },
+  ]
+
+  for (const t of sampleTickets) {
+    const existing = await prisma.tickets.findFirst({ where: { ticketCode: t.ticketCode } })
+    if (!existing) {
+      const ticket = await prisma.tickets.create({
+        data: {
+          id: randomUUID(), ...t,
+          clientId: adminId, createdById: adminId,
+          status: 'OPEN', source: 'ADMIN', codeIsManual: false,
+          createdAt: now, updatedAt: now,
+        },
+      })
+      await prisma.ticket_history.create({
+        data: { id: randomUUID(), action: 'created', comment: 'Ticket creado por seed', ticketId: ticket.id, userId: adminId, createdAt: now },
+      })
+    }
+  }
+  console.log(`✅ ${sampleTickets.length} tickets de ejemplo (TI-2026-0001, TI-2026-0002, INF-2026-0001, ADM-2026-0001)`)
+}
+
+// ============================================
+// 20. ARTÍCULOS DE BASE DE CONOCIMIENTOS
+// ============================================
+
+async function seedKnowledgeArticles(
+  familyMap: Map<string, string>,
+  deptMap: Map<string, string>,
+  adminId: string
+) {
+  const articles = [
+    {
+      familyCode: 'TECHNOLOGY',
+      title: 'Cómo restablecer tu contraseña de Microsoft 365',
+      content: 'Para restablecer tu contraseña de M365: 1) Ve a portal.office.com 2) Haz clic en "¿Olvidaste tu contraseña?" 3) Sigue las instrucciones de verificación.',
+      summary: 'Guía paso a paso para restablecer contraseña M365',
+      tags: ['m365', 'contraseña', 'acceso'],
+    },
+    {
+      familyCode: 'TECHNOLOGY',
+      title: 'Solución a problemas de conexión VPN',
+      content: 'Si tienes problemas con la VPN: 1) Verifica que el cliente VPN esté actualizado 2) Comprueba tus credenciales 3) Reinicia el servicio VPN en tu equipo.',
+      summary: 'Pasos para resolver problemas comunes de VPN',
+      tags: ['vpn', 'conexión', 'red'],
+    },
+    {
+      familyCode: 'FIXED_ASSETS',
+      title: 'Procedimiento de solicitud de mantenimiento de equipos',
+      content: 'Para solicitar mantenimiento: 1) Crea un ticket en la familia Infraestructura 2) Describe el equipo y el problema 3) Adjunta fotos si es posible 4) El técnico coordinará la visita.',
+      summary: 'Cómo solicitar mantenimiento de activos fijos',
+      tags: ['mantenimiento', 'infraestructura', 'activos'],
+    },
+    {
+      familyCode: 'ADMINISTRATIVE',
+      title: 'Proceso de solicitud de reportes administrativos',
+      content: 'Para solicitar reportes: 1) Crea un ticket en la familia Administrativa 2) Especifica el tipo de reporte y período 3) Indica el formato requerido (Excel, PDF) 4) El área procesará en 48h hábiles.',
+      summary: 'Cómo solicitar reportes al área administrativa',
+      tags: ['reportes', 'administrativo', 'documentos'],
+    },
+    {
+      familyCode: 'MAINTENANCE',
+      title: 'Guía de solicitud de mantenimiento preventivo',
+      content: 'Para solicitar mantenimiento preventivo: 1) Identifica el equipo o instalación 2) Crea un ticket indicando el tipo de mantenimiento 3) Adjunta el historial de mantenimiento si está disponible.',
+      summary: 'Cómo solicitar mantenimiento preventivo',
+      tags: ['mantenimiento', 'preventivo', 'equipos'],
+    },
+    {
+      familyCode: 'SERVICES',
+      title: 'Solicitud de servicios generales',
+      content: 'Para solicitar servicios generales: 1) Crea un ticket en la familia Servicios 2) Describe el servicio requerido 3) Indica la ubicación y urgencia 4) El equipo coordinará la atención.',
+      summary: 'Cómo solicitar servicios generales',
+      tags: ['servicios', 'limpieza', 'operaciones'],
+    },
+    {
+      familyCode: 'SECURITY',
+      title: 'Reporte de incidentes de seguridad',
+      content: 'Para reportar un incidente de seguridad: 1) Crea un ticket urgente en la familia Seguridad 2) Describe el incidente con detalle 3) Indica la ubicación y hora del incidente 4) No manipules evidencia.',
+      summary: 'Cómo reportar incidentes de seguridad',
+      tags: ['seguridad', 'incidente', 'reporte'],
+    },
+    {
+      familyCode: 'COMMERCIAL',
+      title: 'Solicitud de materiales de marketing',
+      content: 'Para solicitar materiales de marketing: 1) Crea un ticket en la familia Comercial 2) Especifica el tipo de material y cantidad 3) Indica la fecha de necesidad 4) El área de marketing procesará la solicitud.',
+      summary: 'Cómo solicitar materiales comerciales y de marketing',
+      tags: ['marketing', 'comercial', 'materiales'],
+    },
+  ]
+
+  for (const a of articles) {
+    const familyId = familyMap.get(a.familyCode)!
+    // Buscar una categoría de esa familia; si no hay, usar cualquier categoría de TECHNOLOGY como fallback
+    let category = await prisma.categories.findFirst({
+      where: { departments: { familyId }, level: 1 },
+    })
+    if (!category) {
+      category = await prisma.categories.findFirst({
+        where: { departments: { familyId: familyMap.get('TECHNOLOGY') }, level: 1 },
+      })
+    }
+    if (!category) continue
+
+    const existing = await prisma.knowledge_articles.findFirst({ where: { title: a.title } })
+    if (!existing) {
+      await prisma.knowledge_articles.create({
+        data: {
+          id: randomUUID(), title: a.title, content: a.content, summary: a.summary,
+          categoryId: category.id, familyId, authorId: adminId,
+          tags: a.tags, isPublished: true,
+        },
+      })
+    }
+  }
+  console.log(`✅ ${articles.length} artículos de base de conocimientos (1 por familia con ticketsEnabled=true)`)
+}
+
+// ============================================
+// EJECUTAR
+// ============================================
 
 main()
   .catch(e => { console.error('❌ Error durante el seed:', e); process.exit(1) })

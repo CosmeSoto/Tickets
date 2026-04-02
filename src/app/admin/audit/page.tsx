@@ -470,8 +470,19 @@ export default function AuditPage() {
     entityType: 'all',
     action: '',
     userId: '',
-    days: '30'
+    days: '30',
+    familyId: '',
   })
+  const [families, setFamilies] = useState<Array<{ id: string; name: string; code: string; color?: string }>>([])
+
+  useEffect(() => {
+    fetch('/api/families?active=true')
+      .then(r => r.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.data)) setFamilies(data.data)
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (status === 'loading') return
@@ -1189,6 +1200,30 @@ export default function AuditPage() {
                 />
               </div>
 
+              {/* Familia */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Familia</label>
+                <Select
+                  value={filters.familyId || 'all'}
+                  onValueChange={(value) => setFilters(prev => ({ ...prev, familyId: value === 'all' ? '' : value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder='Todas las familias' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='all'>Todas las familias</SelectItem>
+                    {families.map(f => (
+                      <SelectItem key={f.id} value={f.id}>
+                        <div className='flex items-center space-x-2'>
+                          {f.color && <div className='w-2 h-2 rounded-full' style={{ backgroundColor: f.color }} />}
+                          <span>{f.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Exportar y Acciones */}
               <div className="space-y-2 lg:col-span-2">
                 <label className="text-sm font-medium">Exportar y Acciones</label>
@@ -1217,7 +1252,8 @@ export default function AuditPage() {
                       entityType: 'all',
                       action: '',
                       userId: '',
-                      days: '30'
+                      days: '30',
+                      familyId: '',
                     })}
                     variant="outline"
                     size="sm"
@@ -1278,7 +1314,8 @@ export default function AuditPage() {
                     entityType: 'all',
                     action: '',
                     userId: '',
-                    days: '30'
+                    days: '30',
+                    familyId: '',
                   })}
                 >
                   Limpiar filtros

@@ -101,7 +101,6 @@ const navigationByRole: Record<string, NavItem[]> = {
         {
           name: 'Catálogos', href: '/inventory/equipment-types', icon: Database,
           children: [
-            { name: 'Familias', href: '/inventory/families', icon: Layers },
             { name: 'Equipo', href: '/inventory/equipment-types', icon: Boxes },
             { name: 'Bodegas', href: '/inventory/warehouses', icon: Warehouse },
             { name: 'Tipos de Licencia', href: '/inventory/license-types', icon: FileSignature },
@@ -112,7 +111,7 @@ const navigationByRole: Record<string, NavItem[]> = {
         { name: 'Configuración', href: '/settings/inventory', icon: Settings },
       ],
     },
-    { name: 'Departamentos', href: '/admin/departments', icon: Building },
+    { name: 'Familias', href: '/admin/families', icon: Layers },
     { name: 'Usuarios', href: '/admin/users', icon: Users },
     { name: 'Auditoría', href: '/admin/audit', icon: Shield },
     { name: 'Configuración Sistema', href: '/admin/settings', icon: Settings },

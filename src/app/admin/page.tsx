@@ -25,9 +25,19 @@ import {
   RefreshCw,
   AlertTriangle,
   Clock,
+  Layers,
+  Settings,
 } from 'lucide-react'
 import { useUnifiedDashboard } from '@/hooks/use-unified-dashboard'
 import { useSystemStatus } from '@/hooks/use-system-status'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -175,6 +185,119 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* Métricas por Familia */}
+      {stats.familyMetrics && stats.familyMetrics.length > 0 && (
+        <div className='mb-6'>
+          <Card>
+            <CardHeader>
+              <CardTitle className='flex items-center justify-between'>
+                <div className='flex items-center'>
+                  <Layers className='h-5 w-5 mr-2 text-indigo-600' />
+                  Métricas por Familia
+                </div>
+                <Button variant='outline' size='sm' asChild>
+                  <Link href='/admin/families'>Ver Familias</Link>
+                </Button>
+              </CardTitle>
+              <CardDescription>Distribución de tickets y técnicos por familia global</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Familia</TableHead>
+                    <TableHead className='text-center'>Abiertos</TableHead>
+                    <TableHead className='text-center'>En Progreso</TableHead>
+                    <TableHead className='text-center'>Técnicos</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {stats.familyMetrics.map((fm: any) => (
+                    <TableRow key={fm.familyId}>
+                      <TableCell>
+                        <div className='flex items-center space-x-2'>
+                          {fm.color && (
+                            <div className='w-3 h-3 rounded-full flex-shrink-0' style={{ backgroundColor: fm.color }} />
+                          )}
+                          <span className='font-medium'>{fm.familyName}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className='text-center'>
+                        <Badge variant={fm.openTickets > 10 ? 'destructive' : 'secondary'}>
+                          {fm.openTickets}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className='text-center'>
+                        <Badge variant='outline'>{fm.inProgressTickets ?? 0}</Badge>
+                      </TableCell>
+                      <TableCell className='text-center'>
+                        <div className='flex items-center justify-center space-x-1'>
+                          <Users className='h-3 w-3 text-muted-foreground' />
+                          <span className='text-sm'>{fm.technicianCount}</span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Alertas Proactivas */}
+      {stats.proactiveAlerts && stats.proactiveAlerts.length > 0 && (
+        <div className='mb-6'>
+          <Card>
+            <CardHeader>
+              <CardTitle className='flex items-center'>
+                <AlertTriangle className='h-5 w-5 mr-2 text-yellow-600' />
+                Alertas Proactivas
+              </CardTitle>
+              <CardDescription>Situaciones que requieren atención del administrador</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className='space-y-3'>
+                {stats.proactiveAlerts.map((alert: any, idx: number) => {
+                  const sev = (alert.severity ?? '').toLowerCase()
+                  return (
+                    <Alert
+                      key={idx}
+                      className={
+                        sev === 'critical'
+                          ? 'border-red-300 bg-red-50 dark:bg-red-950/30'
+                          : sev === 'warning'
+                          ? 'border-yellow-300 bg-yellow-50 dark:bg-yellow-950/30'
+                          : 'border-blue-300 bg-blue-50 dark:bg-blue-950/30'
+                      }
+                    >
+                      {sev === 'critical' ? (
+                        <AlertCircle className='h-4 w-4 text-red-600' />
+                      ) : sev === 'warning' ? (
+                        <AlertTriangle className='h-4 w-4 text-yellow-600' />
+                      ) : (
+                        <Activity className='h-4 w-4 text-blue-600' />
+                      )}
+                      <AlertDescription
+                        className={
+                          sev === 'critical'
+                            ? 'text-red-800 dark:text-red-200'
+                            : sev === 'warning'
+                            ? 'text-yellow-800 dark:text-yellow-200'
+                            : 'text-blue-800 dark:text-blue-200'
+                        }
+                      >
+                        {alert.message}
+                      </AlertDescription>
+                    </Alert>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
         {/* Quick Actions */}
         <div className='lg:col-span-2'>
@@ -225,6 +348,22 @@ export default function AdminDashboard() {
                   title='Categorías y Departamentos'
                   description='Organizar tipos de tickets y áreas'
                   color='orange'
+                />
+
+                <ActionCard
+                  href='/admin/families'
+                  icon={Layers}
+                  title='Gestionar Familias'
+                  description='Administrar familias globales del sistema'
+                  color='blue'
+                />
+
+                <ActionCard
+                  href='/admin/settings/tickets'
+                  icon={Settings}
+                  title='Configurar Tickets'
+                  description='Configuración de tickets por familia'
+                  color='purple'
                 />
               </div>
             </CardContent>

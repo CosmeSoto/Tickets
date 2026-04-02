@@ -23,7 +23,7 @@ export async function GET(_req: NextRequest) {
     }
   }
 
-  const families = await prisma.inventory_families.findMany({
+  const families = await prisma.families.findMany({
     where: { isActive: true },
     include: { formConfig: true },
   })

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Loader2, Plus, X, Package, Settings, ExternalLink, ImageIcon } from 'lucide-react'
+import { Loader2, Plus, X, Package, Settings, ExternalLink, ImageIcon, Building, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +18,12 @@ import {
 } from '@/components/ui/select'
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { useToast } from '@/hooks/use-toast'
 import { createEquipmentSchema, type CreateEquipmentInput } from '@/lib/validations/inventory/equipment'
 import type { Equipment, EquipmentFormData } from '@/types/inventory/equipment'
@@ -37,6 +43,15 @@ interface EquipmentType {
   icon?: string
   isActive: boolean
   order: number
+  family?: { id: string; name: string; code: string; color?: string } | null
+}
+
+interface Department {
+  id: string
+  name: string
+  isActive: boolean
+  familyId: string | null
+  family?: { id: string; name: string; code: string; color?: string } | null
 }
 
 const EQUIPMENT_STATUS_OPTIONS = [
@@ -65,7 +80,9 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [loadingTypes, setLoadingTypes] = useState(true)
+  const [loadingDepartments, setLoadingDepartments] = useState(true)
   const [equipmentTypes, setEquipmentTypes] = useState<EquipmentType[]>([])
+  const [departments, setDepartments] = useState<Department[]>([])
   const [accessories, setAccessories] = useState<string[]>(equipment?.accessories || [])
   const [newAccessory, setNewAccessory] = useState('')
   const [specifications, setSpecifications] = useState<Record<string, string>>(
@@ -84,6 +101,8 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
   }, [])
 
   const isEditing = !!equipment
+  // Determine if the department selector should be disabled (active assignment in edit mode)
+  const hasActiveAssignment = isEditing && !!equipment?.currentAssignment
 
   // Cargar tipos de equipo desde la API
   useEffect(() => {
@@ -115,6 +134,27 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
     fetchEquipmentTypes()
   }, [])
 
+  // Cargar departamentos activos desde la API
+  useEffect(() => {
+    async function fetchDepartments() {
+      try {
+        const response = await fetch('/api/departments?isActive=true')
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && Array.isArray(data.data)) {
+            setDepartments(data.data)
+          }
+        }
+      } catch (error) {
+        console.error('Error cargando departamentos:', error)
+      } finally {
+        setLoadingDepartments(false)
+      }
+    }
+
+    fetchDepartments()
+  }, [])
+
   const {
     register,
     handleSubmit,
@@ -129,6 +169,7 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
       brand: equipment.brand,
       model: equipment.model,
       typeId: equipment.typeId,
+      departmentId: equipment.departmentId || undefined,
       status: equipment.status,
       condition: equipment.condition,
       ownershipType: equipment.ownershipType,
@@ -155,6 +196,25 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
 
   const ownershipType = watch('ownershipType')
   const isRental = ownershipType === 'RENTAL'
+  const selectedTypeId = watch('typeId')
+  const selectedDepartmentId = watch('departmentId')
+
+  // Derive the familyId of the selected equipment type
+  const selectedTypeFamilyId = equipmentTypes.find(t => t.id === selectedTypeId)?.family?.id ?? null
+
+  // Filter departments by the family of the selected equipment type
+  const filteredDepartments = selectedTypeFamilyId
+    ? departments.filter(d => d.familyId === selectedTypeFamilyId)
+    : departments
+
+  // When the type changes, clear the department if it no longer belongs to the new family
+  useEffect(() => {
+    if (!selectedTypeId || !selectedDepartmentId) return
+    const currentDept = departments.find(d => d.id === selectedDepartmentId)
+    if (currentDept && selectedTypeFamilyId && currentDept.familyId !== selectedTypeFamilyId) {
+      setValue('departmentId', '' as any, { shouldValidate: false })
+    }
+  }, [selectedTypeId, selectedTypeFamilyId, selectedDepartmentId, departments, setValue])
 
   const onSubmit = async (data: CreateEquipmentInput) => {
     try {
@@ -363,6 +423,81 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
               )}
               {errors.typeId && (
                 <p className="text-sm text-destructive">{errors.typeId.message}</p>
+              )}
+            </div>
+
+            {/* Selector de Departamento */}
+            <div className="space-y-2">
+              <Label htmlFor="department">
+                Departamento <span className="text-destructive">*</span>
+              </Label>
+              {loadingDepartments ? (
+                <div className="flex items-center justify-center h-10 border rounded-md">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                </div>
+              ) : hasActiveAssignment ? (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="relative">
+                        <Select disabled value={selectedDepartmentId || ''}>
+                          <SelectTrigger className="opacity-60 cursor-not-allowed">
+                            <SelectValue placeholder="Selecciona un departamento" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {departments.map((dept) => (
+                              <SelectItem key={dept.id} value={dept.id}>
+                                <span className="flex items-center gap-2">
+                                  <Building className="h-3 w-3" />
+                                  {dept.name}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <AlertCircle className="absolute right-8 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-xs">
+                      No se puede cambiar el departamento mientras el equipo tiene una asignación activa
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
+                <Select
+                  value={selectedDepartmentId || ''}
+                  onValueChange={(value) => setValue('departmentId', value as any, { shouldValidate: true })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={
+                      selectedTypeId && filteredDepartments.length === 0
+                        ? 'No hay departamentos para esta familia'
+                        : 'Selecciona un departamento'
+                    } />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredDepartments.map((dept) => (
+                      <SelectItem key={dept.id} value={dept.id}>
+                        <span className="flex items-center gap-2">
+                          <Building className="h-3 w-3" />
+                          {dept.name}
+                          {dept.family && (
+                            <span className="text-xs text-muted-foreground">({dept.family.name})</span>
+                          )}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {!hasActiveAssignment && selectedTypeId && filteredDepartments.length === 0 && !loadingDepartments && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  No hay departamentos activos para la familia del tipo seleccionado
+                </p>
+              )}
+              {errors.departmentId && (
+                <p className="text-sm text-destructive">{errors.departmentId.message}</p>
               )}
             </div>
 

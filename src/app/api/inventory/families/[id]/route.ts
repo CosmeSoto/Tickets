@@ -34,7 +34,7 @@ export async function GET(
 
     const { id } = await params
 
-    const family = await prisma.inventory_families.findUnique({
+    const family = await prisma.families.findUnique({
       where: { id },
       include: {
         equipmentTypes: {
@@ -90,7 +90,7 @@ export async function PUT(
 
     const { id } = await params
 
-    const existing = await prisma.inventory_families.findUnique({ where: { id } })
+    const existing = await prisma.families.findUnique({ where: { id } })
     if (!existing) {
       return NextResponse.json({ error: 'Familia no encontrada' }, { status: 404 })
     }
@@ -98,7 +98,7 @@ export async function PUT(
     const body = await request.json()
     const { name, icon, color, order, description } = body
 
-    const family = await prisma.inventory_families.update({
+    const family = await prisma.families.update({
       where: { id },
       data: {
         ...(name !== undefined && { name: String(name).trim() }),
@@ -155,12 +155,12 @@ export async function PATCH(
 
     const { id } = await params
 
-    const existing = await prisma.inventory_families.findUnique({ where: { id } })
+    const existing = await prisma.families.findUnique({ where: { id } })
     if (!existing) {
       return NextResponse.json({ error: 'Familia no encontrada' }, { status: 404 })
     }
 
-    const family = await prisma.inventory_families.update({
+    const family = await prisma.families.update({
       where: { id },
       data: { isActive: !existing.isActive },
     })
@@ -210,7 +210,7 @@ export async function DELETE(
 
     const { id } = await params
 
-    const existing = await prisma.inventory_families.findUnique({ where: { id } })
+    const existing = await prisma.families.findUnique({ where: { id } })
     if (!existing) {
       return NextResponse.json({ error: 'Familia no encontrada' }, { status: 404 })
     }
@@ -231,7 +231,7 @@ export async function DELETE(
       )
     }
 
-    await prisma.inventory_families.delete({ where: { id } })
+    await prisma.families.delete({ where: { id } })
 
     await prisma.audit_logs.create({
       data: {

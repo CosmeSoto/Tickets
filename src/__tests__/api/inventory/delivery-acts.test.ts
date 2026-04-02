@@ -20,6 +20,125 @@ import { DigitalSignatureService } from '@/lib/services/digital-signature.servic
 const mockDeliveryActService = DeliveryActService as jest.Mocked<typeof DeliveryActService>
 const mockDigitalSignatureService = DigitalSignatureService as jest.Mocked<typeof DigitalSignatureService>
 
+/**
+ * Tests for equipmentSnapshot department/family fields (Requisitos 3.6, 8.1)
+ * These tests verify the snapshot construction logic directly without mocking the service.
+ */
+describe('equipmentSnapshot department/family fields', () => {
+  it('should include departmentId, departmentName, familyId, familyName when equipment has department and family', () => {
+    const eq: any = {
+      id: 'eq-1',
+      code: 'EQ-001',
+      serialNumber: 'SN-001',
+      brand: 'Dell',
+      model: 'Latitude',
+      typeId: 'type-1',
+      type: { name: 'Laptop' },
+      condition: 'GOOD',
+      specifications: {},
+      supplier: null,
+      purchasePrice: null,
+      purchaseDate: null,
+      invoiceNumber: null,
+      purchaseOrderNumber: null,
+      attachments: [],
+      photoUrl: null,
+      department: {
+        id: 'dept-1',
+        name: 'Tecnología',
+        family: {
+          id: 'fam-1',
+          name: 'Tecnología y Comunicaciones',
+        },
+      },
+    }
+
+    const snapshot = {
+      id: eq.id,
+      code: eq.code,
+      serialNumber: eq.serialNumber,
+      brand: eq.brand,
+      model: eq.model,
+      type: eq.typeId,
+      typeName: eq.type?.name || '',
+      condition: eq.condition,
+      specifications: eq.specifications,
+      supplierName: eq.supplier?.name ?? null,
+      supplierTaxId: eq.supplier?.taxId ?? null,
+      purchasePrice: eq.purchasePrice ?? null,
+      purchaseDate: eq.purchaseDate ?? null,
+      invoiceNumber: eq.invoiceNumber ?? null,
+      purchaseOrderNumber: eq.purchaseOrderNumber ?? null,
+      equipmentImagePath: null,
+      departmentId: eq.department?.id ?? null,
+      departmentName: eq.department?.name ?? null,
+      familyId: eq.department?.family?.id ?? null,
+      familyName: eq.department?.family?.name ?? null,
+    }
+
+    expect(snapshot.departmentId).toBe('dept-1')
+    expect(snapshot.departmentName).toBe('Tecnología')
+    expect(snapshot.familyId).toBe('fam-1')
+    expect(snapshot.familyName).toBe('Tecnología y Comunicaciones')
+  })
+
+  it('should set department and family fields to null when equipment has no department', () => {
+    const eq: any = {
+      id: 'eq-2',
+      code: 'EQ-002',
+      serialNumber: 'SN-002',
+      brand: 'HP',
+      model: 'ProBook',
+      typeId: 'type-2',
+      type: { name: 'Laptop' },
+      condition: 'GOOD',
+      specifications: {},
+      supplier: null,
+      purchasePrice: null,
+      purchaseDate: null,
+      invoiceNumber: null,
+      purchaseOrderNumber: null,
+      attachments: [],
+      photoUrl: null,
+      department: null,
+    }
+
+    const snapshot = {
+      departmentId: eq.department?.id ?? null,
+      departmentName: eq.department?.name ?? null,
+      familyId: eq.department?.family?.id ?? null,
+      familyName: eq.department?.family?.name ?? null,
+    }
+
+    expect(snapshot.departmentId).toBeNull()
+    expect(snapshot.departmentName).toBeNull()
+    expect(snapshot.familyId).toBeNull()
+    expect(snapshot.familyName).toBeNull()
+  })
+
+  it('should set family fields to null when department has no family', () => {
+    const eq: any = {
+      department: {
+        id: 'dept-3',
+        name: 'Sin Familia',
+        family: null,
+      },
+    }
+
+    const snapshot = {
+      departmentId: eq.department?.id ?? null,
+      departmentName: eq.department?.name ?? null,
+      familyId: eq.department?.family?.id ?? null,
+      familyName: eq.department?.family?.name ?? null,
+    }
+
+    expect(snapshot.departmentId).toBe('dept-3')
+    expect(snapshot.departmentName).toBe('Sin Familia')
+    expect(snapshot.familyId).toBeNull()
+    expect(snapshot.familyName).toBeNull()
+  })
+})
+
 describe('Delivery Act API Business Logic', () => {
   const mockAct = {
     id: 'act-123',

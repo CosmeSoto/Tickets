@@ -19,6 +19,7 @@ import {
   TrendingUp,
   Star,
   AlertCircle,
+  Layers,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useUnifiedDashboard } from '@/hooks/use-unified-dashboard'
@@ -268,6 +269,35 @@ export default function TechnicianDashboard() {
 
         {/* Panel lateral */}
         <div className="space-y-6">
+          {/* Mis Familias */}
+          {stats.familyMetrics && stats.familyMetrics.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className='flex items-center'>
+                  <Layers className='h-5 w-5 mr-2 text-indigo-600' />
+                  Mis Familias
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className='space-y-3'>
+                  {stats.familyMetrics.map((fm: any) => (
+                    <div key={fm.familyId} className='flex items-center justify-between p-2 rounded-lg bg-muted/50'>
+                      <div className='flex items-center space-x-2'>
+                        {fm.color && (
+                          <div className='w-3 h-3 rounded-full flex-shrink-0' style={{ backgroundColor: fm.color }} />
+                        )}
+                        <span className='text-sm font-medium'>{fm.familyName}</span>
+                      </div>
+                      <Badge variant='secondary' className='text-xs'>
+                        {fm.openTickets ?? 0} activos
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Acciones Rápidas */}
           <Card>
             <CardHeader>

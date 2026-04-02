@@ -500,8 +500,8 @@ export class UserService {
       await tx.software_licenses.updateMany({ where: { assignedToUser: id }, data: { assignedToUser: null } })
 
       // Eliminar el usuario (Prisma cascade elimina: accounts, sessions,
-      // notification_preferences, notifications, user_preferences,
-      // user_settings, password_reset_tokens, article_votes)
+      // notification_preferences, notifications, user_settings,
+      // password_reset_tokens, article_votes)
       await tx.users.delete({ where: { id } })
     })
   }

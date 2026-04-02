@@ -54,7 +54,7 @@ export function Combobox({
     if (!searchValue) return options
     
     return options.filter((option) =>
-      option.label.toLowerCase().includes(searchValue.toLowerCase())
+      (option.label ?? '').toLowerCase().includes(searchValue.toLowerCase())
     )
   }, [options, searchValue])
 

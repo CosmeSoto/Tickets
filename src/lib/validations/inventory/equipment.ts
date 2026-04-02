@@ -106,6 +106,8 @@ const baseEquipmentSchema = z.object({
   rentalNotes: z.string()
     .max(1000, 'Las notas de renta no pueden exceder 1000 caracteres')
     .optional(),
+
+  departmentId: z.string().uuid('ID de departamento inválido'),
 })
 
 // Create equipment schema (con validaciones refine)
@@ -145,6 +147,7 @@ export const equipmentFiltersSchema = z.object({
   status: z.array(equipmentStatusSchema).optional(),
   condition: z.array(equipmentConditionSchema).optional(),
   assignedTo: z.string().uuid('ID de usuario inválido').optional(),
+  familyId: z.string().uuid('ID de familia inválido').optional(),
   departmentId: z.string().uuid('ID de departamento inválido').optional(),
   page: z.coerce.number().int().positive().optional().default(1),
   limit: z.coerce.number().int().positive().max(100).optional().default(10),

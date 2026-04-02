@@ -133,7 +133,7 @@ export const TouchButton: React.FC<TouchButtonProps> = ({
   const variantClasses = {
     primary: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500',
     secondary: 'bg-gray-600 text-white hover:bg-gray-700 focus:ring-gray-500',
-    outline: 'border border-border text-foreground hover:bg-muted focus:ring-blue-500',
+    outline: 'border border-gray-300 text-foreground hover:bg-muted focus:ring-blue-500',
     ghost: 'text-foreground hover:bg-muted focus:ring-blue-500',
   }
 
@@ -382,7 +382,7 @@ export const MobileInput: React.FC<MobileInputProps> = ({
         </p>
       )}
       {helpText && !error && (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-gray-500">
           {helpText}
         </p>
       )}

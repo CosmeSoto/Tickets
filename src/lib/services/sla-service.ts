@@ -92,13 +92,16 @@ export class SLAService {
   }
 
   /**
-   * Busca la política SLA aplicable
+   * Busca la política SLA aplicable con 3 niveles de precedencia:
+   * Nivel 1: política específica de categoría
+   * Nivel 2: política de familia (resuelto desde categoryId → departments.familyId)
+   * Nivel 3: política global (sin categoría ni familia)
    */
   private static async findApplicablePolicy(
     categoryId: string,
     priority: string
   ): Promise<any> {
-    // Buscar política específica para categoría y prioridad
+    // Nivel 1: política específica de categoría
     let policy = await prisma.sla_policies.findFirst({
       where: {
         categoryId,
@@ -106,19 +109,35 @@ export class SLAService {
         isActive: true
       }
     })
+    if (policy) return policy
 
-    // Si no hay específica, buscar por prioridad solamente
-    if (!policy) {
+    // Nivel 2: política de familia
+    const category = await prisma.categories.findUnique({
+      where: { id: categoryId },
+      include: { departments: { select: { familyId: true } } }
+    })
+    const familyId = category?.departments?.familyId
+    if (familyId) {
       policy = await prisma.sla_policies.findFirst({
         where: {
+          familyId,
           categoryId: null,
           priority,
           isActive: true
         }
       })
+      if (policy) return policy
     }
 
-    return policy
+    // Nivel 3: política global (sin categoría ni familia)
+    return await prisma.sla_policies.findFirst({
+      where: {
+        categoryId: null,
+        familyId: null,
+        priority,
+        isActive: true
+      }
+    })
   }
 
   /**
@@ -448,6 +467,7 @@ export class SLAService {
     endDate?: Date
     categoryId?: string
     priority?: string
+    familyId?: string
   }): Promise<{
     totalTickets: number
     ticketsWithSLA: number
@@ -464,6 +484,10 @@ export class SLAService {
       where.createdAt = {}
       if (filters.startDate) where.createdAt.gte = filters.startDate
       if (filters.endDate) where.createdAt.lte = filters.endDate
+    }
+
+    if (filters?.familyId) {
+      where.ticket = { familyId: filters.familyId }
     }
 
     const metrics = await prisma.ticket_sla_metrics.findMany({

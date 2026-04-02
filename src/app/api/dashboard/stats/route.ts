@@ -109,6 +109,116 @@ function formatTimeAgo(date: Date): string {
   return 'ahora'
 }
 
+// Función para obtener métricas por familia
+async function getFamilyMetrics() {
+  try {
+    const families = await prisma.families.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true },
+    })
+
+    const metrics = await Promise.all(
+      families.map(async (family) => {
+        const [openTickets, inProgressTickets, technicianCount] = await Promise.all([
+          prisma.tickets.count({ where: { familyId: family.id, status: 'OPEN' } }),
+          prisma.tickets.count({ where: { familyId: family.id, status: 'IN_PROGRESS' } }),
+          prisma.technician_family_assignments.count({ where: { familyId: family.id, isActive: true } }),
+        ])
+        return { familyId: family.id, familyName: family.name, openTickets, inProgressTickets, technicianCount }
+      })
+    )
+    return metrics
+  } catch {
+    return []
+  }
+}
+
+// Función para obtener alertas proactivas
+async function getProactiveAlerts() {
+  const alerts: any[] = []
+  const now = new Date()
+
+  try {
+    // 1. Alertas de SLA próximo a vencer (< 2h)
+    const slaAssignments = await prisma.sla_assignments.findMany({
+      where: {
+        tickets: { status: { in: ['OPEN', 'IN_PROGRESS'] } },
+        resolutionDeadline: {
+          gte: now,
+          lte: new Date(now.getTime() + 2 * 60 * 60 * 1000),
+        },
+      },
+      select: {
+        id: true,
+        resolutionDeadline: true,
+        tickets: { select: { id: true, title: true, familyId: true } },
+      },
+      take: 10,
+    })
+    slaAssignments.forEach((sa) => {
+      const minutesLeft = Math.round((sa.resolutionDeadline!.getTime() - now.getTime()) / 60000)
+      alerts.push({
+        type: 'SLA_EXPIRING',
+        severity: minutesLeft < 60 ? 'CRITICAL' : 'WARNING',
+        message: `Ticket "${sa.tickets.title}" vence en ${minutesLeft} min`,
+        ticketId: sa.tickets.id,
+        familyId: sa.tickets.familyId,
+      })
+    })
+
+    // 2. Familias sin técnicos activos
+    const familiesWithoutTechnicians = await prisma.families.findMany({
+      where: {
+        isActive: true,
+        ticketFamilyConfig: { ticketsEnabled: true },
+        technicianFamilyAssignments: { none: { isActive: true } },
+      },
+      select: { id: true, name: true },
+    })
+    familiesWithoutTechnicians.forEach((family) => {
+      alerts.push({
+        type: 'NO_TECHNICIANS',
+        severity: 'CRITICAL',
+        message: `La familia "${family.name}" no tiene técnicos activos asignados`,
+        familyId: family.id,
+      })
+    })
+
+    // 3. Técnicos sobrecargados (> 15 tickets activos)
+    const overloadedTechnicians = await prisma.users.findMany({
+      where: {
+        role: 'TECHNICIAN',
+        isActive: true,
+        tickets_tickets_assigneeIdTousers: {
+          some: { status: { in: ['OPEN', 'IN_PROGRESS'] } },
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        _count: {
+          select: { tickets_tickets_assigneeIdTousers: true },
+        },
+      },
+    })
+    overloadedTechnicians.forEach((tech) => {
+      const count = tech._count.tickets_tickets_assigneeIdTousers
+      if (count > 15) {
+        alerts.push({
+          type: 'TECHNICIAN_OVERLOADED',
+          severity: count > 25 ? 'CRITICAL' : 'WARNING',
+          message: `Técnico "${tech.name}" tiene ${count} tickets activos`,
+          technicianId: tech.id,
+        })
+      }
+    })
+  } catch (err) {
+    console.error('[Dashboard] Error generando alertas proactivas:', err)
+  }
+
+  return alerts
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -246,7 +356,9 @@ export async function GET(request: NextRequest) {
           efficiency: planEfficiency,
           taskCompletionRate
         },
-        recentActivity: await getRecentActivity(role, userId)
+        recentActivity: await getRecentActivity(role, userId),
+        familyMetrics: await getFamilyMetrics(),
+        proactiveAlerts: await getProactiveAlerts(),
       }
     } else if (role === 'TECHNICIAN') {
       // Estadísticas profesionales para técnico

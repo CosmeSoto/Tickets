@@ -275,15 +275,16 @@ export const authOptions: NextAuthOptions = {
                 }
               })
 
-              // Crear preferencias por defecto
-              await prisma.user_preferences.create({
-                data: {
+              // Crear configuración por defecto (user_settings unificado)
+              await prisma.user_settings.upsert({
+                where: { userId: newUser.id },
+                update: {},
+                create: {
                   id: randomUUID(),
                   userId: newUser.id,
-                  theme: 'system',
+                  theme: 'light',
                   timezone: 'America/Guayaquil',
                   language: 'es',
-                  createdAt: new Date(),
                   updatedAt: new Date(),
                 }
               })

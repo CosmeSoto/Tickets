@@ -69,7 +69,14 @@ export async function GET(request: NextRequest) {
             id: true,
             name: true,
             color: true,
-            description: true
+            description: true,
+            familyId: true,
+            family: {
+              select: {
+                name: true,
+                code: true,
+              }
+            }
           }
         },
         other_categories: {
