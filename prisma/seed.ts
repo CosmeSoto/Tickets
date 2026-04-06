@@ -372,22 +372,37 @@ async function seedCategories(deptMap: Map<string, string>) {
   await upsertCategory({ name: 'Creación de Cuenta', description: 'Solicitud de creación de cuenta de usuario', level: 3, parentId: solicitudRequerimientoN2Infra.id, departmentId: deptInfraId, order: 5, color: '#3B82F6' })
   await upsertCategory({ name: 'Reseteo Contraseña', description: 'Solicitud de reseteo de contraseña', level: 3, parentId: solicitudRequerimientoN2Infra.id, departmentId: deptInfraId, order: 6, color: '#3B82F6' })
 
+  // N3 - Energía Regulada (Falla)
+  await upsertCategory({ name: 'En Batería', description: 'UPS funcionando en batería, sin corriente', level: 3, parentId: energiaRegulada.id, departmentId: deptInfraId, order: 1, color: '#EF4444' })
+  await upsertCategory({ name: 'No Enciende', description: 'Equipo de energía no enciende', level: 3, parentId: energiaRegulada.id, departmentId: deptInfraId, order: 2, color: '#EF4444' })
+
   // N3 - Energía Regulada (Solicitudes)
   await upsertCategory({ name: 'Nuevos Equipos', description: 'Solicitud de nuevos equipos de energía', level: 3, parentId: energiaReguladaSolicitud.id, departmentId: deptInfraId, order: 1, color: '#3B82F6' })
   await upsertCategory({ name: 'Mantenimiento', description: 'Solicitud de mantenimiento de equipos', level: 3, parentId: energiaReguladaSolicitud.id, departmentId: deptInfraId, order: 2, color: '#3B82F6' })
   await upsertCategory({ name: 'Reemplazo de Partes', description: 'Solicitud de reemplazo de componentes', level: 3, parentId: energiaReguladaSolicitud.id, departmentId: deptInfraId, order: 3, color: '#3B82F6' })
 
-  // N3 - Office 365
+  // N3 - Office 365 (Falla)
   await upsertCategory({ name: 'Plataforma Intermitente', description: 'Office 365 intermitente, inestable', level: 3, parentId: gestionOffice365.id, departmentId: deptInfraId, order: 1, color: '#EF4444' })
 
-  // N3 - Impresión
+  // N3 - Solicitud N2 — adicionales faltantes
+  await upsertCategory({ name: 'Asignación de Licencia', description: 'Solicitud de asignación de licencia de software', level: 3, parentId: solicitudRequerimientoN2Infra.id, departmentId: deptInfraId, order: 7, color: '#3B82F6' })
+  await upsertCategory({ name: 'Teams', description: 'Solicitud relacionada con Microsoft Teams', level: 3, parentId: solicitudRequerimientoN2Infra.id, departmentId: deptInfraId, order: 8, color: '#3B82F6' })
+
+  // N3 - Impresión (completo según hoja de cálculo)
   await upsertCategory({ name: 'Atasco de Papel', description: 'Impresora atascada, papel trabado', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 1, color: '#EF4444' })
   await upsertCategory({ name: 'Baja Calidad de Imagen', description: 'Impresión con baja calidad, borrosa', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 2, color: '#EF4444' })
   await upsertCategory({ name: 'Cable de Impresora Dañado', description: 'Cable de red o USB dañado', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 3, color: '#EF4444' })
   await upsertCategory({ name: 'Impresora Bloqueada', description: 'Impresora bloqueada, cola de impresión', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 4, color: '#EF4444' })
   await upsertCategory({ name: 'Impresora sin Conexión/Red', description: 'Impresora sin conexión de red', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 5, color: '#EF4444' })
   await upsertCategory({ name: 'La Impresora no Digitaliza/Escanea', description: 'Escáner no funciona', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 6, color: '#EF4444' })
-  await upsertCategory({ name: 'Impresora hace Ruido Anormal', description: 'Impresora hace ruido anormal', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 7, color: '#EF4444' })
+  await upsertCategory({ name: 'La Impresora no Enciende', description: 'Impresora no enciende', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 7, color: '#EF4444' })
+  await upsertCategory({ name: 'La Impresora no Fotocopia', description: 'Función de fotocopiado no funciona', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 8, color: '#EF4444' })
+  await upsertCategory({ name: 'La Impresora no Imprime', description: 'Impresora no imprime', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 9, color: '#EF4444' })
+  await upsertCategory({ name: 'Líneas al Escanear', description: 'Aparecen líneas al escanear', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 10, color: '#EF4444' })
+  await upsertCategory({ name: 'Líneas al Fotocopiar', description: 'Aparecen líneas al fotocopiar', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 11, color: '#EF4444' })
+  await upsertCategory({ name: 'Líneas al Imprimir', description: 'Aparecen líneas al imprimir', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 12, color: '#EF4444' })
+  await upsertCategory({ name: 'No Imprime Stickers', description: 'Impresora de etiquetas no imprime stickers', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 13, color: '#EF4444' })
+  await upsertCategory({ name: 'Ruido al Imprimir', description: 'Impresora hace ruido anormal al imprimir', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 14, color: '#EF4444' })
 
   // ==================== SOPORTE TÉCNICO ====================
   const fallaErrorSoporte = await upsertCategory({ name: 'Falla o Error', description: 'Incidentes y fallas en soporte técnico', level: 1, parentId: null, departmentId: deptSoporteId, order: 1, color: '#EF4444' })
@@ -395,6 +410,7 @@ async function seedCategories(deptMap: Map<string, string>) {
 
   const equipos = await upsertCategory({ name: 'Equipos', description: 'Computadoras, laptops, equipos de cómputo', level: 2, parentId: fallaErrorSoporte.id, departmentId: deptSoporteId, order: 1, color: '#10B981' })
   const solicitudRequerimientoN2Soporte = await upsertCategory({ name: 'Solicitud o Requerimiento', description: 'Solicitudes generales de soporte', level: 2, parentId: solicitudRequerimientoSoporte.id, departmentId: deptSoporteId, order: 1, color: '#3B82F6' })
+  const suministros = await upsertCategory({ name: 'Suministros', description: 'Solicitudes de suministros y materiales', level: 2, parentId: solicitudRequerimientoSoporte.id, departmentId: deptSoporteId, order: 2, color: '#F59E0B' })
 
   await upsertCategory({ name: 'Verificación de Partes', description: 'Verificación de componentes, hardware', level: 3, parentId: equipos.id, departmentId: deptSoporteId, order: 1, color: '#EF4444' })
   await upsertCategory({ name: 'Preparación Equipos', description: 'Preparación de equipos nuevos', level: 3, parentId: equipos.id, departmentId: deptSoporteId, order: 2, color: '#EF4444' })
@@ -405,6 +421,8 @@ async function seedCategories(deptMap: Map<string, string>) {
   await upsertCategory({ name: 'Renovación de Equipo', description: 'Solicitud de renovación de equipo', level: 3, parentId: solicitudRequerimientoN2Soporte.id, departmentId: deptSoporteId, order: 1, color: '#3B82F6' })
   await upsertCategory({ name: 'Adquisición Equipos', description: 'Solicitud de compra de equipos', level: 3, parentId: solicitudRequerimientoN2Soporte.id, departmentId: deptSoporteId, order: 2, color: '#3B82F6' })
   await upsertCategory({ name: 'Adquisición de Impresoras', description: 'Solicitud de compra de impresoras', level: 3, parentId: solicitudRequerimientoN2Soporte.id, departmentId: deptSoporteId, order: 3, color: '#3B82F6' })
+
+  await upsertCategory({ name: 'Verificación de Partes', description: 'Verificación de partes y suministros', level: 3, parentId: suministros.id, departmentId: deptSoporteId, order: 1, color: '#F59E0B' })
 
   // ==================== SEGURIDAD DE LA INFORMACIÓN ====================
   const incidentes = await upsertCategory({ name: 'Incidentes', description: 'Incidentes de seguridad de la información', level: 1, parentId: null, departmentId: deptSeguridadId, order: 1, color: '#EF4444' })
