@@ -64,8 +64,7 @@ async function main() {
   // 18. LANDING PAGE
   await seedLandingPage()
 
-  // 19. ARTÍCULOS DE BASE DE CONOCIMIENTOS
-  await seedKnowledgeArticles(familyMap, deptMap, adminId)
+  // 19. ARTÍCULOS DE BASE DE CONOCIMIENTOS — omitido (sin datos de ejemplo)
 
   console.log('\n🎉 Seed completado exitosamente!')
   console.log('\n📋 Credenciales de acceso:')
@@ -339,27 +338,123 @@ async function seedSLAPolicies(familyMap: Map<string, string>) {
 
 async function seedCategories(deptMap: Map<string, string>) {
   const deptInfraId    = deptMap.get('Tecnologías de la Información')!
-  const deptTelefonia  = deptMap.get('Telefonía')!
+  const deptSoporteId  = deptMap.get('Soporte Técnico')!
+  const deptSeguridadId = deptMap.get('Seguridad Informática')!
+  const deptUsuariosId = deptMap.get('Usuarios y Privilegios')!
+  const deptTelefoniaId = deptMap.get('Telefonía')!
 
-  // ==================== INFRAESTRUCTURA TI ====================
-  const fallaInfra = await upsertCategory({ name: 'Falla o Error', description: 'Incidentes y fallas en infraestructura', level: 1, parentId: null, departmentId: deptInfraId, order: 1, color: '#EF4444' })
-  const solicInfra = await upsertCategory({ name: 'Solicitud o Requerimiento', description: 'Solicitudes de infraestructura', level: 1, parentId: null, departmentId: deptInfraId, order: 2, color: '#3B82F6' })
+  // ==================== INFRAESTRUCTURA ====================
+  const fallaErrorInfra = await upsertCategory({ name: 'Falla o Error', description: 'Incidentes y fallas en infraestructura', level: 1, parentId: null, departmentId: deptInfraId, order: 1, color: '#EF4444' })
+  const solicitudRequerimientoInfra = await upsertCategory({ name: 'Solicitud o Requerimiento', description: 'Solicitudes y requerimientos de infraestructura', level: 1, parentId: null, departmentId: deptInfraId, order: 2, color: '#3B82F6' })
 
-  const networking = await upsertCategory({ name: 'Networking', description: 'Redes, conectividad, firewall, VPN', level: 2, parentId: fallaInfra.id, departmentId: deptInfraId, order: 1, color: '#10B981' })
-  const energiaReg = await upsertCategory({ name: 'Energía Regulada', description: 'UPS, baterías, energía eléctrica', level: 2, parentId: fallaInfra.id, departmentId: deptInfraId, order: 2, color: '#F59E0B' })
-  const office365  = await upsertCategory({ name: 'Gestión de Usuarios Office 365', description: 'Microsoft 365, Teams, licencias', level: 2, parentId: fallaInfra.id, departmentId: deptInfraId, order: 3, color: '#8B5CF6' })
-  const impresion  = await upsertCategory({ name: 'Impresión', description: 'Impresoras, fotocopiadoras', level: 2, parentId: fallaInfra.id, departmentId: deptInfraId, order: 4, color: '#EC4899' })
-  const solicInfraN2 = await upsertCategory({ name: 'Solicitud o Requerimiento', description: 'Solicitudes generales de infraestructura', level: 2, parentId: solicInfra.id, departmentId: deptInfraId, order: 1, color: '#3B82F6' })
-  const energiaSolic = await upsertCategory({ name: 'Energía Regulada', description: 'Solicitudes de energía regulada', level: 2, parentId: solicInfra.id, departmentId: deptInfraId, order: 2, color: '#F59E0B' })
+  const networking = await upsertCategory({ name: 'Networking', description: 'Redes, conectividad, comunicaciones, firewall, VPN, central telefónica', level: 2, parentId: fallaErrorInfra.id, departmentId: deptInfraId, order: 1, color: '#10B981' })
+  const energiaRegulada = await upsertCategory({ name: 'Energía Regulada', description: 'UPS, baterías, energía eléctrica, estabilizadores', level: 2, parentId: fallaErrorInfra.id, departmentId: deptInfraId, order: 2, color: '#F59E0B' })
+  const gestionOffice365 = await upsertCategory({ name: 'Gestión de Usuarios Office 365', description: 'Plataforma Microsoft 365, Teams, licencias, cuentas', level: 2, parentId: fallaErrorInfra.id, departmentId: deptInfraId, order: 3, color: '#8B5CF6' })
+  const impresion = await upsertCategory({ name: 'Impresión', description: 'Impresoras, fotocopiadoras, problemas de impresión', level: 2, parentId: fallaErrorInfra.id, departmentId: deptInfraId, order: 4, color: '#EC4899' })
+
+  const solicitudRequerimientoN2Infra = await upsertCategory({ name: 'Solicitud o Requerimiento', description: 'Solicitudes generales de infraestructura', level: 2, parentId: solicitudRequerimientoInfra.id, departmentId: deptInfraId, order: 1, color: '#3B82F6' })
+  const energiaReguladaSolicitud = await upsertCategory({ name: 'Energía Regulada', description: 'Solicitudes de energía regulada, UPS, baterías', level: 2, parentId: solicitudRequerimientoInfra.id, departmentId: deptInfraId, order: 2, color: '#F59E0B' })
+
+  // N3 - Networking
+  await upsertCategory({ name: 'Pérdida de Conexión', description: 'Sin conexión de red, caída de conectividad', level: 3, parentId: networking.id, departmentId: deptInfraId, order: 1, color: '#EF4444' })
+  await upsertCategory({ name: 'Daño de Equipos Comunicaciones', description: 'Equipos de red dañados, switch, router', level: 3, parentId: networking.id, departmentId: deptInfraId, order: 2, color: '#EF4444' })
+  await upsertCategory({ name: 'Pérdida de Rutas Comunicación', description: 'Rutas de red perdidas, routing', level: 3, parentId: networking.id, departmentId: deptInfraId, order: 3, color: '#EF4444' })
+  await upsertCategory({ name: 'Pérdida de Comunicación Inalámbrica', description: 'WiFi caído, señal inalámbrica', level: 3, parentId: networking.id, departmentId: deptInfraId, order: 4, color: '#EF4444' })
+  await upsertCategory({ name: 'Firewall', description: 'Problemas con firewall, bloqueo de puertos', level: 3, parentId: networking.id, departmentId: deptInfraId, order: 5, color: '#EF4444' })
+  await upsertCategory({ name: 'Central Telefónica', description: 'Problemas con PBX, central telefónica', level: 3, parentId: networking.id, departmentId: deptInfraId, order: 6, color: '#EF4444' })
+  await upsertCategory({ name: 'VPN', description: 'Problemas con VPN, túnel VPN caído', level: 3, parentId: networking.id, departmentId: deptInfraId, order: 7, color: '#EF4444' })
+
+  // N3 - Solicitudes Infraestructura
+  await upsertCategory({ name: 'Creación de SSID', description: 'Solicitud de nueva red WiFi, SSID', level: 3, parentId: solicitudRequerimientoN2Infra.id, departmentId: deptInfraId, order: 1, color: '#3B82F6' })
+  await upsertCategory({ name: 'VPN', description: 'Solicitud de acceso VPN, configuración VPN', level: 3, parentId: solicitudRequerimientoN2Infra.id, departmentId: deptInfraId, order: 2, color: '#3B82F6' })
+  await upsertCategory({ name: 'Fortinet', description: 'Solicitud relacionada con Fortinet, firewall Fortinet', level: 3, parentId: solicitudRequerimientoN2Infra.id, departmentId: deptInfraId, order: 3, color: '#3B82F6' })
+  await upsertCategory({ name: 'Reportes', description: 'Solicitud de reportes de infraestructura', level: 3, parentId: solicitudRequerimientoN2Infra.id, departmentId: deptInfraId, order: 4, color: '#3B82F6' })
+  await upsertCategory({ name: 'Creación de Cuenta', description: 'Solicitud de creación de cuenta de usuario', level: 3, parentId: solicitudRequerimientoN2Infra.id, departmentId: deptInfraId, order: 5, color: '#3B82F6' })
+  await upsertCategory({ name: 'Reseteo Contraseña', description: 'Solicitud de reseteo de contraseña', level: 3, parentId: solicitudRequerimientoN2Infra.id, departmentId: deptInfraId, order: 6, color: '#3B82F6' })
+
+  // N3 - Energía Regulada (Solicitudes)
+  await upsertCategory({ name: 'Nuevos Equipos', description: 'Solicitud de nuevos equipos de energía', level: 3, parentId: energiaReguladaSolicitud.id, departmentId: deptInfraId, order: 1, color: '#3B82F6' })
+  await upsertCategory({ name: 'Mantenimiento', description: 'Solicitud de mantenimiento de equipos', level: 3, parentId: energiaReguladaSolicitud.id, departmentId: deptInfraId, order: 2, color: '#3B82F6' })
+  await upsertCategory({ name: 'Reemplazo de Partes', description: 'Solicitud de reemplazo de componentes', level: 3, parentId: energiaReguladaSolicitud.id, departmentId: deptInfraId, order: 3, color: '#3B82F6' })
+
+  // N3 - Office 365
+  await upsertCategory({ name: 'Plataforma Intermitente', description: 'Office 365 intermitente, inestable', level: 3, parentId: gestionOffice365.id, departmentId: deptInfraId, order: 1, color: '#EF4444' })
+
+  // N3 - Impresión
+  await upsertCategory({ name: 'Atasco de Papel', description: 'Impresora atascada, papel trabado', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 1, color: '#EF4444' })
+  await upsertCategory({ name: 'Baja Calidad de Imagen', description: 'Impresión con baja calidad, borrosa', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 2, color: '#EF4444' })
+  await upsertCategory({ name: 'Cable de Impresora Dañado', description: 'Cable de red o USB dañado', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 3, color: '#EF4444' })
+  await upsertCategory({ name: 'Impresora Bloqueada', description: 'Impresora bloqueada, cola de impresión', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 4, color: '#EF4444' })
+  await upsertCategory({ name: 'Impresora sin Conexión/Red', description: 'Impresora sin conexión de red', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 5, color: '#EF4444' })
+  await upsertCategory({ name: 'La Impresora no Digitaliza/Escanea', description: 'Escáner no funciona', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 6, color: '#EF4444' })
+  await upsertCategory({ name: 'Impresora hace Ruido Anormal', description: 'Impresora hace ruido anormal', level: 3, parentId: impresion.id, departmentId: deptInfraId, order: 7, color: '#EF4444' })
+
+  // ==================== SOPORTE TÉCNICO ====================
+  const fallaErrorSoporte = await upsertCategory({ name: 'Falla o Error', description: 'Incidentes y fallas en soporte técnico', level: 1, parentId: null, departmentId: deptSoporteId, order: 1, color: '#EF4444' })
+  const solicitudRequerimientoSoporte = await upsertCategory({ name: 'Solicitud o Requerimiento', description: 'Solicitudes y requerimientos de soporte técnico', level: 1, parentId: null, departmentId: deptSoporteId, order: 2, color: '#3B82F6' })
+
+  const equipos = await upsertCategory({ name: 'Equipos', description: 'Computadoras, laptops, equipos de cómputo', level: 2, parentId: fallaErrorSoporte.id, departmentId: deptSoporteId, order: 1, color: '#10B981' })
+  const solicitudRequerimientoN2Soporte = await upsertCategory({ name: 'Solicitud o Requerimiento', description: 'Solicitudes generales de soporte', level: 2, parentId: solicitudRequerimientoSoporte.id, departmentId: deptSoporteId, order: 1, color: '#3B82F6' })
+
+  await upsertCategory({ name: 'Verificación de Partes', description: 'Verificación de componentes, hardware', level: 3, parentId: equipos.id, departmentId: deptSoporteId, order: 1, color: '#EF4444' })
+  await upsertCategory({ name: 'Preparación Equipos', description: 'Preparación de equipos nuevos', level: 3, parentId: equipos.id, departmentId: deptSoporteId, order: 2, color: '#EF4444' })
+  await upsertCategory({ name: 'Revisión Equipos', description: 'Revisión técnica de equipos', level: 3, parentId: equipos.id, departmentId: deptSoporteId, order: 3, color: '#EF4444' })
+  await upsertCategory({ name: 'Instalar Software Base', description: 'Instalación de sistema operativo y software base', level: 3, parentId: equipos.id, departmentId: deptSoporteId, order: 4, color: '#EF4444' })
+  await upsertCategory({ name: 'Reparación de Equipos', description: 'Reparación de hardware, componentes', level: 3, parentId: equipos.id, departmentId: deptSoporteId, order: 5, color: '#EF4444' })
+
+  await upsertCategory({ name: 'Renovación de Equipo', description: 'Solicitud de renovación de equipo', level: 3, parentId: solicitudRequerimientoN2Soporte.id, departmentId: deptSoporteId, order: 1, color: '#3B82F6' })
+  await upsertCategory({ name: 'Adquisición Equipos', description: 'Solicitud de compra de equipos', level: 3, parentId: solicitudRequerimientoN2Soporte.id, departmentId: deptSoporteId, order: 2, color: '#3B82F6' })
+  await upsertCategory({ name: 'Adquisición de Impresoras', description: 'Solicitud de compra de impresoras', level: 3, parentId: solicitudRequerimientoN2Soporte.id, departmentId: deptSoporteId, order: 3, color: '#3B82F6' })
+
+  // ==================== SEGURIDAD DE LA INFORMACIÓN ====================
+  const incidentes = await upsertCategory({ name: 'Incidentes', description: 'Incidentes de seguridad de la información', level: 1, parentId: null, departmentId: deptSeguridadId, order: 1, color: '#EF4444' })
+  const requerimientosSeguridad = await upsertCategory({ name: 'Requerimientos', description: 'Requerimientos de seguridad de la información', level: 1, parentId: null, departmentId: deptSeguridadId, order: 2, color: '#3B82F6' })
+
+  await upsertCategory({ name: 'Divulgación no Autorizada de Información Confidencial', description: 'Fuga de información, datos confidenciales', level: 3, parentId: incidentes.id, departmentId: deptSeguridadId, order: 1, color: '#EF4444' })
+  await upsertCategory({ name: 'Sensibilización y Entrenamiento a Usuarios', description: 'Capacitación en seguridad', level: 3, parentId: incidentes.id, departmentId: deptSeguridadId, order: 2, color: '#EF4444' })
+  await upsertCategory({ name: 'Sucesivos Intentos Fallidos de Login', description: 'Múltiples intentos de acceso fallidos', level: 3, parentId: incidentes.id, departmentId: deptSeguridadId, order: 3, color: '#EF4444' })
+  await upsertCategory({ name: 'Ataques Informáticos', description: 'Cyberataques, hacking, malware', level: 3, parentId: incidentes.id, departmentId: deptSeguridadId, order: 4, color: '#EF4444' })
+  await upsertCategory({ name: 'Accesos o Intentos no Autorizados', description: 'Acceso no autorizado a sistemas', level: 3, parentId: incidentes.id, departmentId: deptSeguridadId, order: 5, color: '#EF4444' })
+
+  await upsertCategory({ name: 'Informes de Validación de Alta de Cuentas Usuarias', description: 'Validación de nuevas cuentas', level: 3, parentId: requerimientosSeguridad.id, departmentId: deptSeguridadId, order: 1, color: '#3B82F6' })
+  await upsertCategory({ name: 'Informes sobre Validación de Baja de Cuentas Usuarias', description: 'Validación de cuentas eliminadas', level: 3, parentId: requerimientosSeguridad.id, departmentId: deptSeguridadId, order: 2, color: '#3B82F6' })
+  await upsertCategory({ name: 'Informe sobre Validación de Modificación de Cuentas Usuarias', description: 'Validación de cambios en cuentas', level: 3, parentId: requerimientosSeguridad.id, departmentId: deptSeguridadId, order: 3, color: '#3B82F6' })
+  await upsertCategory({ name: 'Definición de Políticas de Seguridad de la Información', description: 'Creación de políticas de seguridad', level: 3, parentId: requerimientosSeguridad.id, departmentId: deptSeguridadId, order: 4, color: '#3B82F6' })
+  await upsertCategory({ name: 'Aprobación del Servicio VPN', description: 'Aprobación de acceso VPN', level: 3, parentId: requerimientosSeguridad.id, departmentId: deptSeguridadId, order: 5, color: '#3B82F6' })
+
+  // ==================== USUARIOS Y PRIVILEGIOS ====================
+  const fallaErrorUsuarios = await upsertCategory({ name: 'Falla o Error', description: 'Problemas con usuarios y privilegios', level: 1, parentId: null, departmentId: deptUsuariosId, order: 1, color: '#EF4444' })
+  const solicitudRequerimientoUsuarios = await upsertCategory({ name: 'Solicitud o Requerimiento', description: 'Solicitudes de usuarios y privilegios', level: 1, parentId: null, departmentId: deptUsuariosId, order: 2, color: '#3B82F6' })
+
+  const m365Fallas = await upsertCategory({ name: 'Microsoft 365', description: 'Problemas con Office 365, Microsoft 365', level: 2, parentId: fallaErrorUsuarios.id, departmentId: deptUsuariosId, order: 1, color: '#8B5CF6' })
+  const m365Solicitudes = await upsertCategory({ name: 'Microsoft 365', description: 'Solicitudes relacionadas con M365', level: 2, parentId: solicitudRequerimientoUsuarios.id, departmentId: deptUsuariosId, order: 1, color: '#8B5CF6' })
+  const vpnUsuarios = await upsertCategory({ name: 'VPN', description: 'Solicitudes de VPN, acceso remoto', level: 2, parentId: solicitudRequerimientoUsuarios.id, departmentId: deptUsuariosId, order: 2, color: '#10B981' })
+
+  await upsertCategory({ name: 'Error al Iniciar Sesión en M365', description: 'No puede iniciar sesión en Microsoft 365', level: 3, parentId: m365Fallas.id, departmentId: deptUsuariosId, order: 1, color: '#EF4444' })
+  await upsertCategory({ name: 'Servicio no Disponible en M365', description: 'Servicio M365 caído, no disponible', level: 3, parentId: m365Fallas.id, departmentId: deptUsuariosId, order: 2, color: '#EF4444' })
+
+  await upsertCategory({ name: 'Cambio de Contraseña Correo', description: 'Solicitud de cambio de contraseña de correo', level: 3, parentId: m365Solicitudes.id, departmentId: deptUsuariosId, order: 1, color: '#3B82F6' })
+  await upsertCategory({ name: 'Creación de Usuario M365', description: 'Solicitud de nuevo usuario en M365', level: 3, parentId: m365Solicitudes.id, departmentId: deptUsuariosId, order: 2, color: '#3B82F6' })
+  await upsertCategory({ name: 'Desactivación de Usuarios en M365', description: 'Solicitud de desactivar usuario M365', level: 3, parentId: m365Solicitudes.id, departmentId: deptUsuariosId, order: 3, color: '#3B82F6' })
+
+  await upsertCategory({ name: 'Creación de Usuario VPN', description: 'Solicitud de nuevo usuario VPN', level: 3, parentId: vpnUsuarios.id, departmentId: deptUsuariosId, order: 1, color: '#3B82F6' })
+  await upsertCategory({ name: 'Baja de Usuario VPN', description: 'Solicitud de eliminar usuario VPN', level: 3, parentId: vpnUsuarios.id, departmentId: deptUsuariosId, order: 2, color: '#3B82F6' })
+  await upsertCategory({ name: 'Modificación Perfil y Privilegios Acceso VPN', description: 'Cambio de permisos VPN', level: 3, parentId: vpnUsuarios.id, departmentId: deptUsuariosId, order: 3, color: '#3B82F6' })
 
   // ==================== TELEFONÍA ====================
-  const fallaTelefonia = await upsertCategory({ name: 'Falla o Error', description: 'Problemas con telefonía', level: 1, parentId: null, departmentId: deptTelefonia, order: 1, color: '#EF4444' })
-  const solicTelefonia = await upsertCategory({ name: 'Solicitud o Requerimiento', description: 'Solicitudes de telefonía', level: 1, parentId: null, departmentId: deptTelefonia, order: 2, color: '#3B82F6' })
-  const dañoBocina = await upsertCategory({ name: 'Daño de Bocina', description: 'Bocina dañada', level: 2, parentId: fallaTelefonia.id, departmentId: deptTelefonia, order: 1, color: '#EF4444' })
-  const noFuncExt  = await upsertCategory({ name: 'No Funciona la Extensión', description: 'Extensión no funciona', level: 2, parentId: fallaTelefonia.id, departmentId: deptTelefonia, order: 2, color: '#EF4444' })
-  const solicExt   = await upsertCategory({ name: 'Solicitud de Extensión', description: 'Nueva extensión', level: 2, parentId: solicTelefonia.id, departmentId: deptTelefonia, order: 1, color: '#3B82F6' })
+  const fallaErrorTelefonia = await upsertCategory({ name: 'Falla o Error', description: 'Problemas con telefonía', level: 1, parentId: null, departmentId: deptTelefoniaId, order: 1, color: '#EF4444' })
+  const solicitudRequerimientoTelefonia = await upsertCategory({ name: 'Solicitud o Requerimiento', description: 'Solicitudes de telefonía', level: 1, parentId: null, departmentId: deptTelefoniaId, order: 2, color: '#3B82F6' })
 
-  console.log('✅ Categorías (todas bajo familia TECHNOLOGY)')
+  await upsertCategory({ name: 'Daño de Bocina', description: 'Bocina del teléfono dañada', level: 2, parentId: fallaErrorTelefonia.id, departmentId: deptTelefoniaId, order: 1, color: '#EF4444' })
+  await upsertCategory({ name: 'Daño de Extensión', description: 'Extensión telefónica dañada', level: 2, parentId: fallaErrorTelefonia.id, departmentId: deptTelefoniaId, order: 2, color: '#EF4444' })
+  await upsertCategory({ name: 'No Funciona la Extensión', description: 'Extensión no funciona', level: 2, parentId: fallaErrorTelefonia.id, departmentId: deptTelefoniaId, order: 3, color: '#EF4444' })
+  await upsertCategory({ name: 'Problemas con Llamadas Entrantes y Salientes', description: 'Problemas con llamadas', level: 2, parentId: fallaErrorTelefonia.id, departmentId: deptTelefoniaId, order: 4, color: '#EF4444' })
+  await upsertCategory({ name: 'Teléfono sin Red', description: 'Teléfono sin conexión de red', level: 2, parentId: fallaErrorTelefonia.id, departmentId: deptTelefoniaId, order: 5, color: '#EF4444' })
+
+  await upsertCategory({ name: 'Cambio de Extensión', description: 'Solicitud de cambio de extensión', level: 2, parentId: solicitudRequerimientoTelefonia.id, departmentId: deptTelefoniaId, order: 1, color: '#3B82F6' })
+  await upsertCategory({ name: 'Solicitud de Extensión', description: 'Solicitud de nueva extensión', level: 2, parentId: solicitudRequerimientoTelefonia.id, departmentId: deptTelefoniaId, order: 2, color: '#3B82F6' })
+
+  console.log('✅ Categorías (5 departamentos con jerarquía N1 → N2 → N3)')
 }
 
 // ============================================
@@ -638,101 +733,6 @@ async function seedLandingPage() {
     })
   }
   console.log('✅ Landing page')
-}
-
-// ============================================
-// 19. ARTÍCULOS DE BASE DE CONOCIMIENTOS
-// ============================================
-
-async function seedKnowledgeArticles(
-  familyMap: Map<string, string>,
-  deptMap: Map<string, string>,
-  adminId: string
-) {
-  const articles = [
-    {
-      familyCode: 'TECHNOLOGY',
-      title: 'Cómo restablecer tu contraseña de Microsoft 365',
-      content: 'Para restablecer tu contraseña de M365: 1) Ve a portal.office.com 2) Haz clic en "¿Olvidaste tu contraseña?" 3) Sigue las instrucciones de verificación.',
-      summary: 'Guía paso a paso para restablecer contraseña M365',
-      tags: ['m365', 'contraseña', 'acceso'],
-    },
-    {
-      familyCode: 'TECHNOLOGY',
-      title: 'Solución a problemas de conexión VPN',
-      content: 'Si tienes problemas con la VPN: 1) Verifica que el cliente VPN esté actualizado 2) Comprueba tus credenciales 3) Reinicia el servicio VPN en tu equipo.',
-      summary: 'Pasos para resolver problemas comunes de VPN',
-      tags: ['vpn', 'conexión', 'red'],
-    },
-    {
-      familyCode: 'FIXED_ASSETS',
-      title: 'Procedimiento de solicitud de mantenimiento de equipos',
-      content: 'Para solicitar mantenimiento: 1) Crea un ticket en la familia Infraestructura 2) Describe el equipo y el problema 3) Adjunta fotos si es posible 4) El técnico coordinará la visita.',
-      summary: 'Cómo solicitar mantenimiento de activos fijos',
-      tags: ['mantenimiento', 'infraestructura', 'activos'],
-    },
-    {
-      familyCode: 'ADMINISTRATIVE',
-      title: 'Proceso de solicitud de reportes administrativos',
-      content: 'Para solicitar reportes: 1) Crea un ticket en la familia Administrativa 2) Especifica el tipo de reporte y período 3) Indica el formato requerido (Excel, PDF) 4) El área procesará en 48h hábiles.',
-      summary: 'Cómo solicitar reportes al área administrativa',
-      tags: ['reportes', 'administrativo', 'documentos'],
-    },
-    {
-      familyCode: 'MAINTENANCE',
-      title: 'Guía de solicitud de mantenimiento preventivo',
-      content: 'Para solicitar mantenimiento preventivo: 1) Identifica el equipo o instalación 2) Crea un ticket indicando el tipo de mantenimiento 3) Adjunta el historial de mantenimiento si está disponible.',
-      summary: 'Cómo solicitar mantenimiento preventivo',
-      tags: ['mantenimiento', 'preventivo', 'equipos'],
-    },
-    {
-      familyCode: 'SERVICES',
-      title: 'Solicitud de servicios generales',
-      content: 'Para solicitar servicios generales: 1) Crea un ticket en la familia Servicios 2) Describe el servicio requerido 3) Indica la ubicación y urgencia 4) El equipo coordinará la atención.',
-      summary: 'Cómo solicitar servicios generales',
-      tags: ['servicios', 'limpieza', 'operaciones'],
-    },
-    {
-      familyCode: 'SECURITY',
-      title: 'Reporte de incidentes de seguridad',
-      content: 'Para reportar un incidente de seguridad: 1) Crea un ticket urgente en la familia Seguridad 2) Describe el incidente con detalle 3) Indica la ubicación y hora del incidente 4) No manipules evidencia.',
-      summary: 'Cómo reportar incidentes de seguridad',
-      tags: ['seguridad', 'incidente', 'reporte'],
-    },
-    {
-      familyCode: 'COMMERCIAL',
-      title: 'Solicitud de materiales de marketing',
-      content: 'Para solicitar materiales de marketing: 1) Crea un ticket en la familia Comercial 2) Especifica el tipo de material y cantidad 3) Indica la fecha de necesidad 4) El área de marketing procesará la solicitud.',
-      summary: 'Cómo solicitar materiales comerciales y de marketing',
-      tags: ['marketing', 'comercial', 'materiales'],
-    },
-  ]
-
-  for (const a of articles) {
-    const familyId = familyMap.get(a.familyCode)!
-    // Buscar una categoría de esa familia; si no hay, usar cualquier categoría de TECHNOLOGY como fallback
-    let category = await prisma.categories.findFirst({
-      where: { departments: { familyId }, level: 1 },
-    })
-    if (!category) {
-      category = await prisma.categories.findFirst({
-        where: { departments: { familyId: familyMap.get('TECHNOLOGY') }, level: 1 },
-      })
-    }
-    if (!category) continue
-
-    const existing = await prisma.knowledge_articles.findFirst({ where: { title: a.title } })
-    if (!existing) {
-      await prisma.knowledge_articles.create({
-        data: {
-          id: randomUUID(), title: a.title, content: a.content, summary: a.summary,
-          categoryId: category.id, familyId, authorId: adminId,
-          tags: a.tags, isPublished: true,
-        },
-      })
-    }
-  }
-  console.log(`✅ ${articles.length} artículos de base de conocimientos (1 por familia con ticketsEnabled=true)`)
 }
 
 // ============================================
