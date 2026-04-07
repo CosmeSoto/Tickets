@@ -6,6 +6,7 @@ import { generateDeliveryActAcceptedEmail } from '../email-templates/inventory/d
 import { generateDeliveryActRejectedEmail } from '../email-templates/inventory/delivery-act-rejected'
 import { generateDeliveryActExpiredEmail } from '../email-templates/inventory/delivery-act-expired'
 import type { DeliveryAct } from '@/types/inventory/delivery-act'
+import { NotificationService } from './notification-service'
 
 const prisma = new PrismaClient()
 
@@ -83,42 +84,22 @@ export class InventoryNotificationService {
         }
       })
 
-      // Crear notificación in-app para el receptor — lleva a la página autenticada del acta
-      await prisma.notifications.create({
-        data: {
-          id: randomUUID(),
-          userId: receiverInfo.id,
-          type: 'INVENTORY',
-          title: `Acta de entrega pendiente — ${equipmentCode}`,
-          message: `Tienes un acta de entrega pendiente para el equipo ${equipmentCode} (${equipmentDescription}). Debes firmarla antes del ${new Date(act.expirationDate).toLocaleDateString('es-ES')}.`,
-          metadata: {
-            type: 'delivery_act_created',
-            actId: act.id,
-            folio: act.folio,
-            equipmentId: act.assignment?.equipmentId,
-            link: `/inventory/acts/${act.id}`,
-          },
-          isRead: false,
-        }
+      // Crear notificación in-app para el receptor
+      await NotificationService.push({
+        userId: receiverInfo.id,
+        type: 'INVENTORY',
+        title: `Acta de entrega pendiente — ${equipmentCode}`,
+        message: `Tienes un acta de entrega pendiente para el equipo ${equipmentCode} (${equipmentDescription}). Debes firmarla antes del ${new Date(act.expirationDate).toLocaleDateString('es-ES')}.`,
+        metadata: { type: 'delivery_act_created', actId: act.id, folio: act.folio, equipmentId: act.assignment?.equipmentId, link: `/inventory/acts/${act.id}` },
       })
 
-      // Notificación al entregador también
-      await prisma.notifications.create({
-        data: {
-          id: randomUUID(),
-          userId: delivererInfo.id,
-          type: 'INVENTORY',
-          title: `Acta generada — ${equipmentCode}`,
-          message: `Se generó el acta ${act.folio} para la entrega de ${equipmentCode} a ${receiverInfo.name}. Pendiente de firma del receptor.`,
-          metadata: {
-            type: 'delivery_act_created',
-            actId: act.id,
-            folio: act.folio,
-            equipmentId: act.assignment?.equipmentId,
-            link: `/inventory/acts/${act.id}`,
-          },
-          isRead: false,
-        }
+      // Notificación al entregador
+      await NotificationService.push({
+        userId: delivererInfo.id,
+        type: 'INVENTORY',
+        title: `Acta generada — ${equipmentCode}`,
+        message: `Se generó el acta ${act.folio} para la entrega de ${equipmentCode} a ${receiverInfo.name}. Pendiente de firma del receptor.`,
+        metadata: { type: 'delivery_act_created', actId: act.id, folio: act.folio, equipmentId: act.assignment?.equipmentId, link: `/inventory/acts/${act.id}` },
       })
 
       console.log(`Notificación de acta creada enviada para ${act.folio}`)
@@ -189,22 +170,12 @@ export class InventoryNotificationService {
       })
 
       // Crear notificación in-app
-      await prisma.notifications.create({
-        data: {
-          id: randomUUID(),
-          userId: receiverInfo.id,
-          type: 'INVENTORY',
-          title: daysRemaining === 1 ? '¡URGENTE! Acta por Expirar' : 'Recordatorio: Acta Pendiente',
-          message: `Tu acta de entrega para ${equipmentCode} expira en ${daysRemaining} ${daysRemaining === 1 ? 'día' : 'días'}.`,
-          metadata: {
-            type: 'delivery_act_reminder',
-            actId: act.id,
-            folio: act.folio,
-            daysRemaining,
-            link: acceptanceUrl
-          },
-          isRead: false,
-        }
+      await NotificationService.push({
+        userId: receiverInfo.id,
+        type: 'INVENTORY',
+        title: daysRemaining === 1 ? '¡URGENTE! Acta por Expirar' : 'Recordatorio: Acta Pendiente',
+        message: `Tu acta de entrega para ${equipmentCode} expira en ${daysRemaining} ${daysRemaining === 1 ? 'día' : 'días'}.`,
+        metadata: { type: 'delivery_act_reminder', actId: act.id, folio: act.folio, daysRemaining, link: acceptanceUrl },
       })
 
       console.log(`Recordatorio enviado para ${act.folio} (${daysRemaining} días restantes)`)
@@ -290,68 +261,37 @@ export class InventoryNotificationService {
       ])
 
       // ── Notificaciones in-app ─────────────────────────────────────────────
-      // Para el RECEPTOR: confirmación de que firmó
-      // Para el ENTREGADOR (admin/técnico): alerta de que el usuario aceptó
-      await prisma.notifications.createMany({
-        data: [
-          {
-            id: randomUUID(),
-            userId: receiverInfo.id,
-            type: 'SUCCESS',
-            title: `✅ Acta firmada — ${equipmentCode}`,
-            message: `Has aceptado y firmado el acta ${act.folio} para el equipo ${equipmentCode} (${equipmentDescription}). La entrega queda registrada el ${acceptedAtStr}.`,
-            metadata: {
-              type: 'delivery_act_accepted',
-              actId: act.id,
-              folio: act.folio,
-              equipmentId: act.assignment?.equipmentId,
-              link: actLink,
-            },
-            isRead: false,
-          },
-          {
-            id: randomUUID(),
-            userId: delivererInfo.id,
-            type: 'SUCCESS',
-            title: `✅ Acta aceptada por ${receiverInfo.name}`,
-            message: `${receiverInfo.name} aceptó y firmó el acta ${act.folio} para el equipo ${equipmentCode} (${equipmentDescription}). Fecha de firma: ${acceptedAtStr}. Puedes descargar el PDF desde el acta.`,
-            metadata: {
-              type: 'delivery_act_accepted',
-              actId: act.id,
-              folio: act.folio,
-              equipmentId: act.assignment?.equipmentId,
-              link: actLink,
-            },
-            isRead: false,
-          },
-        ]
-      })
+      await Promise.all([
+        NotificationService.push({
+          userId: receiverInfo.id,
+          type: 'SUCCESS',
+          title: `✅ Acta firmada — ${equipmentCode}`,
+          message: `Has aceptado y firmado el acta ${act.folio} para el equipo ${equipmentCode} (${equipmentDescription}). La entrega queda registrada el ${acceptedAtStr}.`,
+          metadata: { type: 'delivery_act_accepted', actId: act.id, folio: act.folio, equipmentId: act.assignment?.equipmentId, link: actLink },
+        }),
+        NotificationService.push({
+          userId: delivererInfo.id,
+          type: 'SUCCESS',
+          title: `✅ Acta aceptada por ${receiverInfo.name}`,
+          message: `${receiverInfo.name} aceptó y firmó el acta ${act.folio} para el equipo ${equipmentCode} (${equipmentDescription}). Fecha de firma: ${acceptedAtStr}.`,
+          metadata: { type: 'delivery_act_accepted', actId: act.id, folio: act.folio, equipmentId: act.assignment?.equipmentId, link: actLink },
+        }),
+      ])
 
       // Si hay admins distintos al entregador, notificarlos también
       const admins = await prisma.users.findMany({
         where: { role: 'ADMIN', id: { not: delivererInfo.id } },
         select: { id: true },
       })
-
-      if (admins.length > 0) {
-        await prisma.notifications.createMany({
-          data: admins.map(admin => ({
-            id: randomUUID(),
-            userId: admin.id,
-            type: 'INFO' as const,
-            title: `Acta aceptada — ${equipmentCode}`,
-            message: `${receiverInfo.name} aceptó el acta ${act.folio} entregada por ${delivererInfo.name}. Equipo: ${equipmentCode}.`,
-            metadata: {
-              type: 'delivery_act_accepted',
-              actId: act.id,
-              folio: act.folio,
-              equipmentId: act.assignment?.equipmentId,
-              link: actLink,
-            },
-            isRead: false,
-          }))
+      await Promise.all(admins.map(admin =>
+        NotificationService.push({
+          userId: admin.id,
+          type: 'INFO',
+          title: `Acta aceptada — ${equipmentCode}`,
+          message: `${receiverInfo.name} aceptó el acta ${act.folio} entregada por ${delivererInfo.name}. Equipo: ${equipmentCode}.`,
+          metadata: { type: 'delivery_act_accepted', actId: act.id, folio: act.folio, equipmentId: act.assignment?.equipmentId, link: actLink },
         })
-      }
+      ))
 
       console.log(`Notificaciones de aceptación enviadas para ${act.folio} → receptor: ${receiverInfo.name}, entregador: ${delivererInfo.name}`)
     } catch (error) {
@@ -411,68 +351,37 @@ export class InventoryNotificationService {
       })
 
       // ── Notificaciones in-app ─────────────────────────────────────────────
-      await prisma.notifications.createMany({
-        data: [
-          // Al entregador: alerta de rechazo con motivo
-          {
-            id: randomUUID(),
-            userId: delivererInfo.id,
-            type: 'WARNING' as const,
-            title: `⚠️ Acta rechazada — ${equipmentCode}`,
-            message: `${receiverInfo.name} rechazó el acta ${act.folio} para el equipo ${equipmentCode} (${equipmentDescription}). Motivo: "${motivo}". El equipo volvió a estar disponible. Fecha: ${rejectedAtStr}.`,
-            metadata: {
-              type: 'delivery_act_rejected',
-              actId: act.id,
-              folio: act.folio,
-              equipmentId: act.assignment?.equipmentId,
-              link: actLink,
-            },
-            isRead: false,
-          },
-          // Al receptor: confirmación de que rechazó
-          {
-            id: randomUUID(),
-            userId: receiverInfo.id,
-            type: 'INFO' as const,
-            title: `Rechazo registrado — ${equipmentCode}`,
-            message: `Rechazaste el acta ${act.folio} para el equipo ${equipmentCode}. El entregador ha sido notificado. El equipo volvió a bodega.`,
-            metadata: {
-              type: 'delivery_act_rejected',
-              actId: act.id,
-              folio: act.folio,
-              equipmentId: act.assignment?.equipmentId,
-              link: actLink,
-            },
-            isRead: false,
-          },
-        ]
-      })
+      await Promise.all([
+        NotificationService.push({
+          userId: delivererInfo.id,
+          type: 'WARNING',
+          title: `⚠️ Acta rechazada — ${equipmentCode}`,
+          message: `${receiverInfo.name} rechazó el acta ${act.folio} para el equipo ${equipmentCode} (${equipmentDescription}). Motivo: "${motivo}". El equipo volvió a estar disponible. Fecha: ${rejectedAtStr}.`,
+          metadata: { type: 'delivery_act_rejected', actId: act.id, folio: act.folio, equipmentId: act.assignment?.equipmentId, link: actLink },
+        }),
+        NotificationService.push({
+          userId: receiverInfo.id,
+          type: 'INFO',
+          title: `Rechazo registrado — ${equipmentCode}`,
+          message: `Rechazaste el acta ${act.folio} para el equipo ${equipmentCode}. El entregador ha sido notificado. El equipo volvió a bodega.`,
+          metadata: { type: 'delivery_act_rejected', actId: act.id, folio: act.folio, equipmentId: act.assignment?.equipmentId, link: actLink },
+        }),
+      ])
 
       // Notificar a admins distintos al entregador
       const admins = await prisma.users.findMany({
         where: { role: 'ADMIN', id: { not: delivererInfo.id } },
         select: { id: true },
       })
-
-      if (admins.length > 0) {
-        await prisma.notifications.createMany({
-          data: admins.map(admin => ({
-            id: randomUUID(),
-            userId: admin.id,
-            type: 'WARNING' as const,
-            title: `Acta rechazada — ${equipmentCode}`,
-            message: `${receiverInfo.name} rechazó el acta ${act.folio}. Motivo: "${motivo}". Entregador: ${delivererInfo.name}.`,
-            metadata: {
-              type: 'delivery_act_rejected',
-              actId: act.id,
-              folio: act.folio,
-              equipmentId: act.assignment?.equipmentId,
-              link: actLink,
-            },
-            isRead: false,
-          }))
+      await Promise.all(admins.map(admin =>
+        NotificationService.push({
+          userId: admin.id,
+          type: 'WARNING',
+          title: `Acta rechazada — ${equipmentCode}`,
+          message: `${receiverInfo.name} rechazó el acta ${act.folio}. Motivo: "${motivo}". Entregador: ${delivererInfo.name}.`,
+          metadata: { type: 'delivery_act_rejected', actId: act.id, folio: act.folio, equipmentId: act.assignment?.equipmentId, link: actLink },
         })
-      }
+      ))
 
       console.log(`Notificaciones de rechazo enviadas para ${act.folio}`)
     } catch (error) {
@@ -555,39 +464,22 @@ export class InventoryNotificationService {
       })
 
       // Notificaciones in-app
-      const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
-      await prisma.notifications.createMany({
-        data: [
-          {
-            id: randomUUID(),
-            userId: receiverInfo.id,
-            type: 'INVENTORY',
-            title: 'Acta Expirada',
-            message: `El acta ${act.folio} ha expirado sin ser aceptada.`,
-            metadata: {
-              type: 'delivery_act_expired',
-              actId: act.id,
-              folio: act.folio,
-              link: `${baseUrl}/inventory/acts/${act.id}`
-            },
-            isRead: false,
-          },
-          {
-            id: randomUUID(),
-            userId: delivererInfo.id,
-            type: 'INVENTORY',
-            title: 'Acta Expirada',
-            message: `El acta ${act.folio} ha expirado sin ser aceptada.`,
-            metadata: {
-              type: 'delivery_act_expired',
-              actId: act.id,
-              folio: act.folio,
-              link: `${baseUrl}/inventory/acts/${act.id}`
-            },
-            isRead: false,
-          }
-        ]
-      })
+      await Promise.all([
+        NotificationService.push({
+          userId: receiverInfo.id,
+          type: 'INVENTORY',
+          title: 'Acta Expirada',
+          message: `El acta ${act.folio} ha expirado sin ser aceptada.`,
+          metadata: { type: 'delivery_act_expired', actId: act.id, folio: act.folio, link: `/inventory/acts/${act.id}` },
+        }),
+        NotificationService.push({
+          userId: delivererInfo.id,
+          type: 'INVENTORY',
+          title: 'Acta Expirada',
+          message: `El acta ${act.folio} ha expirado sin ser aceptada.`,
+          metadata: { type: 'delivery_act_expired', actId: act.id, folio: act.folio, link: `/inventory/acts/${act.id}` },
+        }),
+      ])
 
       console.log(`Notificaciones de expiración enviadas para ${act.folio}`)
     } catch (error) {

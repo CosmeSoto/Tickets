@@ -1,6 +1,7 @@
 import prisma from '@/lib/prisma'
 import { LicenseService } from '../services/license.service'
 import { randomUUID } from 'crypto'
+import { NotificationService } from '../services/notification-service'
 
 /**
  * Job para verificar licencias próximas a expirar
@@ -47,18 +48,12 @@ export class CheckLicenseExpirationJob {
         // Crear notificaciones in-app para cada admin
         for (const admin of admins) {
           try {
-            await prisma.notifications.create({
-              data: {
-                id: randomUUID(),
-                userId: admin.id,
-                type: 'WARNING',
-                title: daysRemaining <= 7
-                  ? '¡URGENTE! Licencia por Expirar'
-                  : 'Licencia Próxima a Expirar',
-                message: `La licencia "${license.name}" (${typeName}) expira en ${daysRemaining} ${daysRemaining === 1 ? 'día' : 'días'}. ${assignedTo}`,
-                metadata: { link: `/inventory/licenses` },
-                isRead: false,
-              },
+            await NotificationService.push({
+              userId: admin.id,
+              type: daysRemaining <= 7 ? 'ERROR' : 'WARNING',
+              title: daysRemaining <= 7 ? '¡URGENTE! Licencia por Expirar' : 'Licencia Próxima a Expirar',
+              message: `La licencia "${license.name}" (${typeName}) expira en ${daysRemaining} ${daysRemaining === 1 ? 'día' : 'días'}. ${assignedTo}`,
+              metadata: { link: `/inventory/licenses` },
             })
 
             // Crear email en cola

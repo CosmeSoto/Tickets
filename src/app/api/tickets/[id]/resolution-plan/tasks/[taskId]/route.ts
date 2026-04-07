@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { auditTaskChange } from '@/lib/audit'
 import { calculateDuration, validateTimeRange, combineDateAndTime } from '@/lib/time-utils'
+import { NotificationService } from '@/lib/services/notification-service'
 
 /**
  * PATCH /api/tickets/[id]/resolution-plan/tasks/[taskId]
@@ -218,26 +219,20 @@ export async function PATCH(
         })
 
         // Crear notificación para el cliente
-        await prisma.notifications.create({
-          data: {
-            id: require('crypto').randomUUID(),
-            userId: task.plan.ticket.clientId,
-            type: 'RESOLUTION_PLAN_COMPLETED',
-            title: 'Plan de resolución completado',
-            message: `El plan de resolución "${task.plan.title}" ha sido completado exitosamente. Todas las tareas programadas han sido finalizadas.`,
-            ticketId: task.plan.ticketId,
-            isRead: false,
-            metadata: {
-              planId: task.plan.id,
-              planTitle: task.plan.title,
-              totalTasks,
-              completedTasks: completedCount,
-              actionUrl: `/client/tickets/${task.plan.ticketId}`,
-              actionText: 'Ver ticket'
-            },
-            createdAt: new Date()
-          }
-        })
+        await NotificationService.push({
+          userId: task.plan.ticket.clientId,
+          type: 'SUCCESS',
+          title: 'Plan de resolución completado',
+          message: `El plan de resolución "${task.plan.title}" ha sido completado exitosamente. Todas las tareas programadas han sido finalizadas.`,
+          ticketId: task.plan.ticketId,
+          metadata: {
+            planId: task.plan.id,
+            planTitle: task.plan.title,
+            totalTasks,
+            completedTasks: completedCount,
+            link: `/client/tickets/${task.plan.ticketId}`,
+          },
+        }).catch(() => {})
       }
 
       await prisma.resolution_plans.update({

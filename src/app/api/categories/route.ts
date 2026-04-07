@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
+import { NotificationService } from '@/lib/services/notification-service'
 
 /**
  * Obtiene el nombre del nivel basado en el número
@@ -296,20 +297,15 @@ export async function POST(request: NextRequest) {
       where: { role: 'ADMIN', isActive: true, id: { not: session.user.id } },
       select: { id: true },
     })
-    if (admins.length > 0) {
-      await prisma.notifications.createMany({
-        data: admins.map(admin => ({
-          id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-          title: `Nueva categoría creada: ${category.name}`,
-          message: `Se creó la categoría "${category.name}" (Nivel ${category.level}) en el departamento ${category.departments?.name ?? 'sin departamento'}.`,
-          type: 'INFO' as const,
-          userId: admin.id,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })),
-        skipDuplicates: true,
+    // Notificación in-app a otros admins
+    await Promise.all(admins.map(admin =>
+      NotificationService.push({
+        userId: admin.id,
+        type: 'INFO',
+        title: `Nueva categoría creada: ${category.name}`,
+        message: `Se creó la categoría "${category.name}" (Nivel ${category.level}) en el departamento ${category.departments?.name ?? 'sin departamento'}.`,
       }).catch(err => console.error('[NOTIFY] Error:', err))
-    }
+    ))
 
     // Enriquecer con canDelete y levelName
     const enrichedCategory = {

@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import { randomUUID } from 'crypto'
+import { NotificationService } from '../services/notification-service'
 
 const prisma = new PrismaClient()
 
@@ -82,18 +83,14 @@ export class CheckRentalExpirationJob {
         // Crear notificaciones in-app para cada admin
         for (const admin of admins) {
           try {
-            await prisma.notifications.create({
-              data: {
-                id: randomUUID(),
-                userId: admin.id,
-                type: 'WARNING',
-                title: daysRemaining === 1 
-                  ? '¡URGENTE! Contrato de Renta por Vencer'
-                  : 'Contrato de Renta Próximo a Vencer',
-                message: `El contrato de renta del equipo ${equipmentDescription} con ${rental.rentalProvider} vence en ${daysRemaining} ${daysRemaining === 1 ? 'día' : 'días'} (${expirationDate.toLocaleDateString('es-ES')}).`,
-                metadata: { link: `/inventory/equipment/${rental.id}` },
-                isRead: false,
-              },
+            await NotificationService.push({
+              userId: admin.id,
+              type: daysRemaining === 1 ? 'ERROR' : 'WARNING',
+              title: daysRemaining === 1
+                ? '¡URGENTE! Contrato de Renta por Vencer'
+                : 'Contrato de Renta Próximo a Vencer',
+              message: `El contrato de renta del equipo ${equipmentDescription} con ${rental.rentalProvider} vence en ${daysRemaining} ${daysRemaining === 1 ? 'día' : 'días'} (${expirationDate.toLocaleDateString('es-ES')}).`,
+              metadata: { link: `/inventory/equipment/${rental.id}` },
             })
 
             // Crear email en cola

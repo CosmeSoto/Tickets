@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma'
 import { z } from 'zod'
 import { randomUUID } from 'crypto'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
+import { NotificationService } from '@/lib/services/notification-service'
 
 const updateCategorySchema = z.object({
   name: z.string().min(1, 'El nombre es requerido').max(100, 'El nombre es muy largo').transform(s => s.trim()),
@@ -343,18 +344,14 @@ export async function PUT(
       const message = `Categoría actualizada — ${notifParts.join(', ')}`
 
       if (admins.length > 0) {
-        await prisma.notifications.createMany({
-          data: admins.map(admin => ({
-            id: randomUUID(),
+        await Promise.all(admins.map(admin =>
+          NotificationService.push({
+            userId: admin.id,
+            type: 'INFO',
             title: `Categoría modificada: ${validatedData.name}`,
             message,
-            type: 'INFO' as const,
-            userId: admin.id,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          })),
-          skipDuplicates: true,
-        }).catch(err => console.error('[NOTIFY] Error:', err))
+          }).catch(err => console.error('[NOTIFY] Error:', err))
+        ))
       }
     }
 
@@ -505,20 +502,15 @@ export async function DELETE(
       where: { role: 'ADMIN', isActive: true, id: { not: session.user.id } },
       select: { id: true },
     })
-    if (admins.length > 0) {
-      await prisma.notifications.createMany({
-        data: admins.map(admin => ({
-          id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-          title: `Categoría eliminada: ${category.name}`,
-          message: `Se eliminó la categoría "${category.name}" (Nivel ${category.level}).`,
-          type: 'WARNING' as const,
-          userId: admin.id,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })),
-        skipDuplicates: true,
+    // Notificación in-app a otros admins
+    await Promise.all(admins.map(admin =>
+      NotificationService.push({
+        userId: admin.id,
+        type: 'WARNING',
+        title: `Categoría eliminada: ${category.name}`,
+        message: `Se eliminó la categoría "${category.name}" (Nivel ${category.level}).`,
       }).catch(err => console.error('[NOTIFY] Error:', err))
-    }
+    ))
     
     return NextResponse.json({
       success: true,
