@@ -56,17 +56,36 @@ export async function GET(request: NextRequest) {
 
     const userId = session.user.id
 
-    // Buscar configuración existente
+    // Buscar configuración existente — con manejo de registros corruptos
     let settings = await prisma.user_settings.findUnique({
       where: { userId },
-    })
+    }).catch(() => null) // Si falla la deserialización (campos null), tratar como no existente
 
-    // Si no existe, crear con valores por defecto
+    // Si no existe o falló la lectura, crear/reparar con upsert completo
     if (!settings) {
       const now = new Date()
       settings = await prisma.user_settings.upsert({
         where: { userId },
-        update: {},
+        update: {
+          theme: 'light',
+          language: 'es',
+          timezone: 'America/Guayaquil',
+          systemAlerts: true,
+          weeklyReport: false,
+          soundEnabled: true,
+          ticketUpdates: true,
+          ticketCreated: true,
+          ticketAssigned: true,
+          statusChanged: true,
+          newComments: true,
+          ticketUpdated: true,
+          autoAssignEnabled: true,
+          maxConcurrentTickets: 10,
+          quietHoursEnabled: false,
+          quietHoursStart: '22:00',
+          quietHoursEnd: '08:00',
+          updatedAt: now,
+        },
         create: {
           id: randomUUID(),
           userId,
@@ -94,8 +113,8 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Reparar registros con campos null (creados con schema incompleto)
-    const needsRepair = !settings.theme || !settings.language || !settings.timezone
+    // Reparar registros con campos null (creados con schema incompleto o updatedAt null)
+    const needsRepair = !settings.theme || !settings.language || !settings.timezone || !settings.updatedAt
     if (needsRepair) {
       settings = await prisma.user_settings.update({
         where: { userId },
@@ -107,6 +126,11 @@ export async function GET(request: NextRequest) {
           weeklyReport: settings.weeklyReport ?? false,
           soundEnabled: settings.soundEnabled ?? true,
           ticketUpdates: settings.ticketUpdates ?? true,
+          ticketCreated: settings.ticketCreated ?? true,
+          ticketAssigned: settings.ticketAssigned ?? true,
+          statusChanged: settings.statusChanged ?? true,
+          newComments: settings.newComments ?? true,
+          ticketUpdated: settings.ticketUpdated ?? true,
           autoAssignEnabled: settings.autoAssignEnabled ?? true,
           maxConcurrentTickets: settings.maxConcurrentTickets ?? 10,
           quietHoursEnabled: settings.quietHoursEnabled ?? false,
