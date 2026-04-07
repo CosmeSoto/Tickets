@@ -56,6 +56,19 @@ export async function GET(request: NextRequest) {
 
     const userId = session.user.id
 
+    // Verificar que el usuario existe en la BD
+    const userExists = await prisma.users.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    })
+
+    if (!userExists) {
+      return NextResponse.json(
+        { success: false, error: 'Usuario no encontrado en la base de datos. Por favor cierra sesión e inicia de nuevo.' },
+        { status: 404 }
+      )
+    }
+
     // Buscar configuración existente — con manejo de registros corruptos
     let settings = await prisma.user_settings.findUnique({
       where: { userId },
@@ -172,16 +185,8 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('[API-USER-SETTINGS] GET Error:', error)
-    // En desarrollo mostrar el error real para diagnóstico
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    const errorStack = error instanceof Error ? error.stack : undefined
     return NextResponse.json(
-      { 
-        success: false, 
-        error: 'Error al obtener configuración',
-        detail: errorMessage,
-        stack: process.env.NODE_ENV !== 'production' ? errorStack : undefined,
-      },
+      { success: false, error: 'Error al obtener configuración' },
       { status: 500 }
     )
   }
