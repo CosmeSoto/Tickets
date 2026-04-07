@@ -5,6 +5,7 @@ import { MaintenanceService } from '@/lib/services/maintenance.service'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
+import { NotificationService } from '@/lib/services/notification-service'
 
 export async function GET(
   request: NextRequest,
@@ -76,16 +77,13 @@ export async function PATCH(
       // Notificar al solicitante
       const maintenance = await MaintenanceService.getById(id)
       if (maintenance?.requestedById) {
-        await prisma.notifications.create({
-          data: {
-            id: randomUUID(),
-            userId: maintenance.requestedById,
-            type: 'SUCCESS',
-            title: `Mantenimiento aprobado — ${maintenance.equipment.code}`,
-            message: `Tu solicitud de mantenimiento fue aprobada. El equipo ${maintenance.equipment.code} entrará en mantenimiento el ${new Date(scheduledDate).toLocaleDateString('es-ES')}.`,
-            metadata: { equipmentId: maintenance.equipmentId, maintenanceId: id },
-          },
-        })
+        await NotificationService.push({
+          userId: maintenance.requestedById,
+          type: 'SUCCESS',
+          title: `Mantenimiento aprobado — ${maintenance.equipment.code}`,
+          message: `Tu solicitud de mantenimiento fue aprobada. El equipo ${maintenance.equipment.code} entrará en mantenimiento el ${new Date(scheduledDate).toLocaleDateString('es-ES')}.`,
+          metadata: { equipmentId: maintenance.equipmentId, maintenanceId: id },
+        }).catch(() => {})
       }
 
       return NextResponse.json(result)
@@ -97,16 +95,13 @@ export async function PATCH(
       // Notificar al técnico asignado
       const maintenance = await MaintenanceService.getById(id)
       if (maintenance?.technicianId) {
-        await prisma.notifications.create({
-          data: {
-            id: randomUUID(),
-            userId: maintenance.technicianId,
-            type: 'INFO',
-            title: `Mantenimiento aceptado — ${maintenance.equipment.code}`,
-            message: `El cliente aceptó el mantenimiento del equipo ${maintenance.equipment.code}.`,
-            metadata: { equipmentId: maintenance.equipmentId, maintenanceId: id },
-          },
-        })
+        await NotificationService.push({
+          userId: maintenance.technicianId,
+          type: 'INFO',
+          title: `Mantenimiento aceptado — ${maintenance.equipment.code}`,
+          message: `El cliente aceptó el mantenimiento del equipo ${maintenance.equipment.code}.`,
+          metadata: { equipmentId: maintenance.equipmentId, maintenanceId: id },
+        }).catch(() => {})
       }
 
       return NextResponse.json(result)
@@ -141,16 +136,13 @@ export async function PATCH(
         const destMsg = (result as any).reAssigned
           ? 'El equipo ha sido reasignado a ti.'
           : 'El equipo está disponible en bodega.'
-        await prisma.notifications.create({
-          data: {
-            id: randomUUID(),
-            userId: notifyUserId,
-            type: 'SUCCESS',
-            title: `Mantenimiento completado — ${maintenance?.equipment?.code}`,
-            message: `El mantenimiento del equipo ${maintenance?.equipment?.code} ha sido completado. ${destMsg}`,
-            metadata: { equipmentId: maintenance?.equipmentId, maintenanceId: id },
-          },
-        })
+        await NotificationService.push({
+          userId: notifyUserId,
+          type: 'SUCCESS',
+          title: `Mantenimiento completado — ${maintenance?.equipment?.code}`,
+          message: `El mantenimiento del equipo ${maintenance?.equipment?.code} ha sido completado. ${destMsg}`,
+          metadata: { equipmentId: maintenance?.equipmentId, maintenanceId: id },
+        }).catch(() => {})
       }
 
       return NextResponse.json(result)

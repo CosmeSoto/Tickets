@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { z } from 'zod'
+import { NotificationService } from '@/lib/services/notification-service'
 
 const ratingSchema = z.object({
   rating: z.number().min(1).max(5),
@@ -282,17 +283,13 @@ export async function POST(
 
       // Notificar al técnico que el ticket fue cerrado y puede promoverlo a artículo
       if (ticket.assigneeId) {
-        await prisma.notifications.create({
-          data: {
-            id: randomUUID(),
-            title: 'Ticket cerrado por calificación',
-            message: `El cliente calificó y cerró el ticket: "${ticket.title}" con ${data.rating} estrellas. Ahora puedes promoverlo a artículo de conocimiento.`,
-            type: 'SUCCESS',
-            userId: ticket.assigneeId,
-            ticketId,
-            isRead: false,
-          },
-        })
+        await NotificationService.push({
+          userId: ticket.assigneeId,
+          type: 'SUCCESS',
+          title: 'Ticket cerrado por calificación',
+          message: `El cliente calificó y cerró el ticket: "${ticket.title}" con ${data.rating} estrellas. Ahora puedes promoverlo a artículo de conocimiento.`,
+          ticketId,
+        }).catch(() => {})
       }
 
     }

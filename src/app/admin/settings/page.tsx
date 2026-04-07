@@ -305,7 +305,7 @@ export default function SettingsPage() {
                     type='email'
                     value={settings.supportEmail}
                     onChange={e => setSettings({ ...settings, supportEmail: e.target.value })}
-                    placeholder='soporte@empresa.com'
+                    placeholder='internet.freecom@gmail.com'
                   />
                 </div>
               </div>

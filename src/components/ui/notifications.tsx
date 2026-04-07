@@ -93,7 +93,7 @@ export function Notifications({
     markAllAsRead,
     deleteNotification,
     navigateToTicket,
-  } = useNotifications({ autoLoad: true, refreshInterval: 15 * 1000 })
+  } = useNotifications({ autoLoad: true })
 
   if (!session?.user) return null
 

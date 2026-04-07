@@ -7,7 +7,6 @@
 
 import { useState, useCallback, useMemo } from 'react'
 import { useToast } from '@/hooks/use-toast'
-import { devLogger } from '@/lib/dev-logger'
 import { enrichCategories } from '@/lib/utils/category-utils'
 import type { CategoryData, CacheEntry } from './types'
 
@@ -113,7 +112,7 @@ export function useCategoriesData(options: UseCategoriesDataOptions = {}) {
         throw new Error('Formato de respuesta inválido')
       }
     } catch (error) {
-      devLogger.error('[CATEGORIES] Error:', error)
+      console.error('[CATEGORIES] Error:', error)
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido'
       setError(errorMessage)
       setCategories([])
@@ -127,17 +126,19 @@ export function useCategoriesData(options: UseCategoriesDataOptions = {}) {
     }
   }, [getCacheKey, getFromCache, setToCache, toast])
   
-  // Cargar técnicos
-  const loadAvailableTechnicians = useCallback(async () => {
-    const cacheKey = getCacheKey('/api/users', { role: 'TECHNICIAN', isActive: true })
+  // Cargar técnicos (opcionalmente filtrados por familia)
+  const loadAvailableTechnicians = useCallback(async (familyId?: string) => {
+    const cacheKey = getCacheKey('/api/users', { role: 'TECHNICIAN', isActive: true, familyId: familyId ?? 'all' })
     const cached = getFromCache<any[]>(cacheKey)
     if (cached) {
       setAvailableTechnicians(cached)
       return
     }
-    
+
     try {
-      const response = await fetch('/api/users?role=TECHNICIAN&isActive=true')
+      const params = new URLSearchParams({ role: 'TECHNICIAN', isActive: 'true' })
+      if (familyId) params.set('familyId', familyId)
+      const response = await fetch(`/api/users?${params.toString()}`)
       if (response.ok) {
         const data = await response.json()
         if (data.success && Array.isArray(data.data)) {
@@ -146,13 +147,13 @@ export function useCategoriesData(options: UseCategoriesDataOptions = {}) {
         }
       }
     } catch (error) {
-      devLogger.error('[CATEGORIES] Error al cargar técnicos:', error)
+      console.error('[CATEGORIES] Error al cargar técnicos:', error)
     }
   }, [getCacheKey, getFromCache, setToCache])
   
-  // Cargar departamentos
-  const loadDepartments = useCallback(async () => {
-    const cacheKey = getCacheKey('/api/departments', { isActive: true })
+  // Cargar departamentos (opcionalmente filtrados por familia)
+  const loadDepartments = useCallback(async (familyId?: string | null) => {
+    const cacheKey = getCacheKey('/api/departments', { isActive: true, familyId: familyId ?? 'all' })
     const cached = getFromCache<any[]>(cacheKey)
     if (cached) {
       setDepartments(cached)
@@ -160,7 +161,9 @@ export function useCategoriesData(options: UseCategoriesDataOptions = {}) {
     }
     
     try {
-      const response = await fetch('/api/departments?isActive=true')
+      const params = new URLSearchParams({ isActive: 'true' })
+      if (familyId) params.set('familyId', familyId)
+      const response = await fetch(`/api/departments?${params}`)
       if (response.ok) {
         const data = await response.json()
         if (data.success && Array.isArray(data.data)) {
@@ -169,7 +172,7 @@ export function useCategoriesData(options: UseCategoriesDataOptions = {}) {
         }
       }
     } catch (error) {
-      devLogger.error('[CATEGORIES] Error al cargar departamentos:', error)
+      console.error('[CATEGORIES] Error al cargar departamentos:', error)
     }
   }, [getCacheKey, getFromCache, setToCache])
   
@@ -190,27 +193,34 @@ export function useCategoriesData(options: UseCategoriesDataOptions = {}) {
   }, [])
 
   // Cargar padres disponibles con información de técnicos
-  const loadAvailableParents = useCallback(async (currentCategoryId?: string) => {
+  const loadAvailableParents = useCallback(async (currentCategoryId?: string, familyId?: string) => {
+    // Limpiar inmediatamente para evitar mostrar datos de familia anterior
+    setAvailableParents([])
+
     try {
-      // Cargar todas las categorías activas con información completa de técnicos
-      const response = await fetch('/api/categories?isActive=true')
+      const params = new URLSearchParams({ isActive: 'true' })
+      if (familyId) params.set('familyId', familyId)
+
+      const response = await fetch(`/api/categories?${params.toString()}`)
       if (response.ok) {
         const data = await response.json()
         if (data.success && Array.isArray(data.data)) {
           // Filtrar categorías que pueden ser padres (niveles 1, 2, 3)
-          const availableAsParents = data.data.filter((cat: CategoryData) => {
-            // Excluir la categoría actual si se está editando
-            if (currentCategoryId && cat.id === currentCategoryId) {
-              return false
-            }
-            // Solo niveles 1, 2, 3 pueden ser padres (nivel 4 es el máximo)
+          let availableAsParents = data.data.filter((cat: CategoryData) => {
+            if (currentCategoryId && cat.id === currentCategoryId) return false
             return cat.level <= 3 && cat.isActive
           })
+
+          // Doble seguridad: filtrar por familia en el cliente también
+          if (familyId) {
+            availableAsParents = availableAsParents.filter((cat: any) =>
+              cat.departments?.familyId === familyId ||
+              cat.departments?.family?.id === familyId
+            )
+          }
           
-          // Enriquecer con levelName y información de técnicos
           const enrichedCategories = enrichCategoriesWithLevelName(availableAsParents).map(cat => ({
             ...cat,
-            // Agregar información de técnicos asignados
             assignedTechnicians: cat.technician_assignments?.map(ta => ({
               id: ta.users.id,
               name: ta.users.name,
@@ -219,7 +229,6 @@ export function useCategoriesData(options: UseCategoriesDataOptions = {}) {
               maxTickets: ta.maxTickets,
               autoAssign: ta.autoAssign
             })) || [],
-            // Agregar estadísticas de técnicos
             technicianStats: {
               total: cat.technician_assignments?.length || 0,
               autoAssign: cat.technician_assignments?.filter(ta => ta.autoAssign).length || 0,
@@ -231,7 +240,7 @@ export function useCategoriesData(options: UseCategoriesDataOptions = {}) {
         }
       }
     } catch (error) {
-      devLogger.error('[CATEGORIES] Error al cargar padres:', error)
+      console.error('[CATEGORIES] Error al cargar padres:', error)
     }
   }, [enrichCategoriesWithLevelName])
   

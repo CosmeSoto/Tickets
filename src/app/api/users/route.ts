@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
     const isActive = searchParams.get('isActive')
     const departmentId = searchParams.get('departmentId')
     const department = searchParams.get('department') // Deprecated, usar departmentId
+    const familyId = searchParams.get('familyId') // Filtrar técnicos por familia asignada
     const search = searchParams.get('search') // Búsqueda por nombre o email
     const limit = searchParams.get('limit') // Límite de resultados
 
@@ -53,6 +54,13 @@ export async function GET(request: NextRequest) {
       // Compatibilidad con filtro antiguo por nombre
       where.departments = {
         name: department
+      }
+    }
+
+    // Filtrar técnicos por familia: solo los que tienen asignación activa a esa familia
+    if (familyId) {
+      where.technicianFamilyAssignments = {
+        some: { familyId, isActive: true }
       }
     }
 
@@ -78,9 +86,17 @@ export async function GET(request: NextRequest) {
             id: true,
             name: true,
             color: true,
-            description: true
+            description: true,
+            familyId: true,
           }
         },
+        technicianFamilyAssignments: role === 'TECHNICIAN' ? {
+          where: { isActive: true },
+          select: {
+            familyId: true,
+            family: { select: { id: true, name: true, code: true, color: true } }
+          }
+        } : false,
         phone: true,
         avatar: true,
         isActive: true,

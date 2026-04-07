@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
     const isActive = searchParams.get('isActive')
     const level = searchParams.get('level')
     const parentId = searchParams.get('parentId')
+    const familyId = searchParams.get('familyId')
 
     // Construir filtros para Prisma
     const where: any = {}
@@ -47,6 +48,11 @@ export async function GET(request: NextRequest) {
 
     if (parentId) {
       where.parentId = parentId
+    }
+
+    // Filtrar por familia a través del departamento
+    if (familyId) {
+      where.departments = { familyId }
     }
 
     // Obtener categorías con relaciones
@@ -73,8 +79,10 @@ export async function GET(request: NextRequest) {
             familyId: true,
             family: {
               select: {
+                id: true,
                 name: true,
                 code: true,
+                color: true,
               }
             }
           }
@@ -140,7 +148,9 @@ export async function GET(request: NextRequest) {
           select: {
             tickets: true,
             other_categories: true,
-            technician_assignments: true
+            technician_assignments: true,
+            knowledge_articles: true,
+            sla_policies: true,
           }
         }
       },
@@ -174,7 +184,8 @@ export async function GET(request: NextRequest) {
         filters: {
           isActive,
           level,
-          parentId
+          parentId,
+          familyId,
         }
       }
     })
@@ -208,6 +219,13 @@ export async function POST(request: NextRequest) {
     if (!name || !level) {
       return NextResponse.json(
         { success: false, message: 'Nombre y nivel son requeridos' },
+        { status: 400 }
+      )
+    }
+
+    if (!departmentId) {
+      return NextResponse.json(
+        { success: false, message: 'El departamento es requerido' },
         { status: 400 }
       )
     }
@@ -248,7 +266,9 @@ export async function POST(request: NextRequest) {
           select: {
             tickets: true,
             other_categories: true,
-            technician_assignments: true
+            technician_assignments: true,
+            knowledge_articles: true,
+            sla_policies: true,
           }
         }
       }
@@ -270,6 +290,26 @@ export async function POST(request: NextRequest) {
       },
       request
     })
+
+    // Notificación in-app a otros admins
+    const admins = await prisma.users.findMany({
+      where: { role: 'ADMIN', isActive: true, id: { not: session.user.id } },
+      select: { id: true },
+    })
+    if (admins.length > 0) {
+      await prisma.notifications.createMany({
+        data: admins.map(admin => ({
+          id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+          title: `Nueva categoría creada: ${category.name}`,
+          message: `Se creó la categoría "${category.name}" (Nivel ${category.level}) en el departamento ${category.departments?.name ?? 'sin departamento'}.`,
+          type: 'INFO' as const,
+          userId: admin.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })),
+        skipDuplicates: true,
+      }).catch(err => console.error('[NOTIFY] Error:', err))
+    }
 
     // Enriquecer con canDelete y levelName
     const enrichedCategory = {

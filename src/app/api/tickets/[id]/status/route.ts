@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { randomUUID } from 'crypto'
+import { NotificationService } from '@/lib/services/notification-service'
 
 // Transiciones válidas por rol
 const TRANSITIONS: Record<string, Record<string, string[]>> = {
@@ -112,17 +112,7 @@ export async function PATCH(
 
     // Notificar al cliente cuando el técnico marca como RESOLVED
     if (newStatus === 'RESOLVED' && ticket.clientId) {
-      await prisma.notifications.create({
-        data: {
-          id: randomUUID(),
-          title: 'Tu ticket ha sido resuelto',
-          message: `El técnico ha marcado el ticket "${ticket.title}" como resuelto. Por favor califica el servicio para cerrarlo.`,
-          type: 'SUCCESS',
-          userId: ticket.clientId,
-          ticketId,
-          isRead: false,
-        },
-      }).catch(() => {}) // no fallar si notificación falla
+      await NotificationService.notifyTicketResolved(ticketId).catch(() => {})
     }
 
     return NextResponse.json({

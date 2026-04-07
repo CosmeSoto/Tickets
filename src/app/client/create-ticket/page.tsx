@@ -332,6 +332,9 @@ export default function CreateTicketPage() {
         
         setSubmitSuccess(true)
 
+        // Disparar evento para actualizar notificaciones inmediatamente
+        window.dispatchEvent(new CustomEvent('ticket-created'))
+
         toast({
           title: 'Éxito',
           description: 'Ticket creado exitosamente'

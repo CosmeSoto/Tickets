@@ -246,7 +246,7 @@ export default function HelpConfigPage() {
                       type='email'
                       value={config.supportEmail}
                       onChange={(e) => updateConfig({ supportEmail: e.target.value })}
-                      placeholder='soporte@empresa.com'
+                      placeholder='internet.freecom@gmail.com'
                     />
                   </div>
                 </div>

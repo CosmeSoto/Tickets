@@ -636,6 +636,8 @@ export default function CategoriesPage() {
           onSubmit={handleSubmit}
           onLoadAvailableParents={loadAvailableParents}
           onLoadDepartments={loadDepartments}
+          onLoadTechnicians={loadAvailableTechnicians}
+          families={families.map(f => ({ ...f, color: f.color ?? null }))}
         />
 
         {/* Dialog de confirmación para eliminar */}
@@ -643,80 +645,90 @@ export default function CategoriesPage() {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>¿Eliminar categoría?</AlertDialogTitle>
-              <AlertDialogDescription>
-                {deletingCategory && (
-                  <>
-                    Estás a punto de eliminar:{' '}
-                    <span className="font-semibold text-foreground">
-                      "{deletingCategory.name}"
-                    </span>
-                    <br /><br />
-                    <div className='mt-3 p-3 bg-muted rounded text-sm space-y-2'>
-                      <div className='font-medium mb-2'>Información de la categoría:</div>
-                      <div className="flex items-center justify-between">
-                        <span>• Nivel:</span>
-                        <span className="font-medium">{deletingCategory.levelName}</span>
+              <AlertDialogDescription asChild>
+                <div>
+                {deletingCategory && (() => {
+                  const c = deletingCategory
+                  const tickets = c._count?.tickets ?? 0
+                  const subcats = c._count?.other_categories ?? 0
+                  const articles = c._count?.knowledge_articles ?? 0
+                  const slas = c._count?.sla_policies ?? 0
+                  const technicians = c.technician_assignments?.length ?? 0
+                  const canDel = c.canDelete
+
+                  return (
+                    <>
+                      <p className="mb-3">
+                        Estás a punto de eliminar:{' '}
+                        <span className="font-semibold text-foreground">"{c.name}"</span>
+                      </p>
+
+                      <div className="p-3 bg-muted rounded text-sm space-y-1.5">
+                        <p className="font-medium mb-2">Información de la categoría:</p>
+
+                        <div className="flex items-center justify-between">
+                          <span>Nivel:</span>
+                          <span className="font-medium">{c.levelName}</span>
+                        </div>
+
+                        {/* Bloqueantes */}
+                        <div className="flex items-center justify-between">
+                          <span>Tickets asociados:</span>
+                          <span className={`font-medium ${tickets > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                            {tickets} {tickets > 0 ? '⛔' : '✓'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Subcategorías:</span>
+                          <span className={`font-medium ${subcats > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                            {subcats} {subcats > 0 ? '⛔' : '✓'}
+                          </span>
+                        </div>
+
+                        {/* Se eliminan automáticamente */}
+                        <div className="flex items-center justify-between">
+                          <span>Técnicos asignados:</span>
+                          <span className="font-medium text-amber-600">
+                            {technicians} {technicians > 0 ? '(se desvinculan)' : '✓'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Artículos de conocimiento:</span>
+                          <span className="font-medium text-amber-600">
+                            {articles} {articles > 0 ? '(se eliminan)' : '✓'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Políticas SLA:</span>
+                          <span className="font-medium text-amber-600">
+                            {slas} {slas > 0 ? '(se eliminan)' : '✓'}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span>• Tickets asociados:</span>
-                        <span className={`font-medium ${deletingCategory._count?.tickets > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                          {deletingCategory._count?.tickets || 0}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>• Subcategorías:</span>
-                        <span className={`font-medium ${deletingCategory._count?.other_categories > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                          {deletingCategory._count?.other_categories || 0}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>• Técnicos asignados:</span>
-                        <span className="font-medium text-blue-600">
-                          {deletingCategory.technician_assignments?.length || 0}
-                        </span>
-                      </div>
-                      
-                      {!deletingCategory.canDelete && (
-                        <div className='mt-3 p-2 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded'>
-                          <div className='text-red-600 dark:text-red-400 font-medium text-sm'>
-                            ⚠️ No se puede eliminar esta categoría
-                          </div>
-                          <div className='text-red-600 dark:text-red-400 text-xs mt-1'>
-                            {deletingCategory._count?.tickets > 0 && (
-                              <div>• Tiene {deletingCategory._count.tickets} ticket(s) asociado(s)</div>
-                            )}
-                            {deletingCategory._count?.other_categories > 0 && (
-                              <div>• Tiene {deletingCategory._count.other_categories} subcategoría(s)</div>
-                            )}
-                          </div>
-                          <div className='text-red-600 dark:text-red-400 text-xs mt-2'>
-                            Para eliminar esta categoría, primero debes:
-                            {deletingCategory._count?.tickets > 0 && (
-                              <div>1. Reasignar o eliminar los tickets asociados</div>
-                            )}
-                            {deletingCategory._count?.other_categories > 0 && (
-                              <div>2. Eliminar o reasignar las subcategorías</div>
-                            )}
-                          </div>
+
+                      {/* Bloqueado */}
+                      {!canDel && (
+                        <div className="mt-3 p-2 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded text-xs text-red-600 dark:text-red-400 space-y-1">
+                          <p className="font-medium">⚠️ No se puede eliminar esta categoría</p>
+                          {tickets > 0 && <p>• Reasigna o cierra los {tickets} ticket(s) asociado(s)</p>}
+                          {subcats > 0 && <p>• Elimina o reasigna las {subcats} subcategoría(s)</p>}
                         </div>
                       )}
-                      
-                      {deletingCategory.canDelete && deletingCategory.technician_assignments?.length > 0 && (
-                        <div className='mt-3 p-2 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded'>
-                          <div className='text-blue-600 dark:text-blue-400 text-xs'>
-                            ℹ️ Las asignaciones de técnicos se eliminarán automáticamente
-                          </div>
+
+                      {/* Advertencia de cascade */}
+                      {canDel && (articles > 0 || slas > 0 || technicians > 0) && (
+                        <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded text-xs text-amber-700 dark:text-amber-400">
+                          ⚠️ Se eliminarán automáticamente los datos vinculados indicados arriba.
                         </div>
                       )}
-                    </div>
-                    
-                    {deletingCategory.canDelete && (
-                      <div className='mt-2 text-sm'>
-                        Esta acción no se puede deshacer.
-                      </div>
-                    )}
-                  </>
-                )}
+
+                      {canDel && (
+                        <p className="mt-3 text-sm text-muted-foreground">Esta acción no se puede deshacer.</p>
+                      )}
+                    </>
+                  )
+                })()}
+                </div>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="flex flex-row justify-end space-x-2">

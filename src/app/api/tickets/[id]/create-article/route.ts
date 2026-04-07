@@ -10,6 +10,7 @@ import {
 import { UserRole } from '@prisma/client'
 import { z } from 'zod'
 import { randomUUID } from 'crypto'
+import { NotificationService } from '@/lib/services/notification-service'
 
 // Schema de validación para crear artículo desde ticket
 const createArticleFromTicketSchema = z.object({
@@ -209,17 +210,13 @@ export async function POST(
 
     // Crear notificación para el cliente del ticket
     if (ticket.clientId) {
-      await prisma.notifications.create({
-        data: {
-          id: randomUUID(),
-          title: 'Artículo de conocimiento creado',
-          message: `Se ha creado un artículo de conocimiento basado en tu ticket: "${ticket.title}"`,
-          type: 'INFO',
-          userId: ticket.clientId,
-          ticketId: ticketId,
-          isRead: false,
-        },
-      })
+      await NotificationService.push({
+        userId: ticket.clientId,
+        type: 'INFO',
+        title: 'Artículo de conocimiento creado',
+        message: `Se ha creado un artículo de conocimiento basado en tu ticket: "${ticket.title}"`,
+        ticketId: ticketId,
+      }).catch(() => {})
     }
 
     return NextResponse.json({

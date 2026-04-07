@@ -1,11 +1,23 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Label } from '@/components/ui/label'
-import { Input } from '@/components/ui/input'
+import { useState, useMemo } from 'react'
+import { Check, ChevronsUpDown, Building } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Building, Plus, X, RefreshCw } from 'lucide-react'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 
 interface Department {
   id: string
@@ -13,10 +25,9 @@ interface Department {
   description?: string
   color: string
   isActive: boolean
-  _count?: {
-    users: number
-    categories: number
-  }
+  familyId?: string
+  family?: { id: string; name: string; code: string; color?: string | null }
+  _count?: { users: number; categories: number }
 }
 
 interface DepartmentSelectorProps {
@@ -26,7 +37,7 @@ interface DepartmentSelectorProps {
   error?: string
   placeholder?: string
   departments?: Department[]
-  existingDepartments?: string[] // Deprecated, kept for compatibility
+  existingDepartments?: string[] // kept for compatibility
 }
 
 export function DepartmentSelector({
@@ -35,138 +46,180 @@ export function DepartmentSelector({
   disabled = false,
   error,
   placeholder = 'Seleccionar departamento...',
-  departments: propDepartments,
+  departments = [],
 }: DepartmentSelectorProps) {
-  const [departments, setDepartments] = useState<Department[]>(propDepartments || [])
-  const [loading, setLoading] = useState(!propDepartments)
-  const [showCustomInput, setShowCustomInput] = useState(false)
-  const [customValue, setCustomValue] = useState('')
+  const [open, setOpen] = useState(false)
 
-  // Cargar departamentos desde la API solo si no se proporcionaron
-  useEffect(() => {
-    if (!propDepartments) {
-      loadDepartments()
-    }
-  }, [propDepartments])
+  const selectedDept = departments.find(d => d.id === value) ?? null
 
-  const loadDepartments = async () => {
-    setLoading(true)
-    try {
-      const response = await fetch('/api/departments?isActive=true')
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success && Array.isArray(data.data)) {
-          setDepartments(data.data)
-        }
+  // Group by family when family info is available
+  const grouped = useMemo(() => {
+    const withFamily = departments.filter(d => d.family)
+    const withoutFamily = departments.filter(d => !d.family)
+
+    const familyMap = new Map<string, { familyName: string; color: string | null; depts: Department[] }>()
+    for (const d of withFamily) {
+      const fid = d.family!.id
+      if (!familyMap.has(fid)) {
+        familyMap.set(fid, { familyName: d.family!.name, color: d.family!.color ?? null, depts: [] })
       }
-    } catch (error) {
-      console.error('Error loading departments:', error)
-    } finally {
-      setLoading(false)
+      familyMap.get(fid)!.depts.push(d)
     }
-  }
 
-  const handleSelectDepartment = (deptId: string) => {
-    onChange(deptId)
-    setShowCustomInput(false)
-    setCustomValue('')
-  }
+    return { groups: Array.from(familyMap.values()), ungrouped: withoutFamily }
+  }, [departments])
 
-  const handleClear = () => {
-    onChange(null)
-    setShowCustomInput(false)
-    setCustomValue('')
-  }
-
-  const selectedDepartment = departments.find(d => d.id === value)
-
-  if (loading) {
-    return (
-      <div className="space-y-2">
-        <Label>Departamento</Label>
-        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-          <RefreshCw className="h-4 w-4 animate-spin" />
-          <span>Cargando departamentos...</span>
-        </div>
-      </div>
-    )
-  }
+  const hasGroups = grouped.groups.length > 0
 
   return (
-    <div className="space-y-2">
-      <Label htmlFor="department">
-        Departamento
-        {selectedDepartment && (
-          <Badge 
-            variant="outline" 
-            className="ml-2 text-xs"
-            style={{ 
-              borderColor: selectedDepartment.color,
-              color: selectedDepartment.color
-            }}
+    <div className="space-y-1">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            disabled={disabled || departments.length === 0}
+            className={cn(
+              'w-full justify-between h-9 text-sm font-normal',
+              !selectedDept && 'text-muted-foreground',
+              error && 'border-red-500'
+            )}
           >
-            {selectedDepartment.name}
-          </Badge>
-        )}
-      </Label>
+            {selectedDept ? (
+              <span className="flex items-center gap-2 truncate">
+                <span
+                  className="inline-block h-2.5 w-2.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: selectedDept.color }}
+                />
+                {selectedDept.name}
+                {selectedDept._count?.users !== undefined && (
+                  <Badge variant="secondary" className="text-xs ml-1">
+                    {selectedDept._count.users} usuarios
+                  </Badge>
+                )}
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <Building className="h-3.5 w-3.5 opacity-50" />
+                {departments.length === 0 ? 'Sin departamentos disponibles' : placeholder}
+              </span>
+            )}
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
 
-      <div className="space-y-2">
-        <div className="flex flex-wrap gap-2">
-          {departments.map((dept) => (
-            <Button
-              key={dept.id}
-              type="button"
-              variant={value === dept.id ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => handleSelectDepartment(dept.id)}
-              disabled={disabled}
-              className="text-xs"
-              style={value === dept.id ? {
-                backgroundColor: dept.color,
-                borderColor: dept.color
-              } : {
-                borderColor: dept.color,
-                color: dept.color
-              }}
-            >
-              <Building className="h-3 w-3 mr-1" />
-              {dept.name}
-              {dept._count && dept._count.users > 0 && (
-                <Badge variant="secondary" className="ml-1 text-xs">
-                  {dept._count.users}
-                </Badge>
+        <PopoverContent className="w-[320px] p-0" align="start">
+          <Command>
+            <CommandInput placeholder="Buscar departamento..." className="h-9" />
+            <CommandList>
+              <CommandEmpty>No se encontraron departamentos.</CommandEmpty>
+
+              {/* Opción para limpiar */}
+              {value && (
+                <CommandGroup>
+                  <CommandItem
+                    value="__clear__"
+                    onSelect={() => { onChange(null); setOpen(false) }}
+                    className="text-muted-foreground text-xs"
+                  >
+                    <span className="mr-2 opacity-50">✕</span>
+                    Limpiar selección
+                  </CommandItem>
+                </CommandGroup>
               )}
-            </Button>
-          ))}
-          {value && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={handleClear}
-              disabled={disabled}
-              className="text-xs text-red-600 hover:text-red-800"
-            >
-              <X className="h-3 w-3 mr-1" />
-              Limpiar
-            </Button>
-          )}
-        </div>
-      </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+              {hasGroups ? (
+                // Grouped by family
+                grouped.groups.map(group => (
+                  <CommandGroup
+                    key={group.familyName}
+                    heading={
+                      <span className="flex items-center gap-1.5">
+                        {group.color && (
+                          <span
+                            className="inline-block h-2 w-2 rounded-full"
+                            style={{ backgroundColor: group.color }}
+                          />
+                        )}
+                        {group.familyName}
+                      </span>
+                    }
+                  >
+                    {group.depts.map(dept => (
+                      <DeptItem
+                        key={dept.id}
+                        dept={dept}
+                        selected={value === dept.id}
+                        onSelect={() => { onChange(dept.id); setOpen(false) }}
+                      />
+                    ))}
+                  </CommandGroup>
+                ))
+              ) : (
+                // Flat list
+                <CommandGroup>
+                  {departments.map(dept => (
+                    <DeptItem
+                      key={dept.id}
+                      dept={dept}
+                      selected={value === dept.id}
+                      onSelect={() => { onChange(dept.id); setOpen(false) }}
+                    />
+                  ))}
+                </CommandGroup>
+              )}
 
-      {departments.length === 0 && (
-        <p className="text-xs text-muted-foreground">
-          No hay departamentos disponibles. Contacta al administrador.
-        </p>
-      )}
+              {/* Ungrouped remainder */}
+              {hasGroups && grouped.ungrouped.length > 0 && (
+                <CommandGroup heading="Sin familia">
+                  {grouped.ungrouped.map(dept => (
+                    <DeptItem
+                      key={dept.id}
+                      dept={dept}
+                      selected={value === dept.id}
+                      onSelect={() => { onChange(dept.id); setOpen(false) }}
+                    />
+                  ))}
+                </CommandGroup>
+              )}
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
 
-      {departments.length > 0 && !value && (
-        <p className="text-xs text-muted-foreground">
-          Selecciona un departamento para el técnico
-        </p>
-      )}
+      {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
+  )
+}
+
+function DeptItem({
+  dept,
+  selected,
+  onSelect,
+}: {
+  dept: Department
+  selected: boolean
+  onSelect: () => void
+}) {
+  return (
+    <CommandItem
+      value={`${dept.name} ${dept.description ?? ''}`}
+      onSelect={onSelect}
+      className="flex items-center gap-2"
+    >
+      <Check className={cn('h-4 w-4 flex-shrink-0', selected ? 'opacity-100' : 'opacity-0')} />
+      <span
+        className="inline-block h-2.5 w-2.5 rounded-full flex-shrink-0"
+        style={{ backgroundColor: dept.color }}
+      />
+      <span className="flex-1 truncate">{dept.name}</span>
+      {dept._count?.users !== undefined && dept._count.users > 0 && (
+        <Badge variant="secondary" className="text-xs ml-auto">
+          {dept._count.users}
+        </Badge>
+      )}
+    </CommandItem>
   )
 }

@@ -40,7 +40,7 @@ export async function GET(
         data = await ReportService.getTechnicianPerformance(id, dateRange)
         break
       case 'trends':
-        data = await ReportService.getTemporalTrends(id, granularity)
+        data = await ReportService.getTemporalTrends(id, granularity, dateRange)
         break
       case 'sla':
         data = await ReportService.getSLACompliance(id, dateRange)

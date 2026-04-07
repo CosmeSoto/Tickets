@@ -85,7 +85,7 @@ Los valores se guardan en la tabla `system_settings` con estas claves:
 | `smtpPort` | `"587"` | Puerto SMTP |
 | `smtpUser` | `"tu-email@gmail.com"` | Usuario SMTP |
 | `smtpPassword` | `"tu-contraseña-app"` | Contraseña SMTP |
-| `emailFrom` | `"Soporte <soporte@empresa.com>"` | Email remitente |
+| `emailFrom` | `"Soporte <internet.freecom@gmail.com>"` | Email remitente |
 | `smtpSecure` | `"false"` | SSL/TLS (false para 587, true para 465) |
 
 ## 📝 Ejemplo de Configuración para Gmail

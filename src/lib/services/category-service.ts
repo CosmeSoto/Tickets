@@ -294,7 +294,7 @@ export class CategoryService {
     return false
   }
 
-  static async getAvailableParents(excludeId?: string) {
+  static async getAvailableParents(excludeId?: string, familyId?: string) {
     const where: any = {
       level: { lt: 4 }, // Solo categorías que pueden tener hijos
       isActive: true,
@@ -304,6 +304,11 @@ export class CategoryService {
       where.id = { not: excludeId }
     }
 
+    // Filtrar por familia a través del departamento
+    if (familyId) {
+      where.departments = { familyId }
+    }
+
     return prisma.categories.findMany({
       where,
       select: {
@@ -311,6 +316,7 @@ export class CategoryService {
         name: true,
         level: true,
         color: true,
+        departmentId: true,
       },
       orderBy: [{ level: 'asc' }, { name: 'asc' }],
     })

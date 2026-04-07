@@ -247,7 +247,9 @@ export class ReportService {
       take: limit // Aplicar límite
     })
 
-    console.log(`👥 ReportService - Procesando ${technicians.length} técnicos (límite: ${limit})`)
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`👥 ReportService - Procesando ${technicians.length} técnicos (límite: ${limit})`)
+    }
 
     const reports: TechnicianReport[] = []
     const now = new Date()
@@ -328,8 +330,6 @@ export class ReportService {
    * Genera reporte de categorías con análisis completo y límites de seguridad
    */
   static async generateCategoryReport(filters: ReportFilters = {}, options: { limit?: number } = {}): Promise<CategoryReport[]> {
-    console.log('📂 ReportService - Generando reporte de categorías con filtros:', filters)
-    
     const { limit = 500 } = options // Límite por defecto de 500 categorías
     
     const categories = await prisma.categories.findMany({
@@ -344,7 +344,9 @@ export class ReportService {
       take: limit // Aplicar límite
     })
 
-    console.log(`📂 ReportService - Procesando ${categories.length} categorías (límite: ${limit})`)
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`📂 ReportService - Procesando ${categories.length} categorías (límite: ${limit})`)
+    }
 
     const reports: CategoryReport[] = []
 
@@ -394,8 +396,6 @@ export class ReportService {
    * Genera reporte de departamentos con análisis completo
    */
   static async generateDepartmentReport(filters: ReportFilters = {}, options: { limit?: number } = {}): Promise<any[]> {
-    console.log('🏢 ReportService - Generando reporte de departamentos con filtros:', filters)
-    
     const { limit = 100 } = options
     
     const departments = await prisma.departments.findMany({
@@ -416,7 +416,9 @@ export class ReportService {
       take: limit
     })
 
-    console.log(`🏢 ReportService - Procesando ${departments.length} departamentos`)
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🏢 ReportService - Procesando ${departments.length} departamentos`)
+    }
 
     const reports = []
 

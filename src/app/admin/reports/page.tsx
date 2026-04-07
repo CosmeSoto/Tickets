@@ -31,8 +31,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
-  LineChart,
-  Line,
   BarChart,
   Bar,
   XAxis,
@@ -42,6 +40,8 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -133,13 +133,15 @@ function slaColor(rate: number): string {
 
 function downloadCSV(filename: string, rows: string[][]): void {
   const content = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
-  const blob = new Blob(['\uFEFF' + content], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
+  const bom = '\uFEFF'
+  const encoded = encodeURIComponent(bom + content)
   const a = document.createElement('a')
-  a.href = url
+  a.href = `data:text/csv;charset=utf-8,${encoded}`
   a.download = filename
+  a.style.display = 'none'
+  document.body.appendChild(a)
   a.click()
-  URL.revokeObjectURL(url)
+  document.body.removeChild(a)
 }
 
 function exportExecutiveCSV(data: FamilyExecutiveSummary[], familyName: string): void {
@@ -330,11 +332,9 @@ function exportPDF(
 </body>
 </html>`
 
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const win = window.open(url, '_blank')
+  const encoded = btoa(unescape(encodeURIComponent(html)))
+  const win = window.open(`data:text/html;base64,${encoded}`, '_blank')
   if (win) win.focus()
-  setTimeout(() => URL.revokeObjectURL(url), 10000)
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -349,6 +349,10 @@ export default function ReportsPage() {
 
   // Granularity for trends
   const [granularity, setGranularity] = useState<'day' | 'week' | 'month'>('month')
+
+  // Date range filter
+  const [startDate, setStartDate] = useState<string>('')
+  const [endDate, setEndDate] = useState<string>('')
 
   // Data
   const [executiveData, setExecutiveData] = useState<FamilyExecutiveSummary[]>([])
@@ -408,30 +412,37 @@ export default function ReportsPage() {
           ? '/api/reports/families'
           : `/api/reports/families/${familyParam}`
 
+      // Build date query params
+      const dateParams = new URLSearchParams()
+      if (startDate) dateParams.set('startDate', startDate)
+      if (endDate) dateParams.set('endDate', endDate)
+      const dateSuffix = dateParams.toString() ? `&${dateParams.toString()}` : ''
+      const dateQuery = dateParams.toString() ? `?${dateParams.toString()}` : ''
+
       if (activeTab === 'executive') {
-        const url = familyParam === 'all' ? baseUrl : `${baseUrl}?type=executive`
+        const url = familyParam === 'all' ? `${baseUrl}${dateQuery}` : `${baseUrl}?type=executive${dateSuffix}`
         const res = await fetch(url)
         const json = await res.json()
         if (json.success) setExecutiveData(Array.isArray(json.data) ? json.data : [json.data])
       } else if (activeTab === 'technicians') {
-        const res = await fetch(`${baseUrl}?type=technicians`)
+        const res = await fetch(`${baseUrl}?type=technicians${dateSuffix}`)
         const json = await res.json()
         if (json.success) setTechniciansData(json.data ?? [])
       } else if (activeTab === 'trends') {
-        const res = await fetch(`${baseUrl}?type=trends&granularity=${granularity}`)
+        const res = await fetch(`${baseUrl}?type=trends&granularity=${granularity}${dateSuffix}`)
         const json = await res.json()
         if (json.success) setTrendsData(json.data ?? [])
       } else if (activeTab === 'sla') {
-        const res = await fetch(`${baseUrl}?type=sla`)
+        const res = await fetch(`${baseUrl}?type=sla${dateSuffix}`)
         const json = await res.json()
         if (json.success) setSlaData(json.data ?? [])
       }
-    } catch (e) {
+    } catch {
       setError('Error al cargar los datos del reporte.')
     } finally {
       setLoadingData(false)
     }
-  }, [selectedFamilyId, activeTab, granularity])
+  }, [selectedFamilyId, activeTab, granularity, startDate, endDate])
 
   useEffect(() => {
     loadReportData()
@@ -458,31 +469,18 @@ export default function ReportsPage() {
   return (
     <RoleDashboardLayout title="Reportes Multi-Familia" subtitle="Análisis de desempeño por familia de soporte">
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Reportes Multi-Familia</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Análisis de desempeño por familia de soporte
-          </p>
-        </div>
-        <Button variant="outline" size="sm" onClick={loadReportData} disabled={loadingData}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${loadingData ? 'animate-spin' : ''}`} />
-          Actualizar
-        </Button>
-      </div>
-
       {/* Global family filter */}
       <Card>
         <CardContent className="py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Familia */}
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-muted-foreground">Filtrar por familia:</span>
+              <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Familia:</span>
               {loadingFamilies ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Select value={selectedFamilyId} onValueChange={setSelectedFamilyId}>
-                  <SelectTrigger className="w-56">
+                  <SelectTrigger className="w-52">
                     <SelectValue placeholder="Seleccionar familia" />
                   </SelectTrigger>
                   <SelectContent>
@@ -507,14 +505,47 @@ export default function ReportsPage() {
                 </Select>
               )}
             </div>
+
+            <div className="w-px h-6 bg-border hidden sm:block" />
+
+            {/* Date range */}
+            <div className="flex items-center gap-2">
+              <Label className="text-sm font-medium text-muted-foreground whitespace-nowrap">Desde:</Label>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-36 h-9 text-sm"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-sm font-medium text-muted-foreground whitespace-nowrap">Hasta:</Label>
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-36 h-9 text-sm"
+              />
+            </div>
+            {(startDate || endDate) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setStartDate(''); setEndDate('') }}
+                className="text-muted-foreground h-9"
+              >
+                Limpiar
+              </Button>
+            )}
+
             {selectedFamily && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 ml-auto">
                 <span
-                  className="inline-block h-4 w-4 rounded-full"
+                  className="inline-block h-3 w-3 rounded-full flex-shrink-0"
                   style={{ backgroundColor: selectedFamily.color ?? '#6B7280' }}
                 />
                 <span className="text-sm font-medium">{selectedFamily.name}</span>
-                <Badge variant="secondary">{selectedFamily.code}</Badge>
+                <Badge variant="secondary" className="font-mono text-xs">{selectedFamily.code}</Badge>
               </div>
             )}
           </div>
@@ -540,50 +571,60 @@ export default function ReportsPage() {
         onValueChange={(v) => setActiveTab(v as typeof activeTab)}
         className="space-y-4"
       >
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <TabsList className="grid grid-cols-4 w-full sm:w-auto">
-            <TabsTrigger value="executive" className="flex items-center gap-1.5">
-              <BarChart3 className="h-4 w-4" />
-              <span className="hidden sm:inline">Resumen Ejecutivo</span>
-              <span className="sm:hidden">Resumen</span>
-            </TabsTrigger>
-            <TabsTrigger value="technicians" className="flex items-center gap-1.5">
-              <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">Técnicos</span>
-              <span className="sm:hidden">Técnicos</span>
-            </TabsTrigger>
-            <TabsTrigger value="trends" className="flex items-center gap-1.5">
-              <TrendingUp className="h-4 w-4" />
-              <span className="hidden sm:inline">Tendencias</span>
-              <span className="sm:hidden">Tendencias</span>
-            </TabsTrigger>
-            <TabsTrigger value="sla" className="flex items-center gap-1.5">
-              <ShieldCheck className="h-4 w-4" />
-              <span className="hidden sm:inline">Cumplimiento SLA</span>
-              <span className="sm:hidden">SLA</span>
-            </TabsTrigger>
-          </TabsList>
+        <div className="flex flex-col gap-3">
+          {/* Tabs + action buttons row */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <TabsList className="grid grid-cols-4 w-full sm:w-auto">
+              <TabsTrigger value="executive" className="flex items-center gap-1.5">
+                <BarChart3 className="h-4 w-4" />
+                <span className="hidden md:inline">Resumen Ejecutivo</span>
+                <span className="md:hidden">Resumen</span>
+              </TabsTrigger>
+              <TabsTrigger value="technicians" className="flex items-center gap-1.5">
+                <Users className="h-4 w-4" />
+                <span>Técnicos</span>
+              </TabsTrigger>
+              <TabsTrigger value="trends" className="flex items-center gap-1.5">
+                <TrendingUp className="h-4 w-4" />
+                <span>Tendencias</span>
+              </TabsTrigger>
+              <TabsTrigger value="sla" className="flex items-center gap-1.5">
+                <ShieldCheck className="h-4 w-4" />
+                <span className="hidden md:inline">Cumplimiento SLA</span>
+                <span className="md:hidden">SLA</span>
+              </TabsTrigger>
+            </TabsList>
 
-          {/* Export buttons */}
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExportCSV}
-              disabled={loadingData}
-            >
-              <Download className="h-4 w-4 mr-1.5" />
-              Exportar CSV
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExportPDF}
-              disabled={loadingData}
-            >
-              <FileDown className="h-4 w-4 mr-1.5" />
-              Exportar PDF
-            </Button>
+            {/* Action buttons */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={loadReportData}
+                disabled={loadingData}
+              >
+                <RefreshCw className={`h-4 w-4 sm:mr-1.5 ${loadingData ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Actualizar</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportCSV}
+                disabled={loadingData}
+              >
+                <Download className="h-4 w-4 sm:mr-1.5" />
+                <span className="hidden sm:inline">CSV</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportPDF}
+                disabled={loadingData}
+              >
+                <FileDown className="h-4 w-4 sm:mr-1.5" />
+                <span className="hidden sm:inline">PDF</span>
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -638,8 +679,47 @@ function ExecutiveSummaryTab({
   if (loading) return <TabLoadingState />
   if (data.length === 0) return <TabEmptyState message="No hay datos de resumen ejecutivo para los filtros seleccionados." />
 
+  // Aggregate KPIs
+  const totalTickets = data.reduce((s, r) => s + r.totalTickets, 0)
+  const totalOpen = data.reduce((s, r) => s + r.openTickets, 0)
+  const totalResolved = data.reduce((s, r) => s + r.resolvedTickets, 0)
+  const avgSLA = data.length > 0
+    ? Math.round(data.reduce((s, r) => s + r.slaComplianceRate, 0) / data.length * 10) / 10
+    : 0
+  const resolutionRate = totalTickets > 0 ? Math.round((totalResolved / totalTickets) * 1000) / 10 : 0
+
   return (
     <div className="space-y-4">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground">Total Tickets</p>
+            <p className="text-2xl font-bold mt-1">{totalTickets.toLocaleString()}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground">Abiertos</p>
+            <p className="text-2xl font-bold mt-1 text-yellow-600">{totalOpen.toLocaleString()}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground">Tasa de Resolución</p>
+            <p className={`text-2xl font-bold mt-1 ${resolutionRate >= 80 ? 'text-green-600' : resolutionRate >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
+              {resolutionRate}%
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground">Cumplimiento SLA</p>
+            <p className={`text-2xl font-bold mt-1 ${slaColor(avgSLA)}`}>{avgSLA}%</p>
+          </CardContent>
+        </Card>
+      </div>
+
       {isAllFamilies && (
         <Card className="bg-blue-50 border-blue-200">
           <CardContent className="py-3">
@@ -759,15 +839,53 @@ function TechniciansTab({
 
   const filtered = data.filter(
     (t) =>
-      t.technicianName.toLowerCase().includes(search.toLowerCase()) ||
-      t.technicianEmail.toLowerCase().includes(search.toLowerCase())
+      t.technicianName?.toLowerCase().includes(search.toLowerCase()) ||
+      t.technicianEmail?.toLowerCase().includes(search.toLowerCase())
   )
 
   if (loading) return <TabLoadingState />
   if (data.length === 0) return <TabEmptyState message="No hay datos de rendimiento de técnicos para los filtros seleccionados." />
 
+  const totalAssigned = data.reduce((s, t) => s + t.assignedTickets, 0)
+  const totalResolved = data.reduce((s, t) => s + t.resolvedTickets, 0)
+  const withRating = data.filter((t) => t.avgRating !== null)
+  const avgRating = withRating.length > 0
+    ? Math.round(withRating.reduce((s, t) => s + t.avgRating!, 0) / withRating.length * 10) / 10
+    : null
+
   return (
-    <Card>
+    <div className="space-y-4">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground">Técnicos Activos</p>
+            <p className="text-2xl font-bold mt-1">{data.length}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground">Tickets Asignados</p>
+            <p className="text-2xl font-bold mt-1">{totalAssigned.toLocaleString()}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground">Tickets Resueltos</p>
+            <p className="text-2xl font-bold mt-1 text-green-600">{totalResolved.toLocaleString()}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground">Calificación Promedio</p>
+            <p className="text-2xl font-bold mt-1 text-amber-600">
+              {avgRating !== null ? `★ ${avgRating.toFixed(1)}` : '—'}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Users className="h-5 w-5" />
@@ -851,10 +969,17 @@ function TechniciansTab({
         </div>
       </CardContent>
     </Card>
+    </div>
   )
 }
 
 // ── Trends Tab ─────────────────────────────────────────────────────────────────
+
+// Palette for multi-family stacked bars
+const FAMILY_COLORS = [
+  '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+  '#06b6d4', '#f97316', '#84cc16', '#ec4899', '#6366f1',
+]
 
 function TrendsTab({
   data,
@@ -871,16 +996,38 @@ function TrendsTab({
 }) {
   if (loading) return <TabLoadingState />
 
-  // Aggregate data for chart: when all families, group by period summing counts
-  const chartData = (() => {
+  // Build chart data
+  const { chartData, familyKeys } = (() => {
     if (!isAllFamilies) {
-      return data.map((d) => ({ period: d.period, count: d.count }))
+      return {
+        chartData: data.map((d) => ({ period: d.period, count: d.count })),
+        familyKeys: [] as string[],
+      }
     }
-    // Group by period
-    const map = new Map<string, number>()
+
+    // Collect unique family names
+    const familyNames = Array.from(new Set(data.map((d) => d.familyName ?? 'Sin familia')))
+
+    // Build one row per period with a key per family
+    const periodMap = new Map<string, Record<string, number>>()
     for (const d of data) {
-      map.set(d.period, (map.get(d.period) ?? 0) + d.count)
+      const fname = d.familyName ?? 'Sin familia'
+      if (!periodMap.has(d.period)) periodMap.set(d.period, {})
+      periodMap.get(d.period)![fname] = (periodMap.get(d.period)![fname] ?? 0) + d.count
     }
+
+    const chartData = Array.from(periodMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([period, counts]) => ({ period, ...counts }))
+
+    return { chartData, familyKeys: familyNames }
+  })()
+
+  // Table data: aggregate by period for display
+  const tableData = (() => {
+    if (!isAllFamilies) return data.map((d) => ({ period: d.period, count: d.count }))
+    const map = new Map<string, number>()
+    for (const d of data) map.set(d.period, (map.get(d.period) ?? 0) + d.count)
     return Array.from(map.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([period, count]) => ({ period, count }))
@@ -896,7 +1043,7 @@ function TrendsTab({
               Tendencias Temporales
             </CardTitle>
             <CardDescription>
-              Volumen de tickets creados por período
+              Volumen de tickets creados por período{isAllFamilies ? ' — desglose por familia' : ''}
             </CardDescription>
           </div>
           <Select value={granularity} onValueChange={(v) => onGranularityChange(v as typeof granularity)}>
@@ -927,11 +1074,24 @@ function TrendsTab({
                   axisLine={false}
                 />
                 <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                <Tooltip
-                  contentStyle={{ fontSize: 12, borderRadius: 6 }}
-                  formatter={(value: number) => [value, 'Tickets']}
-                />
-                <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Tickets" />
+                <Tooltip contentStyle={{ fontSize: 12, borderRadius: 6 }} />
+                {isAllFamilies && familyKeys.length > 0 ? (
+                  <>
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    {familyKeys.map((fname, i) => (
+                      <Bar
+                        key={fname}
+                        dataKey={fname}
+                        stackId="a"
+                        fill={FAMILY_COLORS[i % FAMILY_COLORS.length]}
+                        radius={i === familyKeys.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                        name={fname}
+                      />
+                    ))}
+                  </>
+                ) : (
+                  <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Tickets" />
+                )}
               </BarChart>
             </ResponsiveContainer>
 
@@ -945,7 +1105,7 @@ function TrendsTab({
                   </tr>
                 </thead>
                 <tbody>
-                  {chartData.map((row) => (
+                  {tableData.map((row) => (
                     <tr key={row.period} className="border-b hover:bg-muted/30 transition-colors">
                       <td className="p-3 font-mono text-sm">{row.period}</td>
                       <td className="p-3 text-right font-semibold">{row.count}</td>

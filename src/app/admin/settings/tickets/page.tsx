@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { FamilyIcon } from '@/components/inventory/family-badge'
 import {
   Select,
   SelectContent,
@@ -242,7 +243,7 @@ function TicketSettingsContent() {
                           className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
                           style={{ backgroundColor: family.color || '#6B7280' }}
                         >
-                          {family.icon || family.code.substring(0, 2)}
+                          <FamilyIcon icon={family.icon} color={family.color} code={family.code} className="w-4 h-4" />
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-medium truncate">{family.name}</p>
@@ -340,7 +341,7 @@ function TicketSettingsContent() {
                   className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
                   style={{ backgroundColor: selectedFamily?.color || '#6B7280' }}
                 >
-                  {selectedFamily?.icon || selectedFamily?.code.substring(0, 2)}
+                  <FamilyIcon icon={selectedFamily?.icon} color={selectedFamily?.color} code={selectedFamily?.code} className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="font-semibold">{selectedFamily?.name}</h3>

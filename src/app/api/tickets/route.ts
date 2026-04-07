@@ -339,6 +339,13 @@ export async function POST(request: NextRequest) {
       console.error('[NOTIFICATION] Error enviando notificaciones de ticket creado:', err)
     })
 
+    // ⭐ Si el ticket fue asignado al crearse, notificar al técnico asignado
+    if (newTicket.assigneeId) {
+      await NotificationService.notifyTicketAssigned(newTicket.id, newTicket.assigneeId).catch(err => {
+        console.error('[NOTIFICATION] Error enviando notificación de asignación:', err)
+      })
+    }
+
     // Mapear los datos para que coincidan con lo que espera el frontend
     const mappedTicket = {
       ...newTicket,

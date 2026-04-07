@@ -106,6 +106,21 @@ const ICON_MAP: Record<string, LucideIcon> = {
   'router': Router, 'server': Server, 'battery': Battery, 'cable': Cable,
 }
 
+interface FamilyIconProps {
+  icon?: string | null
+  color?: string | null
+  code?: string
+  className?: string
+}
+
+export function FamilyIcon({ icon, color, code, className = 'w-6 h-6' }: FamilyIconProps) {
+  const IconComponent = icon ? (ICON_MAP[icon] ?? null) : null
+  if (IconComponent) {
+    return <IconComponent className={className} />
+  }
+  return <span>{code?.substring(0, 2) ?? '?'}</span>
+}
+
 interface FamilyBadgeProps {
   family: { name: string; icon?: string | null; color?: string | null }
   size?: 'sm' | 'md'

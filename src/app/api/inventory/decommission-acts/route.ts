@@ -6,6 +6,7 @@ import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { writeFile, mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
+import { NotificationService } from '@/lib/services/notification-service'
 import { getUploadDir } from '@/lib/upload-path'
 import { FolioService } from '@/lib/services/folio.service'
 
@@ -293,16 +294,12 @@ export async function POST(request: NextRequest) {
     if (!autoApproveDecommission) {
       const admins = await prisma.users.findMany({ where: { role: 'ADMIN' }, select: { id: true } })
       for (const admin of admins) {
-        await prisma.notifications.create({
-          data: {
-            id: randomUUID(),
-            userId: admin.id,
-            type: 'WARNING',
-            title: 'Nueva Solicitud de Baja',
-            message: `${requesterName} solicitó la baja de "${assetName}". Motivo: ${reason.trim().substring(0, 100)}`,
-            metadata: { link: `/inventory/decommission/${requestId}` },
-            isRead: false,
-          },
+        await NotificationService.push({
+          userId: admin.id,
+          type: 'WARNING',
+          title: 'Nueva Solicitud de Baja',
+          message: `${requesterName} solicitó la baja de "${assetName}". Motivo: ${reason.trim().substring(0, 100)}`,
+          metadata: { link: `/inventory/decommission/${requestId}` },
         }).catch(() => {})
       }
     }

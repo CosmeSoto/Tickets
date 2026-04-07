@@ -8,6 +8,7 @@ import { ZodError } from 'zod'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import { NotificationService } from '@/lib/services/notification-service'
 import { getRenewalAlertStatus } from '@/lib/inventory/renewal-alert'
 
 /**
@@ -190,16 +191,12 @@ async function notifyAdminsNewLicense(name: string, typeName: string, cost?: num
   })
 
   for (const admin of admins) {
-    await prisma.notifications.create({
-      data: {
-        id: randomUUID(),
-        userId: admin.id,
-        type: 'INFO',
-        title: 'Nueva Licencia Registrada',
-        message: `Se registró la licencia "${name}" (${typeName})${cost ? ` - $${cost}` : ''}`,
-        metadata: { link: '/inventory/licenses' },
-        isRead: false,
-      },
+    await NotificationService.push({
+      userId: admin.id,
+      type: 'INFO',
+      title: 'Nueva Licencia Registrada',
+      message: `Se registró la licencia "${name}" (${typeName})${cost ? ` - ${cost}` : ''}`,
+      metadata: { link: '/inventory/licenses' },
     }).catch(() => {})
   }
 }

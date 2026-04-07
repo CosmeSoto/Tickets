@@ -235,6 +235,9 @@ function CreateClientTicketContent() {
         
         setSubmitSuccess(true)
 
+        // Disparar evento para actualizar notificaciones inmediatamente
+        window.dispatchEvent(new CustomEvent('ticket-created'))
+
         toast({
           title: 'Éxito',
           description: 'Tu ticket ha sido creado exitosamente'

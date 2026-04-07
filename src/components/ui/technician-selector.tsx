@@ -10,8 +10,9 @@ interface Technician {
   id: string
   name: string
   email: string
-  department?: string
+  department?: string | { id: string; name: string; color?: string; familyId?: string } | null
   isActive: boolean
+  technicianFamilyAssignments?: { familyId: string; family: { id: string; name: string; code: string; color: string | null } }[]
   _count?: {
     assignedTickets: number
     technicianAssignments: number
@@ -136,6 +137,13 @@ export function TechnicianSelector({
     }
   }, [highlightedIndex])
 
+  // Helper para obtener nombre del departamento
+  const getDeptName = (dept: Technician['department']): string | null => {
+    if (!dept) return null
+    if (typeof dept === 'string') return dept
+    return dept.name ?? null
+  }
+
   // Obtener descripción por nivel de categoría
   const getLevelDescription = (level: number): string => {
     switch (level) {
@@ -191,7 +199,7 @@ export function TechnicianSelector({
                     </div>
                     <div className="text-xs text-muted-foreground truncate">
                       {tech.email}
-                      {tech.department && ` • ${typeof tech.department === 'string' ? tech.department : (tech.department as any)?.name}`}
+                      {tech.department && ` • ${getDeptName(tech.department)}`}
                     </div>
                     <div className="flex items-center space-x-2 mt-1">
                       <Badge variant={tech.autoAssign ? 'default' : 'outline'} className="text-xs">
@@ -328,7 +336,20 @@ export function TechnicianSelector({
                       </div>
                       {technician.department && (
                         <div className="text-xs text-muted-foreground">
-                          {typeof technician.department === 'string' ? technician.department : (technician.department as any)?.name}
+                          {getDeptName(technician.department)}
+                        </div>
+                      )}
+                      {technician.technicianFamilyAssignments && technician.technicianFamilyAssignments.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {technician.technicianFamilyAssignments.map(fa => (
+                            <span
+                              key={fa.familyId}
+                              className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium"
+                              style={{ backgroundColor: (fa.family.color ?? '#6B7280') + '20', color: fa.family.color ?? '#6B7280' }}
+                            >
+                              {fa.family.code}
+                            </span>
+                          ))}
                         </div>
                       )}
                     </div>
@@ -344,8 +365,10 @@ export function TechnicianSelector({
                   </div>
                 ))
               ) : (
-                <div className="px-3 py-2 text-sm text-muted-foreground">
-                  {searchTerm ? 'No se encontraron técnicos' : 'No hay técnicos disponibles'}
+                <div className="px-3 py-3 text-sm text-muted-foreground text-center">
+                  {searchTerm
+                    ? 'No se encontraron técnicos con ese criterio'
+                    : 'No hay técnicos asignados a esta familia. Puedes asignar técnicos desde Familias → Personal.'}
                 </div>
               )}
             </div>

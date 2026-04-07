@@ -48,12 +48,24 @@ export class AssignmentService {
         throw new Error('No hay técnicos disponibles')
       }
 
-      // 🎯 PRIORIZAR técnicos del departamento de la categoría
+      // 🎯 PRIORIDAD 1: técnicos asignados a la familia del ticket
+      if (ticket.familyId) {
+        const techsFromFamily = await prisma.technician_family_assignments.findMany({
+          where: { familyId: ticket.familyId, isActive: true },
+          select: { technicianId: true },
+        })
+        const familyTechIds = new Set(techsFromFamily.map(t => t.technicianId))
+        const techsInFamily = availableTechnicians.filter(t => familyTechIds.has(t.id))
+        if (techsInFamily.length > 0) {
+          availableTechnicians = techsInFamily
+        }
+      }
+
+      // 🎯 PRIORIDAD 2: técnicos del departamento de la categoría
       if (ticket.categories.departmentId) {
         const techsFromDept = availableTechnicians.filter(
           t => t.departmentId === ticket.categories.departmentId
         )
-        
         if (techsFromDept.length > 0) {
           availableTechnicians = techsFromDept
         }
@@ -224,10 +236,21 @@ export class AssignmentService {
         let score = 0
         const reasons: string[] = []
 
-        // Factor 1: Departamento coincidente (50% del peso si aplica)
+        // Factor 1: Familia coincidente (20% del peso)
+        if (ticket.familyId) {
+          const familyAssignment = await prisma.technician_family_assignments.findFirst({
+            where: { technicianId: technician.id, familyId: ticket.familyId, isActive: true },
+          })
+          if (familyAssignment) {
+            score += 0.2
+            reasons.push('Asignado a la familia del ticket')
+          }
+        }
+
+        // Factor 2: Departamento coincidente (40% del peso si aplica)
         if (ticket.categories.departmentId && technician.departmentId === ticket.categories.departmentId) {
-          score += 0.5
-          reasons.push(`Departamento: ${technician.department?.name}`)
+          score += 0.4
+          reasons.push(`Departamento: ${technician.departments?.name}`)
         }
 
         // Factor 2: Carga de trabajo (30% del peso)

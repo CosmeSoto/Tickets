@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { FamilyIcon } from '@/components/inventory/family-badge'
 import {
   Select,
   SelectContent,
@@ -345,7 +346,7 @@ export default function FamiliesPage() {
                           className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
                           style={{ backgroundColor: family.color || '#6B7280' }}
                         >
-                          {family.icon || family.code.substring(0, 2)}
+                          <FamilyIcon icon={family.icon} color={family.color} code={family.code} className="w-4 h-4" />
                         </div>
                         <div>
                           <p className="font-medium">{family.name}</p>

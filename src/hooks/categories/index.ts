@@ -185,7 +185,7 @@ export function useCategories(options: UseCategoriesOptions = {}) {
       dataHook.availableParents // ← PASAR availableParents
     )
   }, [formHook, dataHook, searchTerm, levelFilter])
-  
+
   // Wrapper para handleDelete
   const handleDelete = useCallback(async () => {
     await formHook.handleDelete(
@@ -193,6 +193,16 @@ export function useCategories(options: UseCategoriesOptions = {}) {
       () => dataHook.loadCategories(searchTerm, levelFilter, true)
     )
   }, [formHook, dataHook, searchTerm, levelFilter])
+
+  // Wrapper para handleEdit — recarga departamentos filtrados por familia
+  const handleEdit = useCallback((category: any) => {
+    formHook.handleEdit(category)
+    // Recargar departamentos, padres y técnicos filtrados por la familia de la categoría
+    const familyId = category.departments?.familyId ?? category.department?.familyId ?? null
+    dataHook.loadDepartments(familyId)
+    dataHook.loadAvailableParents(category.id, familyId ?? undefined)
+    dataHook.loadAvailableTechnicians(familyId ?? undefined)
+  }, [formHook, dataHook])
   
   return {
     // Estados de datos
@@ -242,8 +252,14 @@ export function useCategories(options: UseCategoriesOptions = {}) {
     loadDepartments: dataHook.loadDepartments,
     handleSubmit,
     handleDelete,
-    handleEdit: formHook.handleEdit,
-    handleNew: formHook.handleNew,
+    handleEdit,
+    handleNew: useCallback(() => {
+      formHook.handleNew()
+      dataHook.loadDepartments()
+      dataHook.loadAvailableParents()
+      // Sin familia aún — cargar todos los técnicos para que el selector funcione
+      dataHook.loadAvailableTechnicians()
+    }, [formHook, dataHook]),
     resetForm: formHook.resetForm,
     
     // Funciones de utilidad

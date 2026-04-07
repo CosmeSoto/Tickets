@@ -6,6 +6,7 @@ import { createStockMovementSchema } from '@/lib/validations/inventory/consumabl
 import { ZodError } from 'zod'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import prisma from '@/lib/prisma'
+import { NotificationService } from '@/lib/services/notification-service'
 import { randomUUID } from 'crypto'
 
 /**
@@ -123,16 +124,12 @@ async function checkLowStockAndNotify(consumableId: string) {
 
   for (const admin of admins) {
     // Notificación in-app
-    await prisma.notifications.create({
-      data: {
-        id: randomUUID(),
-        userId: admin.id,
-        type: isOutOfStock ? 'ERROR' : 'WARNING',
-        title,
-        message,
-        metadata: { link: '/inventory/consumables' },
-        isRead: false,
-      },
+    await NotificationService.push({
+      userId: admin.id,
+      type: isOutOfStock ? 'ERROR' : 'WARNING',
+      title,
+      message,
+      metadata: { link: '/inventory/consumables' },
     }).catch(() => {})
 
     // Email en cola

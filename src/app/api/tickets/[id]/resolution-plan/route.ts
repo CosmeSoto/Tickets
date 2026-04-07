@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma'
 import { auditResolutionPlanChange } from '@/lib/audit'
 import { EmailService } from '@/lib/services/email/email-service'
 import { randomUUID } from 'crypto'
+import { NotificationService } from '@/lib/services/notification-service'
 
 /**
  * GET /api/tickets/[id]/resolution-plan
@@ -332,28 +333,20 @@ export async function POST(
         message += ` Fecha objetivo: ${formattedTargetDate}.`
       }
 
-      await prisma.notifications.create({
-        data: {
-          id: randomUUID(),
-          userId: ticket.clientId,
-          type: 'INFO',
-          title: 'Plan de resolución creado',
-          message,
-          ticketId,
-          isRead: false,
-          metadata: {
-            planId: plan.id,
-            planTitle: plan.title,
-            startDate: plan.startDate?.toISOString() || null,
-            targetDate: plan.targetDate?.toISOString() || null,
-            actionUrl: `/client/tickets/${ticketId}`,
-            actionText: 'Ver ticket'
-          },
-          createdAt: new Date()
-        }
-      })
-      
-      console.log(`[API] Notification created for client ${ticket.clientId} about resolution plan ${plan.id}`)
+      await NotificationService.push({
+        userId: ticket.clientId,
+        type: 'INFO',
+        title: 'Plan de resolución creado',
+        message,
+        ticketId,
+        metadata: {
+          planId: plan.id,
+          planTitle: plan.title,
+          startDate: plan.startDate?.toISOString() || null,
+          targetDate: plan.targetDate?.toISOString() || null,
+          link: `/client/tickets/${ticketId}`,
+        },
+      }).catch(err => console.error('[API] Error creating notification for resolution plan:', err))
     } catch (notificationError) {
       // No fallar si la notificación falla, solo registrar el error
       console.error('[API] Error creating notification for resolution plan:', notificationError)
@@ -698,23 +691,13 @@ export async function PATCH(
         })
 
         // Crear notificación para el cliente
-        try {
-          await prisma.notifications.create({
-            data: {
-              id: randomUUID(),
-              userId: existingPlan.ticket.clientId,
-              type: 'SUCCESS',
-              title: 'Plan de resolución completado',
-              message: `El plan de resolución "${existingPlan.title}" ha sido completado. ${completedTasks} de ${totalTasks} tareas fueron finalizadas.`,
-              ticketId,
-              isRead: false,
-              createdAt: new Date()
-            }
-          })
-        } catch (notifError) {
-          console.error('[API] Error creating notification:', notifError)
-          // No fallar si la notificación falla
-        }
+        await NotificationService.push({
+          userId: existingPlan.ticket.clientId,
+          type: 'SUCCESS',
+          title: 'Plan de resolución completado',
+          message: `El plan de resolución "${existingPlan.title}" ha sido completado. ${completedTasks} de ${totalTasks} tareas fueron finalizadas.`,
+          ticketId,
+        }).catch(err => console.error('[API] Error creating notification:', err))
       }
     }
 

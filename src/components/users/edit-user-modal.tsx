@@ -203,6 +203,11 @@ export function EditUserModal({ isOpen, onClose, onUserUpdated, user, department
       newErrors.phone = 'Formato de teléfono inválido'
     }
 
+    // Departamento requerido para técnicos y clientes
+    if (formData.role !== 'ADMIN' && !formData.departmentId) {
+      newErrors.departmentId = 'El departamento es requerido para este rol'
+    }
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -374,7 +379,14 @@ export function EditUserModal({ isOpen, onClose, onUserUpdated, user, department
                 <select
                   id="edit-role"
                   value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value as any })}
+                  onChange={(e) => {
+                    const newRole = e.target.value as any
+                    setFormData({ ...formData, role: newRole })
+                    // Si cambia a ADMIN, limpiar error de departamento
+                    if (newRole === 'ADMIN' && errors.departmentId) {
+                      setErrors(prev => ({ ...prev, departmentId: undefined as any }))
+                    }
+                  }}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   {USER_ROLE_FORM_OPTIONS.map(role => (
@@ -386,12 +398,14 @@ export function EditUserModal({ isOpen, onClose, onUserUpdated, user, department
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="edit-department">Departamento</Label>
+                <Label htmlFor="edit-department">
+                  Departamento {formData.role !== 'ADMIN' ? '*' : ''}
+                </Label>
                 <select
                   id="edit-department"
                   value={formData.departmentId}
                   onChange={(e) => setFormData({ ...formData, departmentId: e.target.value })}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className={`flex h-10 w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${errors.departmentId ? 'border-red-500' : 'border-input'}`}
                 >
                   <option value="">Sin departamento</option>
                   {departments.map(dept => (
@@ -400,6 +414,12 @@ export function EditUserModal({ isOpen, onClose, onUserUpdated, user, department
                     </option>
                   ))}
                 </select>
+                {errors.departmentId && (
+                  <p className="text-sm text-red-600 flex items-center">
+                    <AlertCircle className="h-3 w-3 mr-1" />
+                    {errors.departmentId}
+                  </p>
+                )}
               </div>
             </div>
 

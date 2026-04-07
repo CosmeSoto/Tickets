@@ -1,6 +1,7 @@
 import prisma from '@/lib/prisma'
 import { NotificationType } from '@prisma/client'
 import { randomUUID } from 'crypto'
+import { NotificationEvents } from '@/lib/notification-events'
 
 export interface CreateNotificationData {
   userId: string
@@ -129,7 +130,47 @@ export class NotificationService {
   }
 
   /**
-   * Crear una notificación in-app
+   * Enviar notificación directa sin verificar preferencias (para eventos de sistema:
+   * inventario, mantenimiento, actas, etc.). Siempre guarda en BD y emite por SSE.
+   */
+  static async push(data: CreateNotificationData) {
+    try {
+      const notification = await prisma.notifications.create({
+        data: {
+          id: randomUUID(),
+          userId: data.userId,
+          type: data.type,
+          title: data.title,
+          message: data.message,
+          ticketId: data.ticketId ?? null,
+          metadata: data.metadata ?? null,
+          isRead: false,
+        },
+      })
+
+      NotificationEvents.emit(data.userId, {
+        type: 'new_notification',
+        notification: {
+          id: notification.id,
+          title: notification.title,
+          message: notification.message,
+          notificationType: notification.type,
+          ticketId: notification.ticketId,
+          isRead: false,
+          createdAt: notification.createdAt,
+          metadata: notification.metadata,
+        },
+      })
+
+      return notification
+    } catch (error) {
+      console.error('[NOTIFICATION] Error en push:', error)
+      return null
+    }
+  }
+
+  /**
+   * Crear una notificación in-app (con verificación de preferencias)
    */
   static async createNotification(data: CreateNotificationData & { specificType?: 'ticketCreated' | 'ticketAssigned' | 'statusChanged' | 'newComments' | 'ticketUpdates' }) {
     try {
@@ -153,18 +194,26 @@ export class NotificationService {
         },
         include: {
           users: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
+            select: { id: true, name: true, email: true },
           },
           tickets: {
-            select: {
-              id: true,
-              title: true,
-            },
+            select: { id: true, title: true },
           },
+        },
+      })
+
+      // Empujar al cliente vía SSE — inmediato, sin polling
+      NotificationEvents.emit(data.userId, {
+        type: 'new_notification',
+        notification: {
+          id: notification.id,
+          title: notification.title,
+          message: notification.message,
+          notificationType: notification.type,
+          ticketId: notification.ticketId,
+          isRead: false,
+          createdAt: notification.createdAt,
+          metadata: notification.metadata,
         },
       })
 
@@ -199,20 +248,14 @@ export class NotificationService {
 
       // Obtener todos los admins
       const admins = await prisma.users.findMany({
-        where: {
-          role: 'ADMIN',
-          isActive: true,
-        },
+        where: { role: 'ADMIN', isActive: true },
         select: { id: true, name: true, email: true },
       })
 
-      // Obtener técnicos filtrados por familia del ticket
-      const technicianWhere: any = {
-        role: 'TECHNICIAN',
-        isActive: true,
-      }
+      // Obtener técnicos de la familia del ticket (si aplica)
+      const technicianWhere: any = { role: 'TECHNICIAN', isActive: true }
       if (ticket.familyId) {
-        technicianWhere.technician_family_assignments = {
+        technicianWhere.technicianFamilyAssignments = {
           some: { familyId: ticket.familyId, isActive: true },
         }
       }
@@ -221,16 +264,20 @@ export class NotificationService {
         select: { id: true, name: true, email: true },
       })
 
-      const recipients = [...admins, ...technicians]
+      // Deduplicar: excluir al técnico ya asignado (recibirá notificación específica de asignación)
+      const assignedTechId = ticket.assigneeId
+      const uniqueRecipients = [...admins, ...technicians].filter(
+        (r, idx, arr) =>
+          arr.findIndex(x => x.id === r.id) === idx && // dedup por id
+          r.id !== ticket.clientId && // no notificar al cliente que creó el ticket
+          r.id !== assignedTechId // el técnico asignado recibe notif de asignación, no esta
+      )
 
-      if (recipients.length === 0) {
-        return []
-      }
+      if (uniqueRecipients.length === 0) return []
 
-      // Crear notificaciones para admins y técnicos de la familia
       const notifications = await Promise.all(
-        recipients.map(async (recipient) => {
-          return await this.createNotification({
+        uniqueRecipients.map(recipient =>
+          this.createNotification({
             userId: recipient.id,
             type: 'INFO',
             title: 'Nuevo ticket creado',
@@ -243,7 +290,7 @@ export class NotificationService {
               familyId: ticket.familyId,
             },
           })
-        })
+        )
       )
 
       return notifications

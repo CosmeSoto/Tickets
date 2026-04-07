@@ -16,6 +16,16 @@ export interface CategoryData {
     id: string
     name: string
     color: string
+    familyId?: string
+    family?: { id: string; name: string; code: string; color?: string | null }
+  }
+  // Prisma relation name (plural)
+  departments?: {
+    id: string
+    name: string
+    color: string
+    familyId?: string
+    family?: { id: string; name: string; code: string; color?: string | null }
   }
   parentId?: string
   categories?: {
@@ -24,7 +34,7 @@ export interface CategoryData {
     color: string
     level: number
     parentId?: string
-    categories?: any // Para relaciones anidadas
+    categories?: any
   }
   other_categories: {
     id: string
@@ -58,6 +68,7 @@ export interface FormData {
   color: string
   parentId: string | null
   departmentId: string | null
+  familyId: string | null
   isActive: boolean
   technician_assignments: {
     technicianId: string

@@ -8,6 +8,7 @@ import { generateDecommissionActPDF } from '@/lib/templates/decommission-act-pdf
 import { getUploadDir } from '@/lib/upload-path'
 import { mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
+import { NotificationService } from '@/lib/services/notification-service'
 
 /**
  * POST /api/inventory/decommission-acts/[id]/approve
@@ -210,16 +211,12 @@ export async function POST(
     const requesterEmail = decommissionRequest.requester.email
     const requesterName = decommissionRequest.requester.name || requesterEmail
 
-    await prisma.notifications.create({
-      data: {
-        id: randomUUID(),
-        userId: requesterId,
-        type: 'SUCCESS',
-        title: 'Solicitud de Baja Aprobada',
-        message: `Tu solicitud de baja para "${assetName}" fue aprobada por ${adminName}. Folio: ${act.folio}`,
-        metadata: { link: `/inventory/decommission/${requestId}` },
-        isRead: false,
-      },
+    await NotificationService.push({
+      userId: requesterId,
+      type: 'SUCCESS',
+      title: 'Solicitud de Baja Aprobada',
+      message: `Tu solicitud de baja para "${assetName}" fue aprobada por ${adminName}. Folio: ${act.folio}`,
+      metadata: { link: `/inventory/decommission/${requestId}` },
     }).catch(() => {})
 
     await prisma.email_queue.create({

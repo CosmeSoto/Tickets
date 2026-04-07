@@ -3,6 +3,7 @@
 import { useState, useEffect, use, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, RefreshCw, Ticket, Package, Users, Settings } from 'lucide-react'
+import { FamilyIcon } from '@/components/inventory/family-badge'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -63,7 +64,7 @@ function FamilyHeader({ family }: { family: FamilyBase }) {
             className="w-14 h-14 rounded-full flex items-center justify-center text-white text-xl font-bold flex-shrink-0"
             style={{ backgroundColor: family.color || '#6B7280' }}
           >
-            {family.icon || family.code.substring(0, 2)}
+            <FamilyIcon icon={family.icon} color={family.color} code={family.code} className="w-7 h-7" />
           </div>
           <div className="flex-1">
             <div className="flex items-center gap-2 flex-wrap">

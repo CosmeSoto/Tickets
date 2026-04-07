@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma'
 import { auditTaskChange } from '@/lib/audit'
 import { randomUUID } from 'crypto'
 import { calculateDuration, validateTimeRange, combineDateAndTime, formatDuration } from '@/lib/time-utils'
+import { NotificationService } from '@/lib/services/notification-service'
 
 /**
  * POST /api/tickets/[id]/resolution-plan/tasks
@@ -160,31 +161,23 @@ export async function POST(
           timeInfo = `Duración estimada: ${formatDuration(task.estimatedHours)}`
         }
 
-        await prisma.notifications.create({
-          data: {
-            id: randomUUID(),
-            userId: plan.ticket.clientId,
-            type: 'TASK_SCHEDULED',
-            title: 'Nueva tarea programada',
-            message: `Se ha programado una nueva tarea para tu ticket: "${task.title}". Fecha: ${formattedDate}. ${timeInfo}`,
-            ticketId,
-            isRead: false,
-            metadata: {
-              taskId: task.id,
-              planId: plan.id,
-              taskTitle: task.title,
-              dueDate: task.dueDate.toISOString(),
-              startTime: task.startTime,
-              endTime: task.endTime,
-              estimatedHours: task.estimatedHours,
-              actionUrl: `/client/tickets/${ticketId}`,
-              actionText: 'Ver ticket'
-            },
-            createdAt: new Date()
-          }
-        })
-        
-        console.log(`[API] Notification created for client ${plan.ticket.clientId} about task ${task.id}`)
+        await NotificationService.push({
+          userId: plan.ticket.clientId,
+          type: 'INFO',
+          title: 'Nueva tarea programada',
+          message: `Se ha programado una nueva tarea para tu ticket: "${task.title}". Fecha: ${formattedDate}. ${timeInfo}`,
+          ticketId,
+          metadata: {
+            taskId: task.id,
+            planId: plan.id,
+            taskTitle: task.title,
+            dueDate: task.dueDate.toISOString(),
+            startTime: task.startTime,
+            endTime: task.endTime,
+            estimatedHours: task.estimatedHours,
+            link: `/client/tickets/${ticketId}`,
+          },
+        }).catch(err => console.error('[API] Error creating notification for task:', err))
       } catch (notificationError) {
         console.error('[API] Error creating notification for task:', notificationError)
       }

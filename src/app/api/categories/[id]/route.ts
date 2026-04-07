@@ -10,7 +10,7 @@ const updateCategorySchema = z.object({
   name: z.string().min(1, 'El nombre es requerido').max(100, 'El nombre es muy largo').transform(s => s.trim()),
   description: z.string().optional().transform(s => s?.trim() || ''),
   parentId: z.string().optional().nullable(),
-  departmentId: z.string().optional().nullable(),
+  departmentId: z.string().min(1, 'El departamento es requerido'),
   color: z.string().regex(/^#[0-9A-F]{6}$/i, 'Color inválido').default('#6B7280'),
   isActive: z.boolean().default(true),
   assignedTechnicians: z.array(z.object({
@@ -44,7 +44,7 @@ export async function GET(
       where: { id },
       include: {
         departments: {
-          select: { id: true, name: true, color: true, description: true }
+          select: { id: true, name: true, color: true, description: true, familyId: true, family: { select: { id: true, name: true, code: true, color: true } } }
         },
         other_categories: {
           select: { id: true, name: true, color: true, level: true, isActive: true },
@@ -52,7 +52,7 @@ export async function GET(
           orderBy: { name: 'asc' }
         },
         _count: {
-          select: { tickets: true, other_categories: true }
+          select: { tickets: true, other_categories: true, knowledge_articles: true, sla_policies: true }
         },
         technician_assignments: {
           where: { isActive: true },
@@ -107,8 +107,7 @@ export async function PUT(
 ) {
   try {
     const { id } = await params
-    console.log('🔄 [API-CATEGORY] PUT - ID:', id)
-    
+
     const session = await getServerSession(authOptions)
     if (!session || session.user.role !== 'ADMIN') {
       return NextResponse.json(
@@ -117,18 +116,19 @@ export async function PUT(
       )
     }
 
-    // Verificar que la categoría existe
+    // Cargar estado anterior completo (para oldValues en auditoría)
     const existingCategory = await prisma.categories.findUnique({
       where: { id },
-      select: { 
-        id: true, 
-        level: true, 
-        name: true, 
+      select: {
+        id: true,
+        level: true,
+        name: true,
         parentId: true,
         description: true,
         color: true,
         isActive: true,
-        departmentId: true
+        departmentId: true,
+        departments: { select: { name: true, familyId: true, family: { select: { name: true } } } },
       }
     })
 
@@ -140,19 +140,16 @@ export async function PUT(
     }
 
     const body = await request.json()
-    console.log('📝 [API-CATEGORY] Datos recibidos:', JSON.stringify(body, null, 2))
-    
+
     let validatedData
     try {
       validatedData = updateCategorySchema.parse(body)
-      console.log('✅ [API-CATEGORY] Datos validados:', JSON.stringify(validatedData, null, 2))
     } catch (validationError) {
-      console.error('❌ [API-CATEGORY] Error de validación:', validationError)
       if (validationError instanceof z.ZodError) {
         return NextResponse.json(
-          { 
-            success: false, 
-            error: 'Datos inválidos', 
+          {
+            success: false,
+            error: 'Datos inválidos',
             details: validationError.errors.map(e => ({
               field: e.path.join('.'),
               message: e.message
@@ -163,7 +160,7 @@ export async function PUT(
       }
       throw validationError
     }
-    
+
     // Calcular nivel si cambió el padre
     let level = existingCategory.level
     if (validatedData.parentId !== existingCategory.parentId) {
@@ -172,37 +169,33 @@ export async function PUT(
           where: { id: validatedData.parentId },
           select: { level: true }
         })
-        
         if (!parent) {
           return NextResponse.json(
             { success: false, error: 'Categoría padre no encontrada' },
             { status: 400 }
           )
         }
-        
         if (parent.level >= 4) {
           return NextResponse.json(
             { success: false, error: 'No se pueden crear más de 4 niveles de categorías' },
             { status: 400 }
           )
         }
-        
         level = parent.level + 1
       } else {
         level = 1
       }
     }
-    
-    // Verificar nombre único (excluyendo la categoría actual)
+
+    // Verificar nombre único
     const duplicateCategory = await prisma.categories.findFirst({
       where: {
         name: validatedData.name,
         parentId: validatedData.parentId || null,
-        level: level,
+        level,
         id: { not: id }
       }
     })
-    
     if (duplicateCategory) {
       return NextResponse.json(
         { success: false, error: 'Ya existe una categoría con ese nombre en este nivel' },
@@ -210,27 +203,42 @@ export async function PUT(
       )
     }
 
-    // Detectar cambios para auditoría
-    const changes: Record<string, { old: any, new: any }> = {}
-    if (validatedData.name !== existingCategory.name) {
-      changes.name = { old: existingCategory.name, new: validatedData.name }
+    // Resolver nombre del nuevo departamento para auditoría
+    let newDeptName: string | null = null
+    if (validatedData.departmentId) {
+      const newDept = await prisma.departments.findUnique({
+        where: { id: validatedData.departmentId },
+        select: { name: true, family: { select: { name: true } } }
+      })
+      newDeptName = newDept?.name ?? null
     }
-    if (validatedData.isActive !== existingCategory.isActive) {
-      changes.isActive = { old: existingCategory.isActive, new: validatedData.isActive }
+
+    // Construir oldValues / newValues para auditoría
+    const oldValues: Record<string, any> = {
+      name: existingCategory.name,
+      description: existingCategory.description,
+      color: existingCategory.color,
+      isActive: existingCategory.isActive,
+      parentId: existingCategory.parentId,
+      departmentId: existingCategory.departmentId,
+      departmentName: existingCategory.departments?.name ?? null,
+      familyName: existingCategory.departments?.family?.name ?? null,
     }
-    if (validatedData.parentId !== existingCategory.parentId) {
-      changes.parentId = { old: existingCategory.parentId, new: validatedData.parentId }
+    const newValues: Record<string, any> = {
+      name: validatedData.name,
+      description: validatedData.description,
+      color: validatedData.color,
+      isActive: validatedData.isActive,
+      parentId: validatedData.parentId ?? null,
+      departmentId: validatedData.departmentId,
+      departmentName: newDeptName,
     }
-    if (validatedData.color !== existingCategory.color) {
-      changes.color = { old: existingCategory.color, new: validatedData.color }
-    }
-    if (validatedData.description !== existingCategory.description) {
-      changes.description = { old: existingCategory.description, new: validatedData.description }
-    }
-    if (validatedData.departmentId !== existingCategory.departmentId) {
-      changes.departmentId = { old: existingCategory.departmentId, new: validatedData.departmentId }
-    }
-    
+
+    // Detectar cambios relevantes para notificación
+    const deptChanged = validatedData.departmentId !== existingCategory.departmentId
+    const nameChanged = validatedData.name !== existingCategory.name
+    const statusChanged = validatedData.isActive !== existingCategory.isActive
+
     // Actualizar categoría
     const updatedCategory = await prisma.categories.update({
       where: { id },
@@ -239,13 +247,13 @@ export async function PUT(
         description: validatedData.description,
         color: validatedData.color,
         isActive: validatedData.isActive,
-        departmentId: validatedData.departmentId || null,
+        departmentId: validatedData.departmentId,
         level,
         parentId: validatedData.parentId || null,
         updatedAt: new Date()
       },
       include: {
-        departments: { select: { id: true, name: true, color: true, description: true } },
+        departments: { select: { id: true, name: true, color: true, description: true, familyId: true, family: { select: { id: true, name: true, code: true, color: true } } } },
         other_categories: {
           select: { id: true, name: true, color: true, level: true, isActive: true },
           where: { isActive: true },
@@ -254,24 +262,17 @@ export async function PUT(
         _count: { select: { tickets: true, other_categories: true } },
         technician_assignments: {
           where: { isActive: true },
-          include: {
-            users: {
-              select: { id: true, name: true, email: true }
-            }
-          }
+          include: { users: { select: { id: true, name: true, email: true } } }
         }
       }
     })
 
-    // Actualizar asignaciones de técnicos si se proporcionaron
+    // Actualizar asignaciones de técnicos
     if (validatedData.assignedTechnicians !== undefined) {
-      // Desactivar todas las asignaciones existentes
       await prisma.technician_assignments.updateMany({
         where: { categoryId: id },
         data: { isActive: false, updatedAt: new Date() }
       })
-
-      // Crear nuevas asignaciones
       if (validatedData.assignedTechnicians.length > 0) {
         await prisma.technician_assignments.createMany({
           data: validatedData.assignedTechnicians.map(tech => ({
@@ -288,134 +289,99 @@ export async function PUT(
           skipDuplicates: true
         })
       }
+    }
 
-      // Recargar la categoría con las nuevas asignaciones
-      const categoryWithNewAssignments = await prisma.categories.findUnique({
-        where: { id },
-        include: {
-          departments: { select: { id: true, name: true, color: true, description: true } },
-          other_categories: {
-            select: { id: true, name: true, color: true, level: true, isActive: true },
-            where: { isActive: true },
-            orderBy: { name: 'asc' }
-          },
-          _count: { select: { tickets: true, other_categories: true } },
-          technician_assignments: {
-            where: { isActive: true },
-            include: {
-              users: {
-                select: { id: true, name: true, email: true }
-              }
-            }
-          }
+    // Recargar con técnicos actualizados
+    const finalCategory = await prisma.categories.findUnique({
+      where: { id },
+      include: {
+        departments: { select: { id: true, name: true, color: true, description: true, familyId: true, family: { select: { id: true, name: true, code: true, color: true } } } },
+        other_categories: {
+          select: { id: true, name: true, color: true, level: true, isActive: true },
+          where: { isActive: true },
+          orderBy: { name: 'asc' }
+        },
+        _count: { select: { tickets: true, other_categories: true } },
+        technician_assignments: {
+          where: { isActive: true },
+          include: { users: { select: { id: true, name: true, email: true } } }
         }
+      }
+    })
+
+    // ── Auditoría con oldValues / newValues ──────────────────────────────────
+    await AuditServiceComplete.log({
+      action: AuditActionsComplete.CATEGORY_UPDATED,
+      entityType: 'category',
+      entityId: id,
+      userId: session.user.id,
+      oldValues,
+      newValues,
+      details: {
+        categoryName: validatedData.name,
+        changesCount: Object.keys(oldValues).filter(k => oldValues[k] !== newValues[k]).length,
+        assignedTechnicians: validatedData.assignedTechnicians?.length ?? 0,
+        deptChanged,
+        nameChanged,
+        statusChanged,
+      },
+      request,
+    }).catch(err => console.error('[AUDIT] Error:', err))
+
+    // ── Notificaciones in-app a todos los admins cuando cambia algo relevante ─
+    if (deptChanged || nameChanged || statusChanged) {
+      const admins = await prisma.users.findMany({
+        where: { role: 'ADMIN', isActive: true, id: { not: session.user.id } },
+        select: { id: true },
       })
 
-      if (categoryWithNewAssignments) {
-        // Registrar auditoría
-        try {
-          await AuditServiceComplete.logAction({
-            userId: session.user.id,
-            action: AuditActionsComplete.CATEGORY_UPDATED,
-            entityType: 'category',
-            details: {
-              categoryId: id,
-              categoryName: validatedData.name,
-              changes,
-              assignedTechnicians: validatedData.assignedTechnicians.length
-            },
-            metadata: {
-              userAgent: request.headers.get('user-agent') || 'Unknown',
-              ip: request.headers.get('x-forwarded-for') || 'Unknown'
-            }
-          })
-        } catch (auditError) {
-          console.error('Error registrando auditoría:', auditError)
-        }
+      const notifParts: string[] = []
+      if (nameChanged) notifParts.push(`nombre: "${existingCategory.name}" → "${validatedData.name}"`)
+      if (deptChanged) notifParts.push(`departamento: "${existingCategory.departments?.name ?? 'ninguno'}" → "${newDeptName ?? 'ninguno'}"`)
+      if (statusChanged) notifParts.push(`estado: ${existingCategory.isActive ? 'activa' : 'inactiva'} → ${validatedData.isActive ? 'activa' : 'inactiva'}`)
 
-        // Enviar notificaciones de categoría actualizada (log para auditoría)
-        try {
-          console.log(`[INFO] Category updated: ${id} by user ${session.user.id}`)
-        } catch (notificationError) {
-          console.error('Error enviando notificaciones de categoría actualizada:', notificationError)
-        }
+      const message = `Categoría actualizada — ${notifParts.join(', ')}`
 
-        const enrichedCategory = {
-          ...categoryWithNewAssignments,
-          levelName: getLevelName(categoryWithNewAssignments.level),
-          canDelete: categoryWithNewAssignments._count.tickets === 0 && categoryWithNewAssignments._count.other_categories === 0,
-          assignedTechnicians: categoryWithNewAssignments.technician_assignments.map(assignment => ({
-            id: assignment.users.id,
-            name: assignment.users.name,
-            email: assignment.users.email,
-            priority: assignment.priority,
-            maxTickets: assignment.maxTickets,
-            autoAssign: assignment.autoAssign
-          }))
-        }
-        
-        console.log('✅ [API-CATEGORY] Categoría actualizada con técnicos:', categoryWithNewAssignments.name)
-        
-        return NextResponse.json({
-          success: true,
-          data: enrichedCategory,
-          message: 'Categoría actualizada exitosamente'
-        })
+      if (admins.length > 0) {
+        await prisma.notifications.createMany({
+          data: admins.map(admin => ({
+            id: randomUUID(),
+            title: `Categoría modificada: ${validatedData.name}`,
+            message,
+            type: 'INFO' as const,
+            userId: admin.id,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })),
+          skipDuplicates: true,
+        }).catch(err => console.error('[NOTIFY] Error:', err))
       }
     }
 
-    // Registrar auditoría
-    try {
-      await AuditServiceComplete.logAction({
-        userId: session.user.id,
-        action: AuditActionsComplete.CATEGORY_UPDATED,
-        entityType: 'category',
-        details: {
-          categoryId: id,
-          categoryName: validatedData.name,
-          changes
-        },
-        metadata: {
-          userAgent: request.headers.get('user-agent') || 'Unknown',
-          ip: request.headers.get('x-forwarded-for') || 'Unknown'
-        }
-      })
-    } catch (auditError) {
-      console.error('Error registrando auditoría:', auditError)
-    }
-
-    // Enviar notificaciones de categoría actualizada (log para auditoría)
-    try {
-      console.log(`[INFO] Category updated: ${id} by user ${session.user.id}`)
-    } catch (notificationError) {
-      console.error('Error enviando notificaciones de categoría actualizada:', notificationError)
-    }
-    
     const enrichedCategory = {
-      ...updatedCategory,
-      levelName: getLevelName(updatedCategory.level),
-      canDelete: updatedCategory._count.tickets === 0 && updatedCategory._count.other_categories === 0,
-      assignedTechnicians: updatedCategory.technician_assignments.map(assignment => ({
-        id: assignment.users.id,
-        name: assignment.users.name,
-        email: assignment.users.email,
-        priority: assignment.priority,
-        maxTickets: assignment.maxTickets,
-        autoAssign: assignment.autoAssign
+      ...(finalCategory ?? updatedCategory),
+      levelName: getLevelName(level),
+      canDelete: (finalCategory ?? updatedCategory)._count.tickets === 0 &&
+                 (finalCategory ?? updatedCategory)._count.other_categories === 0,
+      assignedTechnicians: (finalCategory ?? updatedCategory).technician_assignments.map(a => ({
+        id: a.users.id,
+        name: a.users.name,
+        email: a.users.email,
+        priority: a.priority,
+        maxTickets: a.maxTickets,
+        autoAssign: a.autoAssign,
       }))
     }
-    
-    console.log('✅ [API-CATEGORY] Categoría actualizada:', updatedCategory.name)
-    
+
     return NextResponse.json({
       success: true,
       data: enrichedCategory,
       message: 'Categoría actualizada exitosamente'
     })
-    
+
   } catch (error) {
     console.error('❌ [API-CATEGORY] Error PUT:', error)
-    
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { 
@@ -448,8 +414,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    console.log('🗑️ [API-CATEGORY] DELETE - ID:', id)
-    
+
     const session = await getServerSession(authOptions)
     if (!session || session.user.role !== 'ADMIN') {
       return NextResponse.json(
@@ -463,7 +428,12 @@ export async function DELETE(
       where: { id },
       include: {
         _count: {
-          select: { tickets: true, other_categories: true }
+          select: {
+            tickets: true,
+            other_categories: true,
+            knowledge_articles: true,
+            sla_policies: true,
+          }
         },
         technician_assignments: {
           where: { isActive: true },
@@ -483,43 +453,34 @@ export async function DELETE(
       )
     }
 
-    // Verificar que no tenga tickets o subcategorías
-    if (category._count.tickets > 0) {
+    // Verificar restricciones de eliminación
+    const errors: string[] = []
+    if (category._count.tickets > 0)
+      errors.push(`${category._count.tickets} ticket(s) asignado(s)`)
+    if (category._count.other_categories > 0)
+      errors.push(`${category._count.other_categories} subcategoría(s)`)
+
+    if (errors.length > 0) {
       return NextResponse.json(
-        { success: false, error: `No se puede eliminar: la categoría tiene ${category._count.tickets} tickets asignados` },
+        {
+          success: false,
+          error: `No se puede eliminar: la categoría tiene ${errors.join(' y ')}`,
+          details: {
+            tickets: category._count.tickets,
+            subcategories: category._count.other_categories,
+          }
+        },
         { status: 400 }
       )
     }
 
-    if (category._count.other_categories > 0) {
-      return NextResponse.json(
-        { success: false, error: `No se puede eliminar: la categoría tiene ${category._count.other_categories} subcategorías` },
-        { status: 400 }
-      )
-    }
-
-    // Guardar datos para notificaciones antes de eliminar
-    const deletedCategoryData = {
-      name: category.name,
-      level: category.level,
-      assignedTechnicians: category.technician_assignments.map(assignment => ({
-        users: {
-          id: assignment.users.id,
-          name: assignment.users.name,
-          email: assignment.users.email
-        }
-      }))
-    }
-
-    // Eliminar asignaciones de técnicos primero
-    await prisma.technician_assignments.deleteMany({
-      where: { categoryId: id }
-    })
+    // Eliminar en orden: técnicos → artículos de conocimiento → políticas SLA → categoría
+    await prisma.technician_assignments.deleteMany({ where: { categoryId: id } })
+    await prisma.knowledge_articles.deleteMany({ where: { categoryId: id } })
+    await prisma.sla_policies.deleteMany({ where: { categoryId: id } })
 
     // Eliminar la categoría
-    await prisma.categories.delete({
-      where: { id }
-    })
+    await prisma.categories.delete({ where: { id } })
 
     // Registrar en auditoría
     await AuditServiceComplete.log({
@@ -532,19 +493,32 @@ export async function DELETE(
         level: category.level,
         ticketsCount: category._count.tickets,
         subcategoriesCount: category._count.other_categories,
-        techniciansCount: category.technician_assignments.length
+        techniciansCount: category.technician_assignments.length,
+        knowledgeArticlesDeleted: category._count.knowledge_articles,
+        slaPoliciesDeleted: category._count.sla_policies,
       },
       request
     })
 
-    // Enviar notificaciones de categoría eliminada (log para auditoría)
-    try {
-      console.log(`[INFO] Category deleted: ${id} by user ${session.user.id}`)
-    } catch (notificationError) {
-      console.error('Error enviando notificaciones de categoría eliminada:', notificationError)
+    // Notificación in-app a otros admins
+    const admins = await prisma.users.findMany({
+      where: { role: 'ADMIN', isActive: true, id: { not: session.user.id } },
+      select: { id: true },
+    })
+    if (admins.length > 0) {
+      await prisma.notifications.createMany({
+        data: admins.map(admin => ({
+          id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+          title: `Categoría eliminada: ${category.name}`,
+          message: `Se eliminó la categoría "${category.name}" (Nivel ${category.level}).`,
+          type: 'WARNING' as const,
+          userId: admin.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })),
+        skipDuplicates: true,
+      }).catch(err => console.error('[NOTIFY] Error:', err))
     }
-    
-    console.log('✅ [API-CATEGORY] Categoría eliminada:', category.name)
     
     return NextResponse.json({
       success: true,

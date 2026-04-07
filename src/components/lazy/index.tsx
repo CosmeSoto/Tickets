@@ -4,7 +4,6 @@
  */
 
 import dynamic from 'next/dynamic'
-import { ComponentType } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 
@@ -21,21 +20,7 @@ const LoadingFallback = () => (
   </Card>
 )
 
-// Reports Components
-export const ReportsPage = dynamic(
-  () => import('@/components/reports/reports-page'),
-  { loading: LoadingFallback, ssr: false }
-)
-
-export const ReportKPIMetrics = dynamic(
-  () => import('@/components/reports/report-kpi-metrics').then(mod => mod.ReportKPIMetrics),
-  { loading: () => <Skeleton className="h-48 w-full" />, ssr: false }
-)
-
-export const DetailedTicketsTable = dynamic(
-  () => import('@/components/reports/detailed-tickets-table').then(mod => mod.DetailedTicketsTable),
-  { loading: () => <Skeleton className="h-96 w-full" />, ssr: false }
-)
+// Reports Components — eliminados (reports usa page.tsx directamente)
 
 // Backup Components
 export const BackupDashboard = dynamic(
@@ -102,19 +87,4 @@ export const ResolveTicketDialog = dynamic(
   { loading: () => <Skeleton className="h-64 w-96" />, ssr: false }
 )
 
-// Chart Components (para reportes)
-// TODO: Crear componentes de gráficos cuando se necesiten
-// export const LazyBarChart = dynamic(
-//   () => import('@/components/reports/charts/bar-chart').then(mod => mod.BarChart),
-//   { loading: () => <Skeleton className="h-64 w-full" />, ssr: false }
-// ) as ComponentType<any>
 
-// export const LazyLineChart = dynamic(
-//   () => import('@/components/reports/charts/line-chart').then(mod => mod.LineChart),
-//   { loading: () => <Skeleton className="h-64 w-full" />, ssr: false }
-// ) as ComponentType<any>
-
-// export const LazyPieChart = dynamic(
-//   () => import('@/components/reports/charts/pie-chart').then(mod => mod.PieChart),
-//   { loading: () => <Skeleton className="h-64 w-full" />, ssr: false }
-// ) as ComponentType<any>

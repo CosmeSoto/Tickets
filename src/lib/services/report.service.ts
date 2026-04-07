@@ -237,15 +237,20 @@ export class ReportService {
   /**
    * Tendencias temporales de volumen de tickets agrupados por período.
    * Granularidad: 'day' | 'week' | 'month'
+   * Rango: usa dateRange si se provee, sino últimos 90 días por defecto.
    */
   static async getTemporalTrends(
     familyId: string | 'all',
-    granularity: 'day' | 'week' | 'month'
+    granularity: 'day' | 'week' | 'month',
+    dateRange?: DateRange
   ): Promise<TemporalTrendPoint[]> {
-    // Rango por defecto: últimos 90 días
-    const endDate = new Date()
-    const startDate = new Date()
-    startDate.setDate(startDate.getDate() - 90)
+    // Rango: usar el provisto o últimos 90 días por defecto
+    const endDate = dateRange?.endDate ?? new Date()
+    const startDate = dateRange?.startDate ?? (() => {
+      const d = new Date(endDate)
+      d.setDate(d.getDate() - 90)
+      return d
+    })()
 
     const where = buildTicketWhere(familyId, { startDate, endDate })
 
@@ -312,6 +317,7 @@ export class ReportService {
 
   /**
    * Cumplimiento de SLA por familia y prioridad.
+   * Optimizado: una sola query por familia en lugar de N×4.
    */
   static async getSLACompliance(
     familyId: string | 'all',
@@ -334,20 +340,25 @@ export class ReportService {
     const now = new Date()
 
     for (const family of families) {
+      // Una sola query por familia con todas las prioridades
+      const tickets = await prisma.tickets.findMany({
+        where: buildTicketWhere(family.id, dateRange),
+        select: {
+          priority: true,
+          slaDeadline: true,
+          resolvedAt: true,
+          ticket_sla_metrics: { select: { resolutionSLAMet: true } },
+        },
+      })
+
+      // Agrupar por prioridad en memoria
+      const byPriority = new Map<string, typeof tickets>()
+      for (const p of priorities) byPriority.set(p, [])
+      for (const t of tickets) byPriority.get(t.priority)?.push(t)
+
       for (const priority of priorities) {
-        const where = {
-          ...buildTicketWhere(family.id, dateRange),
-          priority: priority as 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT',
-        }
-
-        const tickets = await prisma.tickets.findMany({
-          where,
-          include: {
-            ticket_sla_metrics: { select: { resolutionSLAMet: true } },
-          },
-        })
-
-        const withSLA = tickets.filter((t) => t.ticket_sla_metrics || t.slaDeadline)
+        const group = byPriority.get(priority) ?? []
+        const withSLA = group.filter((t) => t.ticket_sla_metrics || t.slaDeadline)
         let compliant = 0
         let breached = 0
 
@@ -369,8 +380,6 @@ export class ReportService {
         }
 
         const total = withSLA.length
-        const complianceRate = total > 0 ? Math.round((compliant / total) * 1000) / 10 : 0
-
         results.push({
           familyId: family.id,
           familyName: family.name,
@@ -378,7 +387,7 @@ export class ReportService {
           total,
           compliant,
           breached,
-          complianceRate,
+          complianceRate: total > 0 ? Math.round((compliant / total) * 1000) / 10 : 0,
         })
       }
     }

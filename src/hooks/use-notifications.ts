@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
 import { safeFetch } from '@/lib/auth-fetch'
+import { useNotificationSSE } from '@/hooks/use-notification-sse'
 
 export interface NotificationData {
   id: string
@@ -24,11 +25,10 @@ export interface NotificationData {
 
 interface UseNotificationsOptions {
   autoLoad?: boolean
-  refreshInterval?: number
 }
 
 export function useNotifications(options: UseNotificationsOptions = {}) {
-  const { autoLoad = true, refreshInterval = 15 * 1000 } = options
+  const { autoLoad = true } = options
 
   const [notifications, setNotifications] = useState<NotificationData[]>([])
   const [loading, setLoading] = useState(false)
@@ -230,24 +230,34 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     hasActiveFilters: filterRead !== 'all' || filterType !== 'all' || searchTerm !== '',
   }), [notifications, filteredNotifications, filterRead, filterType, searchTerm])
 
-  // Carga inicial + polling — solo cuando hay sesión activa
+  // Carga inicial — solo cuando hay sesión activa
   useEffect(() => {
     if (!autoLoad || status !== 'authenticated' || !session?.user?.id) return
     loadNotifications(true)
-    if (refreshInterval > 0) {
-      const interval = setInterval(() => loadNotifications(false), refreshInterval)
-      return () => clearInterval(interval)
-    }
-    return undefined
-  }, [autoLoad, status, session?.user?.id, loadNotifications, refreshInterval])
+  }, [autoLoad, status, session?.user?.id, loadNotifications])
 
-  // Recargar cuando llega un evento SSE de ticket
-  useEffect(() => {
-    if (status !== 'authenticated' || !session?.user?.id) return
-    const handler = () => loadNotifications(true)
-    window.addEventListener('ticket-updated', handler)
-    return () => window.removeEventListener('ticket-updated', handler)
-  }, [status, session?.user?.id, loadNotifications])
+  // SSE: recibe notificaciones en tiempo real y las inserta al inicio de la lista
+  useNotificationSSE({
+    onNotification: (notif) => {
+      setNotifications(prev => {
+        if (prev.some(n => n.id === notif.id)) return prev
+        const newNotif: NotificationData = {
+          id: notif.id,
+          type: notif.notificationType,
+          title: notif.title,
+          message: notif.message,
+          isRead: false,
+          ticketId: notif.ticketId,
+          metadata: notif.metadata,
+          createdAt: notif.createdAt,
+        }
+        return [newNotif, ...prev]
+          .filter(n => !deletedIds.current.has(n.id))
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      })
+    },
+    sound: true,
+  })
 
   return {
     notifications,

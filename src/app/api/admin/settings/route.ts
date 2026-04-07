@@ -37,7 +37,7 @@ const settingsSchema = z.object({
 const defaultSettings = {
   systemName: 'Sistema de Tickets',
   systemDescription: 'Sistema de gestión de tickets de soporte técnico',
-  supportEmail: 'soporte@empresa.com',
+  supportEmail: 'internet.freecom@gmail.com',
   maxTicketsPerUser: 10,
   autoAssignmentEnabled: true,
   emailEnabled: false,

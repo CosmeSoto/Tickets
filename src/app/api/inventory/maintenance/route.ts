@@ -5,6 +5,7 @@ import { MaintenanceService } from '@/lib/services/maintenance.service'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { sendEmail } from '@/lib/email-service'
+import { NotificationService } from '@/lib/services/notification-service'
 
 /**
  * GET /api/inventory/maintenance
@@ -126,16 +127,13 @@ export async function POST(request: NextRequest) {
       const requesterName = session.user.name || session.user.email
 
       for (const admin of admins) {
-        await prisma.notifications.create({
-          data: {
-            id: randomUUID(),
-            userId: admin.id,
-            type: 'INFO',
-            title: `Solicitud de mantenimiento — ${equipment.code}`,
-            message: `${requesterName} solicitó mantenimiento ${type === 'PREVENTIVE' ? 'preventivo' : 'correctivo'} para el equipo ${equipmentLabel}. Motivo: ${description}`,
-            metadata: { equipmentId, maintenanceId: maintenance.id, action: 'approve_maintenance' },
-          },
-        })
+        await NotificationService.push({
+          userId: admin.id,
+          type: 'INFO',
+          title: `Solicitud de mantenimiento — ${equipment.code}`,
+          message: `${requesterName} solicitó mantenimiento ${type === 'PREVENTIVE' ? 'preventivo' : 'correctivo'} para el equipo ${equipmentLabel}. Motivo: ${description}`,
+          metadata: { equipmentId, maintenanceId: maintenance.id, action: 'approve_maintenance' },
+        }).catch(() => {})
       }
     } else {
       // Admin/Técnico programa mantenimiento directamente
@@ -161,16 +159,13 @@ export async function POST(request: NextRequest) {
         })
         const equipmentLabel = `${equipment.code} (${equipment.brand} ${equipment.model})`
 
-        await prisma.notifications.create({
-          data: {
-            id: randomUUID(),
-            userId: receiver.id,
-            type: 'INFO',
-            title: `Mantenimiento programado — ${equipment.code}`,
-            message: `El equipo ${equipmentLabel} entrará en mantenimiento ${maintenanceTypeLabel} el ${formattedDate}. Motivo: ${description}`,
-            metadata: { equipmentId, maintenanceId: maintenance.id },
-          },
-        })
+        await NotificationService.push({
+          userId: receiver.id,
+          type: 'INFO',
+          title: `Mantenimiento programado — ${equipment.code}`,
+          message: `El equipo ${equipmentLabel} entrará en mantenimiento ${maintenanceTypeLabel} el ${formattedDate}. Motivo: ${description}`,
+          metadata: { equipmentId, maintenanceId: maintenance.id },
+        }).catch(() => {})
 
         sendEmail({
           to: receiver.email,
