@@ -172,8 +172,16 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('[API-USER-SETTINGS] GET Error:', error)
+    // En desarrollo mostrar el error real para diagnóstico
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorStack = error instanceof Error ? error.stack : undefined
     return NextResponse.json(
-      { success: false, error: 'Error al obtener configuración' },
+      { 
+        success: false, 
+        error: 'Error al obtener configuración',
+        detail: errorMessage,
+        stack: process.env.NODE_ENV !== 'production' ? errorStack : undefined,
+      },
       { status: 500 }
     )
   }
