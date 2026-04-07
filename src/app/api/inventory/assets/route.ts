@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
   } else if (role === 'CLIENT') {
     // Cliente: solo ve equipos asignados a él
     const assignments = await prisma.equipment_assignments.findMany({
-      where: { receiverId: userId, status: 'ACTIVE' },
+      where: { receiverId: userId, isActive: true },
       select: { equipmentId: true },
     })
     clientAssignedEquipmentIds = assignments.map(a => a.equipmentId)
@@ -83,9 +83,8 @@ export async function GET(req: NextRequest) {
           orderBy: { createdAt: 'desc' },
         }),
 
-    // Solo incluir MRO si no se filtra por subtype o el subtype es MRO
-    // Clientes no ven MRO ni licencias
-    subtypeParam && subtypeParam !== 'MRO' || clientAssignedEquipmentIds !== undefined
+    // Solo incluir MRO — clientes no ven MRO
+    (clientAssignedEquipmentIds !== undefined) || (subtypeParam && subtypeParam !== 'MRO')
       ? Promise.resolve([])
       : prisma.consumables.findMany({
           where: effectiveFamilyIds
@@ -95,9 +94,8 @@ export async function GET(req: NextRequest) {
           orderBy: { createdAt: 'desc' },
         }),
 
-    // Solo incluir LICENSE si no se filtra por subtype o el subtype es LICENSE
-    // Clientes no ven licencias
-    subtypeParam && subtypeParam !== 'LICENSE' || clientAssignedEquipmentIds !== undefined
+    // Solo incluir LICENSE — clientes no ven licencias
+    (clientAssignedEquipmentIds !== undefined) || (subtypeParam && subtypeParam !== 'LICENSE')
       ? Promise.resolve([])
       : prisma.software_licenses.findMany({
           where: effectiveFamilyIds
