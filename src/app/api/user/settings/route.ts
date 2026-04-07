@@ -64,8 +64,10 @@ export async function GET(request: NextRequest) {
     // Si no existe, crear con valores por defecto
     if (!settings) {
       const now = new Date()
-      settings = await prisma.user_settings.create({
-        data: {
+      settings = await prisma.user_settings.upsert({
+        where: { userId },
+        update: {},
+        create: {
           id: randomUUID(),
           userId,
           emailNotifications: true,
@@ -88,6 +90,29 @@ export async function GET(request: NextRequest) {
           language: 'es',
           timezone: 'America/Guayaquil',
           updatedAt: now,
+        },
+      })
+    }
+
+    // Reparar registros con campos null (creados con schema incompleto)
+    const needsRepair = !settings.theme || !settings.language || !settings.timezone
+    if (needsRepair) {
+      settings = await prisma.user_settings.update({
+        where: { userId },
+        data: {
+          theme: settings.theme ?? 'light',
+          language: settings.language ?? 'es',
+          timezone: settings.timezone ?? 'America/Guayaquil',
+          systemAlerts: settings.systemAlerts ?? true,
+          weeklyReport: settings.weeklyReport ?? false,
+          soundEnabled: settings.soundEnabled ?? true,
+          ticketUpdates: settings.ticketUpdates ?? true,
+          autoAssignEnabled: settings.autoAssignEnabled ?? true,
+          maxConcurrentTickets: settings.maxConcurrentTickets ?? 10,
+          quietHoursEnabled: settings.quietHoursEnabled ?? false,
+          quietHoursStart: settings.quietHoursStart ?? '22:00',
+          quietHoursEnd: settings.quietHoursEnd ?? '08:00',
+          updatedAt: new Date(),
         },
       })
     }

@@ -41,8 +41,10 @@ export class NotificationService {
       // Si no hay preferencias, crear defaults y enviar
       if (!prefs) {
         // Crear settings por defecto en background (no bloquear)
-        prisma.user_settings.create({
-          data: {
+        prisma.user_settings.upsert({
+          where: { userId },
+          update: {},
+          create: {
             id: randomUUID(),
             userId,
             emailNotifications: true,
@@ -52,14 +54,21 @@ export class NotificationService {
             statusChanged: true,
             newComments: true,
             ticketUpdated: true,
+            ticketUpdates: true,
+            systemAlerts: true,
+            weeklyReport: false,
+            soundEnabled: true,
+            quietHoursEnabled: false,
+            quietHoursStart: '22:00',
+            quietHoursEnd: '08:00',
+            autoAssignEnabled: true,
+            maxConcurrentTickets: 10,
+            theme: 'light',
+            language: 'es',
+            timezone: 'America/Guayaquil',
             updatedAt: new Date(),
           }
-        }).catch(err => {
-          // Ignorar error si ya existe (race condition)
-          if (!err.message?.includes('Unique constraint')) {
-            console.error('[NOTIFICATION] Error creating default settings:', err)
-          }
-        })
+        }).catch(err => console.error('[NOTIFICATION] Error creating default settings:', err))
         return true
       }
 
