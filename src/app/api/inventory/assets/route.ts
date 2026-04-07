@@ -31,21 +31,30 @@ export async function GET(req: NextRequest) {
 
   // Determinar familias permitidas para el usuario
   let allowedFamilyIds: string[] | undefined
+  let clientAssignedEquipmentIds: string[] | undefined
 
-  if (role !== 'ADMIN') {
-    const allowed = await canManageInventory(userId, role)
-    if (!allowed) {
-      return NextResponse.json(
-        { error: 'No tienes permiso para gestionar el inventario' },
-        { status: 403 }
-      )
-    }
-    // Gestor: filtrar por familias asignadas
-    const assignments = await prisma.inventory_manager_families.findMany({
-      where: { managerId: userId },
-      select: { familyId: true },
+  if (role === 'ADMIN') {
+    // Admin: acceso total, sin restricción de familias
+    allowedFamilyIds = undefined
+  } else if (role === 'CLIENT') {
+    // Cliente: solo ve equipos asignados a él
+    const assignments = await prisma.equipment_assignments.findMany({
+      where: { receiverId: userId, status: 'ACTIVE' },
+      select: { equipmentId: true },
     })
-    allowedFamilyIds = assignments.map((a) => a.familyId)
+    clientAssignedEquipmentIds = assignments.map(a => a.equipmentId)
+  } else {
+    // TECHNICIAN u otro rol: verificar si es gestor
+    const isManager = await canManageInventory(userId, role)
+    if (isManager) {
+      // Gestor: filtrar por familias asignadas
+      const assignments = await prisma.inventory_manager_families.findMany({
+        where: { managerId: userId },
+        select: { familyId: true },
+      })
+      allowedFamilyIds = assignments.map((a) => a.familyId)
+    }
+    // Técnico sin gestión: acceso de lectura a todo el inventario (para ver equipos en tickets)
   }
 
   // Si se pasa familyId como query param, intersectar con las familias permitidas
@@ -65,44 +74,36 @@ export async function GET(req: NextRequest) {
     subtypeParam && subtypeParam !== 'EQUIPMENT'
       ? Promise.resolve([])
       : prisma.equipment.findMany({
-          where: effectiveFamilyIds
-            ? { type: { familyId: { in: effectiveFamilyIds } } }
-            : undefined,
-          include: {
-            type: {
-              include: { family: true },
-            },
+          where: {
+            ...(effectiveFamilyIds ? { type: { familyId: { in: effectiveFamilyIds } } } : {}),
+            // Cliente: solo equipos asignados a él
+            ...(clientAssignedEquipmentIds ? { id: { in: clientAssignedEquipmentIds } } : {}),
           },
+          include: { type: { include: { family: true } } },
           orderBy: { createdAt: 'desc' },
         }),
 
     // Solo incluir MRO si no se filtra por subtype o el subtype es MRO
-    subtypeParam && subtypeParam !== 'MRO'
+    // Clientes no ven MRO ni licencias
+    subtypeParam && subtypeParam !== 'MRO' || clientAssignedEquipmentIds !== undefined
       ? Promise.resolve([])
       : prisma.consumables.findMany({
           where: effectiveFamilyIds
             ? { consumableType: { familyId: { in: effectiveFamilyIds } } }
             : undefined,
-          include: {
-            consumableType: {
-              include: { family: true },
-            },
-          },
+          include: { consumableType: { include: { family: true } } },
           orderBy: { createdAt: 'desc' },
         }),
 
     // Solo incluir LICENSE si no se filtra por subtype o el subtype es LICENSE
-    subtypeParam && subtypeParam !== 'LICENSE'
+    // Clientes no ven licencias
+    subtypeParam && subtypeParam !== 'LICENSE' || clientAssignedEquipmentIds !== undefined
       ? Promise.resolve([])
       : prisma.software_licenses.findMany({
           where: effectiveFamilyIds
             ? { licenseType: { familyId: { in: effectiveFamilyIds } } }
             : undefined,
-          include: {
-            licenseType: {
-              include: { family: true },
-            },
-          },
+          include: { licenseType: { include: { family: true } } },
           orderBy: { createdAt: 'desc' },
         }),
   ])

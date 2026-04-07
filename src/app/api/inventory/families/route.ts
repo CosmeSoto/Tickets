@@ -9,7 +9,8 @@ import { randomUUID } from 'crypto'
  * GET /api/inventory/families
  * Lista familias de inventario.
  * - ADMIN: todas las activas (o todas si ?includeInactive=true)
- * - Gestor (canManageInventory): solo las familias asignadas a él via inventory_manager_families
+ * - Gestor (canManageInventory): solo las familias asignadas a él
+ * - TECHNICIAN / CLIENT: todas las activas (solo lectura, para filtros de UI)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -21,18 +22,12 @@ export async function GET(request: NextRequest) {
 
     const { user } = session
     const isAdmin = user.role === 'ADMIN'
-    const isManager = await canManageInventory(user.id, user.role)
-
-    if (!isAdmin && !isManager) {
-      return NextResponse.json(
-        { error: 'No tienes permiso para acceder al inventario' },
-        { status: 403 }
-      )
-    }
+    const isManager = !isAdmin && await canManageInventory(user.id, user.role)
 
     const includeInactive =
       isAdmin && request.nextUrl.searchParams.get('includeInactive') === 'true'
 
+    // ADMIN: todas las familias
     if (isAdmin) {
       const families = await prisma.families.findMany({
         where: includeInactive ? undefined : { isActive: true },
@@ -42,18 +37,24 @@ export async function GET(request: NextRequest) {
     }
 
     // Gestor: solo familias asignadas y activas
-    const assignments = await prisma.inventory_manager_families.findMany({
-      where: { managerId: user.id },
-      include: {
-        family: true,
-      },
+    if (isManager) {
+      const assignments = await prisma.inventory_manager_families.findMany({
+        where: { managerId: user.id },
+        include: { family: true },
+      })
+      const families = assignments
+        .map((a) => a.family)
+        .filter((f) => f.isActive)
+        .sort((a, b) => a.order - b.order)
+      return NextResponse.json({ families })
+    }
+
+    // TECHNICIAN / CLIENT: todas las familias activas (solo lectura para filtros)
+    const families = await prisma.families.findMany({
+      where: { isActive: true },
+      orderBy: { order: 'asc' },
+      select: { id: true, name: true, code: true, color: true, icon: true, order: true },
     })
-
-    const families = assignments
-      .map((a) => a.family)
-      .filter((f) => f.isActive)
-      .sort((a, b) => a.order - b.order)
-
     return NextResponse.json({ families })
   } catch {
     return NextResponse.json(
