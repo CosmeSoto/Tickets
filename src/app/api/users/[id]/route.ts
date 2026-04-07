@@ -94,19 +94,30 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       delete validatedData.assignedCategories // Solo admins pueden asignar categorías
     }
 
-    // Validación de seguridad: el usuario no puede desactivar su propia cuenta
-    if (session.user.id === (await params).id && validatedData.isActive === false) {
+    const targetId = (await params).id
+    const isSelf = session.user.id === targetId
+
+    // Un admin no puede desactivar su propia cuenta
+    if (isSelf && validatedData.isActive === false) {
       return NextResponse.json({ 
         success: false,
         error: 'No puedes desactivar tu propia cuenta' 
       }, { status: 400 })
     }
 
-    console.log('📤 [API-USERS] Actualizando usuario:', (await params).id)
+    // Un admin no puede cambiar su propio rol (evita auto-degradación accidental)
+    if (isSelf && validatedData.role && validatedData.role !== session.user.role) {
+      return NextResponse.json({ 
+        success: false,
+        error: 'No puedes cambiar tu propio rol' 
+      }, { status: 400 })
+    }
+
+    console.log('📤 [API-USERS] Actualizando usuario:', targetId)
     console.log('📤 [API-USERS] Datos validados:', validatedData)
 
     // Actualizar el usuario
-    const user = await UserService.updateUser((await params).id, validatedData)
+    const user = await UserService.updateUser(targetId, validatedData)
 
     // Registrar auditoría de cambios
     try {

@@ -379,15 +379,15 @@ export function EditUserModal({ isOpen, onClose, onUserUpdated, user, department
                 <select
                   id="edit-role"
                   value={formData.role}
+                  disabled={isCurrentUser}
                   onChange={(e) => {
                     const newRole = e.target.value as any
                     setFormData({ ...formData, role: newRole })
-                    // Si cambia a ADMIN, limpiar error de departamento
                     if (newRole === 'ADMIN' && errors.departmentId) {
                       setErrors(prev => ({ ...prev, departmentId: undefined as any }))
                     }
                   }}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {USER_ROLE_FORM_OPTIONS.map(role => (
                     <option key={role.value} value={role.value}>
@@ -395,6 +395,9 @@ export function EditUserModal({ isOpen, onClose, onUserUpdated, user, department
                     </option>
                   ))}
                 </select>
+                {isCurrentUser && (
+                  <p className="text-xs text-amber-600">(no puedes cambiar tu propio rol)</p>
+                )}
               </div>
 
               <div className="space-y-2">
