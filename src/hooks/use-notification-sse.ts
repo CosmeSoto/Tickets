@@ -19,28 +19,35 @@ interface UseNotificationSSEOptions {
   sound?: boolean
 }
 
-// ── Audio singleton ────────────────────────────────────────────────────────────
-// AudioContext se crea una sola vez. Si está suspendido (política autoplay del
-// navegador), se intenta reanudar en cada reproducción — funciona siempre que
-// el usuario haya interactuado con la página al menos una vez.
+// ── Audio — política de autoplay del navegador ────────────────────────────────
+//
+// Los navegadores bloquean AudioContext hasta que el usuario interactúa con la
+// página (click, tecla, touch). La estrategia correcta es:
+//
+//  1. NO crear AudioContext al cargar el módulo.
+//  2. Crearlo dentro del primer gesto del usuario (handler de click/keydown).
+//  3. Si llega una notificación antes del primer gesto, encolar el sonido.
+//  4. Al primer gesto, reproducir los sonidos encolados.
+//
+// Esto garantiza que el contexto siempre se crea en un contexto de gesto activo
+// y nunca queda en estado "suspended" sin posibilidad de reanudarse.
 
 let audioCtx: AudioContext | null = null
+let gestureReceived = false
+let pendingTones = 0
 
-function getAudioContext(): AudioContext | null {
+function createOrGetContext(): AudioContext | null {
   if (typeof window === 'undefined') return null
-  if (!audioCtx) {
-    try {
-      audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
-    } catch {
-      return null
-    }
+  if (audioCtx) return audioCtx
+  try {
+    audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
+    return audioCtx
+  } catch {
+    return null
   }
-  return audioCtx
 }
 
-function playTone() {
-  const ctx = getAudioContext()
-  if (!ctx) return
+function playToneNow(ctx: AudioContext) {
   try {
     const osc = ctx.createOscillator()
     const gain = ctx.createGain()
@@ -56,24 +63,54 @@ function playTone() {
   } catch { /* silencioso */ }
 }
 
-export function playNotificationSound() {
-  const ctx = getAudioContext()
+// Llamado en cada gesto del usuario — crea/reanuda el contexto y vacía la cola
+function onUserGesture() {
+  gestureReceived = true
+  const ctx = createOrGetContext()
   if (!ctx) return
+
+  const resume = () => {
+    if (pendingTones > 0) {
+      const count = pendingTones
+      pendingTones = 0
+      for (let i = 0; i < count; i++) playToneNow(ctx)
+    }
+  }
+
   if (ctx.state === 'suspended') {
-    ctx.resume().then(playTone).catch(() => {})
+    ctx.resume().then(resume).catch(() => {})
   } else {
-    playTone()
+    resume()
   }
 }
 
-// ── Hook ───────────────────────────────────────────────────────────────────────
+// Registrar listeners de gesto una sola vez (nivel de módulo, solo en browser)
+if (typeof window !== 'undefined') {
+  const GESTURE_EVENTS = ['click', 'keydown', 'touchstart', 'pointerdown'] as const
+  const handler = () => onUserGesture()
+  GESTURE_EVENTS.forEach(evt =>
+    window.addEventListener(evt, handler, { passive: true, capture: true })
+  )
+}
 
-/**
- * Conecta al stream SSE de notificaciones del usuario autenticado.
- * Llama onNotification inmediatamente cuando llega una nueva notificación.
- * Reproduce sonido si sound=true (default: true).
- * El sonido respeta la política de autoplay del navegador.
- */
+export function playNotificationSound() {
+  if (!gestureReceived) {
+    // Aún no hubo gesto — encolar para reproducir en el próximo
+    pendingTones++
+    return
+  }
+
+  const ctx = createOrGetContext()
+  if (!ctx) return
+
+  if (ctx.state === 'suspended') {
+    ctx.resume().then(() => playToneNow(ctx)).catch(() => {})
+  } else {
+    playToneNow(ctx)
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function useNotificationSSE({ onNotification, sound = true }: UseNotificationSSEOptions = {}) {
   const { data: session, status } = useSession()
   const onNotificationRef = useRef(onNotification)
@@ -96,7 +133,6 @@ export function useNotificationSSE({ onNotification, sound = true }: UseNotifica
         try {
           const data = JSON.parse(e.data)
 
-          // Forzar refresh de sesión cuando el admin cambia rol/permisos
           if (data.type === 'session_refresh') {
             window.location.reload()
             return

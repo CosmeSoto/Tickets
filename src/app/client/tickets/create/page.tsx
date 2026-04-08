@@ -332,9 +332,9 @@ function CreateClientTicketContent() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit(onSubmit)} className='space-y-6'>
+            <form onSubmit={handleSubmit(onSubmit)} className='space-y-4'>
               {/* Título */}
-              <div className='space-y-2'>
+              <div className='space-y-1.5'>
                 <Label htmlFor='title'>Título *</Label>
                 <Input
                   id='title'
@@ -342,28 +342,28 @@ function CreateClientTicketContent() {
                   {...register('title')}
                   className={errors.title ? 'border-red-500' : ''}
                 />
-                {errors.title && <p className='text-sm text-red-600'>{errors.title.message}</p>}
+                {errors.title && <p className='text-xs text-red-600'>{errors.title.message}</p>}
               </div>
 
               {/* Descripción */}
-              <div className='space-y-2'>
+              <div className='space-y-1.5'>
                 <Label htmlFor='description'>Descripción Detallada *</Label>
                 <Textarea
                   id='description'
                   placeholder='Proporciona todos los detalles relevantes sobre tu problema. Incluye pasos para reproducirlo, mensajes de error, etc.'
-                  rows={6}
+                  rows={4}
                   {...register('description')}
                   className={errors.description ? 'border-red-500' : ''}
                 />
                 {errors.description && (
-                  <p className='text-sm text-red-600'>{errors.description.message}</p>
+                  <p className='text-xs text-red-600'>{errors.description.message}</p>
                 )}
               </div>
 
-              {/* Prioridad - Movida antes de Categoría */}
-              <div className='space-y-2'>
-                <Label htmlFor='priority' className='flex items-center'>
-                  <Zap className='h-4 w-4 mr-2' />
+              {/* Prioridad */}
+              <div className='space-y-1.5'>
+                <Label htmlFor='priority' className='flex items-center gap-1.5'>
+                  <Zap className='h-3.5 w-3.5' />
                   Prioridad *
                 </Label>
                 <Select
@@ -378,7 +378,7 @@ function CreateClientTicketContent() {
                       <SelectItem key={value} value={value}>
                         <div className='flex items-center space-x-2'>
                           <div
-                            className={`w-3 h-3 rounded-full ${
+                            className={`w-2.5 h-2.5 rounded-full ${
                               value === 'LOW'
                                 ? 'bg-green-500'
                                 : value === 'MEDIUM'
@@ -395,24 +395,25 @@ function CreateClientTicketContent() {
                   </SelectContent>
                 </Select>
                 {selectedPriority && (
-                  <div className={`p-3 rounded-lg text-xs ${priorityColors[selectedPriority as keyof typeof priorityColors]}`}>
-                    <strong>{priorityLabels[selectedPriority as keyof typeof priorityLabels]}:</strong> {priorityDescriptions[selectedPriority as keyof typeof priorityDescriptions]}
-                  </div>
+                  <p className={`px-2 py-1.5 rounded text-xs ${priorityColors[selectedPriority as keyof typeof priorityColors]}`}>
+                    <strong>{priorityLabels[selectedPriority as keyof typeof priorityLabels]}:</strong>{' '}
+                    {priorityDescriptions[selectedPriority as keyof typeof priorityDescriptions]}
+                  </p>
                 )}
               </div>
 
-              <Separator className='my-6' />
+              <Separator />
 
-              {/* Selector de Categorías Mejorado - ANCHO COMPLETO CON MÁS ESPACIO */}
-              <div className='space-y-2'>
-                <Label className='flex items-center text-base font-semibold'>
-                  <Tag className='h-5 w-5 mr-2' />
+              {/* Selector de Categorías */}
+              <div className='space-y-1.5'>
+                <Label className='flex items-center gap-1.5 text-sm font-semibold'>
+                  <Tag className='h-4 w-4' />
                   Categoría *
                 </Label>
-                <p className='text-sm text-muted-foreground mb-3'>
+                <p className='text-xs text-muted-foreground'>
                   Selecciona la categoría que mejor describa tu problema. Usa la búsqueda (Ctrl+K) para encontrarla rápidamente.
                 </p>
-                <div className='border rounded-lg p-4 bg-muted/30'>
+                <div className='border rounded-lg p-3 bg-muted/30'>
                   <CategorySelectorWrapper
                     value={selectedCategoryId}
                     onChange={(categoryId) => setValue('categoryId', categoryId)}
@@ -424,12 +425,12 @@ function CreateClientTicketContent() {
                 </div>
               </div>
 
-              <Separator className='my-6' />
+              <Separator />
 
               {/* Archivos Adjuntos */}
-              <div className='space-y-2'>
+              <div className='space-y-1.5'>
                 <Label>Archivos Adjuntos (Opcional)</Label>
-                <div className='border-2 border-dashed border-border rounded-lg p-6'>
+                <div className='border-2 border-dashed border-border rounded-lg px-4 py-3'>
                   <input
                     ref={fileInputRef}
                     type='file'
@@ -438,19 +439,20 @@ function CreateClientTicketContent() {
                     className='hidden'
                     accept='image/*,.pdf,.doc,.docx,.txt'
                   />
-                  <div className='text-center'>
-                    <Upload className='h-8 w-8 mx-auto mb-2 text-muted-foreground' />
+                  <div className='flex items-center justify-between gap-4'>
+                    <div className='flex items-center gap-3'>
+                      <Upload className='h-5 w-5 text-muted-foreground flex-shrink-0' />
+                      <p className='text-xs text-muted-foreground'>Máximo 5 archivos, 10MB cada uno</p>
+                    </div>
                     <Button
                       type='button'
                       variant='outline'
+                      size='sm'
                       onClick={() => fileInputRef.current?.click()}
                     >
-                      <Paperclip className='h-4 w-4 mr-2' />
-                      Seleccionar Archivos
+                      <Paperclip className='h-3.5 w-3.5 mr-1.5' />
+                      Seleccionar
                     </Button>
-                    <p className='text-xs text-muted-foreground mt-2'>
-                      Máximo 5 archivos, 10MB cada uno
-                    </p>
                   </div>
                 </div>
 
@@ -460,19 +462,19 @@ function CreateClientTicketContent() {
               </div>
 
               {/* Botones */}
-              <div className='flex items-center justify-end space-x-4 pt-4'>
-                <Button type='button' variant='outline' asChild>
+              <div className='flex items-center justify-end gap-3 pt-2'>
+                <Button type='button' variant='outline' size='sm' asChild>
                   <Link href='/client/tickets'>Cancelar</Link>
                 </Button>
-                <Button type='submit' disabled={isSubmitting}>
+                <Button type='submit' size='sm' disabled={isSubmitting}>
                   {isSubmitting ? (
                     <>
-                      <Loader2 className='h-4 w-4 mr-2 animate-spin' />
+                      <Loader2 className='h-3.5 w-3.5 mr-1.5 animate-spin' />
                       Creando...
                     </>
                   ) : (
                     <>
-                      <Ticket className='h-4 w-4 mr-2' />
+                      <Ticket className='h-3.5 w-3.5 mr-1.5' />
                       Crear Ticket
                     </>
                   )}

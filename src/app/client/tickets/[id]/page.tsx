@@ -62,6 +62,7 @@ export default function ClientTicketDetailPage() {
   const [deleting, setDeleting] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [activeTab, setActiveTab] = useState('timeline')
+  const stopTimelinePollingRef = useRef<(() => void) | null>(null)
   const [timelineRefreshKey, setTimelineRefreshKey] = useState(0)
   const [fileRefreshKey, setFileRefreshKey] = useState(0)
   const [editForm, setEditForm] = useState({
@@ -161,6 +162,9 @@ export default function ClientTicketDetailPage() {
 
   const handleDeleteTicket = async () => {
     if (!ticket) return
+
+    // Detener el polling del timeline ANTES de eliminar para evitar 404s
+    stopTimelinePollingRef.current?.()
 
     setDeleting(true)
     try {
@@ -424,6 +428,7 @@ export default function ClientTicketDetailPage() {
                 canViewInternal={false}
                 refreshKey={timelineRefreshKey}
                 onCommentAdded={() => setFileRefreshKey(k => k + 1)}
+                onStopPolling={(fn) => { stopTimelinePollingRef.current = fn }}
               />
             </TabsContent>
             

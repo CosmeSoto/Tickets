@@ -17,7 +17,6 @@ import { StepByStepNavigator } from './StepByStepNavigator';
 import { FrequentCategories } from './FrequentCategories';
 import { ConfirmationPanel } from './ConfirmationPanel';
 import { RelatedArticles } from './RelatedArticles';
-import { KnowledgeBaseSearch } from './KnowledgeBaseSearch';
 
 // Import hooks
 import { useCategorySearch } from '../hooks/useCategorySearch';
@@ -597,7 +596,7 @@ export function CategorySelector({
                 }}
               />
 
-              {/* Related articles - compact */}
+              {/* Knowledge base: artículos relacionados + búsqueda en un solo bloque */}
               <RelatedArticles
                 categoryId={selectedCategory.id}
                 ticketTitle={ticketTitle}
@@ -605,16 +604,6 @@ export function CategorySelector({
                 onArticleClick={(articleId: string) => {
                   trackAnalyticsEvent('search', selectedCategory.id, undefined, {
                     articleViewed: articleId,
-                  });
-                }}
-              />
-
-              {/* Knowledge base search - compact */}
-              <KnowledgeBaseSearch
-                onArticleClick={(articleId: string) => {
-                  // Track article click from KB search
-                  trackAnalyticsEvent('search', selectedCategory.id, undefined, {
-                    kbArticleViewed: articleId,
                   });
                 }}
               />

@@ -34,6 +34,7 @@ interface TicketTimelineProps {
   canViewInternal?: boolean
   refreshKey?: number
   onCommentAdded?: () => void
+  onStopPolling?: (stopFn: () => void) => void
 }
 
 // ─── Helpers globales (sin estado, reutilizables) ─────────────────────────────
@@ -124,9 +125,16 @@ export function TicketTimeline({
   canViewInternal = false,
   refreshKey = 0,
   onCommentAdded,
+  onStopPolling,
 }: TicketTimelineProps) {
   const { data: session } = useSession()
-  const { events, loading, addComment, loadTimeline, setEvents } = useTimeline(ticketId)
+  const { events, loading, addComment, loadTimeline, setEvents, stopPolling } = useTimeline(ticketId)
+
+  // Exponer stopPolling al padre para que lo llame antes de eliminar el ticket
+  useEffect(() => {
+    if (onStopPolling) onStopPolling(stopPolling)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stopPolling])
   const [newComment, setNewComment] = useState('')
   const [isInternal, setIsInternal] = useState(false)
   const [submitting, setSubmitting] = useState(false)

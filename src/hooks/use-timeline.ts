@@ -79,19 +79,21 @@ export function useTimeline(ticketId: string) {
   const submittingRef = useRef(false)
   const toastRef = useRef(toast)
   const ticketIdRef = useRef(ticketId)
+  // useRef para que el flag sea visible inmediatamente en todos los closures
+  // sin esperar re-render (a diferencia de useState)
+  const stoppedRef = useRef(false)
+
   useEffect(() => { toastRef.current = toast }, [toast])
   useEffect(() => {
     ticketIdRef.current = ticketId
-    // Recargar cuando cambia el ticket (navegación entre tickets)
+    stoppedRef.current = false  // resetear al navegar a otro ticket
     if (ticketId) loadTimeline()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketId])
 
-  const [stopped, setStopped] = useState(false)
-
   const loadTimeline = useCallback(async (silent = false) => {
     const currentTicketId = ticketIdRef.current
-    if (!currentTicketId || stopped) return
+    if (!currentTicketId || stoppedRef.current) return
 
     try {
       if (!silent) setLoading(true)
@@ -101,8 +103,8 @@ export function useTimeline(ticketId: string) {
       
       if (!response.ok) {
         if (response.status === 404) {
-          // Ticket eliminado — detener polling permanentemente
-          setStopped(true)
+          // Ticket eliminado — detener polling permanentemente e inmediatamente
+          stoppedRef.current = true
           setEvents([])
           return
         }
@@ -132,7 +134,7 @@ export function useTimeline(ticketId: string) {
       if (!silent) setLoading(false)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stopped])
+  }, [])
 
   const addComment = useCallback(async (content: string, isInternal: boolean = false, attachments?: File[]) => {
     if (!content.trim()) {
@@ -248,33 +250,32 @@ export function useTimeline(ticketId: string) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadTimeline])
 
-  // Cargar timeline al montar + polling cada 3s (pausado cuando la pestaña no está visible o ticket eliminado)
+  // Polling cada 3s — usa stoppedRef para detención inmediata sin esperar re-render
   useEffect(() => {
-    if (stopped) return
+    if (stoppedRef.current) return
     loadTimeline()
 
     let interval: ReturnType<typeof setInterval> | null = null
 
     const startPolling = () => {
-      if (interval || stopped) return
+      if (interval) return
       interval = setInterval(() => {
-        if (!stopped) loadTimeline(true)
+        if (stoppedRef.current) {
+          clearInterval(interval!)
+          interval = null
+          return
+        }
+        loadTimeline(true)
       }, 3 * 1000)
     }
 
     const stopPolling = () => {
-      if (interval) {
-        clearInterval(interval)
-        interval = null
-      }
+      if (interval) { clearInterval(interval); interval = null }
     }
 
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
-        if (!stopped) {
-          loadTimeline(true)
-          startPolling()
-        }
+        if (!stoppedRef.current) { loadTimeline(true); startPolling() }
       } else {
         stopPolling()
       }
@@ -287,12 +288,15 @@ export function useTimeline(ticketId: string) {
       stopPolling()
       document.removeEventListener('visibilitychange', handleVisibility)
     }
-  }, [loadTimeline, stopped])
+  }, [loadTimeline])
 
   // SSE: recarga inmediata cuando el servidor emite un evento (comment_added, etc.)
   useTicketSSE(ticketId, useCallback(() => {
     loadTimeline(true)
   }, [loadTimeline]))
+
+  /** Detiene el polling permanentemente (ej: antes de eliminar el ticket) */
+  const stopPolling = () => { stoppedRef.current = true }
 
   return {
     events,
@@ -303,6 +307,7 @@ export function useTimeline(ticketId: string) {
     updateTicketStatus,
     assignTicket,
     setEvents,
+    stopPolling,
   }
 }
 
