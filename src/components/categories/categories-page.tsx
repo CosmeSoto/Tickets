@@ -462,7 +462,7 @@ export default function CategoriesPage() {
                       placeholder='Buscar categorías por nombre o descripción...'
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className='pl-10'
+                      className='pl-10 text-foreground'
                     />
                   </div>
                 </div>

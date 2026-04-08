@@ -1,0 +1,22 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Instalar dependencias del sistema
+RUN apk add --no-cache libc6-compat curl
+
+# Copiar package files e instalar dependencias
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Copiar prisma schema y generar cliente
+COPY prisma ./prisma/
+RUN npx prisma generate
+
+# El código fuente se monta como volumen en docker-compose.dev.yml
+# No se copia aquí para permitir hot-reload
+
+EXPOSE 3000
+
+# Ejecutar migraciones y arrancar en modo desarrollo
+CMD ["sh", "-c", "npx prisma migrate deploy && npm run dev"]
