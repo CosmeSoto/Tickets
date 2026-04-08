@@ -34,10 +34,9 @@ export async function GET(
     })
 
     if (!ticket) {
-      return NextResponse.json(
-        { success: false, error: 'Ticket no encontrado' },
-        { status: 404 }
-      )
+      // Ticket eliminado — devolver array vacío en lugar de 404
+      // para que el cliente detenga el polling silenciosamente
+      return NextResponse.json({ success: true, data: [], deleted: true })
     }
 
     // Verificar permisos

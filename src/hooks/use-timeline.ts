@@ -116,6 +116,8 @@ export function useTimeline(ticketId: string) {
       if (data.success) {
         const incoming: TimelineEvent[] = data.data || []
         setEvents(incoming)
+        // Si el servidor indica que el ticket fue eliminado, detener polling
+        if (data.deleted) stoppedRef.current = true
       } else {
         throw new Error(data.message || data.error || 'Error al cargar el historial')
       }
