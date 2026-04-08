@@ -165,8 +165,7 @@ export async function POST(
 
         // Determinar código HTTP según el tipo de error
         const isNotFound = msg.includes('no encontrado') || msg.includes('not found')
-        const isConflict = msg.includes('ya está asignado')
-        const status = isNotFound ? 404 : isConflict ? 409 : 400
+        const status = isNotFound ? 404 : 400
 
         return NextResponse.json({ error: msg }, { status })
       }

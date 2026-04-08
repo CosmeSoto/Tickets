@@ -111,6 +111,8 @@ export default function TicketDetailPage() {
     const ticketId = params.id as string
     if (!ticketId || ticketId === 'create') return
     const interval = setInterval(async () => {
+      // No hacer polling si hay una operación de asignación en curso
+      if (unassigning) return
       try {
         const res = await fetch(`/api/tickets/${ticketId}`, { cache: 'no-store' })
         if (!res.ok) return
@@ -119,7 +121,9 @@ export default function TicketDetailPage() {
         const fresh = data.data
         setTicket(prev => {
           if (!prev) return prev
-          if (prev.status !== fresh.status || prev.updatedAt !== fresh.updatedAt) {
+          // Solo actualizar si hay cambios reales en campos relevantes
+          if (prev.status !== fresh.status || prev.updatedAt !== fresh.updatedAt ||
+              prev.assignee?.id !== fresh.assignee?.id) {
             setEditForm({
               title: fresh.title,
               description: fresh.description,
@@ -134,14 +138,14 @@ export default function TicketDetailPage() {
       } catch {}
     }, 10000)
     return () => clearInterval(interval)
-  }, [params.id])
+  }, [params.id, unassigning])
 
   // Fetch directo — independiente del hook para evitar conflictos de estado loading
   const loadTicket = async () => {
     if (!params.id || params.id === 'create') return
     setTicketLoading(true)
     try {
-      const res = await fetch(`/api/tickets/${params.id}`, { cache: 'no-store' })
+      const res = await fetch(`/api/tickets/${params.id}?_t=${Date.now()}`, { cache: 'no-store' })
       if (!res.ok) return
       const data = await res.json()
       if (data.success && data.data) {
@@ -163,20 +167,7 @@ export default function TicketDetailPage() {
 
   // Callback para cuando se completa una asignación automática
   const handleAssignmentComplete = async (assignedTechnician?: { id: string; name: string; email: string }) => {
-    // Actualizar estado local inmediatamente si tenemos datos del técnico
-    if (assignedTechnician) {
-      setTicket(prev => prev ? { 
-        ...prev, 
-        assignee: { 
-          id: assignedTechnician.id, 
-          name: assignedTechnician.name, 
-          email: assignedTechnician.email, 
-          role: 'TECHNICIAN' as const,
-          isActive: true
-        },
-        status: 'IN_PROGRESS' as const
-      } : prev)
-    }
+    // Recargar ticket desde servidor para obtener datos frescos y actualizados
     await loadTicket()
     setTimelineRefreshKey(k => k + 1)
   }
@@ -192,11 +183,23 @@ export default function TicketDetailPage() {
         body: JSON.stringify({ assigneeId: null, comment: 'Técnico desasignado por administrador' }),
       })
       if (res.ok) {
-        // Actualizar estado local inmediatamente para respuesta instantánea en UI
-        setTicket(prev => prev ? { ...prev, assignee: undefined, status: 'OPEN' as const } : prev)
-        // Luego recargar desde servidor para datos frescos
-        await loadTicket()
+        const data = await res.json()
+        // Usar datos frescos del servidor directamente
+        if (data.success && data.data?.ticket) {
+          const fresh = data.data.ticket
+          setTicket(prev => prev ? {
+            ...prev,
+            assignee: fresh.users_tickets_assigneeIdTousers || undefined,
+            status: fresh.status,
+            updatedAt: fresh.updatedAt,
+          } : prev)
+        } else {
+          // Fallback: actualizar estado local optimistamente
+          setTicket(prev => prev ? { ...prev, assignee: undefined, status: 'OPEN' as const } : prev)
+        }
         setTimelineRefreshKey(k => k + 1)
+        // Recargar desde servidor para sincronizar todo
+        await loadTicket()
       }
     } catch (err) {
       console.error('Error desasignando técnico:', err)
@@ -347,8 +350,8 @@ export default function TicketDetailPage() {
       {getPriorityBadge(ticket.priority)}
       {session?.user?.role === 'ADMIN' && (
         <>
-          {ticket.assignee ? (
-            // Ya hay técnico asignado → mostrar botón "Sin asignar"
+          {/* Botón Sin asignar — solo cuando hay técnico */}
+          {ticket.assignee && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant='outline' size='sm' disabled={unassigning}>
@@ -376,14 +379,13 @@ export default function TicketDetailPage() {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-          ) : (
-            // Sin técnico → mostrar botón de asignación automática
-            <AutoAssignment
-              ticketId={ticket.id}
-              currentAssignee={ticket.assignee}
-              onAssignmentComplete={handleAssignmentComplete}
-            />
           )}
+          {/* Botón Asignación Automática — siempre visible para admin */}
+          <AutoAssignment
+            ticketId={ticket.id}
+            currentAssignee={ticket.assignee}
+            onAssignmentComplete={handleAssignmentComplete}
+          />
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>

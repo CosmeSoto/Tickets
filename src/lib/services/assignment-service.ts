@@ -37,10 +37,6 @@ export class AssignmentService {
         throw new Error('Ticket no encontrado')
       }
 
-      if (ticket.assigneeId) {
-        throw new Error('El ticket ya está asignado')
-      }
-
       // Obtener técnicos disponibles
       let availableTechnicians = await this.getAvailableTechnicians(criteria)
 
@@ -106,8 +102,10 @@ export class AssignmentService {
       await prisma.ticket_history.create({
         data: {
           id: randomUUID(),
-          action: 'auto_assigned',
-          comment: `Ticket asignado automáticamente a ${bestTechnician.name}`,
+          action: ticket.assigneeId ? 'reassigned' : 'auto_assigned',
+          comment: ticket.assigneeId
+            ? `Ticket reasignado automáticamente a ${bestTechnician.name}`
+            : `Ticket asignado automáticamente a ${bestTechnician.name}`,
           ticketId,
           userId: bestTechnician.id,
           createdAt: new Date()
