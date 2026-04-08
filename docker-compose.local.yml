@@ -7,7 +7,7 @@ services:
     environment:
       DATABASE_URL: postgresql://tickets_user:tickets_password_2024@postgres:5432/tickets_db
     networks:
-      - tickets-network
+      - tickets_network
     depends_on:
       postgres:
         condition: service_healthy
@@ -39,7 +39,7 @@ services:
       - app_uploads:/app/uploads
       - app_logs:/app/logs
     networks:
-      - tickets-network
+      - tickets_network
     depends_on:
       postgres:
         condition: service_healthy
@@ -67,7 +67,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - tickets-network
+      - tickets_network
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U tickets_user -d tickets_db"]
@@ -82,7 +82,7 @@ services:
     volumes:
       - redis_data:/data
     networks:
-      - tickets-network
+      - tickets_network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -100,7 +100,7 @@ services:
       - ./docker/nginx.local.conf:/etc/nginx/nginx.conf:ro
       - app_uploads:/var/www/uploads:ro
     networks:
-      - tickets-network
+      - tickets_network
     depends_on:
       app:
         condition: service_healthy
@@ -113,5 +113,5 @@ volumes:
   app_logs:
 
 networks:
-  tickets-network:
+  tickets_network:
     driver: bridge
