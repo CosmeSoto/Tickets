@@ -63,10 +63,31 @@ export async function GET(request: NextRequest) {
     })
 
     if (!userExists) {
-      return NextResponse.json(
-        { success: false, error: 'Usuario no encontrado en la base de datos. Por favor cierra sesión e inicia de nuevo.' },
-        { status: 404 }
-      )
+      // Usuario no existe en BD — sesión huérfana, devolver defaults sin error 404
+      return NextResponse.json({
+        success: true,
+        settings: {
+          emailNotifications: true,
+          pushNotifications: true,
+          ticketUpdates: true,
+          systemAlerts: true,
+          weeklyReport: false,
+          soundEnabled: true,
+          ticketCreated: true,
+          ticketAssigned: true,
+          statusChanged: true,
+          newComments: true,
+          ticketUpdated: true,
+          quietHours: { enabled: false, startTime: '22:00', endTime: '08:00' },
+          autoAssignEnabled: true,
+          maxConcurrentTickets: 10,
+          theme: 'light',
+          language: 'es',
+          timezone: 'America/Guayaquil',
+          profileVisible: true,
+          activityVisible: true,
+        },
+      })
     }
 
     // Buscar configuración existente — con manejo de registros corruptos

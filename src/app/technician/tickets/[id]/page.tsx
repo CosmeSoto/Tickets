@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/hooks/use-toast'
-import { useTicketData, type Ticket as TicketType, TICKET_STATUSES, TICKET_PRIORITIES, formatDate } from '@/hooks/use-ticket-data'
+import { useTicketData, type Ticket as TicketType, TICKET_STATUSES, TICKET_PRIORITIES, formatDate, getTicketDisplayCode } from '@/hooks/use-ticket-data'
 import { formatTimeAgo } from '@/hooks/use-users'
 import { AttachmentButton } from '@/components/tickets/attachment-button'
 import { CompactFileManager } from '@/components/tickets/compact-file-manager'
@@ -244,7 +244,7 @@ export default function TechnicianTicketDetailPage() {
 
   return (
     <ModuleLayout
-      title={`Ticket #${ticket.id.slice(-8)}`}
+      title={`Ticket #${getTicketDisplayCode(ticket)}`}
       subtitle={`${ticket.title}`}
       loading={loading}
     >
@@ -259,7 +259,7 @@ export default function TechnicianTicketDetailPage() {
               </Link>
             </Button>
             <div>
-              <h1 className='text-2xl font-bold text-foreground'>#{ticket.id.slice(-8)}</h1>
+              <h1 className='text-2xl font-bold text-foreground'>#{getTicketDisplayCode(ticket)}</h1>
               <p className='text-muted-foreground hidden sm:block'>Detalles del Ticket</p>
             </div>
           </div>

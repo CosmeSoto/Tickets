@@ -36,7 +36,8 @@ import {
   type Ticket,
   formatDate,
   getStatusConfig,
-  getPriorityConfig
+  getPriorityConfig,
+  getTicketDisplayCode
 } from '@/hooks/use-ticket-data'
 import {
   AlertDialog,
@@ -196,8 +197,8 @@ export default function ClientTicketDetailPage() {
     // No hacer finally aquí para evitar cambiar el estado después de la redirección
   }
 
-  // Verificar si el ticket puede ser eliminado (solo si está en estado OPEN)
-  const canDeleteTicket = ticket?.status === 'OPEN'
+  // Verificar si el ticket puede ser eliminado: solo OPEN y sin técnico asignado
+  const canDeleteTicket = ticket?.status === 'OPEN' && !ticket?.assignee
   
   // Verificar si el ticket puede ser editado (solo si está en estado OPEN)
   const canEditTicket = ticket?.status === 'OPEN'
@@ -282,7 +283,7 @@ export default function ClientTicketDetailPage() {
 
   return (
     <ModuleLayout
-      title={`Ticket #${ticket.id.slice(-8)}`}
+      title={`Ticket #${getTicketDisplayCode(ticket)}`}
       subtitle={`Creado ${formatDate(ticket.createdAt)}`}
       headerActions={headerActions}
     >
@@ -560,7 +561,9 @@ export default function ClientTicketDetailPage() {
               {!canDeleteTicket && (
                 <div className='mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg'>
                   <p className='text-amber-800 text-sm font-medium'>
-                    ⚠️ Solo puedes eliminar tickets que aún no han sido revisados o asignados.
+                    ⚠️ {ticket?.assignee
+                      ? 'No puedes eliminar este ticket porque ya ha sido asignado a un técnico.'
+                      : 'Solo puedes eliminar tickets que aún no han sido revisados o asignados.'}
                   </p>
                 </div>
               )}

@@ -922,6 +922,17 @@ export async function DELETE(
           { status: 403 }
         )
       }
+
+      // Cliente no puede eliminar tickets que ya tienen técnico asignado
+      if (existingTicket.assigneeId) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'No puedes eliminar este ticket porque ya ha sido asignado a un técnico.',
+          },
+          { status: 403 }
+        )
+      }
     } else {
       // Técnicos no pueden eliminar tickets
       return NextResponse.json(
@@ -930,23 +941,10 @@ export async function DELETE(
       )
     }
 
-    console.log('[TICKET DELETE] ========================================')
-    console.log('[TICKET DELETE] Eliminando ticket:', finalId)
-    console.log('[TICKET DELETE] Título:', existingTicket.title)
-    console.log('[TICKET DELETE] Estado:', existingTicket.status)
-    console.log('[TICKET DELETE] Eliminado por:', session.user.name, `(${session.user.role})`)
-    console.log('[TICKET DELETE] ========================================')
-
     // Eliminar ticket (esto también eliminará comentarios, attachments, historial y notificaciones por cascada)
     await prisma.tickets.delete({
       where: { id: finalId }
     })
-
-    console.log('[TICKET DELETE] ✅ Ticket eliminado exitosamente')
-    console.log('[TICKET DELETE] ✅ Notificaciones asociadas eliminadas por cascada')
-    console.log('[TICKET DELETE] ✅ Comentarios eliminados por cascada')
-    console.log('[TICKET DELETE] ✅ Attachments eliminados por cascada')
-    console.log('[TICKET DELETE] ✅ Historial eliminado por cascada')
 
     // ⭐ AUDITORÍA: Registrar eliminación de ticket
     await AuditServiceComplete.log({

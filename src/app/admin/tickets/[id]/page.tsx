@@ -72,7 +72,8 @@ import {
   formatTimeAgo,
   formatDate,
   getStatusConfig,
-  getPriorityConfig
+  getPriorityConfig,
+  getTicketDisplayCode
 } from '@/hooks/use-ticket-data'
 
 export default function TicketDetailPage() {
@@ -452,7 +453,7 @@ export default function TicketDetailPage() {
 
   return (
     <RoleDashboardLayout
-      title={`Ticket #${ticket.id.slice(-8)}`}
+      title={`Ticket #${getTicketDisplayCode(ticket)}`}
       subtitle={`Creado ${formatDate(ticket.createdAt)}`}
       headerActions={headerActions}
     >

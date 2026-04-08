@@ -44,10 +44,11 @@ export const NOTIFICATION_FIELDS_BY_LEVEL: Record<
   NotificationLevel,
   (keyof NotificationPreferences | 'quietHours')[]
 > = {
-  basic: ['emailNotifications', 'pushNotifications'],
+  basic: ['emailNotifications', 'pushNotifications', 'soundEnabled'],
   intermediate: [
     'emailNotifications',
     'pushNotifications',
+    'soundEnabled',
     'ticketUpdates',
     'newComments',
     'statusChanged',
@@ -55,12 +56,12 @@ export const NOTIFICATION_FIELDS_BY_LEVEL: Record<
   advanced: [
     'emailNotifications',
     'pushNotifications',
+    'soundEnabled',
     'ticketUpdates',
     'newComments',
     'statusChanged',
     'systemAlerts',
     'weeklyReport',
-    'soundEnabled',
     'ticketCreated',
     'ticketAssigned',
     'ticketUpdated',

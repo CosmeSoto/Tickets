@@ -15,6 +15,7 @@ import { TechnicianSearchSelector } from '@/components/ui/technician-search-sele
 import { enrichCategories } from '@/lib/utils/category-utils'
 import { ArrowLeft, Save, X } from 'lucide-react'
 import Link from 'next/link'
+import { getTicketDisplayCode } from '@/hooks/use-ticket-data'
 
 interface TicketData {
   id: string
@@ -227,7 +228,7 @@ export default function EditTicketPage() {
 
   return (
     <RoleDashboardLayout
-      title={`Editar Ticket #${ticket.id.slice(-8)}`}
+      title={`Editar Ticket #${getTicketDisplayCode(ticket)}`}
       subtitle={ticket.title}
       headerActions={headerActions}
     >

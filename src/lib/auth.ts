@@ -331,9 +331,7 @@ export const authOptions: NextAuthOptions = {
             try {
               const dbUser = await prisma.users.findUnique({
                 where: { email: user.email! },
-                include: {
-                  departments: true
-                },
+                include: { departments: true },
               })
 
               if (dbUser) {
@@ -345,13 +343,11 @@ export const authOptions: NextAuthOptions = {
                 token.canManageInventory = dbUser.canManageInventory ?? false
                 token.isOAuth = true
               } else {
-                // Usuario no encontrado, usar valores por defecto
                 token.role = 'CLIENT'
                 token.isOAuth = true
               }
             } catch (error) {
               console.error('Error obteniendo usuario OAuth:', error)
-              // Continuar con datos básicos
               token.role = 'CLIENT'
               token.isOAuth = true
             }
@@ -363,7 +359,6 @@ export const authOptions: NextAuthOptions = {
             token.phone = user.phone
             token.avatar = user.avatar
             token.isOAuth = false
-            // Leer canManageInventory directamente de la BD
             try {
               const dbUser = await prisma.users.findUnique({
                 where: { id: user.id },
@@ -375,8 +370,37 @@ export const authOptions: NextAuthOptions = {
             }
           }
         }
+
+        // Refrescar rol y permisos desde la BD en cada request
+        // Esto garantiza que cambios de rol/permisos se reflejen sin cerrar sesión
+        if (!user && token.sub) {
+          try {
+            const dbUser = await prisma.users.findUnique({
+              where: { id: token.sub },
+              select: {
+                role: true,
+                isActive: true,
+                canManageInventory: true,
+                departmentId: true,
+                departments: { select: { name: true } },
+              },
+            })
+            if (dbUser) {
+              // Si el usuario fue desactivado, invalidar el token
+              if (!dbUser.isActive) {
+                return { ...token, error: 'UserDeactivated' }
+              }
+              token.role = dbUser.role
+              token.canManageInventory = dbUser.canManageInventory ?? false
+              token.departmentId = dbUser.departmentId || undefined
+              token.department = dbUser.departments?.name || undefined
+            }
+          } catch {
+            // Si falla la BD, continuar con el token existente
+          }
+        }
         
-        // Si es una actualización de sesión, mantener los datos
+        // Si es una actualización de sesión explícita, aplicar los datos
         if (trigger === 'update' && session) {
           token = { ...token, ...session }
         }
@@ -384,7 +408,6 @@ export const authOptions: NextAuthOptions = {
         return token
       } catch (error) {
         console.error('Error en JWT callback:', error)
-        // Retornar token básico en caso de error
         return token
       }
     },
@@ -392,6 +415,11 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       try {
         if (token && session?.user) {
+          // Si el usuario fue desactivado, retornar sesión sin datos para forzar logout
+          if ((token as any).error === 'UserDeactivated') {
+            return { ...session, user: { ...session.user }, error: 'UserDeactivated' } as any
+          }
+
           session.user.id = token.sub!
           session.user.role = (token.role as UserRole) || 'CLIENT'
           session.user.departmentId = token.departmentId as string | undefined
@@ -443,9 +471,6 @@ export const authOptions: NextAuthOptions = {
     error: '/login',
     newUser: '/client', // Redirigir nuevos usuarios OAuth al dashboard de cliente
   },
-  // Configurar rutas públicas que no requieren autenticación
-  // NextAuth no debe redirigir estas rutas
-  secret: process.env.NEXTAUTH_SECRET,
   events: {
     async signIn({ user, account, isNewUser }) {
       // Registrar inicio de sesión en auditoría
@@ -467,8 +492,6 @@ export const authOptions: NextAuthOptions = {
           },
           result: 'SUCCESS'
         })
-        
-        console.log(`[AUTH] Login registrado en auditoría: ${user.email}`)
       } catch (error) {
         console.error('[AUTH] Error registrando login en auditoría:', error)
         // No bloquear el login si falla la auditoría
@@ -495,8 +518,6 @@ export const authOptions: NextAuthOptions = {
             },
             result: 'SUCCESS'
           })
-          
-          console.log(`[AUTH] Logout registrado en auditoría: ${userId}`)
         }
       } catch (error) {
         console.error('[AUTH] Error registrando logout en auditoría:', error)

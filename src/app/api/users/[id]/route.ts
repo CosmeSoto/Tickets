@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import prisma from '@/lib/prisma'
 import { IdResolverService } from '@/lib/services/id-resolver-service'
+import { NotificationEvents } from '@/lib/notification-events'
 
 const updateUserSchema = z.object({
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').optional(),
@@ -113,9 +114,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }, { status: 400 })
     }
 
-    console.log('📤 [API-USERS] Actualizando usuario:', targetId)
-    console.log('📤 [API-USERS] Datos validados:', validatedData)
-
     // Actualizar el usuario
     const user = await UserService.updateUser(targetId, validatedData)
 
@@ -145,6 +143,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         }
         oldValues.role = currentUser.role
         newValues.role = validatedData.role
+
+        // Notificar al usuario afectado para que refresque su sesión inmediatamente
+        NotificationEvents.emit(targetId, {
+          type: 'session_refresh',
+          reason: 'role_changed',
+          newRole: validatedData.role,
+        })
       }
       
       if (validatedData.departmentId !== undefined) {
@@ -173,6 +178,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         }
         oldValues.isActive = currentUser.isActive
         newValues.isActive = validatedData.isActive
+
+        // Si se desactiva el usuario, notificarle para que cierre sesión
+        if (!validatedData.isActive) {
+          NotificationEvents.emit(targetId, { type: 'session_refresh', reason: 'account_deactivated' })
+        }
+      }
+
+      // Si cambia canManageInventory, notificar para refrescar sesión
+      if ((validatedData as any).canManageInventory !== undefined &&
+          (validatedData as any).canManageInventory !== (currentUser as any).canManageInventory) {
+        NotificationEvents.emit(targetId, { type: 'session_refresh', reason: 'permissions_changed' })
       }
 
       // Registrar en auditoría si hay cambios
@@ -194,19 +210,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             ip: request.headers.get('x-forwarded-for') || 'Unknown'
           }
         })
-
-        console.log(`[INFO] User updated: ${(await params).id} by user ${session.user.id}`)
-        console.log(`[INFO] Changes registered in audit:`, changes)
-        
-        // Log especial para cambio de rol
-        if (changes.role) {
-          console.log(`[INFO] Role changed for user ${(await params).id}: ${changes.role.old} -> ${changes.role.new}`)
-        }
-
-        // Log específico para técnicos
-        if (currentUser.role === 'TECHNICIAN' || validatedData.role === 'TECHNICIAN') {
-          console.log(`[INFO] Technician updated: ${(await params).id} by user ${session.user.id}`)
-        }
       }
     } catch (auditError) {
       console.error('Error registrando auditoría:', auditError)

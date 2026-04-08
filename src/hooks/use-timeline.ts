@@ -87,9 +87,11 @@ export function useTimeline(ticketId: string) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketId])
 
+  const [stopped, setStopped] = useState(false)
+
   const loadTimeline = useCallback(async (silent = false) => {
     const currentTicketId = ticketIdRef.current
-    if (!currentTicketId) return
+    if (!currentTicketId || stopped) return
 
     try {
       if (!silent) setLoading(true)
@@ -99,7 +101,8 @@ export function useTimeline(ticketId: string) {
       
       if (!response.ok) {
         if (response.status === 404) {
-          console.warn(`Timeline API not found for ticket ${currentTicketId}. Using empty timeline.`)
+          // Ticket eliminado — detener polling permanentemente
+          setStopped(true)
           setEvents([])
           return
         }
@@ -128,9 +131,8 @@ export function useTimeline(ticketId: string) {
     } finally {
       if (!silent) setLoading(false)
     }
-  // Sin dependencias externas — usa refs para ticketId y toast
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [stopped])
 
   const addComment = useCallback(async (content: string, isInternal: boolean = false, attachments?: File[]) => {
     if (!content.trim()) {
@@ -246,15 +248,18 @@ export function useTimeline(ticketId: string) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadTimeline])
 
-  // Cargar timeline al montar + polling cada 5s (pausado cuando la pestaña no está visible)
+  // Cargar timeline al montar + polling cada 3s (pausado cuando la pestaña no está visible o ticket eliminado)
   useEffect(() => {
+    if (stopped) return
     loadTimeline()
 
     let interval: ReturnType<typeof setInterval> | null = null
 
     const startPolling = () => {
-      if (interval) return
-      interval = setInterval(() => loadTimeline(true), 3 * 1000)
+      if (interval || stopped) return
+      interval = setInterval(() => {
+        if (!stopped) loadTimeline(true)
+      }, 3 * 1000)
     }
 
     const stopPolling = () => {
@@ -266,8 +271,10 @@ export function useTimeline(ticketId: string) {
 
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
-        loadTimeline(true) // recargar inmediatamente al volver
-        startPolling()
+        if (!stopped) {
+          loadTimeline(true)
+          startPolling()
+        }
       } else {
         stopPolling()
       }
@@ -280,7 +287,7 @@ export function useTimeline(ticketId: string) {
       stopPolling()
       document.removeEventListener('visibilitychange', handleVisibility)
     }
-  }, [loadTimeline])
+  }, [loadTimeline, stopped])
 
   // SSE: recarga inmediata cuando el servidor emite un evento (comment_added, etc.)
   useTicketSSE(ticketId, useCallback(() => {

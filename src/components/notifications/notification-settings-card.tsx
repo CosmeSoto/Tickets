@@ -108,6 +108,28 @@ export function NotificationSettingsCard({
               onCheckedChange={checked => updatePreference('pushNotifications', checked)}
             />
           </div>
+
+          <Separator />
+
+          <div className='flex items-center justify-between'>
+            <div className='space-y-0.5'>
+              <Label className='text-base flex items-center space-x-2'>
+                {preferences.soundEnabled ? (
+                  <Volume2 className='h-4 w-4 text-blue-600' />
+                ) : (
+                  <VolumeX className='h-4 w-4 text-gray-400' />
+                )}
+                <span>Sonido de notificaciones</span>
+              </Label>
+              <p className='text-sm text-muted-foreground'>
+                Reproducir sonido cuando lleguen notificaciones en tiempo real
+              </p>
+            </div>
+            <Switch
+              checked={preferences.soundEnabled}
+              onCheckedChange={checked => updatePreference('soundEnabled', checked)}
+            />
+          </div>
         </div>
 
         {/* NIVEL INTERMEDIO - Solo para intermediate y advanced */}
@@ -222,28 +244,6 @@ export function NotificationSettingsCard({
               <h3 className='text-sm font-semibold text-muted-foreground'>
                 Configuración Avanzada
               </h3>
-
-              <div className='flex items-center justify-between'>
-                <div className='space-y-0.5'>
-                  <Label className='text-base flex items-center space-x-2'>
-                    {preferences.soundEnabled ? (
-                      <Volume2 className='h-4 w-4 text-blue-600' />
-                    ) : (
-                      <VolumeX className='h-4 w-4 text-gray-400' />
-                    )}
-                    <span>Sonidos de notificación</span>
-                  </Label>
-                  <p className='text-sm text-muted-foreground'>
-                    Reproducir sonido cuando lleguen notificaciones
-                  </p>
-                </div>
-                <Switch
-                  checked={preferences.soundEnabled}
-                  onCheckedChange={checked => updatePreference('soundEnabled', checked)}
-                />
-              </div>
-
-              <Separator />
 
               <div className='flex items-center justify-between'>
                 <div className='space-y-0.5'>

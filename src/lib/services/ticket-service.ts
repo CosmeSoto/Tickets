@@ -167,10 +167,22 @@ export class TicketService {
         where: { id: data.categoryId },
         include: { departments: { select: { familyId: true } } },
       })
-      const familyId =
+
+      // Prioridad: categoría → departamento → familia default → primera familia activa
+      let familyId: string | undefined =
         category?.departments?.familyId ??
         (await TicketFamilyConfigService.getDefaultFamily())?.id ??
         undefined
+
+      // Último fallback: primera familia activa con tickets habilitados
+      if (!familyId) {
+        const fallbackFamily = await prisma.ticket_family_config.findFirst({
+          where: { ticketsEnabled: true },
+          select: { familyId: true },
+          orderBy: { createdAt: 'asc' },
+        })
+        familyId = fallbackFamily?.familyId ?? undefined
+      }
 
       // 2. Generar ticketCode (automático o manual si es ADMIN)
       let ticketCode: string | undefined

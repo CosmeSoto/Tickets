@@ -27,69 +27,7 @@ import { useModuleData } from '@/hooks/common/use-module-data'
 import { useTicketFilters } from '@/hooks/common/use-ticket-filters'
 import { usePagination } from '@/hooks/common/use-pagination'
 import type { Ticket as TicketType } from '@/hooks/use-ticket-data'
-
-// Función para filtrar tickets (como filterTechnicians)
-function filterTickets(tickets: TicketType[], filters: any, clientId: string) {
-  return tickets.filter(ticket => {
-    // Solo tickets del cliente actual
-    if (ticket.client?.id !== clientId) return false
-
-    // Búsqueda
-    if (filters.search) {
-      const searchLower = filters.search.toLowerCase()
-      const matchesSearch = 
-        ticket.title.toLowerCase().includes(searchLower) ||
-        (ticket.description && ticket.description.toLowerCase().includes(searchLower)) ||
-        (ticket.assignee?.name && ticket.assignee.name.toLowerCase().includes(searchLower))
-      
-      if (!matchesSearch) return false
-    }
-
-    // Estado
-    if (filters.status !== 'all' && ticket.status !== filters.status) return false
-
-    // Prioridad
-    if (filters.priority !== 'all' && ticket.priority !== filters.priority) return false
-
-    // Categoría
-    if (filters.category !== 'all' && ticket.category?.id !== filters.category) return false
-
-    // Fecha
-    if (filters.dateRange !== 'all') {
-      const now = new Date()
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-      const createdDate = new Date(ticket.createdAt)
-      
-      switch (filters.dateRange) {
-        case 'today':
-          if (createdDate < today) return false
-          break
-        case 'yesterday':
-          const yesterday = new Date(today)
-          yesterday.setDate(yesterday.getDate() - 1)
-          if (createdDate < yesterday || createdDate >= today) return false
-          break
-        case 'week':
-          const weekAgo = new Date(today)
-          weekAgo.setDate(weekAgo.getDate() - 7)
-          if (createdDate < weekAgo) return false
-          break
-        case 'month':
-          const monthAgo = new Date(today)
-          monthAgo.setMonth(monthAgo.getMonth() - 1)
-          if (createdDate < monthAgo) return false
-          break
-        case 'older':
-          const monthAgoOlder = new Date(today)
-          monthAgoOlder.setMonth(monthAgoOlder.getMonth() - 1)
-          if (createdDate >= monthAgoOlder) return false
-          break
-      }
-    }
-
-    return true
-  })
-}
+import { filterTicketsClient } from '@/lib/utils/ticket-filters'
 
 export default function ClientTicketsPage() {
   const { data: session } = useSession()
@@ -124,7 +62,7 @@ export default function ClientTicketsPage() {
   // Filtrar en MEMORIA (como técnicos)
   const filteredTickets = useMemo(() => {
     if (!session?.user?.id) return []
-    return filterTickets(allTickets, debouncedFilters, session.user.id)
+    return filterTicketsClient(allTickets, debouncedFilters, session.user.id)
   }, [allTickets, debouncedFilters, session?.user?.id])
 
   // Paginación

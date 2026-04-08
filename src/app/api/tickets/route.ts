@@ -317,7 +317,7 @@ export async function POST(request: NextRequest) {
     // ⭐ NUEVO: Enviar email de notificación al cliente
     await EmailService.queueEmail({
       to: newTicket.users_tickets_clientIdTousers.email,
-      subject: `Ticket #${newTicket.id.substring(0, 8)} creado`,
+      subject: `Ticket #${(newTicket as any).ticketCode ?? newTicket.id.substring(0, 8)} creado`,
       template: 'ticket-created',
       templateData: {
         ticketId: newTicket.id,

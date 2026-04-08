@@ -25,38 +25,7 @@ import { useModuleData } from '@/hooks/common/use-module-data'
 import { useTicketFilters } from '@/hooks/common/use-ticket-filters'
 import { usePagination } from '@/hooks/common/use-pagination'
 import type { Ticket as TicketType } from '@/hooks/use-ticket-data'
-
-// Función para filtrar tickets (como filterTechnicians)
-function filterTickets(tickets: TicketType[], filters: any) {
-  return tickets.filter(ticket => {
-    // Búsqueda
-    if (filters.search) {
-      const searchLower = filters.search.toLowerCase()
-      const matchesSearch = 
-        ticket.title.toLowerCase().includes(searchLower) ||
-        (ticket.description && ticket.description.toLowerCase().includes(searchLower)) ||
-        (ticket.client?.name && ticket.client.name.toLowerCase().includes(searchLower)) ||
-        (ticket.assignee?.name && ticket.assignee.name.toLowerCase().includes(searchLower))
-      
-      if (!matchesSearch) return false
-    }
-
-    // Estado
-    if (filters.status !== 'all' && ticket.status !== filters.status) return false
-
-    // Prioridad
-    if (filters.priority !== 'all' && ticket.priority !== filters.priority) return false
-
-    // Categoría
-    if (filters.category !== 'all' && ticket.category?.id !== filters.category) return false
-
-    // Asignado
-    if (filters.assignee === 'unassigned' && ticket.assignee) return false
-    if (filters.assignee !== 'all' && filters.assignee !== 'unassigned' && ticket.assignee?.id !== filters.assignee) return false
-
-    return true
-  })
-}
+import { filterTicketsAdmin } from '@/lib/utils/ticket-filters'
 
 export default function AdminTicketsPage() {
   const { data: session } = useSession()
@@ -90,7 +59,7 @@ export default function AdminTicketsPage() {
 
   // Filtrar en MEMORIA (como técnicos)
   const filteredTickets = useMemo(() => {
-    return filterTickets(allTickets, debouncedFilters)
+    return filterTicketsAdmin(allTickets, debouncedFilters)
   }, [allTickets, debouncedFilters])
 
   // Paginación

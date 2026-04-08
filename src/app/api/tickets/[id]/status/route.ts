@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { NotificationService } from '@/lib/services/notification-service'
+import { randomUUID } from 'crypto'
 
 // Transiciones válidas por rol
 const TRANSITIONS: Record<string, Record<string, string[]>> = {

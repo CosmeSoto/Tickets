@@ -179,16 +179,6 @@ export async function GET(request: NextRequest) {
       return normalizedUser
     })
 
-    console.log('📊 [API-USERS] Usuarios retornados:', usersWithCanDelete.length)
-    if (usersWithCanDelete.length > 0) {
-      console.log('📊 [API-USERS] Ejemplo de usuario:', {
-        id: usersWithCanDelete[0].id,
-        name: usersWithCanDelete[0].name,
-        departmentId: usersWithCanDelete[0].departmentId,
-        department: usersWithCanDelete[0].department
-      })
-    }
-
     return NextResponse.json({
       success: true,
       data: usersWithCanDelete,

@@ -20,12 +20,11 @@ interface UseNotificationSSEOptions {
 }
 
 // ── Audio singleton ────────────────────────────────────────────────────────────
-// Los navegadores bloquean AudioContext hasta que haya un gesto del usuario.
-// Mantenemos un contexto singleton y lo desbloqueamos en el primer click/tecla.
+// AudioContext se crea una sola vez. Si está suspendido (política autoplay del
+// navegador), se intenta reanudar en cada reproducción — funciona siempre que
+// el usuario haya interactuado con la página al menos una vez.
 
 let audioCtx: AudioContext | null = null
-let audioUnlocked = false
-let pendingSounds = 0 // sonidos encolados antes del primer gesto
 
 function getAudioContext(): AudioContext | null {
   if (typeof window === 'undefined') return null
@@ -37,24 +36,6 @@ function getAudioContext(): AudioContext | null {
     }
   }
   return audioCtx
-}
-
-function unlockAudio() {
-  if (audioUnlocked) return
-  const ctx = getAudioContext()
-  if (!ctx) return
-
-  // Reanudar el contexto suspendido
-  if (ctx.state === 'suspended') {
-    ctx.resume().then(() => {
-      audioUnlocked = true
-      // Reproducir los sonidos que estaban pendientes
-      for (let i = 0; i < pendingSounds; i++) playTone()
-      pendingSounds = 0
-    }).catch(() => {})
-  } else {
-    audioUnlocked = true
-  }
 }
 
 function playTone() {
@@ -75,12 +56,7 @@ function playTone() {
   } catch { /* silencioso */ }
 }
 
-function playNotificationSound() {
-  if (!audioUnlocked) {
-    // Encolar — se reproducirá cuando el usuario interactúe
-    pendingSounds++
-    return
-  }
+export function playNotificationSound() {
   const ctx = getAudioContext()
   if (!ctx) return
   if (ctx.state === 'suspended') {
@@ -88,19 +64,6 @@ function playNotificationSound() {
   } else {
     playTone()
   }
-}
-
-// Desbloquear en el primer gesto del usuario (una sola vez)
-if (typeof window !== 'undefined') {
-  const unlock = () => {
-    unlockAudio()
-    window.removeEventListener('click', unlock)
-    window.removeEventListener('keydown', unlock)
-    window.removeEventListener('touchstart', unlock)
-  }
-  window.addEventListener('click', unlock, { once: true })
-  window.addEventListener('keydown', unlock, { once: true })
-  window.addEventListener('touchstart', unlock, { once: true })
 }
 
 // ── Hook ───────────────────────────────────────────────────────────────────────
@@ -132,6 +95,13 @@ export function useNotificationSSE({ onNotification, sound = true }: UseNotifica
       es.onmessage = (e) => {
         try {
           const data = JSON.parse(e.data)
+
+          // Forzar refresh de sesión cuando el admin cambia rol/permisos
+          if (data.type === 'session_refresh') {
+            window.location.reload()
+            return
+          }
+
           if (data.type === 'new_notification' && data.notification) {
             if (soundEnabled.current) playNotificationSound()
             onNotificationRef.current?.(data.notification)

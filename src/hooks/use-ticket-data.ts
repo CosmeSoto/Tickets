@@ -45,6 +45,9 @@ export interface Ticket {
   client: User
   assignee?: User
   category: Category
+  family?: { id: string; name: string; code: string; color?: string } | null
+  ticketCode?: string | null
+  codeIsManual?: boolean
   createdAt: string
   updatedAt: string
   resolvedAt?: string
@@ -413,4 +416,14 @@ export const formatDate = (dateString: string): string => {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+/**
+ * Retorna el código legible del ticket:
+ * - Si tiene ticketCode (ej: "TI-2026-0001") → lo usa
+ * - Fallback: últimos 8 chars del UUID en mayúsculas
+ */
+export const getTicketDisplayCode = (ticket: Pick<Ticket, 'id' | 'ticketCode'>): string => {
+  if (ticket.ticketCode) return ticket.ticketCode
+  return ticket.id.slice(-8).toUpperCase()
 }
