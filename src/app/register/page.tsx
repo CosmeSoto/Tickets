@@ -98,7 +98,6 @@ export default function RegisterPage() {
         return
       }
       setSuccess(true)
-      setTimeout(() => router.push('/login?registered=true'), 2000)
     } catch {
       setError('Error de conexión. Verifica tu internet e intenta de nuevo.')
     } finally {
@@ -124,22 +123,35 @@ export default function RegisterPage() {
   return (
     <AuthLayout>
       <AuthCard>
-        <AuthHeader
-          title="Crear Cuenta"
-          description="Regístrate para crear tickets de soporte técnico"
-        />
+        {/* ── Estado de éxito — reemplaza todo el formulario ── */}
+        {success ? (
+          <div className="flex flex-col items-center gap-4 py-4 text-center">
+            <div className="p-4 bg-green-500/10 rounded-full">
+              <CheckCircle className="h-12 w-12 text-green-600" />
+            </div>
+            <div className="space-y-1">
+              <h2 className="text-lg font-semibold text-foreground">¡Cuenta creada exitosamente!</h2>
+              <p className="text-sm text-muted-foreground">
+                Tu cuenta ha sido registrada. Serás redirigido al inicio de sesión en unos segundos.
+              </p>
+            </div>
+            <div className="w-full pt-2">
+              <Button className="w-full" onClick={() => router.push('/login')}>
+                Ir al inicio de sesión
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <AuthHeader
+              title="Crear Cuenta"
+              description="Regístrate para crear tickets de soporte técnico"
+            />
 
         {error && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {success && (
-          <Alert>
-            <CheckCircle className="h-4 w-4 text-green-600" />
-            <AlertDescription>¡Cuenta creada! Redirigiendo al login...</AlertDescription>
           </Alert>
         )}
 
@@ -292,6 +304,8 @@ export default function RegisterPage() {
             <Link href="/help/privacy" className="text-primary hover:underline">Privacidad</Link>
           </p>
         </div>
+          </>
+        )}
       </AuthCard>
     </AuthLayout>
   )
