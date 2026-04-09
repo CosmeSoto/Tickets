@@ -9,19 +9,17 @@ services:
       DATABASE_URL: postgresql://tickets_user:tickets_password_2024@postgres:5432/tickets_db
       REDIS_URL: redis://redis:6379
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
-      NEXTAUTH_URL: ${NEXTAUTH_URL}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://gestion.local}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
       STORAGE_PROVIDER: local
       STORAGE_LOCAL_UPLOAD_PATH: ./uploads
       STORAGE_LOCAL_PUBLIC_PATH: /uploads
       LOG_LEVEL: DEBUG
     volumes:
-      # Montar código fuente para hot-reload
       - .:/app
-      # Preservar node_modules del contenedor (Linux) — NO usar el del host (macOS)
       - dev_node_modules:/app/node_modules
-      # Preservar .next del contenedor
       - dev_next:/app/.next
+      - uploads_data:/app/public/uploads
     ports:
       - '3000:3000'
     networks:
@@ -31,6 +29,20 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: tickets-nginx-dev
+    ports:
+      - '80:80'
+    volumes:
+      - ./docker/nginx.local.conf:/etc/nginx/nginx.conf:ro
+      - uploads_data:/var/www/uploads:ro
+    networks:
+      - tickets-network
+    depends_on:
+      - app
     restart: unless-stopped
 
   postgres:
@@ -72,6 +84,7 @@ volumes:
   postgres_data_dev:
   dev_node_modules:
   dev_next:
+  uploads_data:
 
 networks:
   tickets-network:
