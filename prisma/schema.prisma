@@ -328,6 +328,7 @@ model tickets {
   ticket_sla_metrics               ticket_sla_metrics?
   maintenance_records              maintenance_records[]
   family                           families?                   @relation(fields: [familyId], references: [id])
+  ticket_collaborators             ticket_collaborators[]
   users_tickets_assigneeIdTousers  users?                      @relation("tickets_assigneeIdTousers", fields: [assigneeId], references: [id])
   categories                       categories                  @relation(fields: [categoryId], references: [id])
   users_tickets_clientIdTousers    users                       @relation("tickets_clientIdTousers", fields: [clientId], references: [id])
@@ -418,6 +419,7 @@ model users {
   isActive                                          Boolean                     @default(true)
   isEmailVerified                                   Boolean                     @default(false)
   canManageInventory                                Boolean                     @default(false)
+  isSuperAdmin                                      Boolean                     @default(false) @map("is_super_admin")
   lastLogin                                         DateTime?
   oauthProvider                                     String?
   oauthId                                           String?
@@ -467,6 +469,9 @@ model users {
   decommissionApprovals                             decommission_acts[]         @relation("DecommissionApprover")
   decommissionAttachments                           decommission_attachments[]
   technicianFamilyAssignments                       technician_family_assignments[]
+  adminFamilyAssignments                            admin_family_assignments[]
+  ticketCollaborations                              ticket_collaborators[]      @relation("TicketCollaborator")
+  ticketCollaborationsAdded                         ticket_collaborators[]      @relation("CollaboratorAddedBy")
 
   @@index([departmentId])
   @@index([name, email])
@@ -1576,6 +1581,7 @@ model families {
   tickets                      tickets[]
   ticketFamilyConfig           ticket_family_config?
   technicianFamilyAssignments  technician_family_assignments[]
+  adminFamilyAssignments       admin_family_assignments[]
   ticketCodeCounters           ticket_code_counters[]
   sla_policies                 sla_policies[]
   knowledge_articles           knowledge_articles[]
@@ -1708,6 +1714,42 @@ model technician_family_assignments {
   @@index([technicianId, isActive])
   @@index([familyId, isActive])
   @@map("technician_family_assignments")
+}
+
+// ── Admin family assignments (mirrors technician_family_assignments) ──────────
+model admin_family_assignments {
+  id        String   @id @default(uuid())
+  adminId   String   @map("admin_id")
+  familyId  String   @map("family_id")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  admin  users    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  family families @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@unique([adminId, familyId])
+  @@index([adminId, isActive])
+  @@index([familyId, isActive])
+  @@map("admin_family_assignments")
+}
+
+// ── Ticket collaborators ──────────────────────────────────────────────────────
+model ticket_collaborators {
+  id             String   @id @default(uuid())
+  ticketId       String   @map("ticket_id")
+  collaboratorId String   @map("collaborator_id")
+  addedById      String   @map("added_by_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  ticket       tickets @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  collaborator users   @relation("TicketCollaborator", fields: [collaboratorId], references: [id], onDelete: Cascade)
+  addedBy      users   @relation("CollaboratorAddedBy", fields: [addedById], references: [id])
+
+  @@unique([ticketId, collaboratorId])
+  @@index([ticketId])
+  @@index([collaboratorId])
+  @@map("ticket_collaborators")
 }
 
 model ticket_code_counters {

@@ -207,7 +207,7 @@ export async function POST(
       )
     }
 
-    // Verificar permisos
+    // Verificar permisos: Admin o Técnico ASIGNADO (no colaboradores)
     const isAdmin = session.user.role === 'ADMIN'
     const isAssignedTechnician = 
       session.user.role === 'TECHNICIAN' && 
@@ -215,7 +215,7 @@ export async function POST(
 
     if (!isAdmin && !isAssignedTechnician) {
       return NextResponse.json(
-        { success: false, message: 'No tienes permiso para crear un plan' },
+        { success: false, message: 'Solo el técnico asignado o un administrador puede crear planes de resolución' },
         { status: 403 }
       )
     }

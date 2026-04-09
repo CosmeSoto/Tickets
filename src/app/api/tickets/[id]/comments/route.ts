@@ -59,7 +59,8 @@ export async function POST(
 
     // Verificar que el ticket existe
     const ticket = await prisma.tickets.findUnique({
-      where: { id: ticketId }
+      where: { id: ticketId },
+      select: { id: true, assigneeId: true, clientId: true, status: true },
     })
 
     if (!ticket) {
@@ -67,6 +68,31 @@ export async function POST(
         { success: false, message: 'Ticket no encontrado' },
         { status: 404 }
       )
+    }
+
+    // Verificar acceso: cliente del ticket, técnico asignado, colaborador o admin
+    const isAdmin = session.user.role === 'ADMIN'
+    const isClient = ticket.clientId === session.user.id
+    const isAssignee = ticket.assigneeId === session.user.id
+
+    let isCollaborator = false
+    if (session.user.role === 'TECHNICIAN' && !isAssignee) {
+      const collab = await prisma.ticket_collaborators.findUnique({
+        where: { ticketId_collaboratorId: { ticketId, collaboratorId: session.user.id } },
+      })
+      isCollaborator = !!collab
+    }
+
+    if (!isAdmin && !isClient && !isAssignee && !isCollaborator) {
+      return NextResponse.json(
+        { success: false, message: 'No tienes acceso a este ticket' },
+        { status: 403 }
+      )
+    }
+
+    // Colaboradores y clientes no pueden hacer comentarios internos
+    if (commentData.isInternal && (isClient || isCollaborator)) {
+      commentData.isInternal = false
     }
 
     // Crear comentario en base de datos

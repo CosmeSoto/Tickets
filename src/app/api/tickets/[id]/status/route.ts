@@ -66,6 +66,27 @@ export async function PATCH(
       )
     }
 
+    // Colaboradores: pueden cambiar a IN_PROGRESS/ON_HOLD pero NO cerrar ni resolver
+    if (role === 'TECHNICIAN' && ticket.assigneeId !== session.user.id) {
+      const isCollaborator = await prisma.ticket_collaborators.findUnique({
+        where: { ticketId_collaboratorId: { ticketId, collaboratorId: session.user.id } },
+      })
+      if (!isCollaborator) {
+        return NextResponse.json(
+          { success: false, message: 'No tienes permiso para cambiar el estado de este ticket' },
+          { status: 403 }
+        )
+      }
+      // Colaborador: solo puede poner en progreso o en espera, no resolver ni cerrar
+      const collaboratorAllowed = ['IN_PROGRESS', 'ON_HOLD']
+      if (!collaboratorAllowed.includes(newStatus)) {
+        return NextResponse.json(
+          { success: false, message: 'Los colaboradores no pueden resolver ni cerrar tickets' },
+          { status: 403 }
+        )
+      }
+    }
+
     const allowed = TRANSITIONS[role]?.[currentStatus] ?? []
     if (!allowed.includes(newStatus)) {
       return NextResponse.json(
