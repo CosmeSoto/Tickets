@@ -35,6 +35,8 @@ yarn-error.log*
 .env.local
 .env.production
 .env.staging
+.env.local.production
+.env.local.*
 
 # vercel
 .vercel
@@ -67,5 +69,5 @@ ESTADO_SISTEMA.md
 /uploads/
 /public/uploads/
 
-# Migraciones de Prisma (usamos db push)
-/prisma/migrations/
+# Migraciones de Prisma — NO ignorar, son necesarias para deploy
+# /prisma/migrations/
