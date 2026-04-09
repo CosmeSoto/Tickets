@@ -35,9 +35,10 @@ services:
       STORAGE_PROVIDER: local
       STORAGE_LOCAL_UPLOAD_PATH: ./uploads
       STORAGE_LOCAL_PUBLIC_PATH: /uploads
+      UPLOAD_DIR: /app/public/uploads
       LOG_LEVEL: INFO
     volumes:
-      - app_uploads:/app/uploads
+      - app_uploads:/app/public/uploads
       - app_logs:/app/logs
     networks:
       - tickets-network
