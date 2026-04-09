@@ -89,10 +89,10 @@ export default function EditTicketPage() {
 
   const loadTechnicians = async () => {
     try {
-      const response = await fetch('/api/users?role=TECHNICIAN')
+      const response = await fetch('/api/users?role=TECHNICIAN&isActive=true')
       if (response.ok) {
         const data = await response.json()
-        setTechnicians(data)
+        setTechnicians(data.success ? data.data : [])
       }
     } catch (error) {
       console.error('Error loading technicians:', error)
