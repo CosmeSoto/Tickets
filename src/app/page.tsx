@@ -75,12 +75,11 @@ export default function HomePage() {
 
   const getIcon = (name: string) => (Icons as any)[name] || Icons.HelpCircle
 
-  // Mapa de colores de iconos usando tokens del tema
   const iconColorClass: Record<string, string> = {
     blue:   'bg-primary/10 text-primary',
-    green:  'bg-primary/10 text-primary',
-    orange: 'bg-primary/10 text-primary',
-    purple: 'bg-secondary text-secondary-foreground',
+    green:  'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400',
+    orange: 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400',
+    purple: 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400',
     red:    'bg-destructive/10 text-destructive',
   }
 
@@ -99,7 +98,6 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16 sm:h-20">
             <SystemLogo size="lg" showText={true} />
-
             <nav className="flex items-center gap-2 sm:gap-3">
               {status === 'authenticated' && session?.user ? (
                 <Button asChild size="sm">
@@ -122,24 +120,36 @@ export default function HomePage() {
 
       {/* ── Hero ───────────────────────────────────────────────────────── */}
       <section
-        className="relative flex-1 flex items-center py-24 sm:py-32"
+        className="relative flex-1 flex items-center py-24 sm:py-32 overflow-hidden"
         style={hasHeroImage ? {
           backgroundImage: `url(${d.heroImageUrl})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
         } : undefined}
       >
-        {/* Overlay cuando hay imagen de fondo */}
         {hasHeroImage && (
           <div className="absolute inset-0 bg-background/70" />
         )}
 
-        {/* Fondo decorativo cuando NO hay imagen */}
         {!hasHeroImage && (
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-background to-secondary/20 pointer-events-none" />
+          <>
+            {/* Gradiente base más visible en light mode */}
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.08] via-background to-primary/[0.04] pointer-events-none" />
+            {/* Círculos decorativos con el color primario */}
+            <div className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full bg-primary/[0.07] blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full bg-primary/[0.06] blur-3xl pointer-events-none" />
+            {/* Línea de acento en la parte superior */}
+            <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-transparent via-primary to-transparent" />
+          </>
         )}
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center w-full">
+          {/* Badge */}
+          <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/25 text-primary text-sm font-medium px-4 py-1.5 rounded-full mb-8">
+            <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+            Plataforma de gestión integral
+          </div>
+
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6 text-foreground leading-tight">
             {d.heroTitle.split(' ').slice(0, -1).join(' ')}{' '}
             <span className="text-primary">
@@ -150,10 +160,10 @@ export default function HomePage() {
             {d.heroSubtitle}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button asChild size="lg" className="text-base px-8">
+            <Button asChild size="lg" className="text-base px-8 shadow-md">
               <Link href={d.heroCtaPrimaryUrl}>{d.heroCtaPrimary}</Link>
             </Button>
-            <Button asChild size="lg" variant="outline" className="text-base px-8">
+            <Button asChild size="lg" variant="outline" className="text-base px-8 border-primary/30 hover:bg-primary/5">
               <Link href={d.heroCtaSecondaryUrl}>{d.heroCtaSecondary}</Link>
             </Button>
           </div>
@@ -162,9 +172,17 @@ export default function HomePage() {
 
       {/* ── Services ───────────────────────────────────────────────────── */}
       {d.servicesEnabled && services.length > 0 && (
-        <section id="servicios" className="py-20 bg-muted/30 border-y border-border">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <section id="servicios" className="py-20 border-y border-border relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-b from-muted/50 via-muted/30 to-muted/50 pointer-events-none" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,hsl(var(--primary)/0.06),transparent_60%)] pointer-events-none" />
+
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-14">
+              <div className="flex items-center justify-center gap-3 mb-4">
+                <div className="h-px w-12 bg-primary/40" />
+                <span className="text-primary text-sm font-semibold uppercase tracking-widest">Servicios</span>
+                <div className="h-px w-12 bg-primary/40" />
+              </div>
               <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-3">
                 {d.servicesTitle}
               </h2>
@@ -180,10 +198,10 @@ export default function HomePage() {
                 return (
                   <div
                     key={service.id}
-                    className="bg-card rounded-xl border border-border p-6 text-center shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-200"
+                    className="bg-card rounded-xl border border-border p-6 text-center shadow-sm hover:shadow-lg hover:border-primary/40 hover:-translate-y-1 transition-all duration-200 group"
                   >
-                    <div className={`mx-auto w-12 h-12 ${colorCls} rounded-xl flex items-center justify-center mb-4`}>
-                      <Icon className="h-6 w-6" />
+                    <div className={`mx-auto w-14 h-14 ${colorCls} rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-200`}>
+                      <Icon className="h-7 w-7" />
                     </div>
                     <h3 className="text-lg font-semibold text-foreground mb-2">{service.title}</h3>
                     <p className="text-sm text-muted-foreground leading-relaxed">{service.description}</p>
