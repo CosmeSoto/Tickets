@@ -64,18 +64,19 @@ export default function LoginPage() {
           </div>
           <div className="space-y-3">
             <h2 className="text-3xl font-bold text-primary-foreground">
-              Sistema de Soporte
+              Plataforma de Gestión
             </h2>
             <p className="text-primary-foreground/70 text-base leading-relaxed">
-              Gestiona tus solicitudes de soporte técnico de forma rápida y eficiente.
+              Centraliza soporte técnico, inventario y operaciones en un solo lugar.
             </p>
           </div>
           {/* Feature bullets */}
           <div className="space-y-3 text-left pt-4">
             {[
-              'Tickets en tiempo real',
-              'Seguimiento de solicitudes',
+              'Tickets y soporte técnico',
+              'Gestión de inventario',
               'Base de conocimientos',
+              'Reportes y estadísticas',
             ].map(f => (
               <div key={f} className="flex items-center gap-3">
                 <div className="w-5 h-5 rounded-full bg-primary-foreground/20 flex items-center justify-center flex-shrink-0">
