@@ -55,7 +55,9 @@ export function SystemLogo({ className = '', showText = true, size = 'md' }: Sys
   const logoUrl = isDark ? (darkUrl || lightUrl) : (lightUrl || darkUrl)
 
   const sizeClasses = { sm: 'h-8', md: 'h-10', lg: 'h-12', xl: 'h-16' }
-  const textSizes = { sm: 'text-base', md: 'text-lg', lg: 'text-xl', xl: 'text-2xl' }
+  const textSizes  = { sm: 'text-base', md: 'text-lg', lg: 'text-xl', xl: 'text-2xl' }
+  // max-w proporcional: permite logos anchos sin que se desborden
+  const maxWClasses = { sm: 'max-w-[160px]', md: 'max-w-[200px]', lg: 'max-w-[240px]', xl: 'max-w-[280px]' }
 
   if (loading) {
     return (
@@ -71,7 +73,7 @@ export function SystemLogo({ className = '', showText = true, size = 'md' }: Sys
         <img
           src={logoUrl}
           alt={companyName}
-          className={`${sizeClasses[size]} w-auto object-contain`}
+          className={`${sizeClasses[size]} ${maxWClasses[size]} w-auto object-contain`}
         />
       ) : (
         <>
