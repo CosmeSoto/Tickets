@@ -1080,7 +1080,6 @@ export default function AuditPage() {
             value={stats?.totalLogs || 0}
             icon={FileText}
             color="blue"
-            role="ADMIN"
           />
           
           <SymmetricStatsCard
@@ -1088,7 +1087,6 @@ export default function AuditPage() {
             value={stats?.topUsers?.length || 0}
             icon={Users}
             color="green"
-            role="ADMIN"
           />
           
           <SymmetricStatsCard
@@ -1100,7 +1098,6 @@ export default function AuditPage() {
             ).reduce((acc, s) => acc + s._count.id, 0) || 0}
             icon={AlertTriangle}
             color="orange"
-            role="ADMIN"
             status={(stats?.actionStats?.filter(s => 
               s.action.includes('deleted') || 
               s.action.includes('role_changed') ||
@@ -1113,7 +1110,6 @@ export default function AuditPage() {
             value={stats?.actionStats?.length || 0}
             icon={Activity}
             color="purple"
-            role="ADMIN"
           />
         </div>
 

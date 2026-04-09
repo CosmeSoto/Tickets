@@ -45,11 +45,14 @@ export async function GET(
       case 'sla':
         data = await ReportService.getSLACompliance(id, dateRange)
         break
+      case 'satisfaction':
+        data = await ReportService.getSatisfactionReport(id, dateRange)
+        break
       default:
         return NextResponse.json(
           {
             success: false,
-            message: 'Tipo de reporte inválido. Use: executive, technicians, trends, sla',
+            message: 'Tipo de reporte inválido. Use: executive, technicians, trends, sla, satisfaction',
           },
           { status: 400 }
         )

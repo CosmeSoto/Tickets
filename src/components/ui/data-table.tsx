@@ -447,7 +447,7 @@ export function DataTable<T extends { id: string }>({
               <select
                 value={pagination.limit}
                 onChange={(e) => pagination.onLimitChange(Number(e.target.value))}
-                className="px-3 py-1 border border-border rounded text-sm"
+                className="px-3 py-1 border border-border rounded text-sm bg-background text-foreground"
               >
                 <option value={10}>10</option>
                 <option value={20}>20</option>

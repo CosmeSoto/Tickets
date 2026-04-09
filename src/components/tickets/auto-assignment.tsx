@@ -36,6 +36,7 @@ interface AutoAssignmentProps {
     email: string
   }
   onAssignmentComplete?: (assignedTechnician?: { id: string; name: string; email: string }) => void
+  onOpenChange?: (open: boolean) => void
 }
 
 interface AssignmentResult {
@@ -53,6 +54,7 @@ export function AutoAssignment({
   ticketId,
   currentAssignee,
   onAssignmentComplete,
+  onOpenChange,
 }: AutoAssignmentProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -78,16 +80,10 @@ export function AutoAssignment({
       if (response.ok) {
         const data = await response.json()
         setResult(data)
-        toast({
-          title: 'Éxito',
-          description: 'Ticket asignado automáticamente',
-        })
-        onAssignmentComplete?.(data.assignedTechnician)
+        // NO llamar onAssignmentComplete aquí — esperar a que el usuario cierre el dialog
       } else {
-        // Leer el body solo una vez
         const errorData = await response.json().catch(() => ({ error: `Error ${response.status}: ${response.statusText}` }))
         const errorMessage = errorData.error || errorData.message || 'Error al asignar ticket'
-        
         setError(errorMessage)
         toast({
           title: 'Error',
@@ -115,16 +111,31 @@ export function AutoAssignment({
     setLoading(false)
   }
 
+  const handleClose = () => {
+    setIsOpen(false)
+    onOpenChange?.(false)
+    // Si hubo asignación exitosa, notificar al padre al cerrar
+    if (result) {
+      onAssignmentComplete?.(result.assignedTechnician)
+    }
+    resetDialog()
+  }
+
   return (
     <Dialog
       open={isOpen}
       onOpenChange={open => {
-        setIsOpen(open)
-        if (!open) resetDialog()
+        if (!open) handleClose()
+        else {
+          setIsOpen(true)
+          onOpenChange?.(true)
+        }
       }}
     >
       <DialogTrigger asChild>
-        <Button variant='outline' className='flex items-center space-x-2'>
+        <Button variant='outline' size='sm' className='flex items-center space-x-2'
+          onClick={() => { setIsOpen(true); onOpenChange?.(true) }}
+        >
           <Bot className='h-4 w-4' />
           <span>Asignación Automática</span>
         </Button>
@@ -132,7 +143,7 @@ export function AutoAssignment({
       <DialogContent className='max-w-md'>
         <DialogHeader>
           <DialogTitle className='flex items-center space-x-2'>
-            <Bot className='h-5 w-5 text-blue-600' />
+            <Bot className='h-5 w-5 text-primary' />
             <span>Asignación Automática</span>
           </DialogTitle>
           <DialogDescription>
@@ -141,115 +152,122 @@ export function AutoAssignment({
         </DialogHeader>
 
         <div className='space-y-4'>
-          {/* Estado actual */}
-          <Card>
-            <CardHeader className='pb-3'>
-              <CardTitle className='text-sm'>Estado Actual</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className='flex items-center space-x-2'>
-                <User className='h-4 w-4 text-muted-foreground' />
-                {currentAssignee ? (
-                  <div>
-                    <p className='font-medium text-sm'>{currentAssignee.name}</p>
-                    <p className='text-xs text-muted-foreground'>{currentAssignee.email}</p>
+          {/* Resultado exitoso — mostrado prominentemente */}
+          {result ? (
+            <div className='space-y-4'>
+              <div className='rounded-lg border-2 border-green-500 bg-green-50 dark:bg-green-950/30 p-4'>
+                <div className='flex items-center space-x-2 mb-3'>
+                  <CheckCircle className='h-5 w-5 text-green-600 dark:text-green-400' />
+                  <span className='font-semibold text-green-800 dark:text-green-300 text-base'>
+                    ¡Técnico asignado exitosamente!
+                  </span>
+                </div>
+                <div className='flex items-center space-x-3 mb-3'>
+                  <div className='w-10 h-10 rounded-full bg-green-200 dark:bg-green-800 flex items-center justify-center flex-shrink-0'>
+                    <User className='h-5 w-5 text-green-700 dark:text-green-300' />
                   </div>
-                ) : (
-                  <span className='text-muted-foreground text-sm'>Sin asignar</span>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Criterios de asignación */}
-          <Card>
-            <CardHeader className='pb-3'>
-              <CardTitle className='text-sm'>Criterios de Asignación</CardTitle>
-            </CardHeader>
-            <CardContent className='space-y-3'>
-              <div className='flex items-center space-x-2 text-sm'>
-                <Target className='h-4 w-4 text-green-600' />
-                <span>Carga de trabajo balanceada</span>
-              </div>
-              <div className='flex items-center space-x-2 text-sm'>
-                <Zap className='h-4 w-4 text-blue-600' />
-                <span>Especialización en categoría</span>
-              </div>
-              <div className='flex items-center space-x-2 text-sm'>
-                <Clock className='h-4 w-4 text-purple-600' />
-                <span>Disponibilidad y actividad</span>
-              </div>
-              <div className='flex items-center space-x-2 text-sm'>
-                <AlertCircle className='h-4 w-4 text-orange-600' />
-                <span>Experiencia con prioridades</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Resultado */}
-          {result && (
-            <Card className='border-green-500/30 bg-green-500/10'>
-              <CardHeader className='pb-3'>
-                <CardTitle className='text-sm flex items-center space-x-2'>
-                  <CheckCircle className='h-4 w-4 text-green-500' />
-                  <span>Asignación Completada</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className='space-y-3'>
-                <div className='flex items-center space-x-2'>
-                  <User className='h-4 w-4 text-muted-foreground' />
                   <div>
-                    <p className='font-medium text-sm'>{result.assignedTechnician.name}</p>
+                    <p className='font-semibold text-foreground text-sm'>{result.assignedTechnician.name}</p>
                     <p className='text-xs text-muted-foreground'>{result.assignedTechnician.email}</p>
                   </div>
                 </div>
-                <Separator />
+                <Separator className='my-3' />
                 <div>
-                  <p className='text-xs font-medium text-foreground mb-1'>Razón de asignación:</p>
-                  <p className='text-xs text-muted-foreground'>
+                  <p className='text-xs font-semibold text-foreground mb-1'>Razón de asignación:</p>
+                  <p className='text-sm text-muted-foreground leading-relaxed'>
                     {result.assignedTechnician.assignmentReason}
                   </p>
                 </div>
-                <Badge variant='outline' className='border-green-500/50 text-green-500'>
-                  Estado actualizado a "En Progreso"
-                </Badge>
-              </CardContent>
-            </Card>
-          )}
+                <div className='mt-3'>
+                  <Badge className='bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-green-300'>
+                    Estado actualizado a "En Progreso"
+                  </Badge>
+                </div>
+              </div>
 
-          {/* Error */}
-          {error && (
-            <Alert variant='destructive'>
-              <AlertCircle className='h-4 w-4' />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+              <div className='flex justify-end'>
+                <Button onClick={handleClose} className='w-full'>
+                  <CheckCircle className='h-4 w-4 mr-2' />
+                  Entendido, cerrar
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Estado actual */}
+              <Card>
+                <CardHeader className='pb-3'>
+                  <CardTitle className='text-sm'>Estado Actual</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className='flex items-center space-x-2'>
+                    <User className='h-4 w-4 text-muted-foreground' />
+                    {currentAssignee ? (
+                      <div>
+                        <p className='font-medium text-sm'>{currentAssignee.name}</p>
+                        <p className='text-xs text-muted-foreground'>{currentAssignee.email}</p>
+                      </div>
+                    ) : (
+                      <span className='text-muted-foreground text-sm'>Sin asignar</span>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
 
-          {/* Acciones */}
-          <div className='flex justify-end space-x-2 pt-4'>
-            <Button variant='outline' onClick={() => setIsOpen(false)} disabled={loading}>
-              {result ? 'Cerrar' : 'Cancelar'}
-            </Button>
-            {!result && (
-              <Button
-                onClick={handleAutoAssign}
-                disabled={loading}
-                className='flex items-center space-x-2'
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className='h-4 w-4 animate-spin' />
-                    <span>Asignando...</span>
-                  </>
-                ) : (
-                  <>
-                    <Bot className='h-4 w-4' />
-                    <span>Asignar Automáticamente</span>
-                  </>
-                )}
-              </Button>
-            )}
-          </div>
+              {/* Criterios de asignación */}
+              <Card>
+                <CardHeader className='pb-3'>
+                  <CardTitle className='text-sm'>Criterios de Asignación</CardTitle>
+                </CardHeader>
+                <CardContent className='space-y-3'>
+                  <div className='flex items-center space-x-2 text-sm'>
+                    <Target className='h-4 w-4 text-green-600' />
+                    <span>Carga de trabajo balanceada</span>
+                  </div>
+                  <div className='flex items-center space-x-2 text-sm'>
+                    <Zap className='h-4 w-4 text-primary' />
+                    <span>Especialización en categoría</span>
+                  </div>
+                  <div className='flex items-center space-x-2 text-sm'>
+                    <Clock className='h-4 w-4 text-muted-foreground' />
+                    <span>Disponibilidad y actividad</span>
+                  </div>
+                  <div className='flex items-center space-x-2 text-sm'>
+                    <AlertCircle className='h-4 w-4 text-orange-600' />
+                    <span>Experiencia con prioridades</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Error */}
+              {error && (
+                <Alert variant='destructive'>
+                  <AlertCircle className='h-4 w-4' />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              {/* Acciones */}
+              <div className='flex justify-end space-x-2 pt-2'>
+                <Button variant='outline' onClick={handleClose} disabled={loading}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleAutoAssign} disabled={loading}>
+                  {loading ? (
+                    <>
+                      <Loader2 className='h-4 w-4 animate-spin mr-2' />
+                      <span>Asignando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Bot className='h-4 w-4 mr-2' />
+                      <span>Asignar Automáticamente</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       </DialogContent>
     </Dialog>

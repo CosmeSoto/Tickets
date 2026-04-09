@@ -12,8 +12,10 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
+    const type = searchParams.get('type') ?? 'executive'
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
+    const granularity = (searchParams.get('granularity') ?? 'month') as 'day' | 'week' | 'month'
 
     const dateRange =
       startDate || endDate
@@ -23,7 +25,23 @@ export async function GET(request: NextRequest) {
           }
         : undefined
 
-    const data = await ReportService.getExecutiveSummary('all', dateRange)
+    let data: unknown
+    switch (type) {
+      case 'technicians':
+        data = await ReportService.getTechnicianPerformance('all', dateRange)
+        break
+      case 'trends':
+        data = await ReportService.getTemporalTrends('all', granularity, dateRange)
+        break
+      case 'sla':
+        data = await ReportService.getSLACompliance('all', dateRange)
+        break
+      case 'satisfaction':
+        data = await ReportService.getSatisfactionReport('all', dateRange)
+        break
+      default:
+        data = await ReportService.getExecutiveSummary('all', dateRange)
+    }
 
     return NextResponse.json({ success: true, data })
   } catch (error) {

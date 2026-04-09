@@ -235,7 +235,7 @@ export function TicketRatingSystem({
       <Card>
         <CardContent className="pt-6">
           <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         </CardContent>
       </Card>
@@ -244,22 +244,37 @@ export function TicketRatingSystem({
 
   return (
     <div className="space-y-6">
-      {/* Mensaje informativo cuando no se puede calificar aún */}
+      {/* Mensaje cuando no hay calificación aún */}
       {!rating && !canRate && (
-        <Card className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
+        <Card className={
+          mode === 'admin'
+            ? 'border-border bg-muted/30'
+            : 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950'
+        }>
           <CardContent className="pt-6">
             <div className="flex items-start space-x-3">
-              <div className="flex-shrink-0">
-                <Star className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
-              </div>
+              <Star className={`h-5 w-5 mt-0.5 flex-shrink-0 ${
+                mode === 'admin' ? 'text-muted-foreground' : 'text-blue-600 dark:text-blue-400'
+              }`} />
               <div>
-                <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-1">
-                  Calificación no disponible aún
-                </h4>
-                <p className="text-sm text-blue-800 dark:text-blue-200">
-                  Podrás calificar este ticket una vez que el técnico lo marque como <strong>resuelto</strong>. 
-                  Tu calificación cerrará el ticket automáticamente.
-                </p>
+                {mode === 'admin' ? (
+                  <>
+                    <h4 className="font-medium text-foreground mb-1">Sin calificación</h4>
+                    <p className="text-sm text-muted-foreground">
+                      El cliente podrá calificar este ticket cuando el técnico lo marque como resuelto.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-1">
+                      Calificación no disponible aún
+                    </h4>
+                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                      Podrás calificar este ticket una vez que el técnico lo marque como <strong>resuelto</strong>.
+                      Tu calificación cerrará el ticket automáticamente.
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           </CardContent>

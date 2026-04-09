@@ -63,6 +63,7 @@ docker compose -f docker-compose.local.yml --env-file .env.production up -d --bu
 # Desarrollo (sin build, hot-reload):
 docker compose -f docker-compose.dev.yml down -v
 docker compose -f docker-compose.dev.yml up --build
+docker compose -f docker-compose.dev.yml restart app
 
 # Producción (cuando estés listo):
 docker compose -f docker-compose.prod.yml up --build

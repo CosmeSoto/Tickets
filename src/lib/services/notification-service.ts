@@ -511,9 +511,44 @@ export class NotificationService {
       const author = comment.users
       const isInternalComment = comment.isInternal
 
-      // No notificar si es comentario interno
+      // Comentario interno: notificar solo al equipo (admin ↔ técnico), nunca al cliente
       if (isInternalComment) {
-        return []
+        const notifications = []
+
+        // Si lo escribe el técnico → notificar a todos los admins
+        if (author.role === 'TECHNICIAN') {
+          const admins = await prisma.users.findMany({
+            where: { role: 'ADMIN', isActive: true },
+            select: { id: true },
+          })
+          for (const admin of admins) {
+            if (admin.id === author.id) continue
+            const n = await this.createNotification({
+              userId: admin.id,
+              type: 'INFO',
+              title: '🔒 Nota interna del técnico',
+              message: `${author.name} dejó una nota interna en el ticket "${ticket.title}"`,
+              ticketId: ticket.id,
+              specificType: 'newComments',
+            })
+            if (n) notifications.push(n)
+          }
+        }
+
+        // Si lo escribe el admin → notificar al técnico asignado
+        if (author.role === 'ADMIN' && ticket.assigneeId && ticket.assigneeId !== author.id) {
+          const n = await this.createNotification({
+            userId: ticket.assigneeId,
+            type: 'INFO',
+            title: '🔒 Nota interna del administrador',
+            message: `${author.name} dejó una nota interna en el ticket "${ticket.title}"`,
+            ticketId: ticket.id,
+            specificType: 'newComments',
+          })
+          if (n) notifications.push(n)
+        }
+
+        return notifications
       }
 
       const notifications = []

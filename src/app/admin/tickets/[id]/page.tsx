@@ -88,6 +88,7 @@ export default function TicketDetailPage() {
   const [technicians, setTechnicians] = useState<any[]>([])
   const [isEditing, setIsEditing] = useState(false)
   const [unassigning, setUnassigning] = useState(false)
+  const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false)
   const [timelineRefreshKey, setTimelineRefreshKey] = useState(0)
   const [fileRefreshKey, setFileRefreshKey] = useState(0)
   const [activeTab, setActiveTab] = useState('timeline')
@@ -110,11 +111,22 @@ export default function TicketDetailPage() {
   useEffect(() => {
     const ticketId = params.id as string
     if (!ticketId || ticketId === 'create') return
+
+    let stopped = false
+
     const interval = setInterval(async () => {
-      // No hacer polling si hay una operación de asignación en curso
-      if (unassigning) return
+      if (stopped) return
+      // No hacer polling si hay una operación en curso o el dialog de asignación está abierto
+      if (unassigning || assignmentDialogOpen) return
       try {
         const res = await fetch(`/api/tickets/${ticketId}`, { cache: 'no-store' })
+        // Si el ticket fue eliminado, detener polling y redirigir
+        if (res.status === 404) {
+          stopped = true
+          clearInterval(interval)
+          router.push('/admin/tickets')
+          return
+        }
         if (!res.ok) return
         const data = await res.json()
         if (!data.success || !data.data) return
@@ -137,8 +149,8 @@ export default function TicketDetailPage() {
         })
       } catch {}
     }, 10000)
-    return () => clearInterval(interval)
-  }, [params.id, unassigning])
+    return () => { stopped = true; clearInterval(interval) }
+  }, [params.id, unassigning, assignmentDialogOpen, router])
 
   // Fetch directo — independiente del hook para evitar conflictos de estado loading
   const loadTicket = async () => {
@@ -266,7 +278,7 @@ export default function TicketDetailPage() {
       <RoleDashboardLayout title='Cargando...' subtitle='Obteniendo información del ticket'>
         <div className='flex items-center justify-center h-64'>
           <div className='text-center'>
-            <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto'></div>
+            <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto'></div>
             <p className='mt-2 text-muted-foreground'>Cargando ticket...</p>
           </div>
         </div>
@@ -384,6 +396,7 @@ export default function TicketDetailPage() {
               ticketId={ticket.id}
               currentAssignee={ticket.assignee}
               onAssignmentComplete={handleAssignmentComplete}
+              onOpenChange={setAssignmentDialogOpen}
             />
           )}
           <TooltipProvider>

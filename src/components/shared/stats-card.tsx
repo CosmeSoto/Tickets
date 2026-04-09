@@ -313,11 +313,11 @@ export const SymmetricStatsCard = memo(function SymmetricStatsCard({
   const colors = colorClasses[color]
   const statusIndicator = statusIndicators[status]
 
-  // Temas por rol para consistencia visual
+  // Temas por rol para consistencia visual (legacy - preferir usar color directamente)
   const roleTheme = role ? {
-    ADMIN: 'border-l-purple-500 hover:bg-purple-50/50 dark:hover:bg-purple-950/30',
-    TECHNICIAN: 'border-l-green-500 hover:bg-green-50/50 dark:hover:bg-green-950/30', 
-    CLIENT: 'border-l-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-950/30'
+    ADMIN: 'border-l-purple-500',
+    TECHNICIAN: 'border-l-green-500', 
+    CLIENT: 'border-l-blue-500'
   }[role] : colors.border
 
   return (
@@ -326,7 +326,7 @@ export const SymmetricStatsCard = memo(function SymmetricStatsCard({
         'relative overflow-hidden transition-all duration-200 hover:shadow-lg border-l-4 h-[70px]',
         role ? roleTheme : colors.border,
         onClick && 'cursor-pointer hover:scale-[1.01] active:scale-[0.99]',
-        'bg-white dark:bg-gray-950 hover:bg-gray-50 dark:hover:bg-gray-900'
+        'bg-card hover:bg-muted/50'
       )}
       onClick={onClick}
     >

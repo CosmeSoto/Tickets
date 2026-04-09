@@ -401,14 +401,14 @@ export default function BackupsPage() {
   }
 
   const getTypeColor = (type: string) => {
-    return type === 'manual' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+    return type === 'manual' ? 'bg-muted text-foreground' : 'bg-secondary text-secondary-foreground'
   }
 
   if (status === 'loading') {
     return (
       <div className='flex items-center justify-center h-64'>
         <div className='text-center'>
-          <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto'></div>
+          <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto'></div>
           <p className='mt-2 text-muted-foreground'>Cargando sistema de backups...</p>
         </div>
       </div>
@@ -437,7 +437,7 @@ export default function BackupsPage() {
           Limpiar Fallidos ({backups.filter(b => b.status === 'failed').length})
         </Button>
       )}
-      <Button onClick={createBackup} disabled={creating} size="sm" className="bg-blue-600 hover:bg-blue-700">
+      <Button onClick={createBackup} disabled={creating} size="sm">
         <Plus className={`h-4 w-4 mr-2 ${creating ? 'animate-spin' : ''}`} />
         {creating ? 'Creando...' : 'Crear Backup'}
       </Button>
@@ -492,7 +492,7 @@ export default function BackupsPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Database className="h-5 w-5 text-blue-600" />
+                  <Database className="h-5 w-5 text-primary" />
                   <span>Gestión de Backups</span>
                 </CardTitle>
                 <CardDescription>
@@ -502,7 +502,7 @@ export default function BackupsPage() {
               <CardContent>
                 {loading ? (
                   <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
                     <p className="text-muted-foreground">Cargando backups...</p>
                   </div>
                 ) : (backups && backups.length === 0) ? (
@@ -532,7 +532,7 @@ export default function BackupsPage() {
                               {backup.compressed && (
                                 <>
                                   <span>•</span>
-                                  <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700">
+                                  <Badge variant="outline" className="text-xs">
                                     Comprimido
                                   </Badge>
                                 </>
@@ -627,12 +627,12 @@ export default function BackupsPage() {
                       <p className="text-xs text-green-700">Funcionando correctamente</p>
                     </div>
                     
-                    <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="p-3 bg-muted rounded-lg border border-border">
                       <div className="flex items-center space-x-2 mb-1">
-                        <Clock className="h-4 w-4 text-blue-600" />
-                        <span className="text-sm font-medium text-blue-800">Próximo Backup</span>
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-medium text-foreground">Próximo Backup</span>
                       </div>
-                      <p className="text-xs text-blue-700">Programado automáticamente</p>
+                      <p className="text-xs text-muted-foreground">Programado automáticamente</p>
                     </div>
                   </div>
                   
@@ -664,7 +664,7 @@ export default function BackupsPage() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
-                    <HardDrive className="h-5 w-5 text-purple-600" />
+                    <HardDrive className="h-5 w-5 text-primary" />
                     <span>Métricas de Rendimiento</span>
                   </CardTitle>
                   <CardDescription>
@@ -675,11 +675,11 @@ export default function BackupsPage() {
                   {stats && (
                     <>
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="text-center p-3 bg-purple-50 rounded-lg">
-                          <div className="text-lg font-bold text-purple-700">
+                        <div className="text-center p-3 bg-muted rounded-lg">
+                          <div className="text-lg font-bold text-foreground">
                             {stats.successRate?.toFixed(1) || 0}%
                           </div>
-                          <div className="text-xs text-purple-600">Tasa de Éxito</div>
+                          <div className="text-xs text-muted-foreground">Tasa de Éxito</div>
                         </div>
                         
                         <div className="text-center p-3 bg-orange-50 rounded-lg">

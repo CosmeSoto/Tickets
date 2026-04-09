@@ -101,7 +101,6 @@ export async function PATCH(
         console.error('[ASSIGN] Error enviando notificaciones:', err)
       })
 
-      // ⭐ NUEVO: Enviar email al técnico asignado
       const { 
         triggerTicketAssignedToTechnicianEmail,
         triggerTicketAssignedToClientEmail 
@@ -109,6 +108,20 @@ export async function PATCH(
       
       triggerTicketAssignedToTechnicianEmail(ticketId)
       triggerTicketAssignedToClientEmail(ticketId)
+    }
+
+    // Notificar al técnico anterior cuando es desasignado
+    if (!assignmentData.assigneeId && currentTicket.assigneeId) {
+      const { NotificationService } = await import('@/lib/services/notification-service')
+      await NotificationService.push({
+        userId: currentTicket.assigneeId,
+        type: 'INFO',
+        title: 'Ticket desasignado',
+        message: `El ticket ha sido desasignado de ti por ${session.user.name || 'un administrador'}`,
+        ticketId,
+      }).catch(err => {
+        console.error('[ASSIGN] Error notificando desasignación:', err)
+      })
     }
 
     return NextResponse.json({

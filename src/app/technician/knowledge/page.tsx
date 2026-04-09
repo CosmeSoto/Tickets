@@ -208,14 +208,13 @@ export default function TechnicianKnowledgePage() {
           </CardContent>
         </Card>
 
-        {/* Panel de Estadísticas con Tema TECHNICIAN */}
+        {/* Panel de Estadísticas */}
         <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
           <SymmetricStatsCard
             title="Total Artículos"
             value={stats.total}
             icon={BookOpen}
             color="blue"
-            role="TECHNICIAN"
           />
           
           <SymmetricStatsCard
@@ -223,7 +222,6 @@ export default function TechnicianKnowledgePage() {
             value={stats.published}
             icon={FileText}
             color="green"
-            role="TECHNICIAN"
             badge={stats.total > 0 ? {
               text: `${Math.round((stats.published / stats.total) * 100)}%`,
               variant: 'secondary'
@@ -235,7 +233,6 @@ export default function TechnicianKnowledgePage() {
             value={stats.totalViews}
             icon={Eye}
             color="purple"
-            role="TECHNICIAN"
           />
           
           <SymmetricStatsCard
@@ -243,7 +240,6 @@ export default function TechnicianKnowledgePage() {
             value={`${stats.avgHelpful}%`}
             icon={ThumbsUp}
             color="yellow"
-            role="TECHNICIAN"
             status={stats.avgHelpful >= 80 ? 'success' : 'normal'}
           />
         </div>

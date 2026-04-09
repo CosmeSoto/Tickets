@@ -17,6 +17,8 @@ import {
   Loader2,
   AlertCircle,
   FileDown,
+  Star,
+  SmilePlus,
 } from 'lucide-react'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -91,6 +93,28 @@ interface SLAComplianceRow {
   compliant: number
   breached: number
   complianceRate: number
+}
+
+interface SatisfactionReport {
+  totalRatings: number
+  avgRating: number | null
+  distribution: Record<number, number>
+  categoryAverages: {
+    responseTime: number | null
+    technicalSkill: number | null
+    communication: number | null
+    problemResolution: number | null
+  }
+  satisfactionRate: number | null
+  byFamily: {
+    familyId: string
+    familyName: string
+    familyCode: string
+    familyColor: string | null
+    totalRatings: number
+    avgRating: number
+    satisfactionRate: number
+  }[]
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -216,6 +240,29 @@ function exportSLACSV(data: SLAComplianceRow[], familyName: string): void {
   downloadCSV(`cumplimiento-sla-${familyName}-${new Date().toISOString().split('T')[0]}.csv`, [header, ...rows])
 }
 
+function exportSatisfactionCSV(data: SatisfactionReport, familyName: string): void {
+  const header = ['Familia', 'Total Calificaciones', 'Promedio', 'Tasa Satisfacción (%)', '★1', '★2', '★3', '★4', '★5']
+  const rows = data.byFamily.length > 0
+    ? data.byFamily.map((r) => [
+        r.familyName,
+        String(r.totalRatings),
+        String(r.avgRating),
+        String(r.satisfactionRate),
+        '—', '—', '—', '—', '—',
+      ])
+    : [[
+        familyName,
+        String(data.totalRatings),
+        data.avgRating !== null ? String(data.avgRating) : '—',
+        data.satisfactionRate !== null ? String(data.satisfactionRate) : '—',
+        String(data.distribution[1] ?? 0),
+        String(data.distribution[2] ?? 0),
+        String(data.distribution[3] ?? 0),
+        String(data.distribution[4] ?? 0),
+        String(data.distribution[5] ?? 0),
+      ]]
+  downloadCSV(`satisfaccion-${familyName}-${new Date().toISOString().split('T')[0]}.csv`, [header, ...rows])
+}
 // ─── PDF / Print Export ───────────────────────────────────────────────────────
 
 function exportPDF(
@@ -225,6 +272,7 @@ function exportPDF(
   techniciansData: TechnicianPerformance[],
   trendsData: TemporalTrendPoint[],
   slaData: SLAComplianceRow[],
+  satisfactionData: SatisfactionReport | null,
   granularity: string
 ): void {
   const familyName = family ? family.name : 'Todas las familias'
@@ -298,6 +346,25 @@ function exportPDF(
     technicians: 'Rendimiento de Técnicos',
     trends: `Tendencias Temporales (${granularity === 'day' ? 'Diario' : granularity === 'week' ? 'Semanal' : 'Mensual'})`,
     sla: 'Cumplimiento de SLA',
+    satisfaction: 'Satisfacción del Cliente',
+  }
+
+  if (tab === 'satisfaction' && satisfactionData) {
+    tableHTML = `
+      <table>
+        <thead><tr>
+          <th>Familia</th><th>Calificaciones</th><th>Promedio</th><th>Satisfacción %</th>
+        </tr></thead>
+        <tbody>
+          ${satisfactionData.byFamily.length > 0
+            ? satisfactionData.byFamily.map((r) => `<tr>
+                <td>${r.familyName}</td><td>${r.totalRatings}</td>
+                <td>★ ${r.avgRating}</td><td>${r.satisfactionRate}%</td>
+              </tr>`).join('')
+            : `<tr><td colspan="4">Total: ${satisfactionData.totalRatings} calificaciones · Promedio: ★ ${satisfactionData.avgRating ?? '—'} · Satisfacción: ${satisfactionData.satisfactionRate ?? '—'}%</td></tr>`
+          }
+        </tbody>
+      </table>`
   }
 
   const html = `<!DOCTYPE html>
@@ -332,9 +399,15 @@ function exportPDF(
 </body>
 </html>`
 
-  const encoded = btoa(unescape(encodeURIComponent(html)))
-  const win = window.open(`data:text/html;base64,${encoded}`, '_blank')
-  if (win) win.focus()
+  // Usar Blob en lugar de data: URL (Chrome bloquea data: URLs en window.open)
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const win = window.open(url, '_blank')
+  if (win) {
+    win.focus()
+    // Revocar el URL del blob después de que la ventana cargue
+    setTimeout(() => URL.revokeObjectURL(url), 10_000)
+  }
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -345,7 +418,7 @@ export default function ReportsPage() {
   const [selectedFamilyId, setSelectedFamilyId] = useState<string>('all')
 
   // Active tab
-  const [activeTab, setActiveTab] = useState<'executive' | 'technicians' | 'trends' | 'sla'>('executive')
+  const [activeTab, setActiveTab] = useState<'executive' | 'technicians' | 'trends' | 'sla' | 'satisfaction'>('executive')
 
   // Granularity for trends
   const [granularity, setGranularity] = useState<'day' | 'week' | 'month'>('month')
@@ -359,6 +432,7 @@ export default function ReportsPage() {
   const [techniciansData, setTechniciansData] = useState<TechnicianPerformance[]>([])
   const [trendsData, setTrendsData] = useState<TemporalTrendPoint[]>([])
   const [slaData, setSlaData] = useState<SLAComplianceRow[]>([])
+  const [satisfactionData, setSatisfactionData] = useState<SatisfactionReport | null>(null)
 
   // Loading states
   const [loadingFamilies, setLoadingFamilies] = useState(true)
@@ -436,6 +510,10 @@ export default function ReportsPage() {
         const res = await fetch(`${baseUrl}?type=sla${dateSuffix}`)
         const json = await res.json()
         if (json.success) setSlaData(json.data ?? [])
+      } else if (activeTab === 'satisfaction') {
+        const res = await fetch(`${baseUrl}?type=satisfaction${dateSuffix}`)
+        const json = await res.json()
+        if (json.success) setSatisfactionData(json.data ?? null)
       }
     } catch {
       setError('Error al cargar los datos del reporte.')
@@ -457,14 +535,15 @@ export default function ReportsPage() {
     else if (activeTab === 'technicians') exportTechniciansCSV(techniciansData, familyDisplayName)
     else if (activeTab === 'trends') exportTrendsCSV(trendsData, familyDisplayName)
     else if (activeTab === 'sla') exportSLACSV(slaData, familyDisplayName)
+    else if (activeTab === 'satisfaction' && satisfactionData) exportSatisfactionCSV(satisfactionData, familyDisplayName)
     logExport('csv')
-  }, [activeTab, executiveData, techniciansData, trendsData, slaData, familyDisplayName, logExport])
+  }, [activeTab, executiveData, techniciansData, trendsData, slaData, satisfactionData, familyDisplayName, logExport])
 
   // ── PDF handler ──
   const handleExportPDF = useCallback(() => {
-    exportPDF(selectedFamily, activeTab, executiveData, techniciansData, trendsData, slaData, granularity)
+    exportPDF(selectedFamily, activeTab, executiveData, techniciansData, trendsData, slaData, satisfactionData, granularity)
     logExport('pdf')
-  }, [selectedFamily, activeTab, executiveData, techniciansData, trendsData, slaData, granularity, logExport])
+  }, [selectedFamily, activeTab, executiveData, techniciansData, trendsData, slaData, satisfactionData, granularity, logExport])
 
   return (
     <RoleDashboardLayout title="Reportes Multi-Familia" subtitle="Análisis de desempeño por familia de soporte">
@@ -554,10 +633,10 @@ export default function ReportsPage() {
 
       {/* Error */}
       {error && (
-        <Card className="border-red-200 bg-red-50">
+        <Card className="border-destructive/30 bg-destructive/5">
           <CardContent className="py-4 flex items-center gap-3">
-            <AlertCircle className="h-5 w-5 text-red-500" />
-            <span className="text-sm text-red-700">{error}</span>
+            <AlertCircle className="h-5 w-5 text-destructive" />
+            <span className="text-sm text-destructive">{error}</span>
             <Button variant="outline" size="sm" onClick={loadReportData} className="ml-auto">
               Reintentar
             </Button>
@@ -571,60 +650,65 @@ export default function ReportsPage() {
         onValueChange={(v) => setActiveTab(v as typeof activeTab)}
         className="space-y-4"
       >
-        <div className="flex flex-col gap-3">
-          {/* Tabs + action buttons row */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <TabsList className="grid grid-cols-4 w-full sm:w-auto">
-              <TabsTrigger value="executive" className="flex items-center gap-1.5">
-                <BarChart3 className="h-4 w-4" />
-                <span className="hidden md:inline">Resumen Ejecutivo</span>
-                <span className="md:hidden">Resumen</span>
+        <div className="flex flex-col gap-2">
+          {/* Tabs — scroll horizontal en mobile */}
+          <div className="overflow-x-auto -mx-1 px-1">
+            <TabsList className="inline-flex w-max min-w-full sm:w-full sm:grid sm:grid-cols-5">
+              <TabsTrigger value="executive" className="flex items-center gap-1.5 whitespace-nowrap">
+                <BarChart3 className="h-4 w-4 flex-shrink-0" />
+                <span className="hidden lg:inline">Resumen Ejecutivo</span>
+                <span className="lg:hidden">Resumen</span>
               </TabsTrigger>
-              <TabsTrigger value="technicians" className="flex items-center gap-1.5">
-                <Users className="h-4 w-4" />
+              <TabsTrigger value="technicians" className="flex items-center gap-1.5 whitespace-nowrap">
+                <Users className="h-4 w-4 flex-shrink-0" />
                 <span>Técnicos</span>
               </TabsTrigger>
-              <TabsTrigger value="trends" className="flex items-center gap-1.5">
-                <TrendingUp className="h-4 w-4" />
+              <TabsTrigger value="trends" className="flex items-center gap-1.5 whitespace-nowrap">
+                <TrendingUp className="h-4 w-4 flex-shrink-0" />
                 <span>Tendencias</span>
               </TabsTrigger>
-              <TabsTrigger value="sla" className="flex items-center gap-1.5">
-                <ShieldCheck className="h-4 w-4" />
-                <span className="hidden md:inline">Cumplimiento SLA</span>
-                <span className="md:hidden">SLA</span>
+              <TabsTrigger value="sla" className="flex items-center gap-1.5 whitespace-nowrap">
+                <ShieldCheck className="h-4 w-4 flex-shrink-0" />
+                <span className="hidden lg:inline">Cumplimiento SLA</span>
+                <span className="lg:hidden">SLA</span>
+              </TabsTrigger>
+              <TabsTrigger value="satisfaction" className="flex items-center gap-1.5 whitespace-nowrap">
+                <Star className="h-4 w-4 flex-shrink-0" />
+                <span className="hidden lg:inline">Satisfacción</span>
+                <span className="lg:hidden">★</span>
               </TabsTrigger>
             </TabsList>
+          </div>
 
-            {/* Action buttons */}
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={loadReportData}
-                disabled={loadingData}
-              >
-                <RefreshCw className={`h-4 w-4 sm:mr-1.5 ${loadingData ? 'animate-spin' : ''}`} />
-                <span className="hidden sm:inline">Actualizar</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExportCSV}
-                disabled={loadingData}
-              >
-                <Download className="h-4 w-4 sm:mr-1.5" />
-                <span className="hidden sm:inline">CSV</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExportPDF}
-                disabled={loadingData}
-              >
-                <FileDown className="h-4 w-4 sm:mr-1.5" />
-                <span className="hidden sm:inline">PDF</span>
-              </Button>
-            </div>
+          {/* Action buttons — siempre en su propia fila, alineados a la derecha */}
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadReportData}
+              disabled={loadingData}
+            >
+              <RefreshCw className={`h-4 w-4 mr-1.5 ${loadingData ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Actualizar</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportCSV}
+              disabled={loadingData}
+            >
+              <Download className="h-4 w-4 mr-1.5" />
+              <span className="hidden sm:inline">CSV</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportPDF}
+              disabled={loadingData}
+            >
+              <FileDown className="h-4 w-4 mr-1.5" />
+              <span className="hidden sm:inline">PDF</span>
+            </Button>
           </div>
         </div>
 
@@ -656,6 +740,11 @@ export default function ReportsPage() {
         {/* ── Tab: Cumplimiento de SLA ── */}
         <TabsContent value="sla">
           <SLATab data={slaData} loading={loadingData} />
+        </TabsContent>
+
+        {/* ── Tab: Satisfacción del Cliente ── */}
+        <TabsContent value="satisfaction">
+          <SatisfactionTab data={satisfactionData} loading={loadingData} />
         </TabsContent>
       </Tabs>
     </div>
@@ -701,7 +790,7 @@ function ExecutiveSummaryTab({
         <Card>
           <CardContent className="pt-4 pb-3">
             <p className="text-xs text-muted-foreground">Abiertos</p>
-            <p className="text-2xl font-bold mt-1 text-yellow-600">{totalOpen.toLocaleString()}</p>
+            <p className="text-2xl font-bold mt-1 text-orange-600">{totalOpen.toLocaleString()}</p>
           </CardContent>
         </Card>
         <Card>
@@ -721,9 +810,9 @@ function ExecutiveSummaryTab({
       </div>
 
       {isAllFamilies && (
-        <Card className="bg-blue-50 border-blue-200">
+        <Card className="bg-muted/30 border-border">
           <CardContent className="py-3">
-            <p className="text-sm text-blue-700 font-medium">
+            <p className="text-sm text-muted-foreground font-medium">
               Vista comparativa — mostrando todas las familias activas
             </p>
           </CardContent>
@@ -995,6 +1084,45 @@ function TrendsTab({
   isAllFamilies: boolean
 }) {
   if (loading) return <TabLoadingState />
+  if (data.length === 0) return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Tendencias Temporales
+          </CardTitle>
+          <Select value={granularity} onValueChange={(v) => onGranularityChange(v as typeof granularity)}>
+            <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="day">Diario</SelectItem>
+              <SelectItem value="week">Semanal</SelectItem>
+              <SelectItem value="month">Mensual</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <TabEmptyState message="No hay datos de tendencias para el período seleccionado." />
+      </CardContent>
+    </Card>
+  )
+
+  // Totales para KPIs
+  const totalTickets = data.reduce((s, d) => s + d.count, 0)
+  const periods = Array.from(new Set(data.map(d => d.period))).sort()
+  const lastPeriodCount = (() => {
+    const last = periods[periods.length - 1]
+    return data.filter(d => d.period === last).reduce((s, d) => s + d.count, 0)
+  })()
+  const prevPeriodCount = (() => {
+    if (periods.length < 2) return null
+    const prev = periods[periods.length - 2]
+    return data.filter(d => d.period === prev).reduce((s, d) => s + d.count, 0)
+  })()
+  const trend = prevPeriodCount !== null && prevPeriodCount > 0
+    ? Math.round(((lastPeriodCount - prevPeriodCount) / prevPeriodCount) * 100)
+    : null
 
   // Build chart data
   const { chartData, familyKeys } = (() => {
@@ -1004,26 +1132,20 @@ function TrendsTab({
         familyKeys: [] as string[],
       }
     }
-
-    // Collect unique family names
     const familyNames = Array.from(new Set(data.map((d) => d.familyName ?? 'Sin familia')))
-
-    // Build one row per period with a key per family
     const periodMap = new Map<string, Record<string, number>>()
     for (const d of data) {
       const fname = d.familyName ?? 'Sin familia'
       if (!periodMap.has(d.period)) periodMap.set(d.period, {})
       periodMap.get(d.period)![fname] = (periodMap.get(d.period)![fname] ?? 0) + d.count
     }
-
     const chartData = Array.from(periodMap.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([period, counts]) => ({ period, ...counts }))
-
     return { chartData, familyKeys: familyNames }
   })()
 
-  // Table data: aggregate by period for display
+  // Table data
   const tableData = (() => {
     if (!isAllFamilies) return data.map((d) => ({ period: d.period, count: d.count }))
     const map = new Map<string, number>()
@@ -1034,6 +1156,36 @@ function TrendsTab({
   })()
 
   return (
+    <div className="space-y-4">
+      {/* KPIs */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground">Total en el período</p>
+            <p className="text-2xl font-bold mt-1">{totalTickets.toLocaleString()}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground">Último período</p>
+            <p className="text-2xl font-bold mt-1">{lastPeriodCount.toLocaleString()}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground">Variación vs anterior</p>
+            <p className={`text-2xl font-bold mt-1 ${
+              trend === null ? 'text-muted-foreground'
+              : trend > 0 ? 'text-orange-600'
+              : trend < 0 ? 'text-green-600'
+              : 'text-muted-foreground'
+            }`}>
+              {trend === null ? '—' : `${trend > 0 ? '+' : ''}${trend}%`}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
     <Card>
       <CardHeader>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -1059,9 +1211,6 @@ function TrendsTab({
         </div>
       </CardHeader>
       <CardContent>
-        {chartData.length === 0 ? (
-          <TabEmptyState message="No hay datos de tendencias para el período seleccionado." />
-        ) : (
           <div className="space-y-6">
             {/* Chart */}
             <ResponsiveContainer width="100%" height={300}>
@@ -1073,7 +1222,7 @@ function TrendsTab({
                   tickLine={false}
                   axisLine={false}
                 />
-                <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} allowDecimals={false} />
                 <Tooltip contentStyle={{ fontSize: 12, borderRadius: 6 }} />
                 {isAllFamilies && familyKeys.length > 0 ? (
                   <>
@@ -1090,34 +1239,57 @@ function TrendsTab({
                     ))}
                   </>
                 ) : (
-                  <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Tickets" />
+                  <Bar dataKey="count" fill={FAMILY_COLORS[0]} radius={[4, 4, 0, 0]} name="Tickets" />
                 )}
               </BarChart>
             </ResponsiveContainer>
 
-            {/* Table fallback */}
+            {/* Table */}
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/50">
                     <th className="text-left p-3 font-medium">Período</th>
                     <th className="text-right p-3 font-medium">Tickets</th>
+                    <th className="text-right p-3 font-medium">Variación</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {tableData.map((row) => (
-                    <tr key={row.period} className="border-b hover:bg-muted/30 transition-colors">
-                      <td className="p-3 font-mono text-sm">{row.period}</td>
-                      <td className="p-3 text-right font-semibold">{row.count}</td>
-                    </tr>
-                  ))}
+                  {tableData.map((row, idx) => {
+                    const prev = idx > 0 ? tableData[idx - 1].count : null
+                    const delta = prev !== null && prev > 0
+                      ? Math.round(((row.count - prev) / prev) * 100)
+                      : null
+                    return (
+                      <tr key={row.period} className="border-b hover:bg-muted/30 transition-colors">
+                        <td className="p-3 font-mono text-sm">{row.period}</td>
+                        <td className="p-3 text-right font-semibold">{row.count}</td>
+                        <td className="p-3 text-right">
+                          {delta === null ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <span className={delta > 0 ? 'text-orange-600' : delta < 0 ? 'text-green-600' : 'text-muted-foreground'}>
+                              {delta > 0 ? '+' : ''}{delta}%
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
+                <tfoot>
+                  <tr className="border-t-2 bg-muted/50 font-semibold">
+                    <td className="p-3">Total</td>
+                    <td className="p-3 text-right">{totalTickets.toLocaleString()}</td>
+                    <td className="p-3 text-right text-muted-foreground">—</td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </div>
-        )}
       </CardContent>
     </Card>
+    </div>
   )
 }
 
@@ -1226,8 +1398,186 @@ function SLATab({
   )
 }
 
-// ── Shared UI ──────────────────────────────────────────────────────────────────
+// ── Satisfaction Tab ───────────────────────────────────────────────────────────
 
+function SatisfactionTab({ data, loading }: { data: SatisfactionReport | null; loading: boolean }) {
+  if (loading) return <TabLoadingState />
+  if (!data || data.totalRatings === 0) return <TabEmptyState message="No hay calificaciones registradas para los filtros seleccionados." />
+
+  const stars = [5, 4, 3, 2, 1]
+  const starLabels: Record<number, string> = { 5: 'Excelente', 4: 'Bueno', 3: 'Regular', 2: 'Malo', 1: 'Muy malo' }
+  const catLabels: Record<string, string> = {
+    responseTime: 'Tiempo de Respuesta',
+    technicalSkill: 'Habilidad Técnica',
+    communication: 'Comunicación',
+    problemResolution: 'Resolución del Problema',
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground">Total Calificaciones</p>
+            <p className="text-2xl font-bold mt-1">{data.totalRatings}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground">Promedio General</p>
+            <p className="text-2xl font-bold mt-1 text-amber-500">
+              {data.avgRating !== null ? `★ ${data.avgRating.toFixed(1)}` : '—'}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground">Tasa de Satisfacción</p>
+            <p className={`text-2xl font-bold mt-1 ${
+              data.satisfactionRate !== null
+                ? data.satisfactionRate >= 80 ? 'text-green-600' : data.satisfactionRate >= 60 ? 'text-yellow-600' : 'text-red-600'
+                : 'text-muted-foreground'
+            }`}>
+              {data.satisfactionRate !== null ? `${data.satisfactionRate}%` : '—'}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground">Calificaciones 4-5★</p>
+            <p className="text-2xl font-bold mt-1 text-green-600">
+              {((data.distribution[4] ?? 0) + (data.distribution[5] ?? 0)).toLocaleString()}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Distribución de estrellas */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Star className="h-4 w-4" />
+              Distribución de Calificaciones
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {stars.map((star) => {
+              const count = data.distribution[star] ?? 0
+              const pct = data.totalRatings > 0 ? Math.round((count / data.totalRatings) * 100) : 0
+              return (
+                <div key={star} className="flex items-center gap-3">
+                  <span className="text-sm font-medium w-20 flex-shrink-0 text-amber-500">
+                    {'★'.repeat(star)}{'☆'.repeat(5 - star)}
+                  </span>
+                  <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${star >= 4 ? 'bg-green-500' : star === 3 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <span className="text-sm text-muted-foreground w-16 text-right flex-shrink-0">
+                    {count} ({pct}%)
+                  </span>
+                </div>
+              )
+            })}
+          </CardContent>
+        </Card>
+
+        {/* Promedios por categoría */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <SmilePlus className="h-4 w-4" />
+              Calificación por Categoría
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {Object.entries(catLabels).map(([key, label]) => {
+              const val = data.categoryAverages[key as keyof typeof data.categoryAverages]
+              const pct = val !== null ? (val / 5) * 100 : 0
+              return (
+                <div key={key} className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">{label}</span>
+                    <span className="font-medium text-amber-500">
+                      {val !== null ? `★ ${val.toFixed(1)}` : '—'}
+                    </span>
+                  </div>
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${pct >= 80 ? 'bg-green-500' : pct >= 60 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Desglose por familia */}
+      {data.byFamily.length > 1 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Satisfacción por Familia</CardTitle>
+            <CardDescription>Comparativa de calificaciones entre familias de soporte</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="text-left p-3 font-medium">Familia</th>
+                    <th className="text-right p-3 font-medium">Calificaciones</th>
+                    <th className="text-right p-3 font-medium">Promedio</th>
+                    <th className="text-right p-3 font-medium">Satisfacción</th>
+                    <th className="p-3 font-medium">Barra</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.byFamily.map((row) => (
+                    <tr key={row.familyId} className="border-b hover:bg-muted/30 transition-colors">
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          {row.familyColor && (
+                            <span className="inline-block h-3 w-3 rounded-full flex-shrink-0" style={{ backgroundColor: row.familyColor }} />
+                          )}
+                          <span className="font-medium">{row.familyName}</span>
+                          <Badge variant="outline" className="text-xs">{row.familyCode}</Badge>
+                        </div>
+                      </td>
+                      <td className="p-3 text-right">{row.totalRatings}</td>
+                      <td className="p-3 text-right font-medium text-amber-500">★ {row.avgRating.toFixed(1)}</td>
+                      <td className="p-3 text-right">
+                        <span className={`font-semibold ${row.satisfactionRate >= 80 ? 'text-green-600' : row.satisfactionRate >= 60 ? 'text-yellow-600' : 'text-red-600'}`}>
+                          {row.satisfactionRate}%
+                        </span>
+                      </td>
+                      <td className="p-3 min-w-[120px]">
+                        <div className="h-2 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${row.satisfactionRate >= 80 ? 'bg-green-500' : row.satisfactionRate >= 60 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                            style={{ width: `${row.satisfactionRate}%` }}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
+
+// ── Shared UI ──────────────────────────────────────────────────────────────────
 function TabLoadingState() {
   return (
     <Card>

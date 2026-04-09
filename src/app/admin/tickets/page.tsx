@@ -128,14 +128,13 @@ export default function AdminTicketsPage() {
       }
     >
       <div className="space-y-6">
-        {/* Panel de Estadísticas con Tema ADMIN */}
+        {/* Panel de Estadísticas */}
         <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
           <SymmetricStatsCard
             title="Total Tickets"
             value={stats.total}
             icon={Ticket}
             color="purple"
-            role="ADMIN"
           />
           
           <SymmetricStatsCard
@@ -143,7 +142,6 @@ export default function AdminTicketsPage() {
             value={stats.open}
             icon={AlertCircle}
             color="blue"
-            role="ADMIN"
             badge={stats.total > 0 ? {
               text: `${Math.round((stats.open / stats.total) * 100)}%`,
               variant: 'secondary'
@@ -156,7 +154,6 @@ export default function AdminTicketsPage() {
             value={stats.inProgress}
             icon={Clock}
             color="orange"
-            role="ADMIN"
             badge={stats.total > 0 ? {
               text: `${Math.round((stats.inProgress / stats.total) * 100)}%`,
               variant: 'secondary'
@@ -168,7 +165,6 @@ export default function AdminTicketsPage() {
             value={stats.unassigned}
             icon={UserX}
             color="red"
-            role="ADMIN"
             status={stats.unassigned > 5 ? 'error' : 'normal'}
             badge={stats.total > 0 ? {
               text: `${Math.round((stats.unassigned / stats.total) * 100)}%`,

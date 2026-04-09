@@ -241,7 +241,7 @@ export function OAuthSettingsTab() {
   if (loading) {
     return (
       <div className='flex items-center justify-center h-64'>
-        <Loader2 className='h-12 w-12 animate-spin text-blue-600' />
+        <Loader2 className='h-12 w-12 animate-spin text-primary' />
       </div>
     )
   }
@@ -264,7 +264,7 @@ export function OAuthSettingsTab() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
+              <div className="p-2 bg-muted rounded-lg">
                 <svg className="h-6 w-6" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                   <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -385,7 +385,7 @@ export function OAuthSettingsTab() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
+              <div className="p-2 bg-muted rounded-lg">
                 <svg className="h-6 w-6" viewBox="0 0 23 23">
                   <path fill="#f3f3f3" d="M0 0h23v23H0z"/>
                   <path fill="#f35325" d="M1 1h10v10H1z"/>
@@ -518,17 +518,17 @@ export function OAuthSettingsTab() {
       </Card>
 
       {/* Help Section */}
-      <Card className="bg-blue-50 border-blue-200">
+      <Card className="bg-muted border-border">
         <CardHeader>
-          <CardTitle className="text-blue-900 flex items-center space-x-2">
+          <CardTitle className="text-foreground flex items-center space-x-2">
             <Key className="h-5 w-5" />
             <span>¿Necesitas ayuda?</span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="text-sm text-blue-800 space-y-2">
+        <CardContent className="text-sm text-muted-foreground space-y-2">
           <p><strong>Google:</strong> Crea credenciales en <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" className="underline">Google Cloud Console</a></p>
           <p><strong>Microsoft:</strong> Registra tu app en <a href="https://portal.azure.com/" target="_blank" rel="noopener noreferrer" className="underline">Azure Portal</a></p>
-          <p className="mt-4">Consulta la documentación completa en <code className="bg-blue-100 px-2 py-1 rounded">OAUTH_SETUP_GUIDE.md</code></p>
+          <p className="mt-4">Consulta la documentación completa en <code className="bg-muted px-2 py-1 rounded">OAUTH_SETUP_GUIDE.md</code></p>
         </CardContent>
       </Card>
     </div>

@@ -394,4 +394,79 @@ export class ReportService {
 
     return results
   }
+
+  /**
+   * Reporte de satisfacción del cliente.
+   * Retorna calificaciones promedio, distribución de estrellas y tendencia.
+   */
+  static async getSatisfactionReport(
+    familyId: string | 'all',
+    dateRange?: DateRange
+  ) {
+    const ticketWhere = buildTicketWhere(familyId, dateRange)
+
+    // Obtener todas las calificaciones del período
+    const ratings = await prisma.ticket_ratings.findMany({
+      where: {
+        tickets: ticketWhere,
+      },
+      select: {
+        rating: true,
+        responseTime: true,
+        technicalSkill: true,
+        communication: true,
+        problemResolution: true,
+        createdAt: true,
+        tickets: {
+          select: {
+            familyId: true,
+            family: { select: { id: true, name: true, code: true, color: true } },
+          },
+        },
+      },
+    })
+
+    if (ratings.length === 0) {
+      return {
+        totalRatings: 0,
+        avgRating: null,
+        distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+        categoryAverages: { responseTime: null, technicalSkill: null, communication: null, problemResolution: null },
+        satisfactionRate: null,
+        byFamily: [],
+      }
+    }
+
+    const distribution: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+    for (const r of ratings) distribution[r.rating] = (distribution[r.rating] ?? 0) + 1
+
+    const avgRating = Math.round(ratings.reduce((s, r) => s + r.rating, 0) / ratings.length * 10) / 10
+    const satisfactionRate = Math.round(ratings.filter(r => r.rating >= 4).length / ratings.length * 1000) / 10
+
+    const categoryAverages = {
+      responseTime: Math.round(ratings.reduce((s, r) => s + r.responseTime, 0) / ratings.length * 10) / 10,
+      technicalSkill: Math.round(ratings.reduce((s, r) => s + r.technicalSkill, 0) / ratings.length * 10) / 10,
+      communication: Math.round(ratings.reduce((s, r) => s + r.communication, 0) / ratings.length * 10) / 10,
+      problemResolution: Math.round(ratings.reduce((s, r) => s + r.problemResolution, 0) / ratings.length * 10) / 10,
+    }
+
+    const familyMap = new Map<string, { name: string; code: string; color: string | null; ratings: number[] }>()
+    for (const r of ratings) {
+      const fam = r.tickets?.family
+      if (!fam) continue
+      if (!familyMap.has(fam.id)) familyMap.set(fam.id, { name: fam.name, code: fam.code, color: fam.color, ratings: [] })
+      familyMap.get(fam.id)!.ratings.push(r.rating)
+    }
+    const byFamily = Array.from(familyMap.entries()).map(([id, f]) => ({
+      familyId: id,
+      familyName: f.name,
+      familyCode: f.code,
+      familyColor: f.color,
+      totalRatings: f.ratings.length,
+      avgRating: Math.round(f.ratings.reduce((s, r) => s + r, 0) / f.ratings.length * 10) / 10,
+      satisfactionRate: Math.round(f.ratings.filter(r => r >= 4).length / f.ratings.length * 1000) / 10,
+    }))
+
+    return { totalRatings: ratings.length, avgRating, distribution, categoryAverages, satisfactionRate, byFamily }
+  }
 }

@@ -164,14 +164,13 @@ export default function TechnicianTicketsPage() {
       }
     >
       <div className="space-y-6">
-        {/* Panel de Estadísticas con Tema TECHNICIAN */}
+        {/* Panel de Estadísticas */}
         <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
           <SymmetricStatsCard
             title="Abiertos"
             value={stats.open}
             icon={AlertCircle}
             color="orange"
-            role="TECHNICIAN"
             badge={stats.total > 0 ? {
               text: `${Math.round((stats.open / stats.total) * 100)}%`,
               variant: 'secondary'
@@ -184,7 +183,6 @@ export default function TechnicianTicketsPage() {
             value={stats.inProgress}
             icon={Clock}
             color="blue"
-            role="TECHNICIAN"
             badge={stats.total > 0 ? {
               text: `${Math.round((stats.inProgress / stats.total) * 100)}%`,
               variant: 'secondary'
@@ -196,7 +194,6 @@ export default function TechnicianTicketsPage() {
             value={stats.resolvedToday}
             icon={CheckCircle}
             color="green"
-            role="TECHNICIAN"
             status="success"
             trend={stats.resolvedToday > 0 ? {
               value: stats.resolvedToday,
@@ -210,7 +207,6 @@ export default function TechnicianTicketsPage() {
             value={stats.avgResolutionTime}
             icon={Target}
             color="purple"
-            role="TECHNICIAN"
           />
         </div>
 

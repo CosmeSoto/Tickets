@@ -164,15 +164,15 @@ export default function AdminKnowledgePage() {
       <div className="space-y-6">
         <BackToTickets />
         {/* Nota informativa */}
-        <Card className="border-purple-200 bg-purple-50 dark:bg-purple-950 dark:border-purple-800">
+        <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
           <CardContent className="pt-6">
             <div className="flex items-start gap-3">
-              <Lightbulb className="h-5 w-5 text-purple-600 dark:text-purple-400 mt-0.5" />
+              <Lightbulb className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-purple-900 dark:text-purple-100">
+                <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
                   ¿Cómo crear artículos?
                 </p>
-                <p className="text-sm text-purple-700 dark:text-purple-300 mt-1">
+                <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
                   Los artículos se crean automáticamente desde tickets resueltos. 
                   Ve a un ticket con estado "Resuelto" y haz clic en "Crear Artículo".
                 </p>
@@ -181,14 +181,13 @@ export default function AdminKnowledgePage() {
           </CardContent>
         </Card>
 
-        {/* Panel de Estadísticas con Tema ADMIN */}
+        {/* Panel de Estadísticas */}
         <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
           <SymmetricStatsCard
             title="Total Artículos"
             value={stats.total}
             icon={BookOpen}
             color="blue"
-            role="ADMIN"
           />
           
           <SymmetricStatsCard
@@ -196,7 +195,6 @@ export default function AdminKnowledgePage() {
             value={stats.published}
             icon={FileText}
             color="green"
-            role="ADMIN"
             badge={stats.total > 0 ? {
               text: `${Math.round((stats.published / stats.total) * 100)}%`,
               variant: 'secondary'
@@ -209,7 +207,6 @@ export default function AdminKnowledgePage() {
             value={stats.totalViews}
             icon={Eye}
             color="purple"
-            role="ADMIN"
           />
           
           <SymmetricStatsCard
@@ -217,7 +214,6 @@ export default function AdminKnowledgePage() {
             value={`${stats.avgHelpful}%`}
             icon={ThumbsUp}
             color="yellow"
-            role="ADMIN"
             status={stats.avgHelpful >= 80 ? 'success' : stats.avgHelpful >= 60 ? 'normal' : 'warning'}
           />
         </div>

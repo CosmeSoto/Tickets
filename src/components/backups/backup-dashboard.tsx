@@ -143,7 +143,6 @@ export function BackupDashboard({
           <Button 
             onClick={onCreateBackup}
             size="sm" 
-            className="bg-blue-600 hover:bg-blue-700"
           >
             <Database className="h-4 w-4 mr-2" />
             Crear Backup
@@ -156,8 +155,8 @@ export function BackupDashboard({
         <Card className="relative overflow-hidden">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
-                <Database className="h-6 w-6 text-blue-600" />
+              <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
+                <Database className="h-6 w-6 text-primary" />
               </div>
               <div className="text-right">
                 <div className="text-2xl font-bold text-foreground">
@@ -207,8 +206,8 @@ export function BackupDashboard({
         <Card className="relative overflow-hidden">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <div className="p-3 rounded-lg bg-purple-50 border border-purple-200">
-                <Clock className="h-6 w-6 text-purple-600" />
+              <div className="p-3 rounded-lg bg-muted border border-border">
+                <Clock className="h-6 w-6 text-muted-foreground" />
               </div>
               <div className="text-right">
                 <div className="text-lg font-bold text-foreground">
@@ -263,7 +262,7 @@ export function BackupDashboard({
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
-              <TrendingUp className="h-5 w-5 text-blue-600" />
+              <TrendingUp className="h-5 w-5 text-primary" />
               <span>Análisis de Rendimiento</span>
             </CardTitle>
             <CardDescription>
@@ -285,7 +284,7 @@ export function BackupDashboard({
                     
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium text-foreground">Cobertura Semanal</span>
-                      <span className="text-sm font-bold text-blue-600">
+                      <span className="text-sm font-bold text-foreground">
                         {analysis.recentCount} backups
                       </span>
                     </div>

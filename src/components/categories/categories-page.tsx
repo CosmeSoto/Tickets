@@ -452,22 +452,23 @@ export default function CategoriesPage() {
           </CardHeader>
           
           <CardContent>
-            {/* Filtros y búsqueda en un bloque */}
-            <div className='space-y-4 mb-6'>
-              <div className='flex flex-col sm:flex-row gap-4'>
-                <div className='flex-1'>
-                  <div className='relative'>
-                    <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4' />
-                    <Input
-                      placeholder='Buscar categorías por nombre o descripción...'
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className='pl-10 text-foreground'
-                    />
-                  </div>
-                </div>
+            {/* Filtros y búsqueda */}
+            <div className='space-y-3 mb-6'>
+              {/* Búsqueda — ancho completo */}
+              <div className='relative'>
+                <Search className='absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4 pointer-events-none' />
+                <Input
+                  placeholder='Buscar categorías por nombre o descripción...'
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className='pl-10'
+                />
+              </div>
+
+              {/* Filtros — grid responsivo */}
+              <div className='grid grid-cols-2 sm:grid-cols-4 gap-2'>
                 <Select value={levelFilter} onValueChange={(value) => setLevelFilter(value as any)}>
-                  <SelectTrigger className='w-full sm:w-[200px]'>
+                  <SelectTrigger>
                     <SelectValue placeholder='Nivel' />
                   </SelectTrigger>
                   <SelectContent>
@@ -478,8 +479,9 @@ export default function CategoriesPage() {
                     <SelectItem value='4'>Nivel 4 - Específico</SelectItem>
                   </SelectContent>
                 </Select>
+
                 <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                  <SelectTrigger className='w-full sm:w-[180px]'>
+                  <SelectTrigger>
                     <SelectValue placeholder='Departamento' />
                   </SelectTrigger>
                   <SelectContent>
@@ -489,8 +491,9 @@ export default function CategoriesPage() {
                     ))}
                   </SelectContent>
                 </Select>
+
                 <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as 'all' | 'active' | 'inactive')}>
-                  <SelectTrigger className='w-full sm:w-[150px]'>
+                  <SelectTrigger>
                     <SelectValue placeholder='Estado' />
                   </SelectTrigger>
                   <SelectContent>
@@ -499,8 +502,9 @@ export default function CategoriesPage() {
                     <SelectItem value='inactive'>Inactivas</SelectItem>
                   </SelectContent>
                 </Select>
+
                 <Select value={familyFilter} onValueChange={setFamilyFilter}>
-                  <SelectTrigger className='w-full sm:w-[180px]'>
+                  <SelectTrigger>
                     <SelectValue placeholder='Familia' />
                   </SelectTrigger>
                   <SelectContent>
@@ -513,7 +517,7 @@ export default function CategoriesPage() {
                     {families.map(f => (
                       <SelectItem key={f.id} value={f.id}>
                         <div className='flex items-center space-x-2'>
-                          {f.color && <div className='w-2 h-2 rounded-full' style={{ backgroundColor: f.color }} />}
+                          {f.color && <div className='w-2 h-2 rounded-full flex-shrink-0' style={{ backgroundColor: f.color }} />}
                           <span>{f.name}</span>
                         </div>
                       </SelectItem>

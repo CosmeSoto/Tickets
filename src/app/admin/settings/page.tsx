@@ -216,7 +216,7 @@ export default function SettingsPage() {
     return (
       <div className='flex items-center justify-center h-64'>
         <div className='text-center'>
-          <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto'></div>
+          <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto'></div>
           <p className='mt-2 text-muted-foreground'>Cargando configuración...</p>
         </div>
       </div>
@@ -445,14 +445,14 @@ export default function SettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className='space-y-6'>
-              <div className='rounded-lg border border-blue-200 bg-blue-50 p-4'>
+              <div className='rounded-lg border border-border bg-muted p-4'>
                 <div className='flex items-start space-x-3'>
-                  <Bell className='h-5 w-5 text-blue-600 mt-0.5' />
+                  <Bell className='h-5 w-5 text-muted-foreground mt-0.5' />
                   <div className='space-y-1'>
-                    <h4 className='text-sm font-medium text-blue-900'>
+                    <h4 className='text-sm font-medium text-foreground'>
                       Configuración Global
                     </h4>
-                    <p className='text-sm text-blue-700'>
+                    <p className='text-sm text-muted-foreground'>
                       Esta configuración habilita o deshabilita el módulo de notificaciones para todo el sistema.
                       Cada usuario puede personalizar sus preferencias individuales en Configuración → Notificaciones.
                     </p>
@@ -616,9 +616,9 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Información adicional sobre seguridad */}
-                <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <h4 className="font-medium text-blue-900 mb-2">ℹ️ Información de Seguridad</h4>
-                  <ul className="text-sm text-blue-700 space-y-1">
+                <div className="mt-6 p-4 bg-muted border border-border rounded-lg">
+                  <h4 className="font-medium text-foreground mb-2">ℹ️ Información de Seguridad</h4>
+                  <ul className="text-sm text-muted-foreground space-y-1">
                     <li>• El cierre automático de sesión se activa después del tiempo configurado sin actividad</li>
                     <li>• Se mostrará una advertencia 5 minutos antes de cerrar la sesión</li>
                     <li>• Cualquier acción del usuario (click, tecla, scroll) reinicia el contador</li>
@@ -640,17 +640,16 @@ export default function SettingsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center justify-between p-4 bg-muted border border-border rounded-lg">
                   <div>
-                    <h4 className="font-medium text-blue-900">Sistema de Backups</h4>
-                    <p className="text-sm text-blue-700 mt-1">
+                    <h4 className="font-medium text-foreground">Sistema de Backups</h4>
+                    <p className="text-sm text-muted-foreground mt-1">
                       Accede al módulo completo de gestión de backups con configuración avanzada, 
                       monitoreo en tiempo real y herramientas de restauración.
                     </p>
                   </div>
                   <Button 
                     onClick={() => router.push('/admin/backups')}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
                   >
                     <Database className="h-4 w-4 mr-2" />
                     Ir a Backups

@@ -50,10 +50,10 @@ function getNotificationIcon(type: string) {
 function getNotificationColor(type: string) {
   switch (type) {
     case 'ERROR':
-    case 'CRITICAL': return 'border-l-red-500 bg-red-50/50 hover:bg-red-100/70'
-    case 'WARNING': return 'border-l-orange-500 bg-orange-50/50 hover:bg-orange-100/70'
-    case 'SUCCESS': return 'border-l-green-500 bg-green-50/50 hover:bg-green-100/70'
-    default: return 'border-l-blue-500 bg-blue-50/50 hover:bg-blue-100/70'
+    case 'CRITICAL': return 'border-l-red-500 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-950/60'
+    case 'WARNING': return 'border-l-orange-500 bg-orange-50 dark:bg-orange-950/40 hover:bg-orange-100 dark:hover:bg-orange-950/60'
+    case 'SUCCESS': return 'border-l-green-500 bg-green-50 dark:bg-green-950/40 hover:bg-green-100 dark:hover:bg-green-950/60'
+    default: return 'border-l-blue-500 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-950/60'
   }
 }
 
@@ -61,9 +61,9 @@ function getNotificationBadge(type: string) {
   switch (type) {
     case 'ERROR':
     case 'CRITICAL': return <Badge variant="destructive" className="text-xs">Crítico</Badge>
-    case 'WARNING': return <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800">Atención</Badge>
-    case 'SUCCESS': return <Badge variant="default" className="text-xs bg-green-100 text-green-800">Éxito</Badge>
-    default: return <Badge variant="outline" className="text-xs">Info</Badge>
+    case 'WARNING': return <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">Atención</Badge>
+    case 'SUCCESS': return <Badge variant="default" className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Éxito</Badge>
+    default: return <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">Info</Badge>
   }
 }
 
@@ -234,7 +234,7 @@ export function Notifications({
                     {getNotificationBadge(n.type)}
                     <div className="text-xs text-muted-foreground">{formatTimeAgo(n.createdAt)}</div>
                   </div>
-                  <AlertDescription className="text-sm text-muted-foreground mb-2 leading-relaxed">
+                  <AlertDescription className="text-sm text-foreground/80 mb-2 leading-relaxed">
                     {n.message}
                   </AlertDescription>
                   {n.ticketId && (

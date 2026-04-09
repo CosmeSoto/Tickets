@@ -116,6 +116,28 @@ export async function PATCH(
       await NotificationService.notifyTicketResolved(ticketId).catch(() => {})
     }
 
+    // Notificar al técnico cuando admin cierra el ticket directamente
+    if (newStatus === 'CLOSED' && ticket.assigneeId && session.user.role === 'ADMIN') {
+      await NotificationService.push({
+        userId: ticket.assigneeId,
+        type: 'INFO',
+        title: 'Ticket cerrado',
+        message: `El ticket "${ticket.title}" ha sido cerrado por el administrador`,
+        ticketId,
+      }).catch(() => {})
+    }
+
+    // Notificar al cliente cuando admin cierra directamente (sin calificación)
+    if (newStatus === 'CLOSED' && ticket.clientId && session.user.role === 'ADMIN') {
+      await NotificationService.push({
+        userId: ticket.clientId,
+        type: 'SUCCESS',
+        title: 'Ticket cerrado',
+        message: `Tu ticket "${ticket.title}" ha sido cerrado`,
+        ticketId,
+      }).catch(() => {})
+    }
+
     return NextResponse.json({
       success: true,
       data: {

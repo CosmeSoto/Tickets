@@ -81,21 +81,21 @@ function FamilyHeader({ family }: { family: FamilyBase }) {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
-          <div className="text-center p-3 bg-muted/50 rounded-lg">
-            <p className="text-2xl font-bold">{family._count?.departments ?? 0}</p>
-            <p className="text-xs text-muted-foreground">Departamentos</p>
+          <div className="text-center p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">{family._count?.departments ?? 0}</p>
+            <p className="text-xs text-blue-600 dark:text-blue-500">Departamentos</p>
           </div>
-          <div className="text-center p-3 bg-muted/50 rounded-lg">
-            <p className="text-2xl font-bold">{family._count?.tickets ?? 0}</p>
-            <p className="text-xs text-muted-foreground">Tickets</p>
+          <div className="text-center p-3 bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded-lg">
+            <p className="text-2xl font-bold text-orange-700 dark:text-orange-400">{family._count?.tickets ?? 0}</p>
+            <p className="text-xs text-orange-600 dark:text-orange-500">Tickets</p>
           </div>
-          <div className="text-center p-3 bg-muted/50 rounded-lg">
-            <p className="text-2xl font-bold">{family._count?.technicianFamilyAssignments ?? 0}</p>
-            <p className="text-xs text-muted-foreground">Técnicos</p>
+          <div className="text-center p-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
+            <p className="text-2xl font-bold text-green-700 dark:text-green-400">{family._count?.technicianFamilyAssignments ?? 0}</p>
+            <p className="text-xs text-green-600 dark:text-green-500">Técnicos</p>
           </div>
-          <div className="text-center p-3 bg-muted/50 rounded-lg">
-            <p className="text-2xl font-bold">{family._count?.managerFamilies ?? 0}</p>
-            <p className="text-xs text-muted-foreground">Managers</p>
+          <div className="text-center p-3 bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-lg">
+            <p className="text-2xl font-bold text-purple-700 dark:text-purple-400">{family._count?.managerFamilies ?? 0}</p>
+            <p className="text-xs text-purple-600 dark:text-purple-500">Managers</p>
           </div>
         </div>
       </CardContent>

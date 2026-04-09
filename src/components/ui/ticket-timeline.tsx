@@ -519,12 +519,22 @@ export function TicketTimeline({
         <CardContent>
           {/* Formulario de comentario */}
           {canAddComments && (
-            <div className="mb-6 p-4 border rounded-lg bg-muted space-y-3">
+            <div className={`mb-6 p-4 border rounded-lg space-y-3 transition-colors ${
+              isInternal
+                ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-300 dark:border-amber-700'
+                : 'bg-muted border-border'
+            }`}>
+              {isInternal && (
+                <div className="flex items-center space-x-2 text-xs font-medium text-amber-700 dark:text-amber-400">
+                  <span>🔒 El cliente no verá este comentario</span>
+                </div>
+              )}
               <Textarea
-                placeholder="Agregar un comentario o actualización..."
+                placeholder={isInternal ? "Nota interna para el equipo..." : "Agregar un comentario o actualización..."}
                 value={newComment}
                 onChange={e => setNewComment(e.target.value)}
                 rows={3}
+                className={isInternal ? 'border-amber-300 dark:border-amber-700 focus-visible:ring-amber-400' : ''}
               />
 
               {/* Selector de archivos */}
@@ -559,14 +569,30 @@ export function TicketTimeline({
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <div className="flex items-center space-x-2">
-                          <input type="checkbox" id="tl-internal" checked={isInternal} onChange={e => setIsInternal(e.target.checked)} className="rounded" />
-                          <label htmlFor="tl-internal" className="text-sm text-muted-foreground cursor-pointer">
-                            Comentario interno (solo visible para el equipo)
-                          </label>
-                        </div>
+                        <label
+                          htmlFor="tl-internal"
+                          className={`flex items-center space-x-2 cursor-pointer px-3 py-1.5 rounded-md border transition-colors select-none ${
+                            isInternal
+                              ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300'
+                              : 'bg-muted/50 border-border text-muted-foreground hover:bg-muted'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            id="tl-internal"
+                            checked={isInternal}
+                            onChange={e => setIsInternal(e.target.checked)}
+                            className="rounded accent-amber-500"
+                          />
+                          <span className="text-sm font-medium">
+                            {isInternal ? '🔒 Solo equipo' : 'Público'}
+                          </span>
+                        </label>
                       </TooltipTrigger>
-                      <TooltipContent><p>Los comentarios internos solo son visibles para técnicos y administradores</p></TooltipContent>
+                      <TooltipContent side="top" className="max-w-xs">
+                        <p className="text-xs"><strong>Público:</strong> el cliente lo ve.</p>
+                        <p className="text-xs mt-1"><strong>Solo equipo 🔒:</strong> el cliente no lo ve.</p>
+                      </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                 ) : <div />}
