@@ -1,0 +1,20 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# OpenSSL requerido por Prisma en Alpine
+RUN apk add --no-cache libc6-compat curl openssl openssl-dev
+
+# Instalar dependencias ANTES de montar el volumen
+# Esto asegura que node_modules sea del contenedor (Linux), no del host (macOS)
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Generar cliente Prisma para Linux
+COPY prisma ./prisma/
+RUN npx prisma generate
+
+EXPOSE 3000
+
+# Migrar y arrancar en modo desarrollo
+CMD ["sh", "-c", "npx prisma migrate deploy && npm run dev"]

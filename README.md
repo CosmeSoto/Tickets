@@ -60,11 +60,12 @@ git pull origin main
 docker compose -f docker-compose.local.yml --env-file .env.production down -v
 docker compose -f docker-compose.local.yml --env-file .env.production up -d --build
 
-docker compose down && docker compose up --build -d
-npx prisma db seed
+# Desarrollo (sin build, hot-reload):
+docker compose -f docker-compose.dev.yml down -v
+docker compose -f docker-compose.dev.yml up --build
 
-DATABASE_URL="postgresql://tickets_user:tickets_password@localhost:5432/tickets_db" npx tsx prisma/seed.ts
-docker compose -f docker-compose.local.yml logs -f app
+# Producción (cuando estés listo):
+docker compose -f docker-compose.prod.yml up --build
 
 ```
 ## 👤 Credenciales por Defecto
