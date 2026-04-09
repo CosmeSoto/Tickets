@@ -188,10 +188,10 @@ export function AutoAssignment({
 
           {/* Resultado */}
           {result && (
-            <Card className='border-green-200 bg-green-50'>
+            <Card className='border-green-500/30 bg-green-500/10'>
               <CardHeader className='pb-3'>
                 <CardTitle className='text-sm flex items-center space-x-2'>
-                  <CheckCircle className='h-4 w-4 text-green-600' />
+                  <CheckCircle className='h-4 w-4 text-green-500' />
                   <span>Asignación Completada</span>
                 </CardTitle>
               </CardHeader>
@@ -210,7 +210,7 @@ export function AutoAssignment({
                     {result.assignedTechnician.assignmentReason}
                   </p>
                 </div>
-                <Badge className='bg-green-100 text-green-800'>
+                <Badge variant='outline' className='border-green-500/50 text-green-500'>
                   Estado actualizado a "En Progreso"
                 </Badge>
               </CardContent>
