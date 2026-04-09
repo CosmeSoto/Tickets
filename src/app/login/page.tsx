@@ -52,21 +52,22 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex bg-background">
       {/* Panel izquierdo decorativo — visible solo en lg+ */}
-      <div className="hidden lg:flex lg:w-1/2 bg-primary flex-col items-center justify-center p-12 relative overflow-hidden">
-        {/* Círculos decorativos usando opacidad del mismo primary */}
-        <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-primary-foreground/5" />
-        <div className="absolute -bottom-32 -right-16 w-80 h-80 rounded-full bg-primary-foreground/5" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-primary-foreground/3" />
+      <div className="hidden lg:flex lg:w-1/2 flex-col items-center justify-center p-12 relative overflow-hidden"
+        style={{ background: 'linear-gradient(135deg, hsl(222,47%,14%) 0%, hsl(222,47%,20%) 100%)' }}>
+        {/* Círculos decorativos */}
+        <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-primary/10" />
+        <div className="absolute -bottom-32 -right-16 w-80 h-80 rounded-full bg-primary/10" />
+        <div className="absolute top-1/3 right-8 w-48 h-48 rounded-full bg-primary/5" />
 
         <div className="relative z-10 text-center space-y-6 max-w-sm">
           <div className="flex justify-center">
             <SystemLogo size="xl" showText={true} className="brightness-0 invert" />
           </div>
           <div className="space-y-3">
-            <h2 className="text-3xl font-bold text-primary-foreground">
+            <h2 className="text-3xl font-bold text-white">
               Plataforma de Gestión
             </h2>
-            <p className="text-primary-foreground/70 text-base leading-relaxed">
+            <p className="text-white/60 text-base leading-relaxed">
               Centraliza soporte técnico, inventario y operaciones en un solo lugar.
             </p>
           </div>
@@ -79,10 +80,10 @@ export default function LoginPage() {
               'Reportes y estadísticas',
             ].map(f => (
               <div key={f} className="flex items-center gap-3">
-                <div className="w-5 h-5 rounded-full bg-primary-foreground/20 flex items-center justify-center flex-shrink-0">
-                  <CheckCircle className="h-3 w-3 text-primary-foreground" />
+                <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle className="h-3 w-3 text-primary" />
                 </div>
-                <span className="text-sm text-primary-foreground/80">{f}</span>
+                <span className="text-sm text-white/80">{f}</span>
               </div>
             ))}
           </div>
