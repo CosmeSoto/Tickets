@@ -350,8 +350,8 @@ export default function TicketDetailPage() {
       {getPriorityBadge(ticket.priority)}
       {session?.user?.role === 'ADMIN' && (
         <>
-          {/* Botón Sin asignar — solo cuando hay técnico */}
-          {ticket.assignee && (
+          {/* Sin técnico → Asignación Automática | Con técnico → Sin asignar */}
+          {ticket.assignee ? (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant='outline' size='sm' disabled={unassigning}>
@@ -379,13 +379,13 @@ export default function TicketDetailPage() {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+          ) : (
+            <AutoAssignment
+              ticketId={ticket.id}
+              currentAssignee={ticket.assignee}
+              onAssignmentComplete={handleAssignmentComplete}
+            />
           )}
-          {/* Botón Asignación Automática — siempre visible para admin */}
-          <AutoAssignment
-            ticketId={ticket.id}
-            currentAssignee={ticket.assignee}
-            onAssignmentComplete={handleAssignmentComplete}
-          />
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
