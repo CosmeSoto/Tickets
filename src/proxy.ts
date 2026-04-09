@@ -75,7 +75,7 @@ if (typeof setInterval !== 'undefined') {
   }, 5 * 60 * 1000)
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const startTime = performance.now()
   const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   const path = request.nextUrl.pathname
