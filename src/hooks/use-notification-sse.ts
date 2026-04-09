@@ -58,9 +58,12 @@ function flushPending(ctx: AudioContext) {
 }
 
 // Handler de gesto — se ejecuta sincrónicamente en el call stack del evento
-function handleGesture() {
+function handleGesture(e: Event) {
+  // Ignorar eventos sintéticos o generados por código (no por el usuario)
+  if (e instanceof KeyboardEvent && e.isTrusted === false) return
+  if (e instanceof MouseEvent && e.isTrusted === false) return
+
   if (!audioCtx) {
-    // Crear el contexto AQUÍ, sincrónicamente dentro del gesto
     try {
       audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
     } catch {
@@ -68,9 +71,7 @@ function handleGesture() {
     }
   }
 
-  // Si está suspendido, reanudarlo (también debe ser dentro del gesto)
   if (audioCtx.state === 'suspended') {
-    // resume() es async pero la llamada ocurre dentro del gesto → permitido
     audioCtx.resume().then(() => flushPending(audioCtx!)).catch(() => {})
   } else {
     flushPending(audioCtx)
@@ -81,7 +82,7 @@ function handleGesture() {
 if (typeof window !== 'undefined') {
   const EVENTS = ['click', 'keydown', 'touchstart', 'pointerdown'] as const
   EVENTS.forEach(evt =>
-    window.addEventListener(evt, handleGesture, { passive: true, capture: true })
+    window.addEventListener(evt, handleGesture as EventListener, { passive: true, capture: true })
   )
 }
 

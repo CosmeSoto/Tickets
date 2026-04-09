@@ -344,8 +344,14 @@ export function RoleDashboardLayout({
       `}>
         {/* Logo + botón cerrar en móvil */}
         <div className="flex items-center justify-between h-16 border-b border-border px-4">
-          <Link href={`/${userRole.toLowerCase() === 'technician_manager' ? 'technician' : userRole.toLowerCase()}`} onClick={closeSidebar}>
-            <SystemLogo size="sm" showText={true} />
+          {/* Espacio reservado en móvil para balancear el botón X */}
+          <div className="lg:hidden w-7" />
+          <Link
+            href={`/${userRole.toLowerCase() === 'technician_manager' ? 'technician' : userRole.toLowerCase()}`}
+            onClick={closeSidebar}
+            className="flex-1 flex justify-center"
+          >
+            <SystemLogo size="md" showText={true} />
           </Link>
           <button
             onClick={closeSidebar}
@@ -353,6 +359,8 @@ export function RoleDashboardLayout({
           >
             <X className="h-5 w-5" />
           </button>
+          {/* Espacio reservado en desktop para mantener el logo centrado */}
+          <div className="hidden lg:block w-7" />
         </div>
 
         {/* Navigation */}
