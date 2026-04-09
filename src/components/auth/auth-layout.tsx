@@ -34,7 +34,7 @@ export function AuthHeader({
 }) {
   return (
     <div className="flex flex-col items-center gap-2 text-center">
-      <SystemLogo size="md" showText={true} />
+      <SystemLogo size="lg" showText={true} />
       {title && <h1 className="text-xl font-semibold text-foreground mt-1">{title}</h1>}
       {description && <p className="text-sm text-muted-foreground">{description}</p>}
     </div>

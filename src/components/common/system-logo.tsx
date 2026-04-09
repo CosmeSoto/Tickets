@@ -7,7 +7,7 @@ import { Building2 } from 'lucide-react'
 interface SystemLogoProps {
   className?: string
   showText?: boolean
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'sm' | 'md' | 'lg' | 'xl'
 }
 
 function useIsDark() {
@@ -54,8 +54,8 @@ export function SystemLogo({ className = '', showText = true, size = 'md' }: Sys
   // En modo claro usar logo claro (versión oscura/color), con fallback al oscuro
   const logoUrl = isDark ? (darkUrl || lightUrl) : (lightUrl || darkUrl)
 
-  const sizeClasses = { sm: 'h-8', md: 'h-10', lg: 'h-12' }
-  const textSizes = { sm: 'text-base', md: 'text-lg', lg: 'text-xl' }
+  const sizeClasses = { sm: 'h-8', md: 'h-10', lg: 'h-12', xl: 'h-16' }
+  const textSizes = { sm: 'text-base', md: 'text-lg', lg: 'text-xl', xl: 'text-2xl' }
 
   if (loading) {
     return (

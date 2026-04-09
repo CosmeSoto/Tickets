@@ -77,7 +77,7 @@ export default function LoginPage() {
 
           {/* Header */}
           <div className="flex flex-col items-center gap-2 text-center">
-            <SystemLogo size="md" showText={true} />
+            <SystemLogo size="lg" showText={true} />
             <p className="text-sm text-muted-foreground mt-1">
               Ingresa tus credenciales para acceder al sistema
             </p>

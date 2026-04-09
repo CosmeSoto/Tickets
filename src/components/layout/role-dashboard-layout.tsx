@@ -343,7 +343,7 @@ export function RoleDashboardLayout({
         lg:translate-x-0
       `}>
         {/* Logo + botón cerrar en móvil */}
-        <div className="flex items-center justify-between h-16 border-b border-border px-4">
+        <div className="flex items-center justify-between h-20 border-b border-border px-4">
           {/* Espacio reservado en móvil para balancear el botón X */}
           <div className="lg:hidden w-7" />
           <Link
@@ -351,7 +351,7 @@ export function RoleDashboardLayout({
             onClick={closeSidebar}
             className="flex-1 flex justify-center"
           >
-            <SystemLogo size="md" showText={true} />
+            <SystemLogo size="xl" showText={true} />
           </Link>
           <button
             onClick={closeSidebar}
@@ -364,7 +364,7 @@ export function RoleDashboardLayout({
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto h-[calc(100vh-4rem)]">
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto h-[calc(100vh-5rem)]">
           {navigation.map((item) => (
             <NavItemComponent
               key={item.name}
