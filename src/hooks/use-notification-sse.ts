@@ -19,35 +19,21 @@ interface UseNotificationSSEOptions {
   sound?: boolean
 }
 
-// ── Audio — política de autoplay del navegador ────────────────────────────────
+// ── Audio ─────────────────────────────────────────────────────────────────────
 //
-// Los navegadores bloquean AudioContext hasta que el usuario interactúa con la
-// página (click, tecla, touch). La estrategia correcta es:
+// Política de autoplay: el AudioContext SOLO se puede crear/reanudar
+// sincrónicamente dentro del call stack de un gesto del usuario.
 //
-//  1. NO crear AudioContext al cargar el módulo.
-//  2. Crearlo dentro del primer gesto del usuario (handler de click/keydown).
-//  3. Si llega una notificación antes del primer gesto, encolar el sonido.
-//  4. Al primer gesto, reproducir los sonidos encolados.
-//
-// Esto garantiza que el contexto siempre se crea en un contexto de gesto activo
-// y nunca queda en estado "suspended" sin posibilidad de reanudarse.
+// Estrategia:
+//  - audioCtx se crea la primera vez que el usuario hace click/keydown/touch
+//  - Si llega una notificación antes del primer gesto → pendingTones++
+//  - Al primer gesto → crear ctx + reproducir pendientes
+//  - Después del primer gesto → reproducir directamente
 
 let audioCtx: AudioContext | null = null
-let gestureReceived = false
 let pendingTones = 0
 
-function createOrGetContext(): AudioContext | null {
-  if (typeof window === 'undefined') return null
-  if (audioCtx) return audioCtx
-  try {
-    audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
-    return audioCtx
-  } catch {
-    return null
-  }
-}
-
-function playToneNow(ctx: AudioContext) {
+function playTone(ctx: AudioContext) {
   try {
     const osc = ctx.createOscillator()
     const gain = ctx.createGain()
@@ -63,51 +49,49 @@ function playToneNow(ctx: AudioContext) {
   } catch { /* silencioso */ }
 }
 
-// Llamado en cada gesto del usuario — crea/reanuda el contexto y vacía la cola
-function onUserGesture() {
-  gestureReceived = true
-  const ctx = createOrGetContext()
-  if (!ctx) return
+function flushPending(ctx: AudioContext) {
+  if (pendingTones <= 0) return
+  const n = pendingTones
+  pendingTones = 0
+  // Reproducir solo 1 aunque haya varios encolados (evitar spam de sonidos)
+  if (n > 0) playTone(ctx)
+}
 
-  const resume = () => {
-    if (pendingTones > 0) {
-      const count = pendingTones
-      pendingTones = 0
-      for (let i = 0; i < count; i++) playToneNow(ctx)
+// Handler de gesto — se ejecuta sincrónicamente en el call stack del evento
+function handleGesture() {
+  if (!audioCtx) {
+    // Crear el contexto AQUÍ, sincrónicamente dentro del gesto
+    try {
+      audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
+    } catch {
+      return
     }
   }
 
-  if (ctx.state === 'suspended') {
-    ctx.resume().then(resume).catch(() => {})
+  // Si está suspendido, reanudarlo (también debe ser dentro del gesto)
+  if (audioCtx.state === 'suspended') {
+    // resume() es async pero la llamada ocurre dentro del gesto → permitido
+    audioCtx.resume().then(() => flushPending(audioCtx!)).catch(() => {})
   } else {
-    resume()
+    flushPending(audioCtx)
   }
 }
 
-// Registrar listeners de gesto una sola vez (nivel de módulo, solo en browser)
+// Registrar una sola vez al cargar el módulo (solo en browser)
 if (typeof window !== 'undefined') {
-  const GESTURE_EVENTS = ['click', 'keydown', 'touchstart', 'pointerdown'] as const
-  const handler = () => onUserGesture()
-  GESTURE_EVENTS.forEach(evt =>
-    window.addEventListener(evt, handler, { passive: true, capture: true })
+  const EVENTS = ['click', 'keydown', 'touchstart', 'pointerdown'] as const
+  EVENTS.forEach(evt =>
+    window.addEventListener(evt, handleGesture, { passive: true, capture: true })
   )
 }
 
 export function playNotificationSound() {
-  if (!gestureReceived) {
-    // Aún no hubo gesto — encolar para reproducir en el próximo
+  if (!audioCtx || audioCtx.state === 'suspended') {
+    // Sin contexto o suspendido → encolar, se reproducirá en el próximo gesto
     pendingTones++
     return
   }
-
-  const ctx = createOrGetContext()
-  if (!ctx) return
-
-  if (ctx.state === 'suspended') {
-    ctx.resume().then(() => playToneNow(ctx)).catch(() => {})
-  } else {
-    playToneNow(ctx)
-  }
+  playTone(audioCtx)
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
