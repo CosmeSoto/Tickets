@@ -59,9 +59,8 @@ function flushPending(ctx: AudioContext) {
 
 // Handler de gesto — se ejecuta sincrónicamente en el call stack del evento
 function handleGesture(e: Event) {
-  // Ignorar eventos sintéticos o generados por código (no por el usuario)
-  if (e instanceof KeyboardEvent && e.isTrusted === false) return
-  if (e instanceof MouseEvent && e.isTrusted === false) return
+  // Solo gestos reales del usuario (isTrusted = false en eventos sintéticos/programáticos)
+  if (!e.isTrusted) return
 
   if (!audioCtx) {
     try {
@@ -72,8 +71,12 @@ function handleGesture(e: Event) {
   }
 
   if (audioCtx.state === 'suspended') {
-    audioCtx.resume().then(() => flushPending(audioCtx!)).catch(() => {})
-  } else {
+    // resume() dentro del call stack del gesto — permitido por el navegador
+    audioCtx.resume().then(() => flushPending(audioCtx!)).catch(() => {
+      // Si falla, resetear para intentar de nuevo en el próximo gesto
+      audioCtx = null
+    })
+  } else if (audioCtx.state === 'running') {
     flushPending(audioCtx)
   }
 }
