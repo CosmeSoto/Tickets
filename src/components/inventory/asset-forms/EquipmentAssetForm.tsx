@@ -18,6 +18,7 @@ import {
   DEFAULT_USEFUL_LIFE_YEARS,
   type DepreciationMethod,
 } from '@/lib/inventory/depreciation'
+import { useUserList } from '@/hooks/use-user-list'
 import { X, Plus, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react'
 
 interface Department {
@@ -91,7 +92,6 @@ export function EquipmentAssetForm({
   const [warehouseId, setWarehouseId] = useState('')
   const [warehouses, setWarehouses] = useState<SearchableSelectOption[]>([])
   const [assignedUserId, setAssignedUserId] = useState('')
-  const [assignableUsers, setAssignableUsers] = useState<SearchableSelectOption[]>([])
   const [notes, setNotes] = useState('')
   const [attachments, setAttachments] = useState<File[]>([])
   const [priceError, setPriceError] = useState('')
@@ -171,14 +171,24 @@ export function EquipmentAssetForm({
     }
   }, [acquisitionMode])
 
+  // Usuarios asignables: filtrados por departamento seleccionado cuando estado es ASSIGNED
+  const { users: assignableUsersList } = useUserList({
+    departmentId: departmentId || undefined,
+    isActive: true,
+    limit: 200,
+    enabled: equipmentStatus === 'ASSIGNED',
+  })
+
+  // Convertir a formato SearchableSelectOption
+  const assignableUsers: SearchableSelectOption[] = assignableUsersList.map(u => ({
+    id: u.id,
+    name: u.name || u.email || u.id,
+  }))
+
+  // Resetear usuario asignado si cambia el departamento
   useEffect(() => {
-    if (equipmentStatus === 'ASSIGNED') {
-      fetch('/api/users?limit=200').then(r => r.json()).then(d => {
-        const list = d.data ?? d.users ?? []
-        setAssignableUsers(list.map((u: { id: string; name?: string; email?: string }) => ({ id: u.id, name: u.name ?? u.email ?? u.id })))
-      })
-    }
-  }, [equipmentStatus])
+    setAssignedUserId('')
+  }, [departmentId])
 
   // Task 19.2: auto-calculate suggested residual value when purchasePrice changes
   const suggestedResidualValue = useMemo(() => {

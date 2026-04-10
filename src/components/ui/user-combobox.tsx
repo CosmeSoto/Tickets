@@ -36,6 +36,7 @@ interface UserComboboxProps {
   value?: string
   onValueChange: (value: string) => void
   role?: 'CLIENT' | 'TECHNICIAN' | 'ADMIN'
+  departmentId?: string
   placeholder?: string
   emptyText?: string
   disabled?: boolean
@@ -49,6 +50,7 @@ export function UserCombobox({
   value,
   onValueChange,
   role,
+  departmentId,
   placeholder = 'Seleccionar usuario...',
   emptyText = 'No se encontraron usuarios',
   disabled = false,
@@ -85,7 +87,7 @@ export function UserCombobox({
         clearTimeout(debounceTimeout.current)
       }
     }
-  }, [open, search, role])
+  }, [open, search, role, departmentId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Cargar usuario seleccionado cuando cambia el value
   React.useEffect(() => {
@@ -101,6 +103,7 @@ export function UserCombobox({
     try {
       const params = new URLSearchParams()
       if (role) params.append('role', role)
+      if (departmentId) params.append('departmentId', departmentId)
       params.append('isActive', 'true')
       params.append('limit', '20')
       if (query) params.append('search', query)
