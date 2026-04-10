@@ -44,6 +44,7 @@ import { CompactFileManager } from '@/components/tickets/compact-file-manager'
 import { TicketTimeline } from '@/components/ui/ticket-timeline'
 import { TicketRatingSystem } from '@/components/ui/ticket-rating-system'
 import { TicketResolutionTracker } from '@/components/ui/ticket-resolution-tracker'
+import { TicketCollaborators } from '@/components/tickets/ticket-collaborators'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   AlertDialog,
@@ -724,9 +725,24 @@ export default function TicketDetailPage() {
 
               <Separator />
 
+              {/* Colaboradores */}
               <div className='flex items-center space-x-3'>
-                <Tag className='h-4 w-4 text-muted-foreground' />
-                <div className='flex-1'>
+                <User className='h-4 w-4 text-muted-foreground' />
+                <TicketCollaborators
+                  ticketId={ticket.id}
+                  familyId={(ticket as any).familyId}
+                  assigneeId={ticket.assignee?.id}
+                  canManage={
+                    session?.user?.role === 'ADMIN' ||
+                    (session?.user?.role === 'TECHNICIAN' && ticket.assignee?.id === session?.user?.id)
+                  }
+                />
+              </div>
+
+              <Separator />
+
+              <div className='flex items-center space-x-3'>
+                <Tag className='h-4 w-4 text-muted-foreground' />                <div className='flex-1'>
                   <p className='text-sm font-medium'>Categoría</p>
                   {/* La categoría NO es editable - preserva la solicitud original del cliente */}
                   <div className='flex items-center space-x-2 mt-1'>

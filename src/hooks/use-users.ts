@@ -26,6 +26,8 @@ export interface UserData {
   phone?: string
   avatar?: string
   isActive: boolean
+  canManageInventory?: boolean
+  isSuperAdmin?: boolean
   lastLogin?: string
   createdAt: string
   canDelete?: boolean

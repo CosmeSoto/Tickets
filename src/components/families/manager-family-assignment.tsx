@@ -247,10 +247,12 @@ function ByFamilyView({ familyId, assignedManagers, onChanged }: ByFamilyProps) 
   const loadManagers = useCallback(async () => {
     setLoadingUsers(true)
     try {
-      // Todos los usuarios activos pueden ser gestores de inventario de una familia.
-      // No filtramos por canManageInventory — ese flag se activa automáticamente
-      // al asignar a una familia si el usuario no lo tiene aún.
-      const res = await fetch('/api/users?isActive=true&limit=500')
+      // Solo usuarios con canManageInventory=true aparecen como disponibles.
+      // La casilla "Gestor de Inventario" en el perfil del usuario es el requisito previo
+      // para poder asignarlo a una familia. Esto diferencia claramente ambas acciones:
+      // 1. Activar la casilla = habilitar el permiso global de gestión
+      // 2. Asignar a familia = definir el alcance (qué familias puede gestionar)
+      const res = await fetch('/api/users?isActive=true&canManageInventory=true&limit=500')
       if (res.ok) {
         const data = await res.json()
         setAllManagers(data.data ?? [])
@@ -397,7 +399,9 @@ function ByFamilyView({ familyId, assignedManagers, onChanged }: ByFamilyProps) 
             </div>
           ) : unassignedUsers.length === 0 ? (
             <p className="text-sm text-muted-foreground italic py-1">
-              {search ? 'Sin resultados' : 'No hay gestores disponibles'}
+              {search
+                ? 'Sin resultados'
+                : 'No hay usuarios con permiso de gestor disponibles. Activa la casilla "Gestor de Inventario" en el perfil del usuario primero.'}
             </p>
           ) : (
             <div className="space-y-2 max-h-64 overflow-y-auto pr-1">

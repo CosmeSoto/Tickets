@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
     const familyId = searchParams.get('familyId') // Filtrar técnicos por familia asignada
     const search = searchParams.get('search') // Búsqueda por nombre o email
     const limit = searchParams.get('limit') // Límite de resultados
+    const canManageInventory = searchParams.get('canManageInventory') // Filtrar por permiso de gestión
 
     // Construir filtros para Prisma
     const where: any = {}
@@ -46,6 +47,10 @@ export async function GET(request: NextRequest) {
 
     if (isActive !== null) {
       where.isActive = isActive === 'true'
+    }
+
+    if (canManageInventory !== null) {
+      where.canManageInventory = canManageInventory === 'true'
     }
 
     if (departmentId) {
@@ -101,6 +106,7 @@ export async function GET(request: NextRequest) {
         avatar: true,
         isActive: true,
         canManageInventory: true,
+        isSuperAdmin: true,
         createdAt: true,
         lastLogin: true,
         _count: {

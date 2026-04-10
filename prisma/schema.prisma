@@ -91,14 +91,11 @@ model categories {
   departments            departments?             @relation(fields: [departmentId], references: [id])
   categories             categories?              @relation("categoriesTocategories", fields: [parentId], references: [id])
   other_categories       categories[]             @relation("categoriesTocategories")
-  technician_assignments technician_assignments[]
-  tickets                tickets[]
   knowledge_articles     knowledge_articles[]
   sla_policies           sla_policies[]           @relation("SLAPolicyCategory")
+  technician_assignments technician_assignments[]
+  tickets                tickets[]
 
-  // Unique constraints manejados via SQL parcial indexes:
-  // - categories_name_parentId_level_key: UNIQUE(name, parentId, level) WHERE parentId IS NOT NULL
-  // - categories_name_level_root_key: UNIQUE(name, level) WHERE parentId IS NULL
   @@index([departmentId])
   @@index([parentId, level, isActive])
   @@index([name, level])
@@ -119,19 +116,19 @@ model comments {
 }
 
 model departments {
-  id          String       @id
-  name        String       @unique
+  id          String              @id
+  name        String              @unique
   description String?
-  color       String?      @default("#3B82F6")
-  isActive    Boolean      @default(true)
-  order       Int          @default(0)
-  familyId    String?      @map("family_id")
-  createdAt   DateTime     @default(now())
+  color       String?             @default("#3B82F6")
+  isActive    Boolean             @default(true)
+  order       Int                 @default(0)
+  familyId    String?             @map("family_id")
+  createdAt   DateTime            @default(now())
   updatedAt   DateTime
-  family      families?    @relation(fields: [familyId], references: [id])
   categories  categories[]
-  users       users[]
+  family      families?           @relation(fields: [familyId], references: [id])
   licenses    software_licenses[]
+  users       users[]
 
   @@index([isActive, order])
   @@index([familyId])
@@ -318,21 +315,21 @@ model tickets {
   updatedAt                        DateTime
   attachments                      attachments[]
   comments                         comments[]
-  notifications                    notifications[]
-  ticket_history                   ticket_history[]
-  ticket_ratings                   ticket_ratings?
   knowledge_article                knowledge_articles?         @relation("knowledge_articles_source")
-  resolution_plans                 resolution_plans[]
-  ticket_knowledge_articles        ticket_knowledge_articles[]
-  sla_violations                   sla_violations[]
-  ticket_sla_metrics               ticket_sla_metrics?
   maintenance_records              maintenance_records[]
-  family                           families?                   @relation(fields: [familyId], references: [id])
+  notifications                    notifications[]
+  resolution_plans                 resolution_plans[]
+  sla_violations                   sla_violations[]
   ticket_collaborators             ticket_collaborators[]
+  ticket_history                   ticket_history[]
+  ticket_knowledge_articles        ticket_knowledge_articles[]
+  ticket_ratings                   ticket_ratings?
+  ticket_sla_metrics               ticket_sla_metrics?
   users_tickets_assigneeIdTousers  users?                      @relation("tickets_assigneeIdTousers", fields: [assigneeId], references: [id])
   categories                       categories                  @relation(fields: [categoryId], references: [id])
   users_tickets_clientIdTousers    users                       @relation("tickets_clientIdTousers", fields: [clientId], references: [id])
   users_tickets_createdByIdTousers users?                      @relation("tickets_createdByIdTousers", fields: [createdById], references: [id])
+  family                           families?                   @relation(fields: [familyId], references: [id])
 
   @@index([assigneeId, status])
   @@index([categoryId, status])
@@ -346,43 +343,30 @@ model tickets {
 }
 
 model user_settings {
-  id     String @id
-  userId String @unique
-
-  // Notificaciones básicas
-  emailNotifications Boolean @default(true)
-  pushNotifications  Boolean @default(true)
-
-  // Notificaciones intermedias
-  ticketUpdates Boolean @default(true)
-  systemAlerts  Boolean @default(true)
-  weeklyReport  Boolean @default(false)
-
-  // Notificaciones avanzadas
-  soundEnabled   Boolean @default(true)
-  ticketCreated  Boolean @default(true)
-  ticketAssigned Boolean @default(true)
-  statusChanged  Boolean @default(true)
-  newComments    Boolean @default(true)
-  ticketUpdated  Boolean @default(true)
-
-  // Horarios silenciosos
-  quietHoursEnabled Boolean @default(false)
-  quietHoursStart   String  @default("22:00")
-  quietHoursEnd     String  @default("08:00")
-
-  // Configuraciones de técnico
-  autoAssignEnabled    Boolean @default(true)
-  maxConcurrentTickets Int     @default(10)
-
-  // Preferencias generales
-  theme    String @default("light")
-  language String @default("es")
-  timezone String @default("America/Guayaquil")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime
-  users     users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                   String   @id
+  userId               String   @unique
+  emailNotifications   Boolean  @default(true)
+  pushNotifications    Boolean  @default(true)
+  ticketUpdates        Boolean  @default(true)
+  systemAlerts         Boolean  @default(true)
+  weeklyReport         Boolean  @default(false)
+  soundEnabled         Boolean  @default(true)
+  ticketCreated        Boolean  @default(true)
+  ticketAssigned       Boolean  @default(true)
+  statusChanged        Boolean  @default(true)
+  newComments          Boolean  @default(true)
+  ticketUpdated        Boolean  @default(true)
+  quietHoursEnabled    Boolean  @default(false)
+  quietHoursStart      String   @default("22:00")
+  quietHoursEnd        String   @default("08:00")
+  autoAssignEnabled    Boolean  @default(true)
+  maxConcurrentTickets Int      @default(10)
+  theme                String   @default("light")
+  language             String   @default("es")
+  timezone             String   @default("America/Guayaquil")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime
+  users                users    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
@@ -391,15 +375,15 @@ model email_queue {
   id           String    @id
   toEmail      String
   subject      String
-  body         String    @db.Text
+  body         String
   templateName String?
-  templateData String?   @db.Text
+  templateData String?
   status       String    @default("pending")
   attempts     Int       @default(0)
   maxAttempts  Int       @default(3)
   scheduledAt  DateTime  @default(now())
   sentAt       DateTime?
-  errorMessage String?   @db.Text
+  errorMessage String?
   createdAt    DateTime  @default(now())
 
   @@index([status, scheduledAt])
@@ -408,70 +392,66 @@ model email_queue {
 }
 
 model users {
-  id                                                String                      @id
-  email                                             String                      @unique
+  id                                                String                          @id
+  email                                             String                          @unique
   name                                              String
   passwordHash                                      String?
-  role                                              UserRole                    @default(CLIENT)
+  role                                              UserRole                        @default(CLIENT)
   departmentId                                      String?
   phone                                             String?
   avatar                                            String?
-  isActive                                          Boolean                     @default(true)
-  isEmailVerified                                   Boolean                     @default(false)
-  canManageInventory                                Boolean                     @default(false)
-  isSuperAdmin                                      Boolean                     @default(false) @map("is_super_admin")
+  isActive                                          Boolean                         @default(true)
+  isEmailVerified                                   Boolean                         @default(false)
+  canManageInventory                                Boolean                         @default(false)
   lastLogin                                         DateTime?
   oauthProvider                                     String?
   oauthId                                           String?
-  createdAt                                         DateTime                    @default(now())
+  createdAt                                         DateTime                        @default(now())
   updatedAt                                         DateTime
+  isSuperAdmin                                      Boolean                         @default(false) @map("is_super_admin")
   accounts                                          accounts[]
+  adminFamilyAssignments                            admin_family_assignments[]
+  article_votes                                     article_votes[]
   attachments                                       attachments[]
   audit_logs                                        audit_logs[]
   comments                                          comments[]
+  decommissionApprovals                             decommission_acts[]             @relation("DecommissionApprover")
+  decommissionAttachments                           decommission_attachments[]
+  decommissionRequests                              decommission_requests[]         @relation("DecommissionRequester")
+  decommissionReviews                               decommission_requests[]         @relation("DecommissionReviewer")
+  assignmentsDelivered                              equipment_assignments[]         @relation("AssignmentDeliverer")
+  assignmentsReceived                               equipment_assignments[]         @relation("AssignmentReceiver")
+  equipmentAttachments                              equipment_attachments[]
+  inventoryManagerFamilies                          inventory_manager_families[]    @relation("InventoryManagerFamilies")
+  knowledge_articles                                knowledge_articles[]            @relation("knowledge_articles_author")
+  licenseAttachments                                license_attachments[]
+  maintenanceRequests                               maintenance_records[]           @relation("MaintenanceRequester")
+  maintenanceRecords                                maintenance_records[]           @relation("MaintenanceTechnician")
   notification_preferences                          notification_preferences?
   notifications                                     notifications[]
   oauth_accounts                                    oauth_accounts[]
-  sessions                                          sessions[]
-  technician_assignments                            technician_assignments[]
-  ticket_history                                    ticket_history[]
-  ticket_ratings_ticket_ratings_clientIdTousers     ticket_ratings[]            @relation("ticket_ratings_clientIdTousers")
-  ticket_ratings_ticket_ratings_technicianIdTousers ticket_ratings[]            @relation("ticket_ratings_technicianIdTousers")
-  tickets_tickets_assigneeIdTousers                 tickets[]                   @relation("tickets_assigneeIdTousers")
-  tickets_tickets_clientIdTousers                   tickets[]                   @relation("tickets_clientIdTousers")
-  tickets_tickets_createdByIdTousers                tickets[]                   @relation("tickets_createdByIdTousers")
-  user_settings                                     user_settings?
-  knowledge_articles                                knowledge_articles[]        @relation("knowledge_articles_author")
-  article_votes                                     article_votes[]
-  resolution_plans_created                          resolution_plans[]          @relation("ResolutionPlanCreator")
-  tasks_assigned                                    resolution_tasks[]          @relation("TaskAssignee")
-  articles_created                                  ticket_knowledge_articles[] @relation("ArticleCreator")
-  webhooks_created                                  webhooks[]                  @relation("WebhookCreator")
   password_reset_tokens                             password_reset_tokens[]
-  departments                                       departments?                @relation(fields: [departmentId], references: [id])
-  
-  // Inventory relations
-  assignmentsReceived                               equipment_assignments[]     @relation("AssignmentReceiver")
-  assignmentsDelivered                              equipment_assignments[]     @relation("AssignmentDeliverer")
-  maintenanceRecords                                maintenance_records[]       @relation("MaintenanceTechnician")
-  maintenanceRequests                               maintenance_records[]       @relation("MaintenanceRequester")
-  licensesAssigned                                  software_licenses[]         @relation("LicenseUser")
-  stockMovements                                    stock_movements[]           @relation("StockMovementUser")
-  stockMovementsAssigned                            stock_movements[]           @relation("StockMovementAssignedTo")
-  equipmentAttachments                              equipment_attachments[]
-  managedWarehouses                                 warehouses[]                @relation("WarehouseManager")
-  inventoryManagerFamilies                          inventory_manager_families[] @relation("InventoryManagerFamilies")
-  licenseAttachments                                license_attachments[]
-
-  // Decommission relations
-  decommissionRequests                              decommission_requests[]     @relation("DecommissionRequester")
-  decommissionReviews                               decommission_requests[]     @relation("DecommissionReviewer")
-  decommissionApprovals                             decommission_acts[]         @relation("DecommissionApprover")
-  decommissionAttachments                           decommission_attachments[]
+  resolution_plans_created                          resolution_plans[]              @relation("ResolutionPlanCreator")
+  tasks_assigned                                    resolution_tasks[]              @relation("TaskAssignee")
+  sessions                                          sessions[]
+  licensesAssigned                                  software_licenses[]             @relation("LicenseUser")
+  stockMovementsAssigned                            stock_movements[]               @relation("StockMovementAssignedTo")
+  stockMovements                                    stock_movements[]               @relation("StockMovementUser")
+  technician_assignments                            technician_assignments[]
   technicianFamilyAssignments                       technician_family_assignments[]
-  adminFamilyAssignments                            admin_family_assignments[]
-  ticketCollaborations                              ticket_collaborators[]      @relation("TicketCollaborator")
-  ticketCollaborationsAdded                         ticket_collaborators[]      @relation("CollaboratorAddedBy")
+  ticketCollaborationsAdded                         ticket_collaborators[]          @relation("CollaboratorAddedBy")
+  ticketCollaborations                              ticket_collaborators[]          @relation("TicketCollaborator")
+  ticket_history                                    ticket_history[]
+  articles_created                                  ticket_knowledge_articles[]     @relation("ArticleCreator")
+  ticket_ratings_ticket_ratings_clientIdTousers     ticket_ratings[]                @relation("ticket_ratings_clientIdTousers")
+  ticket_ratings_ticket_ratings_technicianIdTousers ticket_ratings[]                @relation("ticket_ratings_technicianIdTousers")
+  tickets_tickets_assigneeIdTousers                 tickets[]                       @relation("tickets_assigneeIdTousers")
+  tickets_tickets_clientIdTousers                   tickets[]                       @relation("tickets_clientIdTousers")
+  tickets_tickets_createdByIdTousers                tickets[]                       @relation("tickets_createdByIdTousers")
+  user_settings                                     user_settings?
+  departments                                       departments?                    @relation(fields: [departmentId], references: [id])
+  managedWarehouses                                 warehouses[]                    @relation("WarehouseManager")
+  webhooks_created                                  webhooks[]                      @relation("WebhookCreator")
 
   @@index([departmentId])
   @@index([name, email])
@@ -515,11 +495,11 @@ model knowledge_articles {
   isPublished               Boolean                     @default(true)
   createdAt                 DateTime                    @default(now())
   updatedAt                 DateTime                    @updatedAt
-  category                  categories                  @relation(fields: [categoryId], references: [id])
-  author                    users                       @relation("knowledge_articles_author", fields: [authorId], references: [id])
-  sourceTicket              tickets?                    @relation("knowledge_articles_source", fields: [sourceTicketId], references: [id])
-  family                    families?                   @relation(fields: [familyId], references: [id])
   votes                     article_votes[]
+  author                    users                       @relation("knowledge_articles_author", fields: [authorId], references: [id])
+  category                  categories                  @relation(fields: [categoryId], references: [id])
+  family                    families?                   @relation(fields: [familyId], references: [id])
+  sourceTicket              tickets?                    @relation("knowledge_articles_source", fields: [sourceTicketId], references: [id])
   ticket_knowledge_articles ticket_knowledge_articles[]
 
   @@index([categoryId, isPublished])
@@ -541,6 +521,910 @@ model article_votes {
 
   @@unique([articleId, userId])
   @@index([articleId, isHelpful])
+}
+
+model resolution_plans {
+  id             String             @id @default(uuid())
+  ticketId       String             @map("ticket_id")
+  title          String
+  description    String?
+  status         String             @default("draft")
+  totalTasks     Int                @default(0) @map("total_tasks")
+  completedTasks Int                @default(0) @map("completed_tasks")
+  estimatedHours Float              @default(0) @map("estimated_hours")
+  actualHours    Float              @default(0) @map("actual_hours")
+  startDate      DateTime?          @map("start_date")
+  targetDate     DateTime?          @map("target_date")
+  completedDate  DateTime?          @map("completed_date")
+  createdBy      String             @map("created_by")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+  creator        users              @relation("ResolutionPlanCreator", fields: [createdBy], references: [id])
+  ticket         tickets            @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  tasks          resolution_tasks[]
+
+  @@index([ticketId])
+  @@index([createdBy])
+  @@map("resolution_plans")
+}
+
+model resolution_tasks {
+  id             String           @id @default(uuid())
+  planId         String           @map("plan_id")
+  title          String
+  description    String?
+  status         String           @default("pending")
+  priority       String           @default("medium")
+  estimatedHours Float?           @map("estimated_hours")
+  actualHours    Float?           @map("actual_hours")
+  startTime      String?          @map("start_time")
+  endTime        String?          @map("end_time")
+  assignedTo     String?          @map("assigned_to")
+  dueDate        DateTime?        @map("due_date")
+  completedAt    DateTime?        @map("completed_at")
+  notes          String?
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+  assignee       users?           @relation("TaskAssignee", fields: [assignedTo], references: [id])
+  plan           resolution_plans @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId])
+  @@index([assignedTo])
+  @@index([startTime, endTime])
+  @@map("resolution_tasks")
+}
+
+model ticket_knowledge_articles {
+  id        String             @id @default(uuid())
+  ticketId  String             @map("ticket_id")
+  articleId String             @map("article_id")
+  createdBy String             @map("created_by")
+  createdAt DateTime           @default(now()) @map("created_at")
+  article   knowledge_articles @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  creator   users              @relation("ArticleCreator", fields: [createdBy], references: [id])
+  ticket    tickets            @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@unique([ticketId, articleId])
+  @@index([ticketId])
+  @@index([articleId])
+  @@map("ticket_knowledge_articles")
+}
+
+model webhooks {
+  id              String         @id @default(uuid())
+  name            String         @db.VarChar(100)
+  url             String         @db.VarChar(500)
+  events          String[]
+  secret          String         @db.VarChar(255)
+  isActive        Boolean        @default(true) @map("is_active")
+  headers         Json?
+  timeoutMs       Int            @default(30000) @map("timeout_ms")
+  retryCount      Int            @default(3) @map("retry_count")
+  createdBy       String?        @map("created_by")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @default(now()) @updatedAt @map("updated_at")
+  lastTriggeredAt DateTime?      @map("last_triggered_at")
+  webhook_logs    webhook_logs[]
+  creator         users?         @relation("WebhookCreator", fields: [createdBy], references: [id])
+
+  @@index([isActive])
+  @@map("webhooks")
+}
+
+model webhook_logs {
+  id             String   @id @default(uuid())
+  webhookId      String   @map("webhook_id")
+  event          String   @db.VarChar(50)
+  payload        Json
+  responseStatus Int?     @map("response_status")
+  responseBody   String?  @map("response_body")
+  errorMessage   String?  @map("error_message")
+  durationMs     Int?     @map("duration_ms")
+  attempt        Int      @default(1)
+  createdAt      DateTime @default(now()) @map("created_at")
+  webhook        webhooks @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId, createdAt(sort: Desc)])
+  @@index([event, createdAt(sort: Desc)])
+  @@map("webhook_logs")
+}
+
+model sla_policies {
+  id                  String               @id @default(uuid())
+  name                String               @db.VarChar(100)
+  description         String?
+  categoryId          String?              @map("category_id")
+  familyId            String?              @map("family_id")
+  priority            String               @db.VarChar(20)
+  responseTimeHours   Int                  @map("response_time_hours")
+  resolutionTimeHours Int                  @map("resolution_time_hours")
+  businessHoursOnly   Boolean              @default(false) @map("business_hours_only")
+  businessHoursStart  String               @default("09:00:00") @map("business_hours_start") @db.VarChar(8)
+  businessHoursEnd    String               @default("18:00:00") @map("business_hours_end") @db.VarChar(8)
+  businessDays        String               @default("MON,TUE,WED,THU,FRI") @map("business_days") @db.VarChar(50)
+  isActive            Boolean              @default(true) @map("is_active")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @default(now()) @updatedAt @map("updated_at")
+  category            categories?          @relation("SLAPolicyCategory", fields: [categoryId], references: [id])
+  family              families?            @relation(fields: [familyId], references: [id])
+  sla_violations      sla_violations[]
+  ticket_sla_metrics  ticket_sla_metrics[]
+
+  @@index([isActive, categoryId, priority])
+  @@index([isActive, familyId, priority])
+  @@map("sla_policies")
+}
+
+model sla_violations {
+  id            String       @id @default(uuid())
+  ticketId      String       @map("ticket_id")
+  slaPolicyId   String       @map("sla_policy_id")
+  violationType String       @map("violation_type") @db.VarChar(50)
+  expectedAt    DateTime     @map("expected_at")
+  actualAt      DateTime?    @map("actual_at")
+  isResolved    Boolean      @default(false) @map("is_resolved")
+  severity      String       @default("MEDIUM") @db.VarChar(20)
+  notifiedAt    DateTime?    @map("notified_at")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  sla_policy    sla_policies @relation(fields: [slaPolicyId], references: [id])
+  ticket        tickets      @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, isResolved])
+  @@index([slaPolicyId, createdAt(sort: Desc)])
+  @@map("sla_violations")
+}
+
+model ticket_sla_metrics {
+  id                    String       @id @default(uuid())
+  ticketId              String       @unique @map("ticket_id")
+  slaPolicyId           String       @map("sla_policy_id")
+  responseDeadline      DateTime?    @map("response_deadline")
+  resolutionDeadline    DateTime?    @map("resolution_deadline")
+  firstResponseAt       DateTime?    @map("first_response_at")
+  resolvedAt            DateTime?    @map("resolved_at")
+  responseSLAMet        Boolean?     @map("response_sla_met")
+  resolutionSLAMet      Boolean?     @map("resolution_sla_met")
+  responseTimeMinutes   Int?         @map("response_time_minutes")
+  resolutionTimeMinutes Int?         @map("resolution_time_minutes")
+  businessHoursElapsed  Int?         @map("business_hours_elapsed")
+  createdAt             DateTime     @default(now()) @map("created_at")
+  updatedAt             DateTime     @default(now()) @updatedAt @map("updated_at")
+  sla_policy            sla_policies @relation(fields: [slaPolicyId], references: [id])
+  ticket                tickets      @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@index([responseDeadline, resolutionDeadline])
+  @@map("ticket_sla_metrics")
+}
+
+model category_analytics {
+  id           String   @id @default(uuid())
+  eventType    String   @map("event_type") @db.VarChar(50)
+  clientId     String   @map("client_id")
+  categoryId   String?  @map("category_id")
+  searchQuery  String?  @map("search_query") @db.VarChar(255)
+  timeToSelect Int?     @map("time_to_select")
+  metadata     Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([clientId, createdAt(sort: Desc)])
+  @@index([eventType, createdAt(sort: Desc)])
+  @@index([categoryId, createdAt(sort: Desc)])
+  @@map("category_analytics")
+}
+
+model landing_page_content {
+  id                  String   @id @default(uuid())
+  heroTitle           String   @default("Soporte Técnico Profesional") @map("hero_title")
+  heroSubtitle        String   @default("Resolvemos tus problemas técnicos de manera rápida y eficiente") @map("hero_subtitle")
+  heroCtaPrimary      String   @default("Crear Ticket de Soporte") @map("hero_cta_primary")
+  heroCtaPrimaryUrl   String   @default("/login") @map("hero_cta_primary_url")
+  heroCtaSecondary    String   @default("Ver Servicios") @map("hero_cta_secondary")
+  heroCtaSecondaryUrl String   @default("#servicios") @map("hero_cta_secondary_url")
+  heroImageUrl        String?  @map("hero_image_url")
+  servicesTitle       String   @default("Nuestros Servicios") @map("services_title")
+  servicesSubtitle    String   @default("Ofrecemos soporte técnico integral para todas tus necesidades tecnológicas") @map("services_subtitle")
+  servicesEnabled     Boolean  @default(true) @map("services_enabled")
+  companyName         String   @default("Sistema de Tickets") @map("company_name")
+  companyTagline      String   @default("Soporte técnico profesional") @map("company_tagline")
+  companyLogoLightUrl String?  @map("company_logo_light_url")
+  companyLogoDarkUrl  String?  @map("company_logo_dark_url")
+  contactEmail        String?  @map("contact_email")
+  contactPhone        String?  @map("contact_phone")
+  contactAddress      String?  @map("contact_address")
+  footerText          String   @default("© 2024 Sistema de Tickets. Todos los derechos reservados.") @map("footer_text")
+  metaTitle           String   @default("Sistema de Tickets - Soporte Técnico Profesional") @map("meta_title")
+  metaDescription     String   @default("Sistema profesional de gestión de tickets de soporte técnico") @map("meta_description")
+  metaKeywords        String?  @map("meta_keywords")
+  showStats           Boolean  @default(false) @map("show_stats")
+  showTestimonials    Boolean  @default(false) @map("show_testimonials")
+  showFaq             Boolean  @default(false) @map("show_faq")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+  updatedBy           String?  @map("updated_by")
+
+  @@map("landing_page_content")
+}
+
+model landing_page_services {
+  id          String   @id @default(uuid())
+  order       Int      @default(0)
+  enabled     Boolean  @default(true)
+  icon        String
+  iconColor   String   @default("blue") @map("icon_color")
+  title       String
+  description String
+  linkUrl     String?  @map("link_url")
+  linkText    String?  @map("link_text")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("landing_page_services")
+}
+
+model landing_page_banners {
+  id           String    @id @default(uuid())
+  order        Int       @default(0)
+  enabled      Boolean   @default(true)
+  title        String
+  description  String?
+  imageUrl     String    @map("image_url")
+  imageUrlDark String?   @map("image_url_dark")
+  linkUrl      String?   @map("link_url")
+  linkText     String?   @map("link_text")
+  position     String    @default("hero")
+  startDate    DateTime? @map("start_date")
+  endDate      DateTime? @map("end_date")
+  clicks       Int       @default(0)
+  views        Int       @default(0)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@map("landing_page_banners")
+}
+
+model equipment_types {
+  id          String      @id @default(uuid())
+  code        String      @unique
+  name        String
+  description String?
+  icon        String?
+  isActive    Boolean     @default(true) @map("is_active")
+  order       Int         @default(0)
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  familyId    String?     @map("family_id")
+  equipment   equipment[]
+  family      families?   @relation(fields: [familyId], references: [id])
+
+  @@index([isActive, order])
+  @@index([familyId])
+  @@map("equipment_types")
+}
+
+model equipment {
+  id                    String                  @id @default(uuid())
+  code                  String                  @unique
+  serialNumber          String                  @map("serial_number")
+  brand                 String
+  model                 String
+  typeId                String                  @map("type_id")
+  status                EquipmentStatus         @default(AVAILABLE)
+  condition             EquipmentCondition      @default(GOOD)
+  ownershipType         OwnershipType           @default(FIXED_ASSET) @map("ownership_type")
+  purchaseDate          DateTime?               @map("purchase_date")
+  purchasePrice         Float?                  @map("purchase_price")
+  warrantyExpiration    DateTime?               @map("warranty_expiration")
+  specifications        Json?
+  accessories           String[]
+  location              String?
+  notes                 String?
+  photoUrl              String?                 @map("photo_url")
+  qrCode                String                  @unique @map("qr_code")
+  rentalProvider        String?                 @map("rental_provider")
+  rentalContractNumber  String?                 @map("rental_contract_number")
+  rentalStartDate       DateTime?               @map("rental_start_date")
+  rentalEndDate         DateTime?               @map("rental_end_date")
+  rentalMonthlyCost     Float?                  @map("rental_monthly_cost")
+  rentalContactName     String?                 @map("rental_contact_name")
+  rentalContactEmail    String?                 @map("rental_contact_email")
+  rentalContactPhone    String?                 @map("rental_contact_phone")
+  rentalNotes           String?                 @map("rental_notes")
+  supplierId            String?                 @map("supplier_id")
+  invoiceNumber         String?                 @map("invoice_number") @db.VarChar(100)
+  purchaseOrderNumber   String?                 @map("purchase_order_number") @db.VarChar(100)
+  usefulLifeYears       Float?                  @map("useful_life_years")
+  residualValue         Float?                  @default(0) @map("residual_value")
+  warehouseId           String?                 @map("warehouse_id")
+  acquisitionMode       OwnershipType?          @map("acquisition_mode")
+  depreciationRate      Float?                  @map("depreciation_rate")
+  depreciationMethod    DepreciationMethod?     @map("depreciation_method")
+  totalUnits            Float?                  @map("total_units")
+  usedUnits             Float?                  @map("used_units")
+  contractStartDate     DateTime?               @map("contract_start_date")
+  contractEndDate       DateTime?               @map("contract_end_date")
+  contractRenewalCost   Float?                  @map("contract_renewal_cost")
+  contractId            String?                 @map("contract_id")
+  createdAt             DateTime                @default(now()) @map("created_at")
+  updatedAt             DateTime                @updatedAt @map("updated_at")
+  consumables           consumables[]
+  decommission_requests decommission_requests[]
+  contract              software_licenses?      @relation("EquipmentContract", fields: [contractId], references: [id])
+  supplier              suppliers?              @relation(fields: [supplierId], references: [id])
+  type                  equipment_types         @relation(fields: [typeId], references: [id])
+  warehouse             warehouses?             @relation(fields: [warehouseId], references: [id])
+  assignments           equipment_assignments[]
+  attachments           equipment_attachments[]
+  maintenanceRecords    maintenance_records[]
+  licenses              software_licenses[]
+  stockMovements        stock_movements[]       @relation("StockMovementEquipment")
+
+  @@index([code])
+  @@index([serialNumber])
+  @@index([typeId, status])
+  @@index([status])
+  @@index([rentalProvider])
+  @@index([rentalEndDate])
+  @@map("equipment")
+}
+
+model equipment_attachments {
+  id           String    @id @default(uuid())
+  equipmentId  String    @map("equipment_id")
+  filename     String
+  originalName String    @map("original_name")
+  mimeType     String    @map("mime_type")
+  size         Int
+  path         String
+  uploadedBy   String    @map("uploaded_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  equipment    equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  uploader     users     @relation(fields: [uploadedBy], references: [id])
+
+  @@index([equipmentId])
+  @@map("equipment_attachments")
+}
+
+model equipment_assignments {
+  id             String         @id @default(uuid())
+  equipmentId    String         @map("equipment_id")
+  receiverId     String         @map("receiver_id")
+  delivererId    String         @map("deliverer_id")
+  assignmentType AssignmentType @map("assignment_type")
+  startDate      DateTime       @map("start_date")
+  endDate        DateTime?      @map("end_date")
+  actualEndDate  DateTime?      @map("actual_end_date")
+  accessories    String[]
+  observations   String?
+  isActive       Boolean        @default(true) @map("is_active")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  deliveryAct    delivery_acts?
+  deliverer      users          @relation("AssignmentDeliverer", fields: [delivererId], references: [id])
+  equipment      equipment      @relation(fields: [equipmentId], references: [id])
+  receiver       users          @relation("AssignmentReceiver", fields: [receiverId], references: [id])
+  returnAct      return_acts?
+
+  @@index([equipmentId, isActive])
+  @@index([receiverId, isActive])
+  @@index([delivererId])
+  @@map("equipment_assignments")
+}
+
+model delivery_acts {
+  id                 String                 @id @default(uuid())
+  folio              String                 @unique
+  assignmentId       String?                @unique @map("assignment_id")
+  equipmentSnapshot  Json                   @map("equipment_snapshot")
+  delivererInfo      Json                   @map("deliverer_info")
+  receiverInfo       Json                   @map("receiver_info")
+  accessories        String[]
+  observations       String?
+  termsVersion       String                 @default("1.0") @map("terms_version")
+  status             ActStatus              @default(PENDING)
+  acceptanceToken    String                 @unique @map("acceptance_token")
+  expirationDate     DateTime               @map("expiration_date")
+  acceptedAt         DateTime?              @map("accepted_at")
+  rejectedAt         DateTime?              @map("rejected_at")
+  rejectionReason    String?                @map("rejection_reason")
+  signatureTimestamp DateTime?              @map("signature_timestamp")
+  signatureIp        String?                @map("signature_ip")
+  signatureUserAgent String?                @map("signature_user_agent")
+  verificationHash   String?                @map("verification_hash")
+  pdfPath            String?                @map("pdf_path")
+  actType            DeliveryActType        @default(EQUIPMENT_ASSIGNMENT) @map("act_type")
+  referenceId        String?                @map("reference_id")
+  referenceType      String?                @map("reference_type")
+  createdAt          DateTime               @default(now()) @map("created_at")
+  updatedAt          DateTime               @updatedAt @map("updated_at")
+  assignment         equipment_assignments? @relation(fields: [assignmentId], references: [id])
+
+  @@index([folio])
+  @@index([status, expirationDate])
+  @@index([acceptanceToken])
+  @@map("delivery_acts")
+}
+
+model return_acts {
+  id                 String                @id @default(uuid())
+  folio              String                @unique
+  assignmentId       String                @unique @map("assignment_id")
+  deliveryActId      String                @map("delivery_act_id")
+  equipmentCondition EquipmentCondition    @map("equipment_condition")
+  inspectionNotes    String?               @map("inspection_notes")
+  returnDate         DateTime              @map("return_date")
+  receiverInfo       Json                  @map("receiver_info")
+  delivererInfo      Json                  @map("deliverer_info")
+  status             ActStatus             @default(PENDING)
+  acceptanceToken    String                @unique @map("acceptance_token")
+  expirationDate     DateTime              @map("expiration_date")
+  acceptedAt         DateTime?             @map("accepted_at")
+  rejectedAt         DateTime?             @map("rejected_at")
+  rejectionReason    String?               @map("rejection_reason")
+  signatureTimestamp DateTime?             @map("signature_timestamp")
+  signatureIp        String?               @map("signature_ip")
+  signatureUserAgent String?               @map("signature_user_agent")
+  verificationHash   String?               @map("verification_hash")
+  pdfPath            String?               @map("pdf_path")
+  createdAt          DateTime              @default(now()) @map("created_at")
+  updatedAt          DateTime              @updatedAt @map("updated_at")
+  assignment         equipment_assignments @relation(fields: [assignmentId], references: [id])
+
+  @@index([folio])
+  @@index([status, expirationDate])
+  @@index([acceptanceToken])
+  @@map("return_acts")
+}
+
+model maintenance_records {
+  id             String            @id @default(uuid())
+  equipmentId    String            @map("equipment_id")
+  type           MaintenanceType
+  status         MaintenanceStatus @default(SCHEDULED)
+  date           DateTime
+  description    String
+  technicianId   String?           @map("technician_id")
+  requestedById  String?           @map("requested_by_id")
+  acceptedAt     DateTime?         @map("accepted_at")
+  completedAt    DateTime?         @map("completed_at")
+  cost           Float?
+  partsReplaced  String[]          @map("parts_replaced")
+  ticketId       String?           @map("ticket_id")
+  notes          String?
+  previousStatus EquipmentStatus?  @map("previous_status")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+  equipment      equipment         @relation(fields: [equipmentId], references: [id])
+  requestedBy    users?            @relation("MaintenanceRequester", fields: [requestedById], references: [id])
+  technician     users?            @relation("MaintenanceTechnician", fields: [technicianId], references: [id])
+  ticket         tickets?          @relation(fields: [ticketId], references: [id])
+
+  @@index([equipmentId, date])
+  @@index([technicianId])
+  @@index([ticketId])
+  @@index([status])
+  @@map("maintenance_records")
+}
+
+model license_types {
+  id          String              @id @default(uuid())
+  code        String              @unique
+  name        String
+  description String?
+  icon        String?
+  isActive    Boolean             @default(true) @map("is_active")
+  order       Int                 @default(0)
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+  familyId    String?             @map("family_id")
+  family      families?           @relation(fields: [familyId], references: [id])
+  licenses    software_licenses[]
+
+  @@index([isActive, order])
+  @@index([familyId])
+  @@map("license_types")
+}
+
+model software_licenses {
+  id                    String                  @id @default(uuid())
+  name                  String
+  typeId                String                  @map("type_id")
+  key                   String?
+  purchaseDate          DateTime?               @map("purchase_date")
+  expirationDate        DateTime?               @map("expiration_date")
+  cost                  Float?
+  vendor                String?
+  notes                 String?
+  assignedToEquipment   String?                 @map("assigned_to_equipment")
+  assignedToUser        String?                 @map("assigned_to_user")
+  assignedToDepartment  String?                 @map("assigned_to_department")
+  supplierId            String?                 @map("supplier_id")
+  renewalCost           Float?                  @map("renewal_cost")
+  renewalDate           DateTime?               @map("renewal_date")
+  invoiceNumber         String?                 @map("invoice_number") @db.VarChar(100)
+  purchaseOrderNumber   String?                 @map("purchase_order_number") @db.VarChar(100)
+  licenseScope          LicenseScope?           @map("license_scope")
+  contractType          ContractType?           @map("contract_type")
+  createdAt             DateTime                @default(now()) @map("created_at")
+  updatedAt             DateTime                @updatedAt @map("updated_at")
+  decommission_requests decommission_requests[]
+  linkedEquipment       equipment[]             @relation("EquipmentContract")
+  attachments           license_attachments[]
+  department            departments?            @relation(fields: [assignedToDepartment], references: [id])
+  equipment             equipment?              @relation(fields: [assignedToEquipment], references: [id])
+  user                  users?                  @relation("LicenseUser", fields: [assignedToUser], references: [id])
+  supplier              suppliers?              @relation(fields: [supplierId], references: [id])
+  licenseType           license_types           @relation(fields: [typeId], references: [id])
+
+  @@index([typeId, expirationDate])
+  @@index([assignedToEquipment])
+  @@index([assignedToUser])
+  @@index([assignedToDepartment])
+  @@map("software_licenses")
+}
+
+model consumable_types {
+  id          String        @id @default(uuid())
+  code        String        @unique
+  name        String
+  description String?
+  icon        String?
+  isActive    Boolean       @default(true) @map("is_active")
+  order       Int           @default(0)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  familyId    String?       @map("family_id")
+  family      families?     @relation(fields: [familyId], references: [id])
+  consumables consumables[]
+
+  @@index([isActive, order])
+  @@index([familyId])
+  @@map("consumable_types")
+}
+
+model units_of_measure {
+  id          String        @id @default(uuid())
+  code        String        @unique
+  name        String
+  symbol      String
+  description String?
+  isActive    Boolean       @default(true) @map("is_active")
+  order       Int           @default(0)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  consumables consumables[]
+
+  @@index([isActive, order])
+  @@map("units_of_measure")
+}
+
+model consumables {
+  id                  String            @id @default(uuid())
+  name                String
+  typeId              String            @map("type_id")
+  unitOfMeasureId     String            @map("unit_of_measure_id")
+  assignedEquipmentId String?           @map("assigned_equipment_id")
+  currentStock        Float             @map("current_stock")
+  minStock            Float             @map("min_stock")
+  maxStock            Float             @map("max_stock")
+  costPerUnit         Float?            @map("cost_per_unit")
+  location            String?
+  notes               String?
+  compatibleEquipment String[]          @map("compatible_equipment")
+  supplierId          String?           @map("supplier_id")
+  warehouseId         String?           @map("warehouse_id")
+  status              ConsumableStatus  @default(ACTIVE)
+  expirationDate      DateTime?         @map("expiration_date")
+  expiryAlertSentAt   DateTime?         @map("expiry_alert_sent_at")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+  assignedEquipment   equipment?        @relation(fields: [assignedEquipmentId], references: [id])
+  supplier            suppliers?        @relation(fields: [supplierId], references: [id])
+  consumableType      consumable_types  @relation(fields: [typeId], references: [id])
+  unitOfMeasure       units_of_measure  @relation(fields: [unitOfMeasureId], references: [id])
+  warehouse           warehouses?       @relation(fields: [warehouseId], references: [id])
+  movements           stock_movements[]
+
+  @@index([typeId, currentStock])
+  @@index([unitOfMeasureId])
+  @@index([assignedEquipmentId])
+  @@map("consumables")
+}
+
+model stock_movements {
+  id                    String       @id @default(uuid())
+  consumableId          String       @map("consumable_id")
+  type                  MovementType
+  quantity              Float
+  reason                String?
+  userId                String       @map("user_id")
+  assignedToUserId      String?      @map("assigned_to_user_id")
+  assignedToEquipmentId String?      @map("assigned_to_equipment_id")
+  createdAt             DateTime     @default(now()) @map("created_at")
+  assignedToEquipment   equipment?   @relation("StockMovementEquipment", fields: [assignedToEquipmentId], references: [id])
+  assignedToUser        users?       @relation("StockMovementAssignedTo", fields: [assignedToUserId], references: [id])
+  consumable            consumables  @relation(fields: [consumableId], references: [id])
+  user                  users        @relation("StockMovementUser", fields: [userId], references: [id])
+
+  @@index([consumableId, createdAt])
+  @@index([userId])
+  @@index([assignedToUserId])
+  @@index([assignedToEquipmentId])
+  @@map("stock_movements")
+}
+
+model suppliers {
+  id                String              @id @default(cuid())
+  name              String              @db.VarChar(200)
+  type              SupplierType
+  taxId             String?             @unique @map("tax_id") @db.VarChar(20)
+  email             String?             @db.VarChar(200)
+  phone             String?             @db.VarChar(50)
+  address           String?
+  website           String?
+  contactName       String?             @map("contact_name") @db.VarChar(200)
+  isActive          Boolean             @default(true) @map("is_active")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+  consumables       consumables[]
+  equipment         equipment[]
+  software_licenses software_licenses[]
+
+  @@index([type, isActive])
+  @@index([name])
+  @@map("suppliers")
+}
+
+model decommission_requests {
+  id              String                     @id @default(cuid())
+  assetType       DecommissionAssetType      @map("asset_type")
+  equipmentId     String?                    @map("equipment_id")
+  licenseId       String?                    @map("license_id")
+  requestedById   String                     @map("requested_by_id")
+  reason          String
+  condition       EquipmentCondition?
+  status          DecommissionStatus         @default(PENDING)
+  rejectionReason String?                    @map("rejection_reason")
+  reviewedById    String?                    @map("reviewed_by_id")
+  reviewedAt      DateTime?                  @map("reviewed_at")
+  createdAt       DateTime                   @default(now()) @map("created_at")
+  updatedAt       DateTime                   @updatedAt @map("updated_at")
+  act             decommission_acts?
+  attachments     decommission_attachments[]
+  equipment       equipment?                 @relation(fields: [equipmentId], references: [id])
+  license         software_licenses?         @relation(fields: [licenseId], references: [id])
+  requester       users                      @relation("DecommissionRequester", fields: [requestedById], references: [id])
+  reviewer        users?                     @relation("DecommissionReviewer", fields: [reviewedById], references: [id])
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([requestedById])
+  @@index([equipmentId])
+  @@index([licenseId])
+  @@map("decommission_requests")
+}
+
+model decommission_attachments {
+  id           String                @id @default(cuid())
+  requestId    String                @map("request_id")
+  filename     String
+  originalName String                @map("original_name")
+  mimeType     String                @map("mime_type")
+  size         Int
+  path         String
+  uploadedBy   String                @map("uploaded_by")
+  createdAt    DateTime              @default(now()) @map("created_at")
+  request      decommission_requests @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  uploader     users                 @relation(fields: [uploadedBy], references: [id])
+
+  @@index([requestId])
+  @@map("decommission_attachments")
+}
+
+model decommission_acts {
+  id           String                @id @default(cuid())
+  folio        String                @unique
+  requestId    String                @unique @map("request_id")
+  approvedById String                @map("approved_by_id")
+  approvedAt   DateTime              @default(now()) @map("approved_at")
+  pdfPath      String?               @map("pdf_path")
+  createdAt    DateTime              @default(now()) @map("created_at")
+  approvedBy   users                 @relation("DecommissionApprover", fields: [approvedById], references: [id])
+  request      decommission_requests @relation(fields: [requestId], references: [id])
+
+  @@index([folio])
+  @@map("decommission_acts")
+}
+
+model folio_counters {
+  id         String @id @default(uuid())
+  year       Int
+  type       String
+  lastNumber Int    @default(0) @map("last_number")
+
+  @@unique([year, type])
+  @@map("folio_counters")
+}
+
+model families {
+  id                          String                          @id @default(uuid())
+  code                        String                          @unique @db.VarChar(50)
+  name                        String                          @db.VarChar(100)
+  description                 String?
+  icon                        String?                         @db.VarChar(50)
+  color                       String?                         @default("#6B7280") @db.VarChar(20)
+  isActive                    Boolean                         @default(true) @map("is_active")
+  order                       Int                             @default(0)
+  createdAt                   DateTime                        @default(now()) @map("created_at")
+  updatedAt                   DateTime                        @updatedAt @map("updated_at")
+  adminFamilyAssignments      admin_family_assignments[]
+  consumableTypes             consumable_types[]
+  departments                 departments[]
+  equipmentTypes              equipment_types[]
+  formConfig                  inventory_family_config?
+  managerFamilies             inventory_manager_families[]
+  knowledge_articles          knowledge_articles[]
+  licenseTypes                license_types[]
+  sla_policies                sla_policies[]
+  technicianFamilyAssignments technician_family_assignments[]
+  ticketCodeCounters          ticket_code_counters[]
+  ticketFamilyConfig          ticket_family_config?
+  tickets                     tickets[]
+
+  @@index([isActive, order])
+  @@map("families")
+}
+
+model warehouses {
+  id          String        @id @default(uuid())
+  name        String        @db.VarChar(100)
+  location    String?       @db.VarChar(200)
+  description String?
+  managerId   String?       @map("manager_id")
+  isActive    Boolean       @default(true) @map("is_active")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  consumables consumables[]
+  equipment   equipment[]
+  manager     users?        @relation("WarehouseManager", fields: [managerId], references: [id])
+
+  @@index([isActive])
+  @@map("warehouses")
+}
+
+model inventory_manager_families {
+  id        String   @id @default(uuid())
+  managerId String   @map("manager_id")
+  familyId  String   @map("family_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  family    families @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  manager   users    @relation("InventoryManagerFamilies", fields: [managerId], references: [id], onDelete: Cascade)
+
+  @@unique([managerId, familyId])
+  @@index([managerId])
+  @@index([familyId])
+  @@map("inventory_manager_families")
+}
+
+model license_attachments {
+  id           String            @id @default(uuid())
+  licenseId    String            @map("license_id")
+  filename     String
+  originalName String            @map("original_name")
+  mimeType     String            @map("mime_type")
+  size         Int
+  path         String
+  uploadedBy   String            @map("uploaded_by")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  license      software_licenses @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+  uploader     users             @relation(fields: [uploadedBy], references: [id])
+
+  @@index([licenseId])
+  @@map("license_attachments")
+}
+
+model inventory_family_config {
+  id                        String              @id @default(uuid())
+  familyId                  String              @unique @map("family_id")
+  allowedSubtypes           AssetSubtype[]      @map("allowed_subtypes")
+  visibleSections           FormSection[]       @map("visible_sections")
+  requiredSections          FormSection[]       @map("required_sections")
+  requireFinancialForNew    Boolean             @default(true) @map("require_financial_for_new")
+  /// Config de secciones por modalidad de adquisición para EQUIPMENT.
+  /// Estructura: { FIXED_ASSET?: { visible: FormSection[], required: FormSection[] }, RENTAL?: {...}, LOAN?: {...} }
+  /// Si es null, se usan visibleSections/requiredSections como fallback global.
+  sectionsByMode            Json?               @map("sections_by_mode")
+  defaultDepreciationMethod DepreciationMethod? @map("default_depreciation_method")
+  defaultUsefulLifeYears    Float?              @map("default_useful_life_years")
+  defaultResidualValuePct   Float?              @map("default_residual_value_pct")
+  codePrefix                String?             @map("code_prefix") @db.VarChar(10)
+  autoApproveDecommission   Boolean             @default(false) @map("auto_approve_decommission")
+  requireDeliveryAct        Boolean             @default(true) @map("require_delivery_act")
+  createdAt                 DateTime            @default(now()) @map("created_at")
+  updatedAt                 DateTime            @updatedAt @map("updated_at")
+  family                    families            @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@index([familyId])
+  @@map("inventory_family_config")
+}
+
+model ticket_family_config {
+  id                         String   @id @default(uuid())
+  familyId                   String   @unique @map("family_id")
+  ticketsEnabled             Boolean  @default(true) @map("tickets_enabled")
+  codePrefix                 String?  @map("code_prefix") @db.VarChar(10)
+  isDefault                  Boolean  @default(false) @map("is_default")
+  autoAssignRespectsFamilies Boolean  @default(true) @map("auto_assign_respects_families")
+  alertVolumeThreshold       Int?     @map("alert_volume_threshold")
+  businessHoursStart         String   @default("09:00:00") @map("business_hours_start") @db.VarChar(8)
+  businessHoursEnd           String   @default("18:00:00") @map("business_hours_end") @db.VarChar(8)
+  businessDays               String   @default("MON,TUE,WED,THU,FRI") @map("business_days") @db.VarChar(50)
+  createdAt                  DateTime @default(now()) @map("created_at")
+  updatedAt                  DateTime @updatedAt @map("updated_at")
+  family                     families @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@index([familyId])
+  @@index([ticketsEnabled])
+  @@map("ticket_family_config")
+}
+
+model technician_family_assignments {
+  id           String   @id @default(uuid())
+  technicianId String   @map("technician_id")
+  familyId     String   @map("family_id")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  family       families @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  technician   users    @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+
+  @@unique([technicianId, familyId])
+  @@index([technicianId, isActive])
+  @@index([familyId, isActive])
+  @@map("technician_family_assignments")
+}
+
+model admin_family_assignments {
+  id        String   @id @default(uuid())
+  adminId   String   @map("admin_id")
+  familyId  String   @map("family_id")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  admin     users    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  family    families @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@unique([adminId, familyId])
+  @@index([adminId, isActive])
+  @@index([familyId, isActive])
+  @@map("admin_family_assignments")
+}
+
+model ticket_collaborators {
+  id             String   @id @default(uuid())
+  ticketId       String   @map("ticket_id")
+  collaboratorId String   @map("collaborator_id")
+  addedById      String   @map("added_by_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+  addedBy        users    @relation("CollaboratorAddedBy", fields: [addedById], references: [id])
+  collaborator   users    @relation("TicketCollaborator", fields: [collaboratorId], references: [id], onDelete: Cascade)
+  ticket         tickets  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@unique([ticketId, collaboratorId])
+  @@index([ticketId])
+  @@index([collaboratorId])
+  @@map("ticket_collaborators")
+}
+
+model ticket_code_counters {
+  id           String   @id @default(uuid())
+  familyId     String   @map("family_id")
+  year         Int
+  lastSequence Int      @default(0) @map("last_sequence")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  family       families @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@unique([familyId, year])
+  @@index([familyId, year])
+  @@map("ticket_code_counters")
 }
 
 enum NotificationType {
@@ -595,446 +1479,6 @@ enum UserRole {
   CLIENT
 }
 
-// ============================================
-// PLAN DE RESOLUCIÓN
-// ============================================
-
-model resolution_plans {
-  id             String    @id @default(uuid())
-  ticketId       String    @map("ticket_id")
-  title          String
-  description    String?   @db.Text
-  status         String    @default("draft") // 'draft', 'active', 'completed', 'cancelled'
-  totalTasks     Int       @default(0) @map("total_tasks")
-  completedTasks Int       @default(0) @map("completed_tasks")
-  estimatedHours Float     @default(0) @map("estimated_hours")
-  actualHours    Float     @default(0) @map("actual_hours")
-  startDate      DateTime? @map("start_date")
-  targetDate     DateTime? @map("target_date")
-  completedDate  DateTime? @map("completed_date")
-  createdBy      String    @map("created_by")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
-
-  ticket  tickets            @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  creator users              @relation("ResolutionPlanCreator", fields: [createdBy], references: [id])
-  tasks   resolution_tasks[]
-
-  @@index([ticketId])
-  @@index([createdBy])
-  @@map("resolution_plans")
-}
-
-model resolution_tasks {
-  id             String    @id @default(uuid())
-  planId         String    @map("plan_id")
-  title          String
-  description    String?   @db.Text
-  status         String    @default("pending") // 'pending', 'in_progress', 'completed', 'blocked'
-  priority       String    @default("medium") // 'low', 'medium', 'high'
-  estimatedHours Float?    @map("estimated_hours")
-  actualHours    Float?    @map("actual_hours")
-  startTime      String?   @map("start_time") // Hora de inicio (formato HH:mm)
-  endTime        String?   @map("end_time") // Hora de fin (formato HH:mm)
-  assignedTo     String?   @map("assigned_to")
-  dueDate        DateTime? @map("due_date")
-  completedAt    DateTime? @map("completed_at")
-  notes          String?   @db.Text
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
-
-  plan     resolution_plans @relation(fields: [planId], references: [id], onDelete: Cascade)
-  assignee users?           @relation("TaskAssignee", fields: [assignedTo], references: [id])
-
-  @@index([planId])
-  @@index([assignedTo])
-  @@index([startTime, endTime])
-  @@map("resolution_tasks")
-}
-
-// ============================================
-// VINCULACIÓN TICKETS - CONOCIMIENTOS
-// ============================================
-
-model ticket_knowledge_articles {
-  id        String   @id @default(uuid())
-  ticketId  String   @map("ticket_id")
-  articleId String   @map("article_id")
-  createdBy String   @map("created_by")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  ticket  tickets            @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  article knowledge_articles @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  creator users              @relation("ArticleCreator", fields: [createdBy], references: [id])
-
-  @@unique([ticketId, articleId])
-  @@index([ticketId])
-  @@index([articleId])
-  @@map("ticket_knowledge_articles")
-}
-
-// ============================================
-// WEBHOOKS SYSTEM
-// ============================================
-
-model webhooks {
-  id              String         @id @default(uuid())
-  name            String         @db.VarChar(100)
-  url             String         @db.VarChar(500)
-  events          String[]
-  secret          String         @db.VarChar(255)
-  isActive        Boolean        @default(true) @map("is_active")
-  headers         Json?
-  timeoutMs       Int            @default(30000) @map("timeout_ms")
-  retryCount      Int            @default(3) @map("retry_count")
-  createdBy       String?        @map("created_by")
-  createdAt       DateTime       @default(now()) @map("created_at")
-  updatedAt       DateTime       @default(now()) @updatedAt @map("updated_at")
-  lastTriggeredAt DateTime?      @map("last_triggered_at")
-  webhook_logs    webhook_logs[]
-  creator         users?         @relation("WebhookCreator", fields: [createdBy], references: [id])
-
-  @@index([isActive])
-  @@map("webhooks")
-}
-
-model webhook_logs {
-  id             String   @id @default(uuid())
-  webhookId      String   @map("webhook_id")
-  event          String   @db.VarChar(50)
-  payload        Json
-  responseStatus Int?     @map("response_status")
-  responseBody   String?  @map("response_body") @db.Text
-  errorMessage   String?  @map("error_message") @db.Text
-  durationMs     Int?     @map("duration_ms")
-  attempt        Int      @default(1)
-  createdAt      DateTime @default(now()) @map("created_at")
-  webhook        webhooks @relation(fields: [webhookId], references: [id], onDelete: Cascade)
-
-  @@index([webhookId, createdAt(sort: Desc)])
-  @@index([event, createdAt(sort: Desc)])
-  @@map("webhook_logs")
-}
-
-// ============================================
-// SLA SYSTEM
-// ============================================
-
-model sla_policies {
-  id                  String               @id @default(uuid())
-  name                String               @db.VarChar(100)
-  description         String?              @db.Text
-  categoryId          String?              @map("category_id")
-  familyId            String?              @map("family_id")
-  priority            String               @db.VarChar(20)
-  responseTimeHours   Int                  @map("response_time_hours")
-  resolutionTimeHours Int                  @map("resolution_time_hours")
-  businessHoursOnly   Boolean              @default(false) @map("business_hours_only")
-  businessHoursStart  String               @default("09:00:00") @map("business_hours_start") @db.VarChar(8)
-  businessHoursEnd    String               @default("18:00:00") @map("business_hours_end") @db.VarChar(8)
-  businessDays        String               @default("MON,TUE,WED,THU,FRI") @map("business_days") @db.VarChar(50)
-  isActive            Boolean              @default(true) @map("is_active")
-  createdAt           DateTime             @default(now()) @map("created_at")
-  updatedAt           DateTime             @default(now()) @updatedAt @map("updated_at")
-  category            categories?          @relation("SLAPolicyCategory", fields: [categoryId], references: [id])
-  family              families?            @relation(fields: [familyId], references: [id])
-  sla_violations      sla_violations[]
-  ticket_sla_metrics  ticket_sla_metrics[]
-
-  @@index([isActive, categoryId, priority])
-  @@index([isActive, familyId, priority])
-  @@map("sla_policies")
-}
-
-model sla_violations {
-  id            String       @id @default(uuid())
-  ticketId      String       @map("ticket_id")
-  slaPolicyId   String       @map("sla_policy_id")
-  violationType String       @map("violation_type") @db.VarChar(50)
-  expectedAt    DateTime     @map("expected_at")
-  actualAt      DateTime?    @map("actual_at")
-  isResolved    Boolean      @default(false) @map("is_resolved")
-  severity      String       @default("MEDIUM") @db.VarChar(20)
-  notifiedAt    DateTime?    @map("notified_at")
-  createdAt     DateTime     @default(now()) @map("created_at")
-  ticket        tickets      @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  sla_policy    sla_policies @relation(fields: [slaPolicyId], references: [id])
-
-  @@index([ticketId, isResolved])
-  @@index([slaPolicyId, createdAt(sort: Desc)])
-  @@map("sla_violations")
-}
-
-model ticket_sla_metrics {
-  id                    String       @id @default(uuid())
-  ticketId              String       @unique @map("ticket_id")
-  slaPolicyId           String       @map("sla_policy_id")
-  responseDeadline      DateTime?    @map("response_deadline")
-  resolutionDeadline    DateTime?    @map("resolution_deadline")
-  firstResponseAt       DateTime?    @map("first_response_at")
-  resolvedAt            DateTime?    @map("resolved_at")
-  responseSLAMet        Boolean?     @map("response_sla_met")
-  resolutionSLAMet      Boolean?     @map("resolution_sla_met")
-  responseTimeMinutes   Int?         @map("response_time_minutes")
-  resolutionTimeMinutes Int?         @map("resolution_time_minutes")
-  businessHoursElapsed  Int?         @map("business_hours_elapsed")
-  createdAt             DateTime     @default(now()) @map("created_at")
-  updatedAt             DateTime     @default(now()) @updatedAt @map("updated_at")
-  ticket                tickets      @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  sla_policy            sla_policies @relation(fields: [slaPolicyId], references: [id])
-
-  @@index([ticketId])
-  @@index([responseDeadline, resolutionDeadline])
-  @@map("ticket_sla_metrics")
-}
-
-// ============================================
-// CATEGORY ANALYTICS
-// ============================================
-
-model category_analytics {
-  id           String   @id @default(uuid())
-  eventType    String   @map("event_type") @db.VarChar(50)
-  clientId     String   @map("client_id")
-  categoryId   String?  @map("category_id")
-  searchQuery  String?  @map("search_query") @db.VarChar(255)
-  timeToSelect Int?     @map("time_to_select")
-  metadata     Json?
-  createdAt    DateTime @default(now()) @map("created_at")
-
-  @@index([clientId, createdAt(sort: Desc)])
-  @@index([eventType, createdAt(sort: Desc)])
-  @@index([categoryId, createdAt(sort: Desc)])
-  @@map("category_analytics")
-}
-
-// ============================================
-// CMS - Landing Page
-// ============================================
-
-model landing_page_content {
-  id String @id @default(uuid())
-
-  // Hero Section
-  heroTitle          String  @default("Soporte Técnico Profesional") @map("hero_title")
-  heroSubtitle       String  @default("Resolvemos tus problemas técnicos de manera rápida y eficiente") @map("hero_subtitle")
-  heroCtaPrimary     String  @default("Crear Ticket de Soporte") @map("hero_cta_primary")
-  heroCtaPrimaryUrl  String  @default("/login") @map("hero_cta_primary_url")
-  heroCtaSecondary   String  @default("Ver Servicios") @map("hero_cta_secondary")
-  heroCtaSecondaryUrl String @default("#servicios") @map("hero_cta_secondary_url")
-  heroImageUrl       String? @map("hero_image_url")
-
-  // Services Section
-  servicesTitle    String  @default("Nuestros Servicios") @map("services_title")
-  servicesSubtitle String  @default("Ofrecemos soporte técnico integral para todas tus necesidades tecnológicas") @map("services_subtitle")
-  servicesEnabled  Boolean @default(true) @map("services_enabled")
-
-  // Company Info
-  companyName         String  @default("Sistema de Tickets") @map("company_name")
-  companyTagline      String  @default("Soporte técnico profesional") @map("company_tagline")
-  companyLogoLightUrl String? @map("company_logo_light_url")
-  companyLogoDarkUrl  String? @map("company_logo_dark_url")
-
-  // Contact
-  contactEmail   String? @map("contact_email")
-  contactPhone   String? @map("contact_phone")
-  contactAddress String? @map("contact_address")
-
-  // Footer
-  footerText String @default("© 2024 Sistema de Tickets. Todos los derechos reservados.") @map("footer_text")
-
-  // SEO
-  metaTitle       String  @default("Sistema de Tickets - Soporte Técnico Profesional") @map("meta_title")
-  metaDescription String  @default("Sistema profesional de gestión de tickets de soporte técnico") @map("meta_description")
-  metaKeywords    String? @map("meta_keywords")
-
-  // Features
-  showStats        Boolean @default(false) @map("show_stats")
-  showTestimonials Boolean @default(false) @map("show_testimonials")
-  showFaq          Boolean @default(false) @map("show_faq")
-
-  // Timestamps
-  updatedAt DateTime @updatedAt @map("updated_at")
-  updatedBy String?  @map("updated_by")
-
-  @@map("landing_page_content")
-}
-
-model landing_page_services {
-  id      String  @id @default(uuid())
-  order   Int     @default(0)
-  enabled Boolean @default(true)
-
-  icon        String // lucide icon name
-  iconColor   String  @default("blue") @map("icon_color")
-  title       String
-  description String  @db.Text
-  linkUrl     String? @map("link_url")
-  linkText    String? @map("link_text")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("landing_page_services")
-}
-
-model landing_page_banners {
-  id      String  @id @default(uuid())
-  order   Int     @default(0)
-  enabled Boolean @default(true)
-
-  title        String
-  description  String? @db.Text
-  imageUrl     String  @map("image_url")
-  imageUrlDark String? @map("image_url_dark")
-  linkUrl      String? @map("link_url")
-  linkText     String? @map("link_text")
-
-  // Positioning
-  position String @default("hero") // hero, services, footer
-
-  // Scheduling
-  startDate DateTime? @map("start_date")
-  endDate   DateTime? @map("end_date")
-
-  // Analytics
-  clicks Int @default(0)
-  views  Int @default(0)
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("landing_page_banners")
-}
-
-// ============================================
-// INVENTORY MANAGEMENT SYSTEM
-// Equipment Types (dynamic catalog)
-model equipment_types {
-  id          String      @id @default(uuid())
-  code        String      @unique // LAPTOP, DESKTOP, etc.
-  name        String      // Laptop, Desktop, etc.
-  description String?
-  icon        String?     // Nombre del ícono de lucide-react
-  isActive    Boolean     @default(true) @map("is_active")
-  order       Int         @default(0) // Para ordenar en el dropdown
-  createdAt   DateTime    @default(now()) @map("created_at")
-  updatedAt   DateTime    @updatedAt @map("updated_at")
-  
-  familyId    String?             @map("family_id")
-  family      families?           @relation(fields: [familyId], references: [id])
-
-  equipment   equipment[]
-  
-  @@index([isActive, order])
-  @@index([familyId])
-  @@map("equipment_types")
-}
-
-// ============================================
-
-// Equipment table
-model equipment {
-  id                   String            @id @default(uuid())
-  code                 String            @unique
-  serialNumber         String            @map("serial_number")
-  brand                String
-  model                String
-  typeId               String            @map("type_id") // Cambiado de enum a relación
-  status               EquipmentStatus   @default(AVAILABLE)
-  condition            EquipmentCondition @default(GOOD)
-  ownershipType        OwnershipType     @default(FIXED_ASSET) @map("ownership_type")
-  purchaseDate         DateTime?         @map("purchase_date")
-  purchasePrice        Float?            @map("purchase_price")
-  warrantyExpiration   DateTime?         @map("warranty_expiration")
-  specifications       Json?
-  accessories          String[]
-  location             String?
-  notes                String?           @db.Text
-  photoUrl             String?           @map("photo_url")
-  qrCode               String            @unique @map("qr_code")
-  
-  // Campos para equipos rentados/alquilados
-  rentalProvider       String?           @map("rental_provider")
-  rentalContractNumber String?           @map("rental_contract_number")
-  rentalStartDate      DateTime?         @map("rental_start_date")
-  rentalEndDate        DateTime?         @map("rental_end_date")
-  rentalMonthlyCost    Float?            @map("rental_monthly_cost")
-  rentalContactName    String?           @map("rental_contact_name")
-  rentalContactEmail   String?           @map("rental_contact_email")
-  rentalContactPhone   String?           @map("rental_contact_phone")
-  rentalNotes          String?           @db.Text @map("rental_notes")
-
-  // Campos financieros y de depreciación
-  supplierId           String?           @map("supplier_id")
-  invoiceNumber        String?           @map("invoice_number") @db.VarChar(100)
-  purchaseOrderNumber  String?           @map("purchase_order_number") @db.VarChar(100)
-  usefulLifeYears      Float?            @map("useful_life_years")
-  residualValue        Float?            @default(0) @map("residual_value")
-  
-  // Bodega
-  warehouseId          String?           @map("warehouse_id")
-
-  // Modalidad de adquisición (alias semántico de ownershipType)
-  acquisitionMode      OwnershipType?    @map("acquisition_mode")
-
-  // Depreciación extendida
-  depreciationRate     Float?            @map("depreciation_rate")
-  depreciationMethod   DepreciationMethod? @map("depreciation_method")
-  totalUnits           Float?            @map("total_units")
-  usedUnits            Float?            @map("used_units")
-
-  // Contratos/servicios
-  contractStartDate    DateTime?         @map("contract_start_date")
-  contractEndDate      DateTime?         @map("contract_end_date")
-  contractRenewalCost  Float?            @map("contract_renewal_cost")
-
-  // Vínculo a contrato en software_licenses (para RENTAL/LOAN)
-  contractId           String?           @map("contract_id")
-
-  createdAt            DateTime          @default(now()) @map("created_at")
-  updatedAt            DateTime          @updatedAt @map("updated_at")
-  
-  type                 equipment_types   @relation(fields: [typeId], references: [id])
-  supplier             suppliers?        @relation(fields: [supplierId], references: [id])
-  warehouse            warehouses?       @relation(fields: [warehouseId], references: [id])
-  contract             software_licenses? @relation("EquipmentContract", fields: [contractId], references: [id], onDelete: SetNull)
-  assignments          equipment_assignments[]
-  maintenanceRecords   maintenance_records[]
-  licenses             software_licenses[]
-  consumables          consumables[]
-  stockMovements       stock_movements[] @relation("StockMovementEquipment")
-  attachments          equipment_attachments[]
-  decommission_requests decommission_requests[]
-  
-  @@index([code])
-  @@index([serialNumber])
-  @@index([typeId, status])
-  @@index([status])
-  @@index([rentalProvider])
-  @@index([rentalEndDate])
-  @@map("equipment")
-}
-
-// Equipment attachments (imágenes y documentos opcionales del equipo)
-model equipment_attachments {
-  id           String    @id @default(uuid())
-  equipmentId  String    @map("equipment_id")
-  filename     String
-  originalName String    @map("original_name")
-  mimeType     String    @map("mime_type")
-  size         Int
-  path         String
-  uploadedBy   String    @map("uploaded_by")
-  createdAt    DateTime  @default(now()) @map("created_at")
-
-  equipment    equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
-  uploader     users     @relation(fields: [uploadedBy], references: [id])
-
-  @@index([equipmentId])
-  @@map("equipment_attachments")
-}
-
 enum EquipmentStatus {
   AVAILABLE
   ASSIGNED
@@ -1057,74 +1501,10 @@ enum OwnershipType {
   LOAN
 }
 
-// Equipment assignments table
-model equipment_assignments {
-  id              String          @id @default(uuid())
-  equipmentId     String          @map("equipment_id")
-  receiverId      String          @map("receiver_id")
-  delivererId     String          @map("deliverer_id")
-  assignmentType  AssignmentType  @map("assignment_type")
-  startDate       DateTime        @map("start_date")
-  endDate         DateTime?       @map("end_date")
-  actualEndDate   DateTime?       @map("actual_end_date")
-  accessories     String[]
-  observations    String?         @db.Text
-  isActive        Boolean         @default(true) @map("is_active")
-  createdAt       DateTime        @default(now()) @map("created_at")
-  updatedAt       DateTime        @updatedAt @map("updated_at")
-  
-  equipment       equipment       @relation(fields: [equipmentId], references: [id])
-  receiver        users           @relation("AssignmentReceiver", fields: [receiverId], references: [id])
-  deliverer       users           @relation("AssignmentDeliverer", fields: [delivererId], references: [id])
-  deliveryAct     delivery_acts?
-  returnAct       return_acts?
-  
-  @@index([equipmentId, isActive])
-  @@index([receiverId, isActive])
-  @@index([delivererId])
-  @@map("equipment_assignments")
-}
-
 enum AssignmentType {
   PERMANENT
   TEMPORARY
   LOAN
-}
-
-// Delivery acts table
-model delivery_acts {
-  id                  String          @id @default(uuid())
-  folio               String          @unique
-  assignmentId        String?         @unique @map("assignment_id")
-  equipmentSnapshot   Json            @map("equipment_snapshot")
-  delivererInfo       Json            @map("deliverer_info")
-  receiverInfo        Json            @map("receiver_info")
-  accessories         String[]
-  observations        String?         @db.Text
-  termsVersion        String          @default("1.0") @map("terms_version")
-  status              ActStatus       @default(PENDING)
-  acceptanceToken     String          @unique @map("acceptance_token")
-  expirationDate      DateTime        @map("expiration_date")
-  acceptedAt          DateTime?       @map("accepted_at")
-  rejectedAt          DateTime?       @map("rejected_at")
-  rejectionReason     String?         @db.Text @map("rejection_reason")
-  signatureTimestamp  DateTime?       @map("signature_timestamp")
-  signatureIp         String?         @map("signature_ip")
-  signatureUserAgent  String?         @map("signature_user_agent")
-  verificationHash    String?         @map("verification_hash")
-  pdfPath             String?         @map("pdf_path")
-  actType             DeliveryActType @default(EQUIPMENT_ASSIGNMENT) @map("act_type")
-  referenceId         String?         @map("reference_id")
-  referenceType       String?         @map("reference_type")
-  createdAt           DateTime        @default(now()) @map("created_at")
-  updatedAt           DateTime        @updatedAt @map("updated_at")
-  
-  assignment          equipment_assignments? @relation(fields: [assignmentId], references: [id])
-  
-  @@index([folio])
-  @@index([status, expirationDate])
-  @@index([acceptanceToken])
-  @@map("delivery_acts")
 }
 
 enum ActStatus {
@@ -1134,247 +1514,17 @@ enum ActStatus {
   EXPIRED
 }
 
-// Return acts table
-model return_acts {
-  id                  String          @id @default(uuid())
-  folio               String          @unique
-  assignmentId        String          @unique @map("assignment_id")
-  deliveryActId       String          @map("delivery_act_id")
-  equipmentCondition  EquipmentCondition @map("equipment_condition")
-  inspectionNotes     String?         @db.Text @map("inspection_notes")
-  returnDate          DateTime        @map("return_date")
-  receiverInfo        Json            @map("receiver_info")
-  delivererInfo       Json            @map("deliverer_info")
-  status              ActStatus       @default(PENDING)
-  acceptanceToken     String          @unique @map("acceptance_token")
-  expirationDate      DateTime        @map("expiration_date")
-  acceptedAt          DateTime?       @map("accepted_at")
-  rejectedAt          DateTime?       @map("rejected_at")
-  rejectionReason     String?         @db.Text @map("rejection_reason")
-  signatureTimestamp  DateTime?       @map("signature_timestamp")
-  signatureIp         String?         @map("signature_ip")
-  signatureUserAgent  String?         @map("signature_user_agent")
-  verificationHash    String?         @map("verification_hash")
-  pdfPath             String?         @map("pdf_path")
-  createdAt           DateTime        @default(now()) @map("created_at")
-  updatedAt           DateTime        @updatedAt @map("updated_at")
-  
-  assignment          equipment_assignments @relation(fields: [assignmentId], references: [id])
-  
-  @@index([folio])
-  @@index([status, expirationDate])
-  @@index([acceptanceToken])
-  @@map("return_acts")
-}
-
-// Maintenance records table
-model maintenance_records {
-  id              String              @id @default(uuid())
-  equipmentId     String              @map("equipment_id")
-  type            MaintenanceType
-  status          MaintenanceStatus   @default(SCHEDULED)
-  date            DateTime
-  description     String              @db.Text
-  technicianId    String?             @map("technician_id")
-  requestedById   String?             @map("requested_by_id")
-  acceptedAt      DateTime?           @map("accepted_at")
-  completedAt     DateTime?           @map("completed_at")
-  cost            Float?
-  partsReplaced   String[]            @map("parts_replaced")
-  ticketId        String?             @map("ticket_id")
-  notes           String?             @db.Text
-  previousStatus  EquipmentStatus?    @map("previous_status")
-  createdAt       DateTime            @default(now()) @map("created_at")
-  updatedAt       DateTime            @updatedAt @map("updated_at")
-  
-  equipment       equipment           @relation(fields: [equipmentId], references: [id])
-  technician      users?              @relation("MaintenanceTechnician", fields: [technicianId], references: [id])
-  requestedBy     users?              @relation("MaintenanceRequester", fields: [requestedById], references: [id])
-  ticket          tickets?            @relation(fields: [ticketId], references: [id])
-  
-  @@index([equipmentId, date])
-  @@index([technicianId])
-  @@index([ticketId])
-  @@index([status])
-  @@map("maintenance_records")
-}
-
 enum MaintenanceType {
   PREVENTIVE
   CORRECTIVE
 }
 
 enum MaintenanceStatus {
-  REQUESTED    // Cliente solicitó mantenimiento
-  SCHEDULED    // Admin/Técnico programó (equipo pasa a MAINTENANCE)
-  ACCEPTED     // Cliente aceptó/confirmó
-  COMPLETED    // Técnico completó (equipo vuelve a AVAILABLE o ASSIGNED)
-  CANCELLED    // Cancelado
-}
-
-// License Types (dynamic catalog, like equipment_types)
-model license_types {
-  id          String              @id @default(uuid())
-  code        String              @unique
-  name        String
-  description String?
-  icon        String?
-  isActive    Boolean             @default(true) @map("is_active")
-  order       Int                 @default(0)
-  createdAt   DateTime            @default(now()) @map("created_at")
-  updatedAt   DateTime            @updatedAt @map("updated_at")
-
-  familyId    String?             @map("family_id")
-  family      families?           @relation(fields: [familyId], references: [id])
-
-  licenses    software_licenses[]
-
-  @@index([isActive, order])
-  @@index([familyId])
-  @@map("license_types")
-}
-
-// Software licenses / contracts table
-model software_licenses {
-  id                    String          @id @default(uuid())
-  name                  String
-  typeId                String          @map("type_id")
-  key                   String?         @db.Text // Encrypted, optional
-  purchaseDate          DateTime?       @map("purchase_date")
-  expirationDate        DateTime?       @map("expiration_date")
-  cost                  Float?
-  vendor                String?
-  notes                 String?         @db.Text
-  assignedToEquipment   String?         @map("assigned_to_equipment")
-  assignedToUser        String?         @map("assigned_to_user")
-  assignedToDepartment  String?         @map("assigned_to_department")
-
-  // Campos financieros
-  supplierId            String?         @map("supplier_id")
-  renewalCost           Float?          @map("renewal_cost")
-  renewalDate           DateTime?       @map("renewal_date")
-  invoiceNumber         String?         @map("invoice_number") @db.VarChar(100)
-  purchaseOrderNumber   String?         @map("purchase_order_number") @db.VarChar(100)
-
-  licenseScope   LicenseScope?   @map("license_scope")
-  contractType   ContractType?   @map("contract_type")
-
-  createdAt             DateTime        @default(now()) @map("created_at")
-  updatedAt             DateTime        @updatedAt @map("updated_at")
-
-  licenseType   license_types?  @relation(fields: [typeId], references: [id])
-  equipment     equipment?      @relation(fields: [assignedToEquipment], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  user          users?          @relation("LicenseUser", fields: [assignedToUser], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  department    departments?    @relation(fields: [assignedToDepartment], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  supplier      suppliers?      @relation(fields: [supplierId], references: [id])
-  decommission_requests decommission_requests[]
-  attachments   license_attachments[]
-  linkedEquipment equipment[]   @relation("EquipmentContract")
-
-  @@index([typeId, expirationDate])
-  @@index([assignedToEquipment])
-  @@index([assignedToUser])
-  @@index([assignedToDepartment])
-  @@map("software_licenses")
-}
-
-// Consumable Types (dynamic catalog, like equipment_types)
-model consumable_types {
-  id          String        @id @default(uuid())
-  code        String        @unique
-  name        String
-  description String?
-  icon        String?
-  isActive    Boolean       @default(true) @map("is_active")
-  order       Int           @default(0)
-  createdAt   DateTime      @default(now()) @map("created_at")
-  updatedAt   DateTime      @updatedAt @map("updated_at")
-
-  familyId    String?             @map("family_id")
-  family      families?           @relation(fields: [familyId], references: [id])
-
-  consumables consumables[]
-
-  @@index([isActive, order])
-  @@index([familyId])
-  @@map("consumable_types")
-}
-
-// Units of Measure (dynamic catalog)
-model units_of_measure {
-  id          String        @id @default(uuid())
-  code        String        @unique
-  name        String
-  symbol      String
-  description String?
-  isActive    Boolean       @default(true) @map("is_active")
-  order       Int           @default(0)
-  createdAt   DateTime      @default(now()) @map("created_at")
-  updatedAt   DateTime      @updatedAt @map("updated_at")
-
-  consumables consumables[]
-
-  @@index([isActive, order])
-  @@map("units_of_measure")
-}
-
-// Consumables table
-model consumables {
-  id                  String            @id @default(uuid())
-  name                String
-  typeId              String            @map("type_id")
-  unitOfMeasureId     String            @map("unit_of_measure_id")
-  assignedEquipmentId String?           @map("assigned_equipment_id")
-  currentStock        Float             @map("current_stock")
-  minStock            Float             @map("min_stock")
-  maxStock            Float             @map("max_stock")
-  costPerUnit         Float?            @map("cost_per_unit")
-  location            String?
-  notes               String?           @db.Text
-  compatibleEquipment String[]          @map("compatible_equipment")
-  supplierId          String?           @map("supplier_id")
-  warehouseId         String?           @map("warehouse_id")
-  status              ConsumableStatus  @default(ACTIVE)
-  expirationDate      DateTime?         @map("expiration_date")
-  expiryAlertSentAt   DateTime?         @map("expiry_alert_sent_at")
-  createdAt           DateTime          @default(now()) @map("created_at")
-  updatedAt           DateTime          @updatedAt @map("updated_at")
-  
-  consumableType      consumable_types  @relation(fields: [typeId], references: [id])
-  unitOfMeasure       units_of_measure  @relation(fields: [unitOfMeasureId], references: [id])
-  assignedEquipment   equipment?        @relation(fields: [assignedEquipmentId], references: [id])
-  supplier            suppliers?        @relation(fields: [supplierId], references: [id])
-  warehouse           warehouses?       @relation(fields: [warehouseId], references: [id])
-  movements           stock_movements[]
-  
-  @@index([typeId, currentStock])
-  @@index([unitOfMeasureId])
-  @@index([assignedEquipmentId])
-  @@map("consumables")
-}
-
-// Stock movements table
-model stock_movements {
-  id                  String        @id @default(uuid())
-  consumableId        String        @map("consumable_id")
-  type                MovementType
-  quantity            Float
-  reason              String?       @db.Text
-  userId              String        @map("user_id")
-  assignedToUserId    String?       @map("assigned_to_user_id")
-  assignedToEquipmentId String?     @map("assigned_to_equipment_id")
-  createdAt           DateTime      @default(now()) @map("created_at")
-  
-  consumable          consumables   @relation(fields: [consumableId], references: [id])
-  user                users         @relation("StockMovementUser", fields: [userId], references: [id])
-  assignedToUser      users?        @relation("StockMovementAssignedTo", fields: [assignedToUserId], references: [id])
-  assignedToEquipment equipment?    @relation("StockMovementEquipment", fields: [assignedToEquipmentId], references: [id])
-  
-  @@index([consumableId, createdAt])
-  @@index([userId])
-  @@index([assignedToUserId])
-  @@index([assignedToEquipmentId])
-  @@map("stock_movements")
+  REQUESTED
+  SCHEDULED
+  ACCEPTED
+  COMPLETED
+  CANCELLED
 }
 
 enum MovementType {
@@ -1383,43 +1533,12 @@ enum MovementType {
   ADJUSTMENT
 }
 
-// ============================================
-// SUPPLIERS
-// ============================================
-
 enum SupplierType {
   EQUIPMENT
   CONSUMABLE
   LICENSE
   MIXED
 }
-
-model suppliers {
-  id          String       @id @default(cuid())
-  name        String       @db.VarChar(200)
-  type        SupplierType
-  taxId       String?      @unique @map("tax_id") @db.VarChar(20)
-  email       String?      @db.VarChar(200)
-  phone       String?      @db.VarChar(50)
-  address     String?
-  website     String?
-  contactName String?      @map("contact_name") @db.VarChar(200)
-  isActive    Boolean      @default(true) @map("is_active")
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
-
-  equipment         equipment[]
-  consumables       consumables[]
-  software_licenses software_licenses[]
-
-  @@index([type, isActive])
-  @@index([name])
-  @@map("suppliers")
-}
-
-// ============================================
-// DECOMMISSION (ACTAS DE BAJA)
-// ============================================
 
 enum DecommissionAssetType {
   EQUIPMENT
@@ -1431,84 +1550,6 @@ enum DecommissionStatus {
   APPROVED
   REJECTED
 }
-
-model decommission_requests {
-  id              String                @id @default(cuid())
-  assetType       DecommissionAssetType @map("asset_type")
-  equipmentId     String?               @map("equipment_id")
-  licenseId       String?               @map("license_id")
-  requestedById   String                @map("requested_by_id")
-  reason          String                @db.Text
-  condition       EquipmentCondition?
-  status          DecommissionStatus    @default(PENDING)
-  rejectionReason String?               @db.Text @map("rejection_reason")
-  reviewedById    String?               @map("reviewed_by_id")
-  reviewedAt      DateTime?             @map("reviewed_at")
-  createdAt       DateTime              @default(now()) @map("created_at")
-  updatedAt       DateTime              @updatedAt @map("updated_at")
-
-  equipment    equipment?                 @relation(fields: [equipmentId], references: [id])
-  license      software_licenses?         @relation(fields: [licenseId], references: [id])
-  requester    users                      @relation("DecommissionRequester", fields: [requestedById], references: [id])
-  reviewer     users?                     @relation("DecommissionReviewer", fields: [reviewedById], references: [id])
-  attachments  decommission_attachments[]
-  act          decommission_acts?
-
-  @@index([status, createdAt(sort: Desc)])
-  @@index([requestedById])
-  @@index([equipmentId])
-  @@index([licenseId])
-  @@map("decommission_requests")
-}
-
-model decommission_attachments {
-  id           String   @id @default(cuid())
-  requestId    String   @map("request_id")
-  filename     String
-  originalName String   @map("original_name")
-  mimeType     String   @map("mime_type")
-  size         Int
-  path         String
-  uploadedBy   String   @map("uploaded_by")
-  createdAt    DateTime @default(now()) @map("created_at")
-
-  request  decommission_requests @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  uploader users                 @relation(fields: [uploadedBy], references: [id])
-
-  @@index([requestId])
-  @@map("decommission_attachments")
-}
-
-model decommission_acts {
-  id           String   @id @default(cuid())
-  folio        String   @unique
-  requestId    String   @unique @map("request_id")
-  approvedById String   @map("approved_by_id")
-  approvedAt   DateTime @default(now()) @map("approved_at")
-  pdfPath      String?  @map("pdf_path")
-  createdAt    DateTime @default(now()) @map("created_at")
-
-  request    decommission_requests @relation(fields: [requestId], references: [id])
-  approvedBy users                 @relation("DecommissionApprover", fields: [approvedById], references: [id])
-
-  @@index([folio])
-  @@map("decommission_acts")
-}
-
-// Folio counters table (for sequential folio generation)
-model folio_counters {
-  id        String   @id @default(uuid())
-  year      Int
-  type      String   // 'ACT' or 'DEV'
-  lastNumber Int     @default(0) @map("last_number")
-  
-  @@unique([year, type])
-  @@map("folio_counters")
-}
-
-// ============================================
-// INVENTORY FAMILIES — Nuevos enums (tarea 1.1)
-// ============================================
 
 enum DeliveryActType {
   EQUIPMENT_ASSIGNMENT
@@ -1558,210 +1599,4 @@ enum ConsumableStatus {
   OUT_OF_STOCK
   EXPIRED
   RETIRED
-}
-
-// ============================================
-// INVENTORY FAMILIES — Modelos nuevos
-// ============================================
-
-model families {
-  id          String   @id @default(uuid())
-  code        String   @unique @db.VarChar(50)
-  name        String   @db.VarChar(100)
-  description String?  @db.Text
-  icon        String?  @db.VarChar(50)
-  color       String?  @default("#6B7280") @db.VarChar(20)
-  isActive    Boolean  @default(true) @map("is_active")
-  order       Int      @default(0)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  // Relaciones de tickets
-  departments                  departments[]
-  tickets                      tickets[]
-  ticketFamilyConfig           ticket_family_config?
-  technicianFamilyAssignments  technician_family_assignments[]
-  adminFamilyAssignments       admin_family_assignments[]
-  ticketCodeCounters           ticket_code_counters[]
-  sla_policies                 sla_policies[]
-  knowledge_articles           knowledge_articles[]
-
-  // Relaciones de inventario (sin cambios estructurales)
-  equipmentTypes   equipment_types[]
-  consumableTypes  consumable_types[]
-  licenseTypes     license_types[]
-  managerFamilies  inventory_manager_families[]
-  formConfig       inventory_family_config?
-
-  @@index([isActive, order])
-  @@map("families")
-}
-
-model warehouses {
-  id          String   @id @default(uuid())
-  name        String   @db.VarChar(100)
-  location    String?  @db.VarChar(200)
-  description String?  @db.Text
-  managerId   String?  @map("manager_id")
-  isActive    Boolean  @default(true) @map("is_active")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  manager     users?        @relation("WarehouseManager", fields: [managerId], references: [id])
-  equipment   equipment[]
-  consumables consumables[]
-
-  @@index([isActive])
-  @@map("warehouses")
-}
-
-model inventory_manager_families {
-  id        String   @id @default(uuid())
-  managerId String   @map("manager_id")
-  familyId  String   @map("family_id")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  manager users    @relation("InventoryManagerFamilies", fields: [managerId], references: [id], onDelete: Cascade)
-  family  families @relation(fields: [familyId], references: [id], onDelete: Cascade)
-
-  @@unique([managerId, familyId])
-  @@index([managerId])
-  @@index([familyId])
-  @@map("inventory_manager_families")
-}
-
-model license_attachments {
-  id           String   @id @default(uuid())
-  licenseId    String   @map("license_id")
-  filename     String
-  originalName String   @map("original_name")
-  mimeType     String   @map("mime_type")
-  size         Int
-  path         String
-  uploadedBy   String   @map("uploaded_by")
-  createdAt    DateTime @default(now()) @map("created_at")
-
-  license  software_licenses @relation(fields: [licenseId], references: [id], onDelete: Cascade)
-  uploader users             @relation(fields: [uploadedBy], references: [id])
-
-  @@index([licenseId])
-  @@map("license_attachments")
-}
-
-model inventory_family_config {
-  id                    String        @id @default(uuid())
-  familyId              String        @unique @map("family_id")
-  allowedSubtypes       AssetSubtype[] @map("allowed_subtypes")
-  visibleSections       FormSection[]  @map("visible_sections")
-  requiredSections      FormSection[]  @map("required_sections")
-  requireFinancialForNew Boolean       @default(true) @map("require_financial_for_new")
-  /// Config de secciones por modalidad de adquisición para EQUIPMENT.
-  /// Estructura: { FIXED_ASSET?: { visible: FormSection[], required: FormSection[] }, RENTAL?: {...}, LOAN?: {...} }
-  /// Si es null, se usan visibleSections/requiredSections como fallback global.
-  sectionsByMode        Json?          @map("sections_by_mode")
-  defaultDepreciationMethod  DepreciationMethod?  @map("default_depreciation_method")
-  defaultUsefulLifeYears     Float?               @map("default_useful_life_years")
-  defaultResidualValuePct    Float?               @map("default_residual_value_pct")
-  codePrefix                 String?              @map("code_prefix") @db.VarChar(10)
-  autoApproveDecommission    Boolean              @default(false) @map("auto_approve_decommission")
-  requireDeliveryAct         Boolean              @default(true)  @map("require_delivery_act")
-  createdAt             DateTime      @default(now()) @map("created_at")
-  updatedAt             DateTime      @updatedAt @map("updated_at")
-
-  family                families @relation(fields: [familyId], references: [id], onDelete: Cascade)
-
-  @@index([familyId])
-  @@map("inventory_family_config")
-}
-
-// ============================================
-// TICKET MULTI-FAMILY TABLES
-// ============================================
-
-model ticket_family_config {
-  id                          String   @id @default(uuid())
-  familyId                    String   @unique @map("family_id")
-  ticketsEnabled              Boolean  @default(true) @map("tickets_enabled")
-  codePrefix                  String?  @db.VarChar(10) @map("code_prefix")
-  isDefault                   Boolean  @default(false) @map("is_default")
-  autoAssignRespectsFamilies  Boolean  @default(true) @map("auto_assign_respects_families")
-  alertVolumeThreshold        Int?     @map("alert_volume_threshold")
-  businessHoursStart          String   @default("09:00:00") @map("business_hours_start") @db.VarChar(8)
-  businessHoursEnd            String   @default("18:00:00") @map("business_hours_end") @db.VarChar(8)
-  businessDays                String   @default("MON,TUE,WED,THU,FRI") @map("business_days") @db.VarChar(50)
-  createdAt                   DateTime @default(now()) @map("created_at")
-  updatedAt                   DateTime @updatedAt @map("updated_at")
-
-  family families @relation(fields: [familyId], references: [id], onDelete: Cascade)
-
-  @@index([familyId])
-  @@index([ticketsEnabled])
-  @@map("ticket_family_config")
-}
-
-model technician_family_assignments {
-  id           String   @id @default(uuid())
-  technicianId String   @map("technician_id")
-  familyId     String   @map("family_id")
-  isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  technician users    @relation(fields: [technicianId], references: [id], onDelete: Cascade)
-  family     families @relation(fields: [familyId], references: [id], onDelete: Cascade)
-
-  @@unique([technicianId, familyId])
-  @@index([technicianId, isActive])
-  @@index([familyId, isActive])
-  @@map("technician_family_assignments")
-}
-
-// ── Admin family assignments (mirrors technician_family_assignments) ──────────
-model admin_family_assignments {
-  id        String   @id @default(uuid())
-  adminId   String   @map("admin_id")
-  familyId  String   @map("family_id")
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  admin  users    @relation(fields: [adminId], references: [id], onDelete: Cascade)
-  family families @relation(fields: [familyId], references: [id], onDelete: Cascade)
-
-  @@unique([adminId, familyId])
-  @@index([adminId, isActive])
-  @@index([familyId, isActive])
-  @@map("admin_family_assignments")
-}
-
-// ── Ticket collaborators ──────────────────────────────────────────────────────
-model ticket_collaborators {
-  id             String   @id @default(uuid())
-  ticketId       String   @map("ticket_id")
-  collaboratorId String   @map("collaborator_id")
-  addedById      String   @map("added_by_id")
-  createdAt      DateTime @default(now()) @map("created_at")
-
-  ticket       tickets @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  collaborator users   @relation("TicketCollaborator", fields: [collaboratorId], references: [id], onDelete: Cascade)
-  addedBy      users   @relation("CollaboratorAddedBy", fields: [addedById], references: [id])
-
-  @@unique([ticketId, collaboratorId])
-  @@index([ticketId])
-  @@index([collaboratorId])
-  @@map("ticket_collaborators")
-}
-
-model ticket_code_counters {
-  id           String   @id @default(uuid())
-  familyId     String   @map("family_id")
-  year         Int
-  lastSequence Int      @default(0) @map("last_sequence")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  family families @relation(fields: [familyId], references: [id], onDelete: Cascade)
-
-  @@unique([familyId, year])
-  @@index([familyId, year])
-  @@map("ticket_code_counters")
 }

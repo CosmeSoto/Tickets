@@ -16,7 +16,30 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const includeInactive = searchParams.get('includeInactive') === 'true'
 
-    const families = await FamilyService.findAll(includeInactive)
+    // Si el admin no es super admin, filtrar solo sus familias asignadas
+    const currentUser = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: { isSuperAdmin: true },
+    })
+
+    let families = await FamilyService.findAll(includeInactive)
+
+    if (!currentUser?.isSuperAdmin) {
+      try {
+        const assignments = await prisma.admin_family_assignments.findMany({
+          where: { adminId: session.user.id, isActive: true },
+          select: { familyId: true },
+        })
+        // Si tiene asignaciones específicas, filtrar; si no tiene ninguna, devolver todas
+        // (compatibilidad con admins existentes antes de la feature)
+        if (assignments.length > 0) {
+          const allowedIds = new Set(assignments.map((a) => a.familyId))
+          families = families.filter((f) => allowedIds.has(f.id))
+        }
+      } catch {
+        // Si la tabla aún no existe o hay error, devolver todas (fallback seguro)
+      }
+    }
 
     return NextResponse.json({ success: true, data: families })
   } catch (error) {

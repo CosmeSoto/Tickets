@@ -3,14 +3,16 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { canManageInventory } from '@/lib/inventory-access'
+import { getAccessibleFamilyIds } from '@/lib/inventory/family-access'
 import { randomUUID } from 'crypto'
 
 /**
  * GET /api/inventory/families
- * Lista familias de inventario.
- * - ADMIN: todas las activas (o todas si ?includeInactive=true)
- * - Gestor (canManageInventory): solo las familias asignadas a él
- * - TECHNICIAN / CLIENT: todas las activas (solo lectura, para filtros de UI)
+ * Lista familias de inventario según el rol del usuario:
+ * - SuperAdmin: todas las activas
+ * - Admin normal: solo sus familias asignadas en admin_family_assignments
+ * - Gestor (canManageInventory): solo sus familias en inventory_manager_families
+ * - TECHNICIAN / CLIENT sin gestión: todas las activas (solo lectura para filtros de UI)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -22,34 +24,27 @@ export async function GET(request: NextRequest) {
 
     const { user } = session
     const isAdmin = user.role === 'ADMIN'
+    const isSuperAdmin = (user as any).isSuperAdmin === true
+    const userCanManageInventory = (user as any).canManageInventory === true
     const isManager = !isAdmin && await canManageInventory(user.id, user.role)
 
     const includeInactive =
-      isAdmin && request.nextUrl.searchParams.get('includeInactive') === 'true'
+      isAdmin && isSuperAdmin && request.nextUrl.searchParams.get('includeInactive') === 'true'
 
-    // ADMIN: todas las familias
-    if (isAdmin) {
+    if (isAdmin || isManager) {
+      const accessibleIds = await getAccessibleFamilyIds(user.id, user.role, isSuperAdmin, userCanManageInventory)
+
       const families = await prisma.families.findMany({
-        where: includeInactive ? undefined : { isActive: true },
+        where: {
+          ...(includeInactive ? {} : { isActive: true }),
+          ...(accessibleIds !== undefined ? { id: { in: accessibleIds } } : {}),
+        },
         orderBy: { order: 'asc' },
       })
       return NextResponse.json({ families })
     }
 
-    // Gestor: solo familias asignadas y activas
-    if (isManager) {
-      const assignments = await prisma.inventory_manager_families.findMany({
-        where: { managerId: user.id },
-        include: { family: true },
-      })
-      const families = assignments
-        .map((a) => a.family)
-        .filter((f) => f.isActive)
-        .sort((a, b) => a.order - b.order)
-      return NextResponse.json({ families })
-    }
-
-    // TECHNICIAN / CLIENT: todas las familias activas (solo lectura para filtros)
+    // TECHNICIAN / CLIENT sin gestión: todas las familias activas (solo lectura para filtros)
     const families = await prisma.families.findMany({
       where: { isActive: true },
       orderBy: { order: 'asc' },

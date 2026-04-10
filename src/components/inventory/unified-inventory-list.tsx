@@ -38,6 +38,7 @@ interface UnifiedAssetsResponse {
 
 interface UnifiedInventoryListProps {
   initialFamilyId?: string
+  personalOnly?: boolean   // true = solo equipos asignados al usuario actual
 }
 
 const PAGE_SIZE = 20
@@ -87,7 +88,7 @@ function formatDate(iso: string) {
   })
 }
 
-export function UnifiedInventoryList({ initialFamilyId }: UnifiedInventoryListProps) {
+export function UnifiedInventoryList({ initialFamilyId, personalOnly = false }: UnifiedInventoryListProps) {
   const router = useRouter()
   const { status } = useSession()
   const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(initialFamilyId ?? null)
@@ -123,9 +124,10 @@ export function UnifiedInventoryList({ initialFamilyId }: UnifiedInventoryListPr
       setLoading(true)
       try {
         const params = new URLSearchParams({ page: String(currentPage), pageSize: String(PAGE_SIZE) })
-        if (familyId) params.set('familyId', familyId)
+        if (familyId && !personalOnly) params.set('familyId', familyId)
         if (subtype) params.set('subtype', subtype)
         if (q.trim()) params.set('search', q.trim())
+        if (personalOnly) params.set('personalOnly', 'true')
         const res = await safeFetch(`/api/inventory/assets?${params.toString()}`)
         if (!res?.ok) return
         const data: UnifiedAssetsResponse = await res.json()
@@ -136,7 +138,7 @@ export function UnifiedInventoryList({ initialFamilyId }: UnifiedInventoryListPr
         setLoading(false)
       }
     },
-    []
+    [personalOnly]
   )
 
   useEffect(() => {
@@ -161,12 +163,14 @@ export function UnifiedInventoryList({ initialFamilyId }: UnifiedInventoryListPr
 
   return (
     <div className="space-y-4">
-      {/* Filtro de familia */}
-      <FamilyFilterBar
-        families={families}
-        selectedId={selectedFamilyId}
-        onChange={handleFamilyChange}
-      />
+      {/* Filtro de familia — solo en modo inventario de familias */}
+      {!personalOnly && (
+        <FamilyFilterBar
+          families={families}
+          selectedId={selectedFamilyId}
+          onChange={handleFamilyChange}
+        />
+      )}
 
       {/* Barra de búsqueda + filtro subtipo */}
       <div className="flex flex-col sm:flex-row gap-2">

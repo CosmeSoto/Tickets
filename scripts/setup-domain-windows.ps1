@@ -1,6 +1,8 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# setup-domain-windows.ps1  —  Windows (PowerShell)
-# Configura el dominio local para acceder al sistema desde este equipo.
+# setup-domain-windows.ps1 — Windows (PowerShell)
+#
+# Ejecutar en cada PC Windows que necesite acceder a gestion.local.
+# Cuando el servidor cambie de IP, edita SERVER_IP abajo y vuelve a ejecutar.
 #
 # Uso (PowerShell como Administrador):
 #   .\setup-domain-windows.ps1
@@ -9,36 +11,30 @@
 #   .\setup-domain-windows.ps1 -Remove
 # ─────────────────────────────────────────────────────────────────────────────
 
-param(
-    [switch]$Remove
-)
+param([switch]$Remove)
 
-# Verificar que se ejecuta como Administrador
-if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Write-Host ""
-    Write-Host "❌ Este script requiere permisos de Administrador." -ForegroundColor Red
-    Write-Host "   Haz clic derecho en PowerShell y selecciona 'Ejecutar como administrador'" -ForegroundColor Yellow
-    Write-Host ""
-    Read-Host "Presiona Enter para salir"
-    exit 1
-}
-
-# Leer configuración desde domain-config.txt
+# ── EDITA ESTA IP CUANDO CAMBIE EL SERVIDOR ───────────────────────────────────
+# Puedes ver la IP actual del servidor en: /var/log/gestion-update-hosts.log
+# o ejecutando en el Mac: ipconfig getifaddr en0
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ConfigFile = Join-Path $ScriptDir "domain-config.txt"
+$Config  = Get-Content $ConfigFile | Where-Object { $_ -notmatch "^#" -and $_ -match "=" }
+$Domain  = ($Config | Where-Object { $_ -match "^DOMAIN=" }) -replace "DOMAIN=", "" -replace "\s", ""
+if (-not $Domain) { $Domain = "gestion.local" }
 
-if (-not (Test-Path $ConfigFile)) {
-    Write-Host "❌ No se encontró domain-config.txt en $ScriptDir" -ForegroundColor Red
-    Read-Host "Presiona Enter para salir"
-    exit 1
-}
-
-$Config = Get-Content $ConfigFile | Where-Object { $_ -notmatch "^#" -and $_ -match "=" }
+# IP del servidor Mac — se lee del domain-config.txt si existe SERVER_IP,
+# si no, pide al usuario que la ingrese
 $ServerIP = ($Config | Where-Object { $_ -match "^SERVER_IP=" }) -replace "SERVER_IP=", "" -replace "\s", ""
-$Domain   = ($Config | Where-Object { $_ -match "^DOMAIN=" })   -replace "DOMAIN=",    "" -replace "\s", ""
+if (-not $ServerIP) {
+    $ServerIP = Read-Host "Ingresa la IP del servidor Mac (ej: 192.168.10.181)"
+}
+# ─────────────────────────────────────────────────────────────────────────────
 
-if (-not $ServerIP -or -not $Domain) {
-    Write-Host "❌ SERVER_IP o DOMAIN no definidos en domain-config.txt" -ForegroundColor Red
+# Verificar permisos de Administrador
+if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    Write-Host ""
+    Write-Host "❌ Requiere permisos de Administrador." -ForegroundColor Red
+    Write-Host "   Clic derecho en PowerShell → 'Ejecutar como administrador'" -ForegroundColor Yellow
     Read-Host "Presiona Enter para salir"
     exit 1
 }
@@ -46,40 +42,26 @@ if (-not $ServerIP -or -not $Domain) {
 $HostsFile = "$env:SystemRoot\System32\drivers\etc\hosts"
 $Marker    = "# gestion-local-domain"
 
-# ── Modo desinstalar ──────────────────────────────────────────────────────────
 if ($Remove) {
-    $Lines = Get-Content $HostsFile
-    $NewLines = $Lines | Where-Object { $_ -notmatch [regex]::Escape($Marker) }
-    if ($Lines.Count -ne $NewLines.Count) {
-        $NewLines | Set-Content $HostsFile -Encoding UTF8
-        Write-Host "✅ Dominio '$Domain' eliminado de hosts" -ForegroundColor Green
-    } else {
-        Write-Host "ℹ️  No se encontró entrada de '$Domain' en hosts" -ForegroundColor Yellow
-    }
+    $Lines = Get-Content $HostsFile | Where-Object { $_ -notmatch [regex]::Escape($Marker) }
+    $Lines | Set-Content $HostsFile -Encoding UTF8
+    Write-Host "✅ Entrada eliminada." -ForegroundColor Green
     Read-Host "Presiona Enter para salir"
     exit 0
 }
 
-# ── Modo instalar ─────────────────────────────────────────────────────────────
-
-# Eliminar entrada anterior si existe
-$Lines = Get-Content $HostsFile
-$Lines = $Lines | Where-Object { $_ -notmatch [regex]::Escape($Marker) }
-
-# Agregar nueva entrada
-$NewEntry = "$ServerIP    $Domain www.$Domain $Marker"
-$Lines += $NewEntry
+# Eliminar entrada anterior y agregar la nueva
+$Lines = Get-Content $HostsFile | Where-Object { $_ -notmatch [regex]::Escape($Marker) }
+$Lines += "$ServerIP    $Domain www.$Domain $Marker"
 $Lines | Set-Content $HostsFile -Encoding UTF8
 
+# Limpiar caché DNS de Windows
+ipconfig /flushdns | Out-Null
+
 Write-Host ""
-Write-Host "✅ Configurado correctamente:" -ForegroundColor Green
-Write-Host "   Dominio : $Domain" -ForegroundColor Cyan
-Write-Host "   IP      : $ServerIP" -ForegroundColor Cyan
+Write-Host "✅ Configurado:" -ForegroundColor Green
+Write-Host "   $Domain → $ServerIP" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "🌐 Abre en tu navegador: http://$Domain" -ForegroundColor Green
-Write-Host ""
-Write-Host "💡 Para actualizar la IP o el dominio:" -ForegroundColor Yellow
-Write-Host "   1. Edita scripts\domain-config.txt"
-Write-Host "   2. Vuelve a ejecutar este script como Administrador"
+Write-Host "🌐 Abre: http://$Domain" -ForegroundColor Green
 Write-Host ""
 Read-Host "Presiona Enter para salir"

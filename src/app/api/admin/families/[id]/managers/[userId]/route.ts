@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import { NotificationEvents } from '@/lib/notification-events'
 
 /**
  * DELETE /api/admin/families/[id]/managers/[userId]
@@ -30,6 +31,9 @@ export async function DELETE(
     await prisma.inventory_manager_families.delete({
       where: { managerId_familyId: { managerId: userId, familyId: id } },
     })
+
+    // Notificar al usuario para que refresque su sesión
+    NotificationEvents.emit(userId, { type: 'session_refresh', reason: 'permissions_changed' })
 
     return NextResponse.json({ success: true })
   } catch (error) {

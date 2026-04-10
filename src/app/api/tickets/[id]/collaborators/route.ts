@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { NotificationService } from '@/lib/services/notification-service'
+import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 
 /**
  * GET /api/tickets/[id]/collaborators
@@ -13,21 +14,26 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ success: false }, { status: 401 })
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session) return NextResponse.json({ success: false }, { status: 401 })
 
-  const { id: ticketId } = await params
+    const { id: ticketId } = await params
 
-  const collaborators = await prisma.ticket_collaborators.findMany({
-    where: { ticketId },
-    include: {
-      collaborator: { select: { id: true, name: true, email: true, role: true, avatar: true } },
-      addedBy:      { select: { id: true, name: true } },
-    },
-    orderBy: { createdAt: 'asc' },
-  })
+    const collaborators = await prisma.ticket_collaborators.findMany({
+      where: { ticketId },
+      include: {
+        collaborator: { select: { id: true, name: true, email: true, role: true, avatar: true } },
+        addedBy:      { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    })
 
-  return NextResponse.json({ success: true, data: collaborators })
+    return NextResponse.json({ success: true, data: collaborators })
+  } catch (error) {
+    console.error('[collaborators GET]', error)
+    return NextResponse.json({ success: false, message: 'Error interno del servidor' }, { status: 500 })
+  }
 }
 
 /**
@@ -132,6 +138,14 @@ export async function POST(
     ticketId,
   }).catch(() => {})
 
+  AuditServiceComplete.log({
+    action: AuditActionsComplete.COLLABORATOR_ADDED,
+    entityType: 'ticket',
+    entityId: ticketId,
+    userId: session.user.id,
+    details: { collaboratorId, collaboratorName: collaborator.name, ticketId },
+  }).catch(() => {})
+
   return NextResponse.json({ success: true, data: collaboration }, { status: 201 })
 }
 
@@ -179,6 +193,14 @@ export async function DELETE(
       comment: 'Colaborador eliminado del ticket',
       createdAt: new Date(),
     },
+  }).catch(() => {})
+
+  AuditServiceComplete.log({
+    action: AuditActionsComplete.COLLABORATOR_REMOVED,
+    entityType: 'ticket',
+    entityId: ticketId,
+    userId: session.user.id,
+    details: { collaboratorId, ticketId },
   }).catch(() => {})
 
   return NextResponse.json({ success: true })

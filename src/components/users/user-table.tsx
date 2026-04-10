@@ -75,7 +75,7 @@ import {
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useUsers, UserData, formatTimeAgo } from '@/hooks/use-users'
-import { USER_ROLE_LABELS, USER_ROLE_COLORS } from '@/lib/constants/user-constants'
+import { RoleBadge } from '@/components/ui/role-badge'
 import { useToast } from '@/hooks/use-toast'
 import { AvatarUploadModal } from './avatar-upload-modal'
 import { UserStatsCard } from '@/components/ui/user-stats-card'
@@ -605,6 +605,11 @@ export function UserTable({
                               <div>
                                 <div className='font-medium text-foreground flex items-center space-x-2'>
                                   <span>{user.name}</span>
+                                  {(user as any).isSuperAdmin && (
+                                    <span title="Super Administrador" className="text-amber-500">
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 inline" viewBox="0 0 24 24" fill="currentColor"><path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm2.7 2a1 1 0 0 0 0 2h8.6a1 1 0 0 0 0-2H7.7z"/></svg>
+                                    </span>
+                                  )}
                                   {user.id === session?.user?.id && (
                                     <Badge variant="outline" className="text-xs">Tú</Badge>
                                   )}
@@ -617,10 +622,7 @@ export function UserTable({
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge className={USER_ROLE_COLORS[user.role]}>
-                              <RoleIcon className='h-3 w-3 mr-1' />
-                              {USER_ROLE_LABELS[user.role]}
-                            </Badge>
+                            <RoleBadge role={user.role} isSuperAdmin={(user as any).isSuperAdmin} />
                           </TableCell>
                           <TableCell>
                             <div className='text-sm'>

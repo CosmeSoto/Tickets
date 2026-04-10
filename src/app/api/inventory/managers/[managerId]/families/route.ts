@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import { NotificationEvents } from '@/lib/notification-events'
 
 /**
  * GET /api/inventory/managers/[managerId]/families
@@ -131,6 +132,9 @@ export async function PUT(
     })
 
     const families = assignments.map((a) => a.family)
+
+    // Notificar al gestor para que refresque su sesión
+    NotificationEvents.emit(managerId, { type: 'session_refresh', reason: 'permissions_changed' })
 
     return NextResponse.json({ families })
   } catch {

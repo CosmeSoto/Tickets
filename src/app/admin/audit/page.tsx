@@ -1409,7 +1409,16 @@ export default function AuditPage() {
                         'UPDATE': 'Actualización',
                         'DELETE': 'Eliminación',
                         'VIEW': 'Visualización',
-                        'READ': 'Lectura'
+                        'READ': 'Lectura',
+                        // Colaboradores
+                        'collaborator_added': 'Colaborador Agregado',
+                        'collaborator_removed': 'Colaborador Eliminado',
+                        // Familias — admin
+                        'admin_family_assigned': 'Admin Asignado a Familia',
+                        'admin_family_unassigned': 'Admin Desasignado de Familia',
+                        // Super admin
+                        'super_admin_granted': 'Super Admin Otorgado',
+                        'super_admin_revoked': 'Super Admin Revocado',
                       }
                       return actionLabels[selectedLog.action] || selectedLog.action
                     })()}

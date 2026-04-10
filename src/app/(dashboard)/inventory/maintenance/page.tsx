@@ -50,7 +50,12 @@ export default function MaintenanceListPage() {
 
   const role = session?.user?.role
   const isClient = role === 'CLIENT'
+  const canManageInventory = (session?.user as any)?.canManageInventory === true
+  const isManager = canManageInventory  // gestor o admin con permiso
   const isAdminOrTech = role === 'ADMIN' || role === 'TECHNICIAN'
+
+  // Tab activo: 'family' (mantenimientos de familias) | 'mine' (mis equipos)
+  const [activeTab, setActiveTab] = useState<'family' | 'mine'>(isClient && !canManageInventory ? 'mine' : 'family')
 
   const fetchRecords = useCallback(async () => {
     setLoading(true)
@@ -58,12 +63,14 @@ export default function MaintenanceListPage() {
       const params = new URLSearchParams()
       if (statusFilter !== 'ALL') params.set('status', statusFilter)
       if (typeFilter !== 'ALL') params.set('type', typeFilter)
+      // En tab 'mine' solo traer los de equipos asignados al usuario
+      if (activeTab === 'mine') params.set('personalOnly', 'true')
       const res = await fetch(`/api/inventory/maintenance?${params}`, { cache: 'no-store' })
       if (res.ok) setRecords(await res.json())
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, typeFilter])
+  }, [statusFilter, typeFilter, activeTab])
 
   useEffect(() => { fetchRecords() }, [fetchRecords])
 
@@ -85,9 +92,11 @@ export default function MaintenanceListPage() {
     ? records.filter(r => r.status === 'SCHEDULED').length
     : records.filter(r => r.status === 'REQUESTED').length
 
-  const title = isClient ? 'Mis Mantenimientos' : 'Mantenimientos'
-  const subtitle = isClient
+  const title = isClient && !canManageInventory ? 'Mis Mantenimientos' : 'Mantenimientos'
+  const subtitle = isClient && !canManageInventory
     ? 'Historial de mantenimientos de tus equipos'
+    : activeTab === 'mine'
+    ? 'Mantenimientos de tus equipos asignados'
     : 'Gestión de mantenimientos preventivos y correctivos'
 
   return (
@@ -95,7 +104,7 @@ export default function MaintenanceListPage() {
       title={title}
       subtitle={subtitle}
       headerActions={
-        isAdminOrTech ? (
+        isAdminOrTech || isManager ? (
           <Button onClick={() => setShowNew(true)}>
             <Plus className="mr-2 h-4 w-4" /> Nuevo Mantenimiento
           </Button>
@@ -107,6 +116,27 @@ export default function MaintenanceListPage() {
       }
     >
       <div className="space-y-4">
+        {/* Tabs para gestores/admins/técnicos */}
+        {isManager && (
+          <div className="flex gap-1 p-1 bg-muted rounded-lg w-fit">
+            <button
+              onClick={() => setActiveTab('family')}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'family' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              De mis familias
+            </button>
+            <button
+              onClick={() => setActiveTab('mine')}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'mine' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Mis equipos
+            </button>
+          </div>
+        )}
         {/* Banner de acciones pendientes */}
         {pendingAction > 0 && (
           <div className={`rounded-lg px-4 py-3 flex items-center gap-3 text-sm ${

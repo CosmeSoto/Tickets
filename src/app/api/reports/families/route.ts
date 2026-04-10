@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { ReportService } from '@/lib/services/report.service'
+import prisma from '@/lib/prisma'
 
 // GET /api/reports/families — Resumen ejecutivo comparativo de todas las familias
 export async function GET(request: NextRequest) {
@@ -25,22 +26,41 @@ export async function GET(request: NextRequest) {
           }
         : undefined
 
+    // Determinar scope: super admin ve todo, admin restringido solo sus familias
+    const currentUser = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: { isSuperAdmin: true },
+    })
+
+    let familyScope: string = 'all'
+    if (!currentUser?.isSuperAdmin) {
+      const assignments = await prisma.admin_family_assignments.findMany({
+        where: { adminId: session.user.id, isActive: true },
+        select: { familyId: true },
+      })
+      if (assignments.length > 0) {
+        // Pasar la primera familia asignada como scope (el ReportService filtrará)
+        // Para "all" con restricción, usamos el primer ID y el servicio maneja el array
+        familyScope = assignments.map((a) => a.familyId).join(',')
+      }
+    }
+
     let data: unknown
     switch (type) {
       case 'technicians':
-        data = await ReportService.getTechnicianPerformance('all', dateRange)
+        data = await ReportService.getTechnicianPerformance(familyScope, dateRange)
         break
       case 'trends':
-        data = await ReportService.getTemporalTrends('all', granularity, dateRange)
+        data = await ReportService.getTemporalTrends(familyScope, granularity, dateRange)
         break
       case 'sla':
-        data = await ReportService.getSLACompliance('all', dateRange)
+        data = await ReportService.getSLACompliance(familyScope, dateRange)
         break
       case 'satisfaction':
-        data = await ReportService.getSatisfactionReport('all', dateRange)
+        data = await ReportService.getSatisfactionReport(familyScope, dateRange)
         break
       default:
-        data = await ReportService.getExecutiveSummary('all', dateRange)
+        data = await ReportService.getExecutiveSummary(familyScope, dateRange)
     }
 
     return NextResponse.json({ success: true, data })

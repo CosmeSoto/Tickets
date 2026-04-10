@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { EquipmentService } from '@/lib/services/equipment.service'
 import { updateEquipmentSchema, equipmentIdSchema } from '@/lib/validations/inventory/equipment'
 import { ZodError } from 'zod'
-import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
+import { canManageInventory, canManageAsset, inventoryForbidden } from '@/lib/inventory-access'
 import { prisma } from '@/lib/prisma'
 import { calculateDepreciation, familySupportsDepreciation } from '@/lib/inventory/depreciation'
 
@@ -33,15 +33,32 @@ export async function GET(
     // Obtener equipo
     const equipmentDetail = await EquipmentService.getEquipmentDetail(id)
 
-    // Si es CLIENT, verificar que sea su equipo
-    if (session.user.role === 'CLIENT') {
+    // Si es CLIENT sin gestión, verificar que sea su equipo asignado
+    if (session.user.role === 'CLIENT' && !(session.user as any).canManageInventory) {
       const isAssignedToUser = equipmentDetail.currentAssignment?.receiverId === session.user.id
-      
       if (!isAssignedToUser) {
         return NextResponse.json(
           { error: 'No tienes acceso a este equipo' },
           { status: 403 }
         )
+      }
+    }
+
+    // Si es gestor (no admin), verificar que el activo pertenezca a una de sus familias
+    if (session.user.role !== 'ADMIN' && (session.user as any).canManageInventory) {
+      const eq = equipmentDetail.equipment as any
+      const assetFamilyId = eq.type?.family?.id ?? eq.type?.familyId ?? null
+      const isSuperAdmin = (session.user as any).isSuperAdmin === true
+      const allowed = await canManageAsset(session.user.id, session.user.role, isSuperAdmin, assetFamilyId)
+      if (!allowed) {
+        // Puede que tenga el equipo asignado personalmente — eso también da acceso de lectura
+        const isPersonallyAssigned = equipmentDetail.currentAssignment?.receiverId === session.user.id
+        if (!isPersonallyAssigned) {
+          return NextResponse.json(
+            { error: 'No tienes acceso a este equipo' },
+            { status: 403 }
+          )
+        }
       }
     }
 
@@ -116,6 +133,23 @@ export async function PUT(
     // Validar ID
     const { id: rawId } = await params
     const { id } = equipmentIdSchema.parse({ id: rawId })
+
+    // Verificar que el activo pertenezca a una familia accesible para el usuario
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    if (session.user.role !== 'ADMIN' || !isSuperAdmin) {
+      const equipment = await prisma.equipment.findUnique({
+        where: { id },
+        select: { type: { select: { familyId: true } } },
+      })
+      const assetFamilyId = equipment?.type?.familyId ?? null
+      const allowed = await canManageAsset(session.user.id, session.user.role, isSuperAdmin, assetFamilyId)
+      if (!allowed) {
+        return NextResponse.json(
+          { error: 'No tienes permisos para editar este equipo' },
+          { status: 403 }
+        )
+      }
+    }
 
     const body = await request.json()
 
@@ -324,17 +358,40 @@ export async function DELETE(
       )
     }
 
-    // Solo ADMIN puede eliminar equipos
-    if (session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'No tienes permisos para eliminar equipos' },
-        { status: 403 }
-      )
+    // Solo pueden eliminar: ADMIN (cualquiera) o gestores con acceso a la familia del activo
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    const isAdmin = session.user.role === 'ADMIN'
+
+    if (!isAdmin) {
+      // Verificar permiso global de gestión
+      const hasGlobalPermission = await canManageInventory(session.user.id, session.user.role)
+      if (!hasGlobalPermission) {
+        return NextResponse.json(
+          { error: 'No tienes permisos para eliminar equipos' },
+          { status: 403 }
+        )
+      }
     }
 
     // Validar ID
     const { id: rawId } = await params
     const { id } = equipmentIdSchema.parse({ id: rawId })
+
+    // Verificar que el activo pertenezca a una familia accesible para el usuario
+    if (!isAdmin || !isSuperAdmin) {
+      const equipment = await prisma.equipment.findUnique({
+        where: { id },
+        select: { type: { select: { familyId: true } } },
+      })
+      const assetFamilyId = equipment?.type?.familyId ?? null
+      const allowed = await canManageAsset(session.user.id, session.user.role, isSuperAdmin, assetFamilyId)
+      if (!allowed) {
+        return NextResponse.json(
+          { error: 'No tienes permisos para eliminar este equipo' },
+          { status: 403 }
+        )
+      }
+    }
 
     // Eliminar equipo
     await EquipmentService.deleteEquipment(id, session.user.id)

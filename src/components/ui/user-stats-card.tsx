@@ -24,12 +24,8 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useSession } from 'next-auth/react'
-import { 
-  USER_ROLE_ICONS,
-  USER_ROLE_COLORS,
-  USER_ROLE_LABELS,
-  type UserRole
-} from '@/lib/constants/user-constants'
+import { USER_ROLE_ICONS, type UserRole } from '@/lib/constants/user-constants'
+import { RoleBadge } from '@/components/ui/role-badge'
 
 interface UserStatsCardProps {
   user: {
@@ -177,10 +173,7 @@ export function UserStatsCard({
                 )}
               </div>
               <div className="flex items-center space-x-1 flex-wrap gap-1">
-                <Badge className={cn("text-xs flex-shrink-0", USER_ROLE_COLORS[user.role as UserRole])}>
-                  <RoleIcon className="h-3 w-3 mr-1" />
-                  {USER_ROLE_LABELS[user.role as UserRole]}
-                </Badge>
+                <RoleBadge role={user.role} isSuperAdmin={(user as any).isSuperAdmin} iconSize="sm" />
               </div>
             </div>
           </div>

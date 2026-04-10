@@ -15,7 +15,7 @@ import { TabInventario } from '@/components/families/tab-inventario'
 import { TabPersonal } from '@/components/families/tab-personal'
 import type { TicketFamilyConfig } from '@/components/families/tab-tickets'
 import type { InventoryFamilyConfig } from '@/components/families/tab-inventario'
-import type { TechnicianAssignment, ManagerAssignment } from '@/components/families/tab-personal'
+import type { TechnicianAssignment, ManagerAssignment, AdminAssignment } from '@/components/families/tab-personal'
 import type { DepartmentData } from '@/hooks/use-departments'
 
 // ---- Types ----
@@ -44,6 +44,8 @@ interface FamilyUnifiedResponse {
   departments: DepartmentData[]
   technicians: TechnicianAssignment[]
   managers: ManagerAssignment[]
+  admins: AdminAssignment[]
+  currentUserIsSuperAdmin: boolean
 }
 
 const VALID_TABS = ['general', 'tickets', 'inventario', 'personal'] as const
@@ -253,6 +255,8 @@ export default function FamilyDetailPage({ params }: { params: Promise<{ id: str
                 familyId={id}
                 technicians={data.technicians}
                 managers={data.managers}
+                admins={data.admins ?? []}
+                currentUserIsSuperAdmin={data.currentUserIsSuperAdmin ?? false}
                 onPersonnelChanged={handleDepartmentsChanged}
               />
             </TabsContent>

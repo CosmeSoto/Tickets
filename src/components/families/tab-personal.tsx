@@ -4,7 +4,7 @@
  * TabPersonal — Pestaña Personal de la página de detalle de familia.
  * - Técnicos de Tickets: TechnicianFamilyAssignment + TechnicianManagementPanel
  * - Gestores de Inventario: ManagerFamilyAssignment + InventoryManagerPanel
- * Requisitos: 5.1–5.9
+ * - Administradores Asignados: AdminFamilyAssignment (solo super admin puede modificar)
  */
 
 import {
@@ -17,35 +17,32 @@ import {
   type AssignedManager,
 } from '@/components/families/manager-family-assignment'
 import { InventoryManagerPanel } from '@/components/families/inventory-manager-panel'
-
-// ---- Types ----
+import {
+  AdminFamilyAssignment,
+  type AssignedAdmin,
+} from '@/components/families/admin-family-assignment'
 
 export type { AssignedTechnician as TechnicianAssignment }
 export type { AssignedManager as ManagerAssignment }
-
-interface UserOption {
-  id: string
-  name: string
-  email: string
-  role: string
-  isActive: boolean
-  canManageInventory?: boolean
-}
+export type { AssignedAdmin as AdminAssignment }
 
 export interface TabPersonalProps {
   familyId: string
   technicians: AssignedTechnician[]
   managers: AssignedManager[]
+  admins: AssignedAdmin[]
+  currentUserIsSuperAdmin: boolean
   onPersonnelChanged: () => void
 }
 
-function getInitials(name: string): string {
-  return name.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
-}
-
-// ---- TabPersonal ----
-
-export function TabPersonal({ familyId, technicians, managers, onPersonnelChanged }: TabPersonalProps) {
+export function TabPersonal({
+  familyId,
+  technicians,
+  managers,
+  admins,
+  currentUserIsSuperAdmin,
+  onPersonnelChanged,
+}: TabPersonalProps) {
   return (
     <div className="space-y-8">
 
@@ -76,7 +73,6 @@ export function TabPersonal({ familyId, technicians, managers, onPersonnelChange
           <h3 className="text-sm font-semibold">Gestores de Inventario</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
             Usuarios que pueden gestionar los activos de inventario de <strong>esta familia</strong>.
-            Pueden ser técnicos, clientes o cualquier usuario con el permiso activado.
           </p>
         </div>
         <ManagerFamilyAssignment
@@ -89,6 +85,24 @@ export function TabPersonal({ familyId, technicians, managers, onPersonnelChange
           <span className="text-xs text-muted-foreground">¿Necesitas ver todos los gestores del sistema?</span>
           <InventoryManagerPanel onChanged={onPersonnelChanged} />
         </div>
+      </div>
+
+      {/* ── Sección 3: Administradores asignados a esta familia ── */}
+      <div className="space-y-3">
+        <div>
+          <h3 className="text-sm font-semibold">Administradores de Familia</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Administradores con acceso <strong>restringido a esta familia</strong>.
+            Pueden gestionar sus técnicos y colaboradores dentro de esta familia,
+            pero no tienen acceso a otras familias ni a la configuración global del sistema.
+          </p>
+        </div>
+        <AdminFamilyAssignment
+          familyId={familyId}
+          assignedAdmins={admins}
+          isSuperAdmin={currentUserIsSuperAdmin}
+          onChanged={onPersonnelChanged}
+        />
       </div>
 
     </div>

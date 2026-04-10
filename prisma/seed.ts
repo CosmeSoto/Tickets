@@ -252,11 +252,12 @@ async function seedAdmin(deptAdminId: string): Promise<string> {
   const adminPassword = await bcrypt.hash('admin123', 12)
   const admin = await prisma.users.upsert({
     where: { email: 'internet.freecom@gmail.com' },
-    update: {},
+    update: { isSuperAdmin: true },
     create: {
       id: randomUUID(), email: 'internet.freecom@gmail.com', name: 'Administrador del Sistema',
       passwordHash: adminPassword, role: UserRole.ADMIN, departmentId: deptAdminId,
-      phone: '+593999999999', isActive: true, isEmailVerified: true, createdAt: now, updatedAt: now,
+      phone: '+593999999999', isActive: true, isEmailVerified: true, isSuperAdmin: true,
+      createdAt: now, updatedAt: now,
     },
   })
   await prisma.notification_preferences.upsert({

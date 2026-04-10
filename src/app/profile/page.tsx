@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/hooks/use-toast'
+import { getRoleLabel as getRoleLabelFn, getRoleColor as getRoleColorFn } from '@/components/ui/role-badge'
 import {
   Dialog,
   DialogContent,
@@ -133,29 +134,14 @@ export default function ProfilePage() {
   }
 
   const getRoleColor = () => {
-    switch (session?.user?.role) {
-      case 'ADMIN':
-        return 'bg-blue-100 text-blue-800'
-      case 'TECHNICIAN':
-        return 'bg-green-100 text-green-800'
-      case 'CLIENT':
-        return 'bg-purple-100 text-purple-800'
-      default:
-        return 'bg-muted text-foreground'
-    }
+    return getRoleColorFn(session?.user?.role ?? '', (session?.user as any)?.isSuperAdmin)
   }
 
   const getRoleLabel = () => {
-    switch (session?.user?.role) {
-      case 'ADMIN':
-        return 'Administrador'
-      case 'TECHNICIAN':
-        return 'Técnico'
-      case 'CLIENT':
-        return 'Cliente'
-      default:
-        return 'Usuario'
+    if (session?.user?.role === 'TECHNICIAN') {
+      return (session.user as any).canManageInventory ? 'Técnico · Gestor' : 'Técnico'
     }
+    return getRoleLabelFn(session?.user?.role ?? '', (session?.user as any)?.isSuperAdmin)
   }
 
   // NUEVA FUNCIONALIDAD DE AVATAR

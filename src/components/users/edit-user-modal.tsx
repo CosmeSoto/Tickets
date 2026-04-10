@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
+import { RoleBadge } from '@/components/ui/role-badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { 
@@ -48,6 +49,7 @@ interface EditUserData {
   phone: string
   isActive: boolean
   canManageInventory: boolean
+  isSuperAdmin: boolean
   avatar?: File
 }
 
@@ -70,6 +72,8 @@ export function EditUserModal({ isOpen, onClose, onUserUpdated, user, department
     departmentId: '',
     phone: '',
     isActive: true,
+    canManageInventory: false,
+    isSuperAdmin: false,
     avatar: undefined
   })
 
@@ -86,6 +90,7 @@ export function EditUserModal({ isOpen, onClose, onUserUpdated, user, department
         phone: user.phone || '',
         isActive: user.isActive,
         canManageInventory: (user as any).canManageInventory ?? false,
+        isSuperAdmin: user.isSuperAdmin ?? false,
         avatar: undefined
       })
       setAvatarPreview(user.avatar || null)
@@ -233,6 +238,7 @@ export function EditUserModal({ isOpen, onClose, onUserUpdated, user, department
         phone: formData.phone.trim() || null,
         isActive: formData.isActive,
         canManageInventory: formData.canManageInventory,
+        isSuperAdmin: formData.role === 'ADMIN' ? formData.isSuperAdmin : false,
       }
 
       const response = await fetch(`/api/users/${user.id}`, {
@@ -284,7 +290,6 @@ export function EditUserModal({ isOpen, onClose, onUserUpdated, user, department
   }
 
   const isCurrentUser = user?.id === session?.user?.id
-  const selectedRole = USER_ROLE_FORM_OPTIONS.find(r => r.value === formData.role)
   const selectedDepartment = departments.find(d => d.id === formData.departmentId)
 
   const formatDate = (dateString?: string) => {
@@ -467,25 +472,44 @@ export function EditUserModal({ isOpen, onClose, onUserUpdated, user, department
               </div>
             </div>
 
-            {/* Permiso de gestor de inventario */}
-            <div className="rounded-lg border p-3 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">Gestor de Inventario</p>
-                <p className="text-xs text-muted-foreground">
-                  Permite a este usuario gestionar activos, consumibles y configuración de inventario.
-                  Aplica a cualquier rol (Admin siempre tiene acceso).
-                </p>
+            {/* Permiso de gestor de inventario — solo para roles no-ADMIN */}
+            {formData.role !== 'ADMIN' && (
+              <div className="rounded-lg border p-3 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Gestor de Inventario</p>
+                  <p className="text-xs text-muted-foreground">
+                    Permite a este usuario gestionar activos, consumibles y configuración de inventario.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  id="edit-can-manage-inventory"
+                  checked={formData.canManageInventory}
+                  onChange={(e) => setFormData({ ...formData, canManageInventory: e.target.checked })}
+                  className="h-4 w-4 rounded border-border"
+                />
               </div>
-              <input
-                type="checkbox"
-                id="edit-can-manage-inventory"
-                checked={formData.canManageInventory}
-                onChange={(e) => setFormData({ ...formData, canManageInventory: e.target.checked })}
-                disabled={formData.role === 'ADMIN'}
-                className="h-4 w-4 rounded border-border disabled:opacity-50"
-                title={formData.role === 'ADMIN' ? 'Los administradores siempre tienen acceso' : ''}
-              />
-            </div>
+            )}
+
+            {/* Super Admin — solo visible cuando el rol es ADMIN */}
+            {formData.role === 'ADMIN' && !isCurrentUser && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-3 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Administrador Principal (Super Admin)</p>
+                  <p className="text-xs text-muted-foreground">
+                    Acceso total a todas las familias sin restricciones. Puede asignar admins a familias.
+                    Solo debe haber un administrador principal.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  id="edit-is-super-admin"
+                  checked={formData.isSuperAdmin}
+                  onChange={(e) => setFormData({ ...formData, isSuperAdmin: e.target.checked })}
+                  className="h-4 w-4 rounded border-border"
+                />
+              </div>
+            )}
           </TabsContent>
 
           {/* Perfil */}
@@ -688,12 +712,7 @@ export function EditUserModal({ isOpen, onClose, onUserUpdated, user, department
                     </div>
                     
                     <div className="flex items-center space-x-2 flex-wrap gap-2">
-                      {selectedRole && (
-                        <Badge className={selectedRole.color}>
-                          <selectedRole.icon className="h-3 w-3 mr-1" />
-                          {selectedRole.label}
-                        </Badge>
-                      )}
+                      <RoleBadge role={formData.role} isSuperAdmin={formData.isSuperAdmin} />
                       
                       <Badge variant={formData.isActive ? "default" : "secondary"}>
                         {formData.isActive ? 'Activo' : 'Inactivo'}

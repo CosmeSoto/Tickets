@@ -57,6 +57,7 @@ export interface UpdateUserData {
   phone?: string | null
   avatar?: string | null
   isActive?: boolean
+  isSuperAdmin?: boolean
   assignedCategories?: {
     categoryId: string
     priority: number
@@ -208,6 +209,8 @@ export class UserService {
         avatar: true,
         isActive: true,
         isEmailVerified: true,
+        canManageInventory: true,
+        isSuperAdmin: true,
         lastLogin: true,
         createdAt: true,
         updatedAt: true,
@@ -358,6 +361,7 @@ export class UserService {
     if (data.avatar !== undefined) updateData.avatar = data.avatar
     if (data.isActive !== undefined) updateData.isActive = data.isActive
     if ((data as any).canManageInventory !== undefined) updateData.canManageInventory = (data as any).canManageInventory
+    if (data.isSuperAdmin !== undefined) updateData.isSuperAdmin = data.isSuperAdmin
     
     // Manejar departmentId explícitamente
     if (data.departmentId !== undefined) {

@@ -1,8 +1,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# CONFIGURACIÓN CENTRAL DEL DOMINIO LOCAL
-# Edita este archivo para cambiar la IP o el dominio.
-# Luego vuelve a ejecutar el script correspondiente en cada equipo.
+# CONFIGURACIÓN DEL DOMINIO LOCAL
+# Solo necesitas cambiar DOMAIN si quieres usar otro nombre.
+# La IP se detecta automáticamente — no necesitas editarla aquí.
 # ─────────────────────────────────────────────────────────────────────────────
 
-SERVER_IP=10.10.104.46
 DOMAIN=gestion.local

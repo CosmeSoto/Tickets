@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 
 /**
  * GET /api/admin/family-assignments?adminId=xxx
@@ -88,6 +89,14 @@ export async function POST(request: NextRequest) {
     include: { family: { select: { id: true, name: true, code: true, color: true } } },
   })
 
+  AuditServiceComplete.log({
+    action: AuditActionsComplete.ADMIN_FAMILY_ASSIGNED,
+    entityType: 'family',
+    entityId: familyId,
+    userId: session.user.id,
+    details: { adminId, adminName: targetAdmin.name, familyId },
+  }).catch(() => {})
+
   return NextResponse.json({ success: true, data: assignment }, { status: 201 })
 }
 
@@ -122,6 +131,14 @@ export async function DELETE(request: NextRequest) {
     where: { adminId, familyId },
     data: { isActive: false },
   })
+
+  AuditServiceComplete.log({
+    action: AuditActionsComplete.ADMIN_FAMILY_UNASSIGNED,
+    entityType: 'family',
+    entityId: familyId,
+    userId: session.user.id,
+    details: { adminId, familyId },
+  }).catch(() => {})
 
   return NextResponse.json({ success: true })
 }

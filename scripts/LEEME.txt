@@ -1,0 +1,75 @@
+═══════════════════════════════════════════════════════════════
+  CONFIGURACIÓN DE DOMINIO LOCAL — gestion.local
+═══════════════════════════════════════════════════════════════
+
+ARCHIVOS EN ESTA CARPETA
+─────────────────────────────────────────────────────────────
+
+  domain-config.txt
+    El único archivo que podrías necesitar editar algún día.
+    Solo contiene el nombre del dominio (gestion.local).
+    La IP NO va aquí — se detecta automáticamente.
+
+  auto-update-hosts.sh
+    Script principal del servidor (Mac).
+    Ya está instalado como servicio del sistema.
+    NO necesitas tocarlo nunca más.
+
+  setup-domain-windows.ps1
+    Para cada PC Windows de la red que necesite acceder
+    a gestion.local. Cuando el servidor cambie de IP,
+    hay que volver a ejecutarlo en cada Windows.
+
+  verify-seed.js
+    No tiene que ver con el dominio.
+    Es para verificar datos de la base de datos.
+
+
+CÓMO FUNCIONA AUTOMÁTICAMENTE
+─────────────────────────────────────────────────────────────
+
+  El servicio instalado en este Mac:
+    - Se ejecuta automáticamente al arrancar el Mac
+    - Se repite cada 5 minutos
+    - Detecta la IP actual de la red
+    - Actualiza /etc/hosts solo, sin que hagas nada
+    - Registra cada cambio en: /var/log/gestion-update-hosts.log
+
+
+QUÉ HACER CUANDO CAMBIE DE IP
+─────────────────────────────────────────────────────────────
+
+  Este Mac (servidor)
+    → NADA. El servicio lo detecta solo en máximo 5 minutos.
+
+    Si quieres que sea inmediato sin esperar:
+      sudo bash scripts/auto-update-hosts.sh
+
+  Otro Mac de la red
+    → sudo bash scripts/auto-update-hosts.sh
+
+  PC Windows de la red
+    → Ejecutar setup-domain-windows.ps1 como Administrador
+      (clic derecho → Ejecutar como administrador)
+
+
+PRIMERA VEZ EN UN MAC NUEVO (instalar el servicio)
+─────────────────────────────────────────────────────────────
+
+  sudo bash scripts/auto-update-hosts.sh --install
+
+  Solo se hace una vez. Después funciona solo para siempre.
+
+
+DESINSTALAR EL SERVICIO
+─────────────────────────────────────────────────────────────
+
+  sudo bash scripts/auto-update-hosts.sh --uninstall
+
+
+VER EL LOG (historial de cambios de IP)
+─────────────────────────────────────────────────────────────
+
+  cat /var/log/gestion-update-hosts.log
+
+═══════════════════════════════════════════════════════════════

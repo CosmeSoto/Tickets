@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import { NotificationEvents } from '@/lib/notification-events'
 
 /**
  * POST /api/admin/families/[id]/managers
@@ -72,6 +73,9 @@ export async function POST(
 
       return created
     })
+
+    // Notificar al usuario para que refresque su sesión y vea el menú de gestor
+    NotificationEvents.emit(userId, { type: 'session_refresh', reason: 'permissions_changed' })
 
     return NextResponse.json(assignment, { status: 201 })
   } catch (error) {

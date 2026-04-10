@@ -18,7 +18,13 @@ export async function GET(
 
     const { id } = await params
 
-    const [family, departments, technicians, managers] = await Promise.all([
+    // Verificar si el usuario actual es super admin
+    const currentUser = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: { isSuperAdmin: true },
+    })
+
+    const [family, departments, technicians, managers, admins] = await Promise.all([
       prisma.families.findUnique({
         where: { id },
         include: {
@@ -53,6 +59,14 @@ export async function GET(
           },
         },
       }),
+      prisma.admin_family_assignments.findMany({
+        where: { familyId: id, isActive: true },
+        include: {
+          admin: {
+            select: { id: true, name: true, email: true, isSuperAdmin: true },
+          },
+        },
+      }),
     ])
 
     if (!family) {
@@ -66,6 +80,8 @@ export async function GET(
       departments,
       technicians,
       managers,
+      admins,
+      currentUserIsSuperAdmin: currentUser?.isSuperAdmin ?? false,
     })
   } catch (error) {
     console.error('Error fetching family:', error)

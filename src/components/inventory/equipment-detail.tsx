@@ -460,19 +460,21 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
   const isAssigned = equipment.status === 'ASSIGNED' || !!currentAssignment
   const isInMaintenance = equipment.status === 'MAINTENANCE'
 
-  // Editar: ADMIN o TECHNICIAN, mientras no esté retirado
-  const canEdit = (userRole === 'ADMIN' || userRole === 'TECHNICIAN') && !isRetired
+  // Permisos basados en rol + canManageInventory (el backend valida el alcance por familia)
+  const canManage = userRole === 'ADMIN' || userRole === 'TECHNICIAN' || (data as any)?.canManageInventory
+  // Editar: gestores, admins y técnicos, mientras no esté retirado
+  const canEdit = canManage && !isRetired
   // Asignar: solo si está disponible en bodega
-  const canAssign = (userRole === 'ADMIN' || userRole === 'TECHNICIAN') && equipment.status === 'AVAILABLE'
+  const canAssign = canManage && equipment.status === 'AVAILABLE'
   // Devolver a bodega: solo si tiene asignación activa
-  const canReturn = (userRole === 'ADMIN' || userRole === 'TECHNICIAN') && isAssigned
-  // Mantenimiento (admin/tech): si no está retirado ni ya en mantenimiento
-  const canMaintenance = (userRole === 'ADMIN' || userRole === 'TECHNICIAN') && !isRetired && !isInMaintenance
+  const canReturn = canManage && isAssigned
+  // Mantenimiento (admin/tech/gestor): si no está retirado ni ya en mantenimiento
+  const canMaintenance = canManage && !isRetired && !isInMaintenance
   // Solicitar mantenimiento (cliente): si tiene el equipo asignado y no hay solicitud/mantenimiento activo
   const hasActiveMaintenance = isInMaintenance || (maintenanceRecords && maintenanceRecords.some((r: any) => ['REQUESTED', 'SCHEDULED', 'ACCEPTED'].includes(r.status)))
   const canRequestMaintenance = userRole === 'CLIENT' && currentAssignment?.receiverId === userId && !hasActiveMaintenance
-  // Dar de baja: ADMIN, no retirado, sin asignación activa
-  const canRetire = userRole === 'ADMIN' && !isRetired && !isAssigned
+  // Dar de baja: gestores y admins, no retirado, sin asignación activa
+  const canRetire = canManage && !isRetired && !isAssigned
   // Eliminar definitivamente: solo ADMIN y solo si ya está retirado
   const canPermanentDelete = isAdmin && isRetired
   // Cliente reportar problema: solo si el equipo le está asignado

@@ -29,6 +29,7 @@ import { formatDate } from '@/lib/utils'
 interface EquipmentTableProps {
   equipment: Equipment[]
   userRole: string
+  canManageInventory?: boolean
   onEdit?: (equipment: Equipment) => void
   onDelete?: (equipment: Equipment) => void
   onViewQR?: (equipment: Equipment) => void
@@ -69,13 +70,16 @@ const CONDITION_LABELS: Record<EquipmentCondition, string> = {
 export function EquipmentTable({
   equipment,
   userRole,
+  canManageInventory = false,
   onEdit,
   onDelete,
   onViewQR,
 }: EquipmentTableProps) {
   const router = useRouter()
-  const canEdit = userRole === 'ADMIN' || userRole === 'TECHNICIAN'
-  const canDelete = userRole === 'ADMIN'
+  const isAdmin = userRole === 'ADMIN'
+  const isTechnician = userRole === 'TECHNICIAN'
+  const canEdit = isAdmin || isTechnician || canManageInventory
+  const canDelete = isAdmin || canManageInventory
 
   if (equipment.length === 0) {
     return (

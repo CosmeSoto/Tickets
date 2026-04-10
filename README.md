@@ -33,41 +33,58 @@ npm run dev
 http://localhost:3000
 ```
 
-# Comandos de ayuda
+# Comandos de referencia
+
+## Git
+```bash
+git status                                      # Ver archivos modificados
+git add .                                       # Preparar todos los cambios
+git commit -m "descripción del cambio"          # Guardar cambios
+git push origin main                            # Subir a GitHub
+git pull origin main                            # Bajar cambios de GitHub
+git checkout main                               # Cambiar a rama main
 ```
-clear
-# Borrar la caché
-rm -rf .next
 
-# 1. Verifica qué archivos han cambiado (opcional, pero recomendado)
-git status
+## Docker — Desarrollo (docker-compose.dev.yml)
 
-# 2. Prepara todos los archivos modificados para ser guardados
-git add .
+| Situación | Comando |
+|-----------|---------|
+| **Trabajo diario** (ya está corriendo) | `docker compose -f docker-compose.dev.yml up -d` |
+| **Primera vez o cambios en Dockerfile/deps** | `docker compose -f docker-compose.dev.yml up --build` |
+| **Cambios en .env o config** (sin rebuild) | `docker compose -f docker-compose.dev.yml restart app` |
+| **Cambios en schema.prisma** | Ver sección Prisma abajo |
+| **Problemas de caché en dependencias** | `docker compose -f docker-compose.dev.yml build --no-cache app` |
+| **Limpieza total** (borra volúmenes y BD) | `docker compose -f docker-compose.dev.yml down -v` |
+| **Ver logs en tiempo real** | `docker compose -f docker-compose.dev.yml logs -f app` |
+| **Borrar caché de Next.js** | `docker exec tickets-app-dev rm -rf /app/.next` |
 
-# 3. Guarda los cambios con un mensaje descriptivo
-git commit -m "Descripción de lo que trabajaste hoy (ej: Corregido error de login)"
+## Prisma dentro de Docker ⚠️
 
-# 4. Sube los cambios al repositorio remoto (GitHub)
-git push origin main
+> El volumen `dev_node_modules` es independiente del host. Siempre que modifiques
+> `schema.prisma` hay que regenerar el cliente **dentro del contenedor** y reiniciar.
 
-# 5. Asegúrate de estar en la rama correcta (usualmente main o master)
-git checkout main
+```bash
+# 1. Aplicar migración o push del schema
+docker exec tickets-app-dev npx prisma migrate dev --name nombre_migracion
+# o si no usas migraciones:
+docker exec tickets-app-dev npx prisma db push
 
-# 6. Descarga e integra los cambios más recientes de GitHub
-git pull origin main
+# 2. Regenerar el cliente Prisma dentro del contenedor
+docker exec tickets-app-dev npx prisma generate
 
-docker compose -f docker-compose.local.yml --env-file .env.production down -v
-docker compose -f docker-compose.local.yml --env-file .env.production up -d --build
-
-# Desarrollo (sin build, hot-reload):
-docker compose -f docker-compose.dev.yml down -v
-docker compose -f docker-compose.dev.yml up --build
+# 3. Reiniciar la app para que tome el nuevo cliente
 docker compose -f docker-compose.dev.yml restart app
 
-# Producción (cuando estés listo):
-docker compose -f docker-compose.prod.yml up --build
+# Ejecutar seed (es seguro repetirlo — usa upsert, no duplica datos)
+docker exec tickets-app-dev npm run db:seed
+```
 
+## Docker — Producción (docker-compose.prod.yml)
+
+```bash
+docker compose -f docker-compose.prod.yml up --build -d
+docker compose -f docker-compose.prod.yml logs -f app
+docker compose -f docker-compose.prod.yml down
 ```
 ## 👤 Credenciales por Defecto
 

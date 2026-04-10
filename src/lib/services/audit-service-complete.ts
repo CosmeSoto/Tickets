@@ -800,6 +800,18 @@ export const AuditActionsComplete = {
   UNIT_OF_MEASURE_CREATED: 'unit_of_measure_created',
   UNIT_OF_MEASURE_UPDATED: 'unit_of_measure_updated',
   UNIT_OF_MEASURE_DELETED: 'unit_of_measure_deleted',
+
+  // Colaboradores de tickets
+  COLLABORATOR_ADDED: 'collaborator_added',
+  COLLABORATOR_REMOVED: 'collaborator_removed',
+
+  // Familias — asignaciones de admin
+  ADMIN_FAMILY_ASSIGNED: 'admin_family_assigned',
+  ADMIN_FAMILY_UNASSIGNED: 'admin_family_unassigned',
+
+  // Super admin
+  SUPER_ADMIN_GRANTED: 'super_admin_granted',
+  SUPER_ADMIN_REVOKED: 'super_admin_revoked',
 } as const
 
 // Helpers para registrar acciones específicas con valores anteriores y nuevos

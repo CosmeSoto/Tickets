@@ -16,11 +16,14 @@ export async function GET(req: NextRequest) {
   }
 
   const { role, id: userId } = session.user as { role: string; id: string }
+  const isSuperAdmin = (session.user as any).isSuperAdmin === true
+  const userCanManageInventory = (session.user as any).canManageInventory === true
 
   const { searchParams } = req.nextUrl
   const familyIdParam = searchParams.get('familyId') ?? undefined
   const subtypeParam = searchParams.get('subtype') ?? undefined
   const searchQuery = searchParams.get('search')?.trim().toLowerCase() ?? ''
+  const personalOnly = searchParams.get('personalOnly') === 'true'
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1)
   const pageSizeRaw = parseInt(searchParams.get('pageSize') ?? '20', 10) || 20
 
@@ -29,33 +32,64 @@ export async function GET(req: NextRequest) {
   }
   const pageSize = pageSizeRaw
 
-  // Determinar familias permitidas para el usuario
-  let allowedFamilyIds: string[] | undefined
-  let clientAssignedEquipmentIds: string[] | undefined
+  // Equipos asignados personalmente al usuario (aplica a TODOS los roles sin excepción)
+  const personalAssignments = await prisma.equipment_assignments.findMany({
+    where: { receiverId: userId, isActive: true },
+    select: { equipmentId: true },
+  })
+  const personalEquipmentIds = personalAssignments.map(a => a.equipmentId)
 
-  if (role === 'ADMIN') {
-    // Admin: acceso total, sin restricción de familias
-    allowedFamilyIds = undefined
-  } else if (role === 'CLIENT') {
-    // Cliente: solo ve equipos asignados a él
-    const assignments = await prisma.equipment_assignments.findMany({
-      where: { receiverId: userId, isActive: true },
-      select: { equipmentId: true },
+  // Si personalOnly=true, ignorar lógica de familias y mostrar solo equipos asignados al usuario
+  if (personalOnly) {
+    const items = await prisma.equipment.findMany({
+      where: { id: { in: personalEquipmentIds } },
+      include: { type: { include: { family: true } } },
+      orderBy: { createdAt: 'desc' },
     })
-    clientAssignedEquipmentIds = assignments.map(a => a.equipmentId)
-  } else {
-    // TECHNICIAN u otro rol: verificar si es gestor
-    const isManager = await canManageInventory(userId, role)
-    if (isManager) {
-      // Gestor: filtrar por familias asignadas
-      const assignments = await prisma.inventory_manager_families.findMany({
-        where: { managerId: userId },
-        select: { familyId: true },
-      })
-      allowedFamilyIds = assignments.map((a) => a.familyId)
-    }
-    // Técnico sin gestión: acceso de lectura a todo el inventario (para ver equipos en tickets)
+    const mapped = items.map((item) => ({
+      id: item.id,
+      name: `${item.brand} ${item.model}`,
+      subtype: 'EQUIPMENT' as const,
+      familyId: item.type?.familyId ?? '',
+      family: {
+        name: item.type?.family?.name ?? '',
+        icon: item.type?.family?.icon ?? null,
+        color: item.type?.family?.color ?? null,
+      },
+      status: item.status,
+      code: item.code,
+      acquisitionMode: (item as any).acquisitionMode ?? (item as any).ownershipType ?? undefined,
+      createdAt: item.createdAt.toISOString(),
+    }))
+    const filtered = mapped.filter(i =>
+      !searchQuery || i.name.toLowerCase().includes(searchQuery) || (i.code ?? '').toLowerCase().includes(searchQuery)
+    )
+    const total = filtered.length
+    return NextResponse.json({
+      items: filtered.slice((page - 1) * pageSize, page * pageSize),
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+    })
   }
+
+  // Familias accesibles según rol:
+  // - SuperAdmin → undefined (todo)
+  // - Admin normal → sus familias en admin_family_assignments (o todo si no tiene ninguna)
+  // - Gestor → sus familias en inventory_manager_families
+  // - CLIENT/TECHNICIAN sin gestión → undefined aquí, se aplica restrictToAssignedOnly abajo
+  const { getAccessibleFamilyIds } = await import('@/lib/inventory/family-access')
+  let allowedFamilyIds: string[] | undefined
+  let restrictToAssignedOnly = false
+
+  if (role === 'ADMIN' || userCanManageInventory) {
+    allowedFamilyIds = await getAccessibleFamilyIds(userId, role, isSuperAdmin, userCanManageInventory)
+  } else if (role === 'CLIENT') {
+    // Cliente sin gestión: solo sus equipos asignados personalmente
+    restrictToAssignedOnly = true
+  }
+  // TECHNICIAN sin gestión: acceso de lectura a todo el inventario
 
   // Si se pasa familyId como query param, intersectar con las familias permitidas
   const effectiveFamilyIds: string[] | undefined = (() => {
@@ -68,23 +102,40 @@ export async function GET(req: NextRequest) {
     return allowedFamilyIds
   })()
 
+  // Construir filtro de equipos:
+  // - Cliente sin gestión: solo sus equipos asignados
+  // - Gestor/Técnico/Admin: equipos de sus familias + equipos asignados personalmente (OR)
+  function buildEquipmentWhere() {
+    if (restrictToAssignedOnly) {
+      return { id: { in: personalEquipmentIds } }
+    }
+    if (effectiveFamilyIds !== undefined) {
+      // Gestor con familias: equipos de sus familias OR asignados a él
+      const conditions: object[] = [
+        { type: { familyId: { in: effectiveFamilyIds } } },
+      ]
+      if (personalEquipmentIds.length > 0) {
+        conditions.push({ id: { in: personalEquipmentIds } })
+      }
+      return conditions.length > 1 ? { OR: conditions } : conditions[0]
+    }
+    // Sin restricción (ADMIN o TECHNICIAN sin gestión)
+    return {}
+  }
+
   // Ejecutar 3 queries en paralelo
   const [equipmentItems, consumableItems, licenseItems] = await Promise.all([
-    // Solo incluir EQUIPMENT si no se filtra por subtype o el subtype es EQUIPMENT
+    // EQUIPMENT
     subtypeParam && subtypeParam !== 'EQUIPMENT'
       ? Promise.resolve([])
       : prisma.equipment.findMany({
-          where: {
-            ...(effectiveFamilyIds ? { type: { familyId: { in: effectiveFamilyIds } } } : {}),
-            // Cliente: solo equipos asignados a él
-            ...(clientAssignedEquipmentIds ? { id: { in: clientAssignedEquipmentIds } } : {}),
-          },
+          where: buildEquipmentWhere(),
           include: { type: { include: { family: true } } },
           orderBy: { createdAt: 'desc' },
         }),
 
-    // Solo incluir MRO — clientes no ven MRO
-    (clientAssignedEquipmentIds !== undefined) || (subtypeParam && subtypeParam !== 'MRO')
+    // MRO — clientes sin gestión no ven MRO
+    restrictToAssignedOnly || (subtypeParam && subtypeParam !== 'MRO')
       ? Promise.resolve([])
       : prisma.consumables.findMany({
           where: effectiveFamilyIds
@@ -94,8 +145,8 @@ export async function GET(req: NextRequest) {
           orderBy: { createdAt: 'desc' },
         }),
 
-    // Solo incluir LICENSE — clientes no ven licencias
-    (clientAssignedEquipmentIds !== undefined) || (subtypeParam && subtypeParam !== 'LICENSE')
+    // LICENSE — clientes sin gestión no ven licencias
+    restrictToAssignedOnly || (subtypeParam && subtypeParam !== 'LICENSE')
       ? Promise.resolve([])
       : prisma.software_licenses.findMany({
           where: effectiveFamilyIds

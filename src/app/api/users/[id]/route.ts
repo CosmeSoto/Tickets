@@ -18,6 +18,7 @@ const updateUserSchema = z.object({
   avatar: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
   canManageInventory: z.boolean().optional(),
+  isSuperAdmin: z.boolean().optional(),
   assignedCategories: z.array(z.object({
     categoryId: z.string(),
     priority: z.number().min(1).max(10),
@@ -114,6 +115,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }, { status: 400 })
     }
 
+    // Solo un super admin puede cambiar el flag isSuperAdmin de otro usuario
+    if (validatedData.isSuperAdmin !== undefined && !(session.user as any).isSuperAdmin) {
+      delete validatedData.isSuperAdmin
+    }
+
     // Actualizar el usuario
     const user = await UserService.updateUser(targetId, validatedData)
 
@@ -188,6 +194,18 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       // Si cambia canManageInventory, notificar para refrescar sesión
       if ((validatedData as any).canManageInventory !== undefined &&
           (validatedData as any).canManageInventory !== (currentUser as any).canManageInventory) {
+        NotificationEvents.emit(targetId, { type: 'session_refresh', reason: 'permissions_changed' })
+      }
+
+      // Si cambia isSuperAdmin, registrar acción específica y notificar
+      if (validatedData.isSuperAdmin !== undefined &&
+          validatedData.isSuperAdmin !== (currentUser as any).isSuperAdmin) {
+        changes.isSuperAdmin = {
+          old: (currentUser as any).isSuperAdmin ? 'Super Admin' : 'Admin normal',
+          new: validatedData.isSuperAdmin ? 'Super Admin' : 'Admin normal',
+        }
+        oldValues.isSuperAdmin = (currentUser as any).isSuperAdmin
+        newValues.isSuperAdmin = validatedData.isSuperAdmin
         NotificationEvents.emit(targetId, { type: 'session_refresh', reason: 'permissions_changed' })
       }
 

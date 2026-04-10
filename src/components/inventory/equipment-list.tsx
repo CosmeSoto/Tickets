@@ -88,7 +88,7 @@ export function EquipmentList({
     setPage(1)
   }
 
-  const canCreate = session?.user?.role === 'ADMIN' || session?.user?.role === 'TECHNICIAN'
+  const canCreate = session?.user?.role === 'ADMIN' || session?.user?.role === 'TECHNICIAN' || (session?.user as any)?.canManageInventory === true
 
   return (
     <div className="space-y-4">
@@ -159,6 +159,7 @@ export function EquipmentList({
               <EquipmentTable
                 equipment={equipment}
                 userRole={session?.user?.role || 'CLIENT'}
+                canManageInventory={(session?.user as any)?.canManageInventory === true}
                 onEdit={onEdit}
                 onDelete={onDelete}
                 onViewQR={onViewQR}

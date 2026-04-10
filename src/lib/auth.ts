@@ -341,6 +341,7 @@ export const authOptions: NextAuthOptions = {
                 token.phone = dbUser.phone || undefined
                 token.avatar = dbUser.avatar || user.image || undefined
                 token.canManageInventory = dbUser.canManageInventory ?? false
+                token.isSuperAdmin = (dbUser as any).isSuperAdmin ?? false
                 token.isOAuth = true
               } else {
                 token.role = 'CLIENT'
@@ -362,11 +363,13 @@ export const authOptions: NextAuthOptions = {
             try {
               const dbUser = await prisma.users.findUnique({
                 where: { id: user.id },
-                select: { canManageInventory: true },
+                select: { canManageInventory: true, isSuperAdmin: true },
               })
               token.canManageInventory = dbUser?.canManageInventory ?? false
+              token.isSuperAdmin = dbUser?.isSuperAdmin ?? false
             } catch {
               token.canManageInventory = false
+              token.isSuperAdmin = false
             }
           }
         }
@@ -381,6 +384,7 @@ export const authOptions: NextAuthOptions = {
                 role: true,
                 isActive: true,
                 canManageInventory: true,
+                isSuperAdmin: true,
                 departmentId: true,
                 departments: { select: { name: true } },
               },
@@ -392,6 +396,7 @@ export const authOptions: NextAuthOptions = {
               }
               token.role = dbUser.role
               token.canManageInventory = dbUser.canManageInventory ?? false
+              token.isSuperAdmin = (dbUser as any).isSuperAdmin ?? false
               token.departmentId = dbUser.departmentId || undefined
               token.department = dbUser.departments?.name || undefined
             }
@@ -428,6 +433,7 @@ export const authOptions: NextAuthOptions = {
           session.user.avatar = token.avatar as string | undefined
           session.user.isOAuth = (token.isOAuth as boolean) || false
           ;(session.user as any).canManageInventory = (token.canManageInventory as boolean) || false
+          ;(session.user as any).isSuperAdmin = (token.isSuperAdmin as boolean) || false
           
           // IMPORTANTE: Pasar loginTime a la sesión para el monitor de timeout
           if (token.loginTime) {

@@ -54,6 +54,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
+import { getRoleLabel as getRoleLabelFn, getRoleColor } from '@/components/ui/role-badge'
 
 interface RoleDashboardLayoutProps {
   children: ReactNode
@@ -195,6 +196,34 @@ const navigationByRole: Record<string, NavItem[]> = {
       ],
     },
   ],
+
+  // Cliente CON gestión de inventario: tickets + inventario operativo de sus familias
+  CLIENT_MANAGER: [
+    { name: 'Dashboard', href: '/client', icon: LayoutDashboard },
+    {
+      name: 'Mis Tickets',
+      href: '/client/tickets',
+      icon: Ticket,
+      children: [
+        { name: 'Ver Tickets', href: '/client/tickets', icon: Ticket },
+        { name: 'Base de Conocimientos', href: '/knowledge', icon: BookOpen },
+        { name: 'Centro de Ayuda', href: '/client/help', icon: HelpCircle },
+      ],
+    },
+    {
+      name: 'Inventario',
+      href: '/inventory',
+      icon: Package,
+      children: [
+        { name: 'Equipos', href: '/inventory', icon: Monitor },
+        { name: 'Mantenimientos', href: '/inventory/maintenance', icon: Wrench },
+        { name: 'Contratos', href: '/inventory/contracts', icon: FileSignature },
+        { name: 'Actas de Entrega', href: '/inventory/acts', icon: FileText },
+        { name: 'Actas de Baja', href: '/inventory/decommission', icon: Trash2 },
+        { name: 'Reportes', href: '/inventory/reports', icon: BarChart3 },
+      ],
+    },
+  ],
 }
 
 function NavItemComponent({ item, pathname, onNavigate, depth = 0 }: { item: NavItem; pathname: string | null; onNavigate?: () => void; depth?: number }) {
@@ -280,11 +309,14 @@ export function RoleDashboardLayout({
 
   const userRole = session.user.role as string
 
-  // Técnico con gestión de inventario → menú extendido
+  // Técnico o Cliente con gestión de inventario → menú extendido
+  const canManageInventory = (session.user as any).canManageInventory
   const navKey =
-    userRole === 'TECHNICIAN' && (session.user as any).canManageInventory
+    userRole === 'TECHNICIAN' && canManageInventory
       ? 'TECHNICIAN_MANAGER'
-      : userRole
+      : userRole === 'CLIENT' && canManageInventory
+        ? 'CLIENT_MANAGER'
+        : userRole
 
   const navigation = navigationByRole[navKey] || []
 
@@ -305,21 +337,17 @@ export function RoleDashboardLayout({
   }
 
   const getRoleBadgeColor = (role: string) => {
-    switch (role) {
-      case 'ADMIN': return 'bg-purple-100 text-purple-700 border-purple-200'
-      case 'TECHNICIAN': return 'bg-blue-100 text-blue-700 border-blue-200'
-      case 'CLIENT': return 'bg-green-100 text-green-700 border-green-200'
-      default: return 'bg-gray-100 text-gray-700 border-gray-200'
-    }
+    return getRoleColor(role, (session.user as any).isSuperAdmin)
   }
 
   const getRoleLabel = (role: string) => {
-    switch (role) {
-      case 'ADMIN': return 'Administrador'
-      case 'TECHNICIAN': return (session.user as any).canManageInventory ? 'Técnico · Gestor' : 'Técnico'
-      case 'CLIENT': return 'Cliente'
-      default: return role
+    if (role === 'TECHNICIAN') {
+      return canManageInventory ? 'Técnico · Gestor' : 'Técnico'
     }
+    if (role === 'CLIENT') {
+      return canManageInventory ? 'Cliente · Gestor' : getRoleLabelFn(role, (session.user as any).isSuperAdmin)
+    }
+    return getRoleLabelFn(role, (session.user as any).isSuperAdmin)
   }
 
   const closeSidebar = () => setSidebarOpen(false)

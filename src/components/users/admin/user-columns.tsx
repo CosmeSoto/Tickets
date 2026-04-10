@@ -28,11 +28,8 @@ import {
   UserCog,
 } from 'lucide-react'
 import { UserData, formatTimeAgo } from '@/hooks/use-users'
-import { 
-  USER_ROLE_LABELS, 
-  USER_ROLE_COLORS, 
-  USER_ROLE_ICONS 
-} from '@/lib/constants/user-constants'
+import { USER_ROLE_COLORS, USER_ROLE_ICONS } from '@/lib/constants/user-constants'
+import { RoleBadge } from '@/components/ui/role-badge'
 
 interface UserColumnsProps {
   onUserEdit?: (user: UserData) => void
@@ -115,16 +112,9 @@ export function createUserColumns({
     {
       key: 'role',
       label: 'Rol',
-      render: (user: UserData) => {
-        const RoleIcon = USER_ROLE_ICONS[user.role]
-        
-        return (
-          <Badge className={`${USER_ROLE_COLORS[user.role]} flex items-center space-x-1 w-fit text-xs`}>
-            <RoleIcon className="h-3 w-3" />
-            <span>{USER_ROLE_LABELS[user.role]}</span>
-          </Badge>
-        )
-      },
+      render: (user: UserData) => (
+        <RoleBadge role={user.role} isSuperAdmin={(user as any).isSuperAdmin} iconSize="sm" />
+      ),
       width: '100px'
     },
     {
@@ -472,10 +462,7 @@ export function UserCard({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground">Rol:</span>
-          <Badge className={`${USER_ROLE_COLORS[user.role]} flex items-center space-x-1 text-xs`}>
-            <RoleIcon className="h-3 w-3" />
-            <span>{USER_ROLE_LABELS[user.role]}</span>
-          </Badge>
+          <RoleBadge role={user.role} isSuperAdmin={(user as any).isSuperAdmin} iconSize="sm" />
         </div>
         
         {user.department && (
