@@ -28,7 +28,7 @@ function formatSize(bytes: number) {
 }
 
 function FilePreviewModal({ file, onClose }: { file: File; onClose: () => void }) {
-  const [url, setUrl] = useState('')
+  const [url, setUrl] = useState<string | null>(null)
 
   useEffect(() => {
     const objectUrl = URL.createObjectURL(file)
@@ -52,7 +52,13 @@ function FilePreviewModal({ file, onClose }: { file: File; onClose: () => void }
         >
           <X className="h-4 w-4" />
         </button>
-        <img src={url} alt={file.name} className="max-h-[85vh] max-w-[85vw] rounded-lg object-contain" />
+        {url ? (
+          <img src={url} alt={file.name} className="max-h-[85vh] max-w-[85vw] rounded-lg object-contain" />
+        ) : (
+          <div className="flex h-40 w-40 items-center justify-center">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          </div>
+        )}
         <p className="px-3 py-1.5 text-center text-xs text-muted-foreground">{file.name}</p>
       </div>
     </div>
