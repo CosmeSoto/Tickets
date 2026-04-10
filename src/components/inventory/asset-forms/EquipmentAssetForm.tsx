@@ -282,29 +282,7 @@ export function EquipmentAssetForm({
       {/* Botón atrás superior */}
       <button type="button" onClick={onBack} className="text-sm text-muted-foreground hover:text-foreground">← Atrás</button>
 
-      {/* Modalidad */}
-      <div className="space-y-1">
-        <Label>¿Cómo se adquirió este equipo?</Label>
-        <SimpleSelect
-          value={acquisitionMode}
-          onChange={e => setAcquisitionMode(e.target.value as typeof acquisitionMode)}
-          options={ACQUISITION_MODES}
-        />
-        <p className="text-xs text-muted-foreground">{ACQUISITION_MODES.find(m => m.value === acquisitionMode)?.help}</p>
-      </div>
-
-      {/* Código */}
-      <div className="space-y-1">
-        <Label>Código Interno <span className="text-xs font-normal text-muted-foreground">(opcional — se genera automáticamente)</span></Label>
-        <Input value={code} onChange={e => setCode(e.target.value)} placeholder="Dejar vacío para generar automáticamente" />
-      </div>
-
-      {/* N° Serie */}
-      <div className="space-y-1">
-        <Label>N° de Serie del Fabricante</Label>
-        <Input value={serialNumber} onChange={e => setSerialNumber(e.target.value)} placeholder="Ej: SN-ABC-12345" />
-      </div>
-
+      {/* ── 1. IDENTIFICACIÓN ─────────────────────────────────────── */}
       {/* Marca / Modelo */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
@@ -317,12 +295,25 @@ export function EquipmentAssetForm({
         </div>
       </div>
 
+      {/* N° Serie */}
+      <div className="space-y-1">
+        <Label>N° de Serie del Fabricante</Label>
+        <Input value={serialNumber} onChange={e => setSerialNumber(e.target.value)} placeholder="Ej: SN-ABC-12345" />
+      </div>
+
+      {/* Código */}
+      <div className="space-y-1">
+        <Label>Código Interno <span className="text-xs font-normal text-muted-foreground">(opcional — se genera automáticamente)</span></Label>
+        <Input value={code} onChange={e => setCode(e.target.value)} placeholder="Dejar vacío para generar automáticamente" />
+      </div>
+
       {/* Tipo de equipo */}
       <div className="space-y-1">
         <Label>Tipo de Equipo</Label>
         <SearchableSelect options={equipmentTypes} value={equipmentTypeId} onChange={setEquipmentTypeId} placeholder="Buscar tipo de equipo..." />
       </div>
 
+      {/* ── 2. UBICACIÓN ──────────────────────────────────────────── */}
       {/* Departamento */}
       <div className="space-y-1">
         <Label>Departamento <span className="text-destructive">*</span></Label>
@@ -345,7 +336,7 @@ export function EquipmentAssetForm({
         )}
       </div>
 
-      {/* Condición / Estado */}
+      {/* ── 3. ESTADO + ASIGNACIÓN ────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label>Condición <span className="text-destructive">*</span></Label>
@@ -370,6 +361,32 @@ export function EquipmentAssetForm({
         </div>
       </div>
 
+      {/* Asignar a usuario — aparece inmediatamente después de seleccionar "Asignado" */}
+      {equipmentStatus === 'ASSIGNED' && (
+        <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-1">
+          <Label>Asignar a <span className="text-destructive">*</span></Label>
+          <SearchableSelect
+            options={assignableUsers}
+            value={assignedUserId}
+            onChange={setAssignedUserId}
+            placeholder={departmentId ? 'Buscar usuario del departamento...' : 'Selecciona un departamento primero'}
+            disabled={!departmentId}
+          />
+          {!departmentId && (
+            <p className="text-xs text-amber-600 dark:text-amber-400">Selecciona un departamento para ver los usuarios disponibles.</p>
+          )}
+        </div>
+      )}
+
+      {/* Bodega — solo si no está asignado */}
+      {isVisible('WAREHOUSE') && equipmentStatus !== 'ASSIGNED' && (
+        <div className="space-y-1">
+          <Label>Bodega</Label>
+          <SearchableSelect options={warehouses} value={warehouseId} onChange={setWarehouseId} placeholder="Buscar bodega..." />
+        </div>
+      )}
+
+      {/* ── 4. DETALLES DEL EQUIPO ────────────────────────────────── */}
       {/* Accesorios */}
       <div className="space-y-2">
         <Label>Accesorios</Label>
@@ -412,6 +429,22 @@ export function EquipmentAssetForm({
         )}
       </div>
 
+      {/* ── 5. ADQUISICIÓN ────────────────────────────────────────── */}
+      {/* Modalidad */}
+      <div className="space-y-1">
+        <Label>¿Cómo se adquirió este equipo?</Label>
+      {/* ── 5. ADQUISICIÓN ────────────────────────────────────────── */}
+      {/* Modalidad */}
+      <div className="space-y-1">
+        <Label>¿Cómo se adquirió este equipo?</Label>
+        <SimpleSelect
+          value={acquisitionMode}
+          onChange={e => setAcquisitionMode(e.target.value as typeof acquisitionMode)}
+          options={ACQUISITION_MODES}
+        />
+        <p className="text-xs text-muted-foreground">{ACQUISITION_MODES.find(m => m.value === acquisitionMode)?.help}</p>
+      </div>
+
       {/* Proveedor */}
       <div className="space-y-1">
         <Label>{supplierLabel} {supplierRequired && <span className="text-destructive">*</span>}</Label>
@@ -425,7 +458,7 @@ export function EquipmentAssetForm({
         </div>
       )}
 
-      {/* Sección FINANCIERO */}
+      {/* ── 6. FINANCIERO + DEPRECIACIÓN ──────────────────────────── */}
       {showFinancial && (
         <fieldset className="rounded-lg border border-border p-4 space-y-3">
           <legend className="px-2 text-sm font-semibold text-foreground">
@@ -449,64 +482,45 @@ export function EquipmentAssetForm({
         </fieldset>
       )}
 
-      {/* Sección DEPRECIACIÓN — oculta si la familia no soporta depreciación (Task 19.1) */}
       {isVisible('DEPRECIATION') && supportsDepreciation && (
         <fieldset className="rounded-lg border border-border p-4 space-y-3">
           <legend className="px-2 text-sm font-semibold text-foreground">Depreciación</legend>
           <div className="grid grid-cols-2 gap-3">
-            {/* Método de depreciación */}
             <div className="space-y-1 col-span-2">
               <Label>Método de Depreciación</Label>
-              <SimpleSelect value={depreciationMethod} onChange={e => setDepreciationMethod(e.target.value)}
-                options={DEPRECIATION_METHODS}
-              />
-              {/* Task 19.2: help text per method */}
+              <SimpleSelect value={depreciationMethod} onChange={e => setDepreciationMethod(e.target.value)} options={DEPRECIATION_METHODS} />
               {DEPRECIATION_METHOD_HELP[depreciationMethod] && (
                 <p className="text-xs text-muted-foreground">{DEPRECIATION_METHOD_HELP[depreciationMethod]}</p>
               )}
             </div>
-
-            {/* Vida útil */}
             <div className="space-y-1">
               <Label>Vida Útil (años)</Label>
               <Input type="number" min="1" value={usefulLifeYears} onChange={e => setUsefulLifeYears(e.target.value)} />
-              {/* Task 19.2: help text */}
               <p className="text-xs text-muted-foreground">Ej: laptops 3-5 años, servidores 5-7 años, mobiliario 10 años.</p>
             </div>
-
-            {/* Valor residual */}
             <div className="space-y-1">
               <Label>Valor Residual</Label>
               <Input type="number" min="0" step="0.01" value={residualValue} onChange={e => setResidualValue(e.target.value)} placeholder="0.00" />
-              {/* Task 19.2: help text */}
               <p className="text-xs text-muted-foreground">Valor estimado del activo al final de su vida útil.</p>
-              {/* Task 19.2: suggested residual value based on defaultResidualValuePct */}
               {suggestedResidualValue != null && !residualValue && (
-                <button
-                  type="button"
-                  className="text-xs text-primary hover:underline"
-                  onClick={() => setResidualValue(String(suggestedResidualValue))}
-                >
+                <button type="button" className="text-xs text-primary hover:underline"
+                  onClick={() => setResidualValue(String(suggestedResidualValue))}>
                   Sugerido: ${suggestedResidualValue.toLocaleString('es-CL')} ({familyDepConfig?.defaultResidualValuePct}% del precio)
                 </button>
               )}
             </div>
           </div>
-
-          {/* Task 19.3: real-time depreciation preview */}
           {depreciationPreview && depreciationPreview.length > 0 && (
             <div className="mt-2 rounded-md border border-border bg-muted/30">
-              <button
-                type="button"
+              <button type="button"
                 className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium"
-                onClick={() => setDepreciationPreviewOpen(p => !p)}
-              >
+                onClick={() => setDepreciationPreviewOpen(p => !p)}>
                 <span>Vista previa de depreciación</span>
                 {depreciationPreviewOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               </button>
               {depreciationPreviewOpen && (
                 <div className="border-t border-border px-3 py-2 space-y-1">
-                  <p className="text-xs text-muted-foreground mb-2">Valor libro estimado (solo informativo, no afecta el guardado):</p>
+                  <p className="text-xs text-muted-foreground mb-2">Valor libro estimado (solo informativo):</p>
                   <div className="grid grid-cols-3 gap-2">
                     {depreciationPreview.map(({ year, bookValue }) => (
                       <div key={year} className="rounded-md bg-background border border-border p-2 text-center">
@@ -522,29 +536,12 @@ export function EquipmentAssetForm({
         </fieldset>
       )}
 
-      {/* Asignado a usuario — solo cuando estado es ASSIGNED */}
-      {equipmentStatus === 'ASSIGNED' && (
-        <div className="space-y-1">
-          <Label>Asignar a <span className="text-destructive">*</span></Label>
-          <SearchableSelect options={assignableUsers} value={assignedUserId} onChange={setAssignedUserId} placeholder="Buscar usuario..." />
-        </div>
-      )}
-
-      {/* Sección BODEGA — oculta si está asignado */}
-      {isVisible('WAREHOUSE') && equipmentStatus !== 'ASSIGNED' && (
-        <div className="space-y-1">
-          <Label>Bodega</Label>
-          <SearchableSelect options={warehouses} value={warehouseId} onChange={setWarehouseId} placeholder="Buscar bodega..." />
-        </div>
-      )}
-
-      {/* Observaciones */}
+      {/* ── 7. NOTAS Y ADJUNTOS ───────────────────────────────────── */}
       <div className="space-y-1">
         <Label>Observaciones</Label>
         <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="Notas adicionales sobre el activo..." />
       </div>
 
-      {/* Adjuntos */}
       <FileUploadZone files={attachments} onChange={setAttachments} maxFileSizeMB={maxFileSizeMB} />
 
       {submitError && <p className="text-sm text-destructive">{submitError}</p>}
