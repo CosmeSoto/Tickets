@@ -38,8 +38,8 @@ export function UnifiedAssetForm({ onSuccess, onCancel, defaultFamilyId }: Unifi
       setFamilies(d.families ?? d ?? [])
       setLoadingFamilies(false)
     }).catch(() => setLoadingFamilies(false))
-    fetch('/api/admin/settings').then(r => r.json()).then(d => {
-      if (d.maxFileSize) setMaxFileSizeMB(d.maxFileSize)
+    fetch('/api/config/upload-limits').then(r => r.json()).then(d => {
+      if (d.maxFileSizeMB) setMaxFileSizeMB(d.maxFileSizeMB)
     }).catch(() => {})
   }, [])
 
