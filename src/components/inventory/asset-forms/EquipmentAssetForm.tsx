@@ -433,10 +433,6 @@ export function EquipmentAssetForm({
       {/* Modalidad */}
       <div className="space-y-1">
         <Label>¿Cómo se adquirió este equipo?</Label>
-      {/* ── 5. ADQUISICIÓN ────────────────────────────────────────── */}
-      {/* Modalidad */}
-      <div className="space-y-1">
-        <Label>¿Cómo se adquirió este equipo?</Label>
         <SimpleSelect
           value={acquisitionMode}
           onChange={e => setAcquisitionMode(e.target.value as typeof acquisitionMode)}
