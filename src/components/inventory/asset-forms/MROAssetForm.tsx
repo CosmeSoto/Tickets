@@ -106,14 +106,26 @@ export function MROAssetForm({
             allowClear
             createLabel="Crear categoría"
             createTitle="Nueva categoría de material"
-            createForm={({ onSuccess, onCancel }) => (
+            editTitle="Editar categoría"
+            deleteConfirmMessage="¿Eliminar esta categoría? Solo es posible si no tiene materiales asociados."
+            createForm={({ item, onSuccess, onCancel }) => (
               <CatalogTypeInlineForm
                 apiEndpoint="/api/inventory/consumable-types"
                 familyId={familyId}
-                onSuccess={(item) => { setConsumableTypes(prev => [...prev, item]); onSuccess(item) }}
+                item={item}
+                onSuccess={(newItem) => {
+                  if (item) setConsumableTypes(prev => prev.map(t => t.id === newItem.id ? newItem : t))
+                  else setConsumableTypes(prev => [...prev, newItem])
+                  onSuccess(newItem)
+                }}
                 onCancel={onCancel}
               />
             )}
+            onDelete={async (id) => {
+              const res = await fetch(`/api/inventory/consumable-types/${id}`, { method: 'DELETE' })
+              if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Error al eliminar') }
+              setConsumableTypes(prev => prev.filter(t => t.id !== id))
+            }}
           />
         </div>
         <div className="space-y-1">
@@ -126,12 +138,24 @@ export function MROAssetForm({
             allowClear
             createLabel="Crear unidad"
             createTitle="Nueva unidad de medida"
-            createForm={({ onSuccess, onCancel }) => (
+            editTitle="Editar unidad de medida"
+            deleteConfirmMessage="¿Eliminar esta unidad de medida? Solo es posible si no tiene materiales asociados."
+            createForm={({ item, onSuccess, onCancel }) => (
               <UnitOfMeasureInlineForm
-                onSuccess={(item) => { setUnitsOfMeasure(prev => [...prev, item]); onSuccess(item) }}
+                item={item}
+                onSuccess={(newItem) => {
+                  if (item) setUnitsOfMeasure(prev => prev.map(u => u.id === newItem.id ? newItem : u))
+                  else setUnitsOfMeasure(prev => [...prev, newItem])
+                  onSuccess(newItem)
+                }}
                 onCancel={onCancel}
               />
             )}
+            onDelete={async (id) => {
+              const res = await fetch(`/api/inventory/units-of-measure/${id}`, { method: 'DELETE' })
+              if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Error al eliminar') }
+              setUnitsOfMeasure(prev => prev.filter(u => u.id !== id))
+            }}
           />
         </div>
       </div>

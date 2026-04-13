@@ -314,16 +314,28 @@ export function EquipmentAssetForm({
           placeholder="Buscar tipo de equipo..."
           createLabel="Crear tipo de equipo"
           createTitle="Nuevo tipo de equipo"
-          createForm={({ onSuccess, onCancel }) => (
+          editTitle="Editar tipo de equipo"
+          deleteConfirmMessage="¿Eliminar este tipo de equipo? Solo es posible si no tiene activos asociados."
+          createForm={({ item, onSuccess, onCancel }) => (
             <EquipmentTypeInlineForm
               familyId={familyId}
-              onSuccess={(item) => {
-                setEquipmentTypes(prev => [...prev, item])
-                onSuccess(item)
+              item={item}
+              onSuccess={(newItem) => {
+                if (item) {
+                  setEquipmentTypes(prev => prev.map(t => t.id === newItem.id ? newItem : t))
+                } else {
+                  setEquipmentTypes(prev => [...prev, newItem])
+                }
+                onSuccess(newItem)
               }}
               onCancel={onCancel}
             />
           )}
+          onDelete={async (id) => {
+            const res = await fetch(`/api/admin/equipment-types/${id}`, { method: 'DELETE' })
+            if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Error al eliminar') }
+            setEquipmentTypes(prev => prev.filter(t => t.id !== id))
+          }}
         />
       </div>
 

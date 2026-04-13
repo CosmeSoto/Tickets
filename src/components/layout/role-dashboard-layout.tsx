@@ -99,14 +99,7 @@ const navigationByRole: Record<string, NavItem[]> = {
         { name: 'Proveedores', href: '/inventory/suppliers', icon: Building2 },
         { name: 'Reportes', href: '/inventory/reports', icon: BarChart3 },
         {
-          name: 'Catálogos', href: '/inventory/equipment-types', icon: Database,
-          children: [
-            { name: 'Equipo', href: '/inventory/equipment-types', icon: Boxes },
-            { name: 'Bodegas', href: '/inventory/warehouses', icon: Warehouse },
-            { name: 'Tipos de Licencia', href: '/inventory/license-types', icon: FileSignature },
-            { name: 'Tipos de Material MRO', href: '/inventory/consumable-types', icon: Tag },
-            { name: 'Unidades Medida', href: '/inventory/units-of-measure', icon: Ruler },
-          ],
+          name: 'Catálogos', href: '/inventory/catalogs', icon: Database,
         },
         { name: 'Configuración', href: '/settings/inventory', icon: Settings },
       ],

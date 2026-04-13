@@ -145,7 +145,7 @@ export function SupplierSelect({
 
       {/* Modal de creación inline */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Nuevo proveedor</DialogTitle>
           </DialogHeader>
