@@ -90,8 +90,8 @@ const CATALOGS: CatalogConfig[] = [
     apiGet: '/api/inventory/warehouses?includeInactive=true',
     apiPost: '/api/inventory/warehouses',
     apiPut: (id) => `/api/inventory/warehouses/${id}`,
-    apiDelete: (id) => `/api/inventory/warehouses/${id}/toggle`,
-    hasFamily: false, hasSymbol: false, hasLocation: true, hasCode: false, deleteVerb: 'desactivar',
+    apiDelete: (id) => `/api/inventory/warehouses/${id}`,
+    hasFamily: true, hasSymbol: false, hasLocation: true, hasCode: false, deleteVerb: 'desactivar',
   },
 ]
 
@@ -169,7 +169,7 @@ function CatalogsContent() {
       const body: Record<string, unknown> = { name: form.name, description: form.description || undefined, order: form.order }
       if (!editingItem && catalog.hasCode) body.code = form.code
       if (catalog.hasSymbol) body.symbol = form.symbol
-      if (catalog.hasFamily && form.familyId) body.familyId = form.familyId
+      if (catalog.hasFamily) body.familyId = form.familyId || null   // null = global/compartido
       if (catalog.hasLocation) body.location = form.location || undefined
 
       const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })

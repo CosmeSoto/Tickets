@@ -87,7 +87,7 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { name, location, description, managerId } = body
+    const { name, location, description, managerId, familyId } = body
 
     if (managerId !== undefined && managerId !== null) {
       const managerExists = await prisma.users.findUnique({ where: { id: managerId } })
@@ -106,11 +106,11 @@ export async function PUT(
         ...(location !== undefined && { location }),
         ...(description !== undefined && { description }),
         ...(managerId !== undefined && { managerId }),
+        ...('familyId' in body && { familyId: familyId ?? null }),
       },
       include: {
-        manager: {
-          select: { id: true, name: true, email: true },
-        },
+        manager: { select: { id: true, name: true, email: true } },
+        family: { select: { id: true, name: true, color: true } },
       },
     })
 
