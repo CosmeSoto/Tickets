@@ -6,9 +6,12 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select'
+import { InlineCreateSelect } from '@/components/ui/inline-create-select'
 import { SimpleSelect } from '@/components/ui/simple-select'
 import { FileUploadZone } from '@/components/ui/file-upload-zone'
 import { ContractSection, type ContractData } from '@/components/inventory/contract-section'
+import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
+import { EquipmentTypeInlineForm } from '@/components/inventory/asset-forms/EquipmentTypeInlineForm'
 import type { FamilyConfig } from '@/lib/inventory/family-config-types'
 import { resolveSectionsForMode } from '@/lib/inventory/family-config-types'
 import {
@@ -72,7 +75,7 @@ export function EquipmentAssetForm({
   const [brand, setBrand] = useState('')
   const [model, setModel] = useState('')
   const [equipmentTypeId, setEquipmentTypeId] = useState('')
-  const [equipmentTypes, setEquipmentTypes] = useState<SearchableSelectOption[]>([])
+  const [equipmentTypes, setEquipmentTypes] = useState<{ id: string; name: string }[]>([])
   const [condition, setCondition] = useState('NEW')
   const [equipmentStatus, setEquipmentStatus] = useState('AVAILABLE')
   const [accessories, setAccessories] = useState<string[]>([])
@@ -81,7 +84,6 @@ export function EquipmentAssetForm({
   const [specValue, setSpecValue] = useState('')
   const [specifications, setSpecifications] = useState<Record<string, string>>({})
   const [supplierId, setSupplierId] = useState('')
-  const [suppliers, setSuppliers] = useState<SearchableSelectOption[]>([])
   const [contractData, setContractData] = useState<ContractData | null>(null)
   const [purchaseDate, setPurchaseDate] = useState('')
   const [purchasePrice, setPurchasePrice] = useState('')
@@ -164,12 +166,6 @@ export function EquipmentAssetForm({
       })
       .catch(() => {})
   }, [familyId, familyCode])
-
-  useEffect(() => {
-    if (acquisitionMode === 'RENTAL' || acquisitionMode === 'LOAN') {
-      fetch('/api/inventory/suppliers').then(r => r.json()).then(d => setSuppliers(d.suppliers ?? []))
-    }
-  }, [acquisitionMode])
 
   // Usuarios asignables: filtrados por departamento seleccionado cuando estado es ASSIGNED
   const { users: assignableUsersList } = useUserList({
@@ -310,7 +306,24 @@ export function EquipmentAssetForm({
       {/* Tipo de equipo */}
       <div className="space-y-1">
         <Label>Tipo de Equipo</Label>
-        <SearchableSelect options={equipmentTypes} value={equipmentTypeId} onChange={setEquipmentTypeId} placeholder="Buscar tipo de equipo..." />
+        <InlineCreateSelect
+          options={equipmentTypes}
+          value={equipmentTypeId}
+          onChange={setEquipmentTypeId}
+          placeholder="Buscar tipo de equipo..."
+          createLabel="Crear tipo de equipo"
+          createTitle="Nuevo tipo de equipo"
+          createForm={({ onSuccess, onCancel }) => (
+            <EquipmentTypeInlineForm
+              familyId={familyId}
+              onSuccess={(item) => {
+                setEquipmentTypes(prev => [...prev, item])
+                onSuccess(item)
+              }}
+              onCancel={onCancel}
+            />
+          )}
+        />
       </div>
 
       {/* ── 2. UBICACIÓN ──────────────────────────────────────────── */}
@@ -444,7 +457,10 @@ export function EquipmentAssetForm({
       {/* Proveedor */}
       <div className="space-y-1">
         <Label>{supplierLabel} {supplierRequired && <span className="text-destructive">*</span>}</Label>
-        <SearchableSelect options={suppliers} value={supplierId} onChange={setSupplierId} placeholder="Buscar proveedor..." />
+        <SupplierSelect
+          value={supplierId || null}
+          onChange={v => setSupplierId(v || '')}
+        />
       </div>
 
       {/* Contrato — solo RENTAL */}

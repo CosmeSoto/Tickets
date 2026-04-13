@@ -79,6 +79,8 @@ docker compose -f docker-compose.dev.yml restart app
 docker exec tickets-app-dev npm run db:seed
 ```
 
+sudo bash sistema-tickets-nextjs/scripts/setup-domain-mac.sh
+
 ## Docker — Producción (docker-compose.prod.yml)
 
 ```bash
