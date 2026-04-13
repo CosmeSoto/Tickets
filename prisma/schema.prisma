@@ -1157,6 +1157,7 @@ model suppliers {
   id                String              @id @default(cuid())
   name              String              @db.VarChar(200)
   typeId            String?             @map("type_id")
+  familyId          String?             @map("family_id")
   taxId             String?             @unique @map("tax_id") @db.VarChar(20)
   email             String?             @db.VarChar(200)
   phone             String?             @db.VarChar(50)
@@ -1166,12 +1167,14 @@ model suppliers {
   isActive          Boolean             @default(true) @map("is_active")
   createdAt         DateTime            @default(now()) @map("created_at")
   updatedAt         DateTime            @updatedAt @map("updated_at")
+  family            families?           @relation(fields: [familyId], references: [id])
   supplierType      supplier_types?     @relation(fields: [typeId], references: [id])
   consumables       consumables[]
   equipment         equipment[]
   software_licenses software_licenses[]
 
   @@index([typeId, isActive])
+  @@index([familyId, isActive])
   @@index([name])
   @@map("suppliers")
 }
@@ -1284,6 +1287,7 @@ model families {
   licenseTypes                license_types[]
   sla_policies                sla_policies[]
   supplierTypes               supplier_types[]
+  suppliers                   suppliers[]
   technicianFamilyAssignments technician_family_assignments[]
   warehouses                  warehouses[]
   ticketCodeCounters          ticket_code_counters[]

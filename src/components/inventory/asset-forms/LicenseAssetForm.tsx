@@ -168,7 +168,7 @@ export function LicenseAssetForm({
 
       <div className="space-y-1">
         <Label>Proveedor / Vendedor <span className="text-destructive">*</span></Label>
-        <SupplierSelect value={supplierId || null} onChange={v => setSupplierId(v || '')} />
+        <SupplierSelect value={supplierId || null} onChange={v => setSupplierId(v || '')} familyId={familyId} />
       </div>
 
       <div className="grid grid-cols-2 gap-3">

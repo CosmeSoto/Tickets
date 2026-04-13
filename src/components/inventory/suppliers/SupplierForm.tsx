@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { InlineCreateSelect } from '@/components/ui/inline-create-select'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { CatalogTypeInlineForm } from '@/components/inventory/asset-forms/CatalogTypeInlineForm'
 import { useToast } from '@/hooks/use-toast'
 
@@ -32,21 +33,36 @@ interface SupplierType { id: string; name: string; description?: string }
 
 interface SupplierFormProps {
   supplier?: any
+  /** Si se pasa, pre-selecciona la familia y filtra tipos de proveedor */
+  defaultFamilyId?: string
   onSuccess?: (supplier: any) => void
   onCancel?: () => void
 }
 
-export function SupplierForm({ supplier, onSuccess, onCancel }: SupplierFormProps) {
+export function SupplierForm({ supplier, defaultFamilyId, onSuccess, onCancel }: SupplierFormProps) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [supplierTypes, setSupplierTypes] = useState<SupplierType[]>([])
+  const [families, setFamilies] = useState<{ id: string; name: string }[]>([])
   const [typeId, setTypeId] = useState<string>(supplier?.typeId ?? '')
+  const [familyId, setFamilyId] = useState<string>(supplier?.familyId ?? defaultFamilyId ?? '')
   const isEdit = !!supplier?.id
 
   useEffect(() => {
-    fetch('/api/inventory/supplier-types')
+    // Cargar tipos filtrados por familia si hay una seleccionada
+    const url = familyId
+      ? `/api/inventory/supplier-types?familyId=${familyId}`
+      : '/api/inventory/supplier-types'
+    fetch(url)
       .then(r => r.json())
       .then(d => setSupplierTypes(Array.isArray(d) ? d : []))
+      .catch(() => {})
+  }, [familyId])
+
+  useEffect(() => {
+    fetch('/api/inventory/families')
+      .then(r => r.json())
+      .then(d => setFamilies(d.families ?? []))
       .catch(() => {})
   }, [])
 
@@ -72,7 +88,7 @@ export function SupplierForm({ supplier, onSuccess, onCancel }: SupplierFormProp
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...data, typeId: typeId || null }),
+        body: JSON.stringify({ ...data, typeId: typeId || null, familyId: familyId || null }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Error al guardar proveedor')
@@ -92,6 +108,19 @@ export function SupplierForm({ supplier, onSuccess, onCancel }: SupplierFormProp
           <Label htmlFor="name">Nombre *</Label>
           <Input id="name" {...register('name')} placeholder="Nombre del proveedor" />
           {errors.name && <p className="mt-1 text-xs text-destructive">{errors.name.message}</p>}
+        </div>
+
+        <div>
+          <Label>Familia <span className="text-xs font-normal text-muted-foreground">(opcional — vacío = proveedor global)</span></Label>
+          <SearchableSelect
+            options={families}
+            value={familyId}
+            onChange={setFamilyId}
+            placeholder="Global (todas las familias)"
+          />
+          <p className="mt-1 text-xs text-muted-foreground">
+            Sin familia: visible para todos. Con familia: aparece primero al crear activos de esa familia.
+          </p>
         </div>
 
         <div>

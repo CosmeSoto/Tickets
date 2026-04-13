@@ -174,7 +174,7 @@ export function MROAssetForm({
       {acquisitionMode === 'RENTAL' && (
         <div className="space-y-1">
           <Label>Proveedor <span className="text-destructive">*</span></Label>
-          <SupplierSelect value={supplierId || null} onChange={v => setSupplierId(v || '')} />
+          <SupplierSelect value={supplierId || null} onChange={v => setSupplierId(v || '')} familyId={familyId} />
         </div>
       )}
 

@@ -78,7 +78,7 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { name, typeId, taxId, email, phone, address, website, contactName } = body
+    const { name, typeId, taxId, email, phone, address, website, contactName, familyId } = body
 
     // Validar nombre
     if (!name || !name.trim()) {
@@ -114,6 +114,7 @@ export async function PUT(
       data: {
         name: name.trim(),
         typeId: typeId || null,
+        familyId: familyId || null,
         taxId: taxId || null,
         email: email || null,
         phone: phone || null,

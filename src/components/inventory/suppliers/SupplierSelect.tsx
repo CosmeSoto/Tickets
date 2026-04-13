@@ -21,7 +21,8 @@ interface SupplierSelectProps {
   onChange: (supplierId: string | null) => void
   disabled?: boolean
   placeholder?: string
-  /** Muestra botón para crear proveedor inline. Default: true */
+  /** Filtra proveedores por familia (incluye globales sin familia) */
+  familyId?: string
   allowCreate?: boolean
 }
 
@@ -30,6 +31,7 @@ export function SupplierSelect({
   onChange,
   disabled,
   placeholder = 'Seleccionar proveedor',
+  familyId,
   allowCreate = true,
 }: SupplierSelectProps) {
   const [open, setOpen] = useState(false)
@@ -39,12 +41,15 @@ export function SupplierSelect({
 
   const loadSuppliers = useCallback(() => {
     setLoading(true)
-    fetch('/api/inventory/suppliers?active=true')
+    const url = familyId
+      ? `/api/inventory/suppliers?active=true&familyId=${familyId}`
+      : '/api/inventory/suppliers?active=true'
+    fetch(url)
       .then(r => r.json())
       .then(d => setSuppliers(Array.isArray(d) ? d : []))
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [])
+  }, [familyId])
 
   useEffect(() => { loadSuppliers() }, [loadSuppliers])
 
@@ -150,6 +155,7 @@ export function SupplierSelect({
             <DialogTitle>Nuevo proveedor</DialogTitle>
           </DialogHeader>
           <SupplierForm
+            defaultFamilyId={familyId}
             onSuccess={handleCreated}
             onCancel={() => setCreateOpen(false)}
           />

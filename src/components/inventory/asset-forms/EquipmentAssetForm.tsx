@@ -493,6 +493,7 @@ export function EquipmentAssetForm({
         <SupplierSelect
           value={supplierId || null}
           onChange={v => setSupplierId(v || '')}
+          familyId={familyId}
         />
       </div>
 

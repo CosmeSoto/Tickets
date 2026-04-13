@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type') || undefined
     const activeParam = searchParams.get('active')
     const search = searchParams.get('search') || undefined
+    const familyId = searchParams.get('familyId') || undefined
 
     const where: Record<string, unknown> = {}
 
@@ -41,6 +42,12 @@ export async function GET(request: NextRequest) {
         { name: { contains: search, mode: 'insensitive' } },
         { taxId: { contains: search, mode: 'insensitive' } },
       ]
+    }
+
+    // Si se filtra por familia: mostrar proveedores de esa familia + proveedores globales (sin familia)
+    if (familyId) {
+      const familyFilter = { OR: [{ familyId }, { familyId: null }] }
+      where.AND = [familyFilter]
     }
 
     const suppliers = await prisma.suppliers.findMany({
@@ -71,7 +78,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, typeId, taxId, email, phone, address, website, contactName } = body
+    const { name, typeId, taxId, email, phone, address, website, contactName, familyId } = body
 
     // Validar nombre
     if (!name || !name.trim()) {
@@ -104,6 +111,7 @@ export async function POST(request: NextRequest) {
       data: {
         name: name.trim(),
         typeId: typeId || null,
+        familyId: familyId || null,
         taxId: taxId || null,
         email: email || null,
         phone: phone || null,
