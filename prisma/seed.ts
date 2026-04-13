@@ -49,6 +49,9 @@ async function main() {
   // 13. UNIDADES DE MEDIDA
   await seedUnitsOfMeasure()
 
+  // 13b. TIPOS DE PROVEEDOR
+  await seedSupplierTypes(familyMap)
+
   // 14. CONFIGURACIONES DE INVENTARIO (system_settings)
   await seedInventorySettings()
 
@@ -761,3 +764,31 @@ async function seedLandingPage() {
 main()
   .catch(e => { console.error('❌ Error durante el seed:', e); process.exit(1) })
   .finally(async () => { await prisma.$disconnect() })
+
+// ============================================
+// TIPOS DE PROVEEDOR (dinámicos, reemplaza enum SupplierType)
+// ============================================
+
+async function seedSupplierTypes(familyMap: Map<string, string>) {
+  const types = [
+    // Tipos globales (sin familia específica)
+    { code: 'EQUIPMENT',   name: 'Equipos',      description: 'Proveedor de equipos tecnológicos y hardware' },
+    { code: 'CONSUMABLE',  name: 'Consumibles',  description: 'Proveedor de materiales MRO y consumibles' },
+    { code: 'LICENSE',     name: 'Licencias',    description: 'Proveedor de software y licencias' },
+    { code: 'MIXED',       name: 'Mixto',        description: 'Proveedor de múltiples categorías' },
+    { code: 'SERVICE',     name: 'Servicios',    description: 'Proveedor de servicios y mantenimiento' },
+    // Tipos por familia
+    { code: 'FIXED_ASSETS', name: 'Activos Fijos', description: 'Proveedor de activos fijos e infraestructura', familyCode: 'FIXED_ASSETS' },
+    { code: 'MAINTENANCE',  name: 'Mantenimiento', description: 'Proveedor de servicios de mantenimiento',       familyCode: 'MAINTENANCE' },
+  ]
+
+  for (const [i, t] of types.entries()) {
+    const familyId = t.familyCode ? familyMap.get(t.familyCode) : undefined
+    await (prisma as any).supplier_types.upsert({
+      where: { code: t.code },
+      update: { name: t.name, description: t.description, order: i + 1, ...(familyId ? { familyId } : {}) },
+      create: { id: randomUUID(), code: t.code, name: t.name, description: t.description, order: i + 1, ...(familyId ? { familyId } : {}) },
+    })
+  }
+  console.log('✅ Tipos de proveedor')
+}

@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useToast } from '@/hooks/use-toast'
-import { Plus, Pencil, Trash2, Loader2, Boxes, Warehouse, FileSignature, Tag, Ruler, ToggleLeft, ToggleRight } from 'lucide-react'
+import { Plus, Pencil, Trash2, Loader2, Boxes, Warehouse, FileSignature, Tag, Ruler, ToggleLeft, ToggleRight, Building2 } from 'lucide-react'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
@@ -67,6 +67,14 @@ const CATALOGS: CatalogConfig[] = [
     apiPost: '/api/inventory/license-types',
     apiPut: (id) => `/api/inventory/license-types/${id}`,
     apiDelete: (id) => `/api/inventory/license-types/${id}`,
+    hasFamily: true, hasSymbol: false, hasLocation: false, hasCode: true, deleteVerb: 'eliminar',
+  },
+  {
+    key: 'supplier-types', label: 'Tipos de Proveedor', icon: Building2,
+    apiGet: '/api/inventory/supplier-types?includeInactive=true',
+    apiPost: '/api/inventory/supplier-types',
+    apiPut: (id) => `/api/inventory/supplier-types/${id}`,
+    apiDelete: (id) => `/api/inventory/supplier-types/${id}`,
     hasFamily: true, hasSymbol: false, hasLocation: false, hasCode: true, deleteVerb: 'eliminar',
   },
   {

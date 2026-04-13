@@ -817,6 +817,7 @@ model equipment {
   specifications        Json?
   accessories           String[]
   location              String?
+  physicalLocation      String?                 @map("physical_location")
   notes                 String?
   photoUrl              String?                 @map("photo_url")
   qrCode                String                  @unique @map("qr_code")
@@ -1155,7 +1156,7 @@ model stock_movements {
 model suppliers {
   id                String              @id @default(cuid())
   name              String              @db.VarChar(200)
-  type              SupplierType
+  typeId            String?             @map("type_id")
   taxId             String?             @unique @map("tax_id") @db.VarChar(20)
   email             String?             @db.VarChar(200)
   phone             String?             @db.VarChar(50)
@@ -1165,13 +1166,31 @@ model suppliers {
   isActive          Boolean             @default(true) @map("is_active")
   createdAt         DateTime            @default(now()) @map("created_at")
   updatedAt         DateTime            @updatedAt @map("updated_at")
+  supplierType      supplier_types?     @relation(fields: [typeId], references: [id])
   consumables       consumables[]
   equipment         equipment[]
   software_licenses software_licenses[]
 
-  @@index([type, isActive])
+  @@index([typeId, isActive])
   @@index([name])
   @@map("suppliers")
+}
+
+model supplier_types {
+  id          String      @id @default(uuid())
+  code        String      @unique @db.VarChar(50)
+  name        String      @db.VarChar(100)
+  description String?
+  familyId    String?     @map("family_id")
+  isActive    Boolean     @default(true) @map("is_active")
+  order       Int         @default(999)
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  family      families?   @relation(fields: [familyId], references: [id])
+  suppliers   suppliers[]
+
+  @@index([isActive, order])
+  @@map("supplier_types")
 }
 
 model decommission_requests {
@@ -1264,6 +1283,7 @@ model families {
   knowledge_articles          knowledge_articles[]
   licenseTypes                license_types[]
   sla_policies                sla_policies[]
+  supplierTypes               supplier_types[]
   technicianFamilyAssignments technician_family_assignments[]
   ticketCodeCounters          ticket_code_counters[]
   ticketFamilyConfig          ticket_family_config?
@@ -1531,13 +1551,6 @@ enum MovementType {
   ENTRY
   EXIT
   ADJUSTMENT
-}
-
-enum SupplierType {
-  EQUIPMENT
-  CONSUMABLE
-  LICENSE
-  MIXED
 }
 
 enum DecommissionAssetType {

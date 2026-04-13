@@ -96,6 +96,7 @@ export function EquipmentAssetForm({
   const [warehouses, setWarehouses] = useState<{ id: string; name: string; description?: string }[]>([])
   const [assignedUserId, setAssignedUserId] = useState('')
   const [notes, setNotes] = useState('')
+  const [physicalLocation, setPhysicalLocation] = useState('')
   const [attachments, setAttachments] = useState<File[]>([])
   const [priceError, setPriceError] = useState('')
 
@@ -269,6 +270,7 @@ export function EquipmentAssetForm({
       residualValue: residualValue ? parseFloat(residualValue) : undefined,
       warehouseId: equipmentStatus !== 'ASSIGNED' ? (warehouseId || undefined) : undefined,
       assignedUserId: equipmentStatus === 'ASSIGNED' ? (assignedUserId || undefined) : undefined,
+      physicalLocation: physicalLocation || undefined,
       notes: notes || undefined,
     }
     onSubmit(payload)
@@ -579,6 +581,16 @@ export function EquipmentAssetForm({
       )}
 
       {/* ── 7. NOTAS Y ADJUNTOS ───────────────────────────────────── */}
+      <div className="space-y-1">
+        <Label>Ubicación física actual <span className="text-xs font-normal text-muted-foreground">(opcional)</span></Label>
+        <Input
+          value={physicalLocation}
+          onChange={e => setPhysicalLocation(e.target.value)}
+          placeholder="Ej: Oficina 201, Piso 3, Sala de Servidores..."
+        />
+        <p className="text-xs text-muted-foreground">Dónde se encuentra el equipo actualmente (distinto a la bodega de almacenamiento).</p>
+      </div>
+
       <div className="space-y-1">
         <Label>Observaciones</Label>
         <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="Notas adicionales sobre el activo..." />

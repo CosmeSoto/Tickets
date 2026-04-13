@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -8,12 +8,13 @@ import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { InlineCreateSelect } from '@/components/ui/inline-create-select'
+import { CatalogTypeInlineForm } from '@/components/inventory/asset-forms/CatalogTypeInlineForm'
 import { useToast } from '@/hooks/use-toast'
 
 const supplierSchema = z.object({
   name: z.string().min(1, 'El nombre del proveedor es obligatorio').max(200),
-  type: z.enum(['EQUIPMENT', 'CONSUMABLE', 'LICENSE', 'MIXED'], { required_error: 'El tipo es obligatorio' }),
+  typeId: z.string().optional().or(z.literal('')),
   taxId: z.string().max(20).optional().or(z.literal('')),
   email: z.string().email('Email inválido').optional().or(z.literal('')),
   phone: z.string().max(30).optional().or(z.literal('')),
@@ -27,12 +28,7 @@ const supplierSchema = z.object({
 
 type SupplierFormData = z.infer<typeof supplierSchema>
 
-const TYPE_LABELS: Record<string, string> = {
-  EQUIPMENT: 'Equipos',
-  CONSUMABLE: 'Consumibles',
-  LICENSE: 'Licencias',
-  MIXED: 'Mixto',
-}
+interface SupplierType { id: string; name: string; description?: string }
 
 interface SupplierFormProps {
   supplier?: any
@@ -43,13 +39,22 @@ interface SupplierFormProps {
 export function SupplierForm({ supplier, onSuccess, onCancel }: SupplierFormProps) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
+  const [supplierTypes, setSupplierTypes] = useState<SupplierType[]>([])
+  const [typeId, setTypeId] = useState<string>(supplier?.typeId ?? '')
   const isEdit = !!supplier?.id
 
-  const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<SupplierFormData>({
+  useEffect(() => {
+    fetch('/api/inventory/supplier-types')
+      .then(r => r.json())
+      .then(d => setSupplierTypes(Array.isArray(d) ? d : []))
+      .catch(() => {})
+  }, [])
+
+  const { register, handleSubmit, formState: { errors } } = useForm<SupplierFormData>({
     resolver: zodResolver(supplierSchema),
     defaultValues: {
       name: supplier?.name || '',
-      type: supplier?.type || undefined,
+      typeId: supplier?.typeId || '',
       taxId: supplier?.taxId || '',
       email: supplier?.email || '',
       phone: supplier?.phone || '',
@@ -59,8 +64,6 @@ export function SupplierForm({ supplier, onSuccess, onCancel }: SupplierFormProp
     },
   })
 
-  const typeValue = watch('type')
-
   const onSubmit = async (data: SupplierFormData) => {
     setLoading(true)
     try {
@@ -69,7 +72,7 @@ export function SupplierForm({ supplier, onSuccess, onCancel }: SupplierFormProp
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, typeId: typeId || null }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Error al guardar proveedor')
@@ -92,18 +95,35 @@ export function SupplierForm({ supplier, onSuccess, onCancel }: SupplierFormProp
         </div>
 
         <div>
-          <Label htmlFor="type">Tipo *</Label>
-          <Select value={typeValue} onValueChange={v => setValue('type', v as any)}>
-            <SelectTrigger id="type">
-              <SelectValue placeholder="Seleccionar tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(TYPE_LABELS).map(([v, l]) => (
-                <SelectItem key={v} value={v}>{l}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.type && <p className="mt-1 text-xs text-destructive">{errors.type.message}</p>}
+          <Label>Tipo de proveedor</Label>
+          <InlineCreateSelect
+            options={supplierTypes}
+            value={typeId}
+            onChange={setTypeId}
+            placeholder="Seleccionar tipo..."
+            allowClear
+            createLabel="Crear tipo de proveedor"
+            createTitle="Nuevo tipo de proveedor"
+            editTitle="Editar tipo de proveedor"
+            deleteConfirmMessage="¿Eliminar este tipo? Si tiene proveedores asociados, se desactivará."
+            createForm={({ item, onSuccess: onTypeSuccess, onCancel: onTypeCancel }) => (
+              <CatalogTypeInlineForm
+                apiEndpoint="/api/inventory/supplier-types"
+                item={item}
+                onSuccess={(newItem) => {
+                  if (item) setSupplierTypes(prev => prev.map(t => t.id === newItem.id ? newItem : t))
+                  else setSupplierTypes(prev => [...prev, newItem])
+                  onTypeSuccess(newItem)
+                }}
+                onCancel={onTypeCancel}
+              />
+            )}
+            onDelete={async (id) => {
+              const res = await fetch(`/api/inventory/supplier-types/${id}`, { method: 'DELETE' })
+              if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Error') }
+              setSupplierTypes(prev => prev.filter(t => t.id !== id))
+            }}
+          />
         </div>
 
         <div>
