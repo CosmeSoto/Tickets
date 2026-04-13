@@ -12,6 +12,7 @@ import {
   Wrench,
   Loader2,
   BarChart3,
+  MapPin,
 } from 'lucide-react'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -65,6 +66,14 @@ const REPORTS = [
     icon: Wrench,
     color: 'text-teal-600',
     bg: 'bg-teal-50',
+  },
+  {
+    slug: 'locations',
+    name: '¿Dónde están los equipos?',
+    description: 'Ubicación física actual de cada equipo, bodega asignada y usuario responsable',
+    icon: MapPin,
+    color: 'text-indigo-600',
+    bg: 'bg-indigo-50',
   },
 ]
 

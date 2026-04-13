@@ -18,6 +18,8 @@ interface AssignmentRow {
   familia: string
   estado: string
   usuarioAsignado: string
+  departamento: string
+  ubicacionFisica: string
   fechaAsignacion: string
   fechaFin: string
   tipoAsignacion: string
@@ -86,6 +88,7 @@ export async function GET(request: NextRequest) {
             brand: true,
             model: true,
             status: true,
+            physicalLocation: true,
             type: {
               select: {
                 family: { select: { name: true } },
@@ -94,7 +97,10 @@ export async function GET(request: NextRequest) {
           },
         },
         receiver: {
-          select: { name: true },
+          select: {
+            name: true,
+            departments: { select: { name: true } },
+          },
         },
       },
       orderBy: { startDate: 'desc' },
@@ -106,6 +112,8 @@ export async function GET(request: NextRequest) {
       familia: a.equipment.type?.family?.name ?? '—',
       estado: EQUIPMENT_STATUS_ES[a.equipment.status] ?? a.equipment.status,
       usuarioAsignado: a.receiver.name ?? '—',
+      departamento: (a.receiver as any).departments?.name ?? '—',
+      ubicacionFisica: (a.equipment as any).physicalLocation ?? '—',
       fechaAsignacion: formatDate(a.startDate),
       fechaFin: a.endDate ? formatDate(a.endDate) : 'Indefinida',
       tipoAsignacion: a.assignmentType === 'PERMANENT' ? 'Permanente' : a.assignmentType === 'TEMPORARY' ? 'Temporal' : 'Préstamo',
@@ -157,6 +165,8 @@ export async function GET(request: NextRequest) {
         Familia: r.familia,
         Estado: r.estado,
         'Usuario Asignado': r.usuarioAsignado,
+        Departamento: r.departamento,
+        'Ubicación Física': r.ubicacionFisica,
         'Fecha Asignación': r.fechaAsignacion,
         'Fecha Fin': r.fechaFin,
         'Tipo Asignación': r.tipoAsignacion,

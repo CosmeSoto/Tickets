@@ -23,6 +23,7 @@ const REPORT_NAMES: Record<string, string> = {
   'stock-movements': '¿Qué se ha consumido?',
   decommissioned: '¿Qué se ha dado de baja?',
   maintenance: 'Historial de mantenimientos',
+  locations: '¿Dónde están los equipos?',
 }
 
 interface SummaryItem {
