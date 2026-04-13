@@ -128,7 +128,7 @@ export default function UnitsOfMeasurePage() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent aria-describedby={undefined}>
           <DialogHeader><DialogTitle>{editingUnit ? 'Editar Unidad' : 'Nueva Unidad de Medida'}</DialogTitle><DialogDescription>{editingUnit ? 'Modifica los datos de la unidad' : 'Completa los datos para crear una nueva unidad'}</DialogDescription></DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2"><Label>Código *</Label><Input value={formData.code} onChange={e => setFormData({ ...formData, code: e.target.value.toUpperCase() })} placeholder="UNIT" disabled={!!editingUnit} required /><p className="text-xs text-muted-foreground">Identificador único en mayúsculas</p></div>

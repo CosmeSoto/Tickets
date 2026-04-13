@@ -686,7 +686,7 @@ export default function ProfilePage() {
 
       {/* Modal de confirmación de avatar - NUEVO */}
       <Dialog open={showAvatarDialog} onOpenChange={setShowAvatarDialog}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Confirmar nueva foto de perfil</DialogTitle>
             <DialogDescription>

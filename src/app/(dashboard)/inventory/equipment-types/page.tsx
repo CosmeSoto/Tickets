@@ -324,7 +324,7 @@ export default function EquipmentTypesPage() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>
               {editingType ? 'Editar Tipo de Equipo' : 'Nuevo Tipo de Equipo'}

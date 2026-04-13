@@ -151,7 +151,7 @@ export function TechnicianAssignmentsModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col sm:max-w-[95vw]">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col sm:max-w-[95vw]" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
             <User className="h-5 w-5" />

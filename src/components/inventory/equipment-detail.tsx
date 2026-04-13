@@ -616,7 +616,7 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
 
       {/* Dialog de asignación */}
       <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
-        <DialogContent>
+        <DialogContent aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Asignar Equipo</DialogTitle>
             <DialogDescription>
@@ -673,7 +673,7 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
 
       {/* Dialog de devolución */}
       <Dialog open={showReturnDialog} onOpenChange={setShowReturnDialog}>
-        <DialogContent>
+        <DialogContent aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Devolver Equipo</DialogTitle>
             <DialogDescription>
@@ -733,7 +733,7 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
 
       {/* Dialog de mantenimiento */}
       <Dialog open={showMaintenanceDialog} onOpenChange={setShowMaintenanceDialog}>
-        <DialogContent>
+        <DialogContent aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>
               {userRole === 'CLIENT' ? 'Solicitar Mantenimiento' : 'Registrar Mantenimiento'}
@@ -1132,7 +1132,7 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
 
       {/* Dialog solicitud de baja */}
       <Dialog open={showDecommissionForm} onOpenChange={setShowDecommissionForm}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Solicitar Baja de Equipo</DialogTitle>
             <DialogDescription>

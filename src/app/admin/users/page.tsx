@@ -424,7 +424,7 @@ export default function AdminUsersPage() {
 
       {/* Diálogo de confirmación de eliminación */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px]" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>¿Eliminar usuario?</DialogTitle>
             <DialogDescription>

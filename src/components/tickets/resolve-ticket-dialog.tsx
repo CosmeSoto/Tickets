@@ -77,7 +77,7 @@ export function ResolveTicketDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Resolver Ticket</DialogTitle>
           <DialogDescription>

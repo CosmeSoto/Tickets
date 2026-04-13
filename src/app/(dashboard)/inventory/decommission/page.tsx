@@ -31,7 +31,7 @@ export default function DecommissionPage() {
       />
 
       <Dialog open={!!selectedRequest} onOpenChange={o => !o && setSelectedRequest(null)}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Detalle de Solicitud</DialogTitle>
           </DialogHeader>

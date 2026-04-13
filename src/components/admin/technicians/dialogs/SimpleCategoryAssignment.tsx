@@ -352,7 +352,7 @@ export function SimpleCategoryAssignment({
 
     {/* Modal para seleccionar categoría */}
     <Dialog open={editingIndex !== null} onOpenChange={(open) => !open && handleCancelSelection()}>
-      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Search className="h-5 w-5" />

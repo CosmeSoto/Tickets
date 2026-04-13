@@ -599,7 +599,7 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
           setPdfPreviewUrl(null)
         }
       }}>
-        <DialogContent className="max-w-4xl w-full h-[90vh] flex flex-col p-0">
+        <DialogContent className="max-w-4xl w-full h-[90vh] flex flex-col p-0" aria-describedby={undefined}>
           <DialogHeader className="px-6 pt-5 pb-3 border-b flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />

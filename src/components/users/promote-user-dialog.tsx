@@ -73,7 +73,7 @@ export function PromoteUserDialog({ open, onOpenChange, user, onSuccess }: Props
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md" aria-describedby={undefined}>
         <DialogHeader>
           <div className="flex items-center space-x-2">
             <UserCog className="h-5 w-5 text-blue-600" />

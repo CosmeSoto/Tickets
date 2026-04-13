@@ -59,7 +59,7 @@ export function FilePreviewModal({ isOpen, onClose, file }: FilePreviewModalProp
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
             {isImage && <ImageIcon className="h-5 w-5" />}

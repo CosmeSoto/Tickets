@@ -139,7 +139,7 @@ export default function ConsumableTypesPage() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent aria-describedby={undefined}>
           <DialogHeader><DialogTitle>{editingType ? 'Editar Tipo' : 'Nuevo Tipo de Consumible'}</DialogTitle><DialogDescription>{editingType ? 'Modifica los datos del tipo' : 'Completa los datos para crear un nuevo tipo'}</DialogDescription></DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2"><Label>Código *</Label><Input value={formData.code} onChange={e => setFormData({ ...formData, code: e.target.value.toUpperCase() })} placeholder="TONER" disabled={!!editingType} required /><p className="text-xs text-muted-foreground">Identificador único en mayúsculas</p></div>

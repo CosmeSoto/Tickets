@@ -393,7 +393,7 @@ export default function ConsumablesPage() {
 
         {/* Modal crear/editar */}
         <Dialog open={showForm} onOpenChange={setShowForm}>
-          <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
             <DialogHeader>
               <DialogTitle>{editingItem ? 'Editar Consumible' : 'Nuevo Consumible'}</DialogTitle>
               <DialogDescription>{editingItem ? 'Modifica los datos del consumible' : 'Registra un nuevo consumible'}</DialogDescription>
@@ -483,7 +483,7 @@ export default function ConsumablesPage() {
 
         {/* Modal movimiento de stock */}
         <Dialog open={showMovement} onOpenChange={setShowMovement}>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="sm:max-w-[500px]" aria-describedby={undefined}>
             <DialogHeader>
               <DialogTitle>Movimiento de Stock</DialogTitle>
               <DialogDescription>{movementTarget?.name} — Stock actual: {movementTarget?.currentStock} {movementTarget?.unitOfMeasure?.symbol || ''}</DialogDescription>
@@ -544,7 +544,7 @@ export default function ConsumablesPage() {
 
         {/* Modal historial de movimientos */}
         <Dialog open={showHistory} onOpenChange={setShowHistory}>
-          <DialogContent className="sm:max-w-[750px] max-h-[85vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-[750px] max-h-[85vh] overflow-y-auto" aria-describedby={undefined}>
             <DialogHeader>
               <DialogTitle>Historial de Movimientos</DialogTitle>
               <DialogDescription>{historyTarget?.name} — Stock actual: {historyTarget?.currentStock} {historyTarget?.unitOfMeasure?.symbol || ''}</DialogDescription>

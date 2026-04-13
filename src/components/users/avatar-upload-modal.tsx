@@ -193,7 +193,7 @@ export function AvatarUploadModal({
     <>
       {/* Modal principal */}
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Gestionar Avatar</DialogTitle>
             <DialogDescription>
@@ -251,7 +251,7 @@ export function AvatarUploadModal({
 
       {/* Modal de confirmación de subida */}
       <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Confirmar nueva foto</DialogTitle>
             <DialogDescription>

@@ -449,7 +449,7 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
 
       {/* Dialog: Aprobar solicitud */}
       <Dialog open={showApprove} onOpenChange={setShowApprove}>
-        <DialogContent>
+        <DialogContent aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Aprobar y Programar Mantenimiento</DialogTitle>
             <DialogDescription>Confirma la fecha y asigna el técnico. El equipo pasará a estado Mantenimiento.</DialogDescription>
@@ -469,7 +469,7 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
 
       {/* Dialog: Reagendar */}
       <Dialog open={showReschedule} onOpenChange={setShowReschedule}>
-        <DialogContent>
+        <DialogContent aria-describedby={undefined}>
           <DialogHeader><DialogTitle>Reagendar Mantenimiento</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div><Label>Nueva fecha *</Label><Input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} /></div>
@@ -486,7 +486,7 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
 
       {/* Dialog: Completar */}
       <Dialog open={showComplete} onOpenChange={setShowComplete}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Completar Mantenimiento</DialogTitle>
             <DialogDescription>Indica qué debe pasar con el equipo al finalizar.</DialogDescription>

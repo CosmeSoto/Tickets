@@ -474,7 +474,7 @@ export default function LicensesPage() {
 
         {/* Modal crear/editar */}
         <Dialog open={showForm} onOpenChange={setShowForm}>
-          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
             <DialogHeader>
               <DialogTitle>{editingLicense ? 'Editar Licencia' : 'Nueva Licencia / Contrato'}</DialogTitle>
               <DialogDescription>{editingLicense ? 'Modifica los datos de la licencia' : 'Registra una nueva licencia de software o contrato'}</DialogDescription>

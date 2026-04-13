@@ -140,7 +140,7 @@ export function AutoAssignment({
           <span>Asignación Automática</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className='max-w-md'>
+      <DialogContent className='max-w-md' aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className='flex items-center space-x-2'>
             <Bot className='h-5 w-5 text-primary' />

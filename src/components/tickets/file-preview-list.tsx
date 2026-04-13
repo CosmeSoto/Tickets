@@ -108,7 +108,7 @@ export function FilePreviewList({ files, onRemove }: FilePreviewListProps) {
 
       {/* Preview modal para imágenes */}
       <Dialog open={!!previewUrl} onOpenChange={() => closePreview()}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl" aria-describedby={undefined}>
           <VisuallyHidden><DialogTitle>{previewName}</DialogTitle></VisuallyHidden>
           <div className="text-center">
             <p className="text-sm text-muted-foreground mb-3">{previewName}</p>
