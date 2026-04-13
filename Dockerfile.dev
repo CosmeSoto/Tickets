@@ -15,5 +15,7 @@ RUN npx prisma generate
 
 EXPOSE 3000
 
-# 1. Migrar BD  2. Seed (upsert — idempotente, no duplica)  3. Next dev
-CMD ["sh", "-c", "npx prisma migrate deploy && npm run db:seed && npm run dev"]
+# 1. Sincronizar BD desde schema (dev: db push, no requiere migraciones)
+# 2. Seed (upsert — idempotente, no duplica)
+# 3. Next dev
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss && npm run db:seed && npm run dev"]

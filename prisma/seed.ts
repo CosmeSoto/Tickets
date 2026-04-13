@@ -52,6 +52,9 @@ async function main() {
   // 13b. TIPOS DE PROVEEDOR
   await seedSupplierTypes(familyMap)
 
+  // 13c. MIGRAR suppliers existentes: type enum → typeId
+  await migrateSupplierTypes()
+
   // 14. CONFIGURACIONES DE INVENTARIO (system_settings)
   await seedInventorySettings()
 
@@ -771,24 +774,45 @@ main()
 
 async function seedSupplierTypes(familyMap: Map<string, string>) {
   const types = [
-    // Tipos globales (sin familia específica)
     { code: 'EQUIPMENT',   name: 'Equipos',      description: 'Proveedor de equipos tecnológicos y hardware' },
     { code: 'CONSUMABLE',  name: 'Consumibles',  description: 'Proveedor de materiales MRO y consumibles' },
     { code: 'LICENSE',     name: 'Licencias',    description: 'Proveedor de software y licencias' },
     { code: 'MIXED',       name: 'Mixto',        description: 'Proveedor de múltiples categorías' },
     { code: 'SERVICE',     name: 'Servicios',    description: 'Proveedor de servicios y mantenimiento' },
-    // Tipos por familia
     { code: 'FIXED_ASSETS', name: 'Activos Fijos', description: 'Proveedor de activos fijos e infraestructura', familyCode: 'FIXED_ASSETS' },
     { code: 'MAINTENANCE',  name: 'Mantenimiento', description: 'Proveedor de servicios de mantenimiento',       familyCode: 'MAINTENANCE' },
   ]
 
   for (const [i, t] of types.entries()) {
-    const familyId = t.familyCode ? familyMap.get(t.familyCode) : undefined
-    await (prisma as any).supplier_types.upsert({
-      where: { code: t.code },
-      update: { name: t.name, description: t.description, order: i + 1, ...(familyId ? { familyId } : {}) },
-      create: { id: randomUUID(), code: t.code, name: t.name, description: t.description, order: i + 1, ...(familyId ? { familyId } : {}) },
-    })
+    const familyId = t.familyCode ? (familyMap.get(t.familyCode) ?? null) : null
+    const id = randomUUID()
+    await prisma.$executeRaw`
+      INSERT INTO supplier_types (id, code, name, description, family_id, is_active, "order", created_at, updated_at)
+      VALUES (${id}, ${t.code}, ${t.name}, ${t.description ?? null}, ${familyId}, true, ${i + 1}, NOW(), NOW())
+      ON CONFLICT (code) DO UPDATE SET
+        name = EXCLUDED.name,
+        description = EXCLUDED.description,
+        family_id = EXCLUDED.family_id,
+        "order" = EXCLUDED."order",
+        updated_at = NOW()
+    `
   }
   console.log('✅ Tipos de proveedor')
+}
+
+async function migrateSupplierTypes() {
+  // Si la columna 'type' (enum) aún existe en suppliers, migrar a typeId
+  try {
+    await prisma.$executeRaw`
+      UPDATE suppliers s
+      SET type_id = st.id
+      FROM supplier_types st
+      WHERE s.type_id IS NULL
+        AND st.code = s.type::text
+    `
+    console.log('✅ Migración suppliers type → typeId')
+  } catch {
+    // La columna type puede no existir si ya se hizo la migración
+    console.log('⏭️  Migración suppliers (columna type no existe o ya migrada)')
+  }
 }
