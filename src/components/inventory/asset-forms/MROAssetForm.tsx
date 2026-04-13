@@ -63,7 +63,7 @@ export function MROAssetForm({
           name: `${u.name} (${u.symbol})`,
         })))
       })
-    fetch('/api/inventory/warehouses')
+    fetch(`/api/inventory/warehouses?familyId=${familyId}`)
       .then(r => r.json()).then(d => setWarehouses(d.warehouses ?? d ?? []))
   }, [familyId])
 
@@ -221,6 +221,7 @@ export function MROAssetForm({
             createTitle="Nueva bodega"
             createForm={({ onSuccess, onCancel }) => (
               <WarehouseInlineForm
+                defaultFamilyId={familyId}
                 onSuccess={(item) => { setWarehouses(prev => [...prev, item]); onSuccess(item) }}
                 onCancel={onCancel}
               />

@@ -119,7 +119,7 @@ export function EquipmentAssetForm({
   useEffect(() => {
     fetch(`/api/inventory/equipment-types?familyId=${familyId}`)
       .then(r => r.json()).then(d => setEquipmentTypes(d.types ?? []))
-    fetch('/api/inventory/warehouses')
+    fetch(`/api/inventory/warehouses?familyId=${familyId}`)
       .then(r => r.json()).then(d => setWarehouses(d.warehouses ?? d ?? []))
   }, [familyId])
 
@@ -420,6 +420,7 @@ export function EquipmentAssetForm({
             createTitle="Nueva bodega"
             createForm={({ onSuccess, onCancel }) => (
               <WarehouseInlineForm
+                defaultFamilyId={familyId}
                 onSuccess={(item) => {
                   setWarehouses(prev => [...prev, item])
                   onSuccess(item)

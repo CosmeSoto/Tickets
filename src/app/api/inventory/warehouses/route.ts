@@ -8,86 +8,62 @@ import { randomUUID } from 'crypto'
 /**
  * GET /api/inventory/warehouses
  * Lista bodegas.
- * - ADMIN: todas las activas (o todas si ?includeInactive=true)
- * - Gestor (canManageInventory): solo las activas
+ * ?familyId=  → filtra por familia (incluye bodegas sin familia = compartidas)
+ * ?includeInactive=true → incluye inactivas (solo ADMIN)
  */
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
+    if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
     const { user } = session
     const isAdmin = user.role === 'ADMIN'
     const isManager = await canManageInventory(user.id, user.role)
 
     if (!isAdmin && !isManager) {
-      return NextResponse.json(
-        { error: 'No tienes permiso para acceder al inventario' },
-        { status: 403 }
-      )
+      return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
     }
 
-    const includeInactive =
-      isAdmin && request.nextUrl.searchParams.get('includeInactive') === 'true'
+    const includeInactive = isAdmin && request.nextUrl.searchParams.get('includeInactive') === 'true'
+    const familyId = request.nextUrl.searchParams.get('familyId') ?? undefined
 
     const warehouses = await prisma.warehouses.findMany({
-      where: includeInactive ? undefined : { isActive: true },
-      include: {
-        manager: {
-          select: { id: true, name: true, email: true },
-        },
+      where: {
+        ...(includeInactive ? {} : { isActive: true }),
+        // Si se filtra por familia: mostrar bodegas de esa familia + bodegas compartidas (sin familia)
+        ...(familyId ? { OR: [{ familyId }, { familyId: null }] } : {}),
       },
-      orderBy: { name: 'asc' },
+      include: {
+        manager: { select: { id: true, name: true, email: true } },
+        family: { select: { id: true, name: true, color: true, icon: true } },
+      },
+      orderBy: [{ familyId: 'asc' }, { name: 'asc' }],
     })
 
     return NextResponse.json({ warehouses })
   } catch {
-    return NextResponse.json(
-      { error: 'Error al obtener bodegas' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al obtener bodegas' }, { status: 500 })
   }
 }
 
 /**
  * POST /api/inventory/warehouses
- * Crea una nueva bodega.
- * Solo ADMIN.
+ * Crea una nueva bodega. ADMIN o gestor con canManageInventory.
  */
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
+    if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const isAdmin = session.user.role === 'ADMIN'
+    const isManager = await canManageInventory(session.user.id, session.user.role)
+    if (!isAdmin && !isManager) {
+      return NextResponse.json({ error: 'Sin permiso para gestionar bodegas' }, { status: 403 })
     }
 
-    if (session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'Solo el administrador puede gestionar bodegas' },
-        { status: 403 }
-      )
-    }
+    const { name, location, description, managerId, familyId } = await request.json()
 
-    const body = await request.json()
-    const { name, location, description, managerId } = body
-
-    if (!name || typeof name !== 'string' || name.trim() === '') {
-      return NextResponse.json({ error: 'El nombre es requerido' }, { status: 400 })
-    }
-
-    if (managerId) {
-      const managerExists = await prisma.users.findUnique({ where: { id: managerId } })
-      if (!managerExists) {
-        return NextResponse.json(
-          { error: 'El usuario gestor especificado no existe' },
-          { status: 400 }
-        )
-      }
-    }
+    if (!name?.trim()) return NextResponse.json({ error: 'El nombre es requerido' }, { status: 400 })
 
     const warehouse = await prisma.warehouses.create({
       data: {
@@ -96,11 +72,11 @@ export async function POST(request: NextRequest) {
         location: location ?? null,
         description: description ?? null,
         managerId: managerId ?? null,
+        familyId: familyId ?? null,
       },
       include: {
-        manager: {
-          select: { id: true, name: true, email: true },
-        },
+        manager: { select: { id: true, name: true, email: true } },
+        family: { select: { id: true, name: true, color: true, icon: true } },
       },
     })
 
@@ -111,16 +87,13 @@ export async function POST(request: NextRequest) {
         entityType: 'warehouse',
         entityId: warehouse.id,
         userId: session.user.id,
-        details: { name: warehouse.name },
+        details: { name: warehouse.name, familyId: warehouse.familyId },
         createdAt: new Date(),
       },
     })
 
-    return NextResponse.json({ warehouse }, { status: 201 })
+    return NextResponse.json(warehouse, { status: 201 })
   } catch {
-    return NextResponse.json(
-      { error: 'Error al crear la bodega' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al crear la bodega' }, { status: 500 })
   }
 }
