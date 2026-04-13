@@ -6,9 +6,12 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select'
+import { InlineCreateSelect } from '@/components/ui/inline-create-select'
 import { SimpleSelect } from '@/components/ui/simple-select'
 import { FileUploadZone } from '@/components/ui/file-upload-zone'
 import { ContractSection, type ContractData } from '@/components/inventory/contract-section'
+import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
+import { CatalogTypeInlineForm } from '@/components/inventory/asset-forms/CatalogTypeInlineForm'
 import type { FamilyConfig } from '@/lib/inventory/family-config-types'
 import { RefreshCw } from 'lucide-react'
 
@@ -29,7 +32,7 @@ export function LicenseAssetForm({
 }: LicenseAssetFormProps) {
   const [name, setName] = useState('')
   const [licenseTypeId, setLicenseTypeId] = useState('')
-  const [licenseTypes, setLicenseTypes] = useState<SearchableSelectOption[]>([])
+  const [licenseTypes, setLicenseTypes] = useState<{ id: string; name: string }[]>([])
   const [licenseKey, setLicenseKey] = useState('')
   const [scope, setScope] = useState<Scope>('Empresa')
   const [userId, setUserId] = useState('')
@@ -37,7 +40,6 @@ export function LicenseAssetForm({
   const [departmentId, setDepartmentId] = useState('')
   const [departments, setDepartments] = useState<SearchableSelectOption[]>([])
   const [supplierId, setSupplierId] = useState('')
-  const [suppliers, setSuppliers] = useState<SearchableSelectOption[]>([])
   const [purchaseDate, setPurchaseDate] = useState('')
   const [expirationDate, setExpirationDate] = useState('')
   const [cost, setCost] = useState('')
@@ -58,8 +60,6 @@ export function LicenseAssetForm({
   useEffect(() => {
     fetch(`/api/inventory/license-types?familyId=${familyId}`)
       .then(r => r.json()).then(d => setLicenseTypes(d.types ?? d ?? []))
-    fetch('/api/inventory/suppliers')
-      .then(r => r.json()).then(d => setSuppliers(d.suppliers ?? []))
   }, [familyId])
 
   useEffect(() => {
@@ -120,7 +120,23 @@ export function LicenseAssetForm({
 
       <div className="space-y-1">
         <Label>Tipo de Licencia / Contrato</Label>
-        <SearchableSelect options={licenseTypes} value={licenseTypeId} onChange={setLicenseTypeId} placeholder="Buscar tipo..." />
+        <InlineCreateSelect
+          options={licenseTypes}
+          value={licenseTypeId}
+          onChange={setLicenseTypeId}
+          placeholder="Buscar tipo..."
+          allowClear
+          createLabel="Crear tipo de licencia"
+          createTitle="Nuevo tipo de licencia"
+          createForm={({ onSuccess, onCancel }) => (
+            <CatalogTypeInlineForm
+              apiEndpoint="/api/inventory/license-types"
+              familyId={familyId}
+              onSuccess={(item) => { setLicenseTypes(prev => [...prev, item]); onSuccess(item) }}
+              onCancel={onCancel}
+            />
+          )}
+        />
       </div>
 
       <div className="space-y-1">
@@ -152,7 +168,7 @@ export function LicenseAssetForm({
 
       <div className="space-y-1">
         <Label>Proveedor / Vendedor <span className="text-destructive">*</span></Label>
-        <SearchableSelect options={suppliers} value={supplierId} onChange={setSupplierId} placeholder="Buscar proveedor..." />
+        <SupplierSelect value={supplierId || null} onChange={v => setSupplierId(v || '')} />
       </div>
 
       <div className="grid grid-cols-2 gap-3">

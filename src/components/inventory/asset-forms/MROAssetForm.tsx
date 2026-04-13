@@ -5,11 +5,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { SearchableSelect } from '@/components/ui/searchable-select'
+import { InlineCreateSelect } from '@/components/ui/inline-create-select'
 import { SimpleSelect } from '@/components/ui/simple-select'
 import { FileUploadZone } from '@/components/ui/file-upload-zone'
+import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
+import { CatalogTypeInlineForm } from '@/components/inventory/asset-forms/CatalogTypeInlineForm'
+import { UnitOfMeasureInlineForm } from '@/components/inventory/asset-forms/UnitOfMeasureInlineForm'
+import { WarehouseInlineForm } from '@/components/inventory/asset-forms/WarehouseInlineForm'
 import type { FamilyConfig } from '@/lib/inventory/family-config-types'
-import { X } from 'lucide-react'
 
 interface MROAssetFormProps {
   familyId: string
@@ -22,9 +25,11 @@ interface MROAssetFormProps {
 }
 
 const ACQUISITION_MODES = [
-  { value: 'FIXED_ASSET', label: 'Compra directa',        help: 'Lo adquiriste — es propiedad de la empresa.' },
+  { value: 'FIXED_ASSET', label: 'Compra directa',           help: 'Lo adquiriste — es propiedad de la empresa.' },
   { value: 'RENTAL',      label: 'Suministro por proveedor', help: 'El proveedor lo suministra periódicamente.' },
 ]
+
+type SelectOption = { id: string; name: string; description?: string }
 
 export function MROAssetForm({
   familyId, familyConfig, onSubmit, onBack, submitting, submitError, maxFileSizeMB = 10,
@@ -36,7 +41,6 @@ export function MROAssetForm({
   const [unitsOfMeasure, setUnitsOfMeasure] = useState<SelectOption[]>([])
   const [acquisitionMode, setAcquisitionMode] = useState<'FIXED_ASSET' | 'RENTAL'>('FIXED_ASSET')
   const [supplierId, setSupplierId] = useState('')
-  const [suppliers, setSuppliers] = useState<SelectOption[]>([])
   const [initialStock, setInitialStock] = useState('')
   const [minStock, setMinStock] = useState('')
   const [maxStock, setMaxStock] = useState('')
@@ -63,15 +67,9 @@ export function MROAssetForm({
       .then(r => r.json()).then(d => setWarehouses(d.warehouses ?? d ?? []))
   }, [familyId])
 
-  useEffect(() => {
-    if (acquisitionMode === 'RENTAL') {
-      fetch('/api/inventory/suppliers').then(r => r.json()).then(d => setSuppliers(d.suppliers ?? []))
-    }
-  }, [acquisitionMode])
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    const payload: Record<string, unknown> = {
+    onSubmit({
       name,
       typeId: consumableTypeId || undefined,
       unitOfMeasureId: unitOfMeasureId || undefined,
@@ -83,16 +81,62 @@ export function MROAssetForm({
       costPerUnit: costPerUnit ? parseFloat(costPerUnit) : undefined,
       warehouseId: warehouseId || undefined,
       notes: notes || undefined,
-    }
-    onSubmit(payload)
+    })
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      {/* Botón atrás superior */}
       <button type="button" onClick={onBack} className="text-sm text-muted-foreground hover:text-foreground">← Atrás</button>
 
-      {/* Modalidad */}
+      {/* ── 1. NOMBRE ─────────────────────────────────────────────── */}
+      <div className="space-y-1">
+        <Label>Nombre del material <span className="text-destructive">*</span></Label>
+        <Input value={name} onChange={e => setName(e.target.value)} required placeholder="Ej: Tornillo M6, Tóner HP 85A, Papel A4..." />
+      </div>
+
+      {/* ── 2. CATEGORÍA + UNIDAD ─────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label>Categoría <span className="text-xs font-normal text-muted-foreground">(opcional)</span></Label>
+          <InlineCreateSelect
+            options={consumableTypes}
+            value={consumableTypeId}
+            onChange={setConsumableTypeId}
+            placeholder="Ej: Lubricante, Papel..."
+            allowClear
+            createLabel="Crear categoría"
+            createTitle="Nueva categoría de material"
+            createForm={({ onSuccess, onCancel }) => (
+              <CatalogTypeInlineForm
+                apiEndpoint="/api/inventory/consumable-types"
+                familyId={familyId}
+                onSuccess={(item) => { setConsumableTypes(prev => [...prev, item]); onSuccess(item) }}
+                onCancel={onCancel}
+              />
+            )}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label>Unidad de medida <span className="text-xs font-normal text-muted-foreground">(opcional)</span></Label>
+          <InlineCreateSelect
+            options={unitsOfMeasure}
+            value={unitOfMeasureId}
+            onChange={setUnitOfMeasureId}
+            placeholder="Ej: Unidad, Litro, Kg..."
+            allowClear
+            createLabel="Crear unidad"
+            createTitle="Nueva unidad de medida"
+            createForm={({ onSuccess, onCancel }) => (
+              <UnitOfMeasureInlineForm
+                onSuccess={(item) => { setUnitsOfMeasure(prev => [...prev, item]); onSuccess(item) }}
+                onCancel={onCancel}
+              />
+            )}
+          />
+        </div>
+      </div>
+
+      {/* ── 3. ADQUISICIÓN ────────────────────────────────────────── */}
       <div className="space-y-1">
         <Label>¿Cómo se obtiene este material?</Label>
         <SimpleSelect
@@ -103,34 +147,14 @@ export function MROAssetForm({
         <p className="text-xs text-muted-foreground">{ACQUISITION_MODES.find(m => m.value === acquisitionMode)?.help}</p>
       </div>
 
-      {/* Nombre */}
-      <div className="space-y-1">
-        <Label>Nombre del material <span className="text-destructive">*</span></Label>
-        <Input value={name} onChange={e => setName(e.target.value)} required placeholder="Ej: Tornillo M6, Tóner HP 85A, Papel A4..." />
-      </div>
-
-      {/* Tipo de material */}
-      <div className="space-y-1">
-        <Label>Categoría <span className="text-xs font-normal text-muted-foreground">(opcional)</span></Label>
-        <SearchableSelect options={consumableTypes} value={consumableTypeId} onChange={setConsumableTypeId} placeholder="Ej: Lubricante, Herramienta, Papel..." />
-        <p className="text-xs text-muted-foreground">Agrupa el material con otros del mismo tipo para facilitar búsquedas y reportes.</p>
-      </div>
-
-      {/* Unidad de medida */}
-      <div className="space-y-1">
-        <Label>¿En qué se mide? <span className="text-xs font-normal text-muted-foreground">(opcional)</span></Label>
-        <SearchableSelect options={unitsOfMeasure} value={unitOfMeasureId} onChange={setUnitOfMeasureId} placeholder="Ej: Unidad, Litro, Kg, Metro..." />
-      </div>
-
-      {/* Proveedor — solo suministro */}
       {acquisitionMode === 'RENTAL' && (
         <div className="space-y-1">
           <Label>Proveedor <span className="text-destructive">*</span></Label>
-          <SearchableSelect options={suppliers} value={supplierId} onChange={setSupplierId} placeholder="Buscar proveedor..." />
+          <SupplierSelect value={supplierId || null} onChange={v => setSupplierId(v || '')} />
         </div>
       )}
 
-      {/* Sección STOCK_MRO */}
+      {/* ── 4. STOCK ──────────────────────────────────────────────── */}
       {isVisible('STOCK_MRO') && (
         <fieldset className="rounded-lg border border-border p-4 space-y-3">
           <legend className="px-2 text-sm font-semibold text-foreground">Cantidades en stock</legend>
@@ -151,7 +175,7 @@ export function MROAssetForm({
         </fieldset>
       )}
 
-      {/* Sección FINANCIAL */}
+      {/* ── 5. FINANCIERO ─────────────────────────────────────────── */}
       {isVisible('FINANCIAL') && (
         <div className="space-y-1">
           <Label>Precio por unidad <span className="text-xs font-normal text-muted-foreground">(opcional)</span></Label>
@@ -159,21 +183,33 @@ export function MROAssetForm({
         </div>
       )}
 
-      {/* Sección WAREHOUSE */}
+      {/* ── 6. BODEGA ─────────────────────────────────────────────── */}
       {isVisible('WAREHOUSE') && (
         <div className="space-y-1">
           <Label>Bodega</Label>
-          <SearchableSelect options={warehouses} value={warehouseId} onChange={setWarehouseId} placeholder="Buscar bodega..." />
+          <InlineCreateSelect
+            options={warehouses}
+            value={warehouseId}
+            onChange={setWarehouseId}
+            placeholder="Buscar bodega..."
+            allowClear
+            createLabel="Crear bodega"
+            createTitle="Nueva bodega"
+            createForm={({ onSuccess, onCancel }) => (
+              <WarehouseInlineForm
+                onSuccess={(item) => { setWarehouses(prev => [...prev, item]); onSuccess(item) }}
+                onCancel={onCancel}
+              />
+            )}
+          />
         </div>
       )}
 
-      {/* Observaciones */}
+      {/* ── 7. NOTAS Y ADJUNTOS ───────────────────────────────────── */}
       <div className="space-y-1">
         <Label>Observaciones</Label>
         <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="Notas adicionales..." />
       </div>
-
-      {/* Adjuntos */}
       <FileUploadZone files={attachments} onChange={setAttachments} maxFileSizeMB={maxFileSizeMB} label="Adjuntos" />
 
       {submitError && <p className="text-sm text-destructive">{submitError}</p>}

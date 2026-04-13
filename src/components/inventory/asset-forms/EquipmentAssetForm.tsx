@@ -12,6 +12,7 @@ import { FileUploadZone } from '@/components/ui/file-upload-zone'
 import { ContractSection, type ContractData } from '@/components/inventory/contract-section'
 import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
 import { EquipmentTypeInlineForm } from '@/components/inventory/asset-forms/EquipmentTypeInlineForm'
+import { WarehouseInlineForm } from '@/components/inventory/asset-forms/WarehouseInlineForm'
 import type { FamilyConfig } from '@/lib/inventory/family-config-types'
 import { resolveSectionsForMode } from '@/lib/inventory/family-config-types'
 import {
@@ -92,7 +93,7 @@ export function EquipmentAssetForm({
   const [usefulLifeYears, setUsefulLifeYears] = useState('')
   const [residualValue, setResidualValue] = useState('')
   const [warehouseId, setWarehouseId] = useState('')
-  const [warehouses, setWarehouses] = useState<SearchableSelectOption[]>([])
+  const [warehouses, setWarehouses] = useState<{ id: string; name: string; description?: string }[]>([])
   const [assignedUserId, setAssignedUserId] = useState('')
   const [notes, setNotes] = useState('')
   const [attachments, setAttachments] = useState<File[]>([])
@@ -395,7 +396,24 @@ export function EquipmentAssetForm({
       {isVisible('WAREHOUSE') && equipmentStatus !== 'ASSIGNED' && (
         <div className="space-y-1">
           <Label>Bodega</Label>
-          <SearchableSelect options={warehouses} value={warehouseId} onChange={setWarehouseId} placeholder="Buscar bodega..." />
+          <InlineCreateSelect
+            options={warehouses}
+            value={warehouseId}
+            onChange={setWarehouseId}
+            placeholder="Buscar bodega..."
+            allowClear
+            createLabel="Crear bodega"
+            createTitle="Nueva bodega"
+            createForm={({ onSuccess, onCancel }) => (
+              <WarehouseInlineForm
+                onSuccess={(item) => {
+                  setWarehouses(prev => [...prev, item])
+                  onSuccess(item)
+                }}
+                onCancel={onCancel}
+              />
+            )}
+          />
         </div>
       )}
 
