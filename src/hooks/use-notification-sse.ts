@@ -89,39 +89,23 @@ if (typeof window !== 'undefined') {
   )
 }
 
-// Intentar inicializar el AudioContext al cargar (algunos navegadores lo permiten sin gesto)
-if (typeof window !== 'undefined') {
-  try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
-    if (ctx.state === 'running') {
-      audioCtx = ctx
-    } else {
-      // Suspendido — guardarlo igual para que resume() funcione en el primer gesto
-      audioCtx = ctx
-    }
-  } catch { /* requiere gesto */ }
-}
+// NO crear AudioContext al cargar — Chrome bloquea AudioContext sin gesto del usuario.
+// El contexto se crea en handleGesture() cuando el usuario interactúa por primera vez.
 
 export function playNotificationSound() {
-  // Intentar crear el contexto si no existe (puede fallar sin gesto, pero vale intentarlo)
+  // Solo intentar si ya hay un contexto creado por un gesto previo
   if (!audioCtx) {
-    try {
-      audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
-    } catch { /* sin gesto previo — encolar */ }
-  }
-
-  if (!audioCtx || audioCtx.state === 'suspended') {
-    // Sin contexto o suspendido → encolar, se reproducirá en el próximo gesto
+    // Sin gesto previo → encolar para reproducir en el próximo gesto
     pendingTones++
-    // Intentar resumir proactivamente (puede funcionar si el navegador lo permite)
-    audioCtx?.resume().then(() => {
-      if (pendingTones > 0) {
-        pendingTones = 0
-        playTone(audioCtx!)
-      }
-    }).catch(() => { /* requiere gesto — se reproducirá en el próximo */ })
     return
   }
+
+  if (audioCtx.state === 'suspended') {
+    pendingTones++
+    audioCtx.resume().catch(() => {})
+    return
+  }
+
   playTone(audioCtx)
 }
 // ─────────────────────────────────────────────────────────────────────────────
