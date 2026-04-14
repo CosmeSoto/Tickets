@@ -17,6 +17,7 @@ import {
   USER_ROLE_FORM_OPTIONS,
   type UserRole
 } from '@/lib/constants/user-constants'
+import { DepartmentSelector } from '@/components/ui/department-selector'
 
 interface CreateUserModalProps {
   isOpen: boolean
@@ -322,21 +323,17 @@ export function CreateUserModal({
                 </select>
               </div>
               <div className="space-y-1">
-                <Label htmlFor="create-dept">
+                <Label>
                   Departamento {formData.role !== 'ADMIN' && <span className="text-destructive">*</span>}
                 </Label>
-                <select
-                  id="create-dept"
-                  value={formData.departmentId}
-                  onChange={e => setFormData(p => ({ ...p, departmentId: e.target.value }))}
-                  className={`flex h-9 w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${errors.departmentId ? 'border-destructive' : 'border-input'}`}
-                >
-                  <option value="">Sin departamento</option>
-                  {departments.map(d => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
-                  ))}
-                </select>
-                {errors.departmentId && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors.departmentId}</p>}
+                <DepartmentSelector
+                  value={formData.departmentId || null}
+                  onChange={val => setFormData(p => ({ ...p, departmentId: val ?? '' }))}
+                  departments={departments}
+                  placeholder="Buscar departamento..."
+                  emptyLabel="Sin departamento"
+                  error={errors.departmentId}
+                />
               </div>
             </div>
           </div>
