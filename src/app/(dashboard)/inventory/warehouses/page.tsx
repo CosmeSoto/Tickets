@@ -46,6 +46,8 @@ interface Warehouse {
   description?: string | null
   managerId?: string | null
   manager?: { id: string; name: string; email: string } | null
+  familyId?: string | null
+  family?: { id: string; name: string; color?: string | null } | null
   isActive: boolean
 }
 
@@ -147,13 +149,17 @@ export default function WarehousesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isActive: !togglingWarehouse.isActive }),
       })
-      if (res.ok) {
-        toast({ title: togglingWarehouse.isActive ? 'Bodega desactivada' : 'Bodega activada', description: `"${togglingWarehouse.name}" actualizada` })
-        await fetchWarehouses()
-      } else {
-        const err = await res.json()
-        toast({ title: 'Error', description: err.error || 'Error al cambiar estado', variant: 'destructive' })
+      const data = await res.json()
+      if (!res.ok) {
+        // 409 = tiene activos almacenados
+        toast({ title: 'No se puede desactivar', description: data.error, variant: 'destructive' })
+        return
       }
+      toast({
+        title: togglingWarehouse.isActive ? 'Bodega desactivada' : 'Bodega activada',
+        description: `"${togglingWarehouse.name}" actualizada`,
+      })
+      await fetchWarehouses()
     } catch {
       toast({ title: 'Error', description: 'Error de conexión', variant: 'destructive' })
     } finally {
@@ -198,6 +204,7 @@ export default function WarehousesPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nombre</TableHead>
+                <TableHead>Familia</TableHead>
                 <TableHead>Ubicación</TableHead>
                 <TableHead>Gestor Responsable</TableHead>
                 <TableHead>Estado</TableHead>
@@ -207,7 +214,7 @@ export default function WarehousesPage() {
             <TableBody>
               {warehouses.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className='text-center text-muted-foreground'>
+                  <TableCell colSpan={6} className='text-center text-muted-foreground'>
                     No hay bodegas registradas
                   </TableCell>
                 </TableRow>
@@ -215,6 +222,13 @@ export default function WarehousesPage() {
                 warehouses.map((warehouse) => (
                   <TableRow key={warehouse.id} className='cursor-pointer hover:bg-muted/50' onClick={() => handleOpenDialog(warehouse)}>
                     <TableCell className='font-medium'>{warehouse.name}</TableCell>
+                    <TableCell>
+                      {warehouse.family ? (
+                        <span className='text-xs px-2 py-0.5 rounded-full bg-muted'>{warehouse.family.name}</span>
+                      ) : (
+                        <span className='text-muted-foreground text-xs'>Compartida</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {warehouse.location ? (
                         <span className='flex items-center gap-1 text-sm text-muted-foreground'>
