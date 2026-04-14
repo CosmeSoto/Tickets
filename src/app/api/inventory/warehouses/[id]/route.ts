@@ -138,6 +138,7 @@ export async function PUT(
 /**
  * PATCH /api/inventory/warehouses/[id]
  * Alterna el estado activo/inactivo de una bodega.
+ * Restricción: no se puede desactivar si tiene equipos o consumibles activos.
  * Solo ADMIN.
  */
 export async function PATCH(
@@ -160,18 +161,32 @@ export async function PATCH(
 
     const { id } = await params
 
-    const existing = await prisma.warehouses.findUnique({ where: { id } })
+    const existing = await prisma.warehouses.findUnique({
+      where: { id },
+      include: {
+        _count: { select: { equipment: true, consumables: true } },
+      },
+    })
     if (!existing) {
       return NextResponse.json({ error: 'Bodega no encontrada' }, { status: 404 })
+    }
+
+    // Si se intenta desactivar, verificar que no tenga activos
+    if (existing.isActive) {
+      const total = existing._count.equipment + existing._count.consumables
+      if (total > 0) {
+        return NextResponse.json(
+          { error: `No se puede desactivar: la bodega tiene ${total} activo(s) almacenado(s). Reasígnalos primero.` },
+          { status: 409 }
+        )
+      }
     }
 
     const warehouse = await prisma.warehouses.update({
       where: { id },
       data: { isActive: !existing.isActive },
       include: {
-        manager: {
-          select: { id: true, name: true, email: true },
-        },
+        manager: { select: { id: true, name: true, email: true } },
       },
     })
 

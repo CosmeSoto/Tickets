@@ -148,7 +148,8 @@ export async function PUT(
 
 /**
  * PATCH /api/inventory/suppliers/[id]
- * Desactivar proveedor (solo cambia isActive = false)
+ * Desactivar proveedor.
+ * Restricción: no se puede desactivar si tiene equipos, consumibles o licencias activos.
  */
 export async function PATCH(
   request: NextRequest,
@@ -167,9 +168,25 @@ export async function PATCH(
 
     const { id } = await params
 
-    const existing = await prisma.suppliers.findUnique({ where: { id } })
+    const existing = await prisma.suppliers.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: { equipment: true, consumables: true, software_licenses: true },
+        },
+      },
+    })
     if (!existing) {
       return NextResponse.json({ error: 'Proveedor no encontrado' }, { status: 404 })
+    }
+
+    // Verificar que no tenga activos asociados antes de desactivar
+    const total = existing._count.equipment + existing._count.consumables + existing._count.software_licenses
+    if (total > 0) {
+      return NextResponse.json(
+        { error: `No se puede desactivar: el proveedor tiene ${total} activo(s) asociado(s). Reasígnalos primero.` },
+        { status: 409 }
+      )
     }
 
     const supplier = await prisma.suppliers.update({
