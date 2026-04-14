@@ -350,7 +350,7 @@ export function CreateUserModal({
                     <Crown className="h-3.5 w-3.5 text-amber-600" />
                     Administrador Principal (Super Admin)
                   </p>
-                  <p className="text-xs text-muted-foreground">Acceso total a todas las familias. Solo debe haber uno.</p>
+                  <p className="text-xs text-muted-foreground">Acceso total a todas las familias y configuraciones del sistema.</p>
                 </div>
                 <input
                   type="checkbox"

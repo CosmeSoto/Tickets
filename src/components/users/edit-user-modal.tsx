@@ -443,7 +443,7 @@ export function EditUserModal({ isOpen, onClose, onUserUpdated, user, department
                 <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 px-3 py-2.5">
                   <div>
                     <p className="text-sm font-medium">Administrador Principal (Super Admin)</p>
-                    <p className="text-xs text-muted-foreground">Acceso total a todas las familias. Solo debe haber uno.</p>
+                    <p className="text-xs text-muted-foreground">Acceso total a todas las familias y configuraciones del sistema.</p>
                   </div>
                   <input
                     type="checkbox"
