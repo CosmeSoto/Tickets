@@ -35,7 +35,8 @@ import {
   Upload,
   File,
   X,
-  Paperclip
+  Paperclip,
+  MapPin,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/hooks/use-toast'
@@ -116,16 +117,12 @@ function CreateClientTicketContent() {
     const title = searchParams.get('title')
     const description = searchParams.get('description')
     const equipId = searchParams.get('equipmentId')
+    const location = searchParams.get('location')
 
-    if (title) {
-      setValue('title', title)
-    }
-    if (description) {
-      setValue('description', description)
-    }
-    if (equipId) {
-      setEquipmentId(equipId)
-    }
+    if (title) setValue('title', title)
+    if (description) setValue('description', description)
+    if (location) setValue('location', location)
+    if (equipId) setEquipmentId(equipId)
   }, [searchParams, setValue])
 
   useEffect(() => {
@@ -358,6 +355,22 @@ function CreateClientTicketContent() {
                 {errors.description && (
                   <p className='text-xs text-red-600'>{errors.description.message}</p>
                 )}
+              </div>
+
+              {/* Ubicación */}
+              <div className='space-y-1.5'>
+                <Label htmlFor='location' className='flex items-center gap-1.5'>
+                  <MapPin className='h-3.5 w-3.5' />
+                  Ubicación / Área <span className='text-muted-foreground font-normal text-xs'>(opcional)</span>
+                </Label>
+                <Input
+                  id='location'
+                  placeholder='Ej: Oficina 201, Piso 3, Sala de Reuniones A...'
+                  {...register('location')}
+                />
+                <p className='text-xs text-muted-foreground'>
+                  Indica dónde debe acercarse el técnico para atender el problema.
+                </p>
               </div>
 
               {/* Prioridad */}

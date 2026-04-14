@@ -260,6 +260,7 @@ export async function POST(request: NextRequest) {
     const newTicket = await TicketService.createTicket({
       title: ticketData.title,
       description: ticketData.description,
+      location: ticketData.location || undefined,
       priority: ticketData.priority || 'MEDIUM',
       clientId,
       categoryId: ticketData.categoryId,

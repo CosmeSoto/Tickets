@@ -294,6 +294,7 @@ model tickets {
   id                               String                      @id
   title                            String
   description                      String
+  location                         String?
   status                           TicketStatus                @default(OPEN)
   priority                         TicketPriority              @default(MEDIUM)
   clientId                         String

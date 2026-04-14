@@ -24,6 +24,7 @@ export interface PaginationParams {
 export interface CreateTicketData {
   title: string
   description: string
+  location?: string
   priority: TicketPriority
   categoryId: string
   clientId: string

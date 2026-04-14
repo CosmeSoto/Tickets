@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import {
   Wrench, Calendar, ArrowLeft, CalendarClock, CheckCircle, XCircle,
-  Loader2, Package, UserCheck, Warehouse, Clock, ThumbsUp, User,
+  Loader2, Package, UserCheck, Warehouse, Clock, ThumbsUp, User, Ticket,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -37,6 +37,7 @@ interface MaintenanceDetail {
     brand: string
     model: string
     status: string
+    physicalLocation?: string | null
     type: { name: string } | null
     assignments: { receiver: { id: string; name: string; email: string } }[]
   }
@@ -250,6 +251,24 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
               <XCircle className="mr-2 h-4 w-4" /> Cancelar
             </Button>
           )}
+          {/* Crear ticket de soporte — si no tiene ticket vinculado */}
+          {isAdminOrTech && !maintenance.ticket && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                const eq = maintenance.equipment
+                const params = new URLSearchParams({
+                  title: `Mantenimiento ${maintenance.type === 'CORRECTIVE' ? 'Correctivo' : 'Preventivo'}: ${eq.code} — ${eq.brand} ${eq.model}`,
+                  description: `Equipo: ${eq.code} (${eq.brand} ${eq.model})\nTipo: ${maintenance.type === 'CORRECTIVE' ? 'Correctivo' : 'Preventivo'}\nDescripción: ${maintenance.description}`,
+                  ...(eq.physicalLocation ? { location: eq.physicalLocation } : {}),
+                  maintenanceId: maintenance.id,
+                })
+                router.push(`/client/tickets/create?${params.toString()}`)
+              }}
+            >
+              <Ticket className="mr-2 h-4 w-4" /> Crear Ticket
+            </Button>
+          )}
         </div>
       </div>
 
@@ -435,7 +454,19 @@ export default function MaintenanceDetailPage({ params }: { params: Promise<{ id
             {maintenance.ticket && (
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground text-sm">Ticket relacionado</span>
-                <span className="text-sm">{maintenance.ticket.title}</span>
+                <Button
+                  variant="link"
+                  className="p-0 h-auto text-sm"
+                  onClick={() => router.push(`/admin/tickets/${maintenance.ticket!.id}`)}
+                >
+                  {maintenance.ticket.title}
+                </Button>
+              </div>
+            )}
+            {!maintenance.ticket && isAdminOrTech && (
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground text-sm">Ticket relacionado</span>
+                <span className="text-xs text-muted-foreground italic">Sin ticket vinculado</span>
               </div>
             )}
             <Separator />

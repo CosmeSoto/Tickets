@@ -10,6 +10,11 @@ export const createTicketSchema = z.object({
     .string()
     .min(10, 'La descripción debe tener al menos 10 caracteres')
     .max(5000, 'La descripción no puede exceder 5000 caracteres'),
+  location: z
+    .string()
+    .max(300, 'La ubicación no puede exceder 300 caracteres')
+    .optional()
+    .or(z.literal('')),
   priority: z.nativeEnum(TicketPriority, {
     errorMap: () => ({ message: 'Selecciona una prioridad válida' }),
   }),
@@ -28,6 +33,11 @@ export const updateTicketSchema = z.object({
     .min(10, 'La descripción debe tener al menos 10 caracteres')
     .max(5000, 'La descripción no puede exceder 5000 caracteres')
     .optional(),
+  location: z
+    .string()
+    .max(300)
+    .optional()
+    .or(z.literal('')),
   priority: z.nativeEnum(TicketPriority).optional(),
   status: z.enum(['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED']).optional(),
   assigneeId: z.string().optional(),

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Clock, User, Tag, AlertCircle, MessageSquare, Paperclip, History, Save, FileText, Lightbulb, BookOpen, Star, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Clock, User, Tag, AlertCircle, MessageSquare, Paperclip, History, Save, FileText, Lightbulb, BookOpen, Star, CheckCircle, MapPin } from 'lucide-react'
 import Link from 'next/link'
 
 // Componentes estandarizados
@@ -322,10 +322,19 @@ export default function TechnicianTicketDetailPage() {
                   <span>{ticket.title}</span>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className='space-y-4'>
                 <div className='prose max-w-none'>
                   <p className='text-foreground whitespace-pre-wrap'>{ticket.description}</p>
                 </div>
+                {(ticket as any).location && (
+                  <div className='flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 px-3 py-2'>
+                    <MapPin className='h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0' />
+                    <div>
+                      <p className='text-xs font-semibold text-amber-700 dark:text-amber-400'>Ubicación del problema</p>
+                      <p className='text-sm text-amber-800 dark:text-amber-300'>{(ticket as any).location}</p>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
