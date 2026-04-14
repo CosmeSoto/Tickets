@@ -35,7 +35,9 @@ export async function GET(req: NextRequest) {
     const types = await prisma.equipment_types.findMany({
       where: {
         ...(includeInactive ? {} : { isActive: true }),
-        ...(familyId ? { familyId } : {}),
+        // Sin familia = global (visible para todas las familias)
+        // Con familia = solo esa familia + los globales
+        ...(familyId ? { OR: [{ familyId }, { familyId: null }] } : {}),
       },
       orderBy: [{ order: 'asc' }, { name: 'asc' }],
       select: { id: true, code: true, name: true, icon: true, familyId: true, isActive: true, order: true },

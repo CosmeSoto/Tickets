@@ -17,7 +17,11 @@ export async function GET(request: NextRequest) {
     const familyId = request.nextUrl.searchParams.get('familyId')
     const isAdmin = session.user.role === 'ADMIN'
     const where = isAdmin && includeInactive ? {} : { isActive: true }
-    const whereWithFamily = familyId ? { ...where, familyId } : where
+    // Sin familia = global (visible para todas las familias)
+    // Con familia = solo esa familia + los globales (familyId = null)
+    const whereWithFamily = familyId
+      ? { ...where, OR: [{ familyId }, { familyId: null }] }
+      : where
 
     const types = await prisma.consumable_types.findMany({
       where: whereWithFamily,

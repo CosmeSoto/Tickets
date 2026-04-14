@@ -274,7 +274,9 @@ function CatalogsContent() {
                     <TableCell>
                       {item.family ? (
                         <span className="text-xs px-2 py-0.5 rounded-full bg-muted">{item.family.name}</span>
-                      ) : <span className="text-muted-foreground text-xs">—</span>}
+                      ) : (
+                        <span className="text-xs text-muted-foreground italic">Global</span>
+                      )}
                     </TableCell>
                   )}
                   {catalog.hasLocation && <TableCell className="text-sm text-muted-foreground">{item.location ?? '—'}</TableCell>}
@@ -347,13 +349,16 @@ function CatalogsContent() {
             )}
             {catalog.hasFamily && (
               <div className="space-y-1">
-                <Label>Familia</Label>
+                <Label>Familia <span className="text-xs font-normal text-muted-foreground">(opcional)</span></Label>
                 <SearchableSelect
                   options={families}
                   value={form.familyId}
                   onChange={v => setForm(p => ({ ...p, familyId: v }))}
-                  placeholder="Sin familia específica"
+                  placeholder="Global — disponible para todas las familias"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Sin familia: visible en todas las familias. Con familia: aparece solo en esa familia.
+                </p>
               </div>
             )}
             <div className="space-y-1">
