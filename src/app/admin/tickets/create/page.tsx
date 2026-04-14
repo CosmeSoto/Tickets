@@ -38,7 +38,8 @@ import {
   Upload,
   File,
   X,
-  Paperclip
+  Paperclip,
+  MapPin,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/hooks/use-toast'
@@ -417,6 +418,23 @@ export default function CreateTicketPage() {
                         )}
                       </div>
 
+                      {/* Ubicación */}
+                      <div className='space-y-2'>
+                        <Label htmlFor='location' className='flex items-center gap-1.5'>
+                          <MapPin className='h-4 w-4' />
+                          Ubicación / Área
+                          <span className='text-muted-foreground font-normal text-xs'>(opcional)</span>
+                        </Label>
+                        <Input
+                          id='location'
+                          placeholder='Ej: Oficina 201, Piso 3, Sala de Reuniones A...'
+                          {...register('location')}
+                        />
+                        <p className='text-xs text-muted-foreground'>
+                          Indica dónde debe acercarse el técnico para atender el problema.
+                        </p>
+                      </div>
+
                       {/* Prioridad */}
                       <div className='space-y-2'>
                         <Label htmlFor='priority' className='flex items-center'>
@@ -595,6 +613,16 @@ export default function CreateTicketPage() {
                           </p>
                         </div>
                       </div>
+
+                      {watch('location') && (
+                        <div>
+                          <Label className='text-sm font-medium text-muted-foreground'>Ubicación</Label>
+                          <div className='mt-1 flex items-center gap-2 text-sm'>
+                            <MapPin className='h-3.5 w-3.5 text-amber-600' />
+                            <span>{watch('location')}</span>
+                          </div>
+                        </div>
+                      )}
                       
                       <div className='grid grid-cols-2 gap-4'>
                         <div>
