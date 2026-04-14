@@ -40,6 +40,7 @@ export interface CreateUserData {
   departmentId?: string
   department?: string // Deprecated, usar departmentId
   phone?: string
+  isSuperAdmin?: boolean
   assignedCategories?: {
     categoryId: string
     priority: number
@@ -247,6 +248,7 @@ export class UserService {
           departmentId: data.departmentId || data.department || null,
           phone: data.phone || null,
           isActive: true,
+          isSuperAdmin: data.role === 'ADMIN' ? (data.isSuperAdmin ?? false) : false,
           isEmailVerified: false,
           createdAt: new Date(),
           updatedAt: new Date(),

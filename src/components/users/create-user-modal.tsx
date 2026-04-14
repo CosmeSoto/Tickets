@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSession } from 'next-auth/react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,7 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import {
   User, Mail, Phone, Building, Camera,
-  UserPlus, Eye, EyeOff, AlertCircle, Save, X, Info
+  UserPlus, Eye, EyeOff, AlertCircle, Save, X, Info, Crown
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import {
@@ -34,6 +35,7 @@ interface NewUserData {
   role: UserRole
   departmentId: string
   phone: string
+  isSuperAdmin: boolean
   avatar?: File
 }
 
@@ -44,17 +46,19 @@ export function CreateUserModal({
   departments,
   suggestedRole
 }: CreateUserModalProps) {
+  const { data: session } = useSession()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
 
+  const isSuperAdminSession = (session?.user as any)?.isSuperAdmin === true
   const defaultRole: UserRole = suggestedRole ?? 'CLIENT'
 
   const [formData, setFormData] = useState<NewUserData>({
     name: '', email: '', password: '',
     role: defaultRole,
-    departmentId: '', phone: '', avatar: undefined
+    departmentId: '', phone: '', isSuperAdmin: false, avatar: undefined
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -66,7 +70,7 @@ export function CreateUserModal({
   }, [isOpen, suggestedRole])
 
   const handleClose = () => {
-    setFormData({ name: '', email: '', password: '', role: defaultRole, departmentId: '', phone: '', avatar: undefined })
+    setFormData({ name: '', email: '', password: '', role: defaultRole, departmentId: '', phone: '', isSuperAdmin: false, avatar: undefined })
     setErrors({})
     setAvatarPreview(null)
     onClose()
@@ -116,7 +120,8 @@ export function CreateUserModal({
           role: formData.role,
           departmentId: formData.departmentId || null,
           phone: formData.phone.trim() || null,
-          isActive: true
+          isActive: true,
+          isSuperAdmin: formData.role === 'ADMIN' ? formData.isSuperAdmin : false,
         }),
       })
       const result = await response.json()
@@ -199,7 +204,7 @@ export function CreateUserModal({
                   return (
                     <Badge className={role.color}>
                       <role.icon className="h-3 w-3 mr-1" />
-                      {role.label}
+                      {formData.role === 'ADMIN' && formData.isSuperAdmin ? 'Super Admin' : role.label}
                     </Badge>
                   )
                 })()}
@@ -312,7 +317,7 @@ export function CreateUserModal({
                   value={formData.role}
                   onChange={e => {
                     const r = e.target.value as UserRole
-                    setFormData(p => ({ ...p, role: r }))
+                    setFormData(p => ({ ...p, role: r, isSuperAdmin: false }))
                     if (r === 'ADMIN') setErrors(p => ({ ...p, departmentId: '' }))
                   }}
                   className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -336,6 +341,25 @@ export function CreateUserModal({
                 />
               </div>
             </div>
+
+            {/* Super Admin — solo visible para Super Admins cuando el rol es ADMIN */}
+            {isSuperAdminSession && formData.role === 'ADMIN' && (
+              <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 px-3 py-2.5">
+                <div>
+                  <p className="text-sm font-medium flex items-center gap-1.5">
+                    <Crown className="h-3.5 w-3.5 text-amber-600" />
+                    Administrador Principal (Super Admin)
+                  </p>
+                  <p className="text-xs text-muted-foreground">Acceso total a todas las familias. Solo debe haber uno.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={formData.isSuperAdmin}
+                  onChange={e => setFormData(p => ({ ...p, isSuperAdmin: e.target.checked }))}
+                  className="h-4 w-4 rounded border-border"
+                />
+              </div>
+            )}
           </div>
 
           {/* ── FOOTER ────────────────────────────────────────────── */}

@@ -14,6 +14,7 @@ const createUserSchema = z.object({
   departmentId: z.string().optional(),
   department: z.string().optional(), // Deprecated, usar departmentId
   phone: z.string().optional(),
+  isSuperAdmin: z.boolean().optional(),
 })
 
 export async function GET(request: NextRequest) {
@@ -231,6 +232,11 @@ export async function POST(request: NextRequest) {
     
     // Validar datos de entrada
     const validatedData = createUserSchema.parse(body)
+
+    // Solo un Super Admin puede crear otro Super Admin
+    if (validatedData.isSuperAdmin && !(session.user as any).isSuperAdmin) {
+      validatedData.isSuperAdmin = false
+    }
 
     // Verificar si el departamento existe (si se proporciona departmentId)
     if (validatedData.departmentId) {

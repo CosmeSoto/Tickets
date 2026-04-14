@@ -31,15 +31,11 @@ export function PromoteUserDialog({ open, onOpenChange, user, onSuccess }: Props
   const handlePromote = async () => {
     setLoading(true)
     try {
-      // Promoción simple sin configuración adicional
-      const response = await fetch(`/api/users/${user.id}/promote`, {
-        method: 'POST',
+      // Usar el endpoint estándar de actualización de usuario
+      const response = await fetch(`/api/users/${user.id}`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          isActive: true,
-          maxTickets: 10,
-          categoryAssignments: [] // Se configurarán después en el módulo de técnicos
-        })
+        body: JSON.stringify({ role: 'TECHNICIAN' })
       })
 
       const result = await response.json()
