@@ -52,6 +52,10 @@ export async function GET(request: NextRequest) {
 
     const suppliers = await prisma.suppliers.findMany({
       where,
+      include: {
+        supplierType: { select: { id: true, name: true } },
+        family: { select: { id: true, name: true, color: true } },
+      },
       orderBy: { name: 'asc' },
     })
 
