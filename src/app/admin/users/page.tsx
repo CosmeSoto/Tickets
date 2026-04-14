@@ -478,6 +478,11 @@ export default function AdminUsersPage() {
         onClose={() => setShowCreateDialog(false)}
         onUserCreated={handleUserUpdated}
         departments={departments}
+        suggestedRole={
+          filters.role && filters.role !== 'all' && filters.role !== 'SUPER_ADMIN'
+            ? (filters.role as UserRole)
+            : undefined
+        }
       />
 
       {/* Diálogo de promoción a técnico */}

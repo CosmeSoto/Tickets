@@ -1,30 +1,19 @@
 'use client'
 
-import { useState } from 'react'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useState, useEffect } from 'react'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { 
-  User, 
-  Mail, 
-  Phone, 
-  Building, 
-  Camera, 
-  Upload,
-  UserPlus,
-  Eye,
-  EyeOff,
-  AlertCircle,
-  CheckCircle,
-  X
+import { Separator } from '@/components/ui/separator'
+import {
+  User, Mail, Phone, Building, Camera,
+  UserPlus, Eye, EyeOff, AlertCircle, Save, X, Info
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import { 
+import {
   USER_ROLE_FORM_OPTIONS,
   type UserRole
 } from '@/lib/constants/user-constants'
@@ -34,6 +23,7 @@ interface CreateUserModalProps {
   onClose: () => void
   onUserCreated: () => void
   departments: Array<{ id: string; name: string; color: string }>
+  suggestedRole?: UserRole
 }
 
 interface NewUserData {
@@ -46,525 +36,329 @@ interface NewUserData {
   avatar?: File
 }
 
-export function CreateUserModal({ isOpen, onClose, onUserCreated, departments }: CreateUserModalProps) {
+export function CreateUserModal({
+  isOpen,
+  onClose,
+  onUserCreated,
+  departments,
+  suggestedRole
+}: CreateUserModalProps) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-  const [activeTab, setActiveTab] = useState('basic')
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
-  
-  const [formData, setFormData] = useState<NewUserData>({
-    name: '',
-    email: '',
-    password: '',
-    role: 'CLIENT',
-    departmentId: '',
-    phone: '',
-    avatar: undefined
-  })
 
+  const defaultRole: UserRole = suggestedRole ?? 'CLIENT'
+
+  const [formData, setFormData] = useState<NewUserData>({
+    name: '', email: '', password: '',
+    role: defaultRole,
+    departmentId: '', phone: '', avatar: undefined
+  })
   const [errors, setErrors] = useState<Record<string, string>>({})
 
+  // Actualizar rol sugerido cuando cambia (ej: usuario abre modal con filtro diferente)
+  useEffect(() => {
+    if (isOpen) {
+      setFormData(prev => ({ ...prev, role: suggestedRole ?? 'CLIENT' }))
+    }
+  }, [isOpen, suggestedRole])
+
   const handleClose = () => {
-    setFormData({
-      name: '',
-      email: '',
-      password: '',
-      role: 'CLIENT',
-      departmentId: '',
-      phone: '',
-      avatar: undefined
-    })
+    setFormData({ name: '', email: '', password: '', role: defaultRole, departmentId: '', phone: '', avatar: undefined })
     setErrors({})
     setAvatarPreview(null)
-    setActiveTab('basic')
     onClose()
   }
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      // Validar tipo de archivo
-      if (!file.type.startsWith('image/')) {
-        toast({
-          title: 'Archivo inválido',
-          description: 'Por favor selecciona una imagen válida',
-          variant: 'destructive'
-        })
-        return
-      }
-
-      // Validar tamaño (máximo 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        toast({
-          title: 'Archivo muy grande',
-          description: 'La imagen debe ser menor a 5MB',
-          variant: 'destructive'
-        })
-        return
-      }
-
-      setFormData({ ...formData, avatar: file })
-      
-      // Crear preview
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        setAvatarPreview(e.target?.result as string)
-      }
-      reader.readAsDataURL(file)
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'Archivo inválido', description: 'Selecciona una imagen válida', variant: 'destructive' })
+      return
     }
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: 'Archivo muy grande', description: 'La imagen debe ser menor a 5MB', variant: 'destructive' })
+      return
+    }
+    setFormData(p => ({ ...p, avatar: file }))
+    const reader = new FileReader()
+    reader.onload = e => setAvatarPreview(e.target?.result as string)
+    reader.readAsDataURL(file)
   }
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
-
-    if (!formData.name.trim()) {
-      newErrors.name = 'El nombre es requerido'
-    }
-
-    if (!formData.email.trim()) {
-      newErrors.email = 'El email es requerido'
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Email inválido'
-    }
-
-    if (!formData.password.trim()) {
-      newErrors.password = 'La contraseña es requerida'
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'La contraseña debe tener al menos 6 caracteres'
-    }
-
-    if (formData.phone && !/^[\d\s\-\+\(\)]+$/.test(formData.phone)) {
-      newErrors.phone = 'Formato de teléfono inválido'
-    }
-
-    // Departamento requerido para técnicos y clientes
-    if (formData.role !== 'ADMIN' && !formData.departmentId) {
-      newErrors.departmentId = 'El departamento es requerido para este rol'
-    }
-
+    if (!formData.name.trim()) newErrors.name = 'El nombre es requerido'
+    if (!formData.email.trim()) newErrors.email = 'El email es requerido'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Email inválido'
+    if (!formData.password.trim()) newErrors.password = 'La contraseña es requerida'
+    else if (formData.password.length < 6) newErrors.password = 'Mínimo 6 caracteres'
+    if (formData.phone && !/^[\d\s\-\+\(\)]+$/.test(formData.phone)) newErrors.phone = 'Formato inválido'
+    if (formData.role !== 'ADMIN' && !formData.departmentId) newErrors.departmentId = 'Requerido para este rol'
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
   const handleSubmit = async () => {
-    if (!validateForm()) {
-      toast({
-        title: 'Datos inválidos',
-        description: 'Por favor corrige los errores en el formulario',
-        variant: 'destructive'
-      })
-      return
-    }
-
+    if (!validateForm()) return
     setLoading(true)
     try {
-      // Crear usuario primero
-      const userData = {
-        name: formData.name.trim(),
-        email: formData.email.trim().toLowerCase(),
-        password: formData.password,
-        role: formData.role,
-        departmentId: formData.departmentId || null,
-        phone: formData.phone.trim() || null,
-        isActive: true
-      }
-
       const response = await fetch('/api/users', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(userData),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name.trim(),
+          email: formData.email.trim().toLowerCase(),
+          password: formData.password,
+          role: formData.role,
+          departmentId: formData.departmentId || null,
+          phone: formData.phone.trim() || null,
+          isActive: true
+        }),
       })
-
       const result = await response.json()
-
       if (response.ok && result.success) {
-        // Si hay avatar, subirlo después de crear el usuario
         if (formData.avatar && result.user?.id) {
-          const avatarFormData = new FormData()
-          avatarFormData.append('avatar', formData.avatar)
-
-          await fetch(`/api/users/${result.user.id}/avatar`, {
-            method: 'POST',
-            body: avatarFormData
-          })
+          const fd = new FormData()
+          fd.append('avatar', formData.avatar)
+          await fetch(`/api/users/${result.user.id}/avatar`, { method: 'POST', body: fd })
         }
-        
-        toast({
-          title: 'Usuario creado exitosamente',
-          description: `${formData.name} ha sido registrado como ${USER_ROLE_FORM_OPTIONS.find(r => r.value === formData.role)?.label}`,
-        })
-        
+        const roleLabel = USER_ROLE_FORM_OPTIONS.find(r => r.value === formData.role)?.label
+        toast({ title: 'Usuario creado', description: `${formData.name} registrado como ${roleLabel}` })
         handleClose()
         onUserCreated()
       } else {
-        toast({
-          title: 'Error al crear usuario',
-          description: result.error || 'No se pudo crear el usuario',
-          variant: 'destructive'
-        })
+        toast({ title: 'Error al crear usuario', description: result.error || 'No se pudo crear el usuario', variant: 'destructive' })
       }
-    } catch (error) {
-      console.error('Error creating user:', error)
-      toast({
-        title: 'Error de conexión',
-        description: 'No se pudo conectar con el servidor',
-        variant: 'destructive'
-      })
+    } catch {
+      toast({ title: 'Error de conexión', description: 'No se pudo conectar con el servidor', variant: 'destructive' })
     } finally {
       setLoading(false)
     }
   }
 
-  const selectedRole = USER_ROLE_FORM_OPTIONS.find(r => r.value === formData.role)
+  const initials = formData.name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase() || 'U'
   const selectedDepartment = departments.find(d => d.id === formData.departmentId)
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle className="flex items-center space-x-2">
-            <UserPlus className="h-5 w-5" />
-            <span>Crear Nuevo Usuario</span>
+          <DialogTitle className="flex items-center gap-2">
+            <UserPlus className="h-5 w-5 text-primary" />
+            Crear Nuevo Usuario
           </DialogTitle>
           <DialogDescription>
-            Completa la información para crear una nueva cuenta de usuario en el sistema
+            Completa la información para registrar una nueva cuenta en el sistema
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="basic">Información Básica</TabsTrigger>
-            <TabsTrigger value="profile">Perfil</TabsTrigger>
-            <TabsTrigger value="preview">Vista Previa</TabsTrigger>
-          </TabsList>
+        <div className="space-y-6">
 
-          {/* Información Básica */}
-          <TabsContent value="basic" className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nombre Completo *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Juan Pérez"
-                  className={errors.name ? 'border-red-500' : ''}
-                />
-                {errors.name && (
-                  <p className="text-sm text-red-600 flex items-center">
-                    <AlertCircle className="h-3 w-3 mr-1" />
-                    {errors.name}
-                  </p>
+          {/* ── CABECERA: Avatar + preview ─────────────────────────── */}
+          <div className="flex items-center gap-4 p-4 rounded-lg bg-muted/40 border border-border">
+            <div className="relative group shrink-0">
+              <Avatar className="h-16 w-16 border-2 border-background shadow">
+                <AvatarImage src={avatarPreview || undefined} alt="Preview" />
+                <AvatarFallback className="text-base font-semibold bg-primary/10 text-primary">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                <button
+                  type="button"
+                  title="Seleccionar foto"
+                  onClick={() => document.getElementById('create-avatar-input')?.click()}
+                  className="p-1 rounded-full bg-white/20 hover:bg-white/40 text-white"
+                >
+                  <Camera className="h-3.5 w-3.5" />
+                </button>
+                {avatarPreview && (
+                  <button
+                    type="button"
+                    title="Quitar foto"
+                    onClick={() => { setFormData(p => ({ ...p, avatar: undefined })); setAvatarPreview(null) }}
+                    className="p-1 rounded-full bg-white/20 hover:bg-red-500/60 text-white"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
                 )}
               </div>
+              <input id="create-avatar-input" type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
+            </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="email">Email *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="usuario@empresa.com"
-                  className={errors.email ? 'border-red-500' : ''}
-                />
-                {errors.email && (
-                  <p className="text-sm text-red-600 flex items-center">
-                    <AlertCircle className="h-3 w-3 mr-1" />
-                    {errors.email}
-                  </p>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-foreground truncate">{formData.name || 'Nombre del usuario'}</p>
+              <p className="text-sm text-muted-foreground truncate">{formData.email || 'email@empresa.com'}</p>
+              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                {USER_ROLE_FORM_OPTIONS.find(r => r.value === formData.role) && (() => {
+                  const role = USER_ROLE_FORM_OPTIONS.find(r => r.value === formData.role)!
+                  return (
+                    <Badge className={role.color}>
+                      <role.icon className="h-3 w-3 mr-1" />
+                      {role.label}
+                    </Badge>
+                  )
+                })()}
+                {selectedDepartment && (
+                  <Badge variant="outline" style={{ borderColor: selectedDepartment.color, color: selectedDepartment.color }}>
+                    <Building className="h-3 w-3 mr-1" />
+                    {selectedDepartment.name}
+                  </Badge>
                 )}
               </div>
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Contraseña *</Label>
+          {/* Nota de rol sugerido */}
+          {suggestedRole && (
+            <div className="flex items-center gap-2 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 px-3 py-2 text-sm text-blue-700 dark:text-blue-400">
+              <Info className="h-4 w-4 shrink-0" />
+              <span>Rol sugerido basado en el filtro activo. Puedes cambiarlo si lo necesitas.</span>
+            </div>
+          )}
+
+          {/* ── SECCIÓN 1: Datos personales ────────────────────────── */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+              <User className="h-4 w-4 text-muted-foreground" />
+              Datos personales
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="create-name">Nombre completo <span className="text-destructive">*</span></Label>
+                <Input
+                  id="create-name"
+                  value={formData.name}
+                  onChange={e => setFormData(p => ({ ...p, name: e.target.value }))}
+                  placeholder="Juan Pérez"
+                  className={errors.name ? 'border-destructive' : ''}
+                />
+                {errors.name && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors.name}</p>}
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="create-email">Email <span className="text-destructive">*</span></Label>
+                <Input
+                  id="create-email"
+                  type="email"
+                  value={formData.email}
+                  onChange={e => setFormData(p => ({ ...p, email: e.target.value }))}
+                  placeholder="usuario@empresa.com"
+                  className={errors.email ? 'border-destructive' : ''}
+                />
+                {errors.email && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors.email}</p>}
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="create-phone">Teléfono</Label>
+                <Input
+                  id="create-phone"
+                  value={formData.phone}
+                  onChange={e => setFormData(p => ({ ...p, phone: e.target.value }))}
+                  placeholder="+593 99 999 9999"
+                  className={errors.phone ? 'border-destructive' : ''}
+                />
+                {errors.phone && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors.phone}</p>}
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* ── SECCIÓN 2: Contraseña ──────────────────────────────── */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+              <Mail className="h-4 w-4 text-muted-foreground" />
+              Acceso al sistema
+            </h3>
+            <div className="space-y-1">
+              <Label htmlFor="create-password">Contraseña <span className="text-destructive">*</span></Label>
               <div className="relative">
                 <Input
-                  id="password"
+                  id="create-password"
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  onChange={e => setFormData(p => ({ ...p, password: e.target.value }))}
                   placeholder="Mínimo 6 caracteres"
-                  className={errors.password ? 'border-red-500 pr-10' : 'pr-10'}
+                  className={errors.password ? 'border-destructive pr-10' : 'pr-10'}
                 />
                 <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
+                  type="button" variant="ghost" size="sm"
                   className="absolute right-0 top-0 h-full px-3"
-                  onClick={() => setShowPassword(!showPassword)}
+                  onClick={() => setShowPassword(p => !p)}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
-              {errors.password && (
-                <p className="text-sm text-red-600 flex items-center">
-                  <AlertCircle className="h-3 w-3 mr-1" />
-                  {errors.password}
-                </p>
-              )}
+              {errors.password && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors.password}</p>}
             </div>
+          </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="role">Rol del Usuario *</Label>
+          <Separator />
+
+          {/* ── SECCIÓN 3: Rol y departamento ──────────────────────── */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+              <Building className="h-4 w-4 text-muted-foreground" />
+              Rol y departamento
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="create-role">Rol del usuario <span className="text-destructive">*</span></Label>
                 <select
-                  id="role"
+                  id="create-role"
                   value={formData.role}
-                  onChange={(e) => {
-                    const newRole = e.target.value as any
-                    setFormData({ ...formData, role: newRole })
-                    if (newRole === 'ADMIN' && errors.departmentId) {
-                      setErrors(prev => ({ ...prev, departmentId: undefined as any }))
-                    }
+                  onChange={e => {
+                    const r = e.target.value as UserRole
+                    setFormData(p => ({ ...p, role: r }))
+                    if (r === 'ADMIN') setErrors(p => ({ ...p, departmentId: '' }))
                   }}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  {USER_ROLE_FORM_OPTIONS.map(role => (
-                    <option key={role.value} value={role.value}>
-                      {role.label}
-                    </option>
+                  {USER_ROLE_FORM_OPTIONS.map(r => (
+                    <option key={r.value} value={r.value}>{r.label}</option>
                   ))}
                 </select>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="department">
-                  Departamento {formData.role !== 'ADMIN' ? '*' : ''}
+              <div className="space-y-1">
+                <Label htmlFor="create-dept">
+                  Departamento {formData.role !== 'ADMIN' && <span className="text-destructive">*</span>}
                 </Label>
                 <select
-                  id="department"
+                  id="create-dept"
                   value={formData.departmentId}
-                  onChange={(e) => setFormData({ ...formData, departmentId: e.target.value })}
-                  className={`flex h-10 w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${errors.departmentId ? 'border-red-500' : 'border-input'}`}
+                  onChange={e => setFormData(p => ({ ...p, departmentId: e.target.value }))}
+                  className={`flex h-9 w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${errors.departmentId ? 'border-destructive' : 'border-input'}`}
                 >
                   <option value="">Sin departamento</option>
-                  {departments.map(dept => (
-                    <option key={dept.id} value={dept.id}>
-                      {dept.name}
-                    </option>
+                  {departments.map(d => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
                   ))}
                 </select>
-                {errors.departmentId && (
-                  <p className="text-sm text-red-600 flex items-center">
-                    <AlertCircle className="h-3 w-3 mr-1" />
-                    {errors.departmentId}
-                  </p>
-                )}
+                {errors.departmentId && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors.departmentId}</p>}
               </div>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="phone">Teléfono</Label>
-              <Input
-                id="phone"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="+52 55 1234 5678"
-                className={errors.phone ? 'border-red-500' : ''}
-              />
-              {errors.phone && (
-                <p className="text-sm text-red-600 flex items-center">
-                  <AlertCircle className="h-3 w-3 mr-1" />
-                  {errors.phone}
-                </p>
-              )}
-            </div>
-          </TabsContent>
-
-          {/* Perfil */}
-          <TabsContent value="profile" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Camera className="h-5 w-5" />
-                  <span>Avatar del Usuario</span>
-                </CardTitle>
-                <CardDescription>
-                  Sube una imagen de perfil para el usuario (opcional)
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center space-x-6">
-                  <div className="relative group">
-                    <Avatar className="h-20 w-20 border-4 border-white shadow-lg">
-                      <AvatarImage src={avatarPreview || undefined} alt="Preview" />
-                      <AvatarFallback className="text-lg font-semibold bg-gradient-to-br from-blue-500 to-purple-600 text-white">
-                        {formData.name.split(' ').map(n => n[0]).join('').toUpperCase() || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
-                    {/* Botón para cambiar foto */}
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full p-0 shadow-sm"
-                      title="Seleccionar foto"
-                      onClick={() => document.getElementById('avatar')?.click()}
-                    >
-                      <Camera className="h-4 w-4" />
-                    </Button>
-                    {/* Botón para limpiar foto - Solo visible si hay foto seleccionada */}
-                    {(formData.avatar || avatarPreview) && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0 shadow-sm bg-white hover:bg-red-50 border-red-200 opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Limpiar foto"
-                        onClick={() => {
-                          setFormData({ ...formData, avatar: undefined })
-                          setAvatarPreview(null)
-                        }}
-                      >
-                        <X className="h-3 w-3 text-red-600" />
-                      </Button>
-                    )}
-                  </div>
-                  
-                  <div className="flex-1">
-                    <div className="space-y-2">
-                      <Label htmlFor="avatar">Seleccionar Imagen</Label>
-                      <Input
-                        id="avatar"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleAvatarChange}
-                        className="hidden"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Haz clic en el icono de cámara para seleccionar una foto. Formatos: JPG, PNG, GIF (máx. 5MB)
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Vista Previa */}
-          <TabsContent value="preview" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <CheckCircle className="h-5 w-5" />
-                  <span>Vista Previa del Usuario</span>
-                </CardTitle>
-                <CardDescription>
-                  Revisa la información antes de crear el usuario
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-start space-x-6">
-                  <Avatar className="h-16 w-16 border-4 border-white shadow-lg">
-                    <AvatarImage src={avatarPreview || undefined} alt={formData.name} />
-                    <AvatarFallback className="text-lg font-semibold bg-gradient-to-br from-blue-500 to-purple-600 text-white">
-                      {formData.name.split(' ').map(n => n[0]).join('').toUpperCase() || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                  
-                  <div className="flex-1 space-y-3">
-                    <div>
-                      <h3 className="text-lg font-semibold text-foreground">{formData.name || 'Nombre del usuario'}</h3>
-                      <p className="text-muted-foreground flex items-center">
-                        <Mail className="h-4 w-4 mr-1" />
-                        {formData.email || 'email@empresa.com'}
-                      </p>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2 flex-wrap gap-2">
-                      {selectedRole && (
-                        <Badge className={selectedRole.color}>
-                          <selectedRole.icon className="h-3 w-3 mr-1" />
-                          {selectedRole.label}
-                        </Badge>
-                      )}
-                      
-                      {selectedDepartment && (
-                        <Badge variant="outline" style={{ 
-                          borderColor: selectedDepartment.color,
-                          color: selectedDepartment.color 
-                        }}>
-                          <Building className="h-3 w-3 mr-1" />
-                          {selectedDepartment.name}
-                        </Badge>
-                      )}
-                    </div>
-                    
-                    {formData.phone && (
-                      <p className="text-sm text-muted-foreground flex items-center">
-                        <Phone className="h-4 w-4 mr-1" />
-                        {formData.phone}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-
-        <DialogFooter className="flex justify-between">
-          <Button type="button" variant="outline" onClick={handleClose} disabled={loading}>
-            Cancelar
-          </Button>
-          <div className="flex space-x-2">
-            {activeTab !== 'basic' && (
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => {
-                  const tabs = ['basic', 'profile', 'preview']
-                  const currentIndex = tabs.indexOf(activeTab)
-                  if (currentIndex > 0) {
-                    setActiveTab(tabs[currentIndex - 1])
-                  }
-                }}
-                disabled={loading}
-              >
-                Anterior
-              </Button>
-            )}
-            
-            {activeTab !== 'preview' ? (
-              <Button 
-                type="button" 
-                onClick={() => {
-                  const tabs = ['basic', 'profile', 'preview']
-                  const currentIndex = tabs.indexOf(activeTab)
-                  if (currentIndex < tabs.length - 1) {
-                    setActiveTab(tabs[currentIndex + 1])
-                  }
-                }}
-                disabled={loading}
-              >
-                Siguiente
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                onClick={handleSubmit}
-                disabled={loading || !formData.name || !formData.email || !formData.password}
-              >
-                {loading ? (
-                  <>
-                    <Upload className="h-4 w-4 mr-2 animate-spin" />
-                    Creando Usuario...
-                  </>
-                ) : (
-                  <>
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Crear Usuario
-                  </>
-                )}
-              </Button>
-            )}
           </div>
-        </DialogFooter>
+
+          {/* ── FOOTER ────────────────────────────────────────────── */}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={handleClose} disabled={loading}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSubmit}
+              disabled={loading || !formData.name || !formData.email || !formData.password}
+            >
+              {loading ? (
+                <><Save className="h-4 w-4 mr-2 animate-spin" />Creando...</>
+              ) : (
+                <><UserPlus className="h-4 w-4 mr-2" />Crear Usuario</>
+              )}
+            </Button>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   )

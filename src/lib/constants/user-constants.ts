@@ -3,7 +3,7 @@
  * Evita duplicación y asegura consistencia visual
  */
 
-import { Shield, Wrench, UserCircle, Crown, LucideIcon } from 'lucide-react'
+import { Shield, Wrench, UserCircle, LucideIcon } from 'lucide-react'
 
 // ============================================================================
 // DEFINICIONES DE ROLES
