@@ -168,11 +168,6 @@ export function preloadComponent(importFn: () => Promise<any>) {
 export const LazyComponents = {
   TicketTable: lazy(() => import('@/components/tickets/ticket-table').then(module => ({ default: module.TicketTable }))),
   
-  TicketForm: withLazyLoading(
-    () => import('@/components/tickets/ticket-form'),
-    { fallback: <LoadingSkeleton.Form /> }
-  ),
-  
   Dashboard: withLazyLoading(
     () => import('@/components/dashboard/dashboard'),
     { fallback: <LoadingSkeleton.Dashboard /> }

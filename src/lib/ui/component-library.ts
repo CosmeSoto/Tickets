@@ -69,7 +69,6 @@ export const componentCategories = {
     'PriorityBadge',
     'CategoryBadge',
     'UserBadge',
-    'TicketForm',
     'TicketTable',
     'FileUpload',
     'AutoAssignment',
