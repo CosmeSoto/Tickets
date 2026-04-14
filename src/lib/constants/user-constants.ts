@@ -3,7 +3,7 @@
  * Evita duplicación y asegura consistencia visual
  */
 
-import { Shield, Wrench, UserCircle, LucideIcon } from 'lucide-react'
+import { Shield, Wrench, UserCircle, Crown, LucideIcon } from 'lucide-react'
 
 // ============================================================================
 // DEFINICIONES DE ROLES
@@ -53,6 +53,7 @@ export const USER_ROLE_ICONS: Record<UserRole, LucideIcon> = {
 
 export const USER_ROLE_FILTER_OPTIONS = [
   { value: 'all', label: 'Todos los roles' },
+  { value: 'SUPER_ADMIN', label: 'Super Admin' },
   { value: USER_ROLES.ADMIN, label: USER_ROLE_LABELS.ADMIN },
   { value: USER_ROLES.TECHNICIAN, label: USER_ROLE_LABELS.TECHNICIAN },
   { value: USER_ROLES.CLIENT, label: USER_ROLE_LABELS.CLIENT }

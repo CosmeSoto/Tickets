@@ -5,7 +5,7 @@
 
 'use client'
 
-import { Search, RefreshCw, Filter, X, Users } from 'lucide-react'
+import { Search, RefreshCw, Filter, X, Users, Crown } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -120,17 +120,19 @@ export function UserFilters({
             </Button>
             
             {USER_ROLE_FILTER_OPTIONS.slice(1).map((option) => {
-              const role = option.value as UserRole
-              const Icon = USER_ROLE_ICONS[role]
-              const isActive = roleFilter === role
+              const isSuperAdmin = option.value === 'SUPER_ADMIN'
+              const role = isSuperAdmin ? 'ADMIN' : option.value as UserRole
+              const Icon = isSuperAdmin ? Crown : USER_ROLE_ICONS[role as UserRole]
+              const isActive = roleFilter === option.value
               
               return (
                 <Button
                   key={option.value}
                   variant={isActive ? 'default' : 'outline'}
                   size='sm'
-                  onClick={() => setRoleFilter(role)}
+                  onClick={() => setRoleFilter(option.value)}
                   disabled={loading}
+                  className={isSuperAdmin && isActive ? 'bg-amber-500 hover:bg-amber-600 border-amber-500' : isSuperAdmin ? 'text-amber-600 border-amber-300 hover:bg-amber-50' : ''}
                 >
                   <Icon className="h-4 w-4 mr-1" />
                   {option.label}

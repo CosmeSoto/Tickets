@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') // Búsqueda por nombre o email
     const limit = searchParams.get('limit') // Límite de resultados
     const canManageInventory = searchParams.get('canManageInventory') // Filtrar por permiso de gestión
+    const isSuperAdmin = searchParams.get('isSuperAdmin') // Filtrar super admins
 
     // Construir filtros para Prisma
     const where: any = {}
@@ -51,6 +52,10 @@ export async function GET(request: NextRequest) {
 
     if (canManageInventory !== null) {
       where.canManageInventory = canManageInventory === 'true'
+    }
+
+    if (isSuperAdmin !== null) {
+      where.isSuperAdmin = isSuperAdmin === 'true'
     }
 
     if (departmentId) {

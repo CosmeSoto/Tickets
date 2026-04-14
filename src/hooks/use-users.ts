@@ -112,7 +112,15 @@ function filterUsers(users: UserData[], filters: UserFilters, currentUserId?: st
 
     // Rol - solo filtrar si hay un rol específico seleccionado
     if (filters.role && filters.role !== 'all') {
-      if (user.role !== filters.role) return false
+      if (filters.role === 'SUPER_ADMIN') {
+        // Super Admin = ADMIN con isSuperAdmin=true
+        if (user.role !== 'ADMIN' || !user.isSuperAdmin) return false
+      } else if (filters.role === 'ADMIN') {
+        // Admin normal = ADMIN con isSuperAdmin=false (excluye super admins)
+        if (user.role !== 'ADMIN' || user.isSuperAdmin) return false
+      } else {
+        if (user.role !== filters.role) return false
+      }
     }
 
     // Estado - solo filtrar si hay un estado específico seleccionado
