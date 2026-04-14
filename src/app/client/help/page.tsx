@@ -39,7 +39,7 @@ const faqs: FAQ[] = [
     id: '1',
     question: '¿Cómo creo un nuevo ticket?',
     answer:
-      'Para crear un nuevo ticket, haz clic en el botón "Crear Ticket" en el menú principal o en tu dashboard. Completa el formulario con el título, descripción detallada del problema, selecciona la categoría apropiada y la prioridad. Puedes adjuntar archivos si es necesario. Una vez enviado, recibirás una notificación de confirmación y podrás hacer seguimiento desde "Mis Tickets".',
+      'Para crear un nuevo ticket, haz clic en el botón "Crear Ticket" en el menú principal o en tu dashboard. Completa el formulario con el título, una descripción detallada de tu problema o solicitud, selecciona el área correspondiente, la categoría y la prioridad. Puedes adjuntar archivos si es necesario. Una vez enviado, recibirás una confirmación y podrás hacer seguimiento desde "Mis Tickets".',
     category: 'Primeros Pasos',
     icon: Zap,
   },
@@ -55,7 +55,7 @@ const faqs: FAQ[] = [
     id: '3',
     question: '¿Qué significan los diferentes estados de un ticket?',
     answer:
-      'Los estados de un ticket son: OPEN (recién creado, esperando asignación), IN_PROGRESS (un técnico está trabajando en él), RESOLVED (el problema ha sido solucionado, esperando tu confirmación), CLOSED (ticket finalizado y cerrado). También existe PENDING para tickets que esperan información adicional de tu parte.',
+      'Los estados de un ticket son: OPEN (recién creado, esperando asignación), IN_PROGRESS (el equipo está trabajando en él), RESOLVED (la solicitud ha sido atendida, esperando tu confirmación), CLOSED (ticket finalizado). También existe PENDING para tickets que esperan información adicional de tu parte.',
     category: 'Gestión de Tickets',
     icon: FileText,
   },
@@ -63,7 +63,7 @@ const faqs: FAQ[] = [
     id: '4',
     question: '¿Cómo puedo responder o agregar información a un ticket?',
     answer:
-      'Abre el ticket desde "Mis Tickets" y encontrarás un área de comentarios en la parte inferior. Escribe tu mensaje, puedes adjuntar archivos si es necesario, y haz clic en "Enviar Comentario". El técnico asignado recibirá una notificación inmediata de tu respuesta.',
+      'Abre el ticket desde "Mis Tickets" y encontrarás un área de comentarios en la parte inferior. Escribe tu mensaje, puedes adjuntar archivos si es necesario, y haz clic en "Enviar Comentario". El responsable asignado recibirá una notificación inmediata de tu respuesta.',
     category: 'Gestión de Tickets',
     icon: MessageSquare,
   },
@@ -71,7 +71,7 @@ const faqs: FAQ[] = [
     id: '5',
     question: '¿Puedo cambiar la prioridad de mi ticket?',
     answer:
-      'No, los clientes no pueden cambiar la prioridad de un ticket una vez creado. Sin embargo, si consideras que tu ticket requiere atención urgente, puedes agregar un comentario explicando la situación y un administrador evaluará si es necesario ajustar la prioridad.',
+      'No, los clientes no pueden cambiar la prioridad de un ticket una vez creado. Sin embargo, si consideras que tu solicitud requiere atención urgente, puedes agregar un comentario explicando la situación y el equipo evaluará si es necesario ajustar la prioridad.',
     category: 'Gestión de Tickets',
     icon: FileText,
   },
@@ -79,7 +79,7 @@ const faqs: FAQ[] = [
     id: '6',
     question: '¿Cómo configuro mis notificaciones?',
     answer:
-      'Ve a "Configuración" en el menú principal, luego a la pestaña "Notificaciones". Allí puedes activar o desactivar notificaciones por email y push, elegir qué tipos de eventos quieres recibir (actualizaciones de tickets, nuevos comentarios, cambios de estado) y configurar horarios silenciosos si no quieres recibir notificaciones en ciertos horarios.',
+      'Ve a "Configuración" en el menú principal, luego a la sección "Notificaciones". Allí puedes activar o desactivar notificaciones por email, elegir qué tipos de eventos quieres recibir (actualizaciones de tickets, nuevos comentarios, cambios de estado) y ajustar tus preferencias según tus necesidades.',
     category: 'Configuración de Cuenta',
     icon: HelpCircle,
   },
@@ -87,7 +87,7 @@ const faqs: FAQ[] = [
     id: '7',
     question: '¿Cómo actualizo mi información personal?',
     answer:
-      'En "Configuración", pestaña "Personal", puedes actualizar tu nombre, email, teléfono y otros datos de contacto. También puedes cambiar tu contraseña, configurar tu zona horaria y preferencias de tema (claro/oscuro). Recuerda guardar los cambios antes de salir.',
+      'En "Configuración", sección "Personal", puedes actualizar tu nombre, email, teléfono y otros datos de contacto. También puedes cambiar tu contraseña y configurar tus preferencias de tema (claro/oscuro). Recuerda guardar los cambios antes de salir.',
     category: 'Configuración de Cuenta',
     icon: HelpCircle,
   },

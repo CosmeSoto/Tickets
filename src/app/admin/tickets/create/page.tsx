@@ -697,23 +697,23 @@ export default function CreateTicketPage() {
                 <div className='space-y-3 text-sm'>
                   <div className='flex items-start space-x-2'>
                     <CheckCircle className='h-4 w-4 text-green-600 mt-0.5 flex-shrink-0' />
-                    <p>Usa un título claro y específico</p>
+                    <p>Usa un título claro que resuma el problema o solicitud</p>
                   </div>
                   <div className='flex items-start space-x-2'>
                     <CheckCircle className='h-4 w-4 text-green-600 mt-0.5 flex-shrink-0' />
-                    <p>Incluye pasos para reproducir el problema</p>
+                    <p>Describe con detalle qué ocurrió, cuándo y dónde</p>
                   </div>
                   <div className='flex items-start space-x-2'>
                     <CheckCircle className='h-4 w-4 text-green-600 mt-0.5 flex-shrink-0' />
-                    <p>Menciona el navegador y sistema operativo</p>
+                    <p>Indica si el problema es recurrente o puntual</p>
                   </div>
                   <div className='flex items-start space-x-2'>
                     <CheckCircle className='h-4 w-4 text-green-600 mt-0.5 flex-shrink-0' />
-                    <p>Adjunta capturas de pantalla si es relevante</p>
+                    <p>Adjunta fotos, capturas o documentos de respaldo si aplica</p>
                   </div>
                   <div className='flex items-start space-x-2'>
                     <CheckCircle className='h-4 w-4 text-green-600 mt-0.5 flex-shrink-0' />
-                    <p>Selecciona la prioridad correcta</p>
+                    <p>Selecciona la prioridad según el impacto real en tu trabajo</p>
                   </div>
                 </div>
               </CardContent>

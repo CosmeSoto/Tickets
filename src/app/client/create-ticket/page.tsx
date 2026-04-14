@@ -775,10 +775,11 @@ export default function CreateTicketPage() {
                 <AlertDescription>
                   <strong>Consejos para una mejor atención:</strong>
                   <ul className='mt-2 space-y-1 text-sm'>
-                    <li>• Sé específico en la descripción del problema</li>
-                    <li>• Incluye capturas de pantalla si es relevante</li>
-                    <li>• Menciona qué navegador o sistema operativo usas</li>
+                    <li>• Usa un título claro que resuma el problema o solicitud</li>
+                    <li>• Describe con detalle qué ocurrió, cuándo y dónde</li>
                     <li>• Indica si el problema es recurrente o puntual</li>
+                    <li>• Adjunta fotos, capturas o documentos de respaldo si aplica</li>
+                    <li>• Selecciona la prioridad según el impacto real en tu trabajo</li>
                   </ul>
                 </AlertDescription>
               </Alert>
