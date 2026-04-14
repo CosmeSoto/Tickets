@@ -259,7 +259,11 @@ function CatalogsContent() {
               ) : items.length === 0 ? (
                 <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No hay elementos. Crea el primero.</TableCell></TableRow>
               ) : items.map(item => (
-                <TableRow key={item.id} className="hover:bg-muted/50">
+                <TableRow
+                  key={item.id}
+                  className="hover:bg-muted/50 cursor-pointer"
+                  onClick={() => openEdit(item)}
+                >
                   {catalog.hasCode && <TableCell className="font-mono text-xs text-muted-foreground">{item.code}</TableCell>}
                   <TableCell className="font-medium">
                     {item.name}
@@ -279,7 +283,7 @@ function CatalogsContent() {
                       {item.isActive ? 'Activo' : 'Inactivo'}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right" onClick={e => e.stopPropagation()}>
                     <div className="flex justify-end gap-1">
                       <Button variant="ghost" size="icon" title="Editar" onClick={() => openEdit(item)}>
                         <Pencil className="h-4 w-4" />
