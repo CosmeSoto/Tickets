@@ -139,11 +139,13 @@ export default function CategoriesPage() {
       )
     : familyFilteredCategories
   // Configuración de paginación para DataTableAdvanced
+  // IMPORTANTE: usar familyFilteredCategories.length como total, no pagination.totalItems
+  // porque pagination viene del hook sin filtro de familia
   const paginationConfig = pagination ? {
     page: pagination.currentPage,
     limit: pagination.pageSize,
-    total: pagination.totalItems,
-    totalPages: pagination.totalPages,
+    total: familyFilteredCategories.length,
+    totalPages: Math.ceil(familyFilteredCategories.length / pagination.pageSize),
     onPageChange: pagination.goToPage,
     onLimitChange: pagination.setPageSize,
   } : undefined
@@ -301,16 +303,10 @@ export default function CategoriesPage() {
   // Preparar datos para vista árbol
   const hierarchicalCategories = useMemo(() => {
     if (viewMode !== 'tree') return []
-    
-    // Para vista árbol, usar todas las categorías filtradas (sin paginación)
-    const hierarchy = buildHierarchy(filteredCategories)
-    console.log('🌳 Hierarchy built:', {
-      totalCategories: filteredCategories.length,
-      rootNodes: hierarchy.length,
-      firstRoot: hierarchy[0]
-    })
+    // Para vista árbol, usar categorías filtradas incluyendo filtro de familia
+    const hierarchy = buildHierarchy(familyFilteredCategories)
     return hierarchy
-  }, [viewMode, filteredCategories])
+  }, [viewMode, familyFilteredCategories])
 
   return (
     <ModuleLayout
@@ -352,7 +348,8 @@ export default function CategoriesPage() {
                   <span>Categorías</span>
                 </CardTitle>
                 <CardDescription>
-                  Categorías con 4 niveles jerárquicos • {filteredCategories.length} categorías
+                  Categorías con 4 niveles jerárquicos • {familyFilteredCategories.length} categorías
+                  {familyFilter !== 'all' && ` (filtradas por área)`}
                 </CardDescription>
               </div>
               <div className='flex items-center space-x-2'>
@@ -530,7 +527,7 @@ export default function CategoriesPage() {
             {/* Vista condicional */}
             {viewMode === 'tree' ? (
               <>
-                {(pagination ? pagination.totalItems : filteredCategories.length) === 0 ? (
+                {(pagination ? familyFilteredCategories.length : familyFilteredCategories.length) === 0 ? (
                   <div className='text-center py-8'>
                     <FolderTree className='h-12 w-12 text-muted-foreground mx-auto mb-4' />
                     <p className='text-muted-foreground'>
@@ -575,11 +572,11 @@ export default function CategoriesPage() {
                         : []
                     }))}
                     onEdit={(category: any) => {
-                      const originalCategory = filteredCategories.find(c => c.id === category.id)
+                      const originalCategory = familyFilteredCategories.find(c => c.id === category.id)
                       if (originalCategory) handleEdit(originalCategory)
                     }}
                     onDelete={(category: any) => {
-                      const originalCategory = filteredCategories.find(c => c.id === category.id)
+                      const originalCategory = familyFilteredCategories.find(c => c.id === category.id)
                       if (originalCategory) setDeletingCategory(originalCategory)
                     }}
                     searchTerm={searchTerm}

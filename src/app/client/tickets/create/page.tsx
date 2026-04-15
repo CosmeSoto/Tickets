@@ -103,6 +103,7 @@ function CreateClientTicketContent() {
   const [availableFamilies, setAvailableFamilies] = useState<FamilyOption[]>([])
   const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(null)
   const [loadingFamilies, setLoadingFamilies] = useState(false)
+  const prevFamilyIdRef = useRef<string | null>(null)
 
   // Estados para archivos
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
@@ -178,6 +179,15 @@ function CreateClientTicketContent() {
       .catch(() => {})
       .finally(() => setLoadingFamilies(false))
   }, [session, status, router, setValue])
+
+  // Resetear categoría cuando cambia la familia
+  useEffect(() => {
+    if (prevFamilyIdRef.current !== selectedFamilyId) {
+      prevFamilyIdRef.current = selectedFamilyId
+      // Solo resetear si ya había una categoría seleccionada
+      if (selectedCategoryId) setValue('categoryId', '')
+    }
+  }, [selectedFamilyId])
 
   // Manejar selección de archivos
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -539,6 +549,7 @@ function CreateClientTicketContent() {
                     ticketTitle={ticketTitle || ''}
                     ticketDescription={ticketDescription || ''}
                     clientId={session?.user?.id || ''}
+                    familyId={selectedFamilyId ?? undefined}
                     error={errors.categoryId?.message}
                   />
                 </div>

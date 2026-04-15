@@ -3,7 +3,7 @@
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { BackToTickets } from '@/components/tickets/back-to-tickets'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -14,8 +14,6 @@ import {
   FolderTree,
   Search,
   Ticket,
-  Clock,
-  TrendingUp,
   AlertCircle,
   CheckCircle,
   BarChart3,
@@ -94,16 +92,14 @@ export default function TechnicianCategoriesPage() {
 
   if (isLoading) {
     return (
-      <RoleDashboardLayout title="Mis Categorías" subtitle="Categorías asignadas">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        </div>
-      </RoleDashboardLayout>
+      <ModuleLayout title="Mis Categorías" subtitle="Categorías asignadas" loading={true}>
+        <div />
+      </ModuleLayout>
     )
   }
 
   return (
-    <RoleDashboardLayout
+    <ModuleLayout
       title="Mis Categorías"
       subtitle={`${categories.length} categorías asignadas`}
     >
@@ -307,6 +303,6 @@ export default function TechnicianCategoriesPage() {
           </div>
         )}
       </div>
-    </RoleDashboardLayout>
+    </ModuleLayout>
   )
 }

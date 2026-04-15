@@ -82,11 +82,9 @@ export function useCategories(options: UseCategoriesOptions = {}) {
         (statusFilter === 'active' && category.isActive) ||
         (statusFilter === 'inactive' && !category.isActive)
       
-      // Filtro de departamento
+      // Filtro de departamento — filtra por departmentId de la categoría
       const matchesDepartment = departmentFilter === 'all' || 
-        (category.technician_assignments && category.technician_assignments.some((ta: any) => 
-          ta.users?.departmentId === departmentFilter
-        ))
+        category.departmentId === departmentFilter
       
       return matchesSearch && matchesLevel && matchesStatus && matchesDepartment
     })

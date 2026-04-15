@@ -21,13 +21,17 @@ export interface CategorySelectorWrapperProps {
   ticketTitle?: string;
   ticketDescription?: string;
   clientId?: string;
+  familyId?: string;
   error?: string;
   disabled?: boolean;
 }
 
 /**
  * Wrapper component that handles feature flag initialization and
- * switches between enhanced and fallback selectors
+ * switches between enhanced and fallback selectors.
+ * 
+ * Si se pasa familyId, filtra las categorías para mostrar solo las
+ * que pertenecen a esa familia (a través de departments.familyId).
  */
 export function CategorySelectorWrapper({
   value,
@@ -35,6 +39,7 @@ export function CategorySelectorWrapper({
   ticketTitle = '',
   ticketDescription = '',
   clientId,
+  familyId,
   error,
   disabled = false,
 }: CategorySelectorWrapperProps) {
@@ -44,7 +49,16 @@ export function CategorySelectorWrapper({
     flagsInitialized.current = true;
   }
   const flags = useCategorySelectorFeatureFlags();
-  const { categories, isLoading } = useCategoriesQuery();
+  const { categories: allCategories, isLoading } = useCategoriesQuery();
+
+  // Filtrar por familia si se especifica
+  const categories = React.useMemo(() => {
+    if (!familyId) return allCategories;
+    return allCategories.filter((c: any) => {
+      const catFamilyId = c.departments?.familyId ?? c.departments?.family?.id;
+      return catFamilyId === familyId;
+    });
+  }, [allCategories, familyId]);
 
   // Show loading state while categories load
   if (isLoading) {
