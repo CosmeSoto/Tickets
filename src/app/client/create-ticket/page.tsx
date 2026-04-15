@@ -375,52 +375,86 @@ export default function CreateTicketPage() {
 
   // Step 0: Family selection
   if (familyStep === 'select') {
+    const ownFamilies = families.filter((f: any) => f.isOwnFamily)
+    const otherFamilies = families.filter((f: any) => !f.isOwnFamily)
+
     return (
       <RoleDashboardLayout title='Crear Ticket' subtitle='Selecciona el área de soporte'>
-        <div className='max-w-2xl mx-auto'>
+        <div className='max-w-2xl mx-auto space-y-4'>
           <Card>
             <CardHeader>
-              <CardTitle className='flex items-center'>
-                <Ticket className='h-5 w-5 mr-2 text-blue-600' />
-                ¿A qué área pertenece tu solicitud?
+              <CardTitle className='flex items-center gap-2'>
+                <Ticket className='h-5 w-5 text-primary' />
+                ¿A qué área necesitas soporte?
               </CardTitle>
               <CardDescription>
-                Selecciona el área de soporte para tu ticket
+                Selecciona el área responsable de atender tu solicitud
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-                {families.map(family => {
-                  const isOwn = (family as any).isOwnFamily === true
-                  return (
+            <CardContent className='space-y-4'>
+
+              {/* Familia propia — destacada */}
+              {ownFamilies.length > 0 && (
+                <div className='space-y-2'>
+                  <p className='text-xs font-medium text-muted-foreground uppercase tracking-wide'>Tu área</p>
+                  {ownFamilies.map((family: any) => (
                     <button
                       key={family.id}
                       onClick={() => handleFamilySelect(family.id)}
-                      className={`flex items-start space-x-3 p-4 border-2 rounded-lg transition-all text-left ${
-                        isOwn
-                          ? 'border-primary/40 bg-primary/5 hover:border-primary hover:bg-primary/10'
-                          : 'border-border hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'
-                      }`}
+                      className='w-full flex items-center gap-4 p-4 rounded-xl border-2 border-primary/30 bg-primary/5 hover:border-primary hover:bg-primary/10 transition-all text-left group'
                     >
-                      {family.color && (
-                        <div className='w-4 h-4 rounded-full flex-shrink-0 mt-1' style={{ backgroundColor: family.color }} />
-                      )}
-                      <div className='flex-1'>
+                      <div
+                        className='w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center text-white font-bold text-sm'
+                        style={{ backgroundColor: family.color || '#6B7280' }}
+                      >
+                        {family.code?.slice(0, 2)}
+                      </div>
+                      <div className='flex-1 min-w-0'>
                         <div className='flex items-center gap-2'>
                           <p className='font-semibold text-foreground'>{family.name}</p>
-                          {isOwn && (
-                            <Badge variant='outline' className='text-xs border-primary text-primary'>Mi área</Badge>
-                          )}
+                          <Badge className='text-xs bg-primary/10 text-primary border-primary/20'>Mi área</Badge>
                         </div>
                         {family.description && (
-                          <p className='text-xs text-muted-foreground mt-1'>{family.description}</p>
+                          <p className='text-xs text-muted-foreground mt-0.5 truncate'>{family.description}</p>
                         )}
-                        <Badge variant='outline' className='text-xs mt-2'>{family.code}</Badge>
                       </div>
+                      <ArrowLeft className='h-4 w-4 text-primary rotate-180 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0' />
                     </button>
-                  )
-                })}
-              </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Otras familias */}
+              {otherFamilies.length > 0 && (
+                <div className='space-y-2'>
+                  {ownFamilies.length > 0 && (
+                    <p className='text-xs font-medium text-muted-foreground uppercase tracking-wide'>Otras áreas disponibles</p>
+                  )}
+                  <div className='grid grid-cols-1 sm:grid-cols-2 gap-2'>
+                    {otherFamilies.map((family: any) => (
+                      <button
+                        key={family.id}
+                        onClick={() => handleFamilySelect(family.id)}
+                        className='flex items-center gap-3 p-3 rounded-lg border border-border hover:border-primary/40 hover:bg-muted/50 transition-all text-left'
+                      >
+                        <div
+                          className='w-8 h-8 rounded-md flex-shrink-0 flex items-center justify-center text-white font-bold text-xs'
+                          style={{ backgroundColor: family.color || '#6B7280' }}
+                        >
+                          {family.code?.slice(0, 2)}
+                        </div>
+                        <div className='flex-1 min-w-0'>
+                          <p className='text-sm font-medium text-foreground truncate'>{family.name}</p>
+                          {family.description && (
+                            <p className='text-xs text-muted-foreground truncate'>{family.description}</p>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
             </CardContent>
           </Card>
         </div>

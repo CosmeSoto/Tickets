@@ -14,6 +14,7 @@ export interface TicketFilters {
   category: string
   assignee: string
   dateRange: DateFilter
+  family: string
 }
 
 export interface UseTicketFiltersOptions {
@@ -38,7 +39,8 @@ const DEFAULT_FILTERS: TicketFilters = {
   priority: 'all',
   category: 'all',
   assignee: 'all',
-  dateRange: 'all'
+  dateRange: 'all',
+  family: 'all',
 }
 
 export function useTicketFilters(options: UseTicketFiltersOptions = {}): UseTicketFiltersReturn {

@@ -7,6 +7,7 @@ export interface TicketFilterValues {
   category?: string
   assignee?: string
   dateRange?: string
+  family?: string
 }
 
 /**
@@ -114,6 +115,7 @@ export function filterTicketsClient(tickets: Ticket[], filters: TicketFilterValu
     if (filters.status && filters.status !== 'all' && ticket.status !== filters.status) return false
     if (filters.priority && filters.priority !== 'all' && ticket.priority !== filters.priority) return false
     if (filters.category && filters.category !== 'all' && ticket.category?.id !== filters.category) return false
+    if (filters.family && filters.family !== 'all' && ticket.family?.id !== filters.family) return false
     if (!matchesDateRange(ticket.createdAt, filters.dateRange ?? 'all')) return false
     return true
   })

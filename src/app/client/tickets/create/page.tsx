@@ -37,11 +37,21 @@ import {
   X,
   Paperclip,
   MapPin,
+  Users,
+  Star,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/hooks/use-toast'
 import { CategorySelectorWrapper } from '@/features/category-selection'
 import { FilePreviewList } from '@/components/tickets/file-preview-list'
+
+interface FamilyOption {
+  id: string
+  name: string
+  code: string
+  color?: string | null
+  isUserFamily?: boolean
+}
 
 const priorityLabels = {
   LOW: 'Baja',
@@ -89,6 +99,11 @@ function CreateClientTicketContent() {
   const [createdTicketId, setCreatedTicketId] = useState<string | null>(null)
   const [equipmentId, setEquipmentId] = useState<string | null>(null)
   
+  // Familias disponibles para el cliente
+  const [availableFamilies, setAvailableFamilies] = useState<FamilyOption[]>([])
+  const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(null)
+  const [loadingFamilies, setLoadingFamilies] = useState(false)
+
   // Estados para archivos
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -140,6 +155,28 @@ function CreateClientTicketContent() {
 
     // Auto-asignar el clientId
     setValue('clientId', session.user.id)
+
+    // Cargar familias disponibles para este cliente
+    setLoadingFamilies(true)
+    fetch('/api/families')
+      .then(r => r.json())
+      .then(d => {
+        if (d.success && Array.isArray(d.data)) {
+          const families: FamilyOption[] = d.data.map((f: any) => ({
+            id: f.id,
+            name: f.name,
+            code: f.code,
+            color: f.color,
+            isUserFamily: f.isOwnFamily ?? false,
+          }))
+          setAvailableFamilies(families)
+          // Pre-seleccionar la familia del usuario si existe
+          const userFamily = families.find(f => f.isUserFamily)
+          if (userFamily) setSelectedFamilyId(userFamily.id)
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingFamilies(false))
   }, [session, status, router, setValue])
 
   // Manejar selección de archivos
@@ -204,7 +241,10 @@ function CreateClientTicketContent() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          ...(selectedFamilyId ? { familyId: selectedFamilyId } : {}),
+        }),
       })
 
       if (response.ok) {
@@ -416,6 +456,72 @@ function CreateClientTicketContent() {
               </div>
 
               <Separator />
+
+              {/* Área / Familia de soporte */}
+              {availableFamilies.length > 0 && (
+                <div className='space-y-2'>
+                  <Label className='flex items-center gap-1.5 text-sm font-semibold'>
+                    <Users className='h-4 w-4' />
+                    Área de soporte
+                    <span className='text-muted-foreground font-normal text-xs'>(opcional)</span>
+                  </Label>
+                  <p className='text-xs text-muted-foreground'>
+                    Selecciona el equipo que debe atender tu solicitud.
+                  </p>
+                  <div className='grid grid-cols-1 sm:grid-cols-2 gap-2'>
+                    {/* Opción "Sin preferencia" */}
+                    <button
+                      type='button'
+                      onClick={() => setSelectedFamilyId(null)}
+                      className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${
+                        selectedFamilyId === null
+                          ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                          : 'border-border hover:border-primary/40 hover:bg-muted/40'
+                      }`}
+                    >
+                      <span className='flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground text-xs font-bold flex-shrink-0'>
+                        ?
+                      </span>
+                      <div className='min-w-0'>
+                        <p className='text-sm font-medium truncate'>Sin preferencia</p>
+                        <p className='text-xs text-muted-foreground'>El sistema asignará automáticamente</p>
+                      </div>
+                    </button>
+
+                    {availableFamilies.map(family => (
+                      <button
+                        key={family.id}
+                        type='button'
+                        onClick={() => setSelectedFamilyId(family.id)}
+                        className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${
+                          selectedFamilyId === family.id
+                            ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                            : 'border-border hover:border-primary/40 hover:bg-muted/40'
+                        }`}
+                      >
+                        <span
+                          className='flex h-8 w-8 items-center justify-center rounded-full text-white text-xs font-bold flex-shrink-0'
+                          style={{ backgroundColor: family.color ?? '#6366f1' }}
+                        >
+                          {family.code.slice(0, 2).toUpperCase()}
+                        </span>
+                        <div className='min-w-0 flex-1'>
+                          <div className='flex items-center gap-1.5'>
+                            <p className='text-sm font-medium truncate'>{family.name}</p>
+                            {family.isUserFamily && (
+                              <Badge variant='secondary' className='text-xs px-1.5 py-0 flex-shrink-0 flex items-center gap-0.5'>
+                                <Star className='h-2.5 w-2.5' />
+                                Mi área
+                              </Badge>
+                            )}
+                          </div>
+                          <p className='text-xs text-muted-foreground font-mono'>{family.code}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Selector de Categorías */}
               <div className='space-y-1.5'>

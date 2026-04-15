@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { 
@@ -9,6 +9,7 @@ import {
   Clock,
   AlertCircle,
   CheckCircle,
+  Users,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -21,6 +22,7 @@ import { SymmetricStatsCard } from '@/components/shared/stats-card'
 import { TicketFilters } from '@/components/tickets/ticket-filters'
 import { clientTicketColumns, createClientTicketColumns } from '@/components/tickets/client/ticket-columns'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 
 // Hooks y tipos
 import { useModuleData } from '@/hooks/common/use-module-data'
@@ -29,9 +31,37 @@ import { usePagination } from '@/hooks/common/use-pagination'
 import type { Ticket as TicketType } from '@/hooks/use-ticket-data'
 import { filterTicketsClient } from '@/lib/utils/ticket-filters'
 
+interface FamilyOption {
+  id: string
+  name: string
+  code: string
+  color?: string | null
+  isOwnFamily?: boolean
+}
+
 export default function ClientTicketsPage() {
   const { data: session } = useSession()
   const router = useRouter()
+
+  // Familias disponibles para filtrar
+  const [families, setFamilies] = useState<FamilyOption[]>([])
+
+  useEffect(() => {
+    fetch('/api/families')
+      .then(r => r.json())
+      .then(d => {
+        if (d.success && Array.isArray(d.data)) {
+          setFamilies(d.data.map((f: any) => ({
+            id: f.id,
+            name: f.name,
+            code: f.code,
+            color: f.color,
+            isOwnFamily: f.isOwnFamily ?? false,
+          })))
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   // Cargar TODOS los tickets UNA VEZ (como técnicos)
   const {
@@ -64,7 +94,6 @@ export default function ClientTicketsPage() {
     if (!session?.user?.id) return []
     return filterTicketsClient(allTickets, debouncedFilters, session.user.id)
   }, [allTickets, debouncedFilters, session?.user?.id])
-
   // Paginación
   const pagination = usePagination(filteredTickets, {
     pageSize: 20
@@ -186,6 +215,48 @@ export default function ClientTicketsPage() {
             } : undefined}
           />
         </div>
+
+        {/* Filtro por familia — chips visuales */}
+        {families.length > 1 && (
+          <div className='flex items-center gap-2 flex-wrap'>
+            <span className='text-sm text-muted-foreground flex items-center gap-1.5'>
+              <Users className='h-3.5 w-3.5' />
+              Área:
+            </span>
+            <button
+              onClick={() => setFilter('family', 'all')}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
+                filters.family === 'all'
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-background border-border text-muted-foreground hover:border-primary/50'
+              }`}
+            >
+              Todas
+            </button>
+            {families.map(f => (
+              <button
+                key={f.id}
+                onClick={() => setFilter('family', f.id)}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
+                  filters.family === f.id
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-background border-border text-muted-foreground hover:border-primary/50'
+                }`}
+              >
+                {f.color && (
+                  <span
+                    className='w-2 h-2 rounded-full flex-shrink-0'
+                    style={{ backgroundColor: f.color }}
+                  />
+                )}
+                {f.name}
+                {f.isOwnFamily && (
+                  <Badge variant='secondary' className='text-xs px-1 py-0 ml-0.5'>Mi área</Badge>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Filtros */}
         <TicketFilters
