@@ -31,6 +31,7 @@ import {
 import { useUnifiedDashboard } from '@/hooks/use-unified-dashboard'
 import { useSystemStatus } from '@/hooks/use-system-status'
 import { useSession } from 'next-auth/react'
+import { AssignedFamiliesPanel } from '@/components/dashboard/assigned-families-panel'
 import {
   Table,
   TableBody,
@@ -147,6 +148,17 @@ export default function AdminDashboard() {
           status={resolutionRate >= 85 ? 'success' : resolutionRate >= 70 ? 'warning' : 'error'}
         />
       </div>
+
+      {/* Familias asignadas */}
+      {stats.assignedFamilies !== undefined && (
+        <div className='mb-8'>
+          <AssignedFamiliesPanel
+            families={stats.assignedFamilies ?? []}
+            isSuperAdmin={stats.isSuperAdmin}
+            role="ADMIN"
+          />
+        </div>
+      )}
 
       {/* Métricas de Planes de Resolución */}
       {stats.resolutionPlans && stats.resolutionPlans.total > 0 && (

@@ -28,6 +28,7 @@ import Link from 'next/link'
 import { useUnifiedDashboard } from '@/hooks/use-unified-dashboard'
 import { getPriorityColor, getStatusColor } from '@/lib/utils/ticket-utils'
 import { useEffect, useState } from 'react'
+import { AssignedFamiliesPanel } from '@/components/dashboard/assigned-families-panel'
 
 interface SystemMetrics {
   responseTime: string
@@ -184,6 +185,18 @@ export default function ClientDashboard() {
             role='CLIENT'
             status={(stats.pendingMaintenance || 0) > 0 ? 'warning' : 'normal'}
             badge={{ text: 'Tus equipos', variant: 'default' }}
+          />
+        </div>
+      )}
+
+      {/* Familias asignadas */}
+      {(stats.assignedFamilies?.length > 0 || stats.inventoryFamilies?.length > 0) && (
+        <div className='mb-8'>
+          <AssignedFamiliesPanel
+            families={stats.assignedFamilies ?? []}
+            inventoryFamilies={stats.inventoryFamilies}
+            isInventoryManager={stats.isInventoryManager}
+            role="CLIENT"
           />
         </div>
       )}

@@ -360,6 +360,26 @@ export async function GET(request: NextRequest) {
         familyMetrics: await getFamilyMetrics(),
         proactiveAlerts: await getProactiveAlerts(),
       }
+
+      // Familias asignadas al admin (o todas si es super admin)
+      const isSuperAdmin = (session.user as any).isSuperAdmin === true
+      if (isSuperAdmin) {
+        const allFamilies = await prisma.families.findMany({
+          where: { isActive: true },
+          select: { id: true, name: true, code: true, color: true, icon: true }
+        })
+        stats.assignedFamilies = allFamilies
+        stats.isSuperAdmin = true
+      } else {
+        const adminFamilies = await prisma.admin_family_assignments.findMany({
+          where: { adminId: userId, isActive: true },
+          select: {
+            family: { select: { id: true, name: true, code: true, color: true, icon: true } }
+          }
+        })
+        stats.assignedFamilies = adminFamilies.map(a => a.family)
+        stats.isSuperAdmin = false
+      }
     } else if (role === 'TECHNICIAN') {
       // Estadísticas profesionales para técnico
       const [
@@ -490,6 +510,27 @@ export async function GET(request: NextRequest) {
           taskCompletionRate: myTaskCompletionRate
         }
       }
+
+      // Agregar familias asignadas al técnico
+      const techFamilies = await prisma.technician_family_assignments.findMany({
+        where: { technicianId: userId, isActive: true },
+        select: {
+          family: { select: { id: true, name: true, code: true, color: true, icon: true } }
+        }
+      })
+      stats.assignedFamilies = techFamilies.map(a => a.family)
+      stats.isInventoryManager = (session.user as any).canManageInventory === true
+
+      // Si es gestor de inventario, agregar familias de inventario
+      if (stats.isInventoryManager) {
+        const invFamilies = await prisma.inventory_manager_families.findMany({
+          where: { managerId: userId },
+          select: {
+            family: { select: { id: true, name: true, code: true, color: true, icon: true } }
+          }
+        })
+        stats.inventoryFamilies = invFamilies.map(a => a.family)
+      }
     } else if (role === 'CLIENT') {
       // Estadísticas profesionales para cliente
       const [
@@ -573,6 +614,30 @@ export async function GET(request: NextRequest) {
         assignedEquipment,
         pendingMaintenance,
         supportQuality: avgRating >= 4.5 ? 'excellent' : avgRating >= 4 ? 'good' : 'fair'
+      }
+
+      // Familias del cliente: las de sus tickets + familias de inventario si es gestor
+      const canManageInv = (session.user as any).canManageInventory === true
+      stats.isInventoryManager = canManageInv
+      if (canManageInv) {
+        const invFamilies = await prisma.inventory_manager_families.findMany({
+          where: { managerId: userId },
+          select: {
+            family: { select: { id: true, name: true, code: true, color: true, icon: true } }
+          }
+        })
+        stats.inventoryFamilies = invFamilies.map(a => a.family)
+        stats.assignedFamilies = invFamilies.map(a => a.family)
+      } else {
+        // Familias de los tickets del cliente
+        const clientTicketFamilies = await prisma.tickets.findMany({
+          where: { clientId: userId, familyId: { not: null } },
+          select: { familyId: true, families: { select: { id: true, name: true, code: true, color: true, icon: true } } },
+          distinct: ['familyId']
+        })
+        stats.assignedFamilies = clientTicketFamilies
+          .filter(t => t.families)
+          .map(t => t.families!)
       }
     }
 
