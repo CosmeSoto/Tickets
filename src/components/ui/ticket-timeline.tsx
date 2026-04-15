@@ -11,7 +11,7 @@ import { StatusBadge, PriorityBadge } from './status-badge'
 import {
   Clock, User, MessageSquare, Settings, CheckCircle, AlertCircle,
   FileText, Star, Send, Paperclip, Upload, Calendar, Target, Eye, Download,
-  Image as ImageIcon, File as FileIcon
+  Image as ImageIcon, File as FileIcon, Lock, Globe
 } from 'lucide-react'
 import { useTimeline, type TimelineEvent } from '@/hooks/use-timeline'
 import { formatTimeAgo } from '@/hooks/use-ticket-data'
@@ -239,7 +239,8 @@ export function TicketTimeline({
     return icons[type] ?? <Clock className="h-4 w-4" />
   }
 
-  const getEventColor = (type: TimelineEvent['type']) => {
+  const getEventColor = (type: TimelineEvent['type'], isInternal?: boolean) => {
+    if (type === 'comment' && isInternal) return 'text-amber-700 bg-amber-100 dark:text-amber-300 dark:bg-amber-900/50'
     const colors: Record<string, string> = {
       comment: 'text-blue-600 bg-blue-100',
       status_change: 'text-purple-600 bg-purple-100',
@@ -525,8 +526,15 @@ export function TicketTimeline({
                 : 'bg-muted border-border'
             }`}>
               {isInternal && (
-                <div className="flex items-center space-x-2 text-xs font-medium text-amber-700 dark:text-amber-400">
-                  <span>🔒 El cliente no verá este comentario</span>
+                <div className="flex items-center gap-2 text-xs font-medium text-amber-700 dark:text-amber-400">
+                  <Lock className="h-3.5 w-3.5" />
+                  <span>El cliente no verá este comentario</span>
+                </div>
+              )}
+              {!isInternal && !canViewInternal && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Globe className="h-3.5 w-3.5" />
+                  <span>Tu mensaje será visible para el equipo de soporte</span>
                 </div>
               )}
               <Textarea
@@ -569,29 +577,24 @@ export function TicketTimeline({
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <label
-                          htmlFor="tl-internal"
-                          className={`flex items-center space-x-2 cursor-pointer px-3 py-1.5 rounded-md border transition-colors select-none ${
+                        <button
+                          type="button"
+                          onClick={() => setIsInternal(v => !v)}
+                          className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-medium transition-all select-none ${
                             isInternal
-                              ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300'
-                              : 'bg-muted/50 border-border text-muted-foreground hover:bg-muted'
+                              ? 'bg-amber-100 dark:bg-amber-950/60 border-amber-400 dark:border-amber-600 text-amber-800 dark:text-amber-300'
+                              : 'bg-muted/50 border-border text-muted-foreground hover:bg-muted hover:text-foreground'
                           }`}
                         >
-                          <input
-                            type="checkbox"
-                            id="tl-internal"
-                            checked={isInternal}
-                            onChange={e => setIsInternal(e.target.checked)}
-                            className="rounded accent-amber-500"
-                          />
-                          <span className="text-sm font-medium">
-                            {isInternal ? '🔒 Solo equipo' : 'Público'}
-                          </span>
-                        </label>
+                          {isInternal
+                            ? <><Lock className="h-3.5 w-3.5" /> Solo equipo</>
+                            : <><Globe className="h-3.5 w-3.5" /> Público</>
+                          }
+                        </button>
                       </TooltipTrigger>
                       <TooltipContent side="top" className="max-w-xs">
-                        <p className="text-xs"><strong>Público:</strong> el cliente lo ve.</p>
-                        <p className="text-xs mt-1"><strong>Solo equipo 🔒:</strong> el cliente no lo ve.</p>
+                        <p className="text-xs"><strong className="flex items-center gap-1"><Globe className="h-3 w-3" /> Público:</strong> el cliente lo verá.</p>
+                        <p className="text-xs mt-1"><strong className="flex items-center gap-1"><Lock className="h-3 w-3" /> Solo equipo:</strong> el cliente NO lo verá.</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -617,8 +620,11 @@ export function TicketTimeline({
                 .map(event => (
                   <div key={event.id} className="flex space-x-3">
                     {/* Ícono */}
-                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${getEventColor(event.type)}`}>
-                      {getEventIcon(event.type)}
+                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${getEventColor(event.type, event.isInternal)}`}>
+                      {event.type === 'comment' && event.isInternal
+                        ? <Lock className="h-4 w-4" />
+                        : getEventIcon(event.type)
+                      }
                     </div>
 
                     {/* Contenido */}
@@ -632,7 +638,12 @@ export function TicketTimeline({
                             : event.user.role === 'CLIENT' ? 'Cliente'
                             : event.user.role
                           }</Badge>
-                          {event.isInternal && <Badge variant="secondary" className="text-xs">Interno</Badge>}
+                          {event.isInternal && (
+                            <Badge className="text-xs bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/50 dark:text-amber-300 dark:border-amber-700 flex items-center gap-1">
+                              <Lock className="h-2.5 w-2.5" />
+                              Solo equipo
+                            </Badge>
+                          )}
                         </div>
                         <span className="text-sm text-muted-foreground">{formatTimeAgo(event.createdAt)}</span>
                       </div>

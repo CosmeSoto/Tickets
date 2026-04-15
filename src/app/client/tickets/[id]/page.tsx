@@ -533,10 +533,6 @@ export default function ClientTicketDetailPage() {
                   <>
                     <Separator />
                     <div className='flex items-center justify-between'>
-                      <span className='text-sm text-muted-foreground'>Comentarios</span>
-                      <Badge variant='outline'>{ticket._count.comments || 0}</Badge>
-                    </div>
-                    <div className='flex items-center justify-between'>
                       <span className='text-sm text-muted-foreground'>Archivos</span>
                       <Badge variant='outline'>{ticket._count.attachments || 0}</Badge>
                     </div>
