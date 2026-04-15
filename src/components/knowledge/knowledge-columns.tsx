@@ -2,7 +2,7 @@
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Eye, ThumbsUp, Calendar, BookOpen, Tag, Trash2 } from 'lucide-react'
+import { Eye, ThumbsUp, Calendar, BookOpen, Tag, Trash2, Users } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { Column } from '@/components/ui/data-table'
@@ -12,14 +12,16 @@ interface KnowledgeColumnsProps {
   onView: (article: Article) => void
   onDelete?: (article: Article) => void
   currentUserId?: string
+  showFamily?: boolean
 }
 
 export function createKnowledgeColumns({
   onView,
   onDelete,
-  currentUserId
+  currentUserId,
+  showFamily = false,
 }: KnowledgeColumnsProps): Column<Article>[] {
-  return [
+  const columns: Column<Article>[] = [
     {
       key: 'title',
       label: 'Artículo',
@@ -56,6 +58,32 @@ export function createKnowledgeColumns({
         )
       },
     },
+  ]
+
+  // Columna de familia — solo cuando hay múltiples familias (admin/técnico)
+  if (showFamily) {
+    columns.push({
+      key: 'family',
+      label: 'Área',
+      render: (article: Article) => {
+        if (!article.family) return <span className="text-muted-foreground text-xs">General</span>
+        return (
+          <div className="flex items-center gap-1.5">
+            {article.family.color && (
+              <span
+                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                style={{ backgroundColor: article.family.color }}
+              />
+            )}
+            <span className="text-sm font-medium">{article.family.name}</span>
+            <span className="text-xs text-muted-foreground font-mono">({article.family.code})</span>
+          </div>
+        )
+      },
+    })
+  }
+
+  columns.push(
     {
       key: 'tags',
       label: 'Tags',
@@ -163,5 +191,7 @@ export function createKnowledgeColumns({
         )
       },
     },
-  ]
+  )
+
+  return columns
 }

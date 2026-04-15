@@ -10,6 +10,7 @@ export interface Article {
   tags: string[]
   sourceTicketId?: string
   authorId: string
+  familyId?: string | null
   views: number
   helpfulVotes: number
   notHelpfulVotes: number
@@ -27,6 +28,12 @@ export interface Article {
     email: string
     avatar?: string
   }
+  family?: {
+    id: string
+    name: string
+    code: string
+    color?: string | null
+  } | null
   sourceTicket?: {
     id: string
     title: string

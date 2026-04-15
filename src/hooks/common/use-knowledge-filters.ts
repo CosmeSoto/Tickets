@@ -5,12 +5,14 @@ export interface KnowledgeFilters {
   search: string
   category: string
   sortBy: 'recent' | 'views' | 'helpful'
+  family: string
 }
 
 const DEFAULT_FILTERS: KnowledgeFilters = {
   search: '',
   category: 'all',
   sortBy: 'recent',
+  family: 'all',
 }
 
 export function useKnowledgeFilters() {
@@ -40,7 +42,8 @@ export function useKnowledgeFilters() {
     return (
       filters.search !== DEFAULT_FILTERS.search ||
       filters.category !== DEFAULT_FILTERS.category ||
-      filters.sortBy !== DEFAULT_FILTERS.sortBy
+      filters.sortBy !== DEFAULT_FILTERS.sortBy ||
+      filters.family !== DEFAULT_FILTERS.family
     )
   }, [filters])
 
@@ -49,6 +52,7 @@ export function useKnowledgeFilters() {
       filters.search !== DEFAULT_FILTERS.search,
       filters.category !== DEFAULT_FILTERS.category,
       filters.sortBy !== DEFAULT_FILTERS.sortBy,
+      filters.family !== DEFAULT_FILTERS.family,
     ].filter(Boolean).length
   }, [filters])
 
