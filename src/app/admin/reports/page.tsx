@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
+import { useSession } from 'next-auth/react'
 import {
   BarChart3,
   Download,
@@ -19,6 +20,7 @@ import {
   FileDown,
   Star,
   SmilePlus,
+  Crown,
 } from 'lucide-react'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -413,6 +415,9 @@ function exportPDF(
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function ReportsPage() {
+  const { data: session } = useSession()
+  const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
+
   // Families
   const [families, setFamilies] = useState<Family[]>([])
   const [selectedFamilyId, setSelectedFamilyId] = useState<string>('all')
@@ -546,7 +551,10 @@ export default function ReportsPage() {
   }, [selectedFamily, activeTab, executiveData, techniciansData, trendsData, slaData, satisfactionData, granularity, logExport])
 
   return (
-    <RoleDashboardLayout title="Reportes Multi-Familia" subtitle="Análisis de desempeño por familia de soporte">
+    <RoleDashboardLayout 
+      title="Reportes Multi-Familia" 
+      subtitle={isSuperAdmin ? "Vista global — todas las familias" : "Análisis de desempeño de tus familias asignadas"}
+    >
     <div className="space-y-6">
       {/* Global family filter */}
       <Card>
@@ -582,6 +590,17 @@ export default function ReportsPage() {
                     ))}
                   </SelectContent>
                 </Select>
+              )}
+              {/* Badge de alcance */}
+              {isSuperAdmin ? (
+                <Badge className="bg-amber-100 text-amber-700 border-amber-200 flex items-center gap-1 shrink-0">
+                  <Crown className="h-3 w-3" />
+                  Vista global
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-muted-foreground shrink-0">
+                  Tus familias
+                </Badge>
               )}
             </div>
 

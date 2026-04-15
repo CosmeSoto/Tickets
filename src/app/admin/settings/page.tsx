@@ -312,13 +312,18 @@ export default function SettingsPage() {
             <CardContent className='space-y-4'>
               <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                 <div>
-                  <Label htmlFor='systemName'>Nombre del Sistema</Label>
+                  <Label htmlFor='systemName' className='flex items-center gap-1.5'>
+                    Nombre del Sistema
+                    {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' title='Solo Super Admin' />}
+                  </Label>
                   <Input
                     id='systemName'
                     value={settings.systemName}
-                    onChange={e => setSettings({ ...settings, systemName: e.target.value })}
+                    onChange={e => isSuperAdmin && setSettings({ ...settings, systemName: e.target.value })}
                     placeholder='Sistema de Tickets'
+                    disabled={!isSuperAdmin}
                   />
+                  {!isSuperAdmin && <p className='text-xs text-muted-foreground mt-1'>Solo el Super Admin puede cambiar el nombre del sistema</p>}
                 </div>
                 <div>
                   <Label htmlFor='supportEmail'>Email de Soporte</Label>
@@ -327,7 +332,7 @@ export default function SettingsPage() {
                     type='email'
                     value={settings.supportEmail}
                     onChange={e => setSettings({ ...settings, supportEmail: e.target.value })}
-                    placeholder='internet.freecom@gmail.com'
+                    placeholder='soporte@empresa.com'
                   />
                 </div>
               </div>
@@ -713,7 +718,7 @@ export default function SettingsPage() {
 
         {/* Página Pública CMS */}
         <TabsContent value='landing'>
-          <LandingPageCMSTab />
+          <LandingPageCMSTab isSuperAdmin={isSuperAdmin} />
         </TabsContent>
       </Tabs>
     </RoleDashboardLayout>

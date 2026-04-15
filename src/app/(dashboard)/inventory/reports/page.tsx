@@ -13,9 +13,11 @@ import {
   Loader2,
   BarChart3,
   MapPin,
+  Crown,
 } from 'lucide-react'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { FamilyFilterBar } from '@/components/inventory/family-filter-bar'
 
 const REPORTS = [
@@ -80,6 +82,7 @@ const REPORTS = [
 export default function InventoryReportsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
   const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(null)
   const [families, setFamilies] = useState<Array<{ id: string; name: string; icon?: string | null; color?: string | null }>>([])
 
@@ -108,6 +111,24 @@ export default function InventoryReportsPage() {
 
   if (!session?.user) return null
 
+  // Reportes disponibles para todos los admins
+  const baseReports = REPORTS
+
+  // Reporte adicional solo para Super Admin
+  const superAdminReports = isSuperAdmin ? [
+    {
+      slug: 'financial-summary',
+      name: 'Resumen Financiero Global',
+      description: 'Valor total del inventario, costos de mantenimiento y depreciación acumulada de todas las familias',
+      icon: BarChart3,
+      color: 'text-amber-600',
+      bg: 'bg-amber-50',
+      superAdminOnly: true,
+    },
+  ] : []
+
+  const allReports = [...baseReports, ...superAdminReports]
+
   const handleCardClick = (slug: string) => {
     const params = new URLSearchParams()
     if (selectedFamilyId) params.set('familyId', selectedFamilyId)
@@ -118,29 +139,36 @@ export default function InventoryReportsPage() {
   return (
     <RoleDashboardLayout
       title="Reportes de Inventario"
-      subtitle="Consulta el estado del inventario con lenguaje claro y sencillo"
+      subtitle={isSuperAdmin ? "Vista global — todas las familias" : "Consulta el estado del inventario de tus familias"}
     >
       <div className="space-y-6">
         {/* Filtro por familia */}
         {families.length > 0 && (
-          <div>
-            <p className="text-sm text-muted-foreground mb-2">Filtrar por familia:</p>
+          <div className="flex items-center gap-3">
+            <p className="text-sm text-muted-foreground">Filtrar por familia:</p>
             <FamilyFilterBar
               families={families}
               selectedId={selectedFamilyId}
               onChange={setSelectedFamilyId}
             />
+            {isSuperAdmin && (
+              <Badge className="bg-amber-100 text-amber-700 border-amber-200 flex items-center gap-1 shrink-0">
+                <Crown className="h-3 w-3" />
+                Vista global
+              </Badge>
+            )}
           </div>
         )}
 
         {/* Tarjetas de reportes */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {REPORTS.map((report) => {
+          {allReports.map((report) => {
             const Icon = report.icon
+            const isSuperAdminReport = (report as any).superAdminOnly === true
             return (
               <Card
                 key={report.slug}
-                className="cursor-pointer hover:shadow-md hover:border-primary/40 transition-all"
+                className={`cursor-pointer hover:shadow-md hover:border-primary/40 transition-all ${isSuperAdminReport ? 'border-amber-200' : ''}`}
                 onClick={() => handleCardClick(report.slug)}
               >
                 <CardHeader className="pb-3">
@@ -148,7 +176,15 @@ export default function InventoryReportsPage() {
                     <div className={`p-2 rounded-lg ${report.bg}`}>
                       <Icon className={`h-5 w-5 ${report.color}`} />
                     </div>
-                    <CardTitle className="text-base leading-tight">{report.name}</CardTitle>
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-base leading-tight">{report.name}</CardTitle>
+                      {isSuperAdminReport && (
+                        <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-xs mt-1 flex items-center gap-1 w-fit">
+                          <Crown className="h-2.5 w-2.5" />
+                          Super Admin
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0">

@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Globe, Save, Eye } from 'lucide-react'
+import { Globe, Save, Eye, Crown, Lock } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { ImageUploader } from './image-uploader'
 import { LandingServicesManager } from './landing-services-manager'
@@ -39,7 +39,7 @@ interface LandingContent {
   metaDescription: string
 }
 
-export function LandingPageCMSTab() {
+export function LandingPageCMSTab({ isSuperAdmin = false }: { isSuperAdmin?: boolean }) {
   const [content, setContent] = useState<LandingContent | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -338,11 +338,21 @@ export function LandingPageCMSTab() {
       <LandingServicesManager />
 
       {/* Información de la Empresa */}
-      <Card>
+      <Card className={!isSuperAdmin ? 'opacity-60' : ''}>
         <CardHeader>
-          <CardTitle>Información de la Empresa</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            Información de la Empresa
+            {!isSuperAdmin && (
+              <Badge className="bg-amber-100 text-amber-700 border-amber-200 flex items-center gap-1 text-xs">
+                <Crown className="h-3 w-3" />
+                Solo Super Admin
+              </Badge>
+            )}
+          </CardTitle>
           <CardDescription>
-            Datos generales de tu empresa
+            {isSuperAdmin
+              ? 'Nombre, logos y datos de identidad de la empresa'
+              : 'Solo el Administrador Principal puede modificar la identidad de la empresa'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -351,7 +361,8 @@ export function LandingPageCMSTab() {
             <Input
               id="companyName"
               value={content.companyName}
-              onChange={(e) => setContent({ ...content, companyName: e.target.value })}
+              onChange={(e) => isSuperAdmin && setContent({ ...content, companyName: e.target.value })}
+              disabled={!isSuperAdmin}
             />
           </div>
 
@@ -360,7 +371,8 @@ export function LandingPageCMSTab() {
             <Input
               id="companyTagline"
               value={content.companyTagline}
-              onChange={(e) => setContent({ ...content, companyTagline: e.target.value })}
+              onChange={(e) => isSuperAdmin && setContent({ ...content, companyTagline: e.target.value })}
+              disabled={!isSuperAdmin}
             />
           </div>
 
@@ -369,7 +381,7 @@ export function LandingPageCMSTab() {
               label="Logo Tema Claro"
               currentUrl={content.companyLogoLightUrl}
               onUpload={(url) => {
-                console.log('🎨 Logo claro uploaded, updating state:', url)
+                if (!isSuperAdmin) return
                 setContent({ ...content, companyLogoLightUrl: url })
               }}
               type="logo-light"
@@ -379,7 +391,7 @@ export function LandingPageCMSTab() {
               label="Logo Tema Oscuro"
               currentUrl={content.companyLogoDarkUrl}
               onUpload={(url) => {
-                console.log('🌙 Logo oscuro uploaded, updating state:', url)
+                if (!isSuperAdmin) return
                 setContent({ ...content, companyLogoDarkUrl: url })
               }}
               type="logo-dark"
@@ -391,18 +403,29 @@ export function LandingPageCMSTab() {
             <Input
               id="footerText"
               value={content.footerText}
-              onChange={(e) => setContent({ ...content, footerText: e.target.value })}
+              onChange={(e) => isSuperAdmin && setContent({ ...content, footerText: e.target.value })}
+              disabled={!isSuperAdmin}
             />
           </div>
         </CardContent>
       </Card>
 
       {/* SEO */}
-      <Card>
+      <Card className={!isSuperAdmin ? 'opacity-60' : ''}>
         <CardHeader>
-          <CardTitle>SEO y Metadatos</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            SEO y Metadatos
+            {!isSuperAdmin && (
+              <Badge className="bg-amber-100 text-amber-700 border-amber-200 flex items-center gap-1 text-xs">
+                <Crown className="h-3 w-3" />
+                Solo Super Admin
+              </Badge>
+            )}
+          </CardTitle>
           <CardDescription>
-            Optimiza tu página para motores de búsqueda
+            {isSuperAdmin
+              ? 'Optimiza tu página para motores de búsqueda'
+              : 'Solo el Administrador Principal puede modificar el SEO'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -411,7 +434,8 @@ export function LandingPageCMSTab() {
             <Input
               id="metaTitle"
               value={content.metaTitle}
-              onChange={(e) => setContent({ ...content, metaTitle: e.target.value })}
+              onChange={(e) => isSuperAdmin && setContent({ ...content, metaTitle: e.target.value })}
+              disabled={!isSuperAdmin}
               placeholder="Sistema de Tickets - Soporte Técnico"
             />
           </div>
@@ -421,7 +445,8 @@ export function LandingPageCMSTab() {
             <Textarea
               id="metaDescription"
               value={content.metaDescription}
-              onChange={(e) => setContent({ ...content, metaDescription: e.target.value })}
+              onChange={(e) => isSuperAdmin && setContent({ ...content, metaDescription: e.target.value })}
+              disabled={!isSuperAdmin}
               placeholder="Descripción para motores de búsqueda"
               rows={3}
             />
