@@ -24,7 +24,7 @@ function InventoryContent() {
 
   // Usuarios que gestionan familias Y también pueden tener equipos asignados personalmente
   const isManager = canManageInventory
-  // Cliente sin gestión: solo ve sus equipos asignados
+  // Cliente sin gestión: solo ve sus equipos asignados — forzar personalOnly siempre
   const isClientOnly = isClient && !canManageInventory
 
   useEffect(() => {
@@ -49,13 +49,22 @@ function InventoryContent() {
   const title = isClientOnly ? 'Mis Equipos' : 'Inventario'
   const subtitle = isClientOnly
     ? 'Equipos asignados a tu cuenta'
-    : 'Gestiona el inventario de activos tecnológicos'
+    : 'Gestiona el inventario de activos'
 
   const setTab = (t: string) => {
     const params = new URLSearchParams(searchParams.toString())
     params.set('tab', t)
     if (t === 'mine') params.delete('familyId')
     router.push(`/inventory?${params.toString()}`)
+  }
+
+  // Cliente sin gestión: siempre personalOnly, sin tabs ni botón crear
+  if (isClientOnly) {
+    return (
+      <RoleDashboardLayout title={title} subtitle={subtitle}>
+        <UnifiedInventoryList personalOnly={true} />
+      </RoleDashboardLayout>
+    )
   }
 
   return (

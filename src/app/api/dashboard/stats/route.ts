@@ -499,7 +499,9 @@ export async function GET(request: NextRequest) {
         resolvedTickets,
         thisMonthTickets,
         resolvedTicketsWithTime,
-        ratings
+        ratings,
+        assignedEquipment,
+        pendingMaintenance,
       ] = await Promise.all([
         prisma.tickets.count({ where: { clientId: userId } }),
         prisma.tickets.count({ where: { clientId: userId, status: 'OPEN' } }),
@@ -522,11 +524,22 @@ export async function GET(request: NextRequest) {
           select: { createdAt: true, resolvedAt: true }
         }),
         prisma.ticket_ratings.findMany({
-          where: { 
-            tickets: { clientId: userId }
-          },
+          where: { tickets: { clientId: userId } },
           select: { rating: true }
-        })
+        }),
+        // Equipos asignados al cliente
+        prisma.equipment_assignments.count({
+          where: { receiverId: userId, isActive: true }
+        }),
+        // Mantenimientos pendientes de sus equipos
+        prisma.maintenance_records.count({
+          where: {
+            equipment: {
+              equipment_assignments: { some: { receiverId: userId, isActive: true } }
+            },
+            status: { in: ['PENDING', 'IN_PROGRESS'] }
+          }
+        }),
       ])
       
       const avgResolutionTime = calculateAvgResolutionTime(resolvedTicketsWithTime)
@@ -555,8 +568,10 @@ export async function GET(request: NextRequest) {
         avgResolutionTime,
         satisfactionRating: Math.round(avgRating * 10) / 10,
         totalRatings: ratings.length,
-        ticketsToRate, // Tickets pendientes de calificar
-        responseTime, // Tiempo promedio de primera respuesta (calculado)
+        ticketsToRate,
+        responseTime,
+        assignedEquipment,
+        pendingMaintenance,
         supportQuality: avgRating >= 4.5 ? 'excellent' : avgRating >= 4 ? 'good' : 'fair'
       }
     }

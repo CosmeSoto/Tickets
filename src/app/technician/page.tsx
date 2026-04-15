@@ -50,7 +50,7 @@ export default function TechnicianDashboard() {
       isAuthorized={isAuthorized}
       error={error}
       title="Dashboard Técnico"
-      subtitle="Panel de trabajo técnico"
+      subtitle={`${urgentTickets > 0 ? `${urgentTickets} urgentes · ` : ''}${overdueTickets > 0 ? `${overdueTickets} vencidos · ` : ''}${stats.assignedTickets || 0} tickets asignados`}
       loadingMessage="Cargando tus tickets asignados..."
       onRefresh={refetch}
       notificationsMaxVisible={2}
@@ -82,11 +82,6 @@ export default function TechnicianDashboard() {
           icon={CheckCircle}
           color='green'
           role='TECHNICIAN'
-          trend={{ 
-            value: Math.floor(Math.random() * 20) + 5, 
-            label: 'vs semana pasada', 
-            isPositive: true 
-          }}
           status='success'
         />
 

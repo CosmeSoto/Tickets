@@ -30,6 +30,7 @@ import {
 } from 'lucide-react'
 import { useUnifiedDashboard } from '@/hooks/use-unified-dashboard'
 import { useSystemStatus } from '@/hooks/use-system-status'
+import { useSession } from 'next-auth/react'
 import {
   Table,
   TableBody,
@@ -41,6 +42,9 @@ import {
 
 export default function AdminDashboard() {
   const router = useRouter()
+  const { data: session } = useSession()
+  const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
+
   const {
     userName,
     isLoading: dashboardLoading,
@@ -79,8 +83,8 @@ export default function AdminDashboard() {
       isLoading={isLoading}
       isAuthorized={isAuthorized}
       error={error}
-      title="Dashboard Administrativo"
-      subtitle="Vista general del sistema de tickets"
+      title={isSuperAdmin ? "Dashboard Super Admin" : "Dashboard Administrativo"}
+      subtitle={isSuperAdmin ? "Vista global del sistema — acceso total" : "Vista general de tus familias asignadas"}
       loadingMessage="Cargando estadísticas del sistema..."
       onRefresh={handleRefresh}
       notificationsMaxVisible={3}

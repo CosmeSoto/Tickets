@@ -93,8 +93,8 @@ export default function ClientDashboard() {
       isLoading={isLoading}
       isAuthorized={isAuthorized}
       error={error}
-      title="Dashboard Cliente"
-      subtitle="Panel de cliente"
+      title="Mi Panel"
+      subtitle={hasOpenTickets ? `Tienes ${stats.openTickets} ticket${stats.openTickets > 1 ? 's' : ''} abierto${stats.openTickets > 1 ? 's' : ''}` : 'Todo al día'}
       loadingMessage="Cargando tus tickets..."
       onRefresh={refetch}
       notificationsMaxVisible={2}
@@ -164,6 +164,29 @@ export default function ClientDashboard() {
           }}
         />
       </div>
+
+      {/* Stats de equipos — solo si tiene equipos asignados */}
+      {(stats.assignedEquipment || 0) > 0 && (
+        <div className='grid grid-cols-1 md:grid-cols-2 gap-4 mb-8'>
+          <SymmetricStatsCard
+            title='Equipos Asignados'
+            value={stats.assignedEquipment || 0}
+            icon={Activity}
+            color='blue'
+            role='CLIENT'
+            badge={{ text: 'A tu cargo', variant: 'secondary' }}
+          />
+          <SymmetricStatsCard
+            title='Mantenimientos Pendientes'
+            value={stats.pendingMaintenance || 0}
+            icon={Calendar}
+            color='orange'
+            role='CLIENT'
+            status={(stats.pendingMaintenance || 0) > 0 ? 'warning' : 'normal'}
+            badge={{ text: 'Tus equipos', variant: 'default' }}
+          />
+        </div>
+      )}
 
       {/* Crear Ticket - Destacado */}
       <div className='mb-8'>

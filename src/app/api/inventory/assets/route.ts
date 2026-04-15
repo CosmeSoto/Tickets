@@ -88,8 +88,17 @@ export async function GET(req: NextRequest) {
   } else if (role === 'CLIENT') {
     // Cliente sin gestión: solo sus equipos asignados personalmente
     restrictToAssignedOnly = true
+  } else if (role === 'TECHNICIAN') {
+    // Técnico sin gestión: solo familias donde está asignado como técnico
+    const techAssignments = await prisma.technician_family_assignments.findMany({
+      where: { technicianId: userId, isActive: true },
+      select: { familyId: true },
+    })
+    if (techAssignments.length > 0) {
+      allowedFamilyIds = techAssignments.map(a => a.familyId)
+    }
+    // Si no tiene asignaciones de familia, puede ver todo (técnico recién creado)
   }
-  // TECHNICIAN sin gestión: acceso de lectura a todo el inventario
 
   // Si se pasa familyId como query param, intersectar con las familias permitidas
   const effectiveFamilyIds: string[] | undefined = (() => {
