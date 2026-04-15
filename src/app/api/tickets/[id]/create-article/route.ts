@@ -373,9 +373,9 @@ export async function GET(
     const resolutionTimeDays = Math.floor(resolutionTimeHours / 24)
     const remainingHours = Math.round((resolutionTimeHours % 24) * 10) / 10
     
-    // Tiempo de primera respuesta (primer comentario del técnico)
+    // Tiempo de primera respuesta (primer comentario público del técnico)
     const firstTechnicianComment = ticket.comments.find((c: any) => 
-      c.users.role === 'TECHNICIAN' || c.users.role === 'ADMIN'
+      (c.users.role === 'TECHNICIAN' || c.users.role === 'ADMIN') && !c.isInternal
     )
     let firstResponseTime = 'N/A'
     if (firstTechnicianComment) {
@@ -472,10 +472,11 @@ export async function GET(
       return `${wholeHours} hora${wholeHours !== 1 ? 's' : ''} ${remainingMinutes} minuto${remainingMinutes !== 1 ? 's' : ''}`
     }
     
-    // Número de interacciones
-    const clientComments = ticket.comments.filter((c: any) => c.users.role === 'CLIENT').length
-    const technicianComments = ticket.comments.filter((c: any) => c.users.role === 'TECHNICIAN' || c.users.role === 'ADMIN').length
-    suggestedContent += `- **Interacciones totales:** ${ticket.comments.length} (${clientComments} del cliente, ${technicianComments} del equipo técnico)\n`
+    // Número de interacciones (solo comentarios públicos)
+    const publicComments = ticket.comments.filter((c: any) => !c.isInternal)
+    const clientComments = publicComments.filter((c: any) => c.users.role === 'CLIENT').length
+    const technicianComments = publicComments.filter((c: any) => c.users.role === 'TECHNICIAN' || c.users.role === 'ADMIN').length
+    suggestedContent += `- **Interacciones totales:** ${publicComments.length} (${clientComments} del cliente, ${technicianComments} del equipo técnico)\n`
     
     // Información del plan si existe
     if (ticket.resolution_plans && ticket.resolution_plans.length > 0) {
@@ -490,9 +491,10 @@ export async function GET(
     }
     suggestedContent += `\n`
     
-    // 5. Solución Aplicada (comentarios de técnicos)
-    // 5. Solución Aplicada (comentarios de técnicos)
-    const techComments = ticket.comments.filter((comment: any) => comment.users.role === 'TECHNICIAN')
+    // 5. Solución Aplicada (solo comentarios públicos de técnicos)
+    const techComments = ticket.comments.filter((comment: any) => 
+      (comment.users.role === 'TECHNICIAN' || comment.users.role === 'ADMIN') && !comment.isInternal
+    )
     if (techComments.length > 0) {
       suggestedContent += `## ✅ Solución Aplicada\n\n`
       techComments.forEach((comment: any) => {

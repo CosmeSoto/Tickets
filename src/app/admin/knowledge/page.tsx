@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { 
@@ -86,11 +86,6 @@ export default function AdminKnowledgePage() {
     initialLoad: true,
   })
 
-  const { data: categories } = useModuleData<{ id: string; name: string; color: string | null }>({
-    endpoint: '/api/categories?isActive=true',
-    initialLoad: true,
-  })
-
   // Cargar todas las familias para el filtro
   useEffect(() => {
     fetch('/api/families?includeInactive=false')
@@ -109,6 +104,28 @@ export default function AdminKnowledgePage() {
   }, [])
 
   const { filters, debouncedFilters, setFilter, clearFilters, hasActiveFilters } = useKnowledgeFilters()
+
+  // Resetear categoría cuando cambia la familia
+  const prevFamilyRef = useRef(filters.family)
+  useEffect(() => {
+    if (prevFamilyRef.current !== filters.family) {
+      prevFamilyRef.current = filters.family
+      if (filters.category !== 'all') setFilter('category', 'all')
+    }
+  }, [filters.family])
+
+  // Categorías derivadas de los artículos de la familia seleccionada
+  const categories = useMemo(() => {
+    const seen = new Map<string, { id: string; name: string; color: string | null }>()
+    allArticles
+      .filter(a => debouncedFilters.family === 'all' || a.familyId === debouncedFilters.family)
+      .forEach(a => {
+        if (a.category && !seen.has(a.category.id)) {
+          seen.set(a.category.id, { id: a.category.id, name: a.category.name, color: a.category.color ?? null })
+        }
+      })
+    return Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name))
+  }, [allArticles, debouncedFilters.family])
 
   const processedArticles = useMemo(() => {
     const filtered = filterArticles(allArticles, debouncedFilters)
