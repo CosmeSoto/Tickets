@@ -572,14 +572,18 @@ export async function GET(request: NextRequest) {
         prisma.equipment_assignments.count({
           where: { receiverId: userId, isActive: true }
         }),
-        // Mantenimientos pendientes de sus equipos
-        prisma.maintenance_records.count({
-          where: {
-            equipment: {
-              equipment_assignments: { some: { receiverId: userId, isActive: true } }
-            },
-            status: { in: ['PENDING', 'IN_PROGRESS'] }
-          }
+        // Mantenimientos pendientes: primero obtenemos los equipos del cliente
+        prisma.equipment_assignments.findMany({
+          where: { receiverId: userId, isActive: true },
+          select: { equipmentId: true }
+        }).then(async (assignments) => {
+          if (assignments.length === 0) return 0
+          return prisma.maintenance_records.count({
+            where: {
+              equipmentId: { in: assignments.map(a => a.equipmentId) },
+              status: { in: ['REQUESTED', 'SCHEDULED', 'ACCEPTED'] }
+            }
+          })
         }),
       ])
       
