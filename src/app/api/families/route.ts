@@ -5,18 +5,48 @@ import { FamilyService } from '@/lib/services/family.service'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
 import prisma from '@/lib/prisma'
 
-// GET /api/families — Lista todas las familias con stats; solo ADMIN
+// GET /api/families — Lista familias; ADMIN ve todas las suyas, otros roles ven las habilitadas para tickets
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || session.user.role !== 'ADMIN') {
+    if (!session) {
       return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
     }
 
     const { searchParams } = new URL(request.url)
     const includeInactive = searchParams.get('includeInactive') === 'true'
+    const ticketsEnabled = searchParams.get('ticketsEnabled') === 'true'
 
-    // Si el admin no es super admin, filtrar solo sus familias asignadas
+    // ── Clientes y técnicos: solo familias con tickets habilitados ──────────
+    if (session.user.role !== 'ADMIN') {
+      // Obtener departamento del usuario para pre-filtrar su familia
+      const user = await prisma.users.findUnique({
+        where: { id: session.user.id },
+        select: { departmentId: true, departments: { select: { familyId: true } } }
+      })
+
+      const userFamilyId = user?.departments?.familyId ?? null
+
+      const families = await prisma.families.findMany({
+        where: {
+          isActive: true,
+          ticketFamilyConfig: { ticketsEnabled: true },
+          // Si el usuario tiene familia asignada vía departamento, mostrar solo esa
+          // Si no tiene, mostrar todas las habilitadas
+          ...(userFamilyId ? { id: userFamilyId } : {}),
+        },
+        select: {
+          id: true, name: true, code: true, color: true, icon: true,
+          description: true, isActive: true,
+          ticketFamilyConfig: { select: { ticketsEnabled: true } }
+        },
+        orderBy: { order: 'asc' }
+      })
+
+      return NextResponse.json({ success: true, data: families })
+    }
+
+    // ── ADMIN ────────────────────────────────────────────────────────────────
     const currentUser = await prisma.users.findUnique({
       where: { id: session.user.id },
       select: { isSuperAdmin: true },

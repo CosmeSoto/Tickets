@@ -123,6 +123,7 @@ export default function CreateTicketPage() {
 
   const loadFamilies = async () => {
     try {
+      // La API ya filtra por la familia del departamento del cliente si tiene uno
       const response = await fetch('/api/families?ticketsEnabled=true')
       if (response.ok) {
         const result = await response.json()
@@ -130,12 +131,11 @@ export default function CreateTicketPage() {
           const enabledFamilies = result.data.filter((f: any) => f.isActive)
           setFamilies(enabledFamilies)
           if (enabledFamilies.length === 1) {
-            // Auto-select single family and skip step
+            // Una sola familia (o la del departamento del cliente) — auto-seleccionar
             setSelectedFamilyId(enabledFamilies[0].id)
             setFamilyStep('done')
             await loadCategories(enabledFamilies[0].id)
           } else if (enabledFamilies.length === 0) {
-            // No families — load all categories as fallback
             setFamilyStep('done')
             await loadCategories(null)
           } else {
@@ -148,7 +148,6 @@ export default function CreateTicketPage() {
     } catch (error) {
       console.error('Error loading families:', error)
     }
-    // Fallback: skip family step
     setFamilyStep('done')
     await loadCategories(null)
   }
