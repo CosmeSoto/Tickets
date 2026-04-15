@@ -1386,6 +1386,9 @@ model ticket_family_config {
   businessHoursStart         String   @default("09:00:00") @map("business_hours_start") @db.VarChar(8)
   businessHoursEnd           String   @default("18:00:00") @map("business_hours_end") @db.VarChar(8)
   businessDays               String   @default("MON,TUE,WED,THU,FRI") @map("business_days") @db.VarChar(50)
+  /// IDs de familias cuyos clientes pueden crear tickets aquí.
+  /// Array vacío = acepta tickets de clientes de CUALQUIER familia.
+  allowedFromFamilies        String[] @default([]) @map("allowed_from_families")
   createdAt                  DateTime @default(now()) @map("created_at")
   updatedAt                  DateTime @updatedAt @map("updated_at")
   family                     families @relation(fields: [familyId], references: [id], onDelete: Cascade)

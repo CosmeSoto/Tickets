@@ -385,29 +385,41 @@ export default function CreateTicketPage() {
                 ¿A qué área pertenece tu solicitud?
               </CardTitle>
               <CardDescription>
-                Selecciona la familia de soporte para tu ticket
+                Selecciona el área de soporte para tu ticket
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-                {families.map(family => (
-                  <button
-                    key={family.id}
-                    onClick={() => handleFamilySelect(family.id)}
-                    className='flex items-start space-x-3 p-4 border-2 rounded-lg hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-all text-left'
-                  >
-                    {family.color && (
-                      <div className='w-4 h-4 rounded-full flex-shrink-0 mt-1' style={{ backgroundColor: family.color }} />
-                    )}
-                    <div>
-                      <p className='font-semibold text-foreground'>{family.name}</p>
-                      {family.description && (
-                        <p className='text-xs text-muted-foreground mt-1'>{family.description}</p>
+                {families.map(family => {
+                  const isOwn = (family as any).isOwnFamily === true
+                  return (
+                    <button
+                      key={family.id}
+                      onClick={() => handleFamilySelect(family.id)}
+                      className={`flex items-start space-x-3 p-4 border-2 rounded-lg transition-all text-left ${
+                        isOwn
+                          ? 'border-primary/40 bg-primary/5 hover:border-primary hover:bg-primary/10'
+                          : 'border-border hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'
+                      }`}
+                    >
+                      {family.color && (
+                        <div className='w-4 h-4 rounded-full flex-shrink-0 mt-1' style={{ backgroundColor: family.color }} />
                       )}
-                      <Badge variant='outline' className='text-xs mt-2'>{family.code}</Badge>
-                    </div>
-                  </button>
-                ))}
+                      <div className='flex-1'>
+                        <div className='flex items-center gap-2'>
+                          <p className='font-semibold text-foreground'>{family.name}</p>
+                          {isOwn && (
+                            <Badge variant='outline' className='text-xs border-primary text-primary'>Mi área</Badge>
+                          )}
+                        </div>
+                        {family.description && (
+                          <p className='text-xs text-muted-foreground mt-1'>{family.description}</p>
+                        )}
+                        <Badge variant='outline' className='text-xs mt-2'>{family.code}</Badge>
+                      </div>
+                    </button>
+                  )
+                })}
               </div>
             </CardContent>
           </Card>

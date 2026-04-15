@@ -17,33 +17,51 @@ export async function GET(request: NextRequest) {
     const includeInactive = searchParams.get('includeInactive') === 'true'
     const ticketsEnabled = searchParams.get('ticketsEnabled') === 'true'
 
-    // ── Clientes y técnicos: solo familias con tickets habilitados ──────────
+    // ── Clientes y técnicos: todas las familias habilitadas para tickets ────
     if (session.user.role !== 'ADMIN') {
-      // Obtener departamento del usuario para pre-filtrar su familia
+      // Obtener la familia del departamento del usuario (para marcarla como "su familia")
       const user = await prisma.users.findUnique({
         where: { id: session.user.id },
-        select: { departmentId: true, departments: { select: { familyId: true } } }
+        select: { departments: { select: { familyId: true } } }
       })
-
       const userFamilyId = user?.departments?.familyId ?? null
 
       const families = await prisma.families.findMany({
         where: {
           isActive: true,
           ticketFamilyConfig: { ticketsEnabled: true },
-          // Si el usuario tiene familia asignada vía departamento, mostrar solo esa
-          // Si no tiene, mostrar todas las habilitadas
-          ...(userFamilyId ? { id: userFamilyId } : {}),
         },
         select: {
           id: true, name: true, code: true, color: true, icon: true,
           description: true, isActive: true,
-          ticketFamilyConfig: { select: { ticketsEnabled: true } }
+          ticketFamilyConfig: {
+            select: {
+              ticketsEnabled: true,
+              allowedFromFamilies: true,
+            }
+          }
         },
         orderBy: { order: 'asc' }
       })
 
-      return NextResponse.json({ success: true, data: families })
+      // Filtrar: si allowedFromFamilies tiene valores, el cliente solo puede
+      // crear tickets aquí si su familia está en la lista
+      const accessible = families.filter(f => {
+        const allowed = f.ticketFamilyConfig?.allowedFromFamilies ?? []
+        if (allowed.length === 0) return true // abierta a todos
+        if (!userFamilyId) return true // sin departamento → acceso total
+        return allowed.includes(userFamilyId)
+      })
+
+      // Marcar cuál es la familia "propia" del cliente
+      return NextResponse.json({
+        success: true,
+        data: accessible.map(f => ({
+          ...f,
+          isOwnFamily: f.id === userFamilyId,
+          isRestricted: (f.ticketFamilyConfig?.allowedFromFamilies ?? []).length > 0,
+        }))
+      })
     }
 
     // ── ADMIN ────────────────────────────────────────────────────────────────

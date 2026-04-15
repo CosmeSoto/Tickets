@@ -15,6 +15,7 @@ export interface UpdateTicketFamilyConfigData {
   businessHoursStart?: string
   businessHoursEnd?: string
   businessDays?: string
+  allowedFromFamilies?: string[]
 }
 
 export interface FamilyWithTicketConfig {
@@ -89,6 +90,7 @@ export class TicketFamilyConfigService {
           }),
           ...(data.businessHoursEnd !== undefined && { businessHoursEnd: data.businessHoursEnd }),
           ...(data.businessDays !== undefined && { businessDays: data.businessDays }),
+          ...(data.allowedFromFamilies !== undefined && { allowedFromFamilies: data.allowedFromFamilies }),
         },
       })
 

@@ -37,6 +37,9 @@ async function main() {
   // 9. CATEGORÍAS (todas bajo TECHNOLOGY)
   await seedCategories(deptMap)
 
+  // 9b. CATEGORÍAS OTRAS FAMILIAS (Mantenimiento, Seguridad, Servicios, etc.)
+  await seedCategoriesOtherFamilies(deptMap)
+
   // 10. TIPOS DE EQUIPO (con familyId directo)
   await seedEquipmentTypes(familyMap)
 
@@ -134,14 +137,15 @@ async function seedFamilies(): Promise<Map<string, string>> {
 
 async function seedTicketFamilyConfigs(familyMap: Map<string, string>) {
   // Familias con tickets habilitados
+  // allowedFromFamilies vacío = acepta de TODAS las familias
   const enabledFamilies = [
-    { code: 'TECHNOLOGY',     prefix: 'TI',   isDefault: true  },
-    { code: 'FIXED_ASSETS',   prefix: 'INF',  isDefault: false },
-    { code: 'MAINTENANCE',    prefix: 'MNT',  isDefault: false },
-    { code: 'SERVICES',       prefix: 'SRV',  isDefault: false },
-    { code: 'SECURITY',       prefix: 'SEG',  isDefault: false },
-    { code: 'ADMINISTRATIVE', prefix: 'ADM',  isDefault: false },
-    { code: 'COMMERCIAL',     prefix: 'COM',  isDefault: false },
+    { code: 'TECHNOLOGY',     prefix: 'TI',   isDefault: true,  allowedFromFamilies: [] },
+    { code: 'FIXED_ASSETS',   prefix: 'INF',  isDefault: false, allowedFromFamilies: [] },
+    { code: 'MAINTENANCE',    prefix: 'MNT',  isDefault: false, allowedFromFamilies: [] },
+    { code: 'SERVICES',       prefix: 'SRV',  isDefault: false, allowedFromFamilies: [] },
+    { code: 'SECURITY',       prefix: 'SEG',  isDefault: false, allowedFromFamilies: [] },
+    { code: 'ADMINISTRATIVE', prefix: 'ADM',  isDefault: false, allowedFromFamilies: [] },
+    { code: 'COMMERCIAL',     prefix: 'COM',  isDefault: false, allowedFromFamilies: [] },
   ]
   // GREEN_AREAS: ticketsEnabled = false
   const disabledFamilies = ['GREEN_AREAS']
@@ -150,10 +154,11 @@ async function seedTicketFamilyConfigs(familyMap: Map<string, string>) {
     const familyId = familyMap.get(f.code)!
     await prisma.ticket_family_config.upsert({
       where: { familyId },
-      update: { codePrefix: f.prefix, isDefault: f.isDefault, ticketsEnabled: true },
+      update: { codePrefix: f.prefix, isDefault: f.isDefault, ticketsEnabled: true, allowedFromFamilies: f.allowedFromFamilies },
       create: {
         id: randomUUID(), familyId,
         ticketsEnabled: true, codePrefix: f.prefix, isDefault: f.isDefault,
+        allowedFromFamilies: f.allowedFromFamilies,
         autoAssignRespectsFamilies: true, alertVolumeThreshold: 50,
         businessHoursStart: '08:00:00', businessHoursEnd: '17:00:00',
         businessDays: 'MON,TUE,WED,THU,FRI',
@@ -168,13 +173,14 @@ async function seedTicketFamilyConfigs(familyMap: Map<string, string>) {
       create: {
         id: randomUUID(), familyId, ticketsEnabled: false,
         codePrefix: code.slice(0, 5), isDefault: false,
+        allowedFromFamilies: [],
         autoAssignRespectsFamilies: true,
         businessHoursStart: '08:00:00', businessHoursEnd: '17:00:00',
         businessDays: 'MON,TUE,WED,THU,FRI',
       },
     })
   }
-  console.log('✅ Configuraciones de tickets por familia')
+  console.log('✅ Configuraciones de tickets por familia (allowedFromFamilies vacío = todas)')
 }
 
 // ============================================
@@ -235,6 +241,18 @@ async function seedDepartments(familyMap: Map<string, string>): Promise<Map<stri
     // FIXED_ASSETS
     { name: 'Arquitectura',                description: 'Departamento de Arquitectura y Diseño',         color: '#6366F1', order: 13, familyCode: 'FIXED_ASSETS' },
     { name: 'Mantenimiento',               description: 'Departamento de Mantenimiento e Infraestructura', color: '#84CC16', order: 14, familyCode: 'FIXED_ASSETS' },
+    // MAINTENANCE
+    { name: 'Mantenimiento Civil',         description: 'Mantenimiento de obras civiles e infraestructura', color: '#10B981', order: 15, familyCode: 'MAINTENANCE' },
+    { name: 'Mantenimiento Eléctrico',     description: 'Mantenimiento de instalaciones eléctricas',      color: '#F59E0B', order: 16, familyCode: 'MAINTENANCE' },
+    { name: 'Mantenimiento Mecánico',      description: 'Mantenimiento de equipos mecánicos',             color: '#EF4444', order: 17, familyCode: 'MAINTENANCE' },
+    // SECURITY
+    { name: 'Seguridad Física',            description: 'Seguridad física y vigilancia',                  color: '#EF4444', order: 18, familyCode: 'SECURITY' },
+    { name: 'CCTV y Control de Acceso',    description: 'Cámaras, control de acceso y alarmas',           color: '#DC2626', order: 19, familyCode: 'SECURITY' },
+    // SERVICES
+    { name: 'Limpieza',                    description: 'Servicios de limpieza y aseo',                   color: '#06B6D4', order: 20, familyCode: 'SERVICES' },
+    { name: 'Mensajería',                  description: 'Servicios de mensajería y correspondencia',      color: '#8B5CF6', order: 21, familyCode: 'SERVICES' },
+    // GREEN_AREAS
+    { name: 'Áreas Verdes',                description: 'Mantenimiento de jardines y áreas verdes',       color: '#22C55E', order: 22, familyCode: 'GREEN_AREAS' },
   ]
   const map = new Map<string, string>()
   for (const dept of departments) {
@@ -767,6 +785,74 @@ async function seedLandingPage() {
 main()
   .catch(e => { console.error('❌ Error durante el seed:', e); process.exit(1) })
   .finally(async () => { await prisma.$disconnect() })
+
+// ============================================
+// 9b. CATEGORÍAS OTRAS FAMILIAS
+// ============================================
+
+async function seedCategoriesOtherFamilies(deptMap: Map<string, string>) {
+  // Solo crear si el departamento existe en el mapa
+  const get = (name: string) => deptMap.get(name)
+
+  // ── MANTENIMIENTO CIVIL ──────────────────────────────────────────────────
+  const deptCivil = get('Mantenimiento Civil')
+  if (deptCivil) {
+    const fallasCivil = await upsertCategory({ name: 'Falla o Daño', description: 'Daños en infraestructura civil', level: 1, parentId: null, departmentId: deptCivil, order: 1, color: '#EF4444' })
+    const solicCivil  = await upsertCategory({ name: 'Solicitud de Trabajo', description: 'Solicitudes de trabajos civiles', level: 1, parentId: null, departmentId: deptCivil, order: 2, color: '#3B82F6' })
+    await upsertCategory({ name: 'Filtraciones / Goteras', description: 'Filtraciones de agua, goteras en techo', level: 2, parentId: fallasCivil.id, departmentId: deptCivil, order: 1, color: '#EF4444' })
+    await upsertCategory({ name: 'Daño en Paredes / Pisos', description: 'Grietas, fisuras, daños en superficies', level: 2, parentId: fallasCivil.id, departmentId: deptCivil, order: 2, color: '#EF4444' })
+    await upsertCategory({ name: 'Puertas / Ventanas', description: 'Daños en puertas, ventanas, cerraduras', level: 2, parentId: fallasCivil.id, departmentId: deptCivil, order: 3, color: '#EF4444' })
+    await upsertCategory({ name: 'Plomería / Sanitarios', description: 'Problemas de plomería, sanitarios, tuberías', level: 2, parentId: fallasCivil.id, departmentId: deptCivil, order: 4, color: '#EF4444' })
+    await upsertCategory({ name: 'Remodelación / Adecuación', description: 'Trabajos de remodelación o adecuación de espacios', level: 2, parentId: solicCivil.id, departmentId: deptCivil, order: 1, color: '#3B82F6' })
+    await upsertCategory({ name: 'Pintura', description: 'Trabajos de pintura interior o exterior', level: 2, parentId: solicCivil.id, departmentId: deptCivil, order: 2, color: '#3B82F6' })
+    await upsertCategory({ name: 'Instalación de Mobiliario', description: 'Instalación de muebles, estantes, divisiones', level: 2, parentId: solicCivil.id, departmentId: deptCivil, order: 3, color: '#3B82F6' })
+  }
+
+  // ── MANTENIMIENTO ELÉCTRICO ──────────────────────────────────────────────
+  const deptElec = get('Mantenimiento Eléctrico')
+  if (deptElec) {
+    const fallasElec = await upsertCategory({ name: 'Falla Eléctrica', description: 'Fallas en instalaciones eléctricas', level: 1, parentId: null, departmentId: deptElec, order: 1, color: '#EF4444' })
+    const solicElec  = await upsertCategory({ name: 'Solicitud Eléctrica', description: 'Solicitudes de trabajos eléctricos', level: 1, parentId: null, departmentId: deptElec, order: 2, color: '#3B82F6' })
+    await upsertCategory({ name: 'Sin Energía / Corte', description: 'Corte de energía, sin suministro eléctrico', level: 2, parentId: fallasElec.id, departmentId: deptElec, order: 1, color: '#EF4444' })
+    await upsertCategory({ name: 'Cortocircuito / Sobrecarga', description: 'Cortocircuito, sobrecarga eléctrica', level: 2, parentId: fallasElec.id, departmentId: deptElec, order: 2, color: '#EF4444' })
+    await upsertCategory({ name: 'Luminaria Dañada', description: 'Lámparas, focos, luminarias dañadas', level: 2, parentId: fallasElec.id, departmentId: deptElec, order: 3, color: '#EF4444' })
+    await upsertCategory({ name: 'Tomacorriente / Interruptor', description: 'Tomacorrientes o interruptores dañados', level: 2, parentId: fallasElec.id, departmentId: deptElec, order: 4, color: '#EF4444' })
+    await upsertCategory({ name: 'Instalación Eléctrica Nueva', description: 'Solicitud de nueva instalación eléctrica', level: 2, parentId: solicElec.id, departmentId: deptElec, order: 1, color: '#3B82F6' })
+    await upsertCategory({ name: 'Cambio de Luminaria', description: 'Solicitud de cambio o mejora de luminarias', level: 2, parentId: solicElec.id, departmentId: deptElec, order: 2, color: '#3B82F6' })
+  }
+
+  // ── SEGURIDAD FÍSICA ─────────────────────────────────────────────────────
+  const deptSeg = get('Seguridad Física')
+  if (deptSeg) {
+    const incSeg  = await upsertCategory({ name: 'Incidente de Seguridad', description: 'Incidentes de seguridad física', level: 1, parentId: null, departmentId: deptSeg, order: 1, color: '#EF4444' })
+    const solicSeg = await upsertCategory({ name: 'Solicitud de Seguridad', description: 'Solicitudes al área de seguridad', level: 1, parentId: null, departmentId: deptSeg, order: 2, color: '#3B82F6' })
+    await upsertCategory({ name: 'Acceso No Autorizado', description: 'Persona no autorizada en área restringida', level: 2, parentId: incSeg.id, departmentId: deptSeg, order: 1, color: '#EF4444' })
+    await upsertCategory({ name: 'Robo / Hurto', description: 'Robo o hurto de bienes', level: 2, parentId: incSeg.id, departmentId: deptSeg, order: 2, color: '#EF4444' })
+    await upsertCategory({ name: 'Vandalismo', description: 'Daños intencionales a la propiedad', level: 2, parentId: incSeg.id, departmentId: deptSeg, order: 3, color: '#EF4444' })
+    await upsertCategory({ name: 'Acceso a Área Restringida', description: 'Solicitud de acceso a área restringida', level: 2, parentId: solicSeg.id, departmentId: deptSeg, order: 1, color: '#3B82F6' })
+    await upsertCategory({ name: 'Credencial / Carnet', description: 'Solicitud de credencial o carnet de acceso', level: 2, parentId: solicSeg.id, departmentId: deptSeg, order: 2, color: '#3B82F6' })
+  }
+
+  // ── LIMPIEZA ─────────────────────────────────────────────────────────────
+  const deptLimp = get('Limpieza')
+  if (deptLimp) {
+    const solicLimp = await upsertCategory({ name: 'Solicitud de Limpieza', description: 'Solicitudes al servicio de limpieza', level: 1, parentId: null, departmentId: deptLimp, order: 1, color: '#06B6D4' })
+    await upsertCategory({ name: 'Limpieza de Área', description: 'Solicitud de limpieza de un área específica', level: 2, parentId: solicLimp.id, departmentId: deptLimp, order: 1, color: '#06B6D4' })
+    await upsertCategory({ name: 'Limpieza Profunda', description: 'Solicitud de limpieza profunda o desinfección', level: 2, parentId: solicLimp.id, departmentId: deptLimp, order: 2, color: '#06B6D4' })
+    await upsertCategory({ name: 'Derrame / Emergencia', description: 'Limpieza urgente por derrame u emergencia', level: 2, parentId: solicLimp.id, departmentId: deptLimp, order: 3, color: '#EF4444' })
+  }
+
+  // ── GESTIÓN ADMINISTRATIVA ───────────────────────────────────────────────
+  const deptAdmin = get('Administración')
+  if (deptAdmin) {
+    const solicAdmin = await upsertCategory({ name: 'Solicitud Administrativa', description: 'Solicitudes al área administrativa', level: 1, parentId: null, departmentId: deptAdmin, order: 1, color: '#6B7280' })
+    await upsertCategory({ name: 'Documentos / Certificados', description: 'Solicitud de documentos o certificados', level: 2, parentId: solicAdmin.id, departmentId: deptAdmin, order: 1, color: '#6B7280' })
+    await upsertCategory({ name: 'Permisos / Autorizaciones', description: 'Solicitud de permisos o autorizaciones', level: 2, parentId: solicAdmin.id, departmentId: deptAdmin, order: 2, color: '#6B7280' })
+    await upsertCategory({ name: 'Facturación / Pagos', description: 'Consultas o solicitudes de facturación', level: 2, parentId: solicAdmin.id, departmentId: deptAdmin, order: 3, color: '#6B7280' })
+  }
+
+  console.log('✅ Categorías otras familias (Mantenimiento, Seguridad, Servicios, Administrativa)')
+}
 
 // ============================================
 // TIPOS DE PROVEEDOR (dinámicos, reemplaza enum SupplierType)
