@@ -139,30 +139,25 @@ async function getProactiveAlerts() {
   const now = new Date()
 
   try {
-    // 1. Alertas de SLA próximo a vencer (< 2h)
-    const slaAssignments = await prisma.sla_assignments.findMany({
+    // 1. Alertas de SLA — violaciones activas sin resolver
+    const slaViolations = await prisma.sla_violations.findMany({
       where: {
-        tickets: { status: { in: ['OPEN', 'IN_PROGRESS'] } },
-        resolutionDeadline: {
-          gte: now,
-          lte: new Date(now.getTime() + 2 * 60 * 60 * 1000),
-        },
+        isResolved: false,
+        ticket: { status: { in: ['OPEN', 'IN_PROGRESS'] } },
       },
       select: {
         id: true,
-        resolutionDeadline: true,
-        tickets: { select: { id: true, title: true, familyId: true } },
+        ticket: { select: { id: true, title: true, familyId: true } },
       },
       take: 10,
     })
-    slaAssignments.forEach((sa) => {
-      const minutesLeft = Math.round((sa.resolutionDeadline!.getTime() - now.getTime()) / 60000)
+    slaViolations.forEach((sv) => {
       alerts.push({
         type: 'SLA_EXPIRING',
-        severity: minutesLeft < 60 ? 'CRITICAL' : 'WARNING',
-        message: `Ticket "${sa.tickets.title}" vence en ${minutesLeft} min`,
-        ticketId: sa.tickets.id,
-        familyId: sa.tickets.familyId,
+        severity: 'WARNING',
+        message: `Ticket "${sv.ticket?.title}" tiene una violación de SLA activa`,
+        ticketId: sv.ticket?.id,
+        familyId: sv.ticket?.familyId,
       })
     })
 
@@ -636,12 +631,12 @@ export async function GET(request: NextRequest) {
         // Familias de los tickets del cliente
         const clientTicketFamilies = await prisma.tickets.findMany({
           where: { clientId: userId, familyId: { not: null } },
-          select: { familyId: true, families: { select: { id: true, name: true, code: true, color: true, icon: true } } },
+          select: { familyId: true, family: { select: { id: true, name: true, code: true, color: true, icon: true } } },
           distinct: ['familyId']
         })
         stats.assignedFamilies = clientTicketFamilies
-          .filter(t => t.families)
-          .map(t => t.families!)
+          .filter(t => t.family)
+          .map(t => t.family!)
       }
     }
 
