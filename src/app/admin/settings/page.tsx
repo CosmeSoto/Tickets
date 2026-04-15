@@ -28,6 +28,7 @@ import {
   RefreshCw,
   AlertTriangle,
   Key,
+  Crown,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { OAuthSettingsTab } from '@/components/settings/oauth-settings-tab'
@@ -227,6 +228,8 @@ export default function SettingsPage() {
     return null
   }
 
+  const isSuperAdmin = (session.user as any).isSuperAdmin === true
+
   if (!settings) {
     return (
       <div className='flex items-center justify-center h-64'>
@@ -264,17 +267,36 @@ export default function SettingsPage() {
       subtitle='Administra la configuración global del sistema de tickets'
       headerActions={headerActions}
     >
-      <Tabs value={activeTab} className='space-y-6' onValueChange={setActiveTab}>
+      <Tabs value={activeTab} className='space-y-6' onValueChange={(tab) => {
+        // Tabs restringidos a Super Admin
+        const superAdminTabs = ['email', 'security', 'oauth']
+        if (superAdminTabs.includes(tab) && !isSuperAdmin) return
+        setActiveTab(tab)
+      }}>
         <TabsList className='flex flex-wrap h-auto gap-1 p-1 w-full'>
           <TabsTrigger value='general' className='flex-1 min-w-[80px]'>General</TabsTrigger>
-          <TabsTrigger value='email' className='flex-1 min-w-[60px]'>Email</TabsTrigger>
           <TabsTrigger value='notifications' className='flex-1 min-w-[110px]'>Notificaciones</TabsTrigger>
-          <TabsTrigger value='security' className='flex-1 min-w-[80px]'>Seguridad</TabsTrigger>
-          <TabsTrigger value='oauth' className='flex-1 min-w-[70px]'>
-            <Key className="h-4 w-4 mr-1 hidden sm:inline" />
-            OAuth
-          </TabsTrigger>
           <TabsTrigger value='landing' className='flex-1 min-w-[110px]'>Página Pública</TabsTrigger>
+          {/* Tabs solo para Super Admin */}
+          <TabsTrigger value='email' className='flex-1 min-w-[60px]' disabled={!isSuperAdmin}>
+            <span className='flex items-center gap-1'>
+              {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
+              Email
+            </span>
+          </TabsTrigger>
+          <TabsTrigger value='security' className='flex-1 min-w-[80px]' disabled={!isSuperAdmin}>
+            <span className='flex items-center gap-1'>
+              {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
+              Seguridad
+            </span>
+          </TabsTrigger>
+          <TabsTrigger value='oauth' className='flex-1 min-w-[70px]' disabled={!isSuperAdmin}>
+            <span className='flex items-center gap-1'>
+              {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
+              <Key className="h-4 w-4 hidden sm:inline" />
+              OAuth
+            </span>
+          </TabsTrigger>
         </TabsList>
 
         {/* Configuración General */}
@@ -327,6 +349,13 @@ export default function SettingsPage() {
 
         {/* Configuración de Email */}
         <TabsContent value='email'>
+          {!isSuperAdmin ? (
+            <div className='flex flex-col items-center justify-center py-16 text-center'>
+              <Crown className='h-12 w-12 text-amber-500 mb-4' />
+              <h3 className='text-lg font-semibold text-foreground mb-2'>Acceso restringido</h3>
+              <p className='text-muted-foreground max-w-sm'>Esta sección solo está disponible para Administradores Principales (Super Admin).</p>
+            </div>
+          ) : (
           <Card>
             <CardHeader>
               <CardTitle className='flex items-center'>
@@ -429,6 +458,7 @@ export default function SettingsPage() {
               )}
             </CardContent>
           </Card>
+          )}
         </TabsContent>
 
         {/* Configuración de Notificaciones */}
@@ -502,6 +532,13 @@ export default function SettingsPage() {
 
         {/* Configuración de Seguridad */}
         <TabsContent value='security'>
+          {!isSuperAdmin ? (
+            <div className='flex flex-col items-center justify-center py-16 text-center'>
+              <Crown className='h-12 w-12 text-amber-500 mb-4' />
+              <h3 className='text-lg font-semibold text-foreground mb-2'>Acceso restringido</h3>
+              <p className='text-muted-foreground max-w-sm'>Esta sección solo está disponible para Administradores Principales (Super Admin).</p>
+            </div>
+          ) : (
           <div className="space-y-6">
             <Card>
               <CardHeader>
@@ -658,11 +695,20 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
           </div>
+          )}
         </TabsContent>
 
         {/* Configuración OAuth */}
         <TabsContent value='oauth'>
-          <OAuthSettingsTab />
+          {!isSuperAdmin ? (
+            <div className='flex flex-col items-center justify-center py-16 text-center'>
+              <Crown className='h-12 w-12 text-amber-500 mb-4' />
+              <h3 className='text-lg font-semibold text-foreground mb-2'>Acceso restringido</h3>
+              <p className='text-muted-foreground max-w-sm'>Esta sección solo está disponible para Administradores Principales (Super Admin).</p>
+            </div>
+          ) : (
+            <OAuthSettingsTab />
+          )}
         </TabsContent>
 
         {/* Página Pública CMS */}

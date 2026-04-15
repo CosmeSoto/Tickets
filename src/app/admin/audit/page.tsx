@@ -497,6 +497,12 @@ export default function AuditPage() {
       return
     }
 
+    // Solo Super Admin puede ver auditorías
+    if (!(session.user as any).isSuperAdmin) {
+      router.push('/unauthorized')
+      return
+    }
+
     loadAuditData()
   }, [session, status, router, filters])
 

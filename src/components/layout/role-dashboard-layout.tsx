@@ -40,6 +40,7 @@ import {
   Trash2,
   Layers,
   Warehouse,
+  Crown,
 } from 'lucide-react'
 import { Notifications } from '@/components/ui/notifications'
 import { Button } from '@/components/ui/button'
@@ -302,8 +303,9 @@ export function RoleDashboardLayout({
 
   const userRole = session.user.role as string
 
-  // Técnico o Cliente con gestión de inventario → menú extendido
   const canManageInventory = (session.user as any).canManageInventory
+  const isSuperAdmin = (session.user as any).isSuperAdmin === true
+
   const navKey =
     userRole === 'TECHNICIAN' && canManageInventory
       ? 'TECHNICIAN_MANAGER'
@@ -311,7 +313,18 @@ export function RoleDashboardLayout({
         ? 'CLIENT_MANAGER'
         : userRole
 
-  const navigation = navigationByRole[navKey] || []
+  // Para ADMIN, construir navegación dinámicamente según isSuperAdmin
+  let navigation: NavItem[] = []
+  if (userRole === 'ADMIN') {
+    const adminNav = navigationByRole['ADMIN'].filter(item => {
+      // Auditoría solo para Super Admin
+      if (item.href === '/admin/audit') return isSuperAdmin
+      return true
+    })
+    navigation = adminNav
+  } else {
+    navigation = navigationByRole[navKey] || []
+  }
 
   const handleLogout = async () => {
     await signOut({ 
@@ -330,7 +343,7 @@ export function RoleDashboardLayout({
   }
 
   const getRoleBadgeColor = (role: string) => {
-    return getRoleColor(role, (session.user as any).isSuperAdmin)
+    return getRoleColor(role, isSuperAdmin)
   }
 
   const getRoleLabel = (role: string) => {
@@ -338,9 +351,9 @@ export function RoleDashboardLayout({
       return canManageInventory ? 'Técnico · Gestor' : 'Técnico'
     }
     if (role === 'CLIENT') {
-      return canManageInventory ? 'Cliente · Gestor' : getRoleLabelFn(role, (session.user as any).isSuperAdmin)
+      return canManageInventory ? 'Cliente · Gestor' : getRoleLabelFn(role, isSuperAdmin)
     }
-    return getRoleLabelFn(role, (session.user as any).isSuperAdmin)
+    return getRoleLabelFn(role, isSuperAdmin)
   }
 
   const closeSidebar = () => setSidebarOpen(false)
