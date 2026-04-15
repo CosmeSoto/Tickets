@@ -230,11 +230,11 @@ export default function ClientHelpPage() {
               <CardContent className="space-y-2">
                 <Button
                   variant={selectedCategory === null ? 'default' : 'ghost'}
-                  className="w-full justify-start overflow-hidden"
+                  className="w-full justify-start h-auto py-2"
                   onClick={() => setSelectedCategory(null)}
                 >
                   <HelpCircle className="h-4 w-4 mr-2 shrink-0" />
-                  <span className="truncate flex-1 text-left">Todas</span>
+                  <span className="flex-1 text-left">Todas</span>
                   <Badge variant="secondary" className="ml-2 shrink-0">
                     {faqs.length}
                   </Badge>
@@ -246,11 +246,11 @@ export default function ClientHelpPage() {
                     <Button
                       key={category}
                       variant={selectedCategory === category ? 'default' : 'ghost'}
-                      className="w-full justify-start overflow-hidden"
+                      className="w-full justify-start h-auto py-2 whitespace-normal"
                       onClick={() => setSelectedCategory(category)}
                     >
-                      <Icon className="h-4 w-4 mr-2 shrink-0" />
-                      <span className="truncate flex-1 text-left">{category}</span>
+                      <Icon className="h-4 w-4 mr-2 shrink-0 mt-0.5" />
+                      <span className="flex-1 text-left break-words">{category}</span>
                       <Badge variant="secondary" className="ml-2 shrink-0">
                         {count}
                       </Badge>
