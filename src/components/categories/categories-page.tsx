@@ -51,7 +51,7 @@ export default function CategoriesPage() {
   const [families, setFamilies] = useState<Array<{ id: string; name: string; code: string; color?: string }>>([])
 
   useEffect(() => {
-    fetch('/api/families?active=true')
+    fetch('/api/families?includeInactive=false')
       .then(r => r.json())
       .then(data => {
         if (data.success && Array.isArray(data.data)) setFamilies(data.data)
@@ -189,6 +189,23 @@ export default function CategoriesPage() {
           </div>
         </div>
       ),
+    },
+    {
+      key: 'family',
+      header: 'Área',
+      width: '140px',
+      render: (category: any) => {
+        const family = category.departments?.family
+        if (!family) return <span className='text-xs text-muted-foreground'>—</span>
+        return (
+          <div className='flex items-center gap-1.5'>
+            {family.color && (
+              <span className='w-2 h-2 rounded-full flex-shrink-0' style={{ backgroundColor: family.color }} />
+            )}
+            <span className='text-xs font-medium truncate'>{family.name}</span>
+          </div>
+        )
+      },
     },
     {
       key: 'tickets',
@@ -451,6 +468,43 @@ export default function CategoriesPage() {
           <CardContent>
             {/* Filtros y búsqueda */}
             <div className='space-y-3 mb-6'>
+
+              {/* Chips de familia — mismo patrón que tickets y knowledge */}
+              {families.length > 1 && (
+                <div className='flex items-center gap-2 flex-wrap'>
+                  <span className='text-sm text-muted-foreground flex items-center gap-1.5 flex-shrink-0'>
+                    <Layers className='h-3.5 w-3.5' />
+                    Área:
+                  </span>
+                  <button
+                    onClick={() => { setFamilyFilter('all'); setDepartmentFilter('all') }}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
+                      familyFilter === 'all'
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-background border-border text-muted-foreground hover:border-primary/50'
+                    }`}
+                  >
+                    Todas
+                  </button>
+                  {families.map(f => (
+                    <button
+                      key={f.id}
+                      onClick={() => { setFamilyFilter(f.id); setDepartmentFilter('all') }}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
+                        familyFilter === f.id
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-background border-border text-muted-foreground hover:border-primary/50'
+                      }`}
+                    >
+                      {f.color && (
+                        <span className='w-2 h-2 rounded-full flex-shrink-0' style={{ backgroundColor: f.color }} />
+                      )}
+                      {f.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {/* Búsqueda — ancho completo */}
               <div className='relative'>
                 <Search className='absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4 pointer-events-none' />
@@ -462,35 +516,40 @@ export default function CategoriesPage() {
                 />
               </div>
 
-              {/* Filtros — grid responsivo */}
-              <div className='grid grid-cols-2 sm:grid-cols-4 gap-2'>
+              {/* Filtros secundarios — nivel, departamento (solo si hay familia), estado */}
+              <div className='flex flex-wrap gap-2'>
                 <Select value={levelFilter} onValueChange={(value) => setLevelFilter(value as any)}>
-                  <SelectTrigger>
+                  <SelectTrigger className='w-auto min-w-[160px]'>
                     <SelectValue placeholder='Nivel' />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value='all'>Todos los niveles</SelectItem>
-                    <SelectItem value='1'>Nivel 1 - Principal</SelectItem>
-                    <SelectItem value='2'>Nivel 2 - Secundario</SelectItem>
-                    <SelectItem value='3'>Nivel 3 - Terciario</SelectItem>
-                    <SelectItem value='4'>Nivel 4 - Específico</SelectItem>
+                    <SelectItem value='1'>Principal</SelectItem>
+                    <SelectItem value='2'>Subcategoría</SelectItem>
+                    <SelectItem value='3'>Especialidad</SelectItem>
+                    <SelectItem value='4'>Detalle</SelectItem>
                   </SelectContent>
                 </Select>
 
-                <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder='Departamento' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='all'>Todos los departamentos</SelectItem>
-                    {departments.map(dept => (
-                      <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {/* Departamento — solo visible cuando hay familia seleccionada y tiene múltiples departamentos */}
+                {familyFilter !== 'all' && departments.filter((d: any) => d.familyId === familyFilter || d.family?.id === familyFilter).length > 1 && (
+                  <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                    <SelectTrigger className='w-auto min-w-[180px]'>
+                      <SelectValue placeholder='Departamento' />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value='all'>Todos los departamentos</SelectItem>
+                      {departments
+                        .filter((d: any) => d.familyId === familyFilter || d.family?.id === familyFilter)
+                        .map((dept: any) => (
+                          <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                )}
 
                 <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as 'all' | 'active' | 'inactive')}>
-                  <SelectTrigger>
+                  <SelectTrigger className='w-auto min-w-[120px]'>
                     <SelectValue placeholder='Estado' />
                   </SelectTrigger>
                   <SelectContent>
@@ -500,27 +559,24 @@ export default function CategoriesPage() {
                   </SelectContent>
                 </Select>
 
-                <Select value={familyFilter} onValueChange={setFamilyFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder='Familia' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='all'>
-                      <div className='flex items-center space-x-2'>
-                        <Layers className='h-4 w-4' />
-                        <span>Todas las familias</span>
-                      </div>
-                    </SelectItem>
-                    {families.map(f => (
-                      <SelectItem key={f.id} value={f.id}>
-                        <div className='flex items-center space-x-2'>
-                          {f.color && <div className='w-2 h-2 rounded-full flex-shrink-0' style={{ backgroundColor: f.color }} />}
-                          <span>{f.name}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {/* Limpiar filtros */}
+                {(searchTerm || levelFilter !== 'all' || statusFilter !== 'all' || departmentFilter !== 'all' || familyFilter !== 'all') && (
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    onClick={() => {
+                      setSearchTerm('')
+                      setLevelFilter('all')
+                      setStatusFilter('all')
+                      setDepartmentFilter('all')
+                      setFamilyFilter('all')
+                    }}
+                    className='flex items-center gap-1.5'
+                  >
+                    <Search className='h-3.5 w-3.5' />
+                    Limpiar
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -531,11 +587,11 @@ export default function CategoriesPage() {
                   <div className='text-center py-8'>
                     <FolderTree className='h-12 w-12 text-muted-foreground mx-auto mb-4' />
                     <p className='text-muted-foreground'>
-                      {searchTerm || levelFilter !== 'all' || statusFilter !== 'all' || departmentFilter !== 'all'
+                      {searchTerm || levelFilter !== 'all' || statusFilter !== 'all' || departmentFilter !== 'all' || familyFilter !== 'all'
                         ? 'No se encontraron categorías que coincidan con los filtros' 
                         : 'No hay categorías disponibles'}
                     </p>
-                    {(searchTerm || levelFilter !== 'all' || statusFilter !== 'all' || departmentFilter !== 'all') && (
+                    {(searchTerm || levelFilter !== 'all' || statusFilter !== 'all' || departmentFilter !== 'all' || familyFilter !== 'all') && (
                       <Button 
                         variant="outline" 
                         onClick={() => {
@@ -543,6 +599,7 @@ export default function CategoriesPage() {
                           setLevelFilter('all')
                           setStatusFilter('all')
                           setDepartmentFilter('all')
+                          setFamilyFilter('all')
                         }}
                         className='mt-2'
                       >

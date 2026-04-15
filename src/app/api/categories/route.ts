@@ -56,6 +56,28 @@ export async function GET(request: NextRequest) {
       where.departments = { familyId }
     }
 
+    // Para ADMIN no-superadmin: restringir a familias asignadas
+    // Para TECHNICIAN/CLIENT: solo categorías activas de sus familias
+    const role = session.user.role
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+
+    if (role === 'ADMIN' && !isSuperAdmin && !familyId) {
+      try {
+        const assignments = await prisma.admin_family_assignments.findMany({
+          where: { adminId: session.user.id, isActive: true },
+          select: { familyId: true },
+        })
+        if (assignments.length > 0) {
+          const allowedFamilyIds = assignments.map(a => a.familyId)
+          // Solo aplicar restricción si tiene asignaciones explícitas
+          where.departments = { familyId: { in: allowedFamilyIds } }
+        }
+        // Si no tiene asignaciones, ve todas (compatibilidad con admins existentes)
+      } catch {
+        // Si la tabla no existe, no restringir
+      }
+    }
+
     // Obtener categorías con relaciones
     const categories = await prisma.categories.findMany({
       where,
