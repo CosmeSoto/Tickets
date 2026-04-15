@@ -4,7 +4,7 @@
 
 'use client'
 
-import { Search, RefreshCw, Filter, X, Calendar } from 'lucide-react'
+import { Search, RefreshCw, Filter, X, Calendar, Users } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -27,6 +27,14 @@ import {
 } from '@/lib/constants/filter-options'
 import { cn } from '@/lib/utils'
 
+interface FamilyOption {
+  id: string
+  name: string
+  code: string
+  color?: string | null
+  isOwnFamily?: boolean
+}
+
 interface TicketFiltersProps {
   // Valores de filtros
   searchTerm: string
@@ -35,7 +43,8 @@ interface TicketFiltersProps {
   categoryFilter: string
   assigneeFilter?: string
   dateFilter?: DateFilter
-  
+  familyFilter?: string
+
   // Callbacks
   setSearchTerm: (term: string) => void
   onStatusChange: (status: StatusFilter) => void
@@ -43,17 +52,19 @@ interface TicketFiltersProps {
   onCategoryChange: (category: string) => void
   onAssigneeChange?: (assignee: string) => void
   onDateChange?: (date: DateFilter) => void
+  onFamilyChange?: (family: string) => void
   onRefresh: () => void
   onClearFilters: () => void
-  
+
   // Datos de referencia
   categories?: Array<{ id: string; name: string }>
-  
+  families?: FamilyOption[]
+
   // Configuración
   variant?: 'admin' | 'technician' | 'client'
   loading?: boolean
   className?: string
-  
+
   // Características opcionales
   showAssigneeFilter?: boolean
   showDateFilter?: boolean
@@ -67,23 +78,28 @@ export function TicketFilters({
   categoryFilter,
   assigneeFilter = 'all',
   dateFilter = 'all',
+  familyFilter = 'all',
   setSearchTerm,
   onStatusChange,
   onPriorityChange,
   onCategoryChange,
   onAssigneeChange,
   onDateChange,
+  onFamilyChange,
   onRefresh,
   onClearFilters,
   categories = [],
+  families = [],
   variant = 'admin',
   loading = false,
   className,
   showAssigneeFilter = true,
   showDateFilter = false,
-  searchPlaceholder = 'Buscar por título, descripción o cliente...'
+  searchPlaceholder = 'Buscar por título, descripción o cliente...',
 }: TicketFiltersProps) {
-  
+
+  const showFamilyChips = families.length > 1 && !!onFamilyChange
+
   // Calcular filtros activos
   const activeFilters = [
     statusFilter !== 'all',
@@ -91,16 +107,63 @@ export function TicketFilters({
     categoryFilter !== 'all',
     showAssigneeFilter && assigneeFilter !== 'all',
     showDateFilter && dateFilter !== 'all',
-    searchTerm.trim().length > 0
+    showFamilyChips && familyFilter !== 'all',
+    searchTerm.trim().length > 0,
   ].filter(Boolean).length
 
   const hasActiveFilters = activeFilters > 0
 
   return (
     <Card className={cn('w-full', className)}>
-      <CardContent className="pt-6">
+      <CardContent className="pt-4 pb-4">
         <div className="space-y-4">
-          
+
+          {/* Chips de familia — solo si hay más de una y se pasa el callback */}
+          {showFamilyChips && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm text-muted-foreground flex items-center gap-1.5 flex-shrink-0">
+                <Users className="h-3.5 w-3.5" />
+                Área:
+              </span>
+              <button
+                onClick={() => onFamilyChange!('all')}
+                disabled={loading}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
+                  familyFilter === 'all'
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-background border-border text-muted-foreground hover:border-primary/50'
+                }`}
+              >
+                Todas
+              </button>
+              {families.map(f => (
+                <button
+                  key={f.id}
+                  onClick={() => onFamilyChange!(f.id)}
+                  disabled={loading}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
+                    familyFilter === f.id
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-background border-border text-muted-foreground hover:border-primary/50'
+                  }`}
+                >
+                  {f.color && (
+                    <span
+                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: f.color }}
+                    />
+                  )}
+                  {f.name}
+                  {f.isOwnFamily && (
+                    <Badge variant="secondary" className="text-xs px-1 py-0 ml-0.5">
+                      Mi área
+                    </Badge>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Barra superior: Búsqueda y acciones */}
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1">
@@ -115,7 +178,7 @@ export function TicketFilters({
                 />
               </div>
             </div>
-            
+
             <div className="flex gap-2 shrink-0">
               {hasActiveFilters && (
                 <Button
@@ -129,7 +192,7 @@ export function TicketFilters({
                   Limpiar
                 </Button>
               )}
-              
+
               <Button
                 variant="outline"
                 size="sm"
@@ -137,7 +200,7 @@ export function TicketFilters({
                 disabled={loading}
                 className="flex items-center gap-2"
               >
-                <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+                <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
                 Actualizar
               </Button>
             </div>
@@ -145,7 +208,7 @@ export function TicketFilters({
 
           {/* Filtros principales */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            
+
             {/* Estado */}
             <div className="space-y-1">
               <label className="text-sm font-medium text-muted-foreground">Estado</label>
@@ -180,7 +243,7 @@ export function TicketFilters({
               </Select>
             </div>
 
-            {/* Categoría */}
+            {/* Categoría — derivada de los tickets visibles */}
             <div className="space-y-1">
               <label className="text-sm font-medium text-muted-foreground">Categoría</label>
               <Select value={categoryFilter} onValueChange={onCategoryChange} disabled={loading}>
@@ -213,7 +276,7 @@ export function TicketFilters({
               </div>
             )}
 
-            {/* Filtro de fecha (solo para técnicos) */}
+            {/* Filtro de fecha */}
             {showDateFilter && onDateChange && (
               <div className="space-y-1">
                 <label className="text-sm font-medium text-muted-foreground">

@@ -69,6 +69,7 @@ export function filterTicketsAdmin(tickets: Ticket[], filters: TicketFilterValue
     if (filters.category && filters.category !== 'all' && ticket.category?.id !== filters.category) return false
     if (filters.assignee === 'unassigned' && ticket.assignee) return false
     if (filters.assignee && filters.assignee !== 'all' && filters.assignee !== 'unassigned' && ticket.assignee?.id !== filters.assignee) return false
+    if (filters.family && filters.family !== 'all' && ticket.family?.id !== filters.family) return false
     if (!matchesDateRange(ticket.createdAt, filters.dateRange ?? 'all')) return false
     return true
   })
@@ -92,6 +93,7 @@ export function filterTicketsTechnician(tickets: Ticket[], filters: TicketFilter
     if (filters.status && filters.status !== 'all' && ticket.status !== filters.status) return false
     if (filters.priority && filters.priority !== 'all' && ticket.priority !== filters.priority) return false
     if (filters.category && filters.category !== 'all' && ticket.category?.id !== filters.category) return false
+    if (filters.family && filters.family !== 'all' && ticket.family?.id !== filters.family) return false
     if (!matchesDateRange(ticket.createdAt, filters.dateRange ?? 'all')) return false
     return true
   })

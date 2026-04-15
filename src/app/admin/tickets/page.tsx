@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { 
@@ -12,7 +12,6 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 
-// Componentes
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { DataTable } from '@/components/ui/data-table'
 import { SymmetricStatsCard } from '@/components/shared/stats-card'
@@ -20,85 +19,90 @@ import { TicketFilters } from '@/components/tickets/ticket-filters'
 import { Button } from '@/components/ui/button'
 import { createAdminTicketColumns } from '@/components/tickets/admin/ticket-columns'
 
-// Hooks
 import { useModuleData } from '@/hooks/common/use-module-data'
 import { useTicketFilters } from '@/hooks/common/use-ticket-filters'
 import { usePagination } from '@/hooks/common/use-pagination'
 import type { Ticket as TicketType } from '@/hooks/use-ticket-data'
 import { filterTicketsAdmin } from '@/lib/utils/ticket-filters'
 
+interface FamilyOption {
+  id: string
+  name: string
+  code: string
+  color?: string | null
+}
+
 export default function AdminTicketsPage() {
   const { data: session } = useSession()
   const router = useRouter()
+  const [families, setFamilies] = useState<FamilyOption[]>([])
 
-  // Cargar TODOS los tickets UNA VEZ (como técnicos)
-  const {
-    data: allTickets,
-    loading,
-    error,
-    reload
-  } = useModuleData<TicketType>({
+  const { data: allTickets, loading, error, reload } = useModuleData<TicketType>({
     endpoint: '/api/tickets',
-    initialLoad: true
+    initialLoad: true,
   })
 
-  // Cargar categorías
-  const { data: categories } = useModuleData<{ id: string; name: string }>({
-    endpoint: '/api/categories?isActive=true',
-    initialLoad: true
-  })
+  // Cargar familias según rol: superadmin ve todas, admin normal ve las suyas
+  useEffect(() => {
+    fetch('/api/families?includeInactive=false')
+      .then(r => r.json())
+      .then(d => {
+        if (d.success && Array.isArray(d.data)) {
+          setFamilies(d.data.map((f: any) => ({
+            id: f.id,
+            name: f.name,
+            code: f.code,
+            color: f.color,
+          })))
+        }
+      })
+      .catch(() => {})
+  }, [])
 
-  // Filtros
-  const {
-    filters,
-    debouncedFilters,
-    setFilter,
-    clearFilters,
-    hasActiveFilters
-  } = useTicketFilters()
+  const { filters, debouncedFilters, setFilter, clearFilters, hasActiveFilters } = useTicketFilters()
 
-  // Filtrar en MEMORIA (como técnicos)
+  // Resetear categoría cuando cambia la familia
+  const prevFamilyRef = useRef(filters.family)
+  useEffect(() => {
+    if (prevFamilyRef.current !== filters.family) {
+      prevFamilyRef.current = filters.family
+      if (filters.category !== 'all') setFilter('category', 'all')
+    }
+  }, [filters.family])
+
+  // Filtrar en memoria
   const filteredTickets = useMemo(() => {
     return filterTicketsAdmin(allTickets, debouncedFilters)
   }, [allTickets, debouncedFilters])
 
-  // Paginación
-  const pagination = usePagination(filteredTickets, {
-    pageSize: 20
-  })
+  // Categorías derivadas de los tickets de la familia seleccionada
+  const categories = useMemo(() => {
+    const seen = new Map<string, { id: string; name: string }>()
+    allTickets
+      .filter(t => debouncedFilters.family === 'all' || t.family?.id === debouncedFilters.family)
+      .forEach(t => {
+        if (t.category && !seen.has(t.category.id)) {
+          seen.set(t.category.id, { id: t.category.id, name: t.category.name })
+        }
+      })
+    return Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name))
+  }, [allTickets, debouncedFilters.family])
 
-  // Estadísticas
+  const pagination = usePagination(filteredTickets, { pageSize: 20 })
+
   const stats = useMemo(() => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-
     return {
       total: filteredTickets.length,
       open: filteredTickets.filter(t => t.status === 'OPEN').length,
       inProgress: filteredTickets.filter(t => t.status === 'IN_PROGRESS').length,
-      resolved: filteredTickets.filter(t => t.status === 'RESOLVED').length,
-      closed: filteredTickets.filter(t => t.status === 'CLOSED').length,
-      highPriority: filteredTickets.filter(t => t.priority === 'HIGH' || t.priority === 'URGENT').length,
-      avgResolutionTime: 'N/A',
-      todayCreated: filteredTickets.filter(t => {
-        const createdDate = new Date(t.createdAt)
-        createdDate.setHours(0, 0, 0, 0)
-        return createdDate.getTime() === today.getTime()
-      }).length,
-      unassigned: filteredTickets.filter(t => !t.assignee).length
+      unassigned: filteredTickets.filter(t => !t.assignee).length,
     }
   }, [filteredTickets])
 
-  // Handlers
-  const handleViewTicket = (ticket: TicketType) => {
-    router.push(`/admin/tickets/${ticket.id}`)
-  }
+  const handleViewTicket = (ticket: TicketType) => router.push(`/admin/tickets/${ticket.id}`)
 
-  const handleEditTicket = (ticket: TicketType) => {
-    router.push(`/admin/tickets/${ticket.id}/edit`)
-  }
-
-  // Configuración de paginación
   const paginationConfig = {
     page: pagination.currentPage,
     limit: pagination.pageSize,
@@ -107,9 +111,7 @@ export default function AdminTicketsPage() {
     onLimitChange: (limit: number) => pagination.setPageSize(limit),
   }
 
-  if (!session || session.user.role !== 'ADMIN') {
-    return null
-  }
+  if (!session || session.user.role !== 'ADMIN') return null
 
   return (
     <ModuleLayout
@@ -128,80 +130,61 @@ export default function AdminTicketsPage() {
       }
     >
       <div className="space-y-6">
-        {/* Panel de Estadísticas */}
         <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
-          <SymmetricStatsCard
-            title="Total Tickets"
-            value={stats.total}
-            icon={Ticket}
-            color="purple"
-          />
-          
+          <SymmetricStatsCard title="Total Tickets" value={stats.total} icon={Ticket} color="purple" />
           <SymmetricStatsCard
             title="Abiertos"
             value={stats.open}
             icon={AlertCircle}
             color="blue"
-            badge={stats.total > 0 ? {
-              text: `${Math.round((stats.open / stats.total) * 100)}%`,
-              variant: 'secondary'
-            } : undefined}
+            badge={stats.total > 0 ? { text: `${Math.round((stats.open / stats.total) * 100)}%`, variant: 'secondary' } : undefined}
             status={stats.open > 10 ? 'warning' : 'normal'}
           />
-          
           <SymmetricStatsCard
             title="En Progreso"
             value={stats.inProgress}
             icon={Clock}
             color="orange"
-            badge={stats.total > 0 ? {
-              text: `${Math.round((stats.inProgress / stats.total) * 100)}%`,
-              variant: 'secondary'
-            } : undefined}
+            badge={stats.total > 0 ? { text: `${Math.round((stats.inProgress / stats.total) * 100)}%`, variant: 'secondary' } : undefined}
           />
-          
           <SymmetricStatsCard
             title="Sin Asignar"
             value={stats.unassigned}
             icon={UserX}
             color="red"
             status={stats.unassigned > 5 ? 'error' : 'normal'}
-            badge={stats.total > 0 ? {
-              text: `${Math.round((stats.unassigned / stats.total) * 100)}%`,
-              variant: 'secondary'
-            } : undefined}
+            badge={stats.total > 0 ? { text: `${Math.round((stats.unassigned / stats.total) * 100)}%`, variant: 'secondary' } : undefined}
           />
         </div>
 
-        {/* Filtros */}
         <TicketFilters
           searchTerm={filters.search}
           statusFilter={filters.status}
           priorityFilter={filters.priority}
           categoryFilter={filters.category}
           assigneeFilter={filters.assignee}
+          familyFilter={filters.family}
           setSearchTerm={(term) => setFilter('search', term)}
           onStatusChange={(status) => setFilter('status', status)}
           onPriorityChange={(priority) => setFilter('priority', priority)}
           onCategoryChange={(category) => setFilter('category', category)}
           onAssigneeChange={(assignee) => setFilter('assignee', assignee)}
+          onFamilyChange={(family) => setFilter('family', family)}
           onRefresh={reload}
           onClearFilters={clearFilters}
           categories={categories}
+          families={families}
           variant="admin"
           loading={loading}
           showAssigneeFilter={true}
           searchPlaceholder="Buscar por título, descripción, cliente o técnico..."
         />
 
-        {/* DataTable */}
         <DataTable
           title="Tickets"
           description={`Gestión de tickets del sistema (${filteredTickets.length} tickets)`}
           data={pagination.currentItems}
-          columns={createAdminTicketColumns({
-            onView: handleViewTicket,
-          })}
+          columns={createAdminTicketColumns({ onView: handleViewTicket })}
           loading={loading}
           pagination={paginationConfig}
           onRefresh={reload}
@@ -215,9 +198,7 @@ export default function AdminTicketsPage() {
               ? "Intenta ajustar los filtros de búsqueda"
               : "No se encontraron tickets en el sistema",
             action: hasActiveFilters ? (
-              <Button variant="outline" onClick={clearFilters}>
-                Limpiar filtros
-              </Button>
+              <Button variant="outline" onClick={clearFilters}>Limpiar filtros</Button>
             ) : (
               <Button asChild>
                 <Link href="/admin/tickets/create">
@@ -225,7 +206,7 @@ export default function AdminTicketsPage() {
                   Crear primer ticket
                 </Link>
               </Button>
-            )
+            ),
           }}
         />
       </div>
