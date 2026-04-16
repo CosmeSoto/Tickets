@@ -172,33 +172,24 @@ export default function TechnicianTicketsPage() {
       onRetry={reload}
       headerActions={
         <div className="flex gap-2">
-          <ExportButton
-            onExportCSV={exportCSV}
-            onExportExcel={exportExcel}
-            onExportPDF={exportPDF}
-            loading={exporting}
-            disabled={filteredTickets.length === 0}
-          />
-          <div className="flex gap-2">
-            <Link href="/technician/stats">
-              <Button variant="outline" size="sm">
-                <BarChart3 className="mr-2 h-4 w-4" />
-                Estadísticas
-              </Button>
-            </Link>
-            <Link href="/technician/categories">
-              <Button variant="outline" size="sm">
-                <FolderTree className="mr-2 h-4 w-4" />
-                Mis Categorías
-              </Button>
-            </Link>
-            <Link href="/technician/knowledge">
-              <Button variant="outline" size="sm">
-                <BookOpen className="mr-2 h-4 w-4" />
-                Conocimientos
-              </Button>
-            </Link>
-          </div>
+          <Link href="/technician/stats">
+            <Button variant="outline" size="sm">
+              <BarChart3 className="mr-2 h-4 w-4" />
+              Estadísticas
+            </Button>
+          </Link>
+          <Link href="/technician/categories">
+            <Button variant="outline" size="sm">
+              <FolderTree className="mr-2 h-4 w-4" />
+              Mis Categorías
+            </Button>
+          </Link>
+          <Link href="/technician/knowledge">
+            <Button variant="outline" size="sm">
+              <BookOpen className="mr-2 h-4 w-4" />
+              Conocimientos
+            </Button>
+          </Link>
         </div>
       }
     >
@@ -265,6 +256,15 @@ export default function TechnicianTicketsPage() {
           externalSearch={true}
           hideInternalFilters={true}
           onRowClick={handleViewTicket}
+          actions={
+            <ExportButton
+              onExportCSV={exportCSV}
+              onExportExcel={exportExcel}
+              onExportPDF={exportPDF}
+              loading={exporting}
+              disabled={filteredTickets.length === 0}
+            />
+          }
           emptyState={{
             icon: <TicketIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />,
             title: hasActiveFilters ? "No se encontraron tickets" : "No hay tickets asignados",

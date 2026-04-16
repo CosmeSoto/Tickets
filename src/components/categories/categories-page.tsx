@@ -101,8 +101,7 @@ export default function CategoriesPage() {
       { key: '_count', label: 'Subcategorías', format: v => String(v?.other_categories ?? 0) },
     ],
   })
-  const canManageCat = (category: any): boolean => {
-    if (isSuperAdmin) return true
+  const canManageCat = (category: any): boolean => {    if (isSuperAdmin) return true
     if (adminFamilyIds === null) return true // sin restricciones cargadas aún
     const catFamilyId = category.departments?.familyId ?? category.departments?.family?.id
     if (!catFamilyId) return true // sin familia → cualquier admin
@@ -200,6 +199,24 @@ export default function CategoriesPage() {
         pagination.currentPage * pagination.pageSize
       )
     : familyFilteredCategories
+
+  // Exportación — DESPUÉS de familyFilteredCategories para evitar error de inicialización
+  // subtitle usa función para ser dinámico
+  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+    filename: 'categorias',
+    title: 'Gestión de Categorías',
+    getData: () => familyFilteredCategories,
+    columns: [
+      { key: 'name', label: 'Nombre' },
+      { key: 'levelName', label: 'Nivel' },
+      { key: 'departments', label: 'Departamento', format: v => v?.name ?? '' },
+      { key: 'departments', label: 'Área', format: v => v?.family?.name ?? '' },
+      { key: 'isActive', label: 'Estado', format: v => v ? 'Activa' : 'Inactiva' },
+      { key: 'description', label: 'Descripción', format: v => v ?? '' },
+      { key: '_count', label: 'Tickets', format: v => String(v?.tickets ?? 0) },
+      { key: '_count', label: 'Subcategorías', format: v => String(v?.other_categories ?? 0) },
+    ],
+  })
   // Configuración de paginación para DataTableAdvanced
   // IMPORTANTE: usar familyFilteredCategories.length como total, no pagination.totalItems
   // porque pagination viene del hook sin filtro de familia
@@ -397,13 +414,6 @@ export default function CategoriesPage() {
       onRetry={refresh}
       headerActions={
         <div className="flex items-center space-x-2">
-          <ExportButton
-            onExportCSV={exportCSV}
-            onExportExcel={exportExcel}
-            onExportPDF={exportPDF}
-            loading={exporting}
-            disabled={familyFilteredCategories.length === 0}
-          />
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -444,8 +454,7 @@ export default function CategoriesPage() {
               </div>
               <div className='flex items-center space-x-2'>
                 <TooltipProvider>
-                  {viewMode === 'tree' && (
-                    <div className="flex items-center border rounded-md mr-2">
+                  {viewMode === 'tree' && (                    <div className="flex items-center border rounded-md mr-2">
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
@@ -501,6 +510,14 @@ export default function CategoriesPage() {
                       <p>Actualizar lista de categorías</p>
                     </TooltipContent>
                   </Tooltip>
+                  {/* Exportar — junto a la tabla para que el usuario sepa qué exporta */}
+                  <ExportButton
+                    onExportCSV={exportCSV}
+                    onExportExcel={exportExcel}
+                    onExportPDF={exportPDF}
+                    loading={exporting}
+                    disabled={familyFilteredCategories.length === 0}
+                  />
                   <div className='flex items-center border rounded-md'>
                     <Tooltip>
                       <TooltipTrigger asChild>

@@ -132,8 +132,8 @@ export default function ClientTicketsPage() {
     columns: [
       { key: 'ticketCode', label: 'Código', format: (v, r) => v ?? r.id.slice(-8).toUpperCase() },
       { key: 'title', label: 'Título' },
-      { key: 'status', label: 'Estado', format: v => ({ OPEN: 'Abierto', IN_PROGRESS: 'En Progreso', RESOLVED: 'Resuelto', CLOSED: 'Cerrado' }[v] ?? v) },
-      { key: 'priority', label: 'Prioridad', format: v => ({ LOW: 'Baja', MEDIUM: 'Media', HIGH: 'Alta', URGENT: 'Urgente' }[v] ?? v) },
+      { key: 'status', label: 'Estado', format: (v: string) => ({ OPEN: 'Abierto', IN_PROGRESS: 'En Progreso', RESOLVED: 'Resuelto', CLOSED: 'Cerrado' } as Record<string, string>)[v] ?? v },
+      { key: 'priority', label: 'Prioridad', format: (v: string) => ({ LOW: 'Baja', MEDIUM: 'Media', HIGH: 'Alta', URGENT: 'Urgente' } as Record<string, string>)[v] ?? v },
       { key: 'assignee', label: 'Técnico', format: v => v?.name ?? 'Sin asignar' },
       { key: 'category', label: 'Categoría', format: v => v?.name ?? '' },
       { key: 'family', label: 'Área', format: v => v?.name ?? '' },
@@ -160,21 +160,12 @@ export default function ClientTicketsPage() {
       error={error}
       onRetry={reload}
       headerActions={
-        <div className="flex gap-2">
-          <ExportButton
-            onExportCSV={exportCSV}
-            onExportExcel={exportExcel}
-            onExportPDF={exportPDF}
-            loading={exporting}
-            disabled={filteredTickets.length === 0}
-          />
-          <Button size="sm" asChild>
-            <Link href="/client/tickets/create">
-              <Plus className="h-4 w-4 mr-2" />
-              Nuevo Ticket
-            </Link>
-          </Button>
-        </div>
+        <Button size="sm" asChild>
+          <Link href="/client/tickets/create">
+            <Plus className="h-4 w-4 mr-2" />
+            Nuevo Ticket
+          </Link>
+        </Button>
       }
     >
       <div className="space-y-6">
@@ -243,6 +234,15 @@ export default function ClientTicketsPage() {
           externalSearch={true}
           hideInternalFilters={true}
           onRowClick={handleViewTicket}
+          actions={
+            <ExportButton
+              onExportCSV={exportCSV}
+              onExportExcel={exportExcel}
+              onExportPDF={exportPDF}
+              loading={exporting}
+              disabled={filteredTickets.length === 0}
+            />
+          }
           emptyState={{
             icon: <TicketIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />,
             title: hasActiveFilters ? "No se encontraron tickets" : "No tienes tickets",

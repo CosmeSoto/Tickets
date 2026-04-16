@@ -144,13 +144,6 @@ export default function AdminTicketsPage() {
       onRetry={reload}
       headerActions={
         <div className="flex gap-2">
-          <ExportButton
-            onExportCSV={exportCSV}
-            onExportExcel={exportExcel}
-            onExportPDF={exportPDF}
-            loading={exporting}
-            disabled={filteredTickets.length === 0}
-          />
           <Button size="sm" asChild>
             <Link href="/admin/tickets/create">
               <Plus className="h-4 w-4 mr-2" />
@@ -222,6 +215,15 @@ export default function AdminTicketsPage() {
           externalSearch={true}
           hideInternalFilters={true}
           onRowClick={handleViewTicket}
+          actions={
+            <ExportButton
+              onExportCSV={exportCSV}
+              onExportExcel={exportExcel}
+              onExportPDF={exportPDF}
+              loading={exporting}
+              disabled={filteredTickets.length === 0}
+            />
+          }
           emptyState={{
             icon: <Ticket className="h-12 w-12 text-muted-foreground mx-auto mb-4" />,
             title: hasActiveFilters ? "No se encontraron tickets" : "No hay tickets",
