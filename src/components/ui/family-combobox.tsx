@@ -134,7 +134,8 @@ export function FamilyCombobox({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn('w-full justify-between font-normal', className)}
+          title={selectedFamily?.name ?? triggerLabel}
+          className={cn('w-full justify-between font-normal min-w-[180px]', className)}
           disabled={disabled}
         >
           <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -154,7 +155,7 @@ export function FamilyCombobox({
             ) : (
               <>
                 <Users className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                <span className={cn(value === 'all' || allowAll ? '' : 'text-muted-foreground')}>
+                <span className={cn(value === 'all' || allowAll ? '' : 'text-muted-foreground', 'truncate')}>
                   {triggerLabel}
                 </span>
               </>
@@ -248,7 +249,7 @@ export function FamilyCombobox({
                         style={{ backgroundColor: f.color ?? '#6366f1' }}
                       />
                       <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                        <span className="truncate font-medium">{f.name}</span>
+                        <span className="font-medium break-words">{f.name}</span>
                         <Badge variant="secondary" className="text-xs px-1 py-0 flex-shrink-0">
                           Mi área
                         </Badge>
@@ -263,18 +264,18 @@ export function FamilyCombobox({
                       key={f.id}
                       value={f.id}
                       onSelect={() => handleSelect(f.id)}
-                      className="cursor-pointer"
+                      className="cursor-pointer py-3"
                     >
                       <Check
-                        className={cn('mr-2 h-4 w-4 flex-shrink-0', value === f.id ? 'opacity-100' : 'opacity-0')}
+                        className={cn('mr-2 h-4 w-4 flex-shrink-0 self-start mt-0.5', value === f.id ? 'opacity-100' : 'opacity-0')}
                       />
                       <span
-                        className="w-3 h-3 rounded-full flex-shrink-0 mr-2"
+                        className="w-3 h-3 rounded-full flex-shrink-0 mr-2 mt-1"
                         style={{ backgroundColor: f.color ?? '#6366f1' }}
                       />
                       <div className="flex flex-col flex-1 min-w-0">
-                        <span className="truncate">{f.name}</span>
-                        <span className="text-xs text-muted-foreground font-mono">{f.code}</span>
+                        <span className="break-words leading-snug">{f.name}</span>
+                        <span className="text-xs text-muted-foreground font-mono mt-0.5">{f.code}</span>
                       </div>
                     </CommandItem>
                   ))}
