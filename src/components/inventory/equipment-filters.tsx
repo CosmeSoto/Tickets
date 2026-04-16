@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { EquipmentStatus, EquipmentCondition } from '@prisma/client'
 import type { EquipmentFilters as EquipmentFiltersType, EquipmentTypeInfo } from '@/types/inventory/equipment'
 
@@ -19,6 +20,7 @@ interface FamilyOption {
   id: string
   name: string
   code: string
+  color?: string | null
 }
 
 interface DepartmentOption {
@@ -218,24 +220,16 @@ export function EquipmentFilters({
         <div className="grid gap-4 rounded-lg border p-4 md:grid-cols-2 lg:grid-cols-3">
           {/* Familia */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Familia</label>
-            <Select
-              value={filters.familyId || 'all'}
+            <label className="text-sm font-medium">Área / Familia</label>
+            <FamilyCombobox
+              families={families.map(f => ({ ...f, color: (f as any).color ?? null }))}
+              value={filters.familyId ?? 'all'}
               onValueChange={handleFamilyChange}
+              allowAll
+              allowClear
               disabled={loadingFamilies}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={loadingFamilies ? 'Cargando...' : 'Todas las familias'} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas las familias</SelectItem>
-                {families.map((family) => (
-                  <SelectItem key={family.id} value={family.id}>
-                    {family.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              popoverWidth="240px"
+            />
           </div>
 
           {/* Departamento */}

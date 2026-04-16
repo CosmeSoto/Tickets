@@ -4,9 +4,11 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { safeFetch } from '@/lib/auth-fetch'
-import { FamilyFilterBar } from '@/components/inventory/family-filter-bar'
+import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { FamilyBadge } from '@/components/inventory/family-badge'
 import { SubtypeBadge } from '@/components/inventory/subtype-badge'
+import { ExportButton } from '@/components/common/export-button'
+import { useExport } from '@/hooks/common/use-export'
 import { Search } from 'lucide-react'
 import type { AssetSubtype } from '@/lib/inventory/family-config'
 
@@ -161,28 +163,40 @@ export function UnifiedInventoryList({ initialFamilyId, personalOnly = false }: 
     setPage(1)
   }
 
+  // Exportación — activos visibles con filtros activos
+  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+    filename: 'inventario',
+    title: 'Inventario de Activos',
+    subtitle: `${total} activos${selectedFamilyId ? ' (filtrados por área)' : ''}`,
+    getData: () => assets,
+    columns: [
+      { key: 'subtype', label: 'Tipo', format: (v: string) => ({ EQUIPMENT: 'Equipo', MRO: 'Material MRO', LICENSE: 'Licencia' } as Record<string, string>)[v] ?? v },
+      { key: 'family', label: 'Área', format: v => v?.name ?? '' },
+      { key: 'name', label: 'Nombre' },
+      { key: 'code', label: 'Código', format: (v, r) => v ?? r.id.slice(0, 8) },
+      { key: 'status', label: 'Estado', format: (v: string) => STATUS_LABELS[v] ?? v },
+      { key: 'createdAt', label: 'Creado', format: v => v ? new Date(v).toLocaleDateString('es-ES') : '' },
+    ],
+  })
+
   return (
     <div className="space-y-4">
-      {/* Filtro de familia — solo en modo inventario de familias */}
-      {!personalOnly && (
-        <FamilyFilterBar
-          families={families}
-          selectedId={selectedFamilyId}
-          onChange={handleFamilyChange}
-        />
-      )}
-
-      {/* Barra de búsqueda + filtro subtipo */}
-      <div className="flex flex-col sm:flex-row gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-          <input
-            value={search}
-            onChange={e => handleSearchChange(e.target.value)}
-            placeholder="Buscar por nombre o código..."
-            className="flex h-9 w-full rounded-md border border-border bg-card pl-9 pr-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring placeholder:text-muted-foreground"
+      {/* Filtros: área + tipo + búsqueda + exportar */}
+      <div className="flex flex-col sm:flex-row gap-2 flex-wrap">
+        {/* Área (familia) — combobox con buscador, solo en modo inventario de familias */}
+        {!personalOnly && families.length > 1 && (
+          <FamilyCombobox
+            families={families.map(f => ({ id: f.id, name: f.name, code: f.name.slice(0, 3).toUpperCase(), color: f.color }))}
+            value={selectedFamilyId ?? 'all'}
+            onValueChange={(v) => handleFamilyChange(v === 'all' ? null : v)}
+            allowAll
+            allowClear
+            popoverWidth="260px"
+            className="sm:w-52"
           />
-        </div>
+        )}
+
+        {/* Tipo de activo */}
         <select
           value={selectedSubtype}
           onChange={e => handleSubtypeChange(e.target.value as AssetSubtype | '')}
@@ -192,6 +206,26 @@ export function UnifiedInventoryList({ initialFamilyId, personalOnly = false }: 
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
+
+        {/* Búsqueda */}
+        <div className="relative flex-1 min-w-[180px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <input
+            value={search}
+            onChange={e => handleSearchChange(e.target.value)}
+            placeholder="Buscar por nombre o código..."
+            className="flex h-9 w-full rounded-md border border-border bg-card pl-9 pr-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring placeholder:text-muted-foreground"
+          />
+        </div>
+
+        {/* Exportar */}
+        <ExportButton
+          onExportCSV={exportCSV}
+          onExportExcel={exportExcel}
+          onExportPDF={exportPDF}
+          loading={exporting}
+          disabled={assets.length === 0}
+        />
       </div>
 
       {/* Contador */}

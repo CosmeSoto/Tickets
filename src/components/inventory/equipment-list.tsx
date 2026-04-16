@@ -2,13 +2,15 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { Plus, Download } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { EquipmentFilters } from './equipment-filters'
 import { EquipmentTable } from './equipment-table'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/hooks/use-toast'
+import { ExportButton } from '@/components/common/export-button'
+import { useExport } from '@/hooks/common/use-export'
 import type { Equipment, EquipmentFilters as EquipmentFiltersType } from '@/types/inventory/equipment'
 
 interface EquipmentListProps {
@@ -90,6 +92,28 @@ export function EquipmentList({
 
   const canCreate = session?.user?.role === 'ADMIN' || session?.user?.role === 'TECHNICIAN' || (session?.user as any)?.canManageInventory === true
 
+  // Exportación — equipos visibles con filtros activos
+  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+    filename: 'equipos',
+    title: 'Inventario de Equipos',
+    subtitle: `${total} equipos encontrados`,
+    getData: () => equipment,
+    columns: [
+      { key: 'code', label: 'Código' },
+      { key: 'brand', label: 'Marca' },
+      { key: 'model', label: 'Modelo' },
+      { key: 'serialNumber', label: 'N° Serie' },
+      { key: 'type', label: 'Tipo', format: v => (v as any)?.name ?? '' },
+      { key: 'status', label: 'Estado', format: (v: string) => ({ AVAILABLE: 'Disponible', ASSIGNED: 'Asignado', MAINTENANCE: 'Mantenimiento', DAMAGED: 'Dañado', RETIRED: 'Retirado' } as Record<string, string>)[v] ?? v },
+      { key: 'condition', label: 'Condición', format: (v: string) => ({ NEW: 'Nuevo', LIKE_NEW: 'Como Nuevo', GOOD: 'Bueno', FAIR: 'Regular', POOR: 'Malo' } as Record<string, string>)[v] ?? v },
+      { key: 'department', label: 'Departamento', format: v => (v as any)?.name ?? '' },
+      { key: 'location', label: 'Ubicación', format: v => v ?? '' },
+      { key: 'purchaseDate', label: 'Fecha compra', format: v => v ? new Date(v).toLocaleDateString('es-ES') : '' },
+      { key: 'purchasePrice', label: 'Precio compra', format: v => v != null ? String(v) : '' },
+      { key: 'warrantyExpiration', label: 'Garantía hasta', format: v => v ? new Date(v).toLocaleDateString('es-ES') : '' },
+    ],
+  })
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -101,10 +125,13 @@ export function EquipmentList({
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <Download className="mr-2 h-4 w-4" />
-            Exportar
-          </Button>
+          <ExportButton
+            onExportCSV={exportCSV}
+            onExportExcel={exportExcel}
+            onExportPDF={exportPDF}
+            loading={exporting}
+            disabled={equipment.length === 0}
+          />
           {canCreate && onCreateNew && (
             <Button onClick={onCreateNew} size="sm">
               <Plus className="mr-2 h-4 w-4" />

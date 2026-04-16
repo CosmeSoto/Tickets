@@ -16,37 +16,71 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
 import { SupplierForm } from '@/components/inventory/suppliers/SupplierForm'
+import { ExportButton } from '@/components/common/export-button'
+import { useExport } from '@/hooks/common/use-export'
+import { FamilyCombobox, type FamilyOption } from '@/components/ui/family-combobox'
 
 export default function SuppliersPage() {
   const { toast } = useToast()
   const [suppliers, setSuppliers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [activeFilter, setActiveFilter] = useState('true')  // por defecto solo activos
+  const [activeFilter, setActiveFilter] = useState('true')
+  const [familyFilter, setFamilyFilter] = useState('all')
+  const [families, setFamilies] = useState<FamilyOption[]>([])
   const [formOpen, setFormOpen] = useState(false)
   const [editingSupplier, setEditingSupplier] = useState<any>(null)
   const [deactivatingSupplier, setDeactivatingSupplier] = useState<any>(null)
   const [deactivating, setDeactivating] = useState(false)
+
+  // Cargar familias para el filtro
+  useEffect(() => {
+    fetch('/api/families?includeInactive=false')
+      .then(r => r.json())
+      .then(d => {
+        if (d.success && Array.isArray(d.data)) {
+          setFamilies(d.data.map((f: any) => ({ id: f.id, name: f.name, code: f.code, color: f.color })))
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   const fetchSuppliers = useCallback(async () => {
     setLoading(true)
     const params = new URLSearchParams()
     if (search) params.set('search', search)
     if (activeFilter !== 'all') params.set('active', activeFilter)
+    if (familyFilter !== 'all') params.set('familyId', familyFilter)
     try {
       const res = await fetch(`/api/inventory/suppliers?${params}`)
       if (!res.ok) throw new Error('Error al cargar')
       const data = await res.json()
-      // La API devuelve el array directamente (no envuelto en { suppliers: [] })
       setSuppliers(Array.isArray(data) ? data : (data.suppliers ?? []))
     } catch {
       toast({ title: 'Error', description: 'No se pudieron cargar los proveedores', variant: 'destructive' })
     } finally {
       setLoading(false)
     }
-  }, [search, activeFilter, toast])
+  }, [search, activeFilter, familyFilter, toast])
 
   useEffect(() => { fetchSuppliers() }, [fetchSuppliers])
+
+  // Exportación
+  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+    filename: 'proveedores',
+    title: 'Proveedores',
+    getData: () => suppliers,
+    columns: [
+      { key: 'name', label: 'Nombre' },
+      { key: 'supplierType', label: 'Tipo', format: v => v?.name ?? '' },
+      { key: 'family', label: 'Área', format: v => v?.name ?? '' },
+      { key: 'taxId', label: 'RUC / NIT', format: v => v ?? '' },
+      { key: 'email', label: 'Email', format: v => v ?? '' },
+      { key: 'phone', label: 'Teléfono', format: v => v ?? '' },
+      { key: 'contactName', label: 'Contacto', format: v => v ?? '' },
+      { key: 'isActive', label: 'Estado', format: v => v ? 'Activo' : 'Inactivo' },
+    ],
+  })
 
   const handleDeactivate = async () => {
     if (!deactivatingSupplier) return
@@ -92,6 +126,13 @@ export default function SuppliersPage() {
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Actualizar
             </Button>
+            <ExportButton
+              onExportCSV={exportCSV}
+              onExportExcel={exportExcel}
+              onExportPDF={exportPDF}
+              loading={exporting}
+              disabled={suppliers.length === 0}
+            />
             <Button onClick={() => { setEditingSupplier(null); setFormOpen(true) }}>
               <Plus className="mr-2 h-4 w-4" /> Nuevo proveedor
             </Button>
@@ -106,6 +147,17 @@ export default function SuppliersPage() {
             onChange={e => setSearch(e.target.value)}
             className="max-w-xs"
           />
+          {families.length > 1 && (
+            <FamilyCombobox
+              families={families}
+              value={familyFilter}
+              onValueChange={setFamilyFilter}
+              allowAll
+              allowClear
+              popoverWidth="240px"
+              className="w-52"
+            />
+          )}
           <Select value={activeFilter} onValueChange={setActiveFilter}>
             <SelectTrigger className="w-36">
               <SelectValue placeholder="Estado" />
