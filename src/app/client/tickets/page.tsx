@@ -18,10 +18,12 @@ import { SymmetricStatsCard } from '@/components/shared/stats-card'
 import { TicketFilters } from '@/components/tickets/ticket-filters'
 import { createClientTicketColumns } from '@/components/tickets/client/ticket-columns'
 import { Button } from '@/components/ui/button'
+import { ExportButton } from '@/components/common/export-button'
 
 import { useModuleData } from '@/hooks/common/use-module-data'
 import { useTicketFilters } from '@/hooks/common/use-ticket-filters'
 import { usePagination } from '@/hooks/common/use-pagination'
+import { useExport } from '@/hooks/common/use-export'
 import type { Ticket as TicketType } from '@/hooks/use-ticket-data'
 import { filterTicketsClient } from '@/lib/utils/ticket-filters'
 
@@ -121,6 +123,25 @@ export default function ClientTicketsPage() {
 
   const handleViewTicket = (ticket: TicketType) => router.push(`/client/tickets/${ticket.id}`)
 
+  // Exportación — tickets del cliente con filtros activos
+  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+    filename: 'mis-tickets',
+    title: 'Mis Tickets',
+    subtitle: `${session?.user?.name ?? ''} • ${filteredTickets.length} tickets`,
+    getData: () => filteredTickets,
+    columns: [
+      { key: 'ticketCode', label: 'Código', format: (v, r) => v ?? r.id.slice(-8).toUpperCase() },
+      { key: 'title', label: 'Título' },
+      { key: 'status', label: 'Estado', format: v => ({ OPEN: 'Abierto', IN_PROGRESS: 'En Progreso', RESOLVED: 'Resuelto', CLOSED: 'Cerrado' }[v] ?? v) },
+      { key: 'priority', label: 'Prioridad', format: v => ({ LOW: 'Baja', MEDIUM: 'Media', HIGH: 'Alta', URGENT: 'Urgente' }[v] ?? v) },
+      { key: 'assignee', label: 'Técnico', format: v => v?.name ?? 'Sin asignar' },
+      { key: 'category', label: 'Categoría', format: v => v?.name ?? '' },
+      { key: 'family', label: 'Área', format: v => v?.name ?? '' },
+      { key: 'createdAt', label: 'Creado', format: v => v ? new Date(v).toLocaleDateString('es-ES') : '' },
+      { key: 'updatedAt', label: 'Actualizado', format: v => v ? new Date(v).toLocaleDateString('es-ES') : '' },
+    ],
+  })
+
   const paginationConfig = {
     page: pagination.currentPage,
     limit: pagination.pageSize,
@@ -139,12 +160,21 @@ export default function ClientTicketsPage() {
       error={error}
       onRetry={reload}
       headerActions={
-        <Button size="sm" asChild>
-          <Link href="/client/tickets/create">
-            <Plus className="h-4 w-4 mr-2" />
-            Nuevo Ticket
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <ExportButton
+            onExportCSV={exportCSV}
+            onExportExcel={exportExcel}
+            onExportPDF={exportPDF}
+            loading={exporting}
+            disabled={filteredTickets.length === 0}
+          />
+          <Button size="sm" asChild>
+            <Link href="/client/tickets/create">
+              <Plus className="h-4 w-4 mr-2" />
+              Nuevo Ticket
+            </Link>
+          </Button>
+        </div>
       }
     >
       <div className="space-y-6">

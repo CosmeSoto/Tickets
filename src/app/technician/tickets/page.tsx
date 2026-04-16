@@ -22,10 +22,12 @@ import { SymmetricStatsCard } from '@/components/shared/stats-card'
 import { TicketFilters } from '@/components/tickets/ticket-filters'
 import { createTechnicianTicketColumns } from '@/components/tickets/technician/ticket-columns'
 import { Button } from '@/components/ui/button'
+import { ExportButton } from '@/components/common/export-button'
 
 import { useModuleData } from '@/hooks/common/use-module-data'
 import { useTicketFilters } from '@/hooks/common/use-ticket-filters'
 import { usePagination } from '@/hooks/common/use-pagination'
+import { useExport } from '@/hooks/common/use-export'
 import type { Ticket as TicketType } from '@/hooks/use-ticket-data'
 import { filterTicketsTechnician } from '@/lib/utils/ticket-filters'
 
@@ -132,6 +134,25 @@ export default function TechnicianTicketsPage() {
 
   const handleViewTicket = (ticket: TicketType) => router.push(`/technician/tickets/${ticket.id}`)
 
+  // Exportación — tickets asignados al técnico con filtros activos
+  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+    filename: 'mis-tickets',
+    title: 'Mis Tickets Asignados',
+    subtitle: `${session?.user?.name ?? ''} • ${filteredTickets.length} tickets`,
+    getData: () => filteredTickets,
+    columns: [
+      { key: 'ticketCode', label: 'Código', format: (v, r) => v ?? r.id.slice(-8).toUpperCase() },
+      { key: 'title', label: 'Título' },
+      { key: 'status', label: 'Estado', format: v => ({ OPEN: 'Abierto', IN_PROGRESS: 'En Progreso', RESOLVED: 'Resuelto', CLOSED: 'Cerrado', ON_HOLD: 'En Espera' }[v] ?? v) },
+      { key: 'priority', label: 'Prioridad', format: v => ({ LOW: 'Baja', MEDIUM: 'Media', HIGH: 'Alta', URGENT: 'Urgente' }[v] ?? v) },
+      { key: 'client', label: 'Cliente', format: v => v?.name ?? '' },
+      { key: 'category', label: 'Categoría', format: v => v?.name ?? '' },
+      { key: 'family', label: 'Área', format: v => v?.name ?? '' },
+      { key: 'createdAt', label: 'Creado', format: v => v ? new Date(v).toLocaleDateString('es-ES') : '' },
+      { key: 'resolvedAt', label: 'Resuelto', format: v => v ? new Date(v).toLocaleDateString('es-ES') : '' },
+    ],
+  })
+
   const paginationConfig = {
     page: pagination.currentPage,
     limit: pagination.pageSize,
@@ -151,24 +172,33 @@ export default function TechnicianTicketsPage() {
       onRetry={reload}
       headerActions={
         <div className="flex gap-2">
-          <Link href="/technician/stats">
-            <Button variant="outline" size="sm">
-              <BarChart3 className="mr-2 h-4 w-4" />
-              Estadísticas
-            </Button>
-          </Link>
-          <Link href="/technician/categories">
-            <Button variant="outline" size="sm">
-              <FolderTree className="mr-2 h-4 w-4" />
-              Mis Categorías
-            </Button>
-          </Link>
-          <Link href="/technician/knowledge">
-            <Button variant="outline" size="sm">
-              <BookOpen className="mr-2 h-4 w-4" />
-              Conocimientos
-            </Button>
-          </Link>
+          <ExportButton
+            onExportCSV={exportCSV}
+            onExportExcel={exportExcel}
+            onExportPDF={exportPDF}
+            loading={exporting}
+            disabled={filteredTickets.length === 0}
+          />
+          <div className="flex gap-2">
+            <Link href="/technician/stats">
+              <Button variant="outline" size="sm">
+                <BarChart3 className="mr-2 h-4 w-4" />
+                Estadísticas
+              </Button>
+            </Link>
+            <Link href="/technician/categories">
+              <Button variant="outline" size="sm">
+                <FolderTree className="mr-2 h-4 w-4" />
+                Mis Categorías
+              </Button>
+            </Link>
+            <Link href="/technician/knowledge">
+              <Button variant="outline" size="sm">
+                <BookOpen className="mr-2 h-4 w-4" />
+                Conocimientos
+              </Button>
+            </Link>
+          </div>
         </div>
       }
     >

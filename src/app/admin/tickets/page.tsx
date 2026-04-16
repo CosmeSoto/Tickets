@@ -17,11 +17,13 @@ import { DataTable } from '@/components/ui/data-table'
 import { SymmetricStatsCard } from '@/components/shared/stats-card'
 import { TicketFilters } from '@/components/tickets/ticket-filters'
 import { Button } from '@/components/ui/button'
+import { ExportButton } from '@/components/common/export-button'
 import { createAdminTicketColumns } from '@/components/tickets/admin/ticket-columns'
 
 import { useModuleData } from '@/hooks/common/use-module-data'
 import { useTicketFilters } from '@/hooks/common/use-ticket-filters'
 import { usePagination } from '@/hooks/common/use-pagination'
+import { useExport } from '@/hooks/common/use-export'
 import type { Ticket as TicketType } from '@/hooks/use-ticket-data'
 import { filterTicketsAdmin } from '@/lib/utils/ticket-filters'
 
@@ -103,6 +105,26 @@ export default function AdminTicketsPage() {
 
   const handleViewTicket = (ticket: TicketType) => router.push(`/admin/tickets/${ticket.id}`)
 
+  // Exportación — usa los tickets filtrados actuales (lo que el admin ve en pantalla)
+  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+    filename: 'tickets-admin',
+    title: 'Gestión de Tickets',
+    subtitle: `Exportado el ${new Date().toLocaleDateString('es-ES')} • ${filteredTickets.length} tickets`,
+    getData: () => filteredTickets,
+    columns: [
+      { key: 'ticketCode', label: 'Código', format: (v, r) => v ?? r.id.slice(-8).toUpperCase() },
+      { key: 'title', label: 'Título' },
+      { key: 'status', label: 'Estado', format: v => ({ OPEN: 'Abierto', IN_PROGRESS: 'En Progreso', RESOLVED: 'Resuelto', CLOSED: 'Cerrado', ON_HOLD: 'En Espera' }[v] ?? v) },
+      { key: 'priority', label: 'Prioridad', format: v => ({ LOW: 'Baja', MEDIUM: 'Media', HIGH: 'Alta', URGENT: 'Urgente' }[v] ?? v) },
+      { key: 'client', label: 'Cliente', format: v => v?.name ?? '' },
+      { key: 'assignee', label: 'Técnico', format: v => v?.name ?? 'Sin asignar' },
+      { key: 'category', label: 'Categoría', format: v => v?.name ?? '' },
+      { key: 'family', label: 'Área', format: v => v?.name ?? '' },
+      { key: 'createdAt', label: 'Creado', format: v => v ? new Date(v).toLocaleDateString('es-ES') : '' },
+      { key: 'updatedAt', label: 'Actualizado', format: v => v ? new Date(v).toLocaleDateString('es-ES') : '' },
+    ],
+  })
+
   const paginationConfig = {
     page: pagination.currentPage,
     limit: pagination.pageSize,
@@ -121,12 +143,21 @@ export default function AdminTicketsPage() {
       error={error}
       onRetry={reload}
       headerActions={
-        <Button size="sm" asChild>
-          <Link href="/admin/tickets/create">
-            <Plus className="h-4 w-4 mr-2" />
-            Nuevo Ticket
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <ExportButton
+            onExportCSV={exportCSV}
+            onExportExcel={exportExcel}
+            onExportPDF={exportPDF}
+            loading={exporting}
+            disabled={filteredTickets.length === 0}
+          />
+          <Button size="sm" asChild>
+            <Link href="/admin/tickets/create">
+              <Plus className="h-4 w-4 mr-2" />
+              Nuevo Ticket
+            </Link>
+          </Button>
+        </div>
       }
     >
       <div className="space-y-6">

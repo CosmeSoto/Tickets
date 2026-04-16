@@ -19,11 +19,13 @@ import { KnowledgeFilters } from '@/components/knowledge/knowledge-filters'
 import { createKnowledgeColumns } from '@/components/knowledge/knowledge-columns'
 import { KnowledgeCard } from '@/components/knowledge/knowledge-card'
 import { Card, CardContent } from '@/components/ui/card'
+import { ExportButton } from '@/components/common/export-button'
 
 import { useModuleData } from '@/hooks/common/use-module-data'
 import { useKnowledgeFilters } from '@/hooks/common/use-knowledge-filters'
 import { usePagination } from '@/hooks/common/use-pagination'
 import { useToast } from '@/hooks/use-toast'
+import { useExport } from '@/hooks/common/use-export'
 import type { Article } from '@/hooks/use-knowledge'
 
 interface FamilyOption {
@@ -142,6 +144,25 @@ export default function TechnicianKnowledgePage() {
 
   const handleViewArticle = (article: Article) => router.push(`/technician/knowledge/${article.id}`)
 
+  // Exportación
+  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+    filename: 'base-conocimientos',
+    title: 'Base de Conocimientos',
+    subtitle: `${processedArticles.length} artículos de tus áreas asignadas`,
+    getData: () => processedArticles,
+    columns: [
+      { key: 'title', label: 'Título' },
+      { key: 'category', label: 'Categoría', format: v => v?.name ?? '' },
+      { key: 'family', label: 'Área', format: v => v?.name ?? '' },
+      { key: 'author', label: 'Autor', format: v => v?.name ?? '' },
+      { key: 'views', label: 'Vistas' },
+      { key: 'helpfulVotes', label: 'Votos útiles' },
+      { key: 'helpfulPercentage', label: '% Útil', format: v => v != null ? `${v}%` : '' },
+      { key: 'tags', label: 'Tags', format: v => Array.isArray(v) ? v.join(', ') : '' },
+      { key: 'createdAt', label: 'Creado', format: v => v ? new Date(v).toLocaleDateString('es-ES') : '' },
+    ],
+  })
+
   const handleDeleteArticle = async (article: Article) => {
     if (!confirm('¿Estás seguro de que deseas eliminar este artículo?')) return
     try {
@@ -174,6 +195,15 @@ export default function TechnicianKnowledgePage() {
       loading={loading && allArticles.length === 0}
       error={error}
       onRetry={reload}
+      headerActions={
+        <ExportButton
+          onExportCSV={exportCSV}
+          onExportExcel={exportExcel}
+          onExportPDF={exportPDF}
+          loading={exporting}
+          disabled={processedArticles.length === 0}
+        />
+      }
     >
       <div className="space-y-6">
         <BackToTickets />

@@ -46,6 +46,8 @@ import { useCategories } from '@/hooks/categories'
 import { CategoryFormDialog } from './category-form-dialog'
 import { CategoryStatsPanel } from './category-stats-panel'
 import { getCategoryLevelIcon } from '@/lib/constants/category-constants'
+import { ExportButton } from '@/components/common/export-button'
+import { useExport } from '@/hooks/common/use-export'
 
 export default function CategoriesPage() {
   const { data: session } = useSession()
@@ -82,7 +84,23 @@ export default function CategoriesPage() {
       .catch(() => setAdminFamilyIds(null))
   }, [isSuperAdmin])
 
-  // Determina si el admin puede gestionar una categoría específica
+  // Exportación — categorías filtradas actuales
+  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+    filename: 'categorias',
+    title: 'Gestión de Categorías',
+    subtitle: `${familyFilteredCategories.length} categorías${familyFilter !== 'all' ? ' (filtradas por área)' : ''}`,
+    getData: () => familyFilteredCategories,
+    columns: [
+      { key: 'name', label: 'Nombre' },
+      { key: 'levelName', label: 'Nivel' },
+      { key: 'departments', label: 'Departamento', format: v => v?.name ?? '' },
+      { key: 'departments', label: 'Área', format: v => v?.family?.name ?? '' },
+      { key: 'isActive', label: 'Estado', format: v => v ? 'Activa' : 'Inactiva' },
+      { key: 'description', label: 'Descripción', format: v => v ?? '' },
+      { key: '_count', label: 'Tickets', format: v => String(v?.tickets ?? 0) },
+      { key: '_count', label: 'Subcategorías', format: v => String(v?.other_categories ?? 0) },
+    ],
+  })
   const canManageCat = (category: any): boolean => {
     if (isSuperAdmin) return true
     if (adminFamilyIds === null) return true // sin restricciones cargadas aún
@@ -379,14 +397,20 @@ export default function CategoriesPage() {
       onRetry={refresh}
       headerActions={
         <div className="flex items-center space-x-2">
+          <ExportButton
+            onExportCSV={exportCSV}
+            onExportExcel={exportExcel}
+            onExportPDF={exportPDF}
+            loading={exporting}
+            disabled={familyFilteredCategories.length === 0}
+          />
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button onClick={handleNew} disabled={adminFamilyIds !== null && adminFamilyIds.size === 0 && !isSuperAdmin}>
                   <Plus className='h-4 w-4 mr-2' />
                   Nueva Categoría
-                </Button>
-              </TooltipTrigger>
+                </Button>              </TooltipTrigger>
               <TooltipContent>
                 <p>
                   {adminFamilyIds !== null && adminFamilyIds.size === 0 && !isSuperAdmin

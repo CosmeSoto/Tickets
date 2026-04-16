@@ -13,7 +13,7 @@ import {
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { BackToTickets } from '@/components/tickets/back-to-tickets'
 import { DataTable } from '@/components/ui/data-table'
-import { SymmetricStatsCard } from '@/components/shared/stats-card'
+import { ExportButton } from '@/components/common/export-button'import { SymmetricStatsCard } from '@/components/shared/stats-card'
 import { KnowledgeFilters } from '@/components/knowledge/knowledge-filters'
 import { createKnowledgeColumns } from '@/components/knowledge/knowledge-columns'
 import { KnowledgeCard } from '@/components/knowledge/knowledge-card'
@@ -21,6 +21,7 @@ import { KnowledgeCard } from '@/components/knowledge/knowledge-card'
 import { useModuleData } from '@/hooks/common/use-module-data'
 import { useKnowledgeFilters } from '@/hooks/common/use-knowledge-filters'
 import { usePagination } from '@/hooks/common/use-pagination'
+import { useExport } from '@/hooks/common/use-export'
 import type { Article } from '@/hooks/use-knowledge'
 
 interface FamilyOption {
@@ -147,6 +148,25 @@ export default function KnowledgePage() {
     else router.push(`/knowledge/${article.id}`)
   }
 
+  // Exportación
+  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+    filename: 'base-conocimientos',
+    title: 'Base de Conocimientos',
+    subtitle: `${processedArticles.length} artículos disponibles`,
+    getData: () => processedArticles,
+    columns: [
+      { key: 'title', label: 'Título' },
+      { key: 'summary', label: 'Resumen', format: v => v ?? '' },
+      { key: 'category', label: 'Categoría', format: v => v?.name ?? '' },
+      { key: 'family', label: 'Área', format: v => v?.name ?? '' },
+      { key: 'views', label: 'Vistas' },
+      { key: 'helpfulVotes', label: 'Votos útiles' },
+      { key: 'helpfulPercentage', label: '% Útil', format: v => v != null ? `${v}%` : '' },
+      { key: 'tags', label: 'Tags', format: v => Array.isArray(v) ? v.join(', ') : '' },
+      { key: 'createdAt', label: 'Creado', format: v => v ? new Date(v).toLocaleDateString('es-ES') : '' },
+    ],
+  })
+
   const paginationConfig = {
     page: pagination.currentPage,
     limit: pagination.pageSize,
@@ -164,6 +184,15 @@ export default function KnowledgePage() {
       loading={loading && allArticles.length === 0}
       error={error}
       onRetry={reload}
+      headerActions={
+        <ExportButton
+          onExportCSV={exportCSV}
+          onExportExcel={exportExcel}
+          onExportPDF={exportPDF}
+          loading={exporting}
+          disabled={processedArticles.length === 0}
+        />
+      }
     >
       <div className="space-y-6">
         <BackToTickets />
