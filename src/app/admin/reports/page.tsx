@@ -23,6 +23,8 @@ import {
   Crown,
 } from 'lucide-react'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { ModuleLayout } from '@/components/common/layout/module-layout'
+import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -551,8 +553,8 @@ export default function ReportsPage() {
   }, [selectedFamily, activeTab, executiveData, techniciansData, trendsData, slaData, satisfactionData, granularity, logExport])
 
   return (
-    <RoleDashboardLayout 
-      title="Reportes Multi-Familia" 
+    <ModuleLayout
+      title="Reportes Multi-Familia"
       subtitle={isSuperAdmin ? "Vista global — todas las familias" : "Análisis de desempeño de tus familias asignadas"}
     >
     <div className="space-y-6">
@@ -566,30 +568,16 @@ export default function ReportsPage() {
               {loadingFamilies ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Select value={selectedFamilyId} onValueChange={setSelectedFamilyId}>
-                  <SelectTrigger className="w-52">
-                    <SelectValue placeholder="Seleccionar familia" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas las familias</SelectItem>
-                    {families.map((f) => (
-                      <SelectItem key={f.id} value={f.id}>
-                        <div className="flex items-center gap-2">
-                          {f.color && (
-                            <span
-                              className="inline-block h-3 w-3 rounded-full flex-shrink-0"
-                              style={{ backgroundColor: f.color }}
-                            />
-                          )}
-                          {f.name}
-                          <Badge variant="outline" className="text-xs ml-1">
-                            {f.code}
-                          </Badge>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <FamilyCombobox
+                  families={families.map(f => ({ id: f.id, name: f.name, code: f.code, color: f.color }))}
+                  value={selectedFamilyId}
+                  onValueChange={setSelectedFamilyId}
+                  allowAll
+                  allowClear
+                  popoverWidth="260px"
+                  className="w-52"
+                  disabled={loadingFamilies}
+                />
               )}
               {/* Badge de alcance */}
               {isSuperAdmin ? (
@@ -767,7 +755,7 @@ export default function ReportsPage() {
         </TabsContent>
       </Tabs>
     </div>
-    </RoleDashboardLayout>
+    </ModuleLayout>
   )
 }
 
