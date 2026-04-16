@@ -4,7 +4,7 @@
 
 'use client'
 
-import { Search, RefreshCw, Filter, X, Calendar, Users } from 'lucide-react'
+import { Search, RefreshCw, Filter, X, Calendar } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { UserCombobox } from '@/components/ui/user-combobox'
+import { FamilyCombobox, type FamilyOption } from '@/components/ui/family-combobox'
 import { 
   STATUS_OPTIONS, 
   PRIORITY_OPTIONS, 
@@ -26,14 +27,6 @@ import {
   type DateFilter
 } from '@/lib/constants/filter-options'
 import { cn } from '@/lib/utils'
-
-interface FamilyOption {
-  id: string
-  name: string
-  code: string
-  color?: string | null
-  isOwnFamily?: boolean
-}
 
 interface TicketFiltersProps {
   // Valores de filtros
@@ -98,7 +91,7 @@ export function TicketFilters({
   searchPlaceholder = 'Buscar por título, descripción o cliente...',
 }: TicketFiltersProps) {
 
-  const showFamilyChips = families.length > 1 && !!onFamilyChange
+  const showFamilyFilter = families.length > 1 && !!onFamilyChange
 
   // Calcular filtros activos
   const activeFilters = [
@@ -107,7 +100,7 @@ export function TicketFilters({
     categoryFilter !== 'all',
     showAssigneeFilter && assigneeFilter !== 'all',
     showDateFilter && dateFilter !== 'all',
-    showFamilyChips && familyFilter !== 'all',
+    showFamilyFilter && familyFilter !== 'all',
     searchTerm.trim().length > 0,
   ].filter(Boolean).length
 
@@ -117,52 +110,6 @@ export function TicketFilters({
     <Card className={cn('w-full', className)}>
       <CardContent className="pt-4 pb-4">
         <div className="space-y-4">
-
-          {/* Chips de familia — solo si hay más de una y se pasa el callback */}
-          {showFamilyChips && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm text-muted-foreground flex items-center gap-1.5 flex-shrink-0">
-                <Users className="h-3.5 w-3.5" />
-                Área:
-              </span>
-              <button
-                onClick={() => onFamilyChange!('all')}
-                disabled={loading}
-                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
-                  familyFilter === 'all'
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'bg-background border-border text-muted-foreground hover:border-primary/50'
-                }`}
-              >
-                Todas
-              </button>
-              {families.map(f => (
-                <button
-                  key={f.id}
-                  onClick={() => onFamilyChange!(f.id)}
-                  disabled={loading}
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
-                    familyFilter === f.id
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-background border-border text-muted-foreground hover:border-primary/50'
-                  }`}
-                >
-                  {f.color && (
-                    <span
-                      className="w-2 h-2 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: f.color }}
-                    />
-                  )}
-                  {f.name}
-                  {f.isOwnFamily && (
-                    <Badge variant="secondary" className="text-xs px-1 py-0 ml-0.5">
-                      Mi área
-                    </Badge>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
 
           {/* Barra superior: Búsqueda y acciones */}
           <div className="flex flex-col sm:flex-row gap-3">
@@ -208,6 +155,22 @@ export function TicketFilters({
 
           {/* Filtros principales */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+
+            {/* Área (familia) — combobox con buscador */}
+            {showFamilyFilter && (
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-muted-foreground">Área</label>
+                <FamilyCombobox
+                  families={families}
+                  value={familyFilter}
+                  onValueChange={onFamilyChange!}
+                  allowAll
+                  allowClear
+                  disabled={loading}
+                  popoverWidth="260px"
+                />
+              </div>
+            )}
 
             {/* Estado */}
             <div className="space-y-1">

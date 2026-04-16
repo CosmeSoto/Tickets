@@ -30,20 +30,17 @@ import {
   Loader2, 
   ArrowLeft, 
   Tag,
-  FileText,
   Zap,
   Upload,
-  File,
-  X,
   Paperclip,
   MapPin,
   Users,
-  Star,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/hooks/use-toast'
 import { CategorySelectorWrapper } from '@/features/category-selection'
 import { FilePreviewList } from '@/components/tickets/file-preview-list'
+import { FamilyCombobox } from '@/components/ui/family-combobox'
 
 interface FamilyOption {
   id: string
@@ -478,58 +475,25 @@ function CreateClientTicketContent() {
                   <p className='text-xs text-muted-foreground'>
                     Selecciona el equipo que debe atender tu solicitud.
                   </p>
-                  <div className='grid grid-cols-1 sm:grid-cols-2 gap-2'>
-                    {/* Opción "Sin preferencia" */}
-                    <button
-                      type='button'
-                      onClick={() => setSelectedFamilyId(null)}
-                      className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${
-                        selectedFamilyId === null
-                          ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                          : 'border-border hover:border-primary/40 hover:bg-muted/40'
-                      }`}
-                    >
-                      <span className='flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground text-xs font-bold flex-shrink-0'>
-                        ?
-                      </span>
-                      <div className='min-w-0'>
-                        <p className='text-sm font-medium truncate'>Sin preferencia</p>
-                        <p className='text-xs text-muted-foreground'>El sistema asignará automáticamente</p>
-                      </div>
-                    </button>
-
-                    {availableFamilies.map(family => (
-                      <button
-                        key={family.id}
-                        type='button'
-                        onClick={() => setSelectedFamilyId(family.id)}
-                        className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${
-                          selectedFamilyId === family.id
-                            ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                            : 'border-border hover:border-primary/40 hover:bg-muted/40'
-                        }`}
-                      >
-                        <span
-                          className='flex h-8 w-8 items-center justify-center rounded-full text-white text-xs font-bold flex-shrink-0'
-                          style={{ backgroundColor: family.color ?? '#6366f1' }}
-                        >
-                          {family.code.slice(0, 2).toUpperCase()}
-                        </span>
-                        <div className='min-w-0 flex-1'>
-                          <div className='flex items-center gap-1.5'>
-                            <p className='text-sm font-medium truncate'>{family.name}</p>
-                            {family.isUserFamily && (
-                              <Badge variant='secondary' className='text-xs px-1.5 py-0 flex-shrink-0 flex items-center gap-0.5'>
-                                <Star className='h-2.5 w-2.5' />
-                                Mi área
-                              </Badge>
-                            )}
-                          </div>
-                          <p className='text-xs text-muted-foreground font-mono'>{family.code}</p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
+                  <FamilyCombobox
+                    families={availableFamilies}
+                    value={selectedFamilyId ?? ''}
+                    onValueChange={(v) => setSelectedFamilyId(v || null)}
+                    allowNull
+                    nullLabel='Sin preferencia'
+                    nullDescription='El sistema asignará automáticamente'
+                    allowClear
+                    popoverWidth='360px'
+                  />
+                  {selectedFamilyId && (() => {
+                    const f = availableFamilies.find(x => x.id === selectedFamilyId)
+                    return f ? (
+                      <p className='text-xs text-muted-foreground flex items-center gap-1.5'>
+                        <span className='w-2 h-2 rounded-full' style={{ backgroundColor: f.color ?? '#6366f1' }} />
+                        Tu solicitud irá al equipo de <strong>{f.name}</strong>
+                      </p>
+                    ) : null
+                  })()}
                 </div>
               )}
 

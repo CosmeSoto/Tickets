@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
-import { Plus, FolderTree, RefreshCw, Search, ChevronDown, ChevronRight, List, Edit, Trash2, Ticket, Users, Layers } from 'lucide-react'
+import { Plus, FolderTree, RefreshCw, Search, ChevronDown, ChevronRight, List, Edit, Trash2, Ticket, Users } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -48,6 +48,7 @@ import { CategoryStatsPanel } from './category-stats-panel'
 import { getCategoryLevelIcon } from '@/lib/constants/category-constants'
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
+import { FamilyCombobox } from '@/components/ui/family-combobox'
 
 export default function CategoriesPage() {
   const { data: session } = useSession()
@@ -543,42 +544,6 @@ export default function CategoriesPage() {
             {/* Filtros y búsqueda */}
             <div className='space-y-3 mb-6'>
 
-              {/* Chips de familia — mismo patrón que tickets y knowledge */}
-              {families.length > 1 && (
-                <div className='flex items-center gap-2 flex-wrap'>
-                  <span className='text-sm text-muted-foreground flex items-center gap-1.5 flex-shrink-0'>
-                    <Layers className='h-3.5 w-3.5' />
-                    Área:
-                  </span>
-                  <button
-                    onClick={() => { setFamilyFilter('all'); setDepartmentFilter('all') }}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
-                      familyFilter === 'all'
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'bg-background border-border text-muted-foreground hover:border-primary/50'
-                    }`}
-                  >
-                    Todas
-                  </button>
-                  {families.map(f => (
-                    <button
-                      key={f.id}
-                      onClick={() => { setFamilyFilter(f.id); setDepartmentFilter('all') }}
-                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
-                        familyFilter === f.id
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-background border-border text-muted-foreground hover:border-primary/50'
-                      }`}
-                    >
-                      {f.color && (
-                        <span className='w-2 h-2 rounded-full flex-shrink-0' style={{ backgroundColor: f.color }} />
-                      )}
-                      {f.name}
-                    </button>
-                  ))}
-                </div>
-              )}
-
               {/* Búsqueda — ancho completo */}
               <div className='relative'>
                 <Search className='absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4 pointer-events-none' />
@@ -590,9 +555,20 @@ export default function CategoriesPage() {
                 />
               </div>
 
-              {/* Filtros secundarios — nivel, departamento (solo si hay familia), estado */}
+              {/* Filtros secundarios — área, nivel, departamento, estado */}
               <div className='flex flex-wrap gap-2'>
-                <Select value={levelFilter} onValueChange={(value) => setLevelFilter(value as any)}>
+                {/* Área (familia) — combobox con buscador */}
+                {families.length > 1 && (
+                  <FamilyCombobox
+                    families={families.map(f => ({ ...f, color: f.color ?? null }))}
+                    value={familyFilter}
+                    onValueChange={(v) => { setFamilyFilter(v); setDepartmentFilter('all') }}
+                    allowAll
+                    allowClear
+                    popoverWidth="260px"
+                    className="min-w-[180px]"
+                  />
+                )}                <Select value={levelFilter} onValueChange={(value) => setLevelFilter(value as any)}>
                   <SelectTrigger className='w-auto min-w-[160px]'>
                     <SelectValue placeholder='Nivel' />
                   </SelectTrigger>
