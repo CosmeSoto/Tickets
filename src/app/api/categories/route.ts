@@ -272,10 +272,6 @@ export async function POST(request: NextRequest) {
         { status: 403 }
       )
     }
-        { success: false, message: 'El departamento es requerido' },
-        { status: 400 }
-      )
-    }
 
     // Validar que no exista una categoría con el mismo nombre en el mismo nivel y padre
     const existing = await prisma.categories.findFirst({
