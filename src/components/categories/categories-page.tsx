@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { useSession } from 'next-auth/react'
 import { Plus, FolderTree, RefreshCw, Search, ChevronDown, ChevronRight, List, Edit, Trash2, Ticket, Users, Layers } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -47,8 +48,12 @@ import { CategoryStatsPanel } from './category-stats-panel'
 import { getCategoryLevelIcon } from '@/lib/constants/category-constants'
 
 export default function CategoriesPage() {
+  const { data: session } = useSession()
+  const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
   const [familyFilter, setFamilyFilter] = useState('all')
   const [families, setFamilies] = useState<Array<{ id: string; name: string; code: string; color?: string }>>([])
+  // Familias que el admin tiene asignadas (para validar permisos en UI)
+  const [adminFamilyIds, setAdminFamilyIds] = useState<Set<string> | null>(null)
 
   useEffect(() => {
     fetch('/api/families?includeInactive=false')
@@ -58,6 +63,34 @@ export default function CategoriesPage() {
       })
       .catch(() => {})
   }, [])
+
+  // Cargar familias asignadas al admin (para mostrar/ocultar acciones)
+  useEffect(() => {
+    if (isSuperAdmin) {
+      setAdminFamilyIds(null) // null = sin restricción
+      return
+    }
+    fetch('/api/families?includeInactive=false')
+      .then(r => r.json())
+      .then(data => {
+        // La API ya filtra por admin_family_assignments para admin normal
+        // Si devuelve familias, esas son las que tiene asignadas
+        if (data.success && Array.isArray(data.data)) {
+          setAdminFamilyIds(new Set(data.data.map((f: any) => f.id)))
+        }
+      })
+      .catch(() => setAdminFamilyIds(null))
+  }, [isSuperAdmin])
+
+  // Determina si el admin puede gestionar una categoría específica
+  const canManageCat = (category: any): boolean => {
+    if (isSuperAdmin) return true
+    if (adminFamilyIds === null) return true // sin restricciones cargadas aún
+    const catFamilyId = category.departments?.familyId ?? category.departments?.family?.id
+    if (!catFamilyId) return true // sin familia → cualquier admin
+    if (adminFamilyIds.size === 0) return true // sin asignaciones → acceso total
+    return adminFamilyIds.has(catFamilyId)
+  }
 
   const {
     // Estados principales
@@ -271,6 +304,7 @@ export default function CategoriesPage() {
       icon: Edit,
       onClick: (category) => handleEdit(category),
       variant: 'default',
+      disabled: (category) => !canManageCat(category),
     },
     {
       key: 'delete',
@@ -278,7 +312,7 @@ export default function CategoriesPage() {
       icon: Trash2,
       onClick: (category) => setDeletingCategory(category),
       variant: 'destructive',
-      disabled: (category) => !category.canDelete,
+      disabled: (category) => !category.canDelete || !canManageCat(category),
     }
   ]
 
@@ -337,13 +371,17 @@ export default function CategoriesPage() {
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button onClick={handleNew}>
+                <Button onClick={handleNew} disabled={adminFamilyIds !== null && adminFamilyIds.size === 0 && !isSuperAdmin}>
                   <Plus className='h-4 w-4 mr-2' />
                   Nueva Categoría
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Crea una nueva categoría en el sistema de clasificación</p>
+                <p>
+                  {adminFamilyIds !== null && adminFamilyIds.size === 0 && !isSuperAdmin
+                    ? 'No tienes áreas asignadas para crear categorías'
+                    : 'Crea una nueva categoría en el sistema de clasificación'}
+                </p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>

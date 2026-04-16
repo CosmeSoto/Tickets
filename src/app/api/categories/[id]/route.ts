@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { randomUUID } from 'crypto'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { NotificationService } from '@/lib/services/notification-service'
+import { canManageCategory, getCategoryFamilyId, getDepartmentFamilyId } from '@/lib/category-access'
 
 const updateCategorySchema = z.object({
   name: z.string().min(1, 'El nombre es requerido').max(100, 'El nombre es muy largo').transform(s => s.trim()),
@@ -140,6 +141,17 @@ export async function PUT(
       )
     }
 
+    // Validar que el admin tiene permiso en la familia de la categoría
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    const currentFamilyId = existingCategory.departments?.familyId ?? null
+    const hasPermission = await canManageCategory(session.user.id, isSuperAdmin, currentFamilyId)
+    if (!hasPermission) {
+      return NextResponse.json(
+        { success: false, error: 'No tienes permiso para editar categorías de esta área' },
+        { status: 403 }
+      )
+    }
+
     const body = await request.json()
 
     let validatedData
@@ -212,6 +224,20 @@ export async function PUT(
         select: { name: true, family: { select: { name: true } } }
       })
       newDeptName = newDept?.name ?? null
+    }
+
+    // Si cambia el departamento, validar permiso en la nueva familia también
+    if (validatedData.departmentId !== existingCategory.departmentId) {
+      const newFamilyId = await getDepartmentFamilyId(validatedData.departmentId)
+      if (newFamilyId && newFamilyId !== currentFamilyId) {
+        const hasPermissionNewFamily = await canManageCategory(session.user.id, isSuperAdmin, newFamilyId)
+        if (!hasPermissionNewFamily) {
+          return NextResponse.json(
+            { success: false, error: 'No tienes permiso para mover categorías a esta área' },
+            { status: 403 }
+          )
+        }
+      }
     }
 
     // Construir oldValues / newValues para auditoría
@@ -447,6 +473,17 @@ export async function DELETE(
       return NextResponse.json(
         { success: false, error: 'Categoría no encontrada' },
         { status: 404 }
+      )
+    }
+
+    // Validar que el admin tiene permiso en la familia de la categoría
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    const categoryFamilyId = await getCategoryFamilyId(id)
+    const hasPermission = await canManageCategory(session.user.id, isSuperAdmin, categoryFamilyId)
+    if (!hasPermission) {
+      return NextResponse.json(
+        { success: false, error: 'No tienes permiso para eliminar categorías de esta área' },
+        { status: 403 }
       )
     }
 

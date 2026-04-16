@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { NotificationService } from '@/lib/services/notification-service'
+import { canManageCategory, getDepartmentFamilyId } from '@/lib/category-access'
 
 /**
  * Obtiene el nombre del nivel basado en el número
@@ -235,6 +236,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Solo ADMIN puede crear categorías
+    if (session.user.role !== 'ADMIN') {
+      return NextResponse.json(
+        { success: false, message: 'Solo los administradores pueden crear categorías' },
+        { status: 403 }
+      )
+    }
+
     const body = await request.json()
     const { name, description, level, parentId, departmentId, color, order } = body
 
@@ -248,6 +257,21 @@ export async function POST(request: NextRequest) {
 
     if (!departmentId) {
       return NextResponse.json(
+        { success: false, message: 'El departamento es requerido' },
+        { status: 400 }
+      )
+    }
+
+    // Validar que el admin tiene permiso en la familia del departamento
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    const targetFamilyId = await getDepartmentFamilyId(departmentId)
+    const hasPermission = await canManageCategory(session.user.id, isSuperAdmin, targetFamilyId)
+    if (!hasPermission) {
+      return NextResponse.json(
+        { success: false, message: 'No tienes permiso para crear categorías en esta área' },
+        { status: 403 }
+      )
+    }
         { success: false, message: 'El departamento es requerido' },
         { status: 400 }
       )
