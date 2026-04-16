@@ -195,15 +195,6 @@ export default function TechnicianKnowledgePage() {
       loading={loading && allArticles.length === 0}
       error={error}
       onRetry={reload}
-      headerActions={
-        <ExportButton
-          onExportCSV={exportCSV}
-          onExportExcel={exportExcel}
-          onExportPDF={exportPDF}
-          loading={exporting}
-          disabled={processedArticles.length === 0}
-        />
-      }
     >
       <div className="space-y-6">
         <BackToTickets />
@@ -275,6 +266,15 @@ export default function TechnicianKnowledgePage() {
           externalSearch={true}
           hideInternalFilters={true}
           onRowClick={handleViewArticle}
+          actions={
+            <ExportButton
+              onExportCSV={exportCSV}
+              onExportExcel={exportExcel}
+              onExportPDF={exportPDF}
+              loading={exporting}
+              disabled={processedArticles.length === 0}
+            />
+          }
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           cardRenderer={(article) => (

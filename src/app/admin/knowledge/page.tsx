@@ -216,15 +216,6 @@ export default function AdminKnowledgePage() {
       loading={loading && allArticles.length === 0}
       error={error}
       onRetry={reload}
-      headerActions={
-        <ExportButton
-          onExportCSV={exportCSV}
-          onExportExcel={exportExcel}
-          onExportPDF={exportPDF}
-          loading={exporting}
-          disabled={processedArticles.length === 0}
-        />
-      }
     >
       <div className="space-y-6">
         <BackToTickets />
@@ -288,7 +279,7 @@ export default function AdminKnowledgePage() {
           columns={createKnowledgeColumns({
             onView: handleViewArticle,
             onDelete: handleDeleteArticle,
-            currentUserId: undefined, // Admin puede eliminar todos
+            currentUserId: undefined,
             showFamily: families.length > 1,
           })}
           loading={loading}
@@ -297,6 +288,15 @@ export default function AdminKnowledgePage() {
           externalSearch={true}
           hideInternalFilters={true}
           onRowClick={handleViewArticle}
+          actions={
+            <ExportButton
+              onExportCSV={exportCSV}
+              onExportExcel={exportExcel}
+              onExportPDF={exportPDF}
+              loading={exporting}
+              disabled={processedArticles.length === 0}
+            />
+          }
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           cardRenderer={(article) => (
