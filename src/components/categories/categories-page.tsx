@@ -403,7 +403,8 @@ export default function CategoriesPage() {
                 <Button onClick={handleNew} disabled={adminFamilyIds !== null && adminFamilyIds.size === 0 && !isSuperAdmin}>
                   <Plus className='h-4 w-4 mr-2' />
                   Nueva Categoría
-                </Button>              </TooltipTrigger>
+                </Button>
+              </TooltipTrigger>
               <TooltipContent>
                 <p>
                   {adminFamilyIds !== null && adminFamilyIds.size === 0 && !isSuperAdmin
