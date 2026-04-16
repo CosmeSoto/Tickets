@@ -84,23 +84,6 @@ export default function CategoriesPage() {
       .catch(() => setAdminFamilyIds(null))
   }, [isSuperAdmin])
 
-  // Exportación — categorías filtradas actuales
-  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
-    filename: 'categorias',
-    title: 'Gestión de Categorías',
-    subtitle: `${familyFilteredCategories.length} categorías${familyFilter !== 'all' ? ' (filtradas por área)' : ''}`,
-    getData: () => familyFilteredCategories,
-    columns: [
-      { key: 'name', label: 'Nombre' },
-      { key: 'levelName', label: 'Nivel' },
-      { key: 'departments', label: 'Departamento', format: v => v?.name ?? '' },
-      { key: 'departments', label: 'Área', format: v => v?.family?.name ?? '' },
-      { key: 'isActive', label: 'Estado', format: v => v ? 'Activa' : 'Inactiva' },
-      { key: 'description', label: 'Descripción', format: v => v ?? '' },
-      { key: '_count', label: 'Tickets', format: v => String(v?.tickets ?? 0) },
-      { key: '_count', label: 'Subcategorías', format: v => String(v?.other_categories ?? 0) },
-    ],
-  })
   const canManageCat = (category: any): boolean => {    if (isSuperAdmin) return true
     if (adminFamilyIds === null) return true // sin restricciones cargadas aún
     const catFamilyId = category.departments?.familyId ?? category.departments?.family?.id
