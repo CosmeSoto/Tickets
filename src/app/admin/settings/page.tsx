@@ -33,6 +33,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { OAuthSettingsTab } from '@/components/settings/oauth-settings-tab'
 import { LandingPageCMSTab } from '@/components/settings/landing-page-cms-tab'
+import { ModuleLayout } from '@/components/common/layout/module-layout'
 
 interface SystemSettings {
   // Configuración general
@@ -262,7 +263,7 @@ export default function SettingsPage() {
   )
 
   return (
-    <RoleDashboardLayout
+    <ModuleLayout
       title='Configuración del Sistema'
       subtitle='Administra la configuración global del sistema de tickets'
       headerActions={headerActions}
@@ -721,6 +722,6 @@ export default function SettingsPage() {
           <LandingPageCMSTab isSuperAdmin={isSuperAdmin} />
         </TabsContent>
       </Tabs>
-    </RoleDashboardLayout>
+    </ModuleLayout>
   )
 }

@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/table'
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/hooks/use-toast'
-import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { ModuleLayout } from '@/components/common/layout/module-layout'
 
 interface Family {
   id: string
@@ -194,7 +194,7 @@ function TicketSettingsContent() {
   const selectedFamily = families.find((f) => f.id === selectedFamilyId)
 
   return (
-    <RoleDashboardLayout
+    <ModuleLayout
       title="Configuración de Tickets"
       subtitle="Gestiona la configuración del módulo de tickets por familia"
       headerActions={
@@ -561,18 +561,16 @@ function TicketSettingsContent() {
           )}
         </div>
       </div>
-    </RoleDashboardLayout>
+    </ModuleLayout>
   )
 }
 
 export default function TicketSettingsPage() {
   return (
     <Suspense fallback={
-      <RoleDashboardLayout title="Configuración de Tickets">
-        <div className="flex items-center justify-center h-64">
-          <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      </RoleDashboardLayout>
+      <ModuleLayout title="Configuración de Tickets" loading={true}>
+        <div />
+      </ModuleLayout>
     }>
       <TicketSettingsContent />
     </Suspense>

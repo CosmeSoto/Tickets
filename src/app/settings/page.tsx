@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { useToast } from '@/hooks/use-toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PersonalSettings } from '@/components/settings/personal-settings'
@@ -25,11 +25,9 @@ export default function SettingsPage() {
 
   if (status === 'loading') {
     return (
-      <RoleDashboardLayout title='Configuración' subtitle='Personaliza tu experiencia'>
-        <div className='flex items-center justify-center h-64'>
-          <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600' />
-        </div>
-      </RoleDashboardLayout>
+      <ModuleLayout title='Configuración' subtitle='Personaliza tu experiencia' loading={true}>
+        <div />
+      </ModuleLayout>
     )
   }
 
@@ -85,7 +83,7 @@ export default function SettingsPage() {
   const notificationLevel = userRole === 'CLIENT' ? 'intermediate' : 'advanced'
 
   return (
-    <RoleDashboardLayout
+    <ModuleLayout
       title='Configuración'
       subtitle='Personaliza tu experiencia y configuraciones del sistema'
     >
@@ -111,6 +109,6 @@ export default function SettingsPage() {
           </TabsContent>
         </Tabs>
       </div>
-    </RoleDashboardLayout>
+    </ModuleLayout>
   )
 }

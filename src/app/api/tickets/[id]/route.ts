@@ -69,6 +69,9 @@ export async function GET(
           }
         },
         comments: {
+          where: session.user.role === 'CLIENT'
+            ? { isInternal: false }  // Cliente solo ve comentarios públicos
+            : {},                     // Técnico y admin ven todos
           include: {
             users: {
               select: {
@@ -113,7 +116,8 @@ export async function GET(
         },
         _count: {
           select: {
-            comments: true,
+            // Para clientes: solo contar comentarios públicos
+            // Para técnicos/admin: contar todos
             attachments: true
           }
         }
