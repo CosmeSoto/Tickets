@@ -185,6 +185,9 @@ npm run test:e2e
 # Calidad de código
 npm run quality:check        # Lint + format check
 npm run quality:fix          # Lint fix + format
+
+# Calidad de código
+rm -rf .next        # Limpiar cache
 ```
 
 ## 🐳 Docker
