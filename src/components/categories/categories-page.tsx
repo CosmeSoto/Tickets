@@ -158,12 +158,23 @@ export default function CategoriesPage() {
   // Obtener datos paginados
   // Apply family filter on top of existing filters
   const familyFilteredCategories = useMemo(() => {
-    if (familyFilter === 'all') return filteredCategories
-    return filteredCategories.filter((cat: any) => {
-      const deptFamilyId = cat.departments?.familyId ?? cat.department?.familyId
-      return deptFamilyId === familyFilter
-    })
-  }, [filteredCategories, familyFilter])
+    let result = filteredCategories
+    
+    // Filtro de familia
+    if (familyFilter !== 'all') {
+      result = result.filter((cat: any) => {
+        const deptFamilyId = cat.departments?.familyId ?? cat.department?.familyId
+        return deptFamilyId === familyFilter
+      })
+    }
+    
+    // Filtro de departamento (solo si hay familia seleccionada)
+    if (departmentFilter !== 'all') {
+      result = result.filter((cat: any) => cat.departmentId === departmentFilter)
+    }
+    
+    return result
+  }, [filteredCategories, familyFilter, departmentFilter])
 
   const paginatedCategories = pagination
     ? familyFilteredCategories.slice(

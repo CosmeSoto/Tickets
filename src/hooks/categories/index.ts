@@ -82,13 +82,11 @@ export function useCategories(options: UseCategoriesOptions = {}) {
         (statusFilter === 'active' && category.isActive) ||
         (statusFilter === 'inactive' && !category.isActive)
       
-      // Filtro de departamento — filtra por departmentId de la categoría
-      const matchesDepartment = departmentFilter === 'all' || 
-        category.departmentId === departmentFilter
+      // NO filtrar por departamento aquí — se hace en el componente junto con familia
       
-      return matchesSearch && matchesLevel && matchesStatus && matchesDepartment
+      return matchesSearch && matchesLevel && matchesStatus
     })
-  }, [dataHook.categories, searchTerm, levelFilter, statusFilter, departmentFilter])
+  }, [dataHook.categories, searchTerm, levelFilter, statusFilter])
   
   // Estadísticas
   const stats = useMemo(() => {
