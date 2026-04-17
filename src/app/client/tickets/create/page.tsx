@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -74,11 +75,9 @@ const priorityDescriptions = {
 export default function CreateClientTicketPage() {
   return (
     <Suspense fallback={
-      <RoleDashboardLayout title='Crear Ticket' subtitle='Nueva solicitud de soporte'>
-        <div className='flex items-center justify-center h-64'>
-          <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-primary'></div>
-        </div>
-      </RoleDashboardLayout>
+      <ModuleLayout title='Crear Ticket' subtitle='Nueva solicitud de soporte' loading={true}>
+        <div />
+      </ModuleLayout>
     }>
       <CreateClientTicketContent />
     </Suspense>
@@ -312,17 +311,15 @@ function CreateClientTicketContent() {
 
   if (status === 'loading') {
     return (
-      <RoleDashboardLayout title='Crear Ticket' subtitle='Nueva solicitud de soporte'>
-        <div className='flex items-center justify-center h-64'>
-          <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-primary'></div>
-        </div>
-      </RoleDashboardLayout>
+      <ModuleLayout title='Crear Ticket' subtitle='Nueva solicitud de soporte' loading={true}>
+        <div />
+      </ModuleLayout>
     )
   }
 
   if (submitSuccess) {
     return (
-      <RoleDashboardLayout title='Ticket Creado' subtitle='Solicitud enviada exitosamente'>
+      <ModuleLayout title='Ticket Creado' subtitle='Solicitud enviada exitosamente'>
         <Card className='max-w-2xl mx-auto'>
           <CardContent className='pt-6'>
             <div className='text-center'>
@@ -334,32 +331,33 @@ function CreateClientTicketContent() {
                 Tu solicitud ha sido recibida y será atendida por nuestro equipo de soporte.
                 Recibirás notificaciones sobre el progreso.
               </p>
-              <div className='flex items-center justify-center space-x-4'>
-                <Button asChild>
+              <div className='flex flex-col sm:flex-row items-center justify-center gap-3'>
+                <Button asChild className='w-full sm:w-auto'>
                   <Link href='/client/tickets'>Ver Mis Tickets</Link>
                 </Button>
-                <Button variant='outline' asChild>
+                <Button variant='outline' asChild className='w-full sm:w-auto'>
                   <Link href='/client'>Ir al Dashboard</Link>
                 </Button>
               </div>
             </div>
           </CardContent>
         </Card>
-      </RoleDashboardLayout>
+      </ModuleLayout>
     )
   }
 
   const headerActions = (
-    <Button variant='outline' asChild>
+    <Button variant='outline' size='sm' asChild>
       <Link href='/client/tickets'>
         <ArrowLeft className='h-4 w-4 mr-2' />
-        Volver a Mis Tickets
+        <span className='hidden sm:inline'>Volver a Mis Tickets</span>
+        <span className='sm:hidden'>Volver</span>
       </Link>
     </Button>
   )
 
   return (
-    <RoleDashboardLayout
+    <ModuleLayout
       title='Crear Nuevo Ticket'
       subtitle='Describe tu problema o solicitud'
       headerActions={headerActions}
@@ -556,11 +554,11 @@ function CreateClientTicketContent() {
               </div>
 
               {/* Botones */}
-              <div className='flex items-center justify-end gap-3 pt-2'>
-                <Button type='button' variant='outline' size='sm' asChild>
+              <div className='flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 pt-2'>
+                <Button type='button' variant='outline' size='sm' asChild className='w-full sm:w-auto'>
                   <Link href='/client/tickets'>Cancelar</Link>
                 </Button>
-                <Button type='submit' size='sm' disabled={isSubmitting}>
+                <Button type='submit' size='sm' disabled={isSubmitting} className='w-full sm:w-auto'>
                   {isSubmitting ? (
                     <>
                       <Loader2 className='h-3.5 w-3.5 mr-1.5 animate-spin' />
@@ -578,6 +576,6 @@ function CreateClientTicketContent() {
           </CardContent>
         </Card>
       </div>
-    </RoleDashboardLayout>
+    </ModuleLayout>
   )
 }

@@ -143,8 +143,8 @@ export default function TechnicianTicketsPage() {
     columns: [
       { key: 'ticketCode', label: 'Código', format: (v, r) => v ?? r.id.slice(-8).toUpperCase() },
       { key: 'title', label: 'Título' },
-      { key: 'status', label: 'Estado', format: v => ({ OPEN: 'Abierto', IN_PROGRESS: 'En Progreso', RESOLVED: 'Resuelto', CLOSED: 'Cerrado', ON_HOLD: 'En Espera' }[v] ?? v) },
-      { key: 'priority', label: 'Prioridad', format: v => ({ LOW: 'Baja', MEDIUM: 'Media', HIGH: 'Alta', URGENT: 'Urgente' }[v] ?? v) },
+      { key: 'status', label: 'Estado', format: (v: string) => ({ OPEN: 'Abierto', IN_PROGRESS: 'En Progreso', RESOLVED: 'Resuelto', CLOSED: 'Cerrado', ON_HOLD: 'En Espera' } as Record<string, string>)[v] ?? v },
+      { key: 'priority', label: 'Prioridad', format: (v: string) => ({ LOW: 'Baja', MEDIUM: 'Media', HIGH: 'Alta', URGENT: 'Urgente' } as Record<string, string>)[v] ?? v },
       { key: 'client', label: 'Cliente', format: v => v?.name ?? '' },
       { key: 'category', label: 'Categoría', format: v => v?.name ?? '' },
       { key: 'family', label: 'Área', format: v => v?.name ?? '' },
@@ -171,23 +171,23 @@ export default function TechnicianTicketsPage() {
       error={error}
       onRetry={reload}
       headerActions={
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Link href="/technician/stats">
             <Button variant="outline" size="sm">
-              <BarChart3 className="mr-2 h-4 w-4" />
-              Estadísticas
+              <BarChart3 className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Estadísticas</span>
             </Button>
           </Link>
           <Link href="/technician/categories">
             <Button variant="outline" size="sm">
-              <FolderTree className="mr-2 h-4 w-4" />
-              Mis Categorías
+              <FolderTree className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Mis Categorías</span>
             </Button>
           </Link>
           <Link href="/technician/knowledge">
             <Button variant="outline" size="sm">
-              <BookOpen className="mr-2 h-4 w-4" />
-              Conocimientos
+              <BookOpen className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Conocimientos</span>
             </Button>
           </Link>
         </div>

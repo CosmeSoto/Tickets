@@ -129,6 +129,7 @@ Contraseña: admin123
 - [Despliegue con Docker](./docs/DEPLOYMENT.md)
 - [Características del Sistema](./docs/FEATURES.md)
 - [Base de Datos](./docs/DATABASE.md)
+- [**Manual del Módulo de Tickets**](./docs/MANUAL_TICKETS.md) ← Guía completa por rol
 - [Configuración OAuth (Google/Microsoft)](./docs/OAUTH_SETUP_GUIDE.md)
 - [Configuración de Email/SMTP](./docs/GUIA_CONFIGURACION_EMAIL.md)
 - [SMTP desde la Interfaz](./docs/CONFIGURACION_SMTP_INTERFAZ.md)

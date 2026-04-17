@@ -114,8 +114,8 @@ export default function AdminTicketsPage() {
     columns: [
       { key: 'ticketCode', label: 'Código', format: (v, r) => v ?? r.id.slice(-8).toUpperCase() },
       { key: 'title', label: 'Título' },
-      { key: 'status', label: 'Estado', format: v => ({ OPEN: 'Abierto', IN_PROGRESS: 'En Progreso', RESOLVED: 'Resuelto', CLOSED: 'Cerrado', ON_HOLD: 'En Espera' }[v] ?? v) },
-      { key: 'priority', label: 'Prioridad', format: v => ({ LOW: 'Baja', MEDIUM: 'Media', HIGH: 'Alta', URGENT: 'Urgente' }[v] ?? v) },
+      { key: 'status', label: 'Estado', format: (v: string) => ({ OPEN: 'Abierto', IN_PROGRESS: 'En Progreso', RESOLVED: 'Resuelto', CLOSED: 'Cerrado', ON_HOLD: 'En Espera' } as Record<string, string>)[v] ?? v },
+      { key: 'priority', label: 'Prioridad', format: (v: string) => ({ LOW: 'Baja', MEDIUM: 'Media', HIGH: 'Alta', URGENT: 'Urgente' } as Record<string, string>)[v] ?? v },
       { key: 'client', label: 'Cliente', format: v => v?.name ?? '' },
       { key: 'assignee', label: 'Técnico', format: v => v?.name ?? 'Sin asignar' },
       { key: 'category', label: 'Categoría', format: v => v?.name ?? '' },
