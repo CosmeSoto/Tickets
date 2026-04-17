@@ -8,6 +8,7 @@ import { EmailService } from '@/lib/services/email/email-service'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { NotificationService } from '@/lib/services/notification-service'
 import { TicketService } from '@/lib/services/ticket-service'
+import { withCache, invalidateCache, buildCacheKey } from '@/lib/api-cache'
 
 export async function GET(request: NextRequest) {
   try {
@@ -99,82 +100,85 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Obtener tickets con relaciones — select explícito para evitar traer campos pesados
-    const [tickets, total] = await Promise.all([
-      prisma.tickets.findMany({
-        where,
-        select: {
-          id: true,
-          title: true,
-          description: true,
-          status: true,
-          priority: true,
-          ticketCode: true,
-          codeIsManual: true,
-          familyId: true,
-          categoryId: true,
-          clientId: true,
-          assigneeId: true,
-          createdAt: true,
-          updatedAt: true,
-          resolvedAt: true,
-          closedAt: true,
-          slaDeadline: true,
-          knowledgeArticleId: true,
-          users_tickets_clientIdTousers: {
-            select: { id: true, name: true, email: true, departmentId: true }
-          },
-          users_tickets_assigneeIdTousers: {
-            select: { id: true, name: true, email: true }
-          },
-          categories: {
-            select: { id: true, name: true, color: true, level: true }
-          },
-          family: {
-            select: { id: true, name: true, code: true, color: true }
-          },
-          _count: {
-            select: { comments: true, attachments: true }
-          }
-        },
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      prisma.tickets.count({ where })
-    ])
+    // Clave de caché: incluye rol, userId y todos los filtros activos
+    // TTL: 30s — balance entre frescura y rendimiento
+    // El SSE notifica cambios en tiempo real, así que 30s es seguro
+    const cacheKey = buildCacheKey('tickets', {
+      role: session.user.role,
+      uid: session.user.id,
+      page, limit, status, priority, search, assigneeId, categoryId, familyId,
+    })
 
-    // Mapear los datos para que coincidan con lo que espera el frontend
-    const mappedTickets = tickets.map(ticket => ({
-      ...ticket,
-      client: ticket.users_tickets_clientIdTousers,
-      assignee: ticket.users_tickets_assigneeIdTousers,
-      category: ticket.categories,
-      family: ticket.family,
-    }))
+    const result = await withCache(cacheKey, 30, async () => {
+      // Obtener tickets con relaciones — select explícito para evitar traer campos pesados
+      const [tickets, total] = await Promise.all([
+        prisma.tickets.findMany({
+          where,
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            status: true,
+            priority: true,
+            ticketCode: true,
+            codeIsManual: true,
+            familyId: true,
+            categoryId: true,
+            clientId: true,
+            assigneeId: true,
+            createdAt: true,
+            updatedAt: true,
+            resolvedAt: true,
+            closedAt: true,
+            slaDeadline: true,
+            knowledgeArticleId: true,
+            users_tickets_clientIdTousers: {
+              select: { id: true, name: true, email: true, departmentId: true }
+            },
+            users_tickets_assigneeIdTousers: {
+              select: { id: true, name: true, email: true }
+            },
+            categories: {
+              select: { id: true, name: true, color: true, level: true }
+            },
+            family: {
+              select: { id: true, name: true, code: true, color: true }
+            },
+            _count: {
+              select: { comments: true, attachments: true }
+            }
+          },
+          orderBy: { createdAt: 'desc' },
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+        prisma.tickets.count({ where })
+      ])
 
-    return NextResponse.json({
-      success: true,
-      data: mappedTickets,
-      meta: {
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit),
-          hasNext: (page * limit) < total,
-          hasPrev: page > 1
-        },
-        filters: {
-          status,
-          priority,
-          search,
-          assigneeId,
-          categoryId,
-          familyId
+      const mappedTickets = tickets.map(ticket => ({
+        ...ticket,
+        client: ticket.users_tickets_clientIdTousers,
+        assignee: ticket.users_tickets_assigneeIdTousers,
+        category: ticket.categories,
+        family: ticket.family,
+      }))
+
+      return {
+        success: true,
+        data: mappedTickets,
+        meta: {
+          pagination: {
+            page, limit, total,
+            totalPages: Math.ceil(total / limit),
+            hasNext: (page * limit) < total,
+            hasPrev: page > 1
+          },
+          filters: { status, priority, search, assigneeId, categoryId, familyId }
         }
       }
     })
+
+    return NextResponse.json(result)
   } catch (error) {
     console.error('Error in tickets API:', error)
     return NextResponse.json(
@@ -359,6 +363,10 @@ export async function POST(request: NextRequest) {
         console.error('[NOTIFICATION] Error enviando notificación de asignación:', err)
       })
     }
+
+    // Invalidar caché de tickets para todos los usuarios relevantes
+    // (patrón wildcard — borra todas las variantes de filtros)
+    await invalidateCache(['tickets:role=ADMIN*', 'tickets:role=TECHNICIAN*', `tickets:role=CLIENT:uid=${session.user.id}*`, 'dashboard:*']).catch(() => {})
 
     // Mapear los datos para que coincidan con lo que espera el frontend
     const mappedTicket = {

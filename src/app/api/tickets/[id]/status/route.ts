@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { NotificationService } from '@/lib/services/notification-service'
 import { randomUUID } from 'crypto'
+import { invalidateCache } from '@/lib/api-cache'
 
 // Transiciones válidas por rol
 const TRANSITIONS: Record<string, Record<string, string[]>> = {
@@ -158,6 +159,9 @@ export async function PATCH(
         ticketId,
       }).catch(() => {})
     }
+
+    // Invalidar caché de tickets y dashboard
+    await invalidateCache(['tickets:role=ADMIN*', 'tickets:role=TECHNICIAN*', 'tickets:role=CLIENT*', 'dashboard:*']).catch(() => {})
 
     return NextResponse.json({
       success: true,

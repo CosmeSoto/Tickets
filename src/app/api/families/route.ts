@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { FamilyService } from '@/lib/services/family.service'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
 import prisma from '@/lib/prisma'
+import { withCache, invalidateCache, buildCacheKey } from '@/lib/api-cache'
 
 // GET /api/families — Lista familias; ADMIN ve todas las suyas, otros roles ven las habilitadas para tickets
 export async function GET(request: NextRequest) {
@@ -16,6 +17,20 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const includeInactive = searchParams.get('includeInactive') === 'true'
     const ticketsEnabled = searchParams.get('ticketsEnabled') === 'true'
+
+    // Caché 5 minutos — familias cambian raramente
+    const cacheKey = buildCacheKey('families', {
+      role: session.user.role,
+      uid: session.user.id,
+      includeInactive,
+      ticketsEnabled,
+    })
+
+    try {
+      const { getCached } = await import('@/lib/redis')
+      const cached = await getCached<any>(cacheKey)
+      if (cached) return NextResponse.json(cached)
+    } catch { /* Redis no disponible */ }
 
     // ── Clientes y técnicos: todas las familias habilitadas para tickets ────
     if (session.user.role !== 'ADMIN') {
@@ -54,14 +69,16 @@ export async function GET(request: NextRequest) {
       })
 
       // Marcar cuál es la familia "propia" del cliente
-      return NextResponse.json({
+      const responseData = {
         success: true,
         data: accessible.map(f => ({
           ...f,
           isOwnFamily: f.id === userFamilyId,
           isRestricted: (f.ticketFamilyConfig?.allowedFromFamilies ?? []).length > 0,
         }))
-      })
+      }
+      try { const { setCache } = await import('@/lib/redis'); await setCache(cacheKey, responseData, 300) } catch {}
+      return NextResponse.json(responseData)
     }
 
     // ── ADMIN ────────────────────────────────────────────────────────────────
@@ -89,7 +106,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, data: families })
+    const adminResponse = { success: true, data: families }
+    try { const { setCache } = await import('@/lib/redis'); await setCache(cacheKey, adminResponse, 300) } catch {}
+    return NextResponse.json(adminResponse)
   } catch (error) {
     console.error('[GET /api/families]', error)
     return NextResponse.json(
@@ -163,6 +182,9 @@ export async function POST(request: NextRequest) {
       details: { familyCode: family.code, familyName: family.name },
       request,
     })
+
+    // Invalidar caché de familias para todos los roles
+    await invalidateCache(['families:role=ADMIN*', 'families:role=TECHNICIAN*', 'families:role=CLIENT*']).catch(() => {})
 
     return NextResponse.json(
       { success: true, data: family, message: `Familia "${family.name}" creada exitosamente` },

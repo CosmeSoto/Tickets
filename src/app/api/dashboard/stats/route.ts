@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import { withCache, buildCacheKey } from '@/lib/api-cache'
 
 // Función para calcular tiempo promedio de resolución
 function calculateAvgResolutionTime(tickets: any[]): string {
@@ -226,10 +227,20 @@ export async function GET(request: NextRequest) {
     const role = searchParams.get('role') || session.user.role
     const userId = session.user.id
 
+    // Caché por rol + userId: 2 minutos para admin/técnico, 3 para cliente
+    const ttl = role === 'CLIENT' ? 180 : 120
+    const cacheKey = buildCacheKey('dashboard', { role, uid: userId })
+
+    // Intentar servir desde caché
+    try {
+      const { getCached } = await import('@/lib/redis')
+      const cached = await getCached<any>(cacheKey)
+      if (cached) return NextResponse.json(cached)
+    } catch { /* Redis no disponible — continuar sin caché */ }
+
     let stats: any = {}
 
     if (role === 'ADMIN') {
-      // Estadísticas profesionales para administrador
       const now = new Date()
       const [
         totalUsers,
@@ -639,6 +650,12 @@ export async function GET(request: NextRequest) {
           .map(t => t.family!)
       }
     }
+
+    // Guardar en caché antes de responder
+    try {
+      const { setCache } = await import('@/lib/redis')
+      await setCache(cacheKey, stats, ttl)
+    } catch { /* Redis no disponible */ }
 
     return NextResponse.json(stats)
   } catch (error) {

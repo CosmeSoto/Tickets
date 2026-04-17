@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { NotificationService } from '@/lib/services/notification-service'
 import { canManageCategory, getDepartmentFamilyId } from '@/lib/category-access'
+import { buildCacheKey, invalidateCache } from '@/lib/api-cache'
 
 /**
  * Obtiene el nombre del nivel basado en el número
@@ -36,6 +37,18 @@ export async function GET(request: NextRequest) {
     const level = searchParams.get('level')
     const parentId = searchParams.get('parentId')
     const familyId = searchParams.get('familyId')
+
+    // Caché 3 minutos — categorías cambian raramente
+    const cacheKey = buildCacheKey('categories', {
+      role: session.user.role,
+      uid: session.user.id,
+      isActive, level, parentId, familyId,
+    })
+    try {
+      const { getCached } = await import('@/lib/redis')
+      const cached = await getCached<any>(cacheKey)
+      if (cached) return NextResponse.json(cached)
+    } catch { /* Redis no disponible */ }
 
     // Construir filtros para Prisma
     const where: any = {}
@@ -200,19 +213,19 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({
+    const response = {
       success: true,
       data: enrichedCategories,
       meta: {
         total: enrichedCategories.length,
-        filters: {
-          isActive,
-          level,
-          parentId,
-          familyId,
-        }
+        filters: { isActive, level, parentId, familyId }
       }
-    })
+    }
+
+    // Guardar en caché
+    try { const { setCache } = await import('@/lib/redis'); await setCache(cacheKey, response, 180) } catch {}
+
+    return NextResponse.json(response)
   } catch (error) {
     console.error('Error in categories API:', error)
     return NextResponse.json(
@@ -348,6 +361,9 @@ export async function POST(request: NextRequest) {
         message: `Se creó la categoría "${category.name}" (Nivel ${category.level}) en el departamento ${category.departments?.name ?? 'sin departamento'}.`,
       }).catch(err => console.error('[NOTIFY] Error:', err))
     ))
+
+    // Invalidar caché de categorías
+    await invalidateCache(['categories:role=ADMIN*', 'categories:role=TECHNICIAN*', 'categories:role=CLIENT*']).catch(() => {})
 
     // Enriquecer con canDelete y levelName
     const enrichedCategory = {

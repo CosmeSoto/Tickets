@@ -9,6 +9,12 @@ import { SLAService } from '@/lib/services/sla-service'
 import { EmailService } from '@/lib/services/email/email-service'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { NotificationService } from '@/lib/services/notification-service'
+import { invalidateCache } from '@/lib/api-cache'
+
+// Helper: invalida caché de tickets y dashboard cuando un ticket cambia
+async function invalidateTicketCaches() {
+  await invalidateCache(['tickets:role=ADMIN*', 'tickets:role=TECHNICIAN*', 'tickets:role=CLIENT*', 'dashboard:*']).catch(() => {})
+}
 
 export async function GET(
   request: NextRequest,
@@ -172,6 +178,8 @@ export async function PUT(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  // Invalidar caché al inicio — el ticket va a cambiar
+  invalidateTicketCaches()
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
@@ -373,10 +381,6 @@ export async function PUT(
       })
 
     } else if (session.user.role === 'TECHNICIAN') {
-      // Técnico NO puede editar título ni descripción (preserva solicitud original)
-      // Técnico puede cambiar: status, priority, assigneeId
-      const allowedFields = ['status', 'priority', 'assigneeId']
-      const filteredUpdates: any = {}
       allowedFields.forEach(field => {
         if (updates[field] !== undefined) {
           filteredUpdates[field] = updates[field]
@@ -875,6 +879,7 @@ export async function DELETE(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  invalidateTicketCaches()
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
