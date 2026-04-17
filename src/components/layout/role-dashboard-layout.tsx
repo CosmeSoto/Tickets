@@ -425,7 +425,7 @@ export function RoleDashboardLayout({
                     <h1 className="text-lg sm:text-2xl font-bold text-foreground truncate">{title}</h1>
                   )}
                   {subtitle && (
-                    <p className="mt-0.5 text-xs sm:text-sm text-muted-foreground truncate hidden sm:block">{subtitle}</p>
+                    <div className="mt-0.5 text-xs sm:text-sm text-muted-foreground hidden sm:flex items-center flex-wrap gap-1">{subtitle}</div>
                   )}
                 </div>
               </div>

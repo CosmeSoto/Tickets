@@ -652,7 +652,7 @@ export function TicketTimeline({
                       </div>
 
                       <div className="mt-1">
-                        <p className="text-sm font-medium text-foreground">{event.title}</p>
+                        <p className={`text-sm ${event.type === 'comment' ? 'font-medium' : 'text-muted-foreground'} text-foreground`}>{event.title}</p>
 
                         {/* Contenido del comentario */}
                         {event.type === 'comment' && event.description && (
