@@ -10,15 +10,15 @@ import {
   ShoppingCart,
   Trash2,
   Wrench,
-  Loader2,
   BarChart3,
   MapPin,
   Crown,
 } from 'lucide-react'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { FamilyFilterBar } from '@/components/inventory/family-filter-bar'
+import { FamilyCombobox } from '@/components/ui/family-combobox'
 
 const REPORTS = [
   {
@@ -101,11 +101,9 @@ export default function InventoryReportsPage() {
 
   if (status === 'loading') {
     return (
-      <RoleDashboardLayout title="Cargando..." subtitle="Obteniendo información">
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      </RoleDashboardLayout>
+      <ModuleLayout title="Reportes de Inventario" loading={true}>
+        <div />
+      </ModuleLayout>
     )
   }
 
@@ -137,19 +135,23 @@ export default function InventoryReportsPage() {
   }
 
   return (
-    <RoleDashboardLayout
+    <ModuleLayout
       title="Reportes de Inventario"
       subtitle={isSuperAdmin ? "Vista global — todas las familias" : "Consulta el estado del inventario de tus familias"}
     >
       <div className="space-y-6">
-        {/* Filtro por familia */}
-        {families.length > 0 && (
-          <div className="flex items-center gap-3">
-            <p className="text-sm text-muted-foreground">Filtrar por familia:</p>
-            <FamilyFilterBar
-              families={families}
-              selectedId={selectedFamilyId}
-              onChange={setSelectedFamilyId}
+        {/* Filtro por familia — combobox con buscador */}
+        {families.length > 1 && (
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-sm text-muted-foreground shrink-0">Filtrar por familia:</p>
+            <FamilyCombobox
+              families={families.map(f => ({ id: f.id, name: f.name, code: f.name.slice(0, 3).toUpperCase(), color: f.color }))}
+              value={selectedFamilyId ?? 'all'}
+              onValueChange={(v) => setSelectedFamilyId(v === 'all' ? null : v)}
+              allowAll
+              allowClear
+              popoverWidth="260px"
+              className="w-full sm:w-56"
             />
             {isSuperAdmin && (
               <Badge className="bg-amber-100 text-amber-700 border-amber-200 flex items-center gap-1 shrink-0">
@@ -204,6 +206,6 @@ export default function InventoryReportsPage() {
           </p>
         </div>
       </div>
-    </RoleDashboardLayout>
+    </ModuleLayout>
   )
 }

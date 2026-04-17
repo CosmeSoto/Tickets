@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Input } from '@/components/ui/input'
 import { Search, FileSignature, Monitor, RefreshCw, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
 
@@ -94,7 +95,7 @@ export default function ContractsPage() {
   if (status === 'loading') return null
 
   return (
-    <RoleDashboardLayout
+    <ModuleLayout
       title="Contratos y Suscripciones"
       subtitle="Vista unificada de equipos en arrendamiento y licencias con suscripción activa"
     >
@@ -244,6 +245,6 @@ export default function ContractsPage() {
           </p>
         )}
       </div>
-    </RoleDashboardLayout>
+    </ModuleLayout>
   )
 }

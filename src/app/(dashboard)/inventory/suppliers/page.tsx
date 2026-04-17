@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Pencil, PowerOff, Building2, RefreshCw } from 'lucide-react'
+import { Plus, Pencil, PowerOff, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -15,6 +15,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useToast } from '@/hooks/use-toast'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { SupplierForm } from '@/components/inventory/suppliers/SupplierForm'
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
@@ -106,46 +107,37 @@ export default function SuppliersPage() {
   const total = suppliers.length
 
   return (
-    <RoleDashboardLayout
+    <ModuleLayout
       title="Proveedores"
       subtitle={`${total} proveedor${total !== 1 ? 'es' : ''} ${activeFilter === 'true' ? 'activos' : activeFilter === 'false' ? 'inactivos' : 'en total'}`}
+      headerActions={
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={fetchSuppliers} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 sm:mr-2 ${loading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Actualizar</span>
+          </Button>
+          <ExportButton
+            onExportCSV={exportCSV}
+            onExportExcel={exportExcel}
+            onExportPDF={exportPDF}
+            loading={exporting}
+            disabled={suppliers.length === 0}
+          />
+          <Button onClick={() => { setEditingSupplier(null); setFormOpen(true) }}>
+            <Plus className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Nuevo proveedor</span>
+          </Button>
+        </div>
+      }
     >
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Building2 className="h-6 w-6 text-primary" />
-            <div>
-              <h1 className="text-2xl font-bold">Proveedores</h1>
-              <p className="text-sm text-muted-foreground">
-                {total} proveedor{total !== 1 ? 'es' : ''} {activeFilter === 'true' ? 'activos' : activeFilter === 'false' ? 'inactivos' : ''}
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={fetchSuppliers} disabled={loading}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Actualizar
-            </Button>
-            <ExportButton
-              onExportCSV={exportCSV}
-              onExportExcel={exportExcel}
-              onExportPDF={exportPDF}
-              loading={exporting}
-              disabled={suppliers.length === 0}
-            />
-            <Button onClick={() => { setEditingSupplier(null); setFormOpen(true) }}>
-              <Plus className="mr-2 h-4 w-4" /> Nuevo proveedor
-            </Button>
-          </div>
-        </div>
-
         {/* Filtros */}
         <div className="flex flex-wrap gap-3">
           <Input
             placeholder="Buscar por nombre o RUC/NIT..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="max-w-xs"
+            className="flex-1 min-w-[200px]"
           />
           {families.length > 1 && (
             <FamilyCombobox
@@ -155,11 +147,11 @@ export default function SuppliersPage() {
               allowAll
               allowClear
               popoverWidth="240px"
-              className="w-52"
+              className="w-full sm:w-52"
             />
           )}
           <Select value={activeFilter} onValueChange={setActiveFilter}>
-            <SelectTrigger className="w-36">
+            <SelectTrigger className="w-full sm:w-36">
               <SelectValue placeholder="Estado" />
             </SelectTrigger>
             <SelectContent>
@@ -171,16 +163,16 @@ export default function SuppliersPage() {
         </div>
 
         {/* Tabla */}
-        <div className="rounded-md border">
+        <div className="overflow-x-auto rounded-md border">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Nombre</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Familia</TableHead>
-                <TableHead>RUC / NIT</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Teléfono</TableHead>
+                <TableHead className="hidden md:table-cell">Tipo</TableHead>
+                <TableHead className="hidden md:table-cell">Familia</TableHead>
+                <TableHead className="hidden lg:table-cell">RUC / NIT</TableHead>
+                <TableHead className="hidden lg:table-cell">Email</TableHead>
+                <TableHead className="hidden xl:table-cell">Teléfono</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
@@ -211,15 +203,15 @@ export default function SuppliersPage() {
                   onClick={() => { setEditingSupplier(s); setFormOpen(true) }}
                 >
                   <TableCell className="font-medium">{s.name}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
+                  <TableCell className="text-sm text-muted-foreground hidden md:table-cell">
                     {s.supplierType?.name ?? s.type ?? '—'}
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
+                  <TableCell className="text-sm text-muted-foreground hidden md:table-cell">
                     {s.family?.name ?? '—'}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{s.taxId || '—'}</TableCell>
-                  <TableCell className="text-muted-foreground">{s.email || '—'}</TableCell>
-                  <TableCell className="text-muted-foreground">{s.phone || '—'}</TableCell>
+                  <TableCell className="text-muted-foreground hidden lg:table-cell">{s.taxId || '—'}</TableCell>
+                  <TableCell className="text-muted-foreground hidden lg:table-cell">{s.email || '—'}</TableCell>
+                  <TableCell className="text-muted-foreground hidden xl:table-cell">{s.phone || '—'}</TableCell>
                   <TableCell>
                     <Badge variant={s.isActive ? 'default' : 'secondary'}>
                       {s.isActive ? 'Activo' : 'Inactivo'}
@@ -286,6 +278,6 @@ export default function SuppliersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </RoleDashboardLayout>
+    </ModuleLayout>
   )
 }

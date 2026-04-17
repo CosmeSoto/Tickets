@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { NewMaintenanceDialog } from '@/components/inventory/new-maintenance-dialog'
 
 interface MaintenanceItem {
@@ -100,17 +101,19 @@ export default function MaintenanceListPage() {
     : 'Gestión de mantenimientos preventivos y correctivos'
 
   return (
-    <RoleDashboardLayout
+    <ModuleLayout
       title={title}
       subtitle={subtitle}
       headerActions={
         isAdminOrTech || isManager ? (
-          <Button onClick={() => setShowNew(true)}>
-            <Plus className="mr-2 h-4 w-4" /> Nuevo Mantenimiento
+          <Button onClick={() => setShowNew(true)} size="sm">
+            <Plus className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Nuevo Mantenimiento</span>
           </Button>
         ) : (
-          <Button onClick={() => setShowNew(true)} variant="outline">
-            <Plus className="mr-2 h-4 w-4" /> Solicitar Mantenimiento
+          <Button onClick={() => setShowNew(true)} variant="outline" size="sm">
+            <Plus className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Solicitar Mantenimiento</span>
           </Button>
         )
       }
@@ -283,6 +286,6 @@ export default function MaintenanceListPage() {
           isClient={isClient}
         />
       )}
-    </RoleDashboardLayout>
+    </ModuleLayout>
   )
 }

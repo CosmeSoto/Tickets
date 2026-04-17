@@ -92,17 +92,17 @@ export function EquipmentTable({
   }
 
   return (
-    <div className="rounded-md border">
+    <div className="overflow-x-auto rounded-md border">
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Código</TableHead>
             <TableHead>Equipo</TableHead>
-            <TableHead>Tipo</TableHead>
-            <TableHead>Departamento</TableHead>
+            <TableHead className="hidden md:table-cell">Tipo</TableHead>
+            <TableHead className="hidden lg:table-cell">Departamento</TableHead>
             <TableHead>Estado</TableHead>
-            <TableHead>Condición</TableHead>
-            <TableHead>Ubicación</TableHead>
+            <TableHead className="hidden md:table-cell">Condición</TableHead>
+            <TableHead className="hidden lg:table-cell">Ubicación</TableHead>
             <TableHead className="text-right">Acciones</TableHead>
           </TableRow>
         </TableHeader>
@@ -122,12 +122,12 @@ export function EquipmentTable({
                   </div>
                 </div>
               </TableCell>
-              <TableCell>
+              <TableCell className="hidden md:table-cell">
                 <Badge variant="outline">
                   {item.type?.name || 'Sin tipo'}
                 </Badge>
               </TableCell>
-              <TableCell>
+              <TableCell className="hidden lg:table-cell">
                 {item.department ? (
                   <div>
                     <div className="text-sm font-medium">{item.department.name}</div>
@@ -144,12 +144,12 @@ export function EquipmentTable({
                   {STATUS_LABELS[item.status]}
                 </Badge>
               </TableCell>
-              <TableCell>
+              <TableCell className="hidden md:table-cell">
                 <Badge className={CONDITION_COLORS[item.condition]}>
                   {CONDITION_LABELS[item.condition]}
                 </Badge>
               </TableCell>
-              <TableCell>
+              <TableCell className="hidden lg:table-cell">
                 <span className="text-sm text-muted-foreground">
                   {item.location || '-'}
                 </span>
