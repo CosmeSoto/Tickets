@@ -834,6 +834,6 @@ export default function TicketDetailPage() {
           </Card>
         </div>
       </div>
-    </RoleDashboardLayout>
+    </ModuleLayout>
   )
 }
