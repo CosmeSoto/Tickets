@@ -98,6 +98,14 @@ function TicketSettingsContent() {
   // SLA read-only reference — loaded from API
   const [slaRows, setSlaRows] = useState<SlaRow[]>(DEFAULTS)
 
+  // Global ticket rules (maxTicketsPerUser, autoCloseDays, autoAssignmentEnabled)
+  const [globalSettings, setGlobalSettings] = useState({
+    maxTicketsPerUser: 10,
+    autoCloseDays: 3,
+    autoAssignmentEnabled: true,
+  })
+  const [savingGlobal, setSavingGlobal] = useState(false)
+
   const loadFamilies = useCallback(async () => {
     setLoadingFamilies(true)
     try {
@@ -157,8 +165,46 @@ function TicketSettingsContent() {
   useEffect(() => {
     loadFamilies()
     loadSLAPolicies()
+    loadGlobalSettings()
   }, [loadFamilies, loadSLAPolicies])
 
+  const loadGlobalSettings = async () => {
+    try {
+      const res = await fetch('/api/admin/settings')
+      if (res.ok) {
+        const data = await res.json()
+        setGlobalSettings({
+          maxTicketsPerUser: data.maxTicketsPerUser ?? 10,
+          autoCloseDays: data.autoCloseDays ?? 3,
+          autoAssignmentEnabled: data.autoAssignmentEnabled ?? true,
+        })
+      }
+    } catch {
+      // keep defaults
+    }
+  }
+
+  const handleSaveGlobalSettings = async () => {
+    setSavingGlobal(true)
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(globalSettings),
+      })
+      if (res.ok) {
+        toast({ title: 'Éxito', description: 'Reglas globales actualizadas' })
+        window.dispatchEvent(new CustomEvent('settings-updated'))
+      } else {
+        const err = await res.json()
+        throw new Error(err.error || 'Error al guardar')
+      }
+    } catch (e) {
+      toast({ title: 'Error', description: e instanceof Error ? e.message : 'Error al guardar', variant: 'destructive' })
+    } finally {
+      setSavingGlobal(false)
+    }
+  }
   useEffect(() => {
     if (selectedFamilyId) {
       loadConfig(selectedFamilyId)
@@ -348,6 +394,78 @@ function TicketSettingsContent() {
                   Se usa cuando no se puede determinar la familia desde la categoría
                 </p>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Reglas globales */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Bell className="h-4 w-4" />
+                Reglas globales
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="max-tickets" className="text-sm">Máx. tickets abiertos por usuario</Label>
+                <Input
+                  id="max-tickets"
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={globalSettings.maxTicketsPerUser}
+                  onChange={(e) =>
+                    setGlobalSettings((prev) => ({ ...prev, maxTicketsPerUser: parseInt(e.target.value) || 10 }))
+                  }
+                  className="mt-1 w-24 font-mono"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  El usuario no podrá crear más tickets si ya tiene este número abiertos
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="auto-close-days" className="text-sm">Días para cierre automático</Label>
+                <Input
+                  id="auto-close-days"
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={globalSettings.autoCloseDays}
+                  onChange={(e) =>
+                    setGlobalSettings((prev) => ({ ...prev, autoCloseDays: parseInt(e.target.value) || 3 }))
+                  }
+                  className="mt-1 w-24 font-mono"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Días tras resolución sin calificación antes del cierre automático
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between p-3 border rounded-lg">
+                <div>
+                  <p className="text-sm font-medium">Asignación automática</p>
+                  <p className="text-xs text-muted-foreground">
+                    Asigna tickets al técnico con menor carga en esa categoría
+                  </p>
+                </div>
+                <Switch
+                  checked={globalSettings.autoAssignmentEnabled}
+                  onCheckedChange={(v) =>
+                    setGlobalSettings((prev) => ({ ...prev, autoAssignmentEnabled: v }))
+                  }
+                />
+              </div>
+
+              <Button
+                size="sm"
+                className="w-full"
+                onClick={handleSaveGlobalSettings}
+                disabled={savingGlobal}
+              >
+                <Save className={`h-3 w-3 mr-2 ${savingGlobal ? 'animate-spin' : ''}`} />
+                {savingGlobal ? 'Guardando...' : 'Guardar reglas'}
+              </Button>
             </CardContent>
           </Card>
         </div>
