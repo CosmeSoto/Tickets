@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react'
 import {
   Settings, Ticket, Save, RefreshCw, XCircle,
   Clock, Bell, ChevronRight, Layers, ExternalLink,
+  Users, Timer, Info,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -13,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { FamilyIcon } from '@/components/inventory/family-badge'
 import {
   Select,
@@ -21,14 +23,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { useToast } from '@/hooks/use-toast'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 
@@ -79,6 +73,24 @@ const PRIORITY_LABELS: Record<string, string> = {
   LOW: 'Baja',
 }
 
+// Day toggles
+const DAY_OPTIONS = [
+  { key: 'MON', label: 'L' },
+  { key: 'TUE', label: 'M' },
+  { key: 'WED', label: 'X' },
+  { key: 'THU', label: 'J' },
+  { key: 'FRI', label: 'V' },
+  { key: 'SAT', label: 'S' },
+  { key: 'SUN', label: 'D' },
+]
+
+const PRIORITY_COLORS: Record<string, string> = {
+  URGENT: 'bg-red-100 text-red-700 border-red-200',
+  HIGH: 'bg-orange-100 text-orange-700 border-orange-200',
+  MEDIUM: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+  LOW: 'bg-slate-100 text-slate-600 border-slate-200',
+}
+
 function TicketSettingsContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -94,26 +106,21 @@ function TicketSettingsContent() {
   const [loadingFamilies, setLoadingFamilies] = useState(true)
   const [loadingConfig, setLoadingConfig] = useState(false)
   const [saving, setSaving] = useState(false)
-
-  // SLA read-only reference — loaded from API
   const [slaRows, setSlaRows] = useState<SlaRow[]>(DEFAULTS)
-
-  // Global ticket rules (maxTicketsPerUser, autoCloseDays, autoAssignmentEnabled)
   const [globalSettings, setGlobalSettings] = useState({
     maxTicketsPerUser: 10,
     autoCloseDays: 3,
     autoAssignmentEnabled: true,
+    defaultFamilyId: '',
   })
-  const [savingGlobal, setSavingGlobal] = useState(false)
+  const [globalDirty, setGlobalDirty] = useState(false)
 
   const loadFamilies = useCallback(async () => {
     setLoadingFamilies(true)
     try {
       const res = await fetch('/api/families?includeInactive=true')
       const data = await res.json()
-      if (data.success) {
-        setFamilies(data.data)
-      }
+      if (data.success) setFamilies(data.data)
     } catch {
       toast({ title: 'Error', description: 'Error al cargar familias', variant: 'destructive' })
     } finally {
@@ -126,11 +133,7 @@ function TicketSettingsContent() {
     try {
       const res = await fetch(`/api/families/${familyId}/ticket-config`)
       const data = await res.json()
-      if (data.success) {
-        setConfig(data.data)
-      } else {
-        setConfig(null)
-      }
+      setConfig(data.success ? data.data : null)
     } catch {
       toast({ title: 'Error', description: 'Error al cargar configuración', variant: 'destructive' })
     } finally {
@@ -145,70 +148,44 @@ function TicketSettingsContent() {
       if (data.success) {
         const global = data.data.filter((p: any) => !p.categoryId)
         if (global.length > 0) {
-          const rows: SlaRow[] = PRIORITIES.map((priority) => {
+          setSlaRows(PRIORITIES.map((priority) => {
             const p = global.find((g: any) => g.priority === priority)
             const def = DEFAULTS.find((d) => d.priority === priority)!
-            return {
-              priority,
-              response: p?.responseTimeHours ?? def.response,
-              resolution: p?.resolutionTimeHours ?? def.resolution,
-            }
-          })
-          setSlaRows(rows)
+            return { priority, response: p?.responseTimeHours ?? def.response, resolution: p?.resolutionTimeHours ?? def.resolution }
+          }))
         }
       }
-    } catch {
-      // Keep defaults silently
-    }
+    } catch { /* keep defaults */ }
+  }, [])
+
+  const loadGlobalSettings = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/settings')
+      if (res.ok) {
+        const data = await res.json()
+        setGlobalSettings((prev) => ({
+          ...prev,
+          maxTicketsPerUser: data.maxTicketsPerUser ?? 10,
+          autoCloseDays: data.autoCloseDays ?? 3,
+          autoAssignmentEnabled: data.autoAssignmentEnabled ?? true,
+        }))
+      }
+    } catch { /* keep defaults */ }
   }, [])
 
   useEffect(() => {
     loadFamilies()
     loadSLAPolicies()
     loadGlobalSettings()
-  }, [loadFamilies, loadSLAPolicies])
+  }, [loadFamilies, loadSLAPolicies, loadGlobalSettings])
 
-  const loadGlobalSettings = async () => {
-    try {
-      const res = await fetch('/api/admin/settings')
-      if (res.ok) {
-        const data = await res.json()
-        setGlobalSettings({
-          maxTicketsPerUser: data.maxTicketsPerUser ?? 10,
-          autoCloseDays: data.autoCloseDays ?? 3,
-          autoAssignmentEnabled: data.autoAssignmentEnabled ?? true,
-        })
-      }
-    } catch {
-      // keep defaults
-    }
-  }
-
-  const handleSaveGlobalSettings = async () => {
-    setSavingGlobal(true)
-    try {
-      const res = await fetch('/api/admin/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(globalSettings),
-      })
-      if (res.ok) {
-        toast({ title: 'Éxito', description: 'Reglas globales actualizadas' })
-        window.dispatchEvent(new CustomEvent('settings-updated'))
-      } else {
-        const err = await res.json()
-        throw new Error(err.error || 'Error al guardar')
-      }
-    } catch (e) {
-      toast({ title: 'Error', description: e instanceof Error ? e.message : 'Error al guardar', variant: 'destructive' })
-    } finally {
-      setSavingGlobal(false)
-    }
-  }
   useEffect(() => {
-    if (selectedFamilyId) {
-      loadConfig(selectedFamilyId)
-    }
+    const def = families.find((f) => f.ticketFamilyConfig?.isDefault)
+    if (def) setGlobalSettings((prev) => ({ ...prev, defaultFamilyId: def.id }))
+  }, [families])
+
+  useEffect(() => {
+    if (selectedFamilyId) loadConfig(selectedFamilyId)
   }, [selectedFamilyId, loadConfig])
 
   const handleSelectFamily = (familyId: string) => {
@@ -216,22 +193,19 @@ function TicketSettingsContent() {
     router.replace(`/admin/settings/tickets?familyId=${familyId}`, { scroll: false })
   }
 
-  const handleToggleTickets = async (family: Family) => {
+  const handleToggleTickets = async (family: Family, e: React.MouseEvent) => {
+    e.stopPropagation()
     try {
       const res = await fetch(`/api/families/${family.id}/ticket-config`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ticketsEnabled: !family.ticketFamilyConfig?.ticketsEnabled,
-        }),
+        body: JSON.stringify({ ticketsEnabled: !family.ticketFamilyConfig?.ticketsEnabled }),
       })
       const data = await res.json()
       if (data.success) {
         toast({ title: 'Éxito', description: data.message })
         loadFamilies()
-        if (selectedFamilyId === family.id) {
-          loadConfig(family.id)
-        }
+        if (selectedFamilyId === family.id) loadConfig(family.id)
       } else {
         toast({ title: 'Error', description: data.message, variant: 'destructive' })
       }
@@ -240,495 +214,490 @@ function TicketSettingsContent() {
     }
   }
 
-  const handleSaveConfig = async () => {
-    if (!config || !selectedFamilyId) return
+  const toggleDay = (day: string) => {
+    if (!config) return
+    const days = config.businessDays ? config.businessDays.split(',').filter(Boolean) : []
+    const next = days.includes(day) ? days.filter((d) => d !== day) : [...days, day]
+    const ordered = DAY_OPTIONS.map((d) => d.key).filter((k) => next.includes(k))
+    setConfig({ ...config, businessDays: ordered.join(',') })
+  }
+
+  const handleSave = async () => {
     setSaving(true)
     try {
-      const res = await fetch(`/api/families/${selectedFamilyId}/ticket-config`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ticketsEnabled: config.ticketsEnabled,
-          codePrefix: config.codePrefix,
-          isDefault: config.isDefault,
-          autoAssignRespectsFamilies: config.autoAssignRespectsFamilies,
-          alertVolumeThreshold: config.alertVolumeThreshold,
-          businessHoursStart: config.businessHoursStart,
-          businessHoursEnd: config.businessHoursEnd,
-          businessDays: config.businessDays,
-        }),
-      })
-      const data = await res.json()
-      if (data.success) {
-        toast({ title: 'Éxito', description: data.message })
-        loadFamilies()
-      } else {
-        toast({ title: 'Error', description: data.message, variant: 'destructive' })
+      const promises: Promise<any>[] = []
+      if (config && selectedFamilyId) {
+        promises.push(
+          fetch(`/api/families/${selectedFamilyId}/ticket-config`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ticketsEnabled: config.ticketsEnabled,
+              codePrefix: config.codePrefix,
+              isDefault: config.isDefault,
+              autoAssignRespectsFamilies: config.autoAssignRespectsFamilies,
+              alertVolumeThreshold: config.alertVolumeThreshold,
+              businessHoursStart: config.businessHoursStart,
+              businessHoursEnd: config.businessHoursEnd,
+              businessDays: config.businessDays,
+            }),
+          }).then((r) => r.json())
+        )
       }
+      if (globalDirty) {
+        promises.push(
+          fetch('/api/admin/settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              maxTicketsPerUser: globalSettings.maxTicketsPerUser,
+              autoCloseDays: globalSettings.autoCloseDays,
+              autoAssignmentEnabled: globalSettings.autoAssignmentEnabled,
+            }),
+          }).then((r) => r.json())
+        )
+        if (globalSettings.defaultFamilyId) {
+          promises.push(
+            fetch(`/api/families/${globalSettings.defaultFamilyId}/ticket-config`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ isDefault: true }),
+            }).then((r) => r.json())
+          )
+        }
+      }
+      if (promises.length === 0) {
+        toast({ title: 'Sin cambios', description: 'No hay cambios pendientes' })
+        setSaving(false)
+        return
+      }
+      await Promise.all(promises)
+      toast({ title: 'Guardado', description: 'Configuración actualizada correctamente' })
+      setGlobalDirty(false)
+      loadFamilies()
+      window.dispatchEvent(new CustomEvent('settings-updated'))
     } catch {
-      toast({ title: 'Error', description: 'Error de conexión', variant: 'destructive' })
+      toast({ title: 'Error', description: 'Error al guardar', variant: 'destructive' })
     } finally {
       setSaving(false)
     }
   }
 
   const selectedFamily = families.find((f) => f.id === selectedFamilyId)
+  const activeDays = config?.businessDays ? config.businessDays.split(',') : []
 
   return (
     <ModuleLayout
       title="Configuración de Tickets"
-      subtitle="Gestiona la configuración del módulo de tickets por familia"
+      subtitle="Configura el comportamiento del módulo de tickets"
       headerActions={
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={loadFamilies} disabled={loadingFamilies}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${loadingFamilies ? 'animate-spin' : ''}`} />
-            Recargar
+          <Button variant="outline" size="sm" onClick={() => { loadFamilies(); loadGlobalSettings() }} disabled={loadingFamilies}>
+            <RefreshCw className={`h-4 w-4 ${loadingFamilies ? 'animate-spin' : ''} sm:mr-2`} />
+            <span className="hidden sm:inline">Recargar</span>
           </Button>
-          {config && (
-            <Button onClick={handleSaveConfig} disabled={saving}>
-              <Save className={`h-4 w-4 mr-2 ${saving ? 'animate-spin' : ''}`} />
-              {saving ? 'Guardando...' : 'Guardar configuración'}
-            </Button>
-          )}
+          <Button onClick={handleSave} disabled={saving}>
+            <Save className={`h-4 w-4 ${saving ? 'animate-spin' : ''} sm:mr-2`} />
+            <span className="hidden sm:inline">{saving ? 'Guardando...' : 'Guardar cambios'}</span>
+          </Button>
         </div>
       }
     >
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Panel izquierdo: lista de familias */}
-        <div className="lg:col-span-1 space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Layers className="h-4 w-4" />
-                Familias
-              </CardTitle>
-              <CardDescription>Selecciona una familia para configurar</CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              {loadingFamilies ? (
-                <div className="flex items-center justify-center py-8">
-                  <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
-                </div>
-              ) : (
-                <div className="divide-y">
-                  {families.map((family) => (
-                    <div
-                      key={family.id}
-                      className={`flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 transition-colors ${
-                        selectedFamilyId === family.id ? 'bg-primary/5 border-l-2 border-primary' : ''
-                      }`}
-                      onClick={() => handleSelectFamily(family.id)}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div
-                          className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                          style={{ backgroundColor: family.color || '#6B7280' }}
-                        >
-                          <FamilyIcon icon={family.icon} color={family.color} code={family.code} className="w-4 h-4" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">{family.name}</p>
-                          <p className="text-xs text-muted-foreground font-mono">{family.code}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <Switch
-                          checked={family.ticketFamilyConfig?.ticketsEnabled ?? false}
-                          onCheckedChange={() => handleToggleTickets(family)}
-                          onClick={(e) => e.stopPropagation()}
-                          className="scale-75"
-                        />
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+      <Tabs defaultValue="areas" className="space-y-6">
+        <TabsList className="w-full sm:w-auto">
+          <TabsTrigger value="areas" className="flex-1 sm:flex-none flex items-center gap-2">
+            <Layers className="h-4 w-4" />
+            Por área
+          </TabsTrigger>
+          <TabsTrigger value="global" className="flex-1 sm:flex-none flex items-center gap-2" onClick={() => setGlobalDirty(true)}>
+            <Settings className="h-4 w-4" />
+            Reglas generales
+          </TabsTrigger>
+        </TabsList>
 
-          {/* Configuración global */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Settings className="h-4 w-4" />
-                Configuración Global
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label className="text-sm">Familia por defecto</Label>
+        {/* TAB: POR ÁREA */}
+        <TabsContent value="areas">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Layers className="h-4 w-4" />
+                    Áreas de soporte
+                  </CardTitle>
+                  <CardDescription>
+                    Selecciona un área para ver y editar su configuración individual
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {loadingFamilies ? (
+                    <div className="flex items-center justify-center py-8">
+                      <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : (
+                    <div className="divide-y">
+                      {families.map((family) => (
+                        <button
+                          key={family.id}
+                          type="button"
+                          className={`w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors text-left ${
+                            selectedFamilyId === family.id ? 'bg-primary/5 border-l-2 border-primary' : ''
+                          }`}
+                          onClick={() => handleSelectFamily(family.id)}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div
+                              className="w-7 h-7 rounded-full flex items-center justify-center text-white flex-shrink-0"
+                              style={{ backgroundColor: family.color || '#6B7280' }}
+                            >
+                              <FamilyIcon icon={family.icon} color={family.color} code={family.code} className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">{family.name}</p>
+                              <p className="text-xs text-muted-foreground font-mono">{family.code}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                            <Switch
+                              checked={family.ticketFamilyConfig?.ticketsEnabled ?? false}
+                              onCheckedChange={() => {}}
+                              onClick={(e) => handleToggleTickets(family, e)}
+                              className="scale-75"
+                            />
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="lg:col-span-2 space-y-4">
+              {!selectedFamilyId ? (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                    <Ticket className="h-12 w-12 mb-4 opacity-30" />
+                    <p className="text-base font-medium">Selecciona un área</p>
+                    <p className="text-sm mt-1 text-center">Elige un área de la lista para ver y editar su configuración</p>
+                  </CardContent>
+                </Card>
+              ) : loadingConfig ? (
+                <Card>
+                  <CardContent className="flex items-center justify-center py-16">
+                    <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </CardContent>
+                </Card>
+              ) : config ? (
+                <>
+                  <div className="flex items-center gap-3 p-4 rounded-lg border bg-card">
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
+                      style={{ backgroundColor: selectedFamily?.color || '#6B7280' }}
+                    >
+                      <FamilyIcon icon={selectedFamily?.icon} color={selectedFamily?.color} code={selectedFamily?.code} className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="font-semibold truncate">{selectedFamily?.name}</h3>
+                      <p className="text-xs text-muted-foreground font-mono">{selectedFamily?.code}</p>
+                    </div>
+                    <Badge variant={config.ticketsEnabled ? 'default' : 'secondary'} className="ml-auto flex-shrink-0">
+                      {config.ticketsEnabled ? 'Habilitada' : 'Deshabilitada'}
+                    </Badge>
+                  </div>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Configuración del área</CardTitle>
+                      <CardDescription>Ajustes específicos para esta área de soporte</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="code-prefix">Prefijo de código de ticket</Label>
+                          <Input
+                            id="code-prefix"
+                            value={config.codePrefix || ''}
+                            onChange={(e) => setConfig({ ...config, codePrefix: e.target.value.toUpperCase().slice(0, 10) })}
+                            placeholder={selectedFamily?.code || 'Ej: TI'}
+                            maxLength={10}
+                            className="mt-1 font-mono"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Ejemplo: <span className="font-mono">{config.codePrefix || selectedFamily?.code || 'TI'}-2026-0001</span>
+                          </p>
+                        </div>
+                        <div>
+                          <Label htmlFor="alert-threshold">Alerta de volumen</Label>
+                          <Input
+                            id="alert-threshold"
+                            type="number"
+                            value={config.alertVolumeThreshold ?? ''}
+                            onChange={(e) => setConfig({ ...config, alertVolumeThreshold: e.target.value ? parseInt(e.target.value) : null })}
+                            placeholder="Sin límite"
+                            min={1}
+                            className="mt-1"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Notifica cuando los tickets abiertos superen este número
+                          </p>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between p-3 border rounded-lg">
+                          <div>
+                            <p className="text-sm font-medium">Tickets habilitados</p>
+                            <p className="text-xs text-muted-foreground">Esta área puede recibir tickets</p>
+                          </div>
+                          <Switch checked={config.ticketsEnabled} onCheckedChange={(v) => setConfig({ ...config, ticketsEnabled: v })} />
+                        </div>
+                        <div className="flex items-center justify-between p-3 border rounded-lg">
+                          <div>
+                            <p className="text-sm font-medium">Asignación respeta el área</p>
+                            <p className="text-xs text-muted-foreground">Solo asigna técnicos de esta área automáticamente</p>
+                          </div>
+                          <Switch checked={config.autoAssignRespectsFamilies} onCheckedChange={(v) => setConfig({ ...config, autoAssignRespectsFamilies: v })} />
+                        </div>
+                        <div className="flex items-center justify-between p-3 border rounded-lg">
+                          <div>
+                            <p className="text-sm font-medium">Área por defecto del sistema</p>
+                            <p className="text-xs text-muted-foreground">Recibe tickets cuando no se puede determinar el área</p>
+                          </div>
+                          <Switch checked={config.isDefault} onCheckedChange={(v) => setConfig({ ...config, isDefault: v })} />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        Horario laboral
+                      </CardTitle>
+                      <CardDescription>
+                        Define cuándo está activo el equipo de esta área. Se usa para calcular los tiempos de SLA.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="hours-start">Entrada</Label>
+                          <Input
+                            id="hours-start"
+                            type="time"
+                            value={config.businessHoursStart.substring(0, 5)}
+                            onChange={(e) => setConfig({ ...config, businessHoursStart: `${e.target.value}:00` })}
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="hours-end">Salida</Label>
+                          <Input
+                            id="hours-end"
+                            type="time"
+                            value={config.businessHoursEnd.substring(0, 5)}
+                            onChange={(e) => setConfig({ ...config, businessHoursEnd: `${e.target.value}:00` })}
+                            className="mt-1"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="mb-2 block">Días laborales</Label>
+                        <div className="flex gap-2 flex-wrap">
+                          {DAY_OPTIONS.map((day) => {
+                            const active = activeDays.includes(day.key)
+                            return (
+                              <button
+                                key={day.key}
+                                type="button"
+                                onClick={() => toggleDay(day.key)}
+                                className={`w-9 h-9 rounded-full text-sm font-semibold border-2 transition-colors ${
+                                  active
+                                    ? 'bg-primary text-primary-foreground border-primary'
+                                    : 'bg-background text-muted-foreground border-border hover:border-primary/50'
+                                }`}
+                              >
+                                {day.label}
+                              </button>
+                            )
+                          })}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          {activeDays.length === 0 ? 'Sin días seleccionados' : `${activeDays.length} día${activeDays.length !== 1 ? 's' : ''} seleccionado${activeDays.length !== 1 ? 's' : ''}`}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <Timer className="h-4 w-4" />
+                            Tiempos SLA de referencia
+                          </CardTitle>
+                          <CardDescription className="mt-1">
+                            Tiempos globales del sistema. El horario de arriba determina cuándo se cuentan esas horas.
+                          </CardDescription>
+                        </div>
+                        {isSuperAdmin && (
+                          <Button variant="outline" size="sm" className="flex-shrink-0" onClick={() => router.push('/admin/settings?tab=sla')}>
+                            <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                            Editar SLA
+                          </Button>
+                        )}
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {slaRows.map((row) => (
+                          <div key={row.priority} className={`rounded-lg border p-3 text-center ${PRIORITY_COLORS[row.priority]}`}>
+                            <p className="text-xs font-semibold uppercase tracking-wide mb-1">{PRIORITY_LABELS[row.priority]}</p>
+                            <p className="text-lg font-bold">{row.response}h</p>
+                            <p className="text-xs opacity-70">respuesta</p>
+                            <p className="text-sm font-semibold mt-1">{row.resolution}h</p>
+                            <p className="text-xs opacity-70">resolución</p>
+                          </div>
+                        ))}
+                      </div>
+                      {!isSuperAdmin && (
+                        <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1">
+                          <Info className="h-3 w-3" />
+                          Solo el Super Admin puede modificar los tiempos SLA
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </>
+              ) : (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                    <XCircle className="h-12 w-12 mb-4 opacity-30" />
+                    <p className="text-base font-medium">Sin configuración</p>
+                    <p className="text-sm mt-1">Esta área no tiene configuración de tickets aún</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* TAB: REGLAS GENERALES */}
+        <TabsContent value="global">
+          <div className="max-w-2xl space-y-6">
+            <div className="flex items-start gap-3 p-4 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800">
+              <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-blue-800 dark:text-blue-300">
+                Estas reglas aplican a <strong>todo el sistema</strong>, independientemente del área. Los cambios aquí afectan a todos los usuarios.
+              </p>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Layers className="h-4 w-4" />
+                  Área por defecto
+                </CardTitle>
+                <CardDescription>
+                  Cuando un ticket no puede asociarse a ningún área específica, se asigna aquí automáticamente
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
                 <Select
-                  value={families.find((f) => f.ticketFamilyConfig?.isDefault)?.id || ''}
-                  onValueChange={async (familyId) => {
-                    try {
-                      const res = await fetch(`/api/families/${familyId}/ticket-config`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ isDefault: true }),
-                      })
-                      const data = await res.json()
-                      if (data.success) {
-                        toast({ title: 'Éxito', description: 'Familia por defecto actualizada' })
-                        loadFamilies()
-                      }
-                    } catch {
-                      toast({ title: 'Error', description: 'Error de conexión', variant: 'destructive' })
-                    }
-                  }}
+                  value={globalSettings.defaultFamilyId}
+                  onValueChange={(v) => { setGlobalSettings((prev) => ({ ...prev, defaultFamilyId: v })); setGlobalDirty(true) }}
                 >
-                  <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="Seleccionar familia por defecto" />
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar área por defecto" />
                   </SelectTrigger>
                   <SelectContent>
-                    {families
-                      .filter((f) => f.ticketFamilyConfig?.ticketsEnabled)
-                      .map((f) => (
-                        <SelectItem key={f.id} value={f.id}>
-                          {f.name}
-                        </SelectItem>
-                      ))}
+                    {families.filter((f) => f.ticketFamilyConfig?.ticketsEnabled).map((f) => (
+                      <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Se usa cuando no se puede determinar la familia desde la categoría
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Reglas globales */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Bell className="h-4 w-4" />
-                Reglas globales
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="max-tickets" className="text-sm">Máx. tickets abiertos por usuario</Label>
-                <Input
-                  id="max-tickets"
-                  type="number"
-                  min={1}
-                  max={100}
-                  value={globalSettings.maxTicketsPerUser}
-                  onChange={(e) =>
-                    setGlobalSettings((prev) => ({ ...prev, maxTicketsPerUser: parseInt(e.target.value) || 10 }))
-                  }
-                  className="mt-1 w-24 font-mono"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  El usuario no podrá crear más tickets si ya tiene este número abiertos
-                </p>
-              </div>
-
-              <div>
-                <Label htmlFor="auto-close-days" className="text-sm">Días para cierre automático</Label>
-                <Input
-                  id="auto-close-days"
-                  type="number"
-                  min={1}
-                  max={30}
-                  value={globalSettings.autoCloseDays}
-                  onChange={(e) =>
-                    setGlobalSettings((prev) => ({ ...prev, autoCloseDays: parseInt(e.target.value) || 3 }))
-                  }
-                  className="mt-1 w-24 font-mono"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Días tras resolución sin calificación antes del cierre automático
-                </p>
-              </div>
-
-              <div className="flex items-center justify-between p-3 border rounded-lg">
-                <div>
-                  <p className="text-sm font-medium">Asignación automática</p>
-                  <p className="text-xs text-muted-foreground">
-                    Asigna tickets al técnico con menor carga en esa categoría
-                  </p>
-                </div>
-                <Switch
-                  checked={globalSettings.autoAssignmentEnabled}
-                  onCheckedChange={(v) =>
-                    setGlobalSettings((prev) => ({ ...prev, autoAssignmentEnabled: v }))
-                  }
-                />
-              </div>
-
-              <Button
-                size="sm"
-                className="w-full"
-                onClick={handleSaveGlobalSettings}
-                disabled={savingGlobal}
-              >
-                <Save className={`h-3 w-3 mr-2 ${savingGlobal ? 'animate-spin' : ''}`} />
-                {savingGlobal ? 'Guardando...' : 'Guardar reglas'}
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Panel derecho: configuración de la familia seleccionada */}
-        <div className="lg:col-span-2 space-y-4">
-          {!selectedFamilyId ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                <Ticket className="h-12 w-12 mb-4 opacity-30" />
-                <p className="text-lg font-medium">Selecciona una familia</p>
-                <p className="text-sm mt-1">Elige una familia del panel izquierdo para ver y editar su configuración</p>
               </CardContent>
             </Card>
-          ) : loadingConfig ? (
+
             <Card>
-              <CardContent className="flex items-center justify-center py-16">
-                <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Límite de tickets por usuario
+                </CardTitle>
+                <CardDescription>
+                  Un usuario no podrá crear más tickets si ya tiene este número abiertos al mismo tiempo
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-4">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={globalSettings.maxTicketsPerUser}
+                    onChange={(e) => { setGlobalSettings((prev) => ({ ...prev, maxTicketsPerUser: parseInt(e.target.value) || 10 })); setGlobalDirty(true) }}
+                    className="w-24 font-mono"
+                  />
+                  <p className="text-sm text-muted-foreground">tickets abiertos máximo por usuario</p>
+                </div>
               </CardContent>
             </Card>
-          ) : config ? (
-            <>
-              {/* Header de la familia seleccionada */}
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
-                  style={{ backgroundColor: selectedFamily?.color || '#6B7280' }}
-                >
-                  <FamilyIcon icon={selectedFamily?.icon} color={selectedFamily?.color} code={selectedFamily?.code} className="w-5 h-5" />
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Cierre automático de tickets resueltos
+                </CardTitle>
+                <CardDescription>
+                  Cuando un técnico resuelve un ticket, el cliente tiene este plazo para calificarlo. Si no lo hace, el ticket se cierra automáticamente.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-4">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={30}
+                    value={globalSettings.autoCloseDays}
+                    onChange={(e) => { setGlobalSettings((prev) => ({ ...prev, autoCloseDays: parseInt(e.target.value) || 3 })); setGlobalDirty(true) }}
+                    className="w-24 font-mono"
+                  />
+                  <p className="text-sm text-muted-foreground">días para calificar antes del cierre automático</p>
                 </div>
-                <div>
-                  <h3 className="font-semibold">{selectedFamily?.name}</h3>
-                  <p className="text-sm text-muted-foreground font-mono">{selectedFamily?.code}</p>
-                </div>
-                <Badge variant={config.ticketsEnabled ? 'default' : 'secondary'} className="ml-auto">
-                  {config.ticketsEnabled ? 'Tickets habilitados' : 'Tickets deshabilitados'}
-                </Badge>
-              </div>
+              </CardContent>
+            </Card>
 
-              {/* Configuración básica */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Configuración básica</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="code-prefix">Prefijo de código</Label>
-                      <Input
-                        id="code-prefix"
-                        value={config.codePrefix || ''}
-                        onChange={(e) =>
-                          setConfig({ ...config, codePrefix: e.target.value.toUpperCase().slice(0, 10) })
-                        }
-                        placeholder={selectedFamily?.code || 'Ej: TI'}
-                        maxLength={10}
-                        className="mt-1 font-mono"
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Formato: {config.codePrefix || selectedFamily?.code}-2026-0001
-                      </p>
-                    </div>
-                    <div>
-                      <Label htmlFor="alert-threshold">Umbral de alertas de volumen</Label>
-                      <Input
-                        id="alert-threshold"
-                        type="number"
-                        value={config.alertVolumeThreshold ?? ''}
-                        onChange={(e) =>
-                          setConfig({
-                            ...config,
-                            alertVolumeThreshold: e.target.value ? parseInt(e.target.value) : null,
-                          })
-                        }
-                        placeholder="Sin límite"
-                        min={1}
-                        className="mt-1"
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Alerta cuando los tickets abiertos superen este número
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 border rounded-lg">
-                    <div>
-                      <p className="text-sm font-medium">Tickets habilitados</p>
-                      <p className="text-xs text-muted-foreground">Permite crear tickets en esta familia</p>
-                    </div>
-                    <Switch
-                      checked={config.ticketsEnabled}
-                      onCheckedChange={(v) => setConfig({ ...config, ticketsEnabled: v })}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 border rounded-lg">
-                    <div>
-                      <p className="text-sm font-medium">Asignación automática respeta familias</p>
-                      <p className="text-xs text-muted-foreground">
-                        Solo asigna técnicos con esta familia en sus asignaciones
-                      </p>
-                    </div>
-                    <Switch
-                      checked={config.autoAssignRespectsFamilies}
-                      onCheckedChange={(v) => setConfig({ ...config, autoAssignRespectsFamilies: v })}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 border rounded-lg">
-                    <div>
-                      <p className="text-sm font-medium">Familia por defecto del sistema</p>
-                      <p className="text-xs text-muted-foreground">
-                        Se usa como fallback cuando no se puede determinar la familia
-                      </p>
-                    </div>
-                    <Switch
-                      checked={config.isDefault}
-                      onCheckedChange={(v) => setConfig({ ...config, isDefault: v })}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Horario laboral */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    Horario laboral
-                  </CardTitle>
-                  <CardDescription>Define el horario para el cálculo de SLA</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="hours-start">Hora de inicio</Label>
-                      <Input
-                        id="hours-start"
-                        type="time"
-                        value={config.businessHoursStart.substring(0, 5)}
-                        onChange={(e) =>
-                          setConfig({ ...config, businessHoursStart: `${e.target.value}:00` })
-                        }
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="hours-end">Hora de fin</Label>
-                      <Input
-                        id="hours-end"
-                        type="time"
-                        value={config.businessHoursEnd.substring(0, 5)}
-                        onChange={(e) =>
-                          setConfig({ ...config, businessHoursEnd: `${e.target.value}:00` })
-                        }
-                        className="mt-1"
-                      />
-                    </div>
-                  </div>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Bell className="h-4 w-4" />
+                  Asignación automática de técnicos
+                </CardTitle>
+                <CardDescription>
+                  Cuando se crea un ticket, el sistema puede asignarlo automáticamente al técnico con menor carga de trabajo en esa categoría
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between p-3 border rounded-lg">
                   <div>
-                    <Label htmlFor="business-days">Días laborales (separados por coma)</Label>
-                    <Input
-                      id="business-days"
-                      value={config.businessDays}
-                      onChange={(e) => setConfig({ ...config, businessDays: e.target.value })}
-                      placeholder="MON,TUE,WED,THU,FRI"
-                      className="mt-1 font-mono"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Valores: MON, TUE, WED, THU, FRI, SAT, SUN
-                    </p>
+                    <p className="text-sm font-medium">Activar asignación automática</p>
+                    <p className="text-xs text-muted-foreground">Los tickets nuevos se asignan sin intervención manual</p>
                   </div>
-                </CardContent>
-              </Card>
-
-              {/* SLA por prioridad — solo lectura, edición en Configuración del Sistema */}
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Bell className="h-4 w-4" />
-                        SLA por prioridad
-                      </CardTitle>
-                      <CardDescription className="mt-1">
-                        Tiempos de referencia del sistema. Para modificarlos ve a{' '}
-                        <button
-                          className="text-primary underline text-xs inline-flex items-center gap-0.5"
-                          onClick={() => router.push('/admin/settings?tab=sla')}
-                        >
-                          Configuración → SLA
-                          <ExternalLink className="h-3 w-3" />
-                        </button>
-                      </CardDescription>
-                    </div>
-                    {isSuperAdmin && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => router.push('/admin/settings?tab=sla')}
-                      >
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        Gestionar SLA
-                      </Button>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Prioridad</TableHead>
-                        <TableHead className="text-center">Respuesta (h)</TableHead>
-                        <TableHead className="text-center">Resolución (h)</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {slaRows.map((row) => (
-                        <TableRow key={row.priority}>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                row.priority === 'URGENT'
-                                  ? 'destructive'
-                                  : row.priority === 'HIGH'
-                                  ? 'default'
-                                  : 'secondary'
-                              }
-                            >
-                              {PRIORITY_LABELS[row.priority]}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-center font-mono font-medium">
-                            {row.response}
-                          </TableCell>
-                          <TableCell className="text-center font-mono font-medium">
-                            {row.resolution}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-
-              <div className="flex justify-end">
-                <Button onClick={handleSaveConfig} disabled={saving} size="lg">
-                  <Save className={`h-4 w-4 mr-2 ${saving ? 'animate-spin' : ''}`} />
-                  {saving ? 'Guardando...' : 'Guardar configuración'}
-                </Button>
-              </div>
-            </>
-          ) : (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                <XCircle className="h-12 w-12 mb-4 opacity-30" />
-                <p className="text-lg font-medium">Sin configuración</p>
-                <p className="text-sm mt-1">Esta familia no tiene configuración de tickets</p>
+                  <Switch
+                    checked={globalSettings.autoAssignmentEnabled}
+                    onCheckedChange={(v) => { setGlobalSettings((prev) => ({ ...prev, autoAssignmentEnabled: v })); setGlobalDirty(true) }}
+                  />
+                </div>
               </CardContent>
             </Card>
-          )}
-        </div>
-      </div>
+          </div>
+        </TabsContent>
+      </Tabs>
     </ModuleLayout>
   )
 }
