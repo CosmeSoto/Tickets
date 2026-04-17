@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Clock, User, Tag, Edit, Save, X, AlertCircle, BookOpen, Lightbulb, Loader2, UserX, MapPin } from 'lucide-react'
-
 import { TicketDetailLayout } from '@/components/tickets/ticket-detail-layout'
 import { AutoAssignment } from '@/components/tickets/auto-assignment'
 import { CompactFileManager } from '@/components/tickets/compact-file-manager'
