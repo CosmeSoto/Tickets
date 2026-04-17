@@ -316,9 +316,8 @@ export function useDashboardTickets(role: Role, limit: number = 5) {
   useEffect(() => {
     loadTickets()
     
-    // Auto-refresh cada 30 segundos para tickets
-    const interval = setInterval(loadTickets, 30 * 1000)
-    
+    // Auto-refresh cada 3 minutos — el SSE notifica cambios en tiempo real
+    const interval = setInterval(loadTickets, 3 * 60 * 1000)    
     return () => clearInterval(interval)
   }, [loadTickets])
 

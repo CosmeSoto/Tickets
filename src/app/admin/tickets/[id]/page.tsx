@@ -77,7 +77,7 @@ export default function AdminTicketDetailPage() {
           return data
         })
       } catch {}
-    }, 10000)
+    }, 30_000) // 30s — el SSE notifica cambios en tiempo real
     return () => { stopped = true; clearInterval(interval) }
   }, [ticketId, unassigning, assignmentDialogOpen, router])
 

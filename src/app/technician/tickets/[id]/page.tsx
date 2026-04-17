@@ -53,6 +53,7 @@ export default function TechnicianTicketDetailPage() {
   // Polling para detectar cambios (cliente calificó → CLOSED)
   useEffect(() => {
     if (!ticketId || loading) return
+    // Polling cada 30s — el SSE notifica cambios en tiempo real
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`/api/tickets/${ticketId}`)
@@ -65,7 +66,7 @@ export default function TechnicianTicketDetailPage() {
           return data
         })
       } catch {}
-    }, 5000)
+    }, 30_000)
     return () => clearInterval(interval)
   }, [ticketId, loading])
 

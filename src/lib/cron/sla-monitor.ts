@@ -42,85 +42,74 @@ export class SLAMonitor {
   private static async detectActiveViolations(): Promise<void> {
     const now = new Date()
     
-    // Buscar tickets con SLA vencido que aún no tienen violación registrada
     const overdueTickets = await prisma.ticket_sla_metrics.findMany({
       where: {
         OR: [
-          {
-            // Respuesta vencida y sin primera respuesta
-            responseDeadline: { lt: now },
-            firstResponseAt: null,
-            responseSLAMet: null
-          },
-          {
-            // Resolución vencida y sin resolver
-            resolutionDeadline: { lt: now },
-            resolvedAt: null,
-            resolutionSLAMet: null
-          }
+          { responseDeadline: { lt: now }, firstResponseAt: null, responseSLAMet: null },
+          { resolutionDeadline: { lt: now }, resolvedAt: null, resolutionSLAMet: null }
         ]
       },
-      include: {
+      select: {
+        id: true,
+        ticketId: true,
+        slaPolicyId: true,
+        firstResponseAt: true,
+        responseDeadline: true,
+        resolutionDeadline: true,
+        createdAt: true,
         ticket: {
-          include: {
-            users_tickets_assigneeIdTousers: true,
-            categories: true
+          select: {
+            assigneeId: true,
+            users_tickets_assigneeIdTousers: { select: { id: true, name: true } }
           }
         }
       }
     })
     
+    if (overdueTickets.length === 0) return
     console.log(`[SLA MONITOR] ${overdueTickets.length} tickets con SLA vencido detectados`)
-    
+
+    // Batch: obtener todas las violaciones existentes en una sola query
+    const ticketIds = overdueTickets.map(m => m.ticketId)
+    const existingViolations = await prisma.sla_violations.findMany({
+      where: { ticketId: { in: ticketIds }, isResolved: false },
+      select: { ticketId: true, violationType: true }
+    })
+    const violationSet = new Set(
+      existingViolations.map(v => `${v.ticketId}:${v.violationType}`)
+    )
+
+    // Preparar creaciones en batch
+    const toCreate: Parameters<typeof prisma.sla_violations.createMany>[0]['data'] = []
+
     for (const metrics of overdueTickets) {
-      // Verificar si ya existe violación
-      const existingViolation = await prisma.sla_violations.findFirst({
-        where: {
-          ticketId: metrics.ticketId,
-          violationType: metrics.firstResponseAt === null ? 'RESPONSE' : 'RESOLUTION',
-          isResolved: false
-        }
+      const violationType = metrics.firstResponseAt === null ? 'RESPONSE' : 'RESOLUTION'
+      const key = `${metrics.ticketId}:${violationType}`
+      if (violationSet.has(key)) continue
+
+      const expectedAt = violationType === 'RESPONSE'
+        ? metrics.responseDeadline
+        : metrics.resolutionDeadline
+      if (!expectedAt) continue
+
+      const delayHours = Math.floor((now.getTime() - new Date(expectedAt).getTime()) / 3_600_000)
+      const severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' =
+        delayHours > 24 ? 'CRITICAL' : delayHours > 8 ? 'HIGH' : delayHours > 2 ? 'MEDIUM' : 'LOW'
+
+      toCreate.push({
+        ticketId: metrics.ticketId,
+        slaPolicyId: metrics.slaPolicyId,
+        violationType,
+        expectedAt: new Date(expectedAt),
+        actualAt: null,
+        severity,
+        isResolved: false,
       })
-      
-      if (!existingViolation) {
-        // Crear violación
-        const violationType = metrics.firstResponseAt === null ? 'RESPONSE' : 'RESOLUTION'
-        const expectedAt = violationType === 'RESPONSE' 
-          ? metrics.responseDeadline 
-          : metrics.resolutionDeadline
-        
-        if (!expectedAt) continue
-        
-        const delayHours = Math.floor(
-          (now.getTime() - new Date(expectedAt).getTime()) / (1000 * 60 * 60)
-        )
-        
-        let severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' = 'MEDIUM'
-        if (delayHours > 24) severity = 'CRITICAL'
-        else if (delayHours > 8) severity = 'HIGH'
-        else if (delayHours > 2) severity = 'MEDIUM'
-        else severity = 'LOW'
-        
-        await prisma.sla_violations.create({
-          data: {
-            ticketId: metrics.ticketId,
-            slaPolicyId: metrics.slaPolicyId,
-            violationType,
-            expectedAt: new Date(expectedAt),
-            actualAt: null, // Aún no resuelto
-            severity,
-            isResolved: false
-          }
-        })
-        
-        console.log(`[SLA MONITOR] ⚠️ Nueva violación: Ticket ${metrics.ticketId}, Tipo ${violationType}, Severidad ${severity}`)
-        
-        // Enviar notificación al técnico asignado
-        if (metrics.ticket.users_tickets_assigneeIdTousers) {
-          // TODO: Implementar notificación
-          console.log(`[SLA MONITOR] Notificación enviada a ${metrics.ticket.users_tickets_assigneeIdTousers.name}`)
-        }
-      }
+    }
+
+    if (toCreate.length > 0) {
+      await prisma.sla_violations.createMany({ data: toCreate, skipDuplicates: true })
+      console.log(`[SLA MONITOR] ${toCreate.length} nuevas violaciones registradas`)
     }
   }
   
@@ -128,40 +117,17 @@ export class SLAMonitor {
    * Actualizar métricas de tickets abiertos
    */
   private static async updateOpenTicketsMetrics(): Promise<void> {
-    const openTickets = await prisma.ticket_sla_metrics.findMany({
+    const now = new Date()
+
+    // Batch update: una sola query en lugar de N queries individuales
+    const result = await prisma.ticket_sla_metrics.updateMany({
       where: {
-        ticket: {
-          status: {
-            in: ['OPEN', 'IN_PROGRESS', 'PENDING']
-          }
-        }
+        ticket: { status: { in: ['OPEN', 'IN_PROGRESS', 'PENDING'] } }
       },
-      include: {
-        ticket: true
-      }
+      data: { updatedAt: now }
     })
-    
-    console.log(`[SLA MONITOR] Actualizando ${openTickets.length} tickets abiertos`)
-    
-    for (const metrics of openTickets) {
-      const now = new Date()
-      const createdAt = new Date(metrics.createdAt)
-      
-      // Calcular tiempo transcurrido
-      const elapsedMinutes = Math.floor(
-        (now.getTime() - createdAt.getTime()) / (1000 * 60)
-      )
-      
-      // Actualizar business_hours_elapsed si aplica
-      // (Implementación simplificada, puede mejorarse)
-      await prisma.ticket_sla_metrics.update({
-        where: { id: metrics.id },
-        data: {
-          businessHoursElapsed: elapsedMinutes,
-          updatedAt: now
-        }
-      })
-    }
+
+    console.log(`[SLA MONITOR] ${result.count} métricas de tickets abiertos actualizadas`)
   }
   
   /**

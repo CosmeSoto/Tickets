@@ -99,55 +99,47 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Obtener tickets con relaciones
+    // Obtener tickets con relaciones — select explícito para evitar traer campos pesados
     const [tickets, total] = await Promise.all([
       prisma.tickets.findMany({
         where,
-        include: {
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          status: true,
+          priority: true,
+          ticketCode: true,
+          codeIsManual: true,
+          familyId: true,
+          categoryId: true,
+          clientId: true,
+          assigneeId: true,
+          createdAt: true,
+          updatedAt: true,
+          resolvedAt: true,
+          closedAt: true,
+          slaDeadline: true,
+          knowledgeArticleId: true,
           users_tickets_clientIdTousers: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              departmentId: true
-            }
+            select: { id: true, name: true, email: true, departmentId: true }
           },
           users_tickets_assigneeIdTousers: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              departmentId: true
-            }
+            select: { id: true, name: true, email: true }
           },
           categories: {
-            select: {
-              id: true,
-              name: true,
-              color: true,
-              level: true
-            }
+            select: { id: true, name: true, color: true, level: true }
           },
           family: {
-            select: {
-              id: true,
-              name: true,
-              code: true,
-              color: true
-            }
+            select: { id: true, name: true, code: true, color: true }
           },
           _count: {
-            select: {
-              comments: true,
-              attachments: true
-            }
+            select: { comments: true, attachments: true }
           }
         },
-        orderBy: {
-          createdAt: 'desc'
-        },
+        orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
-        take: limit
+        take: limit,
       }),
       prisma.tickets.count({ where })
     ])

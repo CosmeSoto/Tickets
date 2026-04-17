@@ -52,6 +52,8 @@ export default function ClientTicketDetailPage() {
   // Polling ligero para detectar cambios de estado
   useEffect(() => {
     if (!ticketId || ticketId === 'create' || !session?.user?.id) return
+    // Polling cada 30s — el SSE notifica cambios en tiempo real
+    // Solo para detectar cambios que el SSE pudiera perder (reconexión, etc.)
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`/api/tickets/${ticketId}`)
@@ -64,7 +66,7 @@ export default function ClientTicketDetailPage() {
           return data
         })
       } catch {}
-    }, 5000)
+    }, 30_000)
     return () => clearInterval(interval)
   }, [ticketId, session?.user?.id])
 

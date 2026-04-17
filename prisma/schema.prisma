@@ -341,6 +341,11 @@ model tickets {
   @@index([title, description])
   @@index([familyId, status])
   @@index([ticketCode])
+  // Índices adicionales para consultas frecuentes
+  @@index([status, createdAt(sort: Desc)])
+  @@index([clientId, status])
+  @@index([priority])
+  @@index([updatedAt(sort: Desc)])
 }
 
 model user_settings {
