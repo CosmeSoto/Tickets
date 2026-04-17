@@ -47,12 +47,45 @@ El módulo de tickets es el núcleo del sistema de soporte. Permite a los usuari
 
 ## 2. Roles y permisos
 
+### Los cuatro roles del sistema
+
+| Rol | Quién es | Qué ve |
+|-----|----------|--------|
+| **Cliente** | Usuario final que reporta problemas | Solo sus propios tickets |
+| **Técnico** | Personal de soporte que resuelve tickets | Tickets de sus áreas asignadas |
+| **Admin** | Responsable de un conjunto de áreas | Tickets y configuración de sus áreas asignadas |
+| **Super Admin** | Administrador principal del sistema | Todo, sin restricciones |
+
+> ℹ️ Técnicamente, Super Admin y Admin son el mismo rol (`ADMIN`) en la base de datos. La diferencia es el campo `isSuperAdmin = true/false`. Se asigna al crear o editar el usuario.
+
+### Admin normal vs Super Admin — diferencias concretas
+
+| Capacidad | Admin normal | Super Admin |
+|-----------|:-----------:|:-----------:|
+| Ver tickets de sus áreas asignadas | ✅ | ✅ (todas) |
+| Ver tickets de áreas NO asignadas | ❌ | ✅ |
+| Configurar tickets por área | ✅ (sus áreas) | ✅ (todas) |
+| Ver reportes | ✅ (sus áreas) | ✅ (todas) |
+| Gestionar usuarios | ✅ | ✅ |
+| Crear otro Super Admin | ❌ | ✅ |
+| Ver auditoría del sistema | ❌ | ✅ |
+| Configurar email / SMTP | ❌ | ✅ |
+| Configurar seguridad (sesión, contraseñas) | ❌ | ✅ |
+| Configurar OAuth (Google, etc.) | ❌ | ✅ |
+| Editar políticas SLA globales | ❌ | ✅ |
+| Cambiar nombre del sistema | ❌ | ✅ |
+| Editar logos e identidad de la empresa | ❌ | ✅ |
+| Editar SEO de la página pública | ❌ | ✅ |
+
+**¿Qué pasa si un Admin no tiene áreas asignadas?**  
+Por compatibilidad, un admin sin ninguna asignación tiene acceso total (igual que Super Admin). Esto es para que un admin recién creado pueda trabajar. En cuanto se le asigna al menos un área, queda restringido a esas áreas.
+
 ### Tabla de permisos completa
 
 | Acción | Cliente | Técnico | Admin | SuperAdmin |
 |--------|:-------:|:-------:|:-----:|:----------:|
 | Ver sus propios tickets | ✅ | — | — | — |
-| Ver todos los tickets | — | ✅ (sus familias) | ✅ (sus familias) | ✅ (todos) |
+| Ver todos los tickets | — | ✅ (sus áreas) | ✅ (sus áreas) | ✅ (todos) |
 | Crear ticket | ✅ | — | ✅ | ✅ |
 | Editar título/descripción | ✅ (solo OPEN) | — | ✅ | ✅ |
 | Cambiar estado | — | ✅ (limitado) | ✅ | ✅ |
@@ -64,23 +97,10 @@ El módulo de tickets es el núcleo del sistema de soporte. Permite a los usuari
 | Ver comentarios internos | — | ✅ | ✅ | ✅ |
 | Calificar servicio | ✅ | — | — | — |
 | Crear artículo de conocimiento | — | ✅ | ✅ | ✅ |
-| Configurar área | — | — | ✅ | ✅ |
-| Ver reportes | — | — | ✅ | ✅ |
+| Configurar área | — | — | ✅ (sus áreas) | ✅ |
+| Ver reportes | — | — | ✅ (sus áreas) | ✅ |
 | Ver auditoría | — | — | — | ✅ |
 | Exportar datos | — | ✅ (sus tickets) | ✅ | ✅ |
-
-### Sobre el rol Técnico
-
-El técnico solo puede:
-- Ver tickets **asignados a él** o **sin asignar de sus familias**
-- Cambiar estado a: `EN PROGRESO`, `RESUELTO`, `EN ESPERA` (no puede cerrar directamente)
-- Auto-asignarse tickets (no puede asignar a otro técnico)
-- No puede editar el título ni la descripción (preserva la solicitud original del cliente)
-
-### Sobre el Admin normal vs SuperAdmin
-
-El **Admin normal** ve y gestiona únicamente las familias que tiene asignadas en `admin_family_assignments`.  
-El **SuperAdmin** tiene acceso sin restricciones a todas las familias y configuraciones del sistema.
 
 ---
 
@@ -273,12 +293,29 @@ Los comentarios internos se filtran en el **backend** (no solo en la UI). Cuando
 
 ## 6. Sistema de áreas (familias)
 
-Las **familias** (también llamadas "áreas") son los equipos de soporte. Cada ticket puede pertenecer a una familia. Los clientes pueden crear tickets en:
+Las **familias** (también llamadas "áreas") son los equipos de soporte. Cada ticket pertenece a un área. Los clientes pueden crear tickets en:
 
 - **Su propia área**: Pre-seleccionada automáticamente al crear un ticket
 - **Otras áreas**: Si la configuración `allowedFromFamilies` de esa área lo permite
 
 Si `allowedFromFamilies` está vacío, cualquier cliente del sistema puede crear tickets en esa área. Si tiene valores, solo los clientes de esas familias específicas pueden hacerlo.
+
+### ¿Qué hace el switch de habilitar/deshabilitar en la lista de áreas?
+
+El switch controla si esa área **puede recibir tickets nuevos**. Si está desactivado:
+- Los clientes **no pueden crear** tickets en esa área
+- Los tickets existentes **no se borran** ni se afectan
+- Es útil para áreas sin personal disponible temporalmente
+
+### ¿Qué es el "Área por defecto del sistema"?
+
+Es el **área de último recurso** (fallback). Cuando el sistema no puede determinar a qué área pertenece un ticket — por ejemplo, si la categoría seleccionada no tiene área asignada — el ticket se envía automáticamente a esta área.
+
+**Aclaraciones importantes:**
+- Solo **una** área puede ser la por defecto a la vez
+- No significa que reciba todos los tickets de otras áreas — solo los que quedan "sin área determinada"
+- Si no hay área por defecto configurada, los tickets sin área quedan sin asignar (pueden perderse)
+- Si dejas el selector en blanco en "Reglas generales", los tickets sin área no se asignan a ningún lado
 
 ### Filtros por familia
 

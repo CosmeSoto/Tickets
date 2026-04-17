@@ -448,21 +448,21 @@ function TicketSettingsContent() {
                         <div className="flex items-center justify-between p-3 border rounded-lg">
                           <div>
                             <p className="text-sm font-medium">Tickets habilitados</p>
-                            <p className="text-xs text-muted-foreground">Esta área puede recibir tickets</p>
+                            <p className="text-xs text-muted-foreground">Permite crear tickets nuevos en esta área. Los tickets existentes no se afectan.</p>
                           </div>
                           <Switch checked={config.ticketsEnabled} onCheckedChange={(v) => setConfig({ ...config, ticketsEnabled: v })} />
                         </div>
                         <div className="flex items-center justify-between p-3 border rounded-lg">
                           <div>
                             <p className="text-sm font-medium">Asignación respeta el área</p>
-                            <p className="text-xs text-muted-foreground">Solo asigna técnicos de esta área automáticamente</p>
+                            <p className="text-xs text-muted-foreground">La asignación automática solo elige técnicos que pertenecen a esta área</p>
                           </div>
                           <Switch checked={config.autoAssignRespectsFamilies} onCheckedChange={(v) => setConfig({ ...config, autoAssignRespectsFamilies: v })} />
                         </div>
                         <div className="flex items-center justify-between p-3 border rounded-lg">
                           <div>
-                            <p className="text-sm font-medium">Área por defecto del sistema</p>
-                            <p className="text-xs text-muted-foreground">Recibe tickets cuando no se puede determinar el área</p>
+                            <p className="text-sm font-medium">Área de respaldo del sistema</p>
+                            <p className="text-xs text-muted-foreground">Recibe tickets cuando el sistema no puede determinar el área (solo una área puede ser el respaldo)</p>
                           </div>
                           <Switch checked={config.isDefault} onCheckedChange={(v) => setConfig({ ...config, isDefault: v })} />
                         </div>
@@ -599,10 +599,10 @@ function TicketSettingsContent() {
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <Layers className="h-4 w-4" />
-                  Área por defecto
+                  Área de respaldo del sistema
                 </CardTitle>
                 <CardDescription>
-                  Cuando un ticket no puede asociarse a ningún área específica, se asigna aquí automáticamente
+                  Cuando un ticket no puede asociarse a ningún área (por ejemplo, si la categoría no tiene área asignada), se envía aquí automáticamente. No recibe tickets de otras áreas — solo los que quedan sin área determinada.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -611,7 +611,7 @@ function TicketSettingsContent() {
                   onValueChange={(v) => { setGlobalSettings((prev) => ({ ...prev, defaultFamilyId: v })); setGlobalDirty(true) }}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar área por defecto" />
+                    <SelectValue placeholder="Sin área de respaldo configurada" />
                   </SelectTrigger>
                   <SelectContent>
                     {families.filter((f) => f.ticketFamilyConfig?.ticketsEnabled).map((f) => (
@@ -619,6 +619,9 @@ function TicketSettingsContent() {
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Solo una área puede ser el respaldo. Si no configuras ninguna, los tickets sin área quedan sin asignar.
+                </p>
               </CardContent>
             </Card>
 
