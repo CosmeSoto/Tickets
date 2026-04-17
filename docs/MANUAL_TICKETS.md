@@ -413,9 +413,10 @@ Cada exportación queda registrada en auditoría automáticamente.
 | Toggle de tickets por área (vista global) | Configuración → Tickets | Admin |
 | Familia por defecto | Configuración → Tickets | Admin |
 | Plazo de auto-cierre (días) | `system_settings.autoCloseDays` (BD) | SuperAdmin |
-| Políticas SLA (tiempos por prioridad/categoría) | Admin → Configuración → SLA | Admin |
+| Políticas SLA (tiempos por prioridad) | Configuración → Tickets → sección SLA | SuperAdmin |
 | Notificaciones globales | Admin → Configuración → Notificaciones | Admin |
 | Notificaciones personales | Configuración (usuario) → Notificaciones | Todos |
+| Página pública (hero, servicios, logos, SEO) | Admin → Página Pública | Admin / SuperAdmin |
 
 ### Parámetros clave de `ticket_family_config`
 
@@ -499,4 +500,4 @@ CLOSED      → Ticket finalizado (calificado o auto-cerrado)
 
 ---
 
-*Documento generado automáticamente. Para actualizar, editar `docs/MANUAL_TICKETS.md`.*
+*Para actualizar, editar `docs/MANUAL_TICKETS.md`.*

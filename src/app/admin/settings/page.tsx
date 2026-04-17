@@ -32,7 +32,6 @@ import {
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { OAuthSettingsTab } from '@/components/settings/oauth-settings-tab'
-import { LandingPageCMSTab } from '@/components/settings/landing-page-cms-tab'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 
 interface SystemSettings {
@@ -252,8 +251,8 @@ export default function SettingsPage() {
         <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
         Recargar
       </Button>
-      {/* Solo mostrar botón guardar si NO estamos en la pestaña OAuth o Landing */}
-      {activeTab !== 'oauth' && activeTab !== 'landing' && (
+      {/* Solo mostrar botón guardar si NO estamos en la pestaña OAuth */}
+      {activeTab !== 'oauth' && (
         <Button onClick={saveSettings} disabled={saving}>
           <Save className={`h-4 w-4 mr-2 ${saving ? 'animate-spin' : ''}`} />
           {saving ? 'Guardando...' : 'Guardar'}
@@ -269,15 +268,13 @@ export default function SettingsPage() {
       headerActions={headerActions}
     >
       <Tabs value={activeTab} className='space-y-6' onValueChange={(tab) => {
-        // Tabs restringidos a Super Admin
-        const superAdminTabs = ['email', 'security', 'oauth']
+      const superAdminTabs = ['email', 'security', 'oauth']
         if (superAdminTabs.includes(tab) && !isSuperAdmin) return
         setActiveTab(tab)
       }}>
         <TabsList className='flex flex-wrap h-auto gap-1 p-1 w-full'>
           <TabsTrigger value='general' className='flex-1 min-w-[80px]'>General</TabsTrigger>
           <TabsTrigger value='notifications' className='flex-1 min-w-[110px]'>Notificaciones</TabsTrigger>
-          <TabsTrigger value='landing' className='flex-1 min-w-[110px]'>Página Pública</TabsTrigger>
           {/* Tabs solo para Super Admin */}
           <TabsTrigger value='email' className='flex-1 min-w-[60px]' disabled={!isSuperAdmin}>
             <span className='flex items-center gap-1'>
@@ -715,11 +712,6 @@ export default function SettingsPage() {
           ) : (
             <OAuthSettingsTab />
           )}
-        </TabsContent>
-
-        {/* Página Pública CMS */}
-        <TabsContent value='landing'>
-          <LandingPageCMSTab isSuperAdmin={isSuperAdmin} />
         </TabsContent>
       </Tabs>
     </ModuleLayout>

@@ -108,6 +108,7 @@ const navigationByRole: Record<string, NavItem[]> = {
     { name: 'Familias', href: '/admin/families', icon: Layers },
     { name: 'Usuarios', href: '/admin/users', icon: Users },
     { name: 'Auditoría', href: '/admin/audit', icon: Shield },
+    { name: 'Página Pública', href: '/admin/help-config', icon: Globe },
     { name: 'Configuración Sistema', href: '/admin/settings', icon: Settings },
   ],
 
