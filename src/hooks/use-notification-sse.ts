@@ -53,13 +53,11 @@ function flushPending(ctx: AudioContext) {
   if (pendingTones <= 0) return
   const n = pendingTones
   pendingTones = 0
-  // Reproducir solo 1 aunque haya varios encolados (evitar spam de sonidos)
   if (n > 0) playTone(ctx)
 }
 
 // Handler de gesto — se ejecuta sincrónicamente en el call stack del evento
 function handleGesture(e: Event) {
-  // Solo gestos reales del usuario (isTrusted = false en eventos sintéticos/programáticos)
   if (!e.isTrusted) return
 
   if (!audioCtx) {
@@ -71,9 +69,7 @@ function handleGesture(e: Event) {
   }
 
   if (audioCtx.state === 'suspended') {
-    // resume() dentro del call stack del gesto — permitido por el navegador
     audioCtx.resume().then(() => flushPending(audioCtx!)).catch(() => {
-      // Si falla, resetear para intentar de nuevo en el próximo gesto
       audioCtx = null
     })
   } else if (audioCtx.state === 'running') {
@@ -89,13 +85,8 @@ if (typeof window !== 'undefined') {
   )
 }
 
-// NO crear AudioContext al cargar — Chrome bloquea AudioContext sin gesto del usuario.
-// El contexto se crea en handleGesture() cuando el usuario interactúa por primera vez.
-
 export function playNotificationSound() {
-  // Solo intentar si ya hay un contexto creado por un gesto previo
   if (!audioCtx) {
-    // Sin gesto previo → encolar para reproducir en el próximo gesto
     pendingTones++
     return
   }
@@ -108,6 +99,72 @@ export function playNotificationSound() {
 
   playTone(audioCtx)
 }
+
+// ── Vibración (móvil) ─────────────────────────────────────────────────────────
+// Patrón: vibrar 100ms, pausa 50ms, vibrar 100ms — discreto y reconocible
+function vibrateDevice() {
+  try {
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      navigator.vibrate([100, 50, 100])
+    }
+  } catch { /* silencioso — algunos navegadores bloquean vibrate */ }
+}
+
+// ── Notificación nativa del navegador ────────────────────────────────────────
+// Funciona cuando la app está en segundo plano o la pantalla bloqueada.
+// Requiere permiso del usuario (se solicita de forma no intrusiva).
+function showBrowserNotification(notification: SSENotification) {
+  if (typeof window === 'undefined') return
+  if (!('Notification' in window)) return
+  if (Notification.permission !== 'granted') return
+
+  try {
+    const n = new Notification(notification.title, {
+      body: notification.message,
+      icon: '/favicon.ico',
+      badge: '/favicon.ico',
+      tag: notification.id,          // evita duplicados si llega dos veces
+      renotify: false,
+      silent: true,                  // el sonido lo maneja AudioContext, no el SO
+    })
+
+    // Al hacer clic en la notificación nativa → enfocar la pestaña
+    n.onclick = () => {
+      window.focus()
+      n.close()
+    }
+
+    // Auto-cerrar después de 8 segundos
+    setTimeout(() => n.close(), 8000)
+  } catch { /* silencioso */ }
+}
+
+/**
+ * Solicita permiso de notificaciones del navegador de forma no intrusiva.
+ * Solo se llama después de una interacción del usuario (no al cargar la página).
+ * Retorna true si el permiso fue concedido.
+ */
+export async function requestNotificationPermission(): Promise<boolean> {
+  if (typeof window === 'undefined') return false
+  if (!('Notification' in window)) return false
+  if (Notification.permission === 'granted') return true
+  if (Notification.permission === 'denied') return false
+
+  try {
+    const result = await Notification.requestPermission()
+    return result === 'granted'
+  } catch {
+    return false
+  }
+}
+
+/** Estado actual del permiso de notificaciones */
+export function getNotificationPermission(): 'granted' | 'denied' | 'default' | 'unsupported' {
+  if (typeof window === 'undefined') return 'unsupported'
+  if (!('Notification' in window)) return 'unsupported'
+  return Notification.permission
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function useNotificationSSE({ onNotification, sound = true }: UseNotificationSSEOptions = {}) {
@@ -138,7 +195,16 @@ export function useNotificationSSE({ onNotification, sound = true }: UseNotifica
           }
 
           if (data.type === 'new_notification' && data.notification) {
+            // 1. Sonido (si está habilitado en configuración)
             if (soundEnabled.current) playNotificationSound()
+
+            // 2. Vibración en móvil (siempre, independiente del sonido)
+            vibrateDevice()
+
+            // 3. Notificación nativa del navegador (cuando app en segundo plano)
+            showBrowserNotification(data.notification)
+
+            // 4. Callback para actualizar la UI
             onNotificationRef.current?.(data.notification)
             window.dispatchEvent(new CustomEvent('notification-received', {
               detail: data.notification,

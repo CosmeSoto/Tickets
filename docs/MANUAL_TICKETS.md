@@ -640,6 +640,25 @@ Las notificaciones en tiempo real (SSE) pueden reproducir un tono de alerta al l
 - El sonido requiere **una interacción previa del usuario** (política del navegador). Si llegas a la página y hay notificaciones pendientes, el tono suena al primer clic.
 - El tono es corto y discreto (880Hz → 660Hz, 0.4s).
 
+### Notificaciones en móvil
+
+| Escenario | Comportamiento |
+|---|---|
+| App abierta en primer plano | Tono de sonido + vibración (100ms–50ms–100ms) |
+| App en segundo plano / minimizada | Notificación nativa del SO (si el permiso está activado) |
+| Pantalla bloqueada | Notificación nativa del SO (si el permiso está activado) |
+| App cerrada | Sin notificación (requeriría servidor push — no implementado) |
+
+**Vibración**: Se activa automáticamente en dispositivos móviles cuando llega una notificación, independientemente de si el sonido está activado o no.
+
+**Notificaciones nativas del SO**: Para recibirlas cuando la app está en segundo plano:
+1. Ir a **Configuración → Notificaciones**
+2. En la sección "Notificaciones cuando la app está en segundo plano", hacer clic en **Activar**
+3. El navegador mostrará un diálogo de permiso — aceptar
+4. Una vez activado, aparecerá un badge verde "Activadas"
+
+Si el permiso fue denegado previamente, hay que activarlo manualmente desde la configuración del navegador → Notificaciones → buscar el dominio del sistema.
+
 ### Configuración de email
 
 - El envío de emails se activa en: Admin → Configuración del Sistema → Email (solo SuperAdmin)

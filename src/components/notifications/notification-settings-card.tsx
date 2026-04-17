@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Bell,
+  BellOff,
   Mail,
   Volume2,
   VolumeX,
@@ -13,6 +14,7 @@ import {
   User,
   MessageCircle,
   AlertCircle,
+  Smartphone,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,10 +22,75 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
+import { Badge } from '@/components/ui/badge'
 import {
   NotificationPreferences,
   NotificationSettingsProps,
 } from '@/types/notification-preferences'
+import { requestNotificationPermission, getNotificationPermission } from '@/hooks/use-notification-sse'
+
+/**
+ * Fila de configuración para notificaciones nativas del navegador/SO.
+ * Muestra el estado actual del permiso y permite solicitarlo.
+ */
+function NotificationPermissionRow() {
+  const [permission, setPermission] = useState<'granted' | 'denied' | 'default' | 'unsupported'>('default')
+  const [requesting, setRequesting] = useState(false)
+
+  useEffect(() => {
+    setPermission(getNotificationPermission())
+  }, [])
+
+  const handleRequest = async () => {
+    setRequesting(true)
+    const granted = await requestNotificationPermission()
+    setPermission(granted ? 'granted' : 'denied')
+    setRequesting(false)
+  }
+
+  if (permission === 'unsupported') return null
+
+  return (
+    <div className='flex items-center justify-between'>
+      <div className='space-y-0.5'>
+        <Label className='text-base flex items-center space-x-2'>
+          <Smartphone className='h-4 w-4 text-blue-600' />
+          <span>Notificaciones cuando la app está en segundo plano</span>
+        </Label>
+        <p className='text-sm text-muted-foreground'>
+          Recibe alertas del sistema operativo aunque tengas el navegador minimizado o la pantalla bloqueada
+        </p>
+        {permission === 'denied' && (
+          <p className='text-xs text-amber-600 mt-1'>
+            ⚠️ Permiso denegado. Para activarlo ve a la configuración de tu navegador → Notificaciones.
+          </p>
+        )}
+      </div>
+      <div className='flex-shrink-0 ml-4'>
+        {permission === 'granted' ? (
+          <Badge className='bg-green-100 text-green-700 border-green-200'>
+            <Bell className='h-3 w-3 mr-1' />
+            Activadas
+          </Badge>
+        ) : permission === 'denied' ? (
+          <Badge variant='secondary'>
+            <BellOff className='h-3 w-3 mr-1' />
+            Bloqueadas
+          </Badge>
+        ) : (
+          <Button size='sm' variant='outline' onClick={handleRequest} disabled={requesting}>
+            {requesting ? (
+              <RefreshCw className='h-3.5 w-3.5 mr-1.5 animate-spin' />
+            ) : (
+              <Bell className='h-3.5 w-3.5 mr-1.5' />
+            )}
+            Activar
+          </Button>
+        )}
+      </div>
+    </div>
+  )
+}
 
 /**
  * Componente unificado para configuración de notificaciones
@@ -130,6 +197,11 @@ export function NotificationSettingsCard({
               onCheckedChange={checked => updatePreference('soundEnabled', checked)}
             />
           </div>
+
+          <Separator />
+
+          {/* Permiso de notificaciones del navegador */}
+          <NotificationPermissionRow />
         </div>
 
         {/* NIVEL INTERMEDIO - Solo para intermediate y advanced */}
