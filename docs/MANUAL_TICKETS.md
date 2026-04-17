@@ -480,6 +480,74 @@ Cada exportación queda registrada en auditoría automáticamente.
 
 ---
 
+## 11b. Archivos adjuntos
+
+### Dónde se pueden adjuntar archivos
+
+| Lugar | Quién puede |
+|-------|-------------|
+| Formulario de creación de ticket | Cliente, Admin |
+| Tab "Archivos" en el detalle del ticket | Técnico, Admin |
+| Botón 📎 en el historial/comentarios | Técnico, Admin |
+
+### Carga masiva
+
+Se pueden seleccionar y subir **múltiples archivos a la vez**. El sistema los procesa en lotes de 3 simultáneos para no saturar el servidor. Si alguno falla, los demás continúan y se muestra un resumen al final.
+
+### Compresión automática de imágenes
+
+Las imágenes se comprimen automáticamente en el servidor antes de guardarse:
+
+| Tipo original | Resultado | Calidad |
+|---|---|---|
+| JPEG / JPG | JPEG progresivo | 82% |
+| PNG | WebP | 85% |
+| WebP | WebP | 85% |
+| GIF | Sin cambios | — |
+| PDF / Office | Sin cambios | — |
+
+Todas las imágenes se redimensionan a máximo **1920px de ancho** (sin ampliar las que ya son más pequeñas). El ahorro típico es del 40–70% en tamaño.
+
+### Límites por ticket
+
+| Límite | Valor |
+|--------|-------|
+| Tamaño máximo por archivo | 10 MB (antes de compresión) |
+| Archivos máximos por ticket | 10 archivos |
+| Almacenamiento total por ticket | 50 MB |
+
+Si se supera cualquier límite, el servidor devuelve un error claro indicando cuál se excedió.
+
+### Cámara en móvil
+
+Al acceder desde un dispositivo móvil con cámara, aparecen dos botones en las zonas de adjuntos:
+- 📷 **Cámara** — abre directamente la cámara trasera para tomar una foto en el momento
+- 📎 **Galería / Archivo** — abre la galería o el explorador de archivos
+
+### Organización en disco
+
+Los archivos se guardan organizados por módulo y entidad:
+
+```
+uploads/
+  tickets/
+    {ticketId}/
+      {uuid}.jpg        ← adjuntos de tickets
+  equipment/
+    {equipmentId}/
+      {uuid}.pdf        ← adjuntos de equipos
+  avatars/
+    {uuid}.jpg          ← fotos de perfil
+  landing/
+    {uuid}.webp         ← imágenes de la página pública
+  delivery-acts/        ← PDFs de actas de entrega
+  return-acts/          ← PDFs de actas de devolución
+```
+
+Esta estructura facilita la limpieza por módulo y el respaldo selectivo.
+
+---
+
 ## 12. Configuración del módulo
 
 ### Navegación — dónde está cada cosa

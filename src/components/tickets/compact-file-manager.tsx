@@ -139,22 +139,50 @@ export function CompactFileManager({
     setUploading(true)
     const fileArray = Array.from(files)
 
+    // Validar localmente antes de enviar
+    const valid: File[] = []
     for (const file of fileArray) {
       const error = validateFile(file)
       if (error) {
-        toast({
-          title: 'Archivo inválido',
-          description: `${file.name}: ${error}`,
-          variant: 'destructive'
-        })
-        continue
+        toast({ title: 'Archivo inválido', description: `${file.name}: ${error}`, variant: 'destructive' })
+      } else {
+        valid.push(file)
       }
-
-      await uploadFile(file)
     }
 
-    setUploading(false)
-  }, [disabled, uploading, ticketId, toast, onUploadComplete])
+    if (valid.length === 0) { setUploading(false); return }
+
+    try {
+      if (valid.length === 1) {
+        // Archivo individual
+        const formData = new FormData()
+        formData.append('file', valid[0])
+        const res = await fetch(`/api/tickets/${ticketId}/attachments`, { method: 'POST', body: formData })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Error al subir')
+        toast({ title: 'Archivo subido', description: valid[0].name })
+      } else {
+        // Carga masiva
+        const formData = new FormData()
+        valid.forEach(f => formData.append('files[]', f))
+        const res = await fetch(`/api/tickets/${ticketId}/attachments`, { method: 'POST', body: formData })
+        const data = await res.json()
+        if (data.failed > 0) {
+          const failedNames = data.results.filter((r: any) => !r.success).map((r: any) => r.file).join(', ')
+          toast({ title: `${data.succeeded} subidos, ${data.failed} fallaron`, description: failedNames, variant: 'destructive' })
+        } else {
+          toast({ title: `${data.succeeded} archivos subidos correctamente` })
+        }
+      }
+    } catch (error) {
+      toast({ title: 'Error', description: error instanceof Error ? error.message : 'Error al subir', variant: 'destructive' })
+    } finally {
+      await loadAttachments()
+      onUploadComplete?.()
+      onAttachmentsChange?.()
+      setUploading(false)
+    }
+  }, [disabled, uploading, ticketId, toast, onUploadComplete, loadAttachments])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
