@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
@@ -40,11 +40,13 @@ import {
   X,
   Paperclip,
   MapPin,
+  Camera,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/hooks/use-toast'
 import { UserCombobox } from '@/components/ui/user-combobox'
 import { CategorySelectorWrapper } from '@/features/category-selection'
+import { FileInputWithCamera } from '@/components/common/file-input-with-camera'
 
 interface User {
   id: string
@@ -93,7 +95,6 @@ export default function CreateTicketPage() {
   
   // Estados para archivos
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const {
     register,
@@ -180,11 +181,6 @@ export default function CreateTicketPage() {
     }
 
     setSelectedFiles(prev => [...prev, ...files])
-    
-    // Limpiar input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
-    }
   }
 
   const removeFile = (index: number) => {
@@ -505,32 +501,47 @@ export default function CreateTicketPage() {
                       {/* Archivos Adjuntos */}
                       <div className='space-y-2'>
                         <Label>Archivos Adjuntos (Opcional)</Label>
-                        <div className='border-2 border-dashed border-border rounded-lg p-4 text-center hover:border-gray-400 transition-colors'>
-                          <input
-                            ref={fileInputRef}
-                            type='file'
-                            multiple
-                            onChange={handleFileSelect}
-                            className='hidden'
-                            accept='image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt'
-                          />
-                          <Upload className='h-8 w-8 text-muted-foreground mx-auto mb-2' />
-                          <p className='text-sm text-muted-foreground mb-2'>
-                            Arrastra archivos aquí o haz clic para seleccionar
-                          </p>
-                          <Button
-                            type='button'
-                            variant='outline'
-                            size='sm'
-                            onClick={() => fileInputRef.current?.click()}
-                          >
-                            <Paperclip className='h-4 w-4 mr-2' />
-                            Seleccionar Archivos
-                          </Button>
-                          <p className='text-xs text-muted-foreground mt-2'>
-                            Máximo 5 archivos, 10MB cada uno. Formatos: imágenes, PDF, documentos
-                          </p>
-                        </div>
+                        <FileInputWithCamera
+                          accept='image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt'
+                          multiple
+                          onChange={handleFileSelect}
+                        >
+                          {({ openFile, openCamera, showCamera }) => (
+                            <div className='border-2 border-dashed border-border rounded-lg p-4'>
+                              <div className='flex flex-col items-center gap-3'>
+                                <Upload className='h-8 w-8 text-muted-foreground' />
+                                <p className='text-sm text-muted-foreground text-center'>
+                                  Arrastra archivos aquí o usa los botones
+                                </p>
+                                <div className='flex items-center gap-2 flex-wrap justify-center'>
+                                  {showCamera && (
+                                    <Button
+                                      type='button'
+                                      variant='outline'
+                                      size='sm'
+                                      onClick={openCamera}
+                                    >
+                                      <Camera className='h-4 w-4 mr-2' />
+                                      Tomar foto
+                                    </Button>
+                                  )}
+                                  <Button
+                                    type='button'
+                                    variant='outline'
+                                    size='sm'
+                                    onClick={openFile}
+                                  >
+                                    <Paperclip className='h-4 w-4 mr-2' />
+                                    {showCamera ? 'Galería / Archivo' : 'Seleccionar Archivos'}
+                                  </Button>
+                                </div>
+                                <p className='text-xs text-muted-foreground'>
+                                  Máximo 5 archivos, 10MB cada uno
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </FileInputWithCamera>
 
                         {/* Lista de archivos seleccionados */}
                         {selectedFiles.length > 0 && (

@@ -36,12 +36,14 @@ import {
   Paperclip,
   MapPin,
   Users,
+  Camera,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/hooks/use-toast'
 import { CategorySelectorWrapper } from '@/features/category-selection'
 import { FilePreviewList } from '@/components/tickets/file-preview-list'
 import { FamilyCombobox } from '@/components/ui/family-combobox'
+import { FileInputWithCamera } from '@/components/common/file-input-with-camera'
 
 interface FamilyOption {
   id: string
@@ -94,8 +96,6 @@ function CreateClientTicketContent() {
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [createdTicketId, setCreatedTicketId] = useState<string | null>(null)
   const [equipmentId, setEquipmentId] = useState<string | null>(null)
-  
-  // Familias disponibles para el cliente
   const [availableFamilies, setAvailableFamilies] = useState<FamilyOption[]>([])
   const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(null)
   const [loadingFamilies, setLoadingFamilies] = useState(false)
@@ -103,7 +103,6 @@ function CreateClientTicketContent() {
 
   // Estados para archivos
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const {
     register,
@@ -210,10 +209,6 @@ function CreateClientTicketContent() {
     }
 
     setSelectedFiles(prev => [...prev, ...files])
-    
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
-    }
   }
 
   const removeFile = (index: number) => {
@@ -522,31 +517,44 @@ function CreateClientTicketContent() {
               {/* Archivos Adjuntos */}
               <div className='space-y-1.5'>
                 <Label>Archivos Adjuntos (Opcional)</Label>
-                <div className='border-2 border-dashed border-border rounded-lg px-4 py-3'>
-                  <input
-                    ref={fileInputRef}
-                    type='file'
-                    multiple
-                    onChange={handleFileSelect}
-                    className='hidden'
-                    accept='image/*,.pdf,.doc,.docx,.txt'
-                  />
-                  <div className='flex items-center justify-between gap-4'>
-                    <div className='flex items-center gap-3'>
-                      <Upload className='h-5 w-5 text-muted-foreground flex-shrink-0' />
-                      <p className='text-xs text-muted-foreground'>Máximo 5 archivos, 10MB cada uno</p>
+                <FileInputWithCamera
+                  accept='image/*,.pdf,.doc,.docx,.txt'
+                  multiple
+                  onChange={handleFileSelect}
+                >
+                  {({ openFile, openCamera, showCamera }) => (
+                    <div className='border-2 border-dashed border-border rounded-lg px-4 py-3'>
+                      <div className='flex items-center justify-between gap-4 flex-wrap'>
+                        <div className='flex items-center gap-3'>
+                          <Upload className='h-5 w-5 text-muted-foreground flex-shrink-0' />
+                          <p className='text-xs text-muted-foreground'>Máximo 5 archivos, 10MB cada uno</p>
+                        </div>
+                        <div className='flex items-center gap-2'>
+                          {showCamera && (
+                            <Button
+                              type='button'
+                              variant='outline'
+                              size='sm'
+                              onClick={openCamera}
+                            >
+                              <Camera className='h-3.5 w-3.5 mr-1.5' />
+                              Cámara
+                            </Button>
+                          )}
+                          <Button
+                            type='button'
+                            variant='outline'
+                            size='sm'
+                            onClick={openFile}
+                          >
+                            <Paperclip className='h-3.5 w-3.5 mr-1.5' />
+                            {showCamera ? 'Galería / Archivo' : 'Seleccionar'}
+                          </Button>
+                        </div>
+                      </div>
                     </div>
-                    <Button
-                      type='button'
-                      variant='outline'
-                      size='sm'
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <Paperclip className='h-3.5 w-3.5 mr-1.5' />
-                      Seleccionar
-                    </Button>
-                  </div>
-                </div>
+                  )}
+                </FileInputWithCamera>
 
                 {selectedFiles.length > 0 && (
                   <FilePreviewList files={selectedFiles} onRemove={removeFile} />

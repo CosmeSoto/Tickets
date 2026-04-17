@@ -6,11 +6,12 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
-import { Upload, X, Eye, Download, File, Image as ImageIcon, FileText, Paperclip, RefreshCw } from 'lucide-react'
+import { Upload, X, Eye, Download, File, Image as ImageIcon, FileText, Paperclip, RefreshCw, Camera } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 import { FilePreviewModal } from './file-preview-modal'
+import { FileInputWithCamera } from '@/components/common/file-input-with-camera'
 
 interface Attachment {
   id: string
@@ -240,36 +241,50 @@ export function CompactFileManager({
     <div className="space-y-4">
       {/* Zona de subida */}
       {showUpload && (
-        <div
-          className={cn(
-            "border-2 border-dashed rounded-lg p-4 text-center transition-all",
-            isDragOver
-              ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
-              : "border-gray-300 hover:border-gray-400",
-            uploading && "opacity-75"
-          )}
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
+        <FileInputWithCamera
+          accept={ALLOWED_TYPES.join(',')}
+          multiple
+          onChange={handleFileInput}
         >
-          <Upload className={cn("h-6 w-6 mx-auto mb-2", isDragOver ? "text-blue-500" : "text-gray-400")} />
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Arrastra archivos o{' '}
-            <label className="text-blue-600 hover:text-blue-700 cursor-pointer font-medium">
-              selecciona
-              <input
-                type="file"
-                multiple
-                accept={ALLOWED_TYPES.join(',')}
-                onChange={handleFileInput}
-                disabled={uploading}
-                className="hidden"
-              />
-            </label>
-          </p>
-          <p className="text-xs text-gray-500 mt-1">Imágenes, PDF, Office • Máx {maxFileSize}MB</p>
-          {uploading && <p className="text-xs text-blue-600 mt-2">Subiendo archivo...</p>}
-        </div>
+          {({ openFile, openCamera, showCamera }) => (
+            <div
+              className={cn(
+                'border-2 border-dashed rounded-lg p-4 text-center transition-all',
+                isDragOver
+                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
+                  : 'border-gray-300 hover:border-gray-400',
+                uploading && 'opacity-75'
+              )}
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+            >
+              <Upload className={cn('h-6 w-6 mx-auto mb-2', isDragOver ? 'text-blue-500' : 'text-gray-400')} />
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Arrastra archivos o{' '}
+                <button
+                  type="button"
+                  onClick={openFile}
+                  className="text-blue-600 hover:text-blue-700 cursor-pointer font-medium underline"
+                >
+                  selecciona
+                </button>
+              </p>
+              {showCamera && (
+                <button
+                  type="button"
+                  onClick={openCamera}
+                  className="mt-2 inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  <Camera className="h-3.5 w-3.5" />
+                  Tomar foto con la cámara
+                </button>
+              )}
+              <p className="text-xs text-gray-500 mt-1">Imágenes, PDF, Office • Máx {maxFileSize}MB</p>
+              {uploading && <p className="text-xs text-blue-600 mt-2">Subiendo archivo...</p>}
+            </div>
+          )}
+        </FileInputWithCamera>
       )}
 
       {/* Lista de archivos */}
