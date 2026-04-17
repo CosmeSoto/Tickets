@@ -316,11 +316,33 @@ El SLA (Service Level Agreement) define los tiempos máximos para responder y re
 | Media | 4h | 24h |
 | Baja | 8h | 48h |
 
-### Horario laboral
+> Los tiempos globales se editan en **Configuración del Sistema → tab SLA** (solo SuperAdmin).
 
-Cuando una política SLA tiene **"Solo horas laborales"** activo, el cálculo considera solo las horas dentro del horario configurado por familia.
+### Dónde se configura el horario laboral
 
-Por ejemplo, si el horario es 09:00–18:00 de Lun–Vie y un ticket llega el viernes a las 17:00, las primeras 4 horas de resolución se completarán el lunes a las 12:00 (no el sábado).
+El horario laboral **se configura por familia/área**, no de forma global. Esto permite que cada equipo tenga su propio horario:
+
+- **Ruta**: `Configuración → Tickets → [seleccionar familia] → sección Horario laboral`
+- **Campos**: Hora inicio, Hora fin, Días laborales (ej: `MON,TUE,WED,THU,FRI`)
+
+Cada política SLA tiene además un toggle **"Solo horas hábiles"** que activa o desactiva el cálculo basado en ese horario.
+
+### Cómo funciona el cálculo de horas hábiles
+
+Cuando una política SLA tiene **"Solo horas hábiles"** activo, el sistema descuenta las horas fuera del horario configurado.
+
+**Ejemplo práctico** — Horario: 09:00–18:00, Lun–Vie, política de resolución: 4 horas:
+
+| Ticket llega | Deadline de resolución |
+|---|---|
+| Viernes 17:00 | Lunes 12:00 (1h el viernes + 3h el lunes) |
+| Viernes 18:00 | Lunes 13:00 (0h el viernes + 4h el lunes) |
+| Lunes 10:00 | Lunes 14:00 (4h corridas dentro del horario) |
+| Lunes 16:00 | Martes 11:00 (2h el lunes + 2h el martes) |
+
+El algoritmo avanza hora a hora, saltando días no laborales y horas fuera del rango configurado.
+
+> ⚠️ Si la política tiene **"Solo horas hábiles" desactivado**, el cálculo es calendario corrido (24/7), sin importar el horario de la familia.
 
 ### Violaciones de SLA
 
@@ -412,8 +434,9 @@ Cada exportación queda registrada en auditoría automáticamente.
 | Config por área (prefijo, horario, SLA, acceso) | Familias → [Área] → Tab Tickets | Admin |
 | Toggle de tickets por área (vista global) | Configuración → Tickets | Admin |
 | Familia por defecto | Configuración → Tickets | Admin |
+| **Horario laboral por área** | **Configuración → Tickets → [familia] → Horario laboral** | Admin |
 | Plazo de auto-cierre (días) | `system_settings.autoCloseDays` (BD) | SuperAdmin |
-| Políticas SLA (tiempos por prioridad) | Configuración → Tickets → sección SLA | SuperAdmin |
+| **Políticas SLA globales (tiempos por prioridad)** | **Configuración del Sistema → tab SLA** | SuperAdmin |
 | Notificaciones globales | Admin → Configuración → Notificaciones | Admin |
 | Notificaciones personales | Configuración (usuario) → Notificaciones | Todos |
 | Página pública (hero, servicios, logos, SEO) | Admin → Página Pública | Admin / SuperAdmin |

@@ -7,13 +7,12 @@
 
 import { ReactNode, useState } from 'react'
 import { useSession, signOut } from 'next-auth/react'
-import { useRouter, usePathname } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import {
   LayoutDashboard,
   Ticket,
   Users,
-  Building,
   Settings,
   Shield,
   User,
@@ -25,22 +24,17 @@ import {
   FolderTree,
   Wrench,
   BookOpen,
-  Boxes,
-  Ruler,
   Monitor,
   HelpCircle,
   Menu,
   X,
   Database,
   FileSignature,
-  Tag,
   FileText,
-  ClipboardList,
   Building2,
   Trash2,
   Layers,
-  Warehouse,
-  Crown,
+  ExternalLink,
 } from 'lucide-react'
 import { Notifications } from '@/components/ui/notifications'
 import { Button } from '@/components/ui/button'
@@ -441,6 +435,20 @@ export function RoleDashboardLayout({
                 {headerActions && (
                   <div className="hidden sm:block">{headerActions}</div>
                 )}
+
+                {/* Ver Página Pública — solo para ADMIN */}
+                {userRole === 'ADMIN' && (
+                  <Link
+                    href="/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors border border-border rounded-md px-2.5 py-1.5 hover:bg-accent"
+                  >
+                    <Globe className="h-3.5 w-3.5" />
+                    <span>Página Pública</span>
+                    <ExternalLink className="h-3 w-3 opacity-60" />
+                  </Link>
+                )}
                 
                 <Notifications variant="bell" />
                 
@@ -478,12 +486,6 @@ export function RoleDashboardLayout({
                       <Link href="/settings">
                         <Settings className="h-4 w-4 mr-2" />
                         Configuración Personal
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/?preview=true" target="_blank">
-                        <Globe className="h-4 w-4 mr-2" />
-                        Ver Página Pública
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
