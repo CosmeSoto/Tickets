@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -271,17 +271,15 @@ export default function CreateTicketPage() {
 
   if (status === 'loading' || isLoading) {
     return (
-      <RoleDashboardLayout title='Crear Ticket' subtitle='Nueva solicitud de soporte'>
-        <div className='flex items-center justify-center h-64'>
-          <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600'></div>
-        </div>
-      </RoleDashboardLayout>
+      <ModuleLayout title='Crear Ticket' subtitle='Nueva solicitud de soporte' loading={true}>
+        <div />
+      </ModuleLayout>
     )
   }
 
   if (submitSuccess) {
     return (
-      <RoleDashboardLayout title='Ticket Creado' subtitle='Solicitud enviada exitosamente'>
+      <ModuleLayout title='Ticket Creado' subtitle='Solicitud enviada exitosamente'>
         <Card className='max-w-2xl mx-auto'>
           <CardContent className='pt-6'>
             <div className='text-center'>
@@ -293,18 +291,18 @@ export default function CreateTicketPage() {
                 El ticket ha sido creado y será atendido por el equipo de soporte.
                 El cliente recibirá notificaciones sobre el progreso.
               </p>
-              <div className='flex items-center justify-center space-x-4'>
-                <Button asChild>
+              <div className='flex flex-col sm:flex-row items-center justify-center gap-3'>
+                <Button asChild className='w-full sm:w-auto'>
                   <Link href='/admin/tickets'>Ver Todos los Tickets</Link>
                 </Button>
-                <Button variant='outline' asChild>
+                <Button variant='outline' asChild className='w-full sm:w-auto'>
                   <Link href='/admin'>Ir al Dashboard</Link>
                 </Button>
               </div>
             </div>
           </CardContent>
         </Card>
-      </RoleDashboardLayout>
+      </ModuleLayout>
     )
   }
 
@@ -318,7 +316,7 @@ export default function CreateTicketPage() {
   )
 
   return (
-    <RoleDashboardLayout
+    <ModuleLayout
       title='Crear Nuevo Ticket'
       subtitle='Crear ticket en nombre de un cliente'
       headerActions={headerActions}
@@ -730,6 +728,6 @@ export default function CreateTicketPage() {
           </div>
         </div>
       </div>
-    </RoleDashboardLayout>
+    </ModuleLayout>
   )
 }

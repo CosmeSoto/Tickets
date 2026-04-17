@@ -108,7 +108,7 @@ export const RouteModules = {
   // Client routes
   ClientDashboard: () => dynamicImport(() => import('@/app/client/page')),
   ClientTickets: () => dynamicImport(() => import('@/app/client/tickets/page')),
-  CreateTicket: () => dynamicImport(() => import('@/app/client/create-ticket/page')),
+  CreateTicket: () => dynamicImport(() => import('@/app/client/tickets/create/page')),
   
   // Technician routes
   TechnicianDashboard: () => dynamicImport(() => import('@/app/technician/page')),

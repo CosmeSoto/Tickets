@@ -5,7 +5,7 @@ import {
   Info, CheckCircle, Clock, Search, X, Ticket,
   Check, Filter
 } from 'lucide-react'
-import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -159,12 +159,12 @@ export default function NotificationsPage() {
 
   if (!isAuthenticated) {
     return (
-      <RoleDashboardLayout title="Notificaciones" subtitle="Centro de notificaciones">
+      <ModuleLayout title="Notificaciones" subtitle="Centro de notificaciones">
         <Card><CardContent className="pt-6 text-center py-12">
           <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-3" />
           <p className="text-muted-foreground">Necesitas iniciar sesión para ver las notificaciones</p>
         </CardContent></Card>
-      </RoleDashboardLayout>
+      </ModuleLayout>
     )
   }
 
@@ -191,7 +191,7 @@ export default function NotificationsPage() {
   )
 
   return (
-    <RoleDashboardLayout
+    <ModuleLayout
       title="Notificaciones"
       subtitle={stats.unread > 0 ? `${stats.unread} sin leer` : 'Todo al día'}
       headerActions={headerActions}
@@ -322,6 +322,6 @@ export default function NotificationsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </RoleDashboardLayout>
+    </ModuleLayout>
   )
 }
