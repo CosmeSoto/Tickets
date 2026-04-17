@@ -1,8 +1,3 @@
-/**
- * Definición de columnas para la tabla de tickets del admin
- * Patrón factory para permitir callbacks
- */
-
 'use client'
 
 import { User, Calendar, Clock, MessageSquare, Paperclip, Eye } from 'lucide-react'
@@ -10,27 +5,37 @@ import { StatusBadge, PriorityBadge } from '@/components/ui/status-badge'
 import { Button } from '@/components/ui/button'
 import type { Column } from '@/components/ui/data-table'
 import type { Ticket as TicketType } from '@/hooks/use-ticket-data'
-import { formatTimeAgo } from '@/hooks/use-ticket-data'
+import { formatTimeAgo, getTicketDisplayCode } from '@/hooks/use-ticket-data'
 
 interface AdminTicketColumnsProps {
   onView: (ticket: TicketType) => void
 }
 
-export function createAdminTicketColumns({
-  onView
-}: AdminTicketColumnsProps): Column<TicketType>[] {
+export function createAdminTicketColumns({ onView }: AdminTicketColumnsProps): Column<TicketType>[] {
   return [
     {
       key: 'title',
       label: 'Ticket',
       render: (ticket: TicketType) => (
-        <div>
-          <div className="font-medium text-foreground truncate max-w-[200px]">
-            {ticket.title}
-          </div>
-          <div className="text-sm text-muted-foreground">#{ticket.id.slice(-8)}</div>
+        <div className="min-w-0">
+          <div className="font-medium text-foreground truncate max-w-[200px]">{ticket.title}</div>
+          <div className="text-xs text-muted-foreground font-mono mt-0.5">#{getTicketDisplayCode(ticket)}</div>
         </div>
       ),
+    },
+    {
+      key: 'family',
+      label: 'Área',
+      render: (ticket: TicketType) => {
+        const family = ticket.family
+        if (!family) return <span className="text-muted-foreground text-xs">—</span>
+        return (
+          <div className="flex items-start gap-1.5 max-w-[130px]">
+            <div className="w-2.5 h-2.5 rounded-full shrink-0 mt-0.5" style={{ backgroundColor: family.color || '#6B7280' }} />
+            <span className="text-xs font-medium leading-tight">{family.name}</span>
+          </div>
+        )
+      },
     },
     {
       key: 'status',
@@ -46,55 +51,46 @@ export function createAdminTicketColumns({
       key: 'client',
       label: 'Cliente',
       render: (ticket: TicketType) => (
-        <div className="flex items-center space-x-2">
-          <User className="h-4 w-4 text-muted-foreground" />
-          <div>
-            <div className="font-medium text-sm">{ticket.client?.name || 'Sin asignar'}</div>
-            <div className="text-xs text-muted-foreground truncate max-w-[150px]">
-              {ticket.client?.email || '-'}
-            </div>
+        <div className="flex items-center gap-2">
+          <User className="h-4 w-4 text-muted-foreground shrink-0" />
+          <div className="min-w-0">
+            <div className="font-medium text-sm truncate">{ticket.client?.name || '—'}</div>
+            <div className="text-xs text-muted-foreground truncate max-w-[150px]">{ticket.client?.email || ''}</div>
           </div>
         </div>
-      )
+      ),
     },
     {
       key: 'assignee',
       label: 'Asignado',
-      render: (ticket: TicketType) => (
+      render: (ticket: TicketType) =>
         ticket.assignee ? (
-          <div className="flex items-center space-x-2">
-            <User className="h-4 w-4 text-blue-400" />
-            <div>
-              <div className="font-medium text-sm text-blue-700">{ticket.assignee.name}</div>
-              <div className="text-xs text-muted-foreground truncate max-w-[150px]">
-                {ticket.assignee.email}
-              </div>
+          <div className="flex items-center gap-2">
+            <User className="h-4 w-4 text-blue-400 shrink-0" />
+            <div className="min-w-0">
+              <div className="font-medium text-sm text-blue-700 dark:text-blue-400 truncate">{ticket.assignee.name}</div>
             </div>
           </div>
         ) : (
           <span className="text-muted-foreground text-sm">Sin asignar</span>
-        )
-      )
+        ),
     },
     {
       key: 'category',
       label: 'Categoría',
       render: (ticket: TicketType) => (
-        <div className="flex items-center space-x-2">
-          <div
-            className="w-3 h-3 rounded-full"
-            style={{ backgroundColor: ticket.category?.color || '#6B7280' }}
-          />
-          <span className="text-sm">{ticket.category?.name || 'Sin categoría'}</span>
+        <div className="flex items-center gap-1.5">
+          <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: ticket.category?.color || '#6B7280' }} />
+          <span className="text-sm truncate max-w-[120px]">{ticket.category?.name || '—'}</span>
         </div>
-      )
+      ),
     },
     {
       key: 'createdAt',
       label: 'Creado',
       render: (ticket: TicketType) => (
-        <div className="flex items-center space-x-1 text-sm text-muted-foreground">
-          <Calendar className="h-4 w-4" />
+        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+          <Calendar className="h-3.5 w-3.5" />
           <span>{formatTimeAgo(ticket.createdAt)}</span>
         </div>
       ),
@@ -103,38 +99,22 @@ export function createAdminTicketColumns({
       key: 'activity',
       label: 'Actividad',
       render: (ticket: TicketType) => (
-        <div className="flex items-center space-x-3 text-sm text-muted-foreground">
-          {ticket._count?.comments && ticket._count.comments > 0 && (
-            <div className="flex items-center space-x-1">
-              <MessageSquare className="h-4 w-4" />
-              <span>{ticket._count.comments}</span>
-            </div>
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          {!!ticket._count?.comments && (
+            <div className="flex items-center gap-1"><MessageSquare className="h-3.5 w-3.5" /><span>{ticket._count.comments}</span></div>
           )}
-          {ticket._count?.attachments && ticket._count.attachments > 0 && (
-            <div className="flex items-center space-x-1">
-              <Paperclip className="h-4 w-4" />
-              <span>{ticket._count.attachments}</span>
-            </div>
+          {!!ticket._count?.attachments && (
+            <div className="flex items-center gap-1"><Paperclip className="h-3.5 w-3.5" /><span>{ticket._count.attachments}</span></div>
           )}
-          <div className="flex items-center space-x-1">
-            <Clock className="h-4 w-4" />
-            <span>{formatTimeAgo(ticket.updatedAt)}</span>
-          </div>
+          <div className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /><span>{formatTimeAgo(ticket.updatedAt)}</span></div>
         </div>
-      )
+      ),
     },
     {
       key: 'actions',
-      label: 'Acciones',
+      label: '',
       render: (ticket: TicketType) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={(e) => {
-            e.stopPropagation()
-            onView(ticket)
-          }}
-        >
+        <Button variant="ghost" size="sm" onClick={e => { e.stopPropagation(); onView(ticket) }}>
           <Eye className="h-4 w-4" />
         </Button>
       ),
