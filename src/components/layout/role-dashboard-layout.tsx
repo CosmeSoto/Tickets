@@ -78,7 +78,7 @@ const navigationByRole: Record<string, NavItem[]> = {
         { name: 'Reportes', href: '/admin/reports', icon: BarChart3 },
         { name: 'Categorías', href: '/admin/categories', icon: FolderTree },
         { name: 'Base de Conocimientos', href: '/admin/knowledge', icon: BookOpen },
-        { name: 'Configuración', href: '/settings/tickets', icon: Settings },
+        { name: 'Configuración', href: '/admin/settings/tickets', icon: Settings },
       ],
     },
     {
@@ -441,11 +441,12 @@ export function RoleDashboardLayout({
                   href="/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors border border-border rounded-md px-2.5 py-1.5 hover:bg-accent"
+                  title="Ver Página Pública"
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors border border-border rounded-md px-2 py-1.5 hover:bg-accent"
                 >
-                  <Globe className="h-3.5 w-3.5" />
-                  <span>Página Pública</span>
-                  <ExternalLink className="h-3 w-3 opacity-60" />
+                  <Globe className="h-3.5 w-3.5 flex-shrink-0" />
+                  <span className="hidden md:inline">Página Pública</span>
+                  <ExternalLink className="h-3 w-3 opacity-60 hidden md:inline" />
                 </Link>
                 
                 <Notifications variant="bell" />
