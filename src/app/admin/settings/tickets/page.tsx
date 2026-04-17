@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import {
-  Settings, Ticket, Save, RefreshCw, CheckCircle, XCircle,
-  Clock, Bell, ChevronRight, Layers, Edit2,
+  Settings, Ticket, Save, RefreshCw, XCircle,
+  Clock, Bell, ChevronRight, Layers, ExternalLink,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -28,7 +29,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/hooks/use-toast'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 
@@ -58,14 +58,18 @@ interface TicketFamilyConfig {
   businessDays: string
 }
 
-interface SlaPolicy {
-  id: string
+interface SlaRow {
   priority: string
-  responseTimeHours: number
-  resolutionTimeHours: number
-  name: string
-  isActive: boolean
+  response: number
+  resolution: number
 }
+
+const DEFAULTS: SlaRow[] = [
+  { priority: 'URGENT', response: 1, resolution: 4 },
+  { priority: 'HIGH', response: 2, resolution: 8 },
+  { priority: 'MEDIUM', response: 4, resolution: 24 },
+  { priority: 'LOW', response: 8, resolution: 48 },
+]
 
 const PRIORITIES = ['URGENT', 'HIGH', 'MEDIUM', 'LOW'] as const
 const PRIORITY_LABELS: Record<string, string> = {
@@ -79,6 +83,8 @@ function TicketSettingsContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { toast } = useToast()
+  const { data: session } = useSession()
+  const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
 
   const [families, setFamilies] = useState<Family[]>([])
   const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(
@@ -89,11 +95,8 @@ function TicketSettingsContent() {
   const [loadingConfig, setLoadingConfig] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  // SLA state — loaded from API, editable by SuperAdmin
-  const [slaData, setSlaData] = useState<Record<string, { id: string; response: number; resolution: number }>>({})
-  const [slaEditing, setSlaEditing] = useState(false)
-  const [slaSaving, setSlaSaving] = useState(false)
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  // SLA read-only reference — loaded from API
+  const [slaRows, setSlaRows] = useState<SlaRow[]>(DEFAULTS)
 
   const loadFamilies = useCallback(async () => {
     setLoadingFamilies(true)
@@ -132,84 +135,23 @@ function TicketSettingsContent() {
       const res = await fetch('/api/admin/sla-policies?isActive=true')
       const data = await res.json()
       if (data.success) {
-        const map: Record<string, { id: string; response: number; resolution: number }> = {}
-        for (const policy of data.data as SlaPolicy[]) {
-          // Only global policies (no categoryId) — use as reference defaults
-          if (!map[policy.priority]) {
-            map[policy.priority] = {
-              id: policy.id,
-              response: policy.responseTimeHours,
-              resolution: policy.resolutionTimeHours,
+        const global = data.data.filter((p: any) => !p.categoryId)
+        if (global.length > 0) {
+          const rows: SlaRow[] = PRIORITIES.map((priority) => {
+            const p = global.find((g: any) => g.priority === priority)
+            const def = DEFAULTS.find((d) => d.priority === priority)!
+            return {
+              priority,
+              response: p?.responseTimeHours ?? def.response,
+              resolution: p?.resolutionTimeHours ?? def.resolution,
             }
-          }
+          })
+          setSlaRows(rows)
         }
-        // Fill defaults for any missing priority
-        const defaults: Record<string, { id: string; response: number; resolution: number }> = {
-          URGENT: { id: '', response: 1, resolution: 4 },
-          HIGH: { id: '', response: 2, resolution: 8 },
-          MEDIUM: { id: '', response: 4, resolution: 24 },
-          LOW: { id: '', response: 8, resolution: 48 },
-        }
-        setSlaData({ ...defaults, ...map })
       }
     } catch {
-      // Silently fall back to defaults
-      setSlaData({
-        URGENT: { id: '', response: 1, resolution: 4 },
-        HIGH: { id: '', response: 2, resolution: 8 },
-        MEDIUM: { id: '', response: 4, resolution: 24 },
-        LOW: { id: '', response: 8, resolution: 48 },
-      })
+      // Keep defaults silently
     }
-  }, [])
-
-  const handleSaveSLA = async () => {
-    setSlaSaving(true)
-    try {
-      const updates = Object.entries(slaData).map(([priority, values]) => ({
-        priority,
-        id: values.id,
-        responseTimeHours: values.response,
-        resolutionTimeHours: values.resolution,
-      }))
-
-      const results = await Promise.allSettled(
-        updates.map(({ id, responseTimeHours, resolutionTimeHours }) => {
-          if (!id) return Promise.resolve({ success: false })
-          return fetch(`/api/admin/sla/policies/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ responseTimeHours, resolutionTimeHours }),
-          }).then((r) => r.json())
-        })
-      )
-
-      const allOk = results.every(
-        (r) => r.status === 'fulfilled' && (r.value as any)?.success !== false
-      )
-
-      if (allOk) {
-        toast({ title: 'Éxito', description: 'Políticas SLA actualizadas' })
-        setSlaEditing(false)
-        loadSLAPolicies()
-      } else {
-        toast({ title: 'Advertencia', description: 'Algunos valores no pudieron guardarse', variant: 'destructive' })
-      }
-    } catch {
-      toast({ title: 'Error', description: 'Error al guardar SLA', variant: 'destructive' })
-    } finally {
-      setSlaSaving(false)
-    }
-  }
-
-  useEffect(() => {
-    // Detect SuperAdmin from session
-    fetch('/api/auth/session')
-      .then((r) => r.json())
-      .then((s) => {
-        if (s?.user?.isSuperAdmin) setIsSuperAdmin(true)
-      })
-      .catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -581,29 +523,37 @@ function TicketSettingsContent() {
                 </CardContent>
               </Card>
 
-              {/* SLA por prioridad — editable por SuperAdmin */}
+              {/* SLA por prioridad — solo lectura, edición en Configuración del Sistema */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Bell className="h-4 w-4" />
-                    SLA por prioridad
-                  </CardTitle>
-                  <CardDescription className="flex items-center justify-between">
-                    <span>
-                      {isSuperAdmin
-                        ? 'Tiempos de respuesta y resolución por prioridad (horas)'
-                        : 'Referencia de tiempos SLA configurados en el sistema'}
-                    </span>
-                    {isSuperAdmin && !slaEditing && (
-                      <button
-                        className="text-primary underline text-xs flex items-center gap-1"
-                        onClick={() => setSlaEditing(true)}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Bell className="h-4 w-4" />
+                        SLA por prioridad
+                      </CardTitle>
+                      <CardDescription className="mt-1">
+                        Tiempos de referencia del sistema. Para modificarlos ve a{' '}
+                        <button
+                          className="text-primary underline text-xs inline-flex items-center gap-0.5"
+                          onClick={() => router.push('/admin/settings?tab=sla')}
+                        >
+                          Configuración → SLA
+                          <ExternalLink className="h-3 w-3" />
+                        </button>
+                      </CardDescription>
+                    </div>
+                    {isSuperAdmin && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => router.push('/admin/settings?tab=sla')}
                       >
-                        <Edit2 className="h-3 w-3" />
-                        Editar
-                      </button>
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Gestionar SLA
+                      </Button>
                     )}
-                  </CardDescription>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <Table>
@@ -615,91 +565,31 @@ function TicketSettingsContent() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {PRIORITIES.map((priority) => (
-                        <TableRow key={priority}>
+                      {slaRows.map((row) => (
+                        <TableRow key={row.priority}>
                           <TableCell>
                             <Badge
                               variant={
-                                priority === 'URGENT'
+                                row.priority === 'URGENT'
                                   ? 'destructive'
-                                  : priority === 'HIGH'
+                                  : row.priority === 'HIGH'
                                   ? 'default'
                                   : 'secondary'
                               }
                             >
-                              {PRIORITY_LABELS[priority]}
+                              {PRIORITY_LABELS[row.priority]}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-center">
-                            {slaEditing && isSuperAdmin ? (
-                              <Input
-                                type="number"
-                                min={1}
-                                className="w-20 mx-auto text-center font-mono h-8"
-                                value={slaData[priority]?.response ?? ''}
-                                onChange={(e) =>
-                                  setSlaData((prev) => ({
-                                    ...prev,
-                                    [priority]: {
-                                      ...prev[priority],
-                                      response: parseInt(e.target.value) || 1,
-                                    },
-                                  }))
-                                }
-                              />
-                            ) : (
-                              <span className="font-mono">{slaData[priority]?.response ?? '—'}</span>
-                            )}
+                          <TableCell className="text-center font-mono font-medium">
+                            {row.response}
                           </TableCell>
-                          <TableCell className="text-center">
-                            {slaEditing && isSuperAdmin ? (
-                              <Input
-                                type="number"
-                                min={1}
-                                className="w-20 mx-auto text-center font-mono h-8"
-                                value={slaData[priority]?.resolution ?? ''}
-                                onChange={(e) =>
-                                  setSlaData((prev) => ({
-                                    ...prev,
-                                    [priority]: {
-                                      ...prev[priority],
-                                      resolution: parseInt(e.target.value) || 1,
-                                    },
-                                  }))
-                                }
-                              />
-                            ) : (
-                              <span className="font-mono">{slaData[priority]?.resolution ?? '—'}</span>
-                            )}
+                          <TableCell className="text-center font-mono font-medium">
+                            {row.resolution}
                           </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
-                  {slaEditing && isSuperAdmin && (
-                    <div className="flex justify-end gap-2 mt-4">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSlaEditing(false)
-                          loadSLAPolicies()
-                        }}
-                        disabled={slaSaving}
-                      >
-                        Cancelar
-                      </Button>
-                      <Button size="sm" onClick={handleSaveSLA} disabled={slaSaving}>
-                        <Save className={`h-3 w-3 mr-1 ${slaSaving ? 'animate-spin' : ''}`} />
-                        {slaSaving ? 'Guardando...' : 'Guardar SLA'}
-                      </Button>
-                    </div>
-                  )}
-                  {!isSuperAdmin && (
-                    <p className="text-xs text-muted-foreground mt-3">
-                      Solo el Super Admin puede modificar las políticas SLA.
-                    </p>
-                  )}
                 </CardContent>
               </Card>
 

@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -29,9 +29,11 @@ import {
   AlertTriangle,
   Key,
   Crown,
+  Timer,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { OAuthSettingsTab } from '@/components/settings/oauth-settings-tab'
+import { SLAPoliciesTab } from '@/components/settings/sla-policies-tab'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 
 interface SystemSettings {
@@ -70,13 +72,14 @@ interface SystemSettings {
   backupRetention: number
 }
 
-export default function SettingsPage() {
+function SettingsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [settings, setSettings] = useState<SystemSettings | null>(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [activeTab, setActiveTab] = useState('general')
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'general')
   const { toast } = useToast()
 
   useEffect(() => {
@@ -251,8 +254,8 @@ export default function SettingsPage() {
         <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
         Recargar
       </Button>
-      {/* Solo mostrar botón guardar si NO estamos en la pestaña OAuth */}
-      {activeTab !== 'oauth' && (
+      {/* Solo mostrar botón guardar si NO estamos en la pestaña OAuth o SLA */}
+      {activeTab !== 'oauth' && activeTab !== 'sla' && (
         <Button onClick={saveSettings} disabled={saving}>
           <Save className={`h-4 w-4 mr-2 ${saving ? 'animate-spin' : ''}`} />
           {saving ? 'Guardando...' : 'Guardar'}
@@ -268,7 +271,7 @@ export default function SettingsPage() {
       headerActions={headerActions}
     >
       <Tabs value={activeTab} className='space-y-6' onValueChange={(tab) => {
-      const superAdminTabs = ['email', 'security', 'oauth']
+      const superAdminTabs = ['email', 'security', 'oauth', 'sla']
         if (superAdminTabs.includes(tab) && !isSuperAdmin) return
         setActiveTab(tab)
       }}>
@@ -276,6 +279,14 @@ export default function SettingsPage() {
           <TabsTrigger value='general' className='flex-1 min-w-[80px]'>General</TabsTrigger>
           <TabsTrigger value='notifications' className='flex-1 min-w-[110px]'>Notificaciones</TabsTrigger>
           {/* Tabs solo para Super Admin */}
+          <TabsTrigger value='sla' className='flex-1 min-w-[60px]' disabled={!isSuperAdmin}>
+            <span className='flex items-center gap-1'>
+              {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
+              <Timer className="h-4 w-4 hidden sm:inline" />
+              <span className="hidden sm:inline">SLA</span>
+              <span className="sm:hidden">SLA</span>
+            </span>
+          </TabsTrigger>
           <TabsTrigger value='email' className='flex-1 min-w-[60px]' disabled={!isSuperAdmin}>
             <span className='flex items-center gap-1'>
               {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
@@ -713,7 +724,35 @@ export default function SettingsPage() {
             <OAuthSettingsTab />
           )}
         </TabsContent>
+
+        {/* Políticas SLA */}
+        <TabsContent value='sla'>
+          {!isSuperAdmin ? (
+            <div className='flex flex-col items-center justify-center py-16 text-center'>
+              <Crown className='h-12 w-12 text-amber-500 mb-4' />
+              <h3 className='text-lg font-semibold text-foreground mb-2'>Acceso restringido</h3>
+              <p className='text-muted-foreground max-w-sm'>Esta sección solo está disponible para Administradores Principales (Super Admin).</p>
+            </div>
+          ) : (
+            <SLAPoliciesTab isSuperAdmin={isSuperAdmin} />
+          )}
+        </TabsContent>
       </Tabs>
     </ModuleLayout>
   )
 }
+
+// Wrap in Suspense because useSearchParams requires it
+function SettingsPageWrapper() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    }>
+      <SettingsPage />
+    </Suspense>
+  )
+}
+
+export default SettingsPageWrapper
