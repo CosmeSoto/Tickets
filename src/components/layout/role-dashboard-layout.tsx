@@ -422,10 +422,10 @@ export function RoleDashboardLayout({
                 </button>
                 <div className="min-w-0">
                   {title && (
-                    <h1 className="text-lg sm:text-2xl font-bold text-foreground truncate">{title}</h1>
+                    <h1 className="text-base sm:text-xl font-bold text-foreground line-clamp-2 leading-tight">{title}</h1>
                   )}
                   {subtitle && (
-                    <div className="mt-0.5 text-xs sm:text-sm text-muted-foreground hidden sm:flex items-center flex-wrap gap-1">{subtitle}</div>
+                    <div className="mt-0.5 text-xs text-muted-foreground hidden sm:flex items-center flex-wrap gap-1">{subtitle}</div>
                   )}
                 </div>
               </div>
