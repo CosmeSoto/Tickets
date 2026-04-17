@@ -244,88 +244,51 @@ export default function TechnicianTicketDetailPage() {
 
   return (
     <ModuleLayout
-      title={`Ticket #${getTicketDisplayCode(ticket)}`}
-      subtitle={`${ticket.title}`}
+      title={ticket.title}
+      subtitle={
+        <span className="flex items-center gap-2 flex-wrap">
+          <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded border">
+            #{getTicketDisplayCode(ticket)}
+          </span>
+          <span className="text-muted-foreground text-xs">·</span>
+          <span className="text-xs text-muted-foreground">Creado {formatDate ? formatDate(ticket.createdAt) : ticket.createdAt}</span>
+        </span>
+      }
+      headerActions={
+        <div className='flex flex-wrap items-center gap-2'>
+          <Button variant='outline' size='sm' asChild>
+            <Link href='/technician/tickets'>
+              <ArrowLeft className='h-4 w-4 sm:mr-2' />
+              <span className='hidden sm:inline'>Mis Tickets</span>
+            </Link>
+          </Button>
+          <Badge className={statusConfig.color}>{statusConfig.label}</Badge>
+          <Badge className={priorityConfig.color}>{priorityConfig.label}</Badge>
+          {canCreateArticle && (
+            hasArticle ? (
+              <Button variant='outline' size='sm' onClick={handleViewArticle}>
+                <BookOpen className='h-4 w-4 sm:mr-2' />
+                <span className='hidden sm:inline'>Ver Artículo</span>
+              </Button>
+            ) : (
+              <Button variant='outline' size='sm' onClick={handleCreateArticle}>
+                <Lightbulb className='h-4 w-4 sm:mr-2' />
+                <span className='hidden sm:inline'>Crear Artículo</span>
+              </Button>
+            )
+          )}
+        </div>
+      }
       loading={loading}
     >
       <div className='max-w-6xl mx-auto'>
-        {/* Header con navegación */}
-        <div className='flex flex-wrap items-center justify-between gap-4 mb-6'>
-          <div className='flex items-center space-x-4'>
-            <Button variant='outline' size='sm' asChild>
-              <Link href='/technician/tickets'>
-                <ArrowLeft className='h-4 w-4 sm:mr-2' />
-                <span className='hidden sm:inline'>Mis Tickets</span>
-              </Link>
-            </Button>
-            <div>
-              <h1 className='text-2xl font-bold text-foreground'>#{getTicketDisplayCode(ticket)}</h1>
-              <p className='text-muted-foreground hidden sm:block'>Detalles del Ticket</p>
-            </div>
-          </div>
-          
-          <div className='flex flex-wrap items-center gap-2'>
-            <Badge className={statusConfig.color}>
-              {statusConfig.label}
-            </Badge>
-            <Badge className={priorityConfig.color}>
-              {priorityConfig.label}
-            </Badge>
-            {canCreateArticle && (
-              hasArticle ? (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant='outline' size='sm' onClick={handleViewArticle}>
-                        <BookOpen className='h-4 w-4 sm:mr-2' />
-                        <span className='hidden sm:inline'>Ver Artículo</span>
-                        <span className='sm:hidden'>Artículo</span>
-                        {/* TODO: Descomentar cuando se agregue knowledge_article al tipo Ticket */}
-                        {/* {ticket.knowledge_article && !ticket.knowledge_article.isPublished && (
-                          <Badge variant='secondary' className='ml-2 text-xs'>Borrador</Badge>
-                        )} */}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Ver el artículo de conocimiento creado desde este ticket</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              ) : (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant='outline' size='sm' onClick={handleCreateArticle}>
-                        <Lightbulb className='h-4 w-4 sm:mr-2' />
-                        <span className='hidden sm:inline'>Crear Artículo</span>
-                        <span className='sm:hidden'>Artículo</span>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Crea un artículo de conocimiento con la solución de este ticket</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )
-            )}
-          </div>
-        </div>
-
         <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
           {/* Columna Principal */}
           <div className='lg:col-span-2 space-y-6'>
             {/* Información del Ticket */}
             <Card>
-              <CardHeader>
-                <CardTitle className='flex items-center space-x-2'>
-                  <Tag className='h-5 w-5' />
-                  <span>{ticket.title}</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className='space-y-4'>
-                <div className='prose max-w-none'>
-                  <p className='text-foreground whitespace-pre-wrap'>{ticket.description}</p>
-                </div>
+              <CardContent className='pt-5 space-y-3'>
+                <p className='text-sm text-foreground whitespace-pre-wrap leading-relaxed'>{ticket.description}</p>
                 {(ticket as any).location && (
                   <div className='flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 px-3 py-2'>
                     <MapPin className='h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0' />
@@ -337,8 +300,6 @@ export default function TechnicianTicketDetailPage() {
                 )}
               </CardContent>
             </Card>
-
-            {/* Tabs para organizar el contenido */}
             <Tabs defaultValue="timeline" className="w-full">
               <TabsList className="grid w-full grid-cols-4">
                 <TooltipProvider>

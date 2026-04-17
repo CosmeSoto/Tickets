@@ -39,6 +39,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { AutoAssignment } from '@/components/tickets/auto-assignment'
 import { CompactFileManager } from '@/components/tickets/compact-file-manager'
 import { TicketTimeline } from '@/components/ui/ticket-timeline'
@@ -468,9 +469,17 @@ export default function TicketDetailPage() {
   )
 
   return (
-    <RoleDashboardLayout
-      title={`Ticket #${getTicketDisplayCode(ticket)}`}
-      subtitle={`Creado ${formatDate(ticket.createdAt)}`}
+    <ModuleLayout
+      title={ticket.title}
+      subtitle={
+        <span className="flex items-center gap-2 flex-wrap">
+          <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded border">
+            #{getTicketDisplayCode(ticket)}
+          </span>
+          <span className="text-muted-foreground text-xs">·</span>
+          <span className="text-xs text-muted-foreground">Creado {formatDate(ticket.createdAt)}</span>
+        </span>
+      }
       headerActions={headerActions}
     >
       <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
@@ -478,36 +487,33 @@ export default function TicketDetailPage() {
         <div className='lg:col-span-2 space-y-6'>
           {/* Información del ticket */}
           <Card>
-            <CardHeader>
-              <CardTitle>Información del Ticket</CardTitle>
-            </CardHeader>
-            <CardContent className='space-y-4'>
+            <CardContent className='pt-5 space-y-3'>
               <div>
-                <Label htmlFor='title'>Título</Label>
                 {isEditing ? (
                   <Input
                     id='title'
                     value={editForm.title}
                     onChange={e => setEditForm({ ...editForm, title: e.target.value })}
+                    className="font-medium"
+                    placeholder="Título del ticket"
                   />
                 ) : (
-                  <p className='text-lg font-medium'>{ticket.title}</p>
+                  <p className='text-sm text-foreground whitespace-pre-wrap leading-relaxed'>{ticket.description}</p>
                 )}
               </div>
 
-              <div>
-                <Label htmlFor='description'>Descripción</Label>
-                {isEditing ? (
+              {isEditing && (
+                <div>
+                  <Label htmlFor='description'>Descripción</Label>
                   <Textarea
                     id='description'
                     value={editForm.description}
                     onChange={e => setEditForm({ ...editForm, description: e.target.value })}
                     rows={4}
+                    className="mt-1"
                   />
-                ) : (
-                  <p className='text-foreground whitespace-pre-wrap'>{ticket.description}</p>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* Ubicación — visible para admin y técnico */}
               {!isEditing && (ticket as any).location && (

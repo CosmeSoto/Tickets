@@ -500,7 +500,7 @@ export function TicketTimeline({
   if (loading) {
     return (
       <Card>
-        <CardHeader><CardTitle>Historial del Ticket</CardTitle></CardHeader>
+        <CardHeader className="pb-3"><div className="flex items-center gap-2"><MessageSquare className="h-4 w-4 text-muted-foreground" /><span className="text-sm font-semibold">Historial</span></div></CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
@@ -513,9 +513,12 @@ export function TicketTimeline({
   return (
     <>
       <Card>
-        <CardHeader>
-          <CardTitle>Historial del Ticket</CardTitle>
-          <CardDescription>Cronología completa de actividades y cambios</CardDescription>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <MessageSquare className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-semibold text-foreground">Historial</span>
+            <span className="text-xs text-muted-foreground">· Cronología de actividades</span>
+          </div>
         </CardHeader>
         <CardContent>
           {/* Formulario de comentario */}

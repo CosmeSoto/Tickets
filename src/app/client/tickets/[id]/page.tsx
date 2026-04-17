@@ -287,8 +287,16 @@ export default function ClientTicketDetailPage() {
 
   return (
     <ModuleLayout
-      title={`Ticket #${getTicketDisplayCode(ticket)}`}
-      subtitle={`Creado ${formatDate(ticket.createdAt)}`}
+      title={ticket.title}
+      subtitle={
+        <span className="flex items-center gap-2 flex-wrap">
+          <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded border">
+            #{getTicketDisplayCode(ticket)}
+          </span>
+          <span className="text-muted-foreground text-xs">·</span>
+          <span className="text-xs text-muted-foreground">Creado {formatDate(ticket.createdAt)}</span>
+        </span>
+      }
       headerActions={headerActions}
     >
       <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
@@ -296,31 +304,7 @@ export default function ClientTicketDetailPage() {
         <div className='lg:col-span-2 space-y-6'>
           {/* Información del ticket */}
           <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Información del Ticket</CardTitle>
-                {isEditing && (
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleCancelEdit}
-                    >
-                      <X className="h-4 w-4 mr-2" />
-                      Cancelar
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={handleEditTicket}
-                    >
-                      <Save className="h-4 w-4 mr-2" />
-                      Guardar
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className='space-y-4'>
+            <CardContent className='pt-5 space-y-3'>
               {isEditing ? (
                 <>
                   <div>
@@ -357,23 +341,12 @@ export default function ClientTicketDetailPage() {
                 </>
               ) : (
                 <>
-                  <div>
-                    <p className='text-sm font-medium text-muted-foreground mb-1'>Título</p>
-                    <p className='text-lg font-medium text-foreground'>{ticket.title}</p>
-                  </div>
-
-                  <Separator />
-
-                  <div>
-                    <p className='text-sm font-medium text-muted-foreground mb-1'>Descripción</p>
-                    <p className='text-foreground whitespace-pre-wrap'>{ticket.description}</p>
-                  </div>
+                  <p className='text-sm text-foreground whitespace-pre-wrap leading-relaxed'>{ticket.description}</p>
 
                   {!canEditTicket && (
                     <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
                       <p className="text-amber-800 text-sm">
-                        ℹ️ Este ticket ya está en proceso y no puede ser editado. 
-                        Usa la sección de comentarios para agregar información adicional.
+                        ℹ️ Este ticket ya está en proceso. Usa los comentarios para agregar información adicional.
                       </p>
                     </div>
                   )}
