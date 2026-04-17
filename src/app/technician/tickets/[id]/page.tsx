@@ -12,6 +12,7 @@ import { TicketTimeline } from '@/components/ui/ticket-timeline'
 import { TicketRatingSystem } from '@/components/ui/ticket-rating-system'
 import { TicketResolutionTracker } from '@/components/ui/ticket-resolution-tracker'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { BackToTickets } from '@/components/tickets/back-to-tickets'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -244,26 +245,19 @@ export default function TechnicianTicketDetailPage() {
 
   return (
     <ModuleLayout
-      title={ticket.title}
+      title={ticket.title.length > 50 ? ticket.title.slice(0, 50) + '…' : ticket.title}
       subtitle={
         <span className="flex items-center gap-2 flex-wrap">
           <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded border">
             #{getTicketDisplayCode(ticket)}
           </span>
-          <span className="text-muted-foreground text-xs">·</span>
-          <span className="text-xs text-muted-foreground">Creado {formatDate ? formatDate(ticket.createdAt) : ticket.createdAt}</span>
+          <span className="text-xs">·</span>
+          <Badge className={`text-xs ${statusConfig.color}`}>{statusConfig.label}</Badge>
+          <Badge className={`text-xs ${priorityConfig.color}`}>{priorityConfig.label}</Badge>
         </span>
       }
       headerActions={
         <div className='flex flex-wrap items-center gap-2'>
-          <Button variant='outline' size='sm' asChild>
-            <Link href='/technician/tickets'>
-              <ArrowLeft className='h-4 w-4 sm:mr-2' />
-              <span className='hidden sm:inline'>Mis Tickets</span>
-            </Link>
-          </Button>
-          <Badge className={statusConfig.color}>{statusConfig.label}</Badge>
-          <Badge className={priorityConfig.color}>{priorityConfig.label}</Badge>
           {canCreateArticle && (
             hasArticle ? (
               <Button variant='outline' size='sm' onClick={handleViewArticle}>
@@ -282,6 +276,7 @@ export default function TechnicianTicketDetailPage() {
       loading={loading}
     >
       <div className='max-w-6xl mx-auto'>
+        <BackToTickets />
         <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
           {/* Columna Principal */}
           <div className='lg:col-span-2 space-y-6'>
@@ -534,10 +529,10 @@ export default function TechnicianTicketDetailPage() {
           <div className='space-y-6'>
             {/* Información del Cliente */}
             <Card>
-              <CardHeader>
-                <CardTitle className='flex items-center space-x-2'>
-                  <User className='h-5 w-5' />
-                  <span>Cliente</span>
+              <CardHeader className="pb-2">
+                <CardTitle className='text-sm font-semibold flex items-center gap-1.5'>
+                  <User className='h-3.5 w-3.5' />
+                  Cliente
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -558,8 +553,8 @@ export default function TechnicianTicketDetailPage() {
 
             {/* Detalles del Ticket */}
             <Card>
-              <CardHeader>
-                <CardTitle>Detalles</CardTitle>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">Detalles</CardTitle>
               </CardHeader>
               <CardContent className='space-y-3'>
                 <div>

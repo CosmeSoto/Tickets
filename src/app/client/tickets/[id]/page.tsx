@@ -30,6 +30,7 @@ import { CompactFileManager } from '@/components/tickets/compact-file-manager'
 import { TicketTimeline } from '@/components/ui/ticket-timeline'
 import { TicketRatingSystem } from '@/components/ui/ticket-rating-system'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { BackToTickets } from '@/components/tickets/back-to-tickets'
 import { useToast } from '@/hooks/use-toast'
 import { 
   useTicketData, 
@@ -255,29 +256,26 @@ export default function ClientTicketDetailPage() {
 
   const headerActions = (
     <div className='flex flex-wrap items-center gap-2'>
-      <Button variant='outline' size='sm' onClick={() => router.push('/client/tickets')}>
-        <ArrowLeft className='h-4 w-4 sm:mr-2' />
-        <span className='hidden sm:inline'>Mis Tickets</span>
-      </Button>
-      {getStatusBadge(ticket.status)}
-      {getPriorityBadge(ticket.priority)}
       {canEditTicket && !isEditing && (
-        <Button
-          variant='outline'
-          size='sm'
-          onClick={() => setIsEditing(true)}
-        >
+        <Button variant='outline' size='sm' onClick={() => setIsEditing(true)}>
           <Edit className='h-4 w-4 sm:mr-2' />
           <span className='hidden sm:inline'>Editar</span>
         </Button>
       )}
+      {isEditing && (
+        <>
+          <Button variant='outline' size='sm' onClick={handleCancelEdit}>
+            <X className='h-4 w-4 sm:mr-2' />
+            <span className='hidden sm:inline'>Cancelar</span>
+          </Button>
+          <Button size='sm' onClick={handleEditTicket}>
+            <Save className='h-4 w-4 sm:mr-2' />
+            <span className='hidden sm:inline'>Guardar</span>
+          </Button>
+        </>
+      )}
       {canDeleteTicket && !isEditing && (
-        <Button
-          variant='destructive'
-          size='sm'
-          onClick={() => setShowDeleteDialog(true)}
-          disabled={deleting}
-        >
+        <Button variant='destructive' size='sm' onClick={() => setShowDeleteDialog(true)} disabled={deleting}>
           <Trash2 className='h-4 w-4 sm:mr-2' />
           <span className='hidden sm:inline'>Eliminar</span>
         </Button>
@@ -285,23 +283,29 @@ export default function ClientTicketDetailPage() {
     </div>
   )
 
+  const statusConfig = getStatusConfig(ticket.status)
+  const priorityConfig = getPriorityConfig(ticket.priority)
+  const shortTitle = ticket.title.length > 50 ? ticket.title.slice(0, 50) + '…' : ticket.title
+
   return (
     <ModuleLayout
-      title={ticket.title}
+      title={shortTitle}
       subtitle={
         <span className="flex items-center gap-2 flex-wrap">
           <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded border">
             #{getTicketDisplayCode(ticket)}
           </span>
-          <span className="text-muted-foreground text-xs">·</span>
-          <span className="text-xs text-muted-foreground">Creado {formatDate(ticket.createdAt)}</span>
+          <span className="text-xs">·</span>
+          <Badge className={`text-xs ${statusConfig.color}`}>{statusConfig.label}</Badge>
+          <Badge className={`text-xs ${priorityConfig.color}`}>{priorityConfig.label}</Badge>
         </span>
       }
       headerActions={headerActions}
     >
+      <BackToTickets />
       <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
         {/* Contenido principal */}
-        <div className='lg:col-span-2 space-y-6'>
+        <div className='lg:col-span-2 space-y-4'>
           {/* Información del ticket */}
           <Card>
             <CardContent className='pt-5 space-y-3'>
@@ -431,20 +435,20 @@ export default function ClientTicketDetailPage() {
         </div>
 
         {/* Sidebar */}
-        <div className='space-y-6'>
+        <div className='space-y-4'>
           {/* Detalles */}
           <Card>
-            <CardHeader>
-              <CardTitle>Detalles</CardTitle>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Detalles</CardTitle>
             </CardHeader>
-            <CardContent className='space-y-4'>
-              <div className='flex items-center space-x-3'>
-                <User className='h-4 w-4 text-muted-foreground' />
+            <CardContent className='space-y-3 pt-0'>
+              <div className='flex items-start gap-2'>
+                <User className='h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0' />
                 <div>
-                  <p className='text-sm font-medium'>Asignado a</p>
+                  <p className='text-xs font-medium text-muted-foreground'>Asignado a</p>
                   {ticket.assignee ? (
                     <>
-                      <p className='text-sm text-muted-foreground'>{ticket.assignee.name}</p>
+                      <p className='text-sm'>{ticket.assignee.name}</p>
                       <p className='text-xs text-muted-foreground'>{ticket.assignee.email}</p>
                     </>
                   ) : (
@@ -455,73 +459,46 @@ export default function ClientTicketDetailPage() {
 
               <Separator />
 
-              <div className='flex items-center space-x-3'>
-                <Tag className='h-4 w-4 text-muted-foreground' />
+              <div className='flex items-start gap-2'>
+                <Tag className='h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0' />
                 <div>
-                  <p className='text-sm font-medium'>Categoría</p>
-                  <div className='flex items-center space-x-2 mt-1'>
-                    <div
-                      className='w-3 h-3 rounded-full'
-                      style={{ backgroundColor: ticket.category?.color || '#6B7280' }}
-                    />
-                    <span className='text-sm text-muted-foreground'>{ticket.category?.name || 'Sin categoría'}</span>
+                  <p className='text-xs font-medium text-muted-foreground'>Categoría</p>
+                  <div className='flex items-center gap-1.5 mt-0.5'>
+                    <div className='w-2.5 h-2.5 rounded-full shrink-0' style={{ backgroundColor: ticket.category?.color || '#6B7280' }} />
+                    <span className='text-sm'>{ticket.category?.name || 'Sin categoría'}</span>
                   </div>
                 </div>
               </div>
 
               <Separator />
 
-              <div className='flex items-center space-x-3'>
-                <Clock className='h-4 w-4 text-muted-foreground' />
+              <div className='flex items-start gap-2'>
+                <Clock className='h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0' />
                 <div>
-                  <p className='text-sm font-medium'>Fechas</p>
+                  <p className='text-xs font-medium text-muted-foreground'>Fechas</p>
                   <p className='text-xs text-muted-foreground'>Creado: {formatDate(ticket.createdAt)}</p>
                   <p className='text-xs text-muted-foreground'>Actualizado: {formatDate(ticket.updatedAt)}</p>
                   {ticket.resolvedAt && (
-                    <p className='text-xs text-green-600 dark:text-green-400'>
-                      Resuelto: {formatDate(ticket.resolvedAt)}
-                    </p>
+                    <p className='text-xs text-green-600 dark:text-green-400'>Resuelto: {formatDate(ticket.resolvedAt)}</p>
                   )}
                 </div>
               </div>
+
+              {ticket._count && (
+                <>
+                  <Separator />
+                  <div className='flex items-center justify-between'>
+                    <span className='text-xs text-muted-foreground flex items-center gap-1.5'>
+                      <Paperclip className='h-3.5 w-3.5' />
+                      Archivos adjuntos
+                    </span>
+                    <Badge variant='outline' className="text-xs">{ticket._count.attachments || 0}</Badge>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
-          {/* Estado del Ticket */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Estado del Ticket</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className='space-y-3'>
-                <div className='flex items-center justify-between'>
-                  <span className='text-sm text-muted-foreground'>Estado</span>
-                  {getStatusBadge(ticket.status)}
-                </div>
-                <div className='flex items-center justify-between'>
-                  <span className='text-sm text-muted-foreground'>Prioridad</span>
-                  {getPriorityBadge(ticket.priority)}
-                </div>
-                {ticket._count && (
-                  <>
-                    <Separator />
-                    <div className='flex items-center justify-between'>
-                      <span className='text-sm text-muted-foreground'>Archivos</span>
-                      <Badge variant='outline'>{ticket._count.attachments || 0}</Badge>
-                    </div>
-                  </>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Botón para volver */}
-          <Button variant='outline' className='w-full' asChild>
-            <a href='/client/tickets'>
-              <ArrowLeft className='h-4 w-4 mr-2' />
-              Volver a Mis Tickets
-            </a>
-          </Button>
         </div>
       </div>
 

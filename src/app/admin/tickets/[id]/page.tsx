@@ -47,6 +47,7 @@ import { TicketRatingSystem } from '@/components/ui/ticket-rating-system'
 import { TicketResolutionTracker } from '@/components/ui/ticket-resolution-tracker'
 import { TicketCollaborators } from '@/components/tickets/ticket-collaborators'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { BackToTickets } from '@/components/tickets/back-to-tickets'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -304,20 +305,6 @@ export default function TicketDetailPage() {
 
   const headerActions = (
     <div className='flex flex-wrap items-center gap-2'>
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant='outline' size='sm' onClick={() => router.push('/admin/tickets')}>
-              <ArrowLeft className='h-4 w-4 mr-2' />
-              <span className='hidden sm:inline'>Todos los Tickets</span>
-              <span className='sm:hidden'>Tickets</span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Volver a la lista de todos los tickets</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
       {/* Botón Inteligente de Artículo (solo si ticket está RESOLVED) */}
       {ticket.status === 'RESOLVED' && (
         ticket.knowledgeArticleId ? (
@@ -362,8 +349,7 @@ export default function TicketDetailPage() {
       )}
       {getStatusBadge(ticket.status)}
       {getPriorityBadge(ticket.priority)}
-      {session?.user?.role === 'ADMIN' && (
-        <>
+      {session?.user?.role === 'ADMIN' && (        <>
           {/* Sin técnico → Asignación Automática | Con técnico → Sin asignar */}
           {ticket.assignee ? (
             <AlertDialog>
@@ -470,21 +456,23 @@ export default function TicketDetailPage() {
 
   return (
     <ModuleLayout
-      title={ticket.title}
+      title={ticket.title.length > 50 ? ticket.title.slice(0, 50) + '…' : ticket.title}
       subtitle={
         <span className="flex items-center gap-2 flex-wrap">
           <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded border">
             #{getTicketDisplayCode(ticket)}
           </span>
-          <span className="text-muted-foreground text-xs">·</span>
-          <span className="text-xs text-muted-foreground">Creado {formatDate(ticket.createdAt)}</span>
+          <span className="text-xs">·</span>
+          <Badge className={`text-xs ${getStatusConfig(ticket.status)?.color}`}>{getStatusConfig(ticket.status)?.label}</Badge>
+          <Badge className={`text-xs ${getPriorityConfig(ticket.priority)?.color}`}>{getPriorityConfig(ticket.priority)?.label}</Badge>
         </span>
       }
       headerActions={headerActions}
     >
+      <BackToTickets />
       <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
         {/* Contenido principal */}
-        <div className='lg:col-span-2 space-y-6'>
+        <div className='lg:col-span-2 space-y-4'>
           {/* Información del ticket */}
           <Card>
             <CardContent className='pt-5 space-y-3'>
@@ -671,11 +659,11 @@ export default function TicketDetailPage() {
         </div>
 
         {/* Sidebar */}
-        <div className='space-y-6'>
+        <div className='space-y-4'>
           {/* Detalles */}
           <Card>
-            <CardHeader>
-              <CardTitle>Detalles</CardTitle>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Detalles</CardTitle>
             </CardHeader>
             <CardContent className='space-y-4'>
               <div className='flex items-center space-x-3'>
@@ -797,11 +785,11 @@ export default function TicketDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Historial */}
+          {/* Actividad Reciente */}
           <Card>
-            <CardHeader>
-              <CardTitle className='flex items-center'>
-                <History className='h-5 w-5 mr-2' />
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+                <History className='h-3.5 w-3.5' />
                 Actividad Reciente
               </CardTitle>
             </CardHeader>

@@ -665,8 +665,8 @@ export function TicketTimeline({
                           </div>
                         )}
 
-                        {/* Descripción para otros eventos */}
-                        {event.type !== 'comment' && event.description && !(event.type === 'resolution_plan' && event.metadata) && event.type !== 'file_uploaded' && (
+                        {/* Descripción para otros eventos — solo si es diferente al título */}
+                        {event.type !== 'comment' && event.description && event.description !== event.title && !(event.type === 'resolution_plan' && event.metadata) && event.type !== 'file_uploaded' && (
                           <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{event.description}</p>
                         )}
 
