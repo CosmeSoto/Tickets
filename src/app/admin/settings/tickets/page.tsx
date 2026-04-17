@@ -193,8 +193,7 @@ function TicketSettingsContent() {
     router.replace(`/admin/settings/tickets?familyId=${familyId}`, { scroll: false })
   }
 
-  const handleToggleTickets = async (family: Family, e: React.MouseEvent) => {
-    e.stopPropagation()
+  const handleToggleTickets = async (family: Family) => {
     try {
       const res = await fetch(`/api/families/${family.id}/ticket-config`, {
         method: 'PUT',
@@ -337,15 +336,17 @@ function TicketSettingsContent() {
                   ) : (
                     <div className="divide-y">
                       {families.map((family) => (
-                        <button
+                        <div
                           key={family.id}
-                          type="button"
-                          className={`w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors text-left ${
+                          className={`flex items-center justify-between p-3 hover:bg-muted/50 transition-colors cursor-pointer ${
                             selectedFamilyId === family.id ? 'bg-primary/5 border-l-2 border-primary' : ''
                           }`}
                           onClick={() => handleSelectFamily(family.id)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => e.key === 'Enter' && handleSelectFamily(family.id)}
                         >
-                          <div className="flex items-center gap-2 min-w-0">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
                             <div
                               className="w-7 h-7 rounded-full flex items-center justify-center text-white flex-shrink-0"
                               style={{ backgroundColor: family.color || '#6B7280' }}
@@ -353,20 +354,19 @@ function TicketSettingsContent() {
                               <FamilyIcon icon={family.icon} color={family.color} code={family.code} className="w-4 h-4" />
                             </div>
                             <div className="min-w-0">
-                              <p className="text-sm font-medium truncate">{family.name}</p>
+                              <p className="text-sm font-medium leading-tight">{family.name}</p>
                               <p className="text-xs text-muted-foreground font-mono">{family.code}</p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                          <div className="flex items-center gap-1 flex-shrink-0 ml-2" onClick={(e) => e.stopPropagation()}>
                             <Switch
                               checked={family.ticketFamilyConfig?.ticketsEnabled ?? false}
-                              onCheckedChange={() => {}}
-                              onClick={(e) => handleToggleTickets(family, e)}
+                              onCheckedChange={() => handleToggleTickets(family)}
                               className="scale-75"
                             />
                             <ChevronRight className="h-4 w-4 text-muted-foreground" />
                           </div>
-                        </button>
+                        </div>
                       ))}
                     </div>
                   )}

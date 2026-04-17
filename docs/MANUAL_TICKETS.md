@@ -1,7 +1,7 @@
 # Manual del Módulo de Tickets
 
 **Sistema de Tickets — Documentación Técnica y de Usuario**  
-Versión actual · Abril 2026
+Versión actual · Abril 2026 · Última actualización: configuración de tickets rediseñada
 
 ---
 
@@ -22,6 +22,8 @@ Versión actual · Abril 2026
 10. [Calificación y cierre automático](#10-calificación-y-cierre-automático)
 11. [Exportación de datos](#11-exportación-de-datos)
 12. [Configuración del módulo](#12-configuración-del-módulo)
+    - [Navegación — dónde está cada cosa](#navegación--dónde-está-cada-cosa)
+    - [Dónde se configura cada parámetro](#dónde-se-configura-cada-parámetro)
 13. [Notificaciones y alertas](#13-notificaciones-y-alertas)
 14. [Referencia de estados y transiciones](#14-referencia-de-estados-y-transiciones)
 
@@ -211,25 +213,33 @@ En **Gestión de Tickets** el admin tiene acceso completo:
 
 El **Exportar** descarga los tickets filtrados actualmente en pantalla.
 
-#### Configuración de tickets por área
+#### Configuración de tickets
 
-En **Familias → [Nombre del área] → Tab Tickets**:
+La configuración está en **Tickets → Configuración** en el menú lateral. Tiene dos secciones:
+
+**Tab "Por área"** — configuración individual por cada área de soporte:
 
 | Campo | Descripción |
 |-------|-------------|
-| Tickets habilitados | Activa/desactiva la recepción de tickets en esta área |
+| Switch en la lista | Activa/desactiva la recepción de tickets en esa área |
 | Prefijo de código | Prefijo para los códigos (ej: `TI` → `TI-2026-0001`) |
-| Familia por defecto | Esta área recibe tickets sin familia asignada |
-| Auto-asignación respeta familias | Solo auto-asigna técnicos de esta área |
-| Umbral de alerta de volumen | Alerta cuando los tickets abiertos superen N |
-| Horario laboral | Horas y días para cálculo de SLA |
-| Acceso de otras familias | Qué clientes de otras áreas pueden crear tickets aquí |
-| Días laborales | Checkboxes visuales (Lun–Dom) |
+| Alerta de volumen | Notifica cuando los tickets abiertos superen N |
+| Tickets habilitados | Toggle para habilitar/deshabilitar el área |
+| Asignación respeta el área | Solo auto-asigna técnicos de esa área |
+| Área por defecto del sistema | Esta área recibe tickets sin área asignada |
+| Horario laboral | Entrada, salida y días laborales (botones L M X J V S D) |
+| Tiempos SLA de referencia | Tarjetas visuales por prioridad (solo lectura aquí) |
 
-En **Configuración → Tickets** (vista global):
-- Toggle habilitado/deshabilitado por cada familia
-- Familia por defecto del sistema (fallback)
-- Vista resumida de configuración SLA por prioridad
+**Tab "Reglas generales"** — configuración que aplica a todo el sistema:
+
+| Campo | Descripción |
+|-------|-------------|
+| Área por defecto | Área fallback cuando no se puede determinar el área del ticket |
+| Límite de tickets por usuario | Máximo de tickets abiertos simultáneos por usuario |
+| Cierre automático | Días tras resolución sin calificación antes del cierre automático |
+| Asignación automática | Activa/desactiva la asignación automática al técnico con menor carga |
+
+> 💡 Hay **un solo botón "Guardar cambios"** en el header que guarda todo lo que hayas modificado en ambos tabs.
 
 ---
 
@@ -273,6 +283,12 @@ Si `allowedFromFamilies` está vacío, cualquier cliente del sistema puede crear
 ### Filtros por familia
 
 En todas las secciones (tickets, categorías, knowledge), el selector de área es un **Combobox con buscador** que escala a cualquier cantidad de familias. El nombre completo siempre es visible dentro del dropdown.
+
+### Página Pública
+
+El botón 🌐 **Página Pública** aparece en el header para **todos los roles** (Admin, Técnico, Cliente). En pantallas grandes muestra el texto "Página Pública"; en móvil solo el ícono. Abre la página de inicio pública en una nueva pestaña.
+
+Los administradores pueden editar el contenido de esa página desde **Página Pública** en el menú lateral.
 
 ---
 
@@ -320,10 +336,12 @@ El SLA (Service Level Agreement) define los tiempos máximos para responder y re
 
 ### Dónde se configura el horario laboral
 
-El horario laboral **se configura por familia/área**, no de forma global. Esto permite que cada equipo tenga su propio horario:
+El horario laboral **se configura por área**, no de forma global. Esto permite que cada equipo tenga su propio horario:
 
-- **Ruta**: `Configuración → Tickets → [seleccionar familia] → sección Horario laboral`
-- **Campos**: Hora inicio, Hora fin, Días laborales (ej: `MON,TUE,WED,THU,FRI`)
+- **Ruta**: `Tickets → Configuración → tab "Por área" → [seleccionar área] → sección Horario laboral`
+- **Campos**:
+  - **Entrada / Salida**: selectores de hora (ej: 09:00 – 18:00)
+  - **Días laborales**: botones circulares **L M X J V S D** — los activos se muestran en color primario, los inactivos en gris. Se activan/desactivan con un clic.
 
 Cada política SLA tiene además un toggle **"Solo horas hábiles"** que activa o desactiva el cálculo basado en ese horario.
 
@@ -427,33 +445,70 @@ Cada exportación queda registrada en auditoría automáticamente.
 
 ## 12. Configuración del módulo
 
-### Dónde se configura
+### Navegación — dónde está cada cosa
 
-| Configuración | Ubicación | Acceso |
-|---------------|-----------|--------|
-| Config por área (prefijo, horario, SLA, acceso) | Familias → [Área] → Tab Tickets | Admin |
-| Toggle de tickets por área (vista global) | Configuración → Tickets | Admin |
-| Familia por defecto | Configuración → Tickets | Admin |
-| **Horario laboral por área** | **Configuración → Tickets → [familia] → Horario laboral** | Admin |
-| Plazo de auto-cierre (días) | `system_settings.autoCloseDays` (BD) | SuperAdmin |
-| **Políticas SLA globales (tiempos por prioridad)** | **Configuración del Sistema → tab SLA** | SuperAdmin |
-| Notificaciones globales | Admin → Configuración → Notificaciones | Admin |
-| Notificaciones personales | Configuración (usuario) → Notificaciones | Todos |
-| Página pública (hero, servicios, logos, SEO) | Admin → Página Pública | Admin / SuperAdmin |
+El menú lateral del administrador está organizado así:
+
+```
+Dashboard
+Tickets
+  ├── Todos los Tickets
+  ├── Reportes
+  ├── Categorías
+  ├── Base de Conocimientos
+  └── Configuración          ← configuración por área y reglas generales
+Inventario
+  └── ...
+Familias
+Usuarios
+Auditoría                    ← solo SuperAdmin
+Página Pública               ← hero, servicios, logos, SEO
+Configuración del Sistema    ← email, seguridad, OAuth, SLA global
+```
+
+> 💡 El botón **Página Pública** también aparece en el header (ícono 🌐) para todos los roles, abriendo la página en una nueva pestaña.
+
+### Dónde se configura cada parámetro
+
+| Configuración | Ubicación en el menú | Acceso |
+|---|---|---|
+| Habilitar/deshabilitar área para tickets | Tickets → Configuración → tab "Por área" | Admin |
+| Prefijo de código, horario laboral, alertas | Tickets → Configuración → tab "Por área" → [seleccionar área] | Admin |
+| **Días laborales** | Tickets → Configuración → tab "Por área" → Horario laboral → botones **L M X J V S D** | Admin |
+| Área por defecto del sistema | Tickets → Configuración → tab "Reglas generales" | Admin |
+| Límite de tickets por usuario | Tickets → Configuración → tab "Reglas generales" | Admin |
+| **Plazo de cierre automático (días)** | Tickets → Configuración → tab "Reglas generales" | Admin |
+| Asignación automática global | Tickets → Configuración → tab "Reglas generales" | Admin |
+| **Políticas SLA globales (tiempos por prioridad)** | Configuración del Sistema → tab **SLA** | SuperAdmin |
+| Notificaciones globales | Configuración del Sistema → tab Notificaciones | Admin |
+| Email / SMTP | Configuración del Sistema → tab Email | SuperAdmin |
+| Seguridad (sesión, contraseñas) | Configuración del Sistema → tab Seguridad | SuperAdmin |
+| OAuth (Google, etc.) | Configuración del Sistema → tab OAuth | SuperAdmin |
+| Página pública (hero, servicios, logos, SEO) | Página Pública (menú lateral) | Admin / SuperAdmin |
+| Notificaciones personales | Configuración personal → Notificaciones | Todos |
 
 ### Parámetros clave de `ticket_family_config`
 
 ```
-ticketsEnabled           → Si el área acepta tickets (default: true)
-codePrefix               → Prefijo del código (ej: "TI")
-isDefault                → Esta es la familia fallback del sistema
-autoAssignRespectsFamilies → Solo auto-asigna técnicos de esta familia
-alertVolumeThreshold     → Alerta cuando tickets abiertos > N
-businessHoursStart       → Hora inicio jornada (ej: "09:00")
-businessHoursEnd         → Hora fin jornada (ej: "18:00")
-businessDays             → Días laborales (ej: "MON,TUE,WED,THU,FRI")
-allowedFromFamilies      → IDs de familias cuyos clientes pueden crear tickets aquí
-                           (vacío = abierto a todos)
+ticketsEnabled             → Si el área acepta tickets (default: true)
+codePrefix                 → Prefijo del código (ej: "TI")
+isDefault                  → Esta es el área fallback del sistema
+autoAssignRespectsFamilies → Solo auto-asigna técnicos de esta área
+alertVolumeThreshold       → Alerta cuando tickets abiertos > N
+businessHoursStart         → Hora inicio jornada (ej: "09:00:00")
+businessHoursEnd           → Hora fin jornada (ej: "18:00:00")
+businessDays               → Días laborales en formato interno (ej: "MON,TUE,WED,THU,FRI")
+                             — se edita visualmente con los botones L M X J V S D
+allowedFromFamilies        → IDs de áreas cuyos clientes pueden crear tickets aquí
+                             (vacío = abierto a todos)
+```
+
+### Parámetros clave de `system_settings` (reglas generales)
+
+```
+maxTicketsPerUser      → Máximo de tickets abiertos simultáneos por usuario (default: 10)
+autoAssignmentEnabled  → Asignación automática al técnico con menor carga (default: true)
+autoCloseDays          → Días tras resolución sin calificación antes del cierre (default: 3)
 ```
 
 ---
