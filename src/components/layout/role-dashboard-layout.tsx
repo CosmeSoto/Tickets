@@ -436,19 +436,17 @@ export function RoleDashboardLayout({
                   <div className="hidden sm:block">{headerActions}</div>
                 )}
 
-                {/* Ver Página Pública — solo para ADMIN */}
-                {userRole === 'ADMIN' && (
-                  <Link
-                    href="/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors border border-border rounded-md px-2.5 py-1.5 hover:bg-accent"
-                  >
-                    <Globe className="h-3.5 w-3.5" />
-                    <span>Página Pública</span>
-                    <ExternalLink className="h-3 w-3 opacity-60" />
-                  </Link>
-                )}
+                {/* Ver Página Pública — visible para todos los roles */}
+                <Link
+                  href="/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors border border-border rounded-md px-2.5 py-1.5 hover:bg-accent"
+                >
+                  <Globe className="h-3.5 w-3.5" />
+                  <span>Página Pública</span>
+                  <ExternalLink className="h-3 w-3 opacity-60" />
+                </Link>
                 
                 <Notifications variant="bell" />
                 
