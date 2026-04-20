@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
-import { NotificationService } from '@/lib/services/notification-service'
+import { notifyUser } from '@/lib/api/notify'
 
 /**
  * POST /api/inventory/decommission-acts/[id]/reject
@@ -70,28 +70,21 @@ export async function POST(
   const requesterEmail = decommissionRequest.requester.email
   const requesterName = decommissionRequest.requester.name || requesterEmail
 
-  // Campanita
-  await NotificationService.push({
-    userId: requesterId,
-    type: 'ERROR',
-    title: 'Solicitud de Baja Rechazada',
-    message: `Tu solicitud de baja para "${assetName}" fue rechazada. Motivo: ${rejectionReason.trim().substring(0, 150)}`,
-    metadata: { link: `/inventory/decommission/${requestId}` },
-  }).catch(() => {})
-
-  // Email
-  await prisma.email_queue.create({
-    data: {
-      id: randomUUID(),
-      toEmail: requesterEmail,
-      subject: `Solicitud de Baja Rechazada - ${assetName}`,
-      body: generateRejectionEmail(requesterName, assetName, rejectionReason.trim(), adminName),
-      status: 'pending',
-      attempts: 0,
-      maxAttempts: 3,
-      scheduledAt: new Date(),
-    },
-  }).catch(() => {})
+  // Notificación in-app + email
+  await notifyUser(
+    requesterId,
+    'ERROR',
+    'Solicitud de Baja Rechazada',
+    `Tu solicitud de baja para "${assetName}" fue rechazada. Motivo: ${rejectionReason.trim().substring(0, 150)}`,
+    {
+      metadata: { link: `/inventory/decommission/${requestId}` },
+      email: {
+        to: requesterEmail,
+        subject: `Solicitud de Baja Rechazada - ${assetName}`,
+        html: generateRejectionEmail(requesterName, assetName, rejectionReason.trim(), adminName),
+      },
+    }
+  )
 
   // Audit log
   await prisma.audit_logs.create({

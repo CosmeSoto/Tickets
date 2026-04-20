@@ -6,9 +6,9 @@ import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { writeFile, mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
-import { NotificationService } from '@/lib/services/notification-service'
 import { getUploadDir } from '@/lib/upload-path'
 import { FolioService } from '@/lib/services/folio.service'
+import { notifyAdmins } from '@/lib/api/notify'
 
 const decommissionInclude = {
   requester: { select: { id: true, name: true, email: true } },
@@ -292,16 +292,12 @@ export async function POST(request: NextRequest) {
 
     // Notificar a todos los ADMIN (solo si es PENDING — si fue auto-aprobado, no requiere revisión)
     if (!autoApproveDecommission) {
-      const admins = await prisma.users.findMany({ where: { role: 'ADMIN' }, select: { id: true } })
-      for (const admin of admins) {
-        await NotificationService.push({
-          userId: admin.id,
-          type: 'WARNING',
-          title: 'Nueva Solicitud de Baja',
-          message: `${requesterName} solicitó la baja de "${assetName}". Motivo: ${reason.trim().substring(0, 100)}`,
-          metadata: { link: `/inventory/decommission/${requestId}` },
-        }).catch(() => {})
-      }
+      await notifyAdmins(
+        'WARNING',
+        'Nueva Solicitud de Baja',
+        `${requesterName} solicitó la baja de "${assetName}". Motivo: ${reason.trim().substring(0, 100)}`,
+        { metadata: { link: `/inventory/decommission/${requestId}` } }
+      )
     }
 
     // Audit log de creación (legacy — mantenido para compatibilidad)

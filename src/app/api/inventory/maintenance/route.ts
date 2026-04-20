@@ -4,8 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { MaintenanceService } from '@/lib/services/maintenance.service'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
-import { sendEmail } from '@/lib/email-service'
-import { NotificationService } from '@/lib/services/notification-service'
+import { notifyUser, notifyMany } from '@/lib/api/notify'
 
 /**
  * GET /api/inventory/maintenance
@@ -124,23 +123,21 @@ export async function POST(request: NextRequest) {
       )
 
       // Notificar a admins/técnicos sobre la solicitud
-      const admins = await prisma.users.findMany({
+      const staffMembers = await prisma.users.findMany({
         where: { role: { in: ['ADMIN', 'TECHNICIAN'] }, isActive: true },
-        select: { id: true, name: true, email: true },
+        select: { id: true },
       })
 
       const equipmentLabel = `${equipment.code} (${equipment.brand} ${equipment.model})`
       const requesterName = session.user.name || session.user.email
 
-      for (const admin of admins) {
-        await NotificationService.push({
-          userId: admin.id,
-          type: 'INFO',
-          title: `Solicitud de mantenimiento — ${equipment.code}`,
-          message: `${requesterName} solicitó mantenimiento ${type === 'PREVENTIVE' ? 'preventivo' : 'correctivo'} para el equipo ${equipmentLabel}. Motivo: ${description}`,
-          metadata: { equipmentId, maintenanceId: maintenance.id, action: 'approve_maintenance' },
-        }).catch(() => {})
-      }
+      await notifyMany(
+        staffMembers.map(u => u.id),
+        'INFO',
+        `Solicitud de mantenimiento — ${equipment.code}`,
+        `${requesterName} solicitó mantenimiento ${type === 'PREVENTIVE' ? 'preventivo' : 'correctivo'} para el equipo ${equipmentLabel}. Motivo: ${description}`,
+        { metadata: { equipmentId, maintenanceId: maintenance.id, action: 'approve_maintenance' } }
+      )
     } else {
       // Admin/Técnico programa mantenimiento directamente
       maintenance = await MaintenanceService.createMaintenance(
@@ -165,44 +162,45 @@ export async function POST(request: NextRequest) {
         })
         const equipmentLabel = `${equipment.code} (${equipment.brand} ${equipment.model})`
 
-        await NotificationService.push({
-          userId: receiver.id,
-          type: 'INFO',
-          title: `Mantenimiento programado — ${equipment.code}`,
-          message: `El equipo ${equipmentLabel} entrará en mantenimiento ${maintenanceTypeLabel} el ${formattedDate}. Motivo: ${description}`,
-          metadata: { equipmentId, maintenanceId: maintenance.id },
-        }).catch(() => {})
-
-        sendEmail({
-          to: receiver.email,
-          subject: `Mantenimiento programado para tu equipo ${equipment.code}`,
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2 style="color: #f59e0b;">🔧 Mantenimiento Programado</h2>
-              <p>Hola <strong>${receiver.name}</strong>,</p>
-              <p>El equipo que tienes asignado entrará en mantenimiento:</p>
-              <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
-                <tr style="background: #f9fafb;">
-                  <td style="padding: 8px 12px; font-weight: bold; border: 1px solid #e5e7eb;">Equipo</td>
-                  <td style="padding: 8px 12px; border: 1px solid #e5e7eb;">${equipmentLabel}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 12px; font-weight: bold; border: 1px solid #e5e7eb;">Tipo</td>
-                  <td style="padding: 8px 12px; border: 1px solid #e5e7eb;">Mantenimiento ${maintenanceTypeLabel}</td>
-                </tr>
-                <tr style="background: #f9fafb;">
-                  <td style="padding: 8px 12px; font-weight: bold; border: 1px solid #e5e7eb;">Fecha programada</td>
-                  <td style="padding: 8px 12px; border: 1px solid #e5e7eb;">${formattedDate}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 12px; font-weight: bold; border: 1px solid #e5e7eb;">Motivo</td>
-                  <td style="padding: 8px 12px; border: 1px solid #e5e7eb;">${description}</td>
-                </tr>
-              </table>
-              <p>Si tienes alguna consulta, contacta al equipo de soporte.</p>
-            </div>
-          `,
-        }).catch(() => {})
+        await notifyUser(
+          receiver.id,
+          'INFO',
+          `Mantenimiento programado — ${equipment.code}`,
+          `El equipo ${equipmentLabel} entrará en mantenimiento ${maintenanceTypeLabel} el ${formattedDate}. Motivo: ${description}`,
+          {
+            metadata: { equipmentId, maintenanceId: maintenance.id },
+            email: {
+              to: receiver.email,
+              subject: `Mantenimiento programado para tu equipo ${equipment.code}`,
+              html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                  <h2 style="color: #f59e0b;">🔧 Mantenimiento Programado</h2>
+                  <p>Hola <strong>${receiver.name}</strong>,</p>
+                  <p>El equipo que tienes asignado entrará en mantenimiento:</p>
+                  <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+                    <tr style="background: #f9fafb;">
+                      <td style="padding: 8px 12px; font-weight: bold; border: 1px solid #e5e7eb;">Equipo</td>
+                      <td style="padding: 8px 12px; border: 1px solid #e5e7eb;">${equipmentLabel}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 12px; font-weight: bold; border: 1px solid #e5e7eb;">Tipo</td>
+                      <td style="padding: 8px 12px; border: 1px solid #e5e7eb;">Mantenimiento ${maintenanceTypeLabel}</td>
+                    </tr>
+                    <tr style="background: #f9fafb;">
+                      <td style="padding: 8px 12px; font-weight: bold; border: 1px solid #e5e7eb;">Fecha programada</td>
+                      <td style="padding: 8px 12px; border: 1px solid #e5e7eb;">${formattedDate}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 12px; font-weight: bold; border: 1px solid #e5e7eb;">Motivo</td>
+                      <td style="padding: 8px 12px; border: 1px solid #e5e7eb;">${description}</td>
+                    </tr>
+                  </table>
+                  <p>Si tienes alguna consulta, contacta al equipo de soporte.</p>
+                </div>
+              `,
+            },
+          }
+        )
       }
     }
 

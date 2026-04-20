@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
@@ -17,6 +17,8 @@ import { Plus, Pencil, Trash2, Loader2, Boxes, Warehouse, FileSignature, Tag, Ru
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
+import { useFetch } from '@/hooks/common/use-fetch'
+import { useFormSubmit } from '@/hooks/common/use-form-submit'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -108,15 +110,10 @@ function CatalogsContent() {
   const activeTab = searchParams.get('tab') ?? CATALOGS[0].key
   const catalog = CATALOGS.find(c => c.key === activeTab) ?? CATALOGS[0]
 
-  const [items, setItems] = useState<CatalogItem[]>([])
-  const [families, setFamilies] = useState<Family[]>([])
-  const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<CatalogItem | null>(null)
-  const [submitting, setSubmitting] = useState(false)
   const [deletingItem, setDeletingItem] = useState<CatalogItem | null>(null)
   const [deleting, setDeleting] = useState(false)
-
   const [form, setForm] = useState({ code: '', name: '', symbol: '', description: '', order: 999, familyId: '', location: '' })
 
   const isAdmin = session?.user?.role === 'ADMIN'
@@ -125,22 +122,30 @@ function CatalogsContent() {
     if (status === 'loading') return
     if (!session) { router.push('/login'); return }
     if (!isAdmin && session.user.role !== 'TECHNICIAN') { router.push('/unauthorized'); return }
-    fetch('/api/inventory/families').then(r => r.json()).then(d => setFamilies(d.families ?? []))
   }, [session, status, router, isAdmin])
 
-  const fetchItems = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await fetch(`${catalog.apiGet}&_t=${Date.now()}`, { cache: 'no-store' })
-      if (res.ok) {
-        const data = await res.json()
-        setItems(Array.isArray(data) ? data : (data.types ?? data.warehouses ?? data.units ?? []))
-      }
-    } catch { toast({ title: 'Error', description: 'No se pudieron cargar los datos', variant: 'destructive' }) }
-    finally { setLoading(false) }
-  }, [catalog.apiGet, toast])
+  // Cargar familias con useFetch
+  const { data: families } = useFetch<Family>('/api/inventory/families', {
+    transform: (d) => d.families ?? [],
+    enabled: status === 'authenticated',
+  })
 
-  useEffect(() => { fetchItems() }, [fetchItems])
+  // Cargar items del catálogo activo con useFetch
+  const { data: items, loading, reload: fetchItems } = useFetch<CatalogItem>(catalog.apiGet, {
+    transform: (d) => Array.isArray(d) ? d : (d.types ?? d.warehouses ?? d.units ?? []),
+    enabled: status === 'authenticated',
+  })
+
+  // Submit de formulario (crear/editar) — endpoint dinámico según editingItem
+  const { submit: submitCatalogForm, loading: submitting } = useFormSubmit(
+    editingItem ? catalog.apiPut(editingItem.id) : catalog.apiPost,
+    {
+      method: editingItem ? 'PUT' : 'POST',
+      successMessage: editingItem ? 'Actualizado' : 'Creado',
+      successDescription: form.name,
+      onSuccess: () => { setDialogOpen(false); fetchItems() },
+    }
+  )
 
   const openCreate = () => {
     setEditingItem(null)
@@ -164,27 +169,12 @@ function CatalogsContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setSubmitting(true)
-    try {
-      const url = editingItem ? catalog.apiPut(editingItem.id) : catalog.apiPost
-      const method = editingItem ? 'PUT' : 'POST'
-      const body: Record<string, unknown> = { name: form.name, description: form.description || undefined, order: form.order }
-      if (!editingItem && catalog.hasCode) body.code = form.code
-      if (catalog.hasSymbol) body.symbol = form.symbol
-      if (catalog.hasFamily) body.familyId = form.familyId || null   // null = global/compartido
-      if (catalog.hasLocation) body.location = form.location || undefined
-
-      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-      if (res.ok) {
-        toast({ title: editingItem ? 'Actualizado' : 'Creado', description: form.name })
-        setDialogOpen(false)
-        fetchItems()
-      } else {
-        const err = await res.json()
-        toast({ title: 'Error', description: err.error || 'Error al guardar', variant: 'destructive' })
-      }
-    } catch { toast({ title: 'Error', description: 'Error de conexión', variant: 'destructive' }) }
-    finally { setSubmitting(false) }
+    const body: Record<string, unknown> = { name: form.name, description: form.description || undefined, order: form.order }
+    if (!editingItem && catalog.hasCode) body.code = form.code
+    if (catalog.hasSymbol) body.symbol = form.symbol
+    if (catalog.hasFamily) body.familyId = form.familyId || null
+    if (catalog.hasLocation) body.location = form.location || undefined
+    await submitCatalogForm(body)
   }
 
   const confirmDelete = async () => {

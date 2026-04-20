@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -11,7 +11,8 @@ import { Label } from '@/components/ui/label'
 import { InlineCreateSelect } from '@/components/ui/inline-create-select'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { CatalogTypeInlineForm } from '@/components/inventory/asset-forms/CatalogTypeInlineForm'
-import { useToast } from '@/hooks/use-toast'
+import { useFormSubmit } from '@/hooks/common/use-form-submit'
+import { useFetch } from '@/hooks/common/use-fetch'
 
 const supplierSchema = z.object({
   name: z.string().min(1, 'El nombre del proveedor es obligatorio').max(200),
@@ -40,31 +41,30 @@ interface SupplierFormProps {
 }
 
 export function SupplierForm({ supplier, defaultFamilyId, onSuccess, onCancel }: SupplierFormProps) {
-  const { toast } = useToast()
-  const [loading, setLoading] = useState(false)
-  const [supplierTypes, setSupplierTypes] = useState<SupplierType[]>([])
-  const [families, setFamilies] = useState<{ id: string; name: string }[]>([])
+  const isEdit = !!supplier?.id
   const [typeId, setTypeId] = useState<string>(supplier?.typeId ?? '')
   const [familyId, setFamilyId] = useState<string>(supplier?.familyId ?? defaultFamilyId ?? '')
-  const isEdit = !!supplier?.id
 
-  useEffect(() => {
-    // Cargar tipos filtrados por familia si hay una seleccionada
-    const url = familyId
-      ? `/api/inventory/supplier-types?familyId=${familyId}`
-      : '/api/inventory/supplier-types'
-    fetch(url)
-      .then(r => r.json())
-      .then(d => setSupplierTypes(Array.isArray(d) ? d : []))
-      .catch(() => {})
-  }, [familyId])
+  // Cargar tipos filtrados por familia
+  const { data: supplierTypes, setData: setSupplierTypes } = useFetch<SupplierType>(
+    '/api/inventory/supplier-types',
+    { params: familyId ? { familyId } : undefined }
+  )
 
-  useEffect(() => {
-    fetch('/api/inventory/families')
-      .then(r => r.json())
-      .then(d => setFamilies(d.families ?? []))
-      .catch(() => {})
-  }, [])
+  // Cargar familias
+  const { data: familiesRaw } = useFetch('/api/inventory/families', {
+    transform: (d) => d.families ?? [],
+  })
+  const families = familiesRaw as { id: string; name: string }[]
+
+  const { submit, loading } = useFormSubmit(
+    isEdit ? `/api/inventory/suppliers/${supplier.id}` : '/api/inventory/suppliers',
+    {
+      method: isEdit ? 'PUT' : 'POST',
+      successMessage: isEdit ? 'Proveedor actualizado' : 'Proveedor creado',
+      onSuccess,
+    }
+  )
 
   const { register, handleSubmit, formState: { errors } } = useForm<SupplierFormData>({
     resolver: zodResolver(supplierSchema),
@@ -81,24 +81,7 @@ export function SupplierForm({ supplier, defaultFamilyId, onSuccess, onCancel }:
   })
 
   const onSubmit = async (data: SupplierFormData) => {
-    setLoading(true)
-    try {
-      const url = isEdit ? `/api/inventory/suppliers/${supplier.id}` : '/api/inventory/suppliers'
-      const method = isEdit ? 'PUT' : 'POST'
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...data, typeId: typeId || null, familyId: familyId || null }),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error || 'Error al guardar proveedor')
-      toast({ title: isEdit ? 'Proveedor actualizado' : 'Proveedor creado', description: json.name })
-      onSuccess?.(json)
-    } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' })
-    } finally {
-      setLoading(false)
-    }
+    await submit({ ...data, typeId: typeId || null, familyId: familyId || null })
   }
 
   return (
