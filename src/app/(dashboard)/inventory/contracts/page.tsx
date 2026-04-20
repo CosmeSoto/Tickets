@@ -3,10 +3,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Input } from '@/components/ui/input'
 import { Search, FileSignature, Monitor, RefreshCw, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
+import { FamilyCombobox, type FamilyOption } from '@/components/ui/family-combobox'
+import { ExportButton } from '@/components/common/export-button'
+import { useExport } from '@/hooks/common/use-export'
 
 interface ContractItem {
   id: string
@@ -51,15 +53,30 @@ export default function ContractsPage() {
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'EQUIPMENT' | 'LICENSE'>('ALL')
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'EXPIRING' | 'EXPIRED'>('ALL')
+  const [familyFilter, setFamilyFilter] = useState('all')
+  const [families, setFamilies] = useState<FamilyOption[]>([])
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
   }, [status, router])
 
+  // Cargar familias
+  useEffect(() => {
+    fetch('/api/families?includeInactive=false')
+      .then(r => r.json())
+      .then(d => {
+        if (d.success && Array.isArray(d.data))
+          setFamilies(d.data.map((f: any) => ({ id: f.id, name: f.name, code: f.code, color: f.color })))
+      })
+      .catch(() => {})
+  }, [])
+
   const fetchContracts = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/inventory/contracts')
+      const params = new URLSearchParams()
+      if (familyFilter !== 'all') params.set('familyId', familyFilter)
+      const res = await fetch(`/api/inventory/contracts?${params}`)
       if (res.ok) {
         const data = await res.json()
         setItems(data.items ?? [])
@@ -67,7 +84,7 @@ export default function ContractsPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [familyFilter])
 
   useEffect(() => { fetchContracts() }, [fetchContracts])
 
@@ -85,6 +102,24 @@ export default function ContractsPage() {
     return true
   })
 
+  // Export
+  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+    filename: 'contratos',
+    title: 'Contratos y Suscripciones',
+    getData: () => filtered,
+    columns: [
+      { key: 'type', label: 'Tipo', format: v => TYPE_CONFIG[v as keyof typeof TYPE_CONFIG]?.label ?? v },
+      { key: 'name', label: 'Nombre' },
+      { key: 'contractNumber', label: 'N° Contrato', format: v => v ?? '' },
+      { key: 'supplier', label: 'Proveedor', format: v => v ?? '' },
+      { key: 'startDate', label: 'Inicio', format: v => fmtDate(v) },
+      { key: 'endDate', label: 'Vencimiento', format: v => fmtDate(v) },
+      { key: 'monthlyCost', label: 'Costo mensual', format: v => v != null ? String(v) : '' },
+      { key: 'status', label: 'Estado', format: v => STATUS_CONFIG[v as keyof typeof STATUS_CONFIG]?.label ?? v },
+      { key: 'familyName', label: 'Área', format: v => v ?? '' },
+    ],
+  })
+
   const counts = {
     total: items.length,
     active: items.filter(i => i.status === 'ACTIVE').length,
@@ -92,12 +127,19 @@ export default function ContractsPage() {
     expired: items.filter(i => i.status === 'EXPIRED').length,
   }
 
-  if (status === 'loading') return null
-
   return (
     <ModuleLayout
       title="Contratos y Suscripciones"
       subtitle="Vista unificada de equipos en arrendamiento y licencias con suscripción activa"
+      headerActions={
+        <ExportButton
+          onExportCSV={exportCSV}
+          onExportExcel={exportExcel}
+          onExportPDF={exportPDF}
+          loading={exporting}
+          size="sm"
+        />
+      }
     >
       <div className="space-y-5">
         {/* Resumen */}
@@ -116,8 +158,8 @@ export default function ContractsPage() {
         </div>
 
         {/* Filtros */}
-        <div className="flex flex-col sm:flex-row gap-2">
-          <div className="relative flex-1">
+        <div className="flex flex-col sm:flex-row gap-2 flex-wrap">
+          <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
             <Input
               value={search}
@@ -126,6 +168,14 @@ export default function ContractsPage() {
               className="pl-9"
             />
           </div>
+          <FamilyCombobox
+            families={families}
+            value={familyFilter}
+            onValueChange={v => setFamilyFilter(v || 'all')}
+            allowNull
+            nullLabel="Todas las áreas"
+            popoverWidth="220px"
+          />
           <select
             value={typeFilter}
             onChange={e => setTypeFilter(e.target.value as typeof typeFilter)}

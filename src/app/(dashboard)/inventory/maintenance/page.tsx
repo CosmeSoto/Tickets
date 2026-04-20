@@ -15,6 +15,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { NewMaintenanceDialog } from '@/components/inventory/new-maintenance-dialog'
+import { FamilyCombobox, type FamilyOption } from '@/components/ui/family-combobox'
+import { ExportButton } from '@/components/common/export-button'
+import { useExport } from '@/hooks/common/use-export'
 
 interface MaintenanceItem {
   id: string
@@ -47,7 +50,20 @@ export default function MaintenanceListPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [typeFilter, setTypeFilter] = useState('ALL')
+  const [familyFilter, setFamilyFilter] = useState('all')
+  const [families, setFamilies] = useState<FamilyOption[]>([])
   const [showNew, setShowNew] = useState(false)
+
+  // Cargar familias
+  useEffect(() => {
+    fetch('/api/families?includeInactive=false')
+      .then(r => r.json())
+      .then(d => {
+        if (d.success && Array.isArray(d.data))
+          setFamilies(d.data.map((f: any) => ({ id: f.id, name: f.name, code: f.code, color: f.color })))
+      })
+      .catch(() => {})
+  }, [])
 
   const role = session?.user?.role
   const isClient = role === 'CLIENT'
@@ -64,14 +80,14 @@ export default function MaintenanceListPage() {
       const params = new URLSearchParams()
       if (statusFilter !== 'ALL') params.set('status', statusFilter)
       if (typeFilter !== 'ALL') params.set('type', typeFilter)
-      // En tab 'mine' solo traer los de equipos asignados al usuario
       if (activeTab === 'mine') params.set('personalOnly', 'true')
+      if (familyFilter !== 'all') params.set('familyId', familyFilter)
       const res = await fetch(`/api/inventory/maintenance?${params}`, { cache: 'no-store' })
       if (res.ok) setRecords(await res.json())
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, typeFilter, activeTab])
+  }, [statusFilter, typeFilter, activeTab, familyFilter])
 
   useEffect(() => { fetchRecords() }, [fetchRecords])
 
@@ -93,6 +109,22 @@ export default function MaintenanceListPage() {
     ? records.filter(r => r.status === 'SCHEDULED').length
     : records.filter(r => r.status === 'REQUESTED').length
 
+  // Export
+  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+    filename: 'mantenimientos',
+    title: 'Mantenimientos',
+    getData: () => filtered,
+    columns: [
+      { key: 'type', label: 'Tipo', format: v => TYPE_LABELS[v] ?? v },
+      { key: 'status', label: 'Estado', format: v => STATUS_CONFIG[v]?.label ?? v },
+      { key: 'equipment', label: 'Equipo', format: v => `${v.brand} ${v.model} (${v.code})` },
+      { key: 'description', label: 'Descripción' },
+      { key: 'date', label: 'Fecha', format: v => v ? new Date(v).toLocaleDateString('es-CL') : '' },
+      { key: 'technician', label: 'Técnico', format: v => v?.name ?? '' },
+      { key: 'requestedBy', label: 'Solicitado por', format: v => v?.name ?? '' },
+    ],
+  })
+
   const title = isClient && !canManageInventory ? 'Mis Mantenimientos' : 'Mantenimientos'
   const subtitle = isClient && !canManageInventory
     ? 'Historial de mantenimientos de tus equipos'
@@ -105,17 +137,26 @@ export default function MaintenanceListPage() {
       title={title}
       subtitle={subtitle}
       headerActions={
-        isAdminOrTech || isManager ? (
-          <Button onClick={() => setShowNew(true)} size="sm">
-            <Plus className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Nuevo Mantenimiento</span>
-          </Button>
-        ) : (
-          <Button onClick={() => setShowNew(true)} variant="outline" size="sm">
-            <Plus className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Solicitar Mantenimiento</span>
-          </Button>
-        )
+        <div className="flex items-center gap-2">
+          <ExportButton
+            onExportCSV={exportCSV}
+            onExportExcel={exportExcel}
+            onExportPDF={exportPDF}
+            loading={exporting}
+            size="sm"
+          />
+          {isAdminOrTech || isManager ? (
+            <Button onClick={() => setShowNew(true)} size="sm">
+              <Plus className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Nuevo Mantenimiento</span>
+            </Button>
+          ) : (
+            <Button onClick={() => setShowNew(true)} variant="outline" size="sm">
+              <Plus className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Solicitar Mantenimiento</span>
+            </Button>
+          )}
+        </div>
       }
     >
       <div className="space-y-4">
@@ -153,8 +194,8 @@ export default function MaintenanceListPage() {
         )}
 
         {/* Filtros */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
+        <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
+          <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Buscar por equipo, técnico, descripción..."
@@ -163,6 +204,16 @@ export default function MaintenanceListPage() {
               className="pl-9"
             />
           </div>
+          {!isClientOnly && (
+            <FamilyCombobox
+              families={families}
+              value={familyFilter}
+              onValueChange={v => setFamilyFilter(v || 'all')}
+              allowNull
+              nullLabel="Todas las áreas"
+              popoverWidth="220px"
+            />
+          )}
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-full sm:w-44">
               <Filter className="h-4 w-4 mr-2 text-muted-foreground" />

@@ -4,7 +4,7 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { UnifiedInventoryList } from '@/components/inventory/unified-inventory-list'
 import { Button } from '@/components/ui/button'
 import { Plus, Package, User } from 'lucide-react'
@@ -16,15 +16,12 @@ function InventoryContent() {
   const searchParams = useSearchParams()
 
   const familyId = searchParams.get('familyId') ?? undefined
-  const tab = searchParams.get('tab') ?? 'family'   // 'family' | 'mine'
+  const tab = searchParams.get('tab') ?? 'family'
 
   const role = session?.user?.role
   const isClient = role === 'CLIENT'
   const canManageInventory = (session?.user as any)?.canManageInventory === true
-
-  // Usuarios que gestionan familias Y también pueden tener equipos asignados personalmente
   const isManager = canManageInventory
-  // Cliente sin gestión: solo ve sus equipos asignados — forzar personalOnly siempre
   const isClientOnly = isClient && !canManageInventory
 
   useEffect(() => {
@@ -33,23 +30,15 @@ function InventoryContent() {
 
   if (status === 'loading') {
     return (
-      <RoleDashboardLayout title="Cargando..." subtitle="Obteniendo información">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
-        </div>
-      </RoleDashboardLayout>
+      <ModuleLayout title="Cargando..." loading={true}><div /></ModuleLayout>
     )
   }
 
   if (!session?.user) return null
 
   const canCreate = role === 'ADMIN' || role === 'TECHNICIAN' || canManageInventory
-
-  // Título y subtítulo según contexto
   const title = isClientOnly ? 'Mis Equipos' : 'Inventario'
-  const subtitle = isClientOnly
-    ? 'Equipos asignados a tu cuenta'
-    : 'Gestiona el inventario de activos'
+  const subtitle = isClientOnly ? 'Equipos asignados a tu cuenta' : 'Gestiona el inventario de activos'
 
   const setTab = (t: string) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -58,17 +47,16 @@ function InventoryContent() {
     router.push(`/inventory?${params.toString()}`)
   }
 
-  // Cliente sin gestión: siempre personalOnly, sin tabs ni botón crear
   if (isClientOnly) {
     return (
-      <RoleDashboardLayout title={title} subtitle={subtitle}>
+      <ModuleLayout title={title} subtitle={subtitle}>
         <UnifiedInventoryList personalOnly={true} />
-      </RoleDashboardLayout>
+      </ModuleLayout>
     )
   }
 
   return (
-    <RoleDashboardLayout
+    <ModuleLayout
       title={title}
       subtitle={subtitle}
       headerActions={
@@ -82,15 +70,12 @@ function InventoryContent() {
         ) : undefined
       }
     >
-      {/* Tabs solo para gestores/admins/técnicos que también tienen equipos asignados */}
       {isManager && (
         <div className="flex gap-1 p-1 bg-muted rounded-lg w-fit mb-4">
           <button
             onClick={() => setTab('family')}
             className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              tab !== 'mine'
-                ? 'bg-background shadow-sm text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
+              tab !== 'mine' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             <Package className="h-4 w-4" />
@@ -99,9 +84,7 @@ function InventoryContent() {
           <button
             onClick={() => setTab('mine')}
             className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              tab === 'mine'
-                ? 'bg-background shadow-sm text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
+              tab === 'mine' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             <User className="h-4 w-4" />
@@ -109,15 +92,13 @@ function InventoryContent() {
           </button>
         </div>
       )}
-
       <UnifiedInventoryList
         initialFamilyId={tab !== 'mine' ? familyId : undefined}
         personalOnly={tab === 'mine'}
       />
-    </RoleDashboardLayout>
+    </ModuleLayout>
   )
 }
-
 export default function InventoryPage() {
   return (
     <Suspense>
