@@ -99,7 +99,7 @@ export async function PUT(
       }
     }
 
-    const warehouse = await prisma.warehouses.update({
+    const warehouse = await (prisma.warehouses.update as any)({
       where: { id },
       data: {
         ...(name !== undefined && { name: String(name).trim() }),

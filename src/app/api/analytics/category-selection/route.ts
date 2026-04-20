@@ -202,7 +202,7 @@ export async function POST(request: NextRequest) {
         categoryId: body.categoryId || null,
         searchQuery: sanitizedSearchQuery,
         timeToSelect: body.timeToSelect || null,
-        metadata: sanitizedMetadata,
+        metadata: sanitizedMetadata ?? undefined,
       },
     });
 

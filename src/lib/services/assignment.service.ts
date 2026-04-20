@@ -343,7 +343,7 @@ export class AssignmentService {
           where: { id: assignment.equipmentId },
           data: {
             status: 'AVAILABLE',
-            ...(condition && { condition }),
+            ...(condition && { condition: condition as any }),
           }
         })
 

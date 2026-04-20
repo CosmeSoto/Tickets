@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     const isAdmin = session.user.role === 'ADMIN'
 
     // Construir filtro de estado
-    const statusFilter = status && status !== 'all' ? { status } : {}
+    const statusFilter: any = status && status !== 'all' ? { status } : {}
 
     // Admin ve todas; otros solo las suyas
     const whereClause = isAdmin
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
       ])
     } else {
       // Filtrar por userId dentro del JSON usando path filter de Prisma
-      const jsonFilter = {
+      const jsonFilter: any = {
         OR: [
           { delivererInfo: { path: ['id'], equals: userId } },
           { receiverInfo:  { path: ['id'], equals: userId } },

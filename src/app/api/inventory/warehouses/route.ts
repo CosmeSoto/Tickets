@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     const includeInactive = isAdmin && request.nextUrl.searchParams.get('includeInactive') === 'true'
     const familyId = request.nextUrl.searchParams.get('familyId') ?? undefined
 
-    const warehouses = await prisma.warehouses.findMany({
+    const warehouses = await (prisma.warehouses.findMany as any)({
       where: {
         ...(includeInactive ? {} : { isActive: true }),
         // Si se filtra por familia: mostrar bodegas de esa familia + bodegas compartidas (sin familia)
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
 
     if (!name?.trim()) return NextResponse.json({ error: 'El nombre es requerido' }, { status: 400 })
 
-    const warehouse = await prisma.warehouses.create({
+    const warehouse = await (prisma.warehouses.create as any)({
       data: {
         id: randomUUID(),
         name: name.trim(),

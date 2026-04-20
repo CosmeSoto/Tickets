@@ -75,7 +75,7 @@ export async function DELETE(
       entityType: 'equipment',
       entityId: equipmentId,
       userId: session.user.id,
-      descripcion: `Archivo adjunto "${attachment.originalName}" eliminado del equipo ${attachment.equipment.code}`,
+      details: { descripcion: `Archivo adjunto "${attachment.originalName}" eliminado del equipo ${attachment.equipment.code}` },
       createdAt: new Date(),
     },
   })

@@ -106,6 +106,7 @@ export function AssignmentStrategyPreview({
           setPreview({
             selectedTechnician: null,
             strategy: {
+              categoryId: '',
               categoryLevel,
               availableTechnicians: [],
               categoryPath: hierarchyPath

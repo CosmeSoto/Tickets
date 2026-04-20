@@ -197,7 +197,7 @@ export class DeliveryActService {
    */
   static async getActById(id: string): Promise<DeliveryAct | null> {
     try {
-      const act = await prisma.delivery_acts.findUnique({
+      const act = await (prisma.delivery_acts.findUnique as any)({
         where: { id },
         include: {
           assignment: {
@@ -222,7 +222,7 @@ export class DeliveryActService {
    */
   static async getActByToken(token: string): Promise<DeliveryAct | null> {
     try {
-      const act = await prisma.delivery_acts.findUnique({
+      const act = await (prisma.delivery_acts.findUnique as any)({
         where: { acceptanceToken: token },
         include: {
           assignment: {
@@ -332,7 +332,7 @@ export class DeliveryActService {
         console.error('Error generando PDF post-aceptación:', err)
       })
 
-      return updated as DeliveryAct
+      return updated as unknown as DeliveryAct
     } catch (error) {
       console.error('Error aceptando acta:', error)
       throw error
@@ -424,7 +424,7 @@ export class DeliveryActService {
         // El error se registra pero no se propaga para no afectar el rechazo
       })
 
-      return updated as DeliveryAct
+      return updated as unknown as DeliveryAct
     } catch (error) {
       console.error('Error rechazando acta:', error)
       throw error
@@ -475,7 +475,7 @@ export class DeliveryActService {
       const targetDate = new Date()
       targetDate.setDate(targetDate.getDate() + days)
 
-      const acts = await prisma.delivery_acts.findMany({
+      const acts = await (prisma.delivery_acts.findMany as any)({
         where: {
           status: 'PENDING',
           expirationDate: {

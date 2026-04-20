@@ -127,7 +127,7 @@ export function useUserSettings() {
       loadSettings()
     }
 
-    return unsub
+    return () => { unsub() }
   }, [status])
 
   /** Actualiza settings localmente + persiste en la BD */

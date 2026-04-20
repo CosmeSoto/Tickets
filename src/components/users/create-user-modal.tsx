@@ -334,9 +334,8 @@ export function CreateUserModal({
                 <DepartmentSelector
                   value={formData.departmentId || null}
                   onChange={val => setFormData(p => ({ ...p, departmentId: val ?? '' }))}
-                  departments={departments}
+                  departments={departments as any}
                   placeholder="Buscar departamento..."
-                  emptyLabel="Sin departamento"
                   error={errors.departmentId}
                 />
               </div>

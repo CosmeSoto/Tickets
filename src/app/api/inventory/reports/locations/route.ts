@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
       familyFilter = [familyId]
     }
 
-    const equipment = await prisma.equipment.findMany({
+    const equipment = await (prisma.equipment.findMany as any)({
       where: {
         status: { not: 'RETIRED' },
         ...(familyFilter ? { type: { familyId: { in: familyFilter } } } : {}),
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
       orderBy: [{ physicalLocation: 'asc' }, { code: 'asc' }],
     })
 
-    const rows: LocationRow[] = equipment.map((e) => {
+    const rows: LocationRow[] = equipment.map((e: any) => {
       const assignment = e.assignments[0]
       return {
         equipmentCode: e.code,

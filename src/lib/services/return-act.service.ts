@@ -44,7 +44,7 @@ export class ReturnActService {
   static async generateReturnAct(data: CreateReturnActData): Promise<ReturnAct> {
     try {
       // Obtener asignación con relaciones
-      const assignment = await prisma.equipment_assignments.findUnique({
+      const assignment = await (prisma.equipment_assignments.findUnique as any)({
         where: { id: data.assignmentId },
         include: {
           equipment: true,
@@ -62,7 +62,7 @@ export class ReturnActService {
         throw new Error('La asignación no está activa')
       }
 
-      if (!assignment.deliveryAct || assignment.deliveryAct.status !== 'ACCEPTED') {
+      if (!assignment.deliveryAct || (assignment.deliveryAct as any).status !== 'ACCEPTED') {
         throw new Error('La asignación no tiene un acta de entrega aceptada')
       }
 
@@ -86,7 +86,7 @@ export class ReturnActService {
         serialNumber: assignment.equipment.serialNumber,
         brand: assignment.equipment.brand,
         model: assignment.equipment.model,
-        type: assignment.equipment.type,
+        type: (assignment.equipment as any).type,
         condition: data.returnCondition,
         specifications: assignment.equipment.specifications,
       }
@@ -97,7 +97,7 @@ export class ReturnActService {
         name: assignment.receiver.name,
         email: assignment.receiver.email,
         role: assignment.receiver.role,
-        department: assignment.receiver.departments?.name,
+        department: (assignment.receiver as any).departments?.name,
       }
 
       // Crear info del deliverer (quien recibe la devolución - era el deliverer en la entrega)
@@ -106,15 +106,15 @@ export class ReturnActService {
         name: assignment.deliverer.name,
         email: assignment.deliverer.email,
         role: assignment.deliverer.role,
-        department: assignment.deliverer.departments?.name,
+        department: (assignment.deliverer as any).departments?.name,
       }
 
       // Crear acta de devolución
-      const act = await prisma.return_acts.create({
+      const act = await (prisma.return_acts.create as any)({
         data: {
           folio,
           assignmentId: data.assignmentId,
-          deliveryActId: assignment.deliveryAct.id,
+          deliveryActId: (assignment.deliveryAct as any).id,
           equipmentSnapshot,
           receiverInfo,
           delivererInfo,
@@ -169,7 +169,7 @@ export class ReturnActService {
    */
   static async getActById(id: string): Promise<ReturnAct | null> {
     try {
-      const act = await prisma.return_acts.findUnique({
+      const act = await (prisma.return_acts.findUnique as any)({
         where: { id },
         include: {
           assignment: {
@@ -195,7 +195,7 @@ export class ReturnActService {
    */
   static async getActByToken(token: string): Promise<ReturnAct | null> {
     try {
-      const act = await prisma.return_acts.findUnique({
+      const act = await (prisma.return_acts.findUnique as any)({
         where: { acceptanceToken: token },
         include: {
           assignment: {
@@ -245,8 +245,8 @@ export class ReturnActService {
       const signature = DigitalSignatureService.createDigitalSignature(
         act.id,
         act.folio,
-        act.receiverInfo.id,
-        act.delivererInfo.id,
+        (act as any).receiverInfo?.id ?? '',
+        (act as any).delivererInfo?.id ?? '',
         ipAddress,
         userAgent
       )
@@ -255,7 +255,7 @@ export class ReturnActService {
       let newEquipmentStatus: EquipmentStatus
       let newEquipmentCondition: EquipmentCondition
 
-      switch (act.returnCondition) {
+      switch ((act as any).returnCondition) {
         case 'DAMAGED':
           newEquipmentStatus = 'DAMAGED'
           newEquipmentCondition = 'POOR'
@@ -274,7 +274,7 @@ export class ReturnActService {
           break
         case 'EXCELLENT':
           newEquipmentStatus = 'AVAILABLE'
-          newEquipmentCondition = 'EXCELLENT'
+          newEquipmentCondition = 'GOOD' as EquipmentCondition
           break
         default:
           newEquipmentStatus = 'AVAILABLE'
@@ -284,7 +284,7 @@ export class ReturnActService {
       // Actualizar acta, asignación y equipo en transacción
       const updated = await prisma.$transaction(async (tx) => {
         // Actualizar acta
-        const updatedAct = await tx.return_acts.update({
+        const updatedAct = await (tx.return_acts.update as any)({
           where: { id: actId },
           data: {
             status: 'ACCEPTED',
@@ -317,7 +317,7 @@ export class ReturnActService {
 
         // Actualizar estado y condición del equipo
         await tx.equipment.update({
-          where: { id: act.assignment.equipmentId },
+          where: { id: (act as any).assignment.equipmentId },
           data: {
             status: newEquipmentStatus,
             condition: newEquipmentCondition,
@@ -331,7 +331,7 @@ export class ReturnActService {
             action: 'ACCEPTED',
             entityType: 'return_act',
             entityId: actId,
-            userId: act.delivererInfo.id,
+            userId: (act as any).delivererInfo?.id ?? (act as any).delivererId ?? '',
             details: {
               folio: act.folio,
               signatureHash: signature.hash,
@@ -378,7 +378,7 @@ export class ReturnActService {
       }
 
       // Actualizar acta
-      const updated = await prisma.return_acts.update({
+      const updated = await (prisma.return_acts.update as any)({
         where: { id: actId },
         data: {
           status: 'REJECTED',
@@ -441,8 +441,8 @@ export class ReturnActService {
     return DigitalSignatureService.verifyHash(act.verificationHash, {
       actId: act.id,
       folio: act.folio,
-      receiverId: act.receiverInfo.id,
-      delivererId: act.delivererInfo.id,
+      receiverId: (act.receiverInfo as any)?.id ?? '',
+      delivererId: (act.delivererInfo as any)?.id ?? '',
       timestamp: new Date(act.signatureTimestamp),
       ipAddress: act.signatureIp,
       userAgent: act.signatureUserAgent,

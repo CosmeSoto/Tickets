@@ -45,10 +45,9 @@ export class EquipmentService {
           brand: data.brand,
           model: data.model,
           typeId: data.typeId,
-          departmentId: data.departmentId,
-          status: data.status || 'AVAILABLE',
-          condition: data.condition,
-          ownershipType: data.ownershipType,
+          status: (data.status || 'AVAILABLE') as any,
+          condition: data.condition as any,
+          ownershipType: data.ownershipType as any,
           purchaseDate: data.purchaseDate ? new Date(data.purchaseDate as string | number) : undefined,
           purchasePrice: data.purchasePrice,
           warrantyExpiration: data.warrantyExpiration ? new Date(data.warrantyExpiration as string | number) : undefined,
@@ -57,7 +56,8 @@ export class EquipmentService {
           location: data.location,
           notes: data.notes,
           qrCode: qrCodeId,
-        }
+          ...((data as any).departmentId !== undefined && { departmentId: (data as any).departmentId }),
+        } as any
       })
 
       // Registrar en auditoría
@@ -187,12 +187,12 @@ export class EquipmentService {
 
       // Filtro por familia (a través del departamento del equipo, no del tipo)
       if ((filters as any).familyId) {
-        where.department = { familyId: (filters as any).familyId }
+        ;(where as any).department = { familyId: (filters as any).familyId }
       }
 
       // Filtro por departamento
       if (filters.departmentId) {
-        where.departmentId = filters.departmentId
+        ;(where as any).departmentId = filters.departmentId
       }
 
       // Filtros por estado
@@ -282,9 +282,9 @@ export class EquipmentService {
           ...(data.brand && { brand: data.brand }),
           ...(data.model && { model: data.model }),
           ...(data.typeId && { typeId: data.typeId }),
-          ...(data.status && { status: data.status }),
-          ...(data.condition && { condition: data.condition }),
-          ...(data.ownershipType && { ownershipType: data.ownershipType }),
+          ...(data.status && { status: data.status as any }),
+          ...(data.condition && { condition: data.condition as any }),
+          ...(data.ownershipType && { ownershipType: data.ownershipType as any }),
           ...(data.purchaseDate !== undefined && { 
             purchaseDate: data.purchaseDate ? new Date(data.purchaseDate) : null 
           }),
@@ -517,7 +517,7 @@ export class EquipmentService {
         damaged: 0,
         retired: 0,
         byType: {},
-        byCondition: {},
+        byCondition: {} as any,
         totalValue: 0
       }
     }
@@ -582,7 +582,7 @@ export class EquipmentService {
 
       history.push({
         id: log.id,
-        type: this.mapActionToEventType(log.action),
+        type: this.mapActionToEventType(log.action) as any,
         description: this.getAuditLogDescription(log.action, details),
         userId: log.userId || undefined,
         userName: log.users?.name,

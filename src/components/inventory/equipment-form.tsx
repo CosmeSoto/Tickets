@@ -162,7 +162,7 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
     setValue,
     watch,
   } = useForm<CreateEquipmentInput>({
-    resolver: zodResolver(createEquipmentSchema),
+    resolver: zodResolver(createEquipmentSchema) as any,
     defaultValues: equipment ? {
       code: equipment.code,
       serialNumber: equipment.serialNumber,

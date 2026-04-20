@@ -104,7 +104,7 @@ export async function POST(
       entityType: 'equipment',
       entityId: equipmentId,
       userId: session.user.id,
-      descripcion: `Archivo adjunto "${file.name}" subido al equipo ${equipment.code}`,
+      details: { descripcion: `Archivo adjunto "${file.name}" subido al equipo ${equipment.code}` },
       createdAt: new Date(),
     },
   })

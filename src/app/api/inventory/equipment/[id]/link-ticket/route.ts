@@ -29,9 +29,6 @@ export async function POST(
     // Verificar que el equipo existe
     const equipment = await prisma.equipment.findUnique({
       where: { id: equipmentId },
-      include: {
-        currentAssignment: true
-      }
     })
 
     if (!equipment) {
@@ -68,9 +65,9 @@ export async function POST(
         type: 'CORRECTIVE',
         description: `Problema reportado por usuario: ${ticket.title}`,
         date: new Date(),
-        technicianId: equipment.currentAssignment?.delivererId || session.user.id,
+        technicianId: (equipment as any).currentAssignment?.delivererId || session.user.id,
         ticketId,
-        status: 'PENDING',
+        status: 'REQUESTED',
       }
     })
 

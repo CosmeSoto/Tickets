@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
       where.equipment = { type: { familyId: { in: familyFilter } } }
     }
 
-    const assignments = await prisma.equipment_assignments.findMany({
+    const assignments = await (prisma.equipment_assignments.findMany as any)({
       where,
       include: {
         equipment: {
@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
       orderBy: { startDate: 'desc' },
     })
 
-    const rows: AssignmentRow[] = assignments.map((a) => ({
+    const rows: AssignmentRow[] = assignments.map((a: any) => ({
       equipmentCode: a.equipment.code,
       equipmentName: `${a.equipment.brand} ${a.equipment.model}`,
       familia: a.equipment.type?.family?.name ?? '—',
@@ -121,8 +121,8 @@ export async function GET(request: NextRequest) {
 
     // ── Indicadores ejecutivos ────────────────────────────────────────────────
     const totalAsignados = rows.length
-    const uniqueUsers = new Set(assignments.map((a) => a.receiverId)).size
-    const permanentes = assignments.filter((a) => a.assignmentType === 'PERMANENT').length
+    const uniqueUsers = new Set(assignments.map((a: any) => a.receiverId)).size
+    const permanentes = assignments.filter((a: any) => a.assignmentType === 'PERMANENT').length
 
     const summary = [
       {

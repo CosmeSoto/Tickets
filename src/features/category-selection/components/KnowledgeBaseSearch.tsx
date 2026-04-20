@@ -29,7 +29,7 @@ export function KnowledgeBaseSearch({
   const [error, setError] = React.useState<string | null>(null);
 
   // Debounce search
-  const timeoutRef = React.useRef<NodeJS.Timeout>();
+  const timeoutRef = React.useRef<NodeJS.Timeout | undefined>(undefined);
 
   const performSearch = React.useCallback(async (searchQuery: string) => {
     if (searchQuery.trim().length < 2) {

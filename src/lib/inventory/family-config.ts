@@ -70,6 +70,7 @@ export async function getFamilyConfig(familyId: string): Promise<FamilyConfig> {
       allowedSubtypes: config.allowedSubtypes as AssetSubtype[],
       visibleSections: config.visibleSections as FormSection[],
       requiredSections: config.requiredSections as FormSection[],
+      requireFinancialForNew: config.requireFinancialForNew,
     }
   } catch {
     // Si la tabla no existe aún, devolver config por defecto

@@ -100,7 +100,7 @@ export function RelatedArticles({
   const [tab, setTab] = React.useState<'related' | 'search'>('related');
   const [searchQuery, setSearchQuery] = React.useState('');
   const [debouncedQuery, setDebouncedQuery] = React.useState('');
-  const timerRef = React.useRef<NodeJS.Timeout>();
+  const timerRef = React.useRef<NodeJS.Timeout | undefined>(undefined);
 
   // Related articles query
   const { data: related = [], isLoading: loadingRelated } = useQuery<ArticleWithRelevance[], Error>({

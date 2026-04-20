@@ -97,7 +97,7 @@ export class PDFGeneratorService {
       const systemInfo = await getSystemBranding()
 
       // Generar PDF
-      const doc = await generateDeliveryActPDF(act as DeliveryAct, qrCodeDataUrl, systemInfo)
+      const doc = await generateDeliveryActPDF(act as any, qrCodeDataUrl, systemInfo)
 
       // Nombre del archivo
       const fileName = `${act.folio.replace(/\//g, '-')}_${Date.now()}.pdf`

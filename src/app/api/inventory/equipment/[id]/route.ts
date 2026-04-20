@@ -160,14 +160,14 @@ export async function PUT(
     if (validatedData.departmentId !== undefined) {
       const currentEquipmentDept = await prisma.equipment.findUnique({
         where: { id },
-        select: { departmentId: true },
+        select: { departmentId: true } as any,
       })
 
       if (!currentEquipmentDept) {
         return NextResponse.json({ error: 'Equipo no encontrado' }, { status: 404 })
       }
 
-      if (validatedData.departmentId !== currentEquipmentDept.departmentId) {
+      if (validatedData.departmentId !== (currentEquipmentDept as any).departmentId) {
         const activeAssignment = await prisma.equipment_assignments.findFirst({
           where: { equipmentId: id, isActive: true },
         })

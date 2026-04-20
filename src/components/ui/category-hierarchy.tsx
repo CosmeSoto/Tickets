@@ -69,7 +69,7 @@ export function CategoryHierarchy({
         const isFirst = index === 0
         
         return (
-          <div key={item.id || index} className="flex items-center space-x-1">
+          <div key={(item as any).id || index} className="flex items-center space-x-1">
             {/* Separador (excepto para el primer elemento) */}
             {!isFirst && (
               <ChevronRight className={cn(

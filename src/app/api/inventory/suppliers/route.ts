@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
       where.AND = [familyFilter]
     }
 
-    const suppliers = await prisma.suppliers.findMany({
+    const suppliers = await (prisma.suppliers.findMany as any)({
       where,
       include: {
         supplierType: { select: { id: true, name: true } },
@@ -111,10 +111,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const supplier = await prisma.suppliers.create({
+    const supplier = await (prisma.suppliers.create as any)({
       data: {
         name: name.trim(),
-        typeId: typeId || null,
+        type: typeId || null,
         familyId: familyId || null,
         taxId: taxId || null,
         email: email || null,
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
         details: {
           message: `Proveedor "${supplier.name}" creado por ${session.user.email}`,
           supplierName: supplier.name,
-          supplierType: supplier.type,
+          supplierType: (supplier as any).type,
           taxId: supplier.taxId,
         },
       },

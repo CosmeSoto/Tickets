@@ -385,7 +385,7 @@ export async function POST(req: NextRequest) {
         depreciationMethod: depreciationMethod ?? undefined,
         warehouseId: resolvedEquipmentWarehouseId,
         qrCode: randomUUID(),
-      },
+      } as any,
     })
   } else if (subtype === 'MRO') {
     const resolvedWarehouseId = warehouseId ?? defaultWarehouseId

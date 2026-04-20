@@ -154,7 +154,7 @@ async function seedTicketFamilyConfigs(familyMap: Map<string, string>) {
     const familyId = familyMap.get(f.code)!
     await prisma.ticket_family_config.upsert({
       where: { familyId },
-      update: { codePrefix: f.prefix, isDefault: f.isDefault, ticketsEnabled: true, allowedFromFamilies: f.allowedFromFamilies },
+      update: { codePrefix: f.prefix, isDefault: f.isDefault, ticketsEnabled: true, allowedFromFamilies: f.allowedFromFamilies } as any,
       create: {
         id: randomUUID(), familyId,
         ticketsEnabled: true, codePrefix: f.prefix, isDefault: f.isDefault,
@@ -162,14 +162,14 @@ async function seedTicketFamilyConfigs(familyMap: Map<string, string>) {
         autoAssignRespectsFamilies: true, alertVolumeThreshold: 50,
         businessHoursStart: '08:00:00', businessHoursEnd: '17:00:00',
         businessDays: 'MON,TUE,WED,THU,FRI',
-      },
+      } as any,
     })
   }
   for (const code of disabledFamilies) {
     const familyId = familyMap.get(code)!
     await prisma.ticket_family_config.upsert({
       where: { familyId },
-      update: { ticketsEnabled: false },
+      update: { ticketsEnabled: false } as any,
       create: {
         id: randomUUID(), familyId, ticketsEnabled: false,
         codePrefix: code.slice(0, 5), isDefault: false,
@@ -177,7 +177,7 @@ async function seedTicketFamilyConfigs(familyMap: Map<string, string>) {
         autoAssignRespectsFamilies: true,
         businessHoursStart: '08:00:00', businessHoursEnd: '17:00:00',
         businessDays: 'MON,TUE,WED,THU,FRI',
-      },
+      } as any,
     })
   }
   console.log('✅ Configuraciones de tickets por familia (allowedFromFamilies vacío = todas)')

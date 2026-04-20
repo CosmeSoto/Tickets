@@ -109,11 +109,11 @@ export async function PUT(
       }
     }
 
-    const supplier = await prisma.suppliers.update({
+    const supplier = await (prisma.suppliers.update as any)({
       where: { id },
       data: {
         name: name.trim(),
-        typeId: typeId || null,
+        type: typeId || null,
         familyId: familyId || null,
         taxId: taxId || null,
         email: email || null,
@@ -135,7 +135,7 @@ export async function PUT(
         details: {
           message: `Proveedor "${supplier.name}" actualizado por ${session.user.email}`,
           supplierName: supplier.name,
-          supplierType: supplier.type,
+          supplierType: (supplier as any).type,
         },
       },
     })

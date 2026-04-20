@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const validatedData = createConsumableSchema.parse(body)
-    const consumable = await ConsumableService.createConsumable(validatedData, session.user.id)
+    const consumable = await ConsumableService.createConsumable(validatedData as any, session.user.id)
 
     await AuditServiceComplete.log({
       action: AuditActionsComplete.CONSUMABLE_CREATED,

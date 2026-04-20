@@ -215,7 +215,6 @@ export function ContractSection({
             <p className="text-sm text-muted-foreground">Cargando contratos...</p>
           ) : (
             <SearchableSelect
-              id="existingContract"
               options={existingContracts.map(c => ({ value: c.id, label: c.contractNumber ?? c.name }))}
               value={selectedContractId}
               onChange={setSelectedContractId}

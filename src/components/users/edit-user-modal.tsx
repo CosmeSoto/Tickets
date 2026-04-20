@@ -299,7 +299,7 @@ export function EditUserModal({ isOpen, onClose, onUserUpdated, user, department
             {/* Estadísticas rápidas */}
             <div className="flex gap-3 shrink-0">
               <div className="text-center">
-                <p className="text-lg font-bold text-blue-600">{user._count?.tickets_tickets_clientIdTousers ?? 0}</p>
+                <p className="text-lg font-bold text-blue-600">{(user._count as any)?.tickets_tickets_clientIdTousers ?? 0}</p>
                 <p className="text-xs text-muted-foreground flex items-center gap-0.5"><Ticket className="h-3 w-3" />Tickets</p>
               </div>
               <div className="text-center">
@@ -392,9 +392,8 @@ export function EditUserModal({ isOpen, onClose, onUserUpdated, user, department
                 <DepartmentSelector
                   value={formData.departmentId || null}
                   onChange={val => setFormData(p => ({ ...p, departmentId: val ?? '' }))}
-                  departments={departments}
+                  departments={departments as any}
                   placeholder="Buscar departamento..."
-                  emptyLabel="Sin departamento"
                   error={errors.departmentId}
                 />
               </div>

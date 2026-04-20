@@ -196,7 +196,7 @@ export class FileService {
     if (!ticket) throw new Error('Ticket no encontrado')
 
     // 4. Leer buffer original
-    const originalBuffer = Buffer.from(await file.arrayBuffer())
+    const originalBuffer = Buffer.from(await file.arrayBuffer()) as Buffer
     const originalSize = originalBuffer.length
 
     // 5. Comprimir si es imagen comprimible

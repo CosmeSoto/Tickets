@@ -34,7 +34,7 @@ export class ConsumableService {
         location: data.location,
         notes: data.notes,
         compatibleEquipment: data.compatibleEquipment || [],
-      },
+      } as any,
       include: consumableInclude,
     })
 
@@ -47,7 +47,7 @@ export class ConsumableService {
       }, userId)
     }
 
-    return consumable as Consumable
+    return consumable as unknown as Consumable
   }
 
   static async updateConsumable(id: string, data: UpdateConsumableData, userId: string): Promise<Consumable> {
@@ -61,7 +61,7 @@ export class ConsumableService {
       data: updateData,
       include: consumableInclude,
     })
-    return consumable as Consumable
+    return consumable as unknown as Consumable
   }
 
   static async deleteConsumable(id: string, userId: string): Promise<void> {
@@ -195,7 +195,7 @@ export class ConsumableService {
       prisma.consumables.count({ where }),
     ])
 
-    return { consumables: consumables as Consumable[], total }
+    return { consumables: consumables as unknown as Consumable[], total }
   }
 
   static async getConsumableSummary(): Promise<ConsumableSummary> {

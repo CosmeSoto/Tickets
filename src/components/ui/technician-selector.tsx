@@ -75,7 +75,7 @@ export function TechnicianSelector({
   const filteredTechnicians = availableTechnicians.filter(tech =>
     tech.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     tech.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (tech.department && tech.department.toLowerCase().includes(searchTerm.toLowerCase()))
+    (tech.department && getDeptName(tech.department)?.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
   // Obtener técnicos asignados con información completa
