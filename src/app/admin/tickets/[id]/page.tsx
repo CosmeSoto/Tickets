@@ -216,8 +216,8 @@ export default function AdminTicketDetailPage() {
     <TicketDetailLayout
       title={ticket.title}
       ticketCode={getTicketDisplayCode(ticket)}
-      status={getStatusConfig(ticket.status)}
-      priority={getPriorityConfig(ticket.priority)}
+      status={getStatusConfig(ticket.status) ?? { label: ticket.status, color: '' }}
+      priority={getPriorityConfig(ticket.priority) ?? { label: ticket.priority, color: '' }}
       headerActions={headerActions}
     >
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

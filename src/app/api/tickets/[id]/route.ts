@@ -211,6 +211,12 @@ export async function PUT(
     }
 
     // CONTROL DE PERMISOS POR ROL
+    // Variables compartidas entre bloques de rol
+    const allowedFields = session.user.role === 'CLIENT'
+      ? ['title', 'description']
+      : ['status', 'priority', 'assigneeId', 'categoryId', 'title', 'description', 'location']
+    const filteredUpdates: any = {}
+
     if (session.user.role === 'CLIENT') {
       // Cliente solo puede editar sus propios tickets
       if (existingTicket.clientId !== session.user.id) {
@@ -232,17 +238,14 @@ export async function PUT(
       }
 
       // Filtrar solo campos permitidos para clientes
-      const allowedFields = ['title', 'description']
-      const filteredUpdates: any = {}
-      allowedFields.forEach(field => {
-        if (updates[field] !== undefined) {
-          filteredUpdates[field] = updates[field]
-        }
+      const clientAllowed = ['title', 'description']
+      clientAllowed.forEach(field => {
+        if (updates[field] !== undefined) filteredUpdates[field] = updates[field]
       })
 
       // Si intenta modificar otros campos, rechazar
       const attemptedFields = Object.keys(updates)
-      const unauthorizedFields = attemptedFields.filter(f => !allowedFields.includes(f))
+      const unauthorizedFields = attemptedFields.filter(f => !clientAllowed.includes(f))
       if (unauthorizedFields.length > 0) {
         return NextResponse.json(
           { 
@@ -381,10 +384,10 @@ export async function PUT(
       })
 
     } else if (session.user.role === 'TECHNICIAN') {
-      allowedFields.forEach(field => {
-        if (updates[field] !== undefined) {
-          filteredUpdates[field] = updates[field]
-        }
+      // Técnico puede cambiar: status, priority, assigneeId
+      const techAllowed = ['status', 'priority', 'assigneeId']
+      techAllowed.forEach(field => {
+        if (updates[field] !== undefined) filteredUpdates[field] = updates[field]
       })
 
       // Bloquear transición directa a CLOSED para técnicos.

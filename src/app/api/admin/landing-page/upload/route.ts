@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     const settings = await prisma.system_settings.findFirst({
       where: { id: 'default' },
     })
-    const maxFileSize = settings?.max_file_size || 10 // Default 10MB
+    const maxFileSize = (settings as any)?.max_file_size || 10 // Default 10MB
 
     const formData = await request.formData()
     const file = formData.get('file') as File

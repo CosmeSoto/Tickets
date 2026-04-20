@@ -372,11 +372,11 @@ export function SimpleCategoryAssignment({
               id: cat.id,
               name: cat.name,
               description: cat.description || '',
-              parentId: cat.parentId || null,
+              parentId: (cat as any).parentId || null,
               level: cat.level || 1,
-              isActive: cat.isActive !== false,
+              isActive: (cat as any).isActive !== false,
               color: cat.color || '#6B7280'
-            }))}
+            })) as any}
             ticketTitle=""
             ticketDescription=""
             showFrequentCategories={false}

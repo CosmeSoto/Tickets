@@ -323,7 +323,7 @@ function SettingsPage() {
                 <div>
                   <Label htmlFor='systemName' className='flex items-center gap-1.5'>
                     Nombre del Sistema
-                    {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' title='Solo Super Admin' />}
+                    {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' aria-label='Solo Super Admin' />}
                   </Label>
                   <Input
                     id='systemName'

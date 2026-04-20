@@ -120,8 +120,8 @@ export default function ClientTicketDetailPage() {
     <TicketDetailLayout
       title={ticket.title}
       ticketCode={getTicketDisplayCode(ticket)}
-      status={getStatusConfig(ticket.status)}
-      priority={getPriorityConfig(ticket.priority)}
+      status={getStatusConfig(ticket.status) ?? { label: ticket.status, color: '' }}
+      priority={getPriorityConfig(ticket.priority) ?? { label: ticket.priority, color: '' }}
       headerActions={
         <div className="flex items-center gap-2">
           {canEdit && !isEditing && (

@@ -48,7 +48,7 @@ export class DeliveryActService {
   static async generateDeliveryAct(assignmentId: string): Promise<DeliveryAct> {
     try {
       // Obtener asignación con relaciones
-      const assignment = await prisma.equipment_assignments.findUnique({
+      const assignment = await (prisma.equipment_assignments.findUnique as any)({
         where: { id: assignmentId },
         include: {
           equipment: {

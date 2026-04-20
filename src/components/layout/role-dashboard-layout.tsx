@@ -54,7 +54,7 @@ import { getRoleLabel as getRoleLabelFn, getRoleColor } from '@/components/ui/ro
 interface RoleDashboardLayoutProps {
   children: ReactNode
   title?: string
-  subtitle?: string
+  subtitle?: string | ReactNode
   headerActions?: ReactNode
 }
 

@@ -16,6 +16,7 @@ import { enrichCategories } from '@/lib/utils/category-utils'
 import { ArrowLeft, Save, X } from 'lucide-react'
 import Link from 'next/link'
 import { getTicketDisplayCode } from '@/hooks/use-ticket-data'
+import { useToast } from '@/hooks/use-toast'
 
 interface TicketData {
   id: string

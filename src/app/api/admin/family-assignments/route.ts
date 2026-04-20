@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
 
   AuditServiceComplete.log({
     action: AuditActionsComplete.ADMIN_FAMILY_ASSIGNED,
-    entityType: 'family',
+    entityType: 'settings',
     entityId: familyId,
     userId: session.user.id,
     details: { adminId, adminName: targetAdmin.name, familyId },
@@ -134,7 +134,7 @@ export async function DELETE(request: NextRequest) {
 
   AuditServiceComplete.log({
     action: AuditActionsComplete.ADMIN_FAMILY_UNASSIGNED,
-    entityType: 'family',
+    entityType: 'settings',
     entityId: familyId,
     userId: session.user.id,
     details: { adminId, familyId },

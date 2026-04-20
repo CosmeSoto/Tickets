@@ -80,7 +80,7 @@ export class SLAMonitor {
     )
 
     // Preparar creaciones en batch
-    const toCreate: Parameters<typeof prisma.sla_violations.createMany>[0]['data'] = []
+    const toCreate: any[] = []
 
     for (const metrics of overdueTickets) {
       const violationType = metrics.firstResponseAt === null ? 'RESPONSE' : 'RESOLUTION'
@@ -108,7 +108,7 @@ export class SLAMonitor {
     }
 
     if (toCreate.length > 0) {
-      await prisma.sla_violations.createMany({ data: toCreate, skipDuplicates: true })
+      await (prisma.sla_violations.createMany as any)({ data: toCreate, skipDuplicates: true })
       console.log(`[SLA MONITOR] ${toCreate.length} nuevas violaciones registradas`)
     }
   }
@@ -122,7 +122,7 @@ export class SLAMonitor {
     // Batch update: una sola query en lugar de N queries individuales
     const result = await prisma.ticket_sla_metrics.updateMany({
       where: {
-        ticket: { status: { in: ['OPEN', 'IN_PROGRESS', 'PENDING'] } }
+        ticket: { status: { in: ['OPEN', 'IN_PROGRESS'] as any } }
       },
       data: { updatedAt: now }
     })

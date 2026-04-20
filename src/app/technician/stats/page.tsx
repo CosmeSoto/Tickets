@@ -149,7 +149,7 @@ export default function TechnicianStatsPage() {
         // Agrupar por categoría
         const categoryMap = new Map<string, { resolved: number; pending: number; times: number[]; color: string }>()
         
-        tickets.forEach(ticket => {
+        tickets.forEach((ticket: any) => {
           const category = ticket.category || 'Sin categoría'
           if (!categoryMap.has(category)) {
             categoryMap.set(category, {

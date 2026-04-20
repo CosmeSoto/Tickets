@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils'
 export interface ModuleLayoutProps {
   // Header
   title: string
-  subtitle?: string
+  subtitle?: string | React.ReactNode
   headerActions?: React.ReactNode
   
   // Contenido

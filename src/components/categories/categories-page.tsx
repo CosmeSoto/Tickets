@@ -759,8 +759,8 @@ export default function CategoriesPage() {
                   const c = deletingCategory
                   const tickets = c._count?.tickets ?? 0
                   const subcats = c._count?.other_categories ?? 0
-                  const articles = c._count?.knowledge_articles ?? 0
-                  const slas = c._count?.sla_policies ?? 0
+                  const articles = (c._count as any)?.knowledge_articles ?? 0
+                  const slas = (c._count as any)?.sla_policies ?? 0
                   const technicians = c.technician_assignments?.length ?? 0
                   const canDel = c.canDelete
 

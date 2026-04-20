@@ -62,6 +62,10 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
   const [isExpired, setIsExpired] = useState(false)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [loadingPreview, setLoadingPreview] = useState(false)
+  const [downloadingPdf, setDownloadingPdf] = useState(false)
+  const [showPdfPreview, setShowPdfPreview] = useState(false)
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null)
 
   const [showAcceptDialog, setShowAcceptDialog] = useState(false)
   const [showRejectDialog, setShowRejectDialog] = useState(false)

@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       })
       const userFamilyId = user?.departments?.familyId ?? null
 
-      const families = await prisma.families.findMany({
+      const families = await (prisma.families.findMany as any)({
         where: {
           isActive: true,
           ticketFamilyConfig: { ticketsEnabled: true },
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
           }
         },
         orderBy: { order: 'asc' }
-      })
+      }) as any[]
 
       // Filtrar: si allowedFromFamilies tiene valores, el cliente solo puede
       // crear tickets aquí si su familia está en la lista

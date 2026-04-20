@@ -60,7 +60,7 @@ export async function POST(
     // Verificar que el ticket existe
     const ticket = await prisma.tickets.findUnique({
       where: { id: ticketId },
-      select: { id: true, assigneeId: true, clientId: true, status: true },
+      select: { id: true, assigneeId: true, clientId: true, status: true, title: true },
     })
 
     if (!ticket) {
@@ -267,8 +267,7 @@ export async function POST(
             subject: `Nuevo comentario en Ticket #${ticketId.substring(0, 8)} - ${ticketWithUsers.title}`,
             html: emailBody,
             text: `Nuevo comentario de ${authorName} (${authorRole}) en ticket #${ticketId.substring(0, 8)}:\n\n${newComment.content}`,
-            replyTo: newComment.users.email
-          }, session.user.id)
+          } as any, session.user.id)
         }).catch(err => {
           console.error('[API] Error sending email for new comment:', err)
         })

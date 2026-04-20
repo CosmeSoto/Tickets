@@ -123,10 +123,9 @@ function showBrowserNotification(notification: SSENotification) {
       body: notification.message,
       icon: '/favicon.ico',
       badge: '/favicon.ico',
-      tag: notification.id,          // evita duplicados si llega dos veces
-      renotify: false,
-      silent: true,                  // el sonido lo maneja AudioContext, no el SO
-    })
+      tag: notification.id,
+      silent: true,
+    } as NotificationOptions)
 
     // Al hacer clic en la notificación nativa → enfocar la pestaña
     n.onclick = () => {

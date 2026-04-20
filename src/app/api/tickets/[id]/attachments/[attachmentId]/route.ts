@@ -110,7 +110,7 @@ export async function DELETE(
     }
 
     // Eliminar el archivo
-    await FileService.deleteFile(attachmentId)
+    await FileService.deleteFile(attachmentId, session.user.id)
 
     return NextResponse.json({ success: true, message: 'Archivo eliminado exitosamente' })
   } catch (error) {

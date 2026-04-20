@@ -28,7 +28,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
-import { NotificationPreferences } from '@/hooks/use-notifications'
+import { NotificationPreferences } from '@/types/notification-preferences'
 
 interface NotificationPreferencesProps {
   open: boolean

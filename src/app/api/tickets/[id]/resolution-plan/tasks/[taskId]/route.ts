@@ -213,7 +213,7 @@ export async function PATCH(
             field: 'resolution_plan',
             oldValue: 'active',
             newValue: 'completed',
-            description: `Plan de resolución completado: "${task.plan.title}". Todas las tareas (${totalTasks}) han sido finalizadas exitosamente.`,
+            comment: `Plan de resolución completado: "${task.plan.title}". Todas las tareas (${totalTasks}) han sido finalizadas exitosamente.`,
             createdAt: new Date()
           }
         })

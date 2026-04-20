@@ -34,7 +34,7 @@ export async function GET(
     }
 
     // Obtener todas las calificaciones del técnico
-    const ratings = await prisma.ticket_ratings.findMany({
+    const ratings = await (prisma.ticket_ratings.findMany as any)({
       where: {
         tickets: {
           assigneeId: technicianId
@@ -81,10 +81,10 @@ export async function GET(
     }
 
     // Calcular promedios
-    const sumResponseTime = ratings.reduce((sum, r) => sum + r.responseTime, 0)
-    const sumTechnicalSkill = ratings.reduce((sum, r) => sum + r.technicalSkill, 0)
-    const sumCommunication = ratings.reduce((sum, r) => sum + r.communication, 0)
-    const sumProblemResolution = ratings.reduce((sum, r) => sum + r.problemResolution, 0)
+    const sumResponseTime = (ratings as any[]).reduce((sum: number, r: any) => sum + r.responseTime, 0)
+    const sumTechnicalSkill = (ratings as any[]).reduce((sum: number, r: any) => sum + r.technicalSkill, 0)
+    const sumCommunication = (ratings as any[]).reduce((sum: number, r: any) => sum + r.communication, 0)
+    const sumProblemResolution = (ratings as any[]).reduce((sum: number, r: any) => sum + r.problemResolution, 0)
 
     const avgResponseTime = sumResponseTime / totalRatings
     const avgTechnicalSkill = sumTechnicalSkill / totalRatings
@@ -95,7 +95,7 @@ export async function GET(
     const averageRating = (avgResponseTime + avgTechnicalSkill + avgCommunication + avgProblemResolution) / 4
 
     // Formatear calificaciones recientes (últimas 5)
-    const recentRatings = ratings.slice(0, 5).map(rating => ({
+    const recentRatings = (ratings as any[]).slice(0, 5).map((rating: any) => ({
       id: rating.id,
       ticketId: rating.ticketId,
       clientId: rating.clientId,
