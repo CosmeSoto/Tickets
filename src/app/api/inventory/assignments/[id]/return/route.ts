@@ -5,9 +5,7 @@ import { createReturnActSchema } from '@/lib/validations/inventory/assignment'
 import { ZodError } from 'zod'
 
 interface RouteParams {
-  params: {
-    id: string
-  }
+  params: Promise<{ id: string }>
 }
 
 /**
@@ -23,45 +21,26 @@ export async function POST(
     const session = await getServerSession(authOptions)
     
     if (!session?.user) {
-      return NextResponse.json(
-        { error: 'No autenticado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    // Solo ADMIN y TECHNICIAN pueden crear actas de devolución
     if (session.user.role === 'CLIENT') {
-      return NextResponse.json(
-        { error: 'No tienes permisos para crear actas de devolución' },
-        { status: 403 }
-      )
+      return NextResponse.json({ error: 'No tienes permisos para crear actas de devolución' }, { status: 403 })
     }
 
+    const { id } = await params
     const body = await request.json()
-
-    // Validar datos
     const validatedData = createReturnActSchema.parse(body)
 
     // TODO: Implementar creación de acta de devolución
-    // const returnAct = await ReturnActService.generateReturnAct(params.id, validatedData, session.user.id)
+    // const returnAct = await ReturnActService.generateReturnAct(id, validatedData, session.user.id)
 
-    return NextResponse.json(
-      { error: 'Funcionalidad en desarrollo' },
-      { status: 501 }
-    )
+    return NextResponse.json({ error: 'Funcionalidad en desarrollo' }, { status: 501 })
   } catch (error) {
     console.error('Error en POST /api/inventory/assignments/[id]/return:', error)
-    
     if (error instanceof ZodError) {
-      return NextResponse.json(
-        { error: 'Datos inválidos', details: error.errors },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Datos inválidos', details: error.errors }, { status: 400 })
     }
-
-    return NextResponse.json(
-      { error: 'Error al crear acta de devolución' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al crear acta de devolución' }, { status: 500 })
   }
 }

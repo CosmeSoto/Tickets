@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { Upload, Trash2, Download, FileText, File, Loader2, Paperclip } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Upload, Trash2, Download, FileText, File, Loader2, Paperclip, Camera } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -15,6 +15,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { useToast } from '@/hooks/use-toast'
+import { FileInputWithCamera } from '@/components/common/file-input-with-camera'
 
 interface Attachment {
   id: string
@@ -54,7 +55,6 @@ const ACCEPTED = [
 
 export function LicenseAttachments({ licenseId, canManage }: LicenseAttachmentsProps) {
   const { toast } = useToast()
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
@@ -77,7 +77,6 @@ export function LicenseAttachments({ licenseId, canManage }: LicenseAttachmentsP
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    e.target.value = ''
 
     if (file.size > 20 * 1024 * 1024) {
       toast({ title: 'Archivo muy grande', description: 'El límite es 20 MB', variant: 'destructive' })
@@ -135,27 +134,25 @@ export function LicenseAttachments({ licenseId, canManage }: LicenseAttachmentsP
             </CardDescription>
           </div>
           {canManage && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
+            <FileInputWithCamera
+              accept={ACCEPTED}
+              onChange={handleUpload}
             >
-              {uploading ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Upload className="h-4 w-4 mr-2" />
+              {({ openFile, openCamera, showCamera }) => (
+                <div className="flex items-center gap-1.5">
+                  {showCamera && (
+                    <Button size="sm" variant="outline" onClick={openCamera} disabled={uploading} title="Tomar foto">
+                      {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                    </Button>
+                  )}
+                  <Button size="sm" variant="outline" onClick={openFile} disabled={uploading}>
+                    {uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+                    {uploading ? 'Subiendo...' : showCamera ? 'Archivo' : 'Subir archivo'}
+                  </Button>
+                </div>
               )}
-              {uploading ? 'Subiendo...' : 'Subir archivo'}
-            </Button>
+            </FileInputWithCamera>
           )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={ACCEPTED}
-            onChange={handleUpload}
-            className="hidden"
-          />
         </CardHeader>
         <CardContent>
           {loading ? (

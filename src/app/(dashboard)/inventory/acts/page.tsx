@@ -70,12 +70,6 @@ export default function ActsListPage() {
     <ModuleLayout
       title="Actas de Entrega"
       subtitle={pendingCount > 0 ? `${pendingCount} pendiente${pendingCount > 1 ? 's' : ''} de firma` : 'Historial de actas de entrega de activos'}
-      headerActions={
-        <Button variant="outline" size="sm" onClick={() => fetchActs(1, statusFilter)} disabled={loading}>
-          <RefreshCw className={cn('h-4 w-4 sm:mr-2', loading && 'animate-spin')} />
-          <span className="hidden sm:inline">Actualizar</span>
-        </Button>
-      }
     >
       <div className="max-w-4xl mx-auto space-y-4">
 
@@ -98,6 +92,11 @@ export default function ActsListPage() {
                   </Button>
                 )
               })}
+              <div className="ml-auto">
+                <Button variant="ghost" size="sm" onClick={() => fetchActs(1, statusFilter)} disabled={loading} className="h-7">
+                  <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} />
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

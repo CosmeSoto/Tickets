@@ -14,7 +14,6 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useToast } from '@/hooks/use-toast'
-import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { SupplierForm } from '@/components/inventory/suppliers/SupplierForm'
 import { ExportButton } from '@/components/common/export-button'
@@ -169,7 +168,7 @@ export default function SuppliersPage() {
               <TableRow>
                 <TableHead>Nombre</TableHead>
                 <TableHead className="hidden md:table-cell">Tipo</TableHead>
-                <TableHead className="hidden md:table-cell">Familia</TableHead>
+                <TableHead className="hidden md:table-cell">Área</TableHead>
                 <TableHead className="hidden lg:table-cell">RUC / NIT</TableHead>
                 <TableHead className="hidden lg:table-cell">Email</TableHead>
                 <TableHead className="hidden xl:table-cell">Teléfono</TableHead>
