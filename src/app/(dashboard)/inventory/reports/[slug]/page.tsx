@@ -146,7 +146,25 @@ const REPORT_CONFIG: Record<string, {
   },
 }
 
-// ── Colores de urgencia ───────────────────────────────────────────────────────
+// ── Acceso por rol ────────────────────────────────────────────────────────────
+
+/** Slugs accesibles para cada nivel de acceso */
+const ROLE_ACCESS: Record<string, string[]> = {
+  SUPER_ADMIN: ['summary', 'assignments', 'expiring', 'maintenance', 'stock-movements', 'decommissioned', 'locations', 'financial-summary'],
+  ADMIN:       ['summary', 'assignments', 'expiring', 'maintenance', 'stock-movements', 'decommissioned', 'locations'],
+  MANAGER:     ['summary', 'assignments', 'expiring', 'maintenance', 'stock-movements', 'decommissioned', 'locations'],
+}
+
+function getUserLevel(role: string, isSuperAdmin: boolean, canManage: boolean): string {
+  if (isSuperAdmin) return 'SUPER_ADMIN'
+  if (role === 'ADMIN') return 'ADMIN'
+  if (canManage) return 'MANAGER'
+  return 'MANAGER'
+}
+
+function canAccessSlug(slug: string, level: string): boolean {
+  return (ROLE_ACCESS[level] ?? ROLE_ACCESS.MANAGER).includes(slug)
+}
 
 const URGENCY_COLORS: Record<string, string> = {
   Crítico: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
@@ -362,6 +380,8 @@ function ReportSlugContent({ slug }: { slug: string }) {
   const config = REPORT_CONFIG[slug]
   const reportName = config?.name ?? slug
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
+  const canManageInventory = (session?.user as any)?.canManageInventory === true
+  const userLevel = getUserLevel(session?.user?.role ?? '', isSuperAdmin, canManageInventory)
 
   // Filtros del reporte — defaults usan 'all' como centinela (Radix no permite value="")
   const familyId = searchParams.get('familyId') ?? undefined
@@ -450,13 +470,17 @@ function ReportSlugContent({ slug }: { slug: string }) {
 
   if (!session?.user) return null
 
-  // Bloquear financial-summary para no-superadmin
-  if (slug === 'financial-summary' && !isSuperAdmin) {
+  // Verificar acceso al slug según rol
+  if (!canAccessSlug(slug, userLevel)) {
     return (
-      <ModuleLayout title="Acceso restringido" subtitle="Solo Super Administrador">
+      <ModuleLayout title="Acceso restringido" subtitle="No tienes permiso para ver este reporte">
         <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
           <AlertTriangle className="h-10 w-10 text-amber-500" />
-          <p className="text-muted-foreground">Este reporte solo está disponible para el Super Administrador.</p>
+          <p className="text-muted-foreground max-w-sm">
+            {slug === 'financial-summary'
+              ? 'El resumen financiero global solo está disponible para el Super Administrador.'
+              : 'No tienes permiso para acceder a este reporte.'}
+          </p>
           <Link href="/inventory/reports">
             <Button variant="outline" size="sm">Volver a reportes</Button>
           </Link>
@@ -465,10 +489,16 @@ function ReportSlugContent({ slug }: { slug: string }) {
     )
   }
 
+  const roleSubtitle = userLevel === 'SUPER_ADMIN'
+    ? 'Vista global — todas las familias'
+    : userLevel === 'ADMIN'
+      ? 'Todas las familias'
+      : 'Datos de tus familias asignadas'
+
   return (
     <ModuleLayout
       title={reportName}
-      subtitle={config?.description ?? ''}
+      subtitle={`${config?.description ?? ''} · ${roleSubtitle}`}
       headerActions={
         <div className="flex gap-2">
           <Button
