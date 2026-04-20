@@ -26,6 +26,9 @@ import Link from 'next/link'
 
 // ── Configuración de reportes ─────────────────────────────────────────────────
 
+// Valor centinela para "sin filtro" en selects — Radix no permite value=""
+const ALL = 'all'
+
 const REPORT_CONFIG: Record<string, {
   name: string
   description: string
@@ -40,7 +43,7 @@ const REPORT_CONFIG: Record<string, {
         label: 'Tipo de activo',
         type: 'select',
         options: [
-          { value: '', label: 'Todos' },
+          { value: ALL, label: 'Todos' },
           { value: 'EQUIPMENT', label: 'Equipos' },
           { value: 'MRO', label: 'Materiales MRO' },
           { value: 'LICENSE', label: 'Licencias/Contratos' },
@@ -85,7 +88,7 @@ const REPORT_CONFIG: Record<string, {
         label: 'Tipo de movimiento',
         type: 'select',
         options: [
-          { value: '', label: 'Todos' },
+          { value: ALL, label: 'Todos' },
           { value: 'ENTRY', label: 'Entradas' },
           { value: 'EXIT', label: 'Salidas' },
           { value: 'ADJUSTMENT', label: 'Ajustes' },
@@ -112,7 +115,7 @@ const REPORT_CONFIG: Record<string, {
         label: 'Estado',
         type: 'select',
         options: [
-          { value: '', label: 'Todos' },
+          { value: ALL, label: 'Todos' },
           { value: 'COMPLETED', label: 'Completados' },
           { value: 'SCHEDULED', label: 'Programados' },
           { value: 'REQUESTED', label: 'Solicitados' },
@@ -130,7 +133,7 @@ const REPORT_CONFIG: Record<string, {
         label: 'Mostrar',
         type: 'select',
         options: [
-          { value: '', label: 'Todos los equipos' },
+          { value: ALL, label: 'Todos los equipos' },
           { value: 'true', label: 'Solo con ubicación registrada' },
         ],
       },
@@ -360,16 +363,15 @@ function ReportSlugContent({ slug }: { slug: string }) {
   const reportName = config?.name ?? slug
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
 
-  // Filtros del reporte
+  // Filtros del reporte — defaults usan 'all' como centinela (Radix no permite value="")
   const familyId = searchParams.get('familyId') ?? undefined
   const [filterValues, setFilterValues] = useState<Record<string, string>>(() => {
     const defaults: Record<string, string> = {}
     config?.filters.forEach((f) => {
       if (f.type === 'select' && f.options?.[0]) {
-        defaults[f.key] = f.options[0].value
+        defaults[f.key] = f.options[0].value // primer option (puede ser 'all' o un valor real)
       }
     })
-    // Valor por defecto para días
     if (slug === 'expiring') defaults['days'] = '90'
     return defaults
   })
@@ -387,7 +389,8 @@ function ReportSlugContent({ slug }: { slug: string }) {
     const params = new URLSearchParams()
     if (familyId) params.set('familyId', familyId)
     Object.entries(filterValues).forEach(([k, v]) => {
-      if (v) params.set(k, v)
+      // Omitir el centinela 'all' y valores vacíos — la API interpreta ausencia como "sin filtro"
+      if (v && v !== ALL) params.set(k, v)
     })
     return params
   }, [familyId, filterValues])
@@ -434,7 +437,8 @@ function ReportSlugContent({ slug }: { slug: string }) {
     }
   }
 
-  const hasActiveFilters = Object.values(filterValues).some((v) => v !== '' && v !== undefined)
+  // Hay filtros activos si algún select no es 'all' o alguna fecha está rellena
+  const hasActiveFilters = Object.entries(filterValues).some(([, v]) => v && v !== ALL)
 
   if (status === 'loading') {
     return (
@@ -521,7 +525,7 @@ function ReportSlugContent({ slug }: { slug: string }) {
                       />
                     ) : (
                       <Select
-                        value={filterValues[f.key] ?? ''}
+                        value={filterValues[f.key] ?? ALL}
                         onValueChange={(v) => setFilterValues((prev) => ({ ...prev, [f.key]: v }))}
                       >
                         <SelectTrigger className="h-9 text-sm">
