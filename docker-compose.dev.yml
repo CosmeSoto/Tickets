@@ -43,9 +43,11 @@ services:
     container_name: tickets-nginx-dev
     ports:
       - '80:80'
+      - '443:443'
     volumes:
       - ./docker/nginx.local.conf:/etc/nginx/nginx.conf:ro
       - ./public/uploads:/var/www/uploads:ro
+      - ./docker/certs:/etc/nginx/certs:ro
     networks:
       - tickets-network
     depends_on:
