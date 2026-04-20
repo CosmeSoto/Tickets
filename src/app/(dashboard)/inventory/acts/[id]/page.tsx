@@ -3,10 +3,11 @@
 import { useEffect, useState, useCallback, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { ModuleLayout } from '@/components/common/layout/module-layout'
 import {
   Download, FileText, Shield, Package, User, Calendar,
   CheckCircle, XCircle, Clock, AlertTriangle, Copy, ExternalLink, Check, Eye,
+  ChevronLeft,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -170,23 +171,21 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
 
   if (loading) {
     return (
-      <RoleDashboardLayout title="Cargando acta..." subtitle="">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
-        </div>
-      </RoleDashboardLayout>
+      <ModuleLayout title="Cargando acta..." loading>
+        <div />
+      </ModuleLayout>
     )
   }
 
   if (!act) {
     return (
-      <RoleDashboardLayout title="Acta no encontrada" subtitle="">
+      <ModuleLayout title="Acta no encontrada" subtitle="">
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Acta no encontrada</AlertTitle>
           <AlertDescription>El acta que buscas no existe o no tienes permisos para verla.</AlertDescription>
         </Alert>
-      </RoleDashboardLayout>
+      </ModuleLayout>
     )
   }
 
@@ -200,13 +199,13 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
 
   if (!isDeliverer && !isReceiver && !isAdmin) {
     return (
-      <RoleDashboardLayout title="Acceso Denegado" subtitle="">
+      <ModuleLayout title="Acceso Denegado" subtitle="">
         <Alert variant="destructive">
           <Shield className="h-4 w-4" />
           <AlertTitle>Sin permisos</AlertTitle>
           <AlertDescription>No tienes permisos para ver esta acta de entrega.</AlertDescription>
         </Alert>
-      </RoleDashboardLayout>
+      </ModuleLayout>
     )
   }
 
@@ -214,41 +213,20 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
   const StatusIcon = statusCfg.icon
 
   return (
-    <RoleDashboardLayout
+    <ModuleLayout
       title={`Acta ${act.folio}`}
-      subtitle="Acta de entrega"
-      headerActions={
-        <div className="flex gap-2 flex-wrap">
-          {canDownload && (
-            <>
-              <Button
-                variant="outline"
-                onClick={handlePreviewPdf}
-                disabled={loadingPreview}
-              >
-                <Eye className="mr-2 h-4 w-4" />
-                {loadingPreview ? 'Cargando...' : 'Vista previa'}
-              </Button>
-              <Button
-                onClick={handleDownloadPdf}
-                disabled={downloadingPdf}
-                className="bg-green-600 hover:bg-green-700 text-white"
-              >
-                <Download className="mr-2 h-4 w-4" />
-                {downloadingPdf ? 'Generando...' : 'Descargar PDF'}
-              </Button>
-            </>
-          )}
-          {equipmentId && (
-            <Button variant="outline" onClick={() => router.push(`/inventory/equipment/${equipmentId}`)}>
-              <Package className="mr-2 h-4 w-4" />
-              Ver equipo
-            </Button>
-          )}
-        </div>
-      }
+      subtitle={`Acta de entrega · ${statusCfg.label}`}
     >
       <div className="max-w-4xl mx-auto space-y-6">
+
+        {/* Volver */}
+        <button
+          onClick={() => router.push('/inventory/acts')}
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Volver a actas
+        </button>
 
         {/* Banners contextuales */}
         {act.status === 'PENDING' && isReceiver && canAccept && (
@@ -597,7 +575,6 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
       {/* Dialog: Vista previa PDF */}
       <Dialog open={showPdfPreview} onOpenChange={(open) => {
         setShowPdfPreview(open)
-        // Liberar el object URL al cerrar para no acumular memoria
         if (!open && pdfPreviewUrl) {
           URL.revokeObjectURL(pdfPreviewUrl)
           setPdfPreviewUrl(null)
@@ -626,14 +603,8 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
               </div>
             )}
             <div className="flex justify-end gap-2 flex-shrink-0">
-              <Button variant="outline" onClick={() => setShowPdfPreview(false)}>
-                Cerrar
-              </Button>
-              <Button
-                onClick={handleDownloadPdf}
-                disabled={downloadingPdf}
-                className="bg-green-600 hover:bg-green-700 text-white"
-              >
+              <Button variant="outline" onClick={() => setShowPdfPreview(false)}>Cerrar</Button>
+              <Button onClick={handleDownloadPdf} disabled={downloadingPdf} className="bg-green-600 hover:bg-green-700 text-white">
                 <Download className="mr-2 h-4 w-4" />
                 {downloadingPdf ? 'Descargando...' : 'Descargar PDF'}
               </Button>
@@ -641,6 +612,6 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
           </div>
         </DialogContent>
       </Dialog>
-    </RoleDashboardLayout>
+    </ModuleLayout>
   )
 }

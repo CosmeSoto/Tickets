@@ -169,9 +169,9 @@ export async function generateReturnActPDF(
   const delH = 68
   let dy = card(col2X, y, colW, delH, 'DEVUELTO POR')
   if (receiver) {
-    dy = row(col2X, dy, colW, 'Nombre', `${receiver.firstName || ''} ${receiver.lastName || ''}`.trim() || receiver.email)
+    dy = row(col2X, dy, colW, 'Nombre', receiver.name || receiver.email || '—')
     dy = row(col2X, dy, colW, 'Email', receiver.email || '—')
-    dy = row(col2X, dy, colW, 'Departamento', receiver.department || '—')
+    dy = row(col2X, dy, colW, 'Departamento', receiver.department || receiver.departments?.name || '—')
   }
 
   // Recibido por (deliverer del assignment = quien entregó originalmente)
@@ -180,9 +180,9 @@ export async function generateReturnActPDF(
   const recH = 68
   let ry = card(col2X, recY, colW, recH, 'RECIBIDO POR')
   if (deliverer) {
-    ry = row(col2X, ry, colW, 'Nombre', `${deliverer.firstName || ''} ${deliverer.lastName || ''}`.trim() || deliverer.email)
+    ry = row(col2X, ry, colW, 'Nombre', deliverer.name || deliverer.email || '—')
     ry = row(col2X, ry, colW, 'Email', deliverer.email || '—')
-    ry = row(col2X, ry, colW, 'Departamento', deliverer.department || '—')
+    ry = row(col2X, ry, colW, 'Departamento', deliverer.department || deliverer.departments?.name || '—')
   }
 
   // Fechas
