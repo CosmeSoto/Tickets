@@ -436,25 +436,19 @@ function ReportSlugContent({ slug }: { slug: string }) {
     if (status === 'authenticated') fetchReport()
   }, [fetchReport, status])
 
-  const handleExport = async (format: 'csv' | 'pdf') => {
+  const handleExport = (format: 'csv' | 'pdf') => {
     setExporting(format)
-    try {
-      const params = buildParams()
-      params.set('format', format)
-      const res = await fetch(`/api/inventory/reports/${slug}?${params}`)
-      if (!res.ok) throw new Error('Error al exportar')
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `reporte-${slug}-${new Date().toISOString().split('T')[0]}.${format}`
-      a.click()
-      URL.revokeObjectURL(url)
-    } catch {
-      // silently fail
-    } finally {
-      setExporting(null)
-    }
+    const params = buildParams()
+    params.set('format', format)
+    // Descarga directa via link — evita blob: URLs y el warning de HTTP/HTTPS
+    const a = document.createElement('a')
+    a.href = `/api/inventory/reports/${slug}?${params}`
+    a.download = `reporte-${slug}-${new Date().toISOString().split('T')[0]}.${format}`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    // Limpiar estado de exportación tras un breve delay
+    setTimeout(() => setExporting(null), 1500)
   }
 
   // Hay filtros activos si algún select no es 'all' o alguna fecha está rellena
