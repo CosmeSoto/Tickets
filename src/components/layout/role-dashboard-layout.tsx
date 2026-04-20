@@ -413,16 +413,16 @@ export function RoleDashboardLayout({
             <div className="flex items-center justify-between gap-2">
 
               {/* Hamburguesa + título */}
-              <div className="flex items-center gap-3 min-w-0">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
                 <button
                   onClick={() => setSidebarOpen(true)}
                   className="lg:hidden p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent flex-shrink-0"
                 >
                   <Menu className="h-5 w-5" />
                 </button>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   {title && (
-                    <h1 className="text-base sm:text-xl font-bold text-foreground line-clamp-2 leading-tight">{title}</h1>
+                    <h1 className="text-base sm:text-xl font-bold text-foreground truncate leading-tight">{title}</h1>
                   )}
                   {subtitle && (
                     <div className="mt-0.5 text-xs text-muted-foreground hidden sm:flex items-center flex-wrap gap-1">{subtitle}</div>
@@ -442,11 +442,11 @@ export function RoleDashboardLayout({
                   target="_blank"
                   rel="noopener noreferrer"
                   title="Ver Página Pública"
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors border border-border rounded-md px-2 py-1.5 hover:bg-accent"
+                  className="hidden lg:flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors border border-border rounded-md px-2 py-1.5 hover:bg-accent"
                 >
                   <Globe className="h-3.5 w-3.5 flex-shrink-0" />
-                  <span className="hidden md:inline">Página Pública</span>
-                  <ExternalLink className="h-3 w-3 opacity-60 hidden md:inline" />
+                  <span className="hidden xl:inline">Página Pública</span>
+                  <ExternalLink className="h-3 w-3 opacity-60 hidden xl:inline" />
                 </Link>
                 
                 <Notifications variant="bell" />
