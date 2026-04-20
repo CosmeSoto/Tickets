@@ -499,28 +499,6 @@ function ReportSlugContent({ slug }: { slug: string }) {
     <ModuleLayout
       title={reportName}
       subtitle={`${config?.description ?? ''} · ${roleSubtitle}`}
-      headerActions={
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleExport('csv')}
-            disabled={loading || !!exporting || !reportData}
-          >
-            {exporting === 'csv' ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Download className="h-4 w-4 mr-1.5" />}
-            CSV
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleExport('pdf')}
-            disabled={loading || !!exporting || !reportData}
-          >
-            {exporting === 'pdf' ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <FileText className="h-4 w-4 mr-1.5" />}
-            PDF
-          </Button>
-        </div>
-      }
     >
       <div className="space-y-5">
         {/* Volver */}
@@ -636,18 +614,40 @@ function ReportSlugContent({ slug }: { slug: string }) {
               ))}
             </div>
 
-            {/* Metadatos del reporte */}
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>
+            {/* Metadatos + botones de exportación */}
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <p className="text-xs text-muted-foreground">
                 {reportData.totalCount} registro{reportData.totalCount !== 1 ? 's' : ''}
-                {familyId && ' · filtrado por familia'}
-              </span>
-              <span>
-                Generado el {new Date(reportData.generatedAt).toLocaleString('es-MX', {
+                {familyId && ' · filtrado por área'}
+                {' · '}Generado el {new Date(reportData.generatedAt).toLocaleString('es-MX', {
                   day: '2-digit', month: '2-digit', year: 'numeric',
                   hour: '2-digit', minute: '2-digit',
                 })}
-              </span>
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleExport('csv')}
+                  disabled={!!exporting}
+                >
+                  {exporting === 'csv'
+                    ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                    : <Download className="h-4 w-4 mr-1.5" />}
+                  Exportar CSV
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleExport('pdf')}
+                  disabled={!!exporting}
+                >
+                  {exporting === 'pdf'
+                    ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                    : <FileText className="h-4 w-4 mr-1.5" />}
+                  Exportar PDF
+                </Button>
+              </div>
             </div>
 
             {/* Tabla de datos */}
