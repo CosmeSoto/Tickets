@@ -61,9 +61,9 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
   const [act, setAct] = useState<any>(null)
   const [canAccept, setCanAccept] = useState(false)
   const [isExpired, setIsExpired] = useState(false)
+  const [accessLevel, setAccessLevel] = useState<string>('participant')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const [loadingPreview, setLoadingPreview] = useState(false)
   const [downloadingPdf, setDownloadingPdf] = useState(false)
   const [showPdfPreview, setShowPdfPreview] = useState(false)
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null)
@@ -82,6 +82,7 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
       setAct(data.act)
       setCanAccept(data.canAccept)
       setIsExpired(data.isExpired)
+      setAccessLevel(data.accessLevel ?? 'participant')
     } catch { /* silencioso */ }
     finally { setLoading(false) }
   }, [params.id])
@@ -191,13 +192,15 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
 
   const userId = session.user.id
   const userRole = session.user.role
+  const isSuperAdmin = (session.user as any)?.isSuperAdmin === true
   const isDeliverer = act.delivererInfo?.id === userId
-  const isReceiver = act.receiverInfo?.id === userId
-  const isAdmin = userRole === 'ADMIN'
-  const canDownload = act.status === 'ACCEPTED' && (isDeliverer || isReceiver || isAdmin)
-  const equipmentId = act.assignment?.equipmentId
+  const isReceiver  = act.receiverInfo?.id  === userId
+  const isAdmin     = userRole === 'ADMIN'                          // admin normal o superadmin
+  const isManager   = accessLevel === 'manager'                     // técnico/cliente gestor
+  const isAdminOrManager = isAdmin || isManager                     // puede ver todo
+  const canDownload = act.status === 'ACCEPTED' && (isDeliverer || isReceiver || isAdminOrManager)
 
-  if (!isDeliverer && !isReceiver && !isAdmin) {
+  if (!isDeliverer && !isReceiver && !isAdminOrManager) {
     return (
       <ModuleLayout title="Acceso Denegado" subtitle="">
         <Alert variant="destructive">
@@ -292,11 +295,17 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
           <CardContent>
             <p className="text-sm text-muted-foreground flex items-center gap-2">
               <Shield className="h-4 w-4" />
-              {isAdmin && !isDeliverer && !isReceiver && <span>Viendo como <strong>Administrador</strong></span>}
+              {isSuperAdmin && !isDeliverer && !isReceiver && <span>Viendo como <strong>Super Administrador</strong></span>}
+              {isAdmin && !isSuperAdmin && !isDeliverer && !isReceiver && <span>Viendo como <strong>Administrador</strong></span>}
+              {isManager && !isDeliverer && !isReceiver && <span>Viendo como <strong>Gestor de Inventario</strong></span>}
               {isDeliverer && isReceiver && <span>Eres el <strong>Entregador y Receptor</strong> (autoasignación)</span>}
               {isDeliverer && !isReceiver && <span>Eres el <strong>Entregador</strong> del equipo</span>}
               {isReceiver && !isDeliverer && <span>Eres el <strong>Receptor</strong> del equipo</span>}
-              {isAdmin && (isDeliverer || isReceiver) && <span className="ml-1">(también Administrador)</span>}
+              {isAdminOrManager && (isDeliverer || isReceiver) && (
+                <span className="ml-1">
+                  (también {isSuperAdmin ? 'Super Admin' : isAdmin ? 'Administrador' : 'Gestor'})
+                </span>
+              )}
             </p>
           </CardContent>
         </Card>
@@ -436,8 +445,8 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
           </Card>
         )}
 
-        {/* Enlace para compartir */}
-        {act.status === 'PENDING' && (isDeliverer || isAdmin) && !isExpired && (
+        {/* Enlace para compartir — entregador, admin o gestor */}
+        {act.status === 'PENDING' && (isDeliverer || isAdminOrManager) && !isExpired && (
           <Card className="border-blue-200">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base">

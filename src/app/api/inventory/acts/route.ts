@@ -21,7 +21,14 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit
 
     const userId = session.user.id
-    const isAdmin = session.user.role === 'ADMIN'
+    const userRole = session.user.role
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    const isAdmin = userRole === 'ADMIN'
+    const canManage = !isAdmin && await import('@/lib/inventory-access').then(m =>
+      m.canManageInventory(userId, userRole)
+    )
+    // SuperAdmin y Admin ven todas las actas; gestores ven las de sus familias + las propias
+    const isFullAdmin = isAdmin
 
     // Construir filtro de estado
     const statusFilter: any = status && status !== 'all' ? { status } : {}
@@ -42,7 +49,7 @@ export async function GET(request: NextRequest) {
     let acts: any[]
     let total: number
 
-    if (isAdmin) {
+    if (isFullAdmin) {
       ;[acts, total] = await Promise.all([
         prisma.delivery_acts.findMany({
           where: statusFilter,
@@ -95,7 +102,7 @@ export async function GET(request: NextRequest) {
         receiverInfo,
         equipmentSnapshot,
         equipment: act.assignment?.equipment ?? null,
-        userRole: isAdmin ? 'admin'
+        userRole: isFullAdmin ? 'admin'
           : delivererInfo?.id === userId && receiverInfo?.id === userId ? 'both'
           : delivererInfo?.id === userId ? 'deliverer'
           : 'receiver',
