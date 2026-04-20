@@ -23,13 +23,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
   }
 
-  const { role } = session.user as { role: string }
+  const { searchParams } = new URL(req.url)
+  const familyId = searchParams.get('familyId') || undefined
 
   // Equipos en arrendamiento o activo de tercero (tienen contrato)
   const [equipmentContracts, licenseContracts] = await Promise.all([
     prisma.equipment.findMany({
       where: {
         ownershipType: { in: ['RENTAL', 'LOAN'] },
+        // Filtrar por familia a través del tipo de equipo
+        ...(familyId ? { type: { familyId } } : {}),
       },
       select: {
         id: true,
@@ -59,6 +62,8 @@ export async function GET(req: NextRequest) {
           { expirationDate: { not: null } },
           { renewalCost: { not: null } },
         ],
+        // Filtrar por familia a través del tipo de licencia
+        ...(familyId ? { licenseType: { familyId } } : {}),
       },
       select: {
         id: true,

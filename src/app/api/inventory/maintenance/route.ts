@@ -20,6 +20,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status') || undefined
     const type = searchParams.get('type') || undefined
+    const familyId = searchParams.get('familyId') || undefined
+    const personalOnly = searchParams.get('personalOnly') === 'true'
 
     const isClient = session.user.role === 'CLIENT'
 
@@ -27,13 +29,17 @@ export async function GET(request: NextRequest) {
     if (status) where.status = status
     if (type) where.type = type
 
+    // Filtrar por familia a través del equipo
+    if (familyId) {
+      where.equipment = { type: { familyId } }
+    }
+
     // Cliente solo ve mantenimientos de sus equipos asignados
-    if (isClient) {
+    if (isClient || personalOnly) {
       const myAssignments = await prisma.equipment_assignments.findMany({
         where: { receiverId: session.user.id, isActive: true },
         select: { equipmentId: true },
       })
-      // También incluye mantenimientos que él mismo solicitó
       const myEquipmentIds = myAssignments.map(a => a.equipmentId)
       where.OR = [
         { equipmentId: { in: myEquipmentIds } },

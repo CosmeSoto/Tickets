@@ -47,9 +47,9 @@ const PAGE_SIZE = 20
 
 const SUBTYPE_FILTER_OPTIONS: { value: AssetSubtype | ''; label: string }[] = [
   { value: '', label: 'Todos los tipos' },
-  { value: 'EQUIPMENT', label: 'Equipo Físico' },
-  { value: 'MRO', label: 'Material MRO' },
-  { value: 'LICENSE', label: 'Contrato / Licencia' },
+  { value: 'EQUIPMENT', label: 'Equipo' },
+  { value: 'MRO', label: 'Material / Consumible' },
+  { value: 'LICENSE', label: 'Licencia y Contrato' },
 ]
 
 const STATUS_COLORS: Record<string, string> = {
@@ -170,7 +170,7 @@ export function UnifiedInventoryList({ initialFamilyId, personalOnly = false }: 
     subtitle: `${total} activos${selectedFamilyId ? ' (filtrados por área)' : ''}`,
     getData: () => assets,
     columns: [
-      { key: 'subtype', label: 'Tipo', format: (v: string) => ({ EQUIPMENT: 'Equipo', MRO: 'Material MRO', LICENSE: 'Licencia' } as Record<string, string>)[v] ?? v },
+      { key: 'subtype', label: 'Tipo', format: (v: string) => ({ EQUIPMENT: 'Equipo', MRO: 'Material / Consumible', LICENSE: 'Licencia y Contrato' } as Record<string, string>)[v] ?? v },
       { key: 'family', label: 'Área', format: v => v?.name ?? '' },
       { key: 'name', label: 'Nombre' },
       { key: 'code', label: 'Código', format: (v, r) => v ?? r.id.slice(0, 8) },
@@ -241,7 +241,7 @@ export function UnifiedInventoryList({ initialFamilyId, personalOnly = false }: 
           <thead className="bg-muted/50">
             <tr>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Tipo</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground hidden sm:table-cell">Familia</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground hidden sm:table-cell">Área</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Nombre</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground hidden md:table-cell">Código</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground hidden lg:table-cell">Estado</th>

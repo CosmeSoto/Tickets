@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { Trash2 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { DecommissionRequestList } from '@/components/inventory/decommission/DecommissionRequestList'
 import { DecommissionApprovalPanel } from '@/components/inventory/decommission/DecommissionApprovalPanel'
 
@@ -21,7 +21,7 @@ export default function DecommissionPage() {
   }
 
   return (
-    <RoleDashboardLayout
+    <ModuleLayout
       title="Actas de Baja"
       subtitle={isAdmin ? 'Gestiona y aprueba solicitudes de baja de activos' : 'Tus solicitudes de baja de activos'}
     >
@@ -44,6 +44,6 @@ export default function DecommissionPage() {
           )}
         </DialogContent>
       </Dialog>
-    </RoleDashboardLayout>
+    </ModuleLayout>
   )
 }

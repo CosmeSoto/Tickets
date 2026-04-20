@@ -37,8 +37,8 @@ function InventoryContent() {
   if (!session?.user) return null
 
   const canCreate = role === 'ADMIN' || role === 'TECHNICIAN' || canManageInventory
-  const title = isClientOnly ? 'Mis Equipos' : 'Inventario'
-  const subtitle = isClientOnly ? 'Equipos asignados a tu cuenta' : 'Gestiona el inventario de activos'
+  const title = isClientOnly ? 'Mis Activos' : 'Inventario'
+  const subtitle = isClientOnly ? 'Activos asignados a tu cuenta' : 'Equipos, licencias y materiales de tu organización'
 
   const setTab = (t: string) => {
     const params = new URLSearchParams(searchParams.toString())

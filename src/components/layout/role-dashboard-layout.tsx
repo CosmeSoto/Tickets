@@ -86,7 +86,7 @@ const navigationByRole: Record<string, NavItem[]> = {
       href: '/inventory',
       icon: Package,
       children: [
-        { name: 'Equipos', href: '/inventory', icon: Monitor },
+        { name: 'Activos', href: '/inventory', icon: Monitor },
         { name: 'Mantenimientos', href: '/inventory/maintenance', icon: Wrench },
         { name: 'Contratos', href: '/inventory/contracts', icon: FileSignature },
         { name: 'Actas de Entrega', href: '/inventory/acts', icon: FileText },
@@ -125,7 +125,7 @@ const navigationByRole: Record<string, NavItem[]> = {
       href: '/inventory',
       icon: Package,
       children: [
-        { name: 'Equipos Asignados', href: '/inventory', icon: Monitor },
+        { name: 'Mis Activos', href: '/inventory', icon: Monitor },
         { name: 'Mantenimientos', href: '/inventory/maintenance', icon: Wrench },
         { name: 'Actas de Entrega', href: '/inventory/acts', icon: FileText },
       ],
@@ -151,7 +151,7 @@ const navigationByRole: Record<string, NavItem[]> = {
       href: '/inventory',
       icon: Package,
       children: [
-        { name: 'Equipos', href: '/inventory', icon: Monitor },
+        { name: 'Activos', href: '/inventory', icon: Monitor },
         { name: 'Mantenimientos', href: '/inventory/maintenance', icon: Wrench },
         { name: 'Contratos', href: '/inventory/contracts', icon: FileSignature },
         { name: 'Actas de Entrega', href: '/inventory/acts', icon: FileText },
@@ -179,7 +179,7 @@ const navigationByRole: Record<string, NavItem[]> = {
       href: '/inventory',
       icon: Package,
       children: [
-        { name: 'Equipos Asignados', href: '/inventory', icon: Monitor },
+        { name: 'Mis Activos', href: '/inventory', icon: Monitor },
         { name: 'Mantenimientos', href: '/inventory/maintenance', icon: Wrench },
         { name: 'Actas de Entrega', href: '/inventory/acts', icon: FileText },
       ],
@@ -204,7 +204,7 @@ const navigationByRole: Record<string, NavItem[]> = {
       href: '/inventory',
       icon: Package,
       children: [
-        { name: 'Equipos', href: '/inventory', icon: Monitor },
+        { name: 'Activos', href: '/inventory', icon: Monitor },
         { name: 'Mantenimientos', href: '/inventory/maintenance', icon: Wrench },
         { name: 'Contratos', href: '/inventory/contracts', icon: FileSignature },
         { name: 'Actas de Entrega', href: '/inventory/acts', icon: FileText },

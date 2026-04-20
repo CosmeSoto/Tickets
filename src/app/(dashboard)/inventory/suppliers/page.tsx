@@ -116,13 +116,6 @@ export default function SuppliersPage() {
             <RefreshCw className={`h-4 w-4 sm:mr-2 ${loading ? 'animate-spin' : ''}`} />
             <span className="hidden sm:inline">Actualizar</span>
           </Button>
-          <ExportButton
-            onExportCSV={exportCSV}
-            onExportExcel={exportExcel}
-            onExportPDF={exportPDF}
-            loading={exporting}
-            disabled={suppliers.length === 0}
-          />
           <Button onClick={() => { setEditingSupplier(null); setFormOpen(true) }}>
             <Plus className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Nuevo proveedor</span>
@@ -160,6 +153,13 @@ export default function SuppliersPage() {
               <SelectItem value="false">Inactivos</SelectItem>
             </SelectContent>
           </Select>
+          <ExportButton
+            onExportCSV={exportCSV}
+            onExportExcel={exportExcel}
+            onExportPDF={exportPDF}
+            loading={exporting}
+            disabled={suppliers.length === 0}
+          />
         </div>
 
         {/* Tabla */}

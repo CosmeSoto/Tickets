@@ -68,7 +68,8 @@ export default function MaintenanceListPage() {
   const role = session?.user?.role
   const isClient = role === 'CLIENT'
   const canManageInventory = (session?.user as any)?.canManageInventory === true
-  const isManager = canManageInventory  // gestor o admin con permiso
+  const isClientOnly = isClient && !canManageInventory
+  const isManager = canManageInventory
   const isAdminOrTech = role === 'ADMIN' || role === 'TECHNICIAN'
 
   // Tab activo: 'family' (mantenimientos de familias) | 'mine' (mis equipos)
@@ -138,13 +139,6 @@ export default function MaintenanceListPage() {
       subtitle={subtitle}
       headerActions={
         <div className="flex items-center gap-2">
-          <ExportButton
-            onExportCSV={exportCSV}
-            onExportExcel={exportExcel}
-            onExportPDF={exportPDF}
-            loading={exporting}
-            size="sm"
-          />
           {isAdminOrTech || isManager ? (
             <Button onClick={() => setShowNew(true)} size="sm">
               <Plus className="h-4 w-4 sm:mr-2" />
@@ -238,6 +232,13 @@ export default function MaintenanceListPage() {
               <SelectItem value="CORRECTIVE">Correctivo</SelectItem>
             </SelectContent>
           </Select>
+          <ExportButton
+            onExportCSV={exportCSV}
+            onExportExcel={exportExcel}
+            onExportPDF={exportPDF}
+            loading={exporting}
+            size="sm"
+          />
         </div>
 
         {/* Lista */}

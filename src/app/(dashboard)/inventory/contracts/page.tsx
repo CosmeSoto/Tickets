@@ -131,15 +131,6 @@ export default function ContractsPage() {
     <ModuleLayout
       title="Contratos y Suscripciones"
       subtitle="Vista unificada de equipos en arrendamiento y licencias con suscripción activa"
-      headerActions={
-        <ExportButton
-          onExportCSV={exportCSV}
-          onExportExcel={exportExcel}
-          onExportPDF={exportPDF}
-          loading={exporting}
-          size="sm"
-        />
-      }
     >
       <div className="space-y-5">
         {/* Resumen */}
@@ -202,6 +193,13 @@ export default function ContractsPage() {
           >
             <RefreshCw className="h-4 w-4" />
           </button>
+          <ExportButton
+            onExportCSV={exportCSV}
+            onExportExcel={exportExcel}
+            onExportPDF={exportPDF}
+            loading={exporting}
+            size="sm"
+          />
         </div>
 
         {/* Tabla */}

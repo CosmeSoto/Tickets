@@ -3,13 +3,13 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { ModuleLayout } from '@/components/common/layout/module-layout'
 import {
   FileText, Clock, CheckCircle, XCircle, AlertTriangle,
   Package, User, Calendar, ChevronRight, RefreshCw, Filter,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -67,13 +67,13 @@ export default function ActsListPage() {
   const pendingCount = acts.filter(a => a.status === 'PENDING').length
 
   return (
-    <RoleDashboardLayout
+    <ModuleLayout
       title="Actas de Entrega"
-      subtitle={pendingCount > 0 ? `${pendingCount} pendiente${pendingCount > 1 ? 's' : ''} de firma` : 'Historial de actas de entrega de equipos'}
+      subtitle={pendingCount > 0 ? `${pendingCount} pendiente${pendingCount > 1 ? 's' : ''} de firma` : 'Historial de actas de entrega de activos'}
       headerActions={
         <Button variant="outline" size="sm" onClick={() => fetchActs(1, statusFilter)} disabled={loading}>
-          <RefreshCw className={cn('h-4 w-4 mr-2', loading && 'animate-spin')} />
-          Actualizar
+          <RefreshCw className={cn('h-4 w-4 sm:mr-2', loading && 'animate-spin')} />
+          <span className="hidden sm:inline">Actualizar</span>
         </Button>
       }
     >
@@ -228,6 +228,6 @@ export default function ActsListPage() {
           </div>
         )}
       </div>
-    </RoleDashboardLayout>
+    </ModuleLayout>
   )
 }

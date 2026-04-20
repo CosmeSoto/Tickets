@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
-import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -15,6 +15,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast'
 import { Plus, Pencil, Trash2, Loader2, Boxes, Warehouse, FileSignature, Tag, Ruler, ToggleLeft, ToggleRight, Building2 } from 'lucide-react'
 import { SearchableSelect } from '@/components/ui/searchable-select'
+import { ExportButton } from '@/components/common/export-button'
+import { useExport } from '@/hooks/common/use-export'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -205,8 +207,23 @@ function CatalogsContent() {
 
   const setTab = (key: string) => router.push(`/inventory/catalogs?tab=${key}`)
 
+  // Export del catálogo activo
+  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+    filename: `catalogo-${catalog.key}`,
+    title: catalog.label,
+    getData: () => items,
+    columns: [
+      ...(catalog.hasCode ? [{ key: 'code', label: 'Código', format: (v: any) => v ?? '' }] : []),
+      { key: 'name', label: 'Nombre' },
+      ...(catalog.hasSymbol ? [{ key: 'symbol', label: 'Símbolo', format: (v: any) => v ?? '' }] : []),
+      ...(catalog.hasFamily ? [{ key: 'family', label: 'Área', format: (v: any) => v?.name ?? 'Global' }] : []),
+      ...(catalog.hasLocation ? [{ key: 'location', label: 'Ubicación', format: (v: any) => v ?? '' }] : []),
+      { key: 'isActive', label: 'Estado', format: (v: any) => v ? 'Activo' : 'Inactivo' },
+    ],
+  })
+
   return (
-    <RoleDashboardLayout title="Catálogos" subtitle="Gestiona los tipos y configuraciones del inventario">
+    <ModuleLayout title="Catálogos" subtitle="Gestiona los tipos y configuraciones del inventario">
       <div className="space-y-6">
 
         {/* Tabs */}
@@ -232,11 +249,21 @@ function CatalogsContent() {
         </div>
 
         {/* Header de la tab activa */}
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">{catalog.label}</h2>
-          <Button size="sm" onClick={openCreate}>
-            <Plus className="mr-2 h-4 w-4" /> Nuevo
-          </Button>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h2 className="text-base font-semibold">{catalog.label}</h2>
+          <div className="flex items-center gap-2">
+            <ExportButton
+              onExportCSV={exportCSV}
+              onExportExcel={exportExcel}
+              onExportPDF={exportPDF}
+              loading={exporting}
+              disabled={items.length === 0}
+              size="sm"
+            />
+            <Button size="sm" onClick={openCreate}>
+              <Plus className="mr-2 h-4 w-4" /> Nuevo
+            </Button>
+          </div>
         </div>
 
         {/* Tabla */}
@@ -401,7 +428,7 @@ function CatalogsContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </RoleDashboardLayout>
+    </ModuleLayout>
   )
 }
 
