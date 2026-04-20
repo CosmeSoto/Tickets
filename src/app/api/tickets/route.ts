@@ -131,7 +131,6 @@ export async function GET(request: NextRequest) {
             resolvedAt: true,
             closedAt: true,
             slaDeadline: true,
-            knowledgeArticleId: true,
             users_tickets_clientIdTousers: {
               select: { id: true, name: true, email: true, departmentId: true }
             },
