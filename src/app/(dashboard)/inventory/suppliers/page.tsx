@@ -19,6 +19,7 @@ import { SupplierForm } from '@/components/inventory/suppliers/SupplierForm'
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
 import { FamilyCombobox, type FamilyOption } from '@/components/ui/family-combobox'
+import { useInventoryFamilies } from '@/contexts/families-context'
 
 export default function SuppliersPage() {
   const { toast } = useToast()
@@ -27,11 +28,14 @@ export default function SuppliersPage() {
   const [search, setSearch] = useState('')
   const [activeFilter, setActiveFilter] = useState('true')
   const [familyFilter, setFamilyFilter] = useState('all')
-  const [families, setFamilies] = useState<FamilyOption[]>([])
   const [formOpen, setFormOpen] = useState(false)
   const [editingSupplier, setEditingSupplier] = useState<any>(null)
   const [deactivatingSupplier, setDeactivatingSupplier] = useState<any>(null)
   const [deactivating, setDeactivating] = useState(false)
+
+  // Familias de inventario desde el contexto global (cache Redis, sin peticion extra)
+  const { families: rawFamilies } = useInventoryFamilies()
+  const families = rawFamilies.map(f => ({ id: f.id, name: f.name, code: f.code ?? f.name.slice(0, 3).toUpperCase(), color: f.color }))
 
   // Cargar familias para el filtro
   useEffect(() => {
@@ -39,7 +43,7 @@ export default function SuppliersPage() {
       .then(r => r.json())
       .then(d => {
         if (d.success && Array.isArray(d.data)) {
-          setFamilies(d.data.map((f: any) => ({ id: f.id, name: f.name, code: f.code, color: f.color })))
+          // families from context => ({ id: f.id, name: f.name, code: f.code, color: f.color })))
         }
       })
       .catch(() => {})

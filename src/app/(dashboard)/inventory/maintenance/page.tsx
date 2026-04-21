@@ -17,6 +17,7 @@ import { NewMaintenanceDialog } from '@/components/inventory/new-maintenance-dia
 import { FamilyCombobox, type FamilyOption } from '@/components/ui/family-combobox'
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
+import { useInventoryFamilies } from '@/contexts/families-context'
 
 interface MaintenanceItem {
   id: string
@@ -50,19 +51,9 @@ export default function MaintenanceListPage() {
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [typeFilter, setTypeFilter] = useState('ALL')
   const [familyFilter, setFamilyFilter] = useState('all')
-  const [families, setFamilies] = useState<FamilyOption[]>([])
   const [showNew, setShowNew] = useState(false)
 
-  // Cargar familias
-  useEffect(() => {
-    fetch('/api/families?includeInactive=false')
-      .then(r => r.json())
-      .then(d => {
-        if (d.success && Array.isArray(d.data))
-          setFamilies(d.data.map((f: any) => ({ id: f.id, name: f.name, code: f.code, color: f.color })))
-      })
-      .catch(() => {})
-  }, [])
+  // Familias ya disponibles desde el contexto global
 
   const role = session?.user?.role
   const isClient = role === 'CLIENT'
@@ -73,6 +64,10 @@ export default function MaintenanceListPage() {
 
   // Tab activo: 'family' (mantenimientos de familias) | 'mine' (mis equipos)
   const [activeTab, setActiveTab] = useState<'family' | 'mine'>(isClient && !canManageInventory ? 'mine' : 'family')
+
+  // Familias de inventario desde el contexto global (cache Redis, sin peticion extra)
+  const { families: rawFamilies } = useInventoryFamilies()
+  const families = rawFamilies.map(f => ({ id: f.id, name: f.name, code: f.code ?? f.name.slice(0, 3).toUpperCase(), color: f.color }))
 
   const fetchRecords = useCallback(async () => {
     setLoading(true)

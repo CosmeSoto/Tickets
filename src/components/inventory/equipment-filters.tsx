@@ -15,6 +15,7 @@ import {
 import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { EquipmentStatus, EquipmentCondition } from '@prisma/client'
 import type { EquipmentFilters as EquipmentFiltersType, EquipmentTypeInfo } from '@/types/inventory/equipment'
+import { useInventoryFamilies } from '@/contexts/families-context'
 
 interface FamilyOption {
   id: string
@@ -59,10 +60,13 @@ export function EquipmentFilters({
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [equipmentTypes, setEquipmentTypes] = useState<EquipmentTypeInfo[]>([])
   const [loadingTypes, setLoadingTypes] = useState(true)
-  const [families, setFamilies] = useState<FamilyOption[]>([])
   const [loadingFamilies, setLoadingFamilies] = useState(true)
   const [allDepartments, setAllDepartments] = useState<DepartmentOption[]>([])
   const [loadingDepartments, setLoadingDepartments] = useState(true)
+
+  // Familias de inventario desde el contexto global (cache Redis, sin peticion extra)
+  const { families: rawFamilies } = useInventoryFamilies()
+  const families = rawFamilies.map(f => ({ id: f.id, name: f.name, code: f.code ?? f.name.slice(0, 3).toUpperCase(), color: f.color }))
 
   // Cargar tipos de equipo desde la API
   useEffect(() => {
@@ -89,7 +93,7 @@ export function EquipmentFilters({
         const response = await fetch('/api/inventory/families')
         if (response.ok) {
           const data = await response.json()
-          setFamilies(data.families ?? [])
+          // families from context
         }
       } catch (error) {
         console.error('Error cargando familias:', error)

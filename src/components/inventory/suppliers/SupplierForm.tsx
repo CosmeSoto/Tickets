@@ -13,6 +13,7 @@ import { SearchableSelect } from '@/components/ui/searchable-select'
 import { CatalogTypeInlineForm } from '@/components/inventory/asset-forms/CatalogTypeInlineForm'
 import { useFormSubmit } from '@/hooks/common/use-form-submit'
 import { useFetch } from '@/hooks/common/use-fetch'
+import { useInventoryFamilies } from '@/contexts/families-context'
 
 const supplierSchema = z.object({
   name: z.string().min(1, 'El nombre del proveedor es obligatorio').max(200),
@@ -45,17 +46,15 @@ export function SupplierForm({ supplier, defaultFamilyId, onSuccess, onCancel }:
   const [typeId, setTypeId] = useState<string>(supplier?.typeId ?? '')
   const [familyId, setFamilyId] = useState<string>(supplier?.familyId ?? defaultFamilyId ?? '')
 
+  // Familias de inventario desde el contexto global (cache Redis, sin peticion extra)
+  const { families: rawFamilies } = useInventoryFamilies()
+  const families = rawFamilies.map(f => ({ id: f.id, name: f.name, code: f.code ?? f.name.slice(0, 3).toUpperCase(), color: f.color }))
+
   // Cargar tipos filtrados por familia
   const { data: supplierTypes, setData: setSupplierTypes } = useFetch<SupplierType>(
     '/api/inventory/supplier-types',
     { params: familyId ? { familyId } : undefined }
   )
-
-  // Cargar familias
-  const { data: familiesRaw } = useFetch('/api/inventory/families', {
-    transform: (d) => d.families ?? [],
-  })
-  const families = familiesRaw as { id: string; name: string }[]
 
   const { submit, loading } = useFormSubmit(
     isEdit ? `/api/inventory/suppliers/${supplier.id}` : '/api/inventory/suppliers',

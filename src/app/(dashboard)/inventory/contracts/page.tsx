@@ -9,6 +9,7 @@ import { Search, FileSignature, Monitor, RefreshCw, AlertTriangle, CheckCircle, 
 import { FamilyCombobox, type FamilyOption } from '@/components/ui/family-combobox'
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
+import { useInventoryFamilies } from '@/contexts/families-context'
 
 interface ContractItem {
   id: string
@@ -54,22 +55,16 @@ export default function ContractsPage() {
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'EQUIPMENT' | 'LICENSE'>('ALL')
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'EXPIRING' | 'EXPIRED'>('ALL')
   const [familyFilter, setFamilyFilter] = useState('all')
-  const [families, setFamilies] = useState<FamilyOption[]>([])
+
+  // Familias de inventario desde el contexto global (cache Redis, sin peticion extra)
+  const { families: rawFamilies } = useInventoryFamilies()
+  const families = rawFamilies.map(f => ({ id: f.id, name: f.name, code: f.code ?? f.name.slice(0, 3).toUpperCase(), color: f.color }))
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
   }, [status, router])
 
-  // Cargar familias
-  useEffect(() => {
-    fetch('/api/families?includeInactive=false')
-      .then(r => r.json())
-      .then(d => {
-        if (d.success && Array.isArray(d.data))
-          setFamilies(d.data.map((f: any) => ({ id: f.id, name: f.name, code: f.code, color: f.color })))
-      })
-      .catch(() => {})
-  }, [])
+  // Familias ya disponibles desde el contexto global
 
   const fetchContracts = useCallback(async () => {
     setLoading(true)

@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
+import { useFamilies } from '@/contexts/families-context'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -241,6 +242,9 @@ function ByFamilyView({ familyId, assignedManagers, onChanged }: ByFamilyProps) 
   const [assigningId, setAssigningId] = useState<string | null>(null)
   const [unassigningId, setUnassigningId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+
+  // Familias desde el contexto global (cache Redis, sin peticion extra)
+  const { families } = useFamilies()
 
   const assignedIds = new Set(assignedManagers.map((m) => m.managerId))
 

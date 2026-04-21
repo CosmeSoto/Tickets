@@ -38,6 +38,7 @@ import { usePagination } from '@/hooks/common/use-pagination'
 import { useToast } from '@/hooks/use-toast'
 import { useExport } from '@/hooks/common/use-export'
 import type { Article } from '@/hooks/use-knowledge'
+import { useFamilies } from '@/contexts/families-context'
 
 interface FamilyOption {
   id: string
@@ -78,9 +79,11 @@ export default function AdminKnowledgePage() {
   const router = useRouter()
   const { toast } = useToast()
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
-  const [families, setFamilies] = useState<FamilyOption[]>([])
   const [articleToDelete, setArticleToDelete] = useState<Article | null>(null)
   const [deleting, setDeleting] = useState(false)
+
+  // Familias desde el contexto global (cache Redis, sin peticion extra)
+  const { families } = useFamilies()
 
   // Admin usa el endpoint con filtrado por familia (sin restricción de rol)
   const { data: allArticles, loading, error, reload } = useModuleData<Article>({
@@ -88,22 +91,7 @@ export default function AdminKnowledgePage() {
     initialLoad: true,
   })
 
-  // Cargar todas las familias para el filtro
-  useEffect(() => {
-    fetch('/api/families?includeInactive=false')
-      .then(r => r.json())
-      .then(d => {
-        if (d.success && Array.isArray(d.data)) {
-          setFamilies(d.data.map((f: any) => ({
-            id: f.id,
-            name: f.name,
-            code: f.code,
-            color: f.color,
-          })))
-        }
-      })
-      .catch(() => {})
-  }, [])
+  // Familias ya disponibles desde el contexto global
 
   const { filters, debouncedFilters, setFilter, clearFilters, hasActiveFilters } = useKnowledgeFilters()
 

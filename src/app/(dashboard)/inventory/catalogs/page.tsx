@@ -19,6 +19,7 @@ import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
 import { useFetch } from '@/hooks/common/use-fetch'
 import { useFormSubmit } from '@/hooks/common/use-form-submit'
+import { useInventoryFamilies } from '@/contexts/families-context'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -116,6 +117,10 @@ function CatalogsContent() {
   const [deleting, setDeleting] = useState(false)
   const [form, setForm] = useState({ code: '', name: '', symbol: '', description: '', order: 999, familyId: '', location: '' })
 
+  // Familias de inventario desde el contexto global (cache Redis, sin peticion extra)
+  const { families: rawFamilies } = useInventoryFamilies()
+  const families = rawFamilies.map(f => ({ id: f.id, name: f.name, code: f.code ?? f.name.slice(0, 3).toUpperCase(), color: f.color }))
+
   const isAdmin = session?.user?.role === 'ADMIN'
 
   useEffect(() => {
@@ -123,12 +128,6 @@ function CatalogsContent() {
     if (!session) { router.push('/login'); return }
     if (!isAdmin && session.user.role !== 'TECHNICIAN') { router.push('/unauthorized'); return }
   }, [session, status, router, isAdmin])
-
-  // Cargar familias con useFetch
-  const { data: families } = useFetch<Family>('/api/inventory/families', {
-    transform: (d) => d.families ?? [],
-    enabled: status === 'authenticated',
-  })
 
   // Cargar items del catálogo activo con useFetch
   const { data: items, loading, reload: fetchItems } = useFetch<CatalogItem>(catalog.apiGet, {

@@ -12,6 +12,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
+import { useInventoryFamilies } from '@/contexts/families-context'
 
 interface Props {
   open: boolean
@@ -52,6 +53,10 @@ export function NewMaintenanceDialog({
   const [description, setDescription] = useState('')
   const [scheduledDate, setScheduledDate] = useState('')
   const [notes, setNotes] = useState('')
+
+  // Familias de inventario desde el contexto global (cache Redis, sin peticion extra)
+  const { families: rawFamilies } = useInventoryFamilies()
+  const families = rawFamilies.map(f => ({ id: f.id, name: f.name, code: f.code ?? f.name.slice(0, 3).toUpperCase(), color: f.color }))
 
   // Cargar familias al abrir (solo admin/técnico)
   useEffect(() => {

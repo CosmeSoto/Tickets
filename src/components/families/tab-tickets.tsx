@@ -11,6 +11,7 @@ import { Switch } from '@/components/ui/switch'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
+import { useFamilies } from '@/contexts/families-context'
 
 // ---- Types ----
 
@@ -89,6 +90,9 @@ export function TabTickets({ familyId, ticketConfig, onConfigUpdated }: TabTicke
 
   const [saving, setSaving] = useState(false)
   const [showDisableWarning, setShowDisableWarning] = useState(false)
+
+  // Familias desde el contexto global (cache Redis, sin peticion extra)
+  const { families } = useFamilies()
   const isDisabled = !form.ticketsEnabled
 
   // Cargar todas las familias para el selector de allowedFromFamilies

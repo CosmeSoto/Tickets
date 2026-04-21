@@ -49,23 +49,19 @@ import { getCategoryLevelIcon } from '@/lib/constants/category-constants'
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
 import { FamilyCombobox } from '@/components/ui/family-combobox'
+import { useFamilies } from '@/contexts/families-context'
 
 export default function CategoriesPage() {
   const { data: session } = useSession()
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
   const [familyFilter, setFamilyFilter] = useState('all')
-  const [families, setFamilies] = useState<Array<{ id: string; name: string; code: string; color?: string }>>([])
   // Familias que el admin tiene asignadas (para validar permisos en UI)
   const [adminFamilyIds, setAdminFamilyIds] = useState<Set<string> | null>(null)
 
-  useEffect(() => {
-    fetch('/api/families?includeInactive=false')
-      .then(r => r.json())
-      .then(data => {
-        if (data.success && Array.isArray(data.data)) setFamilies(data.data)
-      })
-      .catch(() => {})
-  }, [])
+  // Familias desde el contexto global (cache Redis, sin peticion extra)
+  const { families } = useFamilies()
+
+  // Familias ya disponibles desde el contexto global
 
   // Cargar familias asignadas al admin (para mostrar/ocultar acciones)
   useEffect(() => {

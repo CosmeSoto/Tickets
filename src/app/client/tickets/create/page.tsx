@@ -44,6 +44,7 @@ import { CategorySelectorWrapper } from '@/features/category-selection'
 import { FilePreviewList } from '@/components/tickets/file-preview-list'
 import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { FileInputWithCamera } from '@/components/common/file-input-with-camera'
+import { useFamilies } from '@/contexts/families-context'
 
 interface FamilyOption {
   id: string
@@ -103,6 +104,9 @@ function CreateClientTicketContent() {
 
   // Estados para archivos
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+
+  // Familias desde el contexto global (cache Redis, sin peticion extra)
+  const { families } = useFamilies()
 
   const {
     register,

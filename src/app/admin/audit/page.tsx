@@ -43,6 +43,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
+import { useFamilies } from '@/contexts/families-context'
 
 interface AuditLog {
   id: string
@@ -473,16 +474,11 @@ export default function AuditPage() {
     days: '30',
     familyId: '',
   })
-  const [families, setFamilies] = useState<Array<{ id: string; name: string; code: string; color?: string }>>([])
 
-  useEffect(() => {
-    fetch('/api/families?active=true')
-      .then(r => r.json())
-      .then(data => {
-        if (data.success && Array.isArray(data.data)) setFamilies(data.data)
-      })
-      .catch(() => {})
-  }, [])
+  // Familias desde el contexto global (cache Redis, sin peticion extra)
+  const { families } = useFamilies()
+
+  // Familias ya disponibles desde el contexto global
 
   useEffect(() => {
     if (status === 'loading') return

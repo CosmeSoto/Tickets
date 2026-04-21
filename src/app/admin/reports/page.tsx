@@ -48,6 +48,7 @@ import {
 } from 'recharts'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useFamilies } from '@/contexts/families-context'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -932,6 +933,9 @@ function TechniciansTab({
   loading: boolean
 }) {
   const [search, setSearch] = useState('')
+
+  // Familias desde el contexto global (cache Redis, sin peticion extra)
+  const { families } = useFamilies()
 
   const filtered = data.filter(
     (t) =>

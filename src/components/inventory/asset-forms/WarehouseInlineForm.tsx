@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { useToast } from '@/hooks/use-toast'
 import type { InlineSelectOption } from '@/components/ui/inline-create-select'
+import { useInventoryFamilies } from '@/contexts/families-context'
 
 interface Props {
   /** Si se pasa, pre-selecciona la familia y la muestra como sugerencia */
@@ -23,16 +24,14 @@ export function WarehouseInlineForm({ defaultFamilyId, onSuccess, onCancel }: Pr
   const [name, setName] = useState('')
   const [location, setLocation] = useState('')
   const [familyId, setFamilyId] = useState(defaultFamilyId ?? '')
-  const [families, setFamilies] = useState<Family[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    fetch('/api/inventory/families')
-      .then(r => r.json())
-      .then(d => setFamilies(d.families ?? []))
-      .catch(() => {})
-  }, [])
+  // Familias de inventario desde el contexto global (cache Redis, sin peticion extra)
+  const { families: rawFamilies } = useInventoryFamilies()
+  const families = rawFamilies.map(f => ({ id: f.id, name: f.name, code: f.code ?? f.name.slice(0, 3).toUpperCase(), color: f.color }))
+
+  // Familias ya disponibles desde el contexto global
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
