@@ -29,15 +29,10 @@ import type React from 'react'
 import { useToast } from '@/hooks/use-toast'
 
 export interface UseFetchOptions<T> {
-  /** Parámetros de query string. Se serializan automáticamente. */
   params?: Record<string, string | number | boolean | undefined | null>
-  /** Transforma la respuesta JSON antes de guardarla en state */
   transform?: (raw: any) => T[]
-  /** Si false, no hace fetch. Útil para esperar un ID. Default: true */
   enabled?: boolean
-  /** Muestra toast de error. Default: true */
   showErrorToast?: boolean
-  /** Valor inicial mientras carga */
   initialData?: T[]
 }
 
@@ -48,6 +43,32 @@ export interface UseFetchReturn<T> {
   reload: () => void
   setData: React.Dispatch<React.SetStateAction<T[]>>
 }
+
+// ── Deduplicación de peticiones en vuelo ──────────────────────────────────────
+// Si múltiples componentes llaman al mismo URL simultáneamente, comparten
+// la misma promesa en lugar de hacer N peticiones HTTP separadas.
+// Esto evita el 429 cuando varias páginas cargan /api/inventory/families al mismo tiempo.
+const inFlight = new Map<string, Promise<any>>()
+
+async function fetchWithDedup(url: string): Promise<any> {
+  if (inFlight.has(url)) return inFlight.get(url)!
+
+  const promise = fetch(url, { cache: 'no-store' })
+    .then(res => {
+      if (!res.ok) throw new Error(`Error ${res.status}`)
+      return res.json()
+    })
+    .finally(() => {
+      // Limpiar después de 100ms para permitir que todos los componentes
+      // que se montan en el mismo ciclo de render compartan la respuesta
+      setTimeout(() => inFlight.delete(url), 100)
+    })
+
+  inFlight.set(url, promise)
+  return promise
+}
+
+// ── Hook ──────────────────────────────────────────────────────────────────────
 
 export function useFetch<T = any>(
   url: string,
@@ -66,7 +87,6 @@ export function useFetch<T = any>(
   const [loading, setLoading] = useState(enabled)
   const [error, setError] = useState<string | null>(null)
 
-  // Serializar params a query string estable
   const queryString = params
     ? Object.entries(params)
         .filter(([, v]) => v !== undefined && v !== null && v !== '')
@@ -76,7 +96,6 @@ export function useFetch<T = any>(
 
   const fullUrl = queryString ? `${url}?${queryString}` : url
 
-  // Ref para evitar setState en componente desmontado
   const mountedRef = useRef(true)
   useEffect(() => {
     mountedRef.current = true
@@ -89,12 +108,8 @@ export function useFetch<T = any>(
     setError(null)
 
     try {
-      const res = await fetch(fullUrl, { cache: 'no-store' })
-      if (!res.ok) throw new Error(`Error ${res.status}`)
+      const raw = await fetchWithDedup(fullUrl)
 
-      const raw = await res.json()
-
-      // Extraer array de distintas estructuras de respuesta
       let items: T[]
       if (transform) {
         items = transform(raw)
@@ -107,7 +122,6 @@ export function useFetch<T = any>(
       } else if (raw.records && Array.isArray(raw.records)) {
         items = raw.records
       } else {
-        // Buscar el primer array en la respuesta
         const firstArray = Object.values(raw).find(Array.isArray) as T[] | undefined
         items = firstArray ?? []
       }

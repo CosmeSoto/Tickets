@@ -22,6 +22,8 @@ const RATE_LIMIT_EXCLUDED = [
   '/api/notifications/stream',
   '/api/auth/',
   '/api/config/session-timeout', // consultado cada 2 min por todos los usuarios
+  '/api/families',               // datos de referencia — cacheados en Redis, se leen en cada página
+  '/api/inventory/families',     // ídem para el endpoint de inventario
 ]
 
 function getRateLimitKey(request: NextRequest, userId?: string): { key: string; limits: { window: number; max: number } } {
