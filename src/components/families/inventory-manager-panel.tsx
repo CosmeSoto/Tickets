@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dialog'
 import { useRouter } from 'next/navigation'
 import { ManagerFamilyAssignment } from '@/components/families/manager-family-assignment'
+import { useFetch } from '@/hooks/common/use-fetch'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -83,46 +84,18 @@ function InventoryManagerDialog({
   onOpenChange: (v: boolean) => void
 }) {
   const router = useRouter()
-  const [managers, setManagers] = useState<Manager[]>([])
-  const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [selectedManager, setSelectedManager] = useState<Manager | null>(null)
 
-  const load = useCallback(async () => {
-    if (!open) return
-    setLoading(true)
-    try {
-      const res = await fetch('/api/users?isActive=true&limit=500')
-      if (res.ok) {
-        const data = await res.json()
-        const mgrs: Manager[] = (data.data ?? []).filter(
-          (u: Manager) => u.canManageInventory === true
-        )
-        // Load assigned families for each manager
-        const withFamilies = await Promise.all(
-          mgrs.map(async (m) => {
-            try {
-              const r = await fetch(`/api/inventory/managers/${m.id}/families`)
-              if (r.ok) {
-                const d = await r.json()
-                return { ...m, assignedFamilies: d.families ?? [] }
-              }
-            } catch {
-              // silencioso
-            }
-            return { ...m, assignedFamilies: [] }
-          })
-        )
-        setManagers(withFamilies)
-      }
-    } catch {
-      // silencioso
-    } finally {
-      setLoading(false)
-    }
-  }, [open])
+  // Cargar usuarios con permisos de gestión de inventario usando useFetch
+  const { data: allUsers, loading, reload } = useFetch<Manager>('/api/users', {
+    params: { isActive: 'true', limit: '500' },
+    enabled: open,
+    showErrorToast: false,
+  })
 
-  useEffect(() => { load() }, [load])
+  // Filtrar solo usuarios con canManageInventory
+  const managers = allUsers.filter(u => u.canManageInventory === true)
 
   const filtered = managers.filter(
     (m) =>
@@ -173,7 +146,7 @@ function InventoryManagerDialog({
                 variant="ghost"
                 size="sm"
                 className="h-7 gap-1.5"
-                onClick={load}
+                onClick={reload}
                 disabled={loading}
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -265,7 +238,7 @@ function InventoryManagerDialog({
                             mode="by-manager"
                             managerId={manager.id}
                             managerName={manager.name}
-                            onChanged={load}
+                            onChanged={reload}
                           />
                         </div>
                       )}

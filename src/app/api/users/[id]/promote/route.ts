@@ -264,6 +264,12 @@ export async function POST(
         
         console.log('✅ [API-USER-PROMOTE] Usuario promovido con categorías:', user.name)
         
+        // Invalidar cache de usuarios
+        try {
+          const { invalidateCache } = await import('@/lib/api-cache')
+          await invalidateCache(['users:*'])
+        } catch { /* Redis no disponible */ }
+        
         return NextResponse.json({
           success: true,
           data: enrichedUser,
@@ -302,6 +308,12 @@ export async function POST(
     }
     
     console.log('✅ [API-USER-PROMOTE] Usuario promovido:', user.name)
+    
+    // Invalidar cache de usuarios
+    try {
+      const { invalidateCache } = await import('@/lib/api-cache')
+      await invalidateCache(['users:*'])
+    } catch { /* Redis no disponible */ }
     
     return NextResponse.json({
       success: true,

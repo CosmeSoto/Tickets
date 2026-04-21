@@ -119,6 +119,12 @@ export async function POST(
       }
     })
 
+    // Invalidar cache de usuarios
+    try {
+      const { invalidateCache } = await import('@/lib/api-cache')
+      await invalidateCache(['users:*'])
+    } catch { /* Redis no disponible */ }
+
     return NextResponse.json({
       success: true,
       message: `${user.name} ha sido convertido a cliente exitosamente`,

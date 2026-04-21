@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma'
 import { z } from 'zod'
 import { randomUUID } from 'crypto'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
+import { buildCacheKey } from '@/lib/api-cache'
 
 // Schema de validación
 const departmentSchema = z.object({
@@ -23,6 +24,21 @@ export async function GET(request: NextRequest) {
     const isActive = searchParams.get('isActive')
     const includeCount = searchParams.get('includeCount') === 'true'
     const publicAccess = searchParams.get('public') === 'true'
+    const familyId = searchParams.get('familyId')
+
+    // Cache de 5 minutos — departamentos cambian raramente
+    const cacheKey = buildCacheKey('departments', {
+      isActive,
+      includeCount,
+      publicAccess,
+      familyId,
+    })
+
+    try {
+      const { getCached } = await import('@/lib/redis')
+      const cached = await getCached<any>(cacheKey)
+      if (cached) return NextResponse.json(cached)
+    } catch { /* Redis no disponible */ }
 
     // Si es acceso público (para registro), solo mostrar departamentos activos sin autenticación
     if (publicAccess) {
@@ -40,10 +56,13 @@ export async function GET(request: NextRequest) {
         ]
       })
 
-      return NextResponse.json({
+      const responseData = {
         success: true,
         departments: departments
-      })
+      }
+
+      try { const { setCache } = await import('@/lib/redis'); await setCache(cacheKey, responseData, 300) } catch {}
+      return NextResponse.json(responseData)
     }
 
     // Para acceso autenticado, requerir sesión
@@ -56,7 +75,6 @@ export async function GET(request: NextRequest) {
     if (isActive !== null) {
       where.isActive = isActive === 'true'
     }
-    const familyId = searchParams.get('familyId')
     if (familyId) {
       where.familyId = familyId
     }
@@ -89,10 +107,13 @@ export async function GET(request: NextRequest) {
       console.log('📊 Departamentos cargados:', departments.length)
     }
 
-    return NextResponse.json({
+    const responseData = {
       success: true,
       data: departments
-    })
+    }
+
+    try { const { setCache } = await import('@/lib/redis'); await setCache(cacheKey, responseData, 300) } catch {}
+    return NextResponse.json(responseData)
   } catch (error) {
     console.error('❌ Error al cargar departamentos:', error)
     return NextResponse.json(
@@ -168,6 +189,12 @@ export async function POST(request: NextRequest) {
       },
       request
     })
+
+    // Invalidar cache de departamentos
+    try {
+      const { invalidateCache } = await import('@/lib/api-cache')
+      await invalidateCache(['departments:*'])
+    } catch { /* Redis no disponible */ }
 
     if (process.env.NODE_ENV === 'development') {
       console.log('✅ Departamento creado:', department.name)

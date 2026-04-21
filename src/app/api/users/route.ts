@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth'
 import { UserService } from '@/lib/services/user-service'
 import { z } from 'zod'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
+import { buildCacheKey } from '@/lib/api-cache'
 
 const createUserSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -39,6 +40,28 @@ export async function GET(request: NextRequest) {
     const limit = searchParams.get('limit') // Límite de resultados
     const canManageInventory = searchParams.get('canManageInventory') // Filtrar por permiso de gestión
     const isSuperAdmin = searchParams.get('isSuperAdmin') // Filtrar super admins
+
+    // Cache de 2 minutos — usuarios cambian con poca frecuencia
+    // No cachear búsquedas (search) porque son dinámicas
+    const shouldCache = !search
+    const cacheKey = shouldCache ? buildCacheKey('users', {
+      role,
+      isActive,
+      departmentId,
+      department,
+      familyId,
+      limit,
+      canManageInventory,
+      isSuperAdmin,
+    }) : null
+
+    if (shouldCache && cacheKey) {
+      try {
+        const { getCached } = await import('@/lib/redis')
+        const cached = await getCached<any>(cacheKey)
+        if (cached) return NextResponse.json(cached)
+      } catch { /* Redis no disponible */ }
+    }
 
     // Construir filtros para Prisma
     const where: any = {}
@@ -191,7 +214,8 @@ export async function GET(request: NextRequest) {
       return normalizedUser
     })
 
-    return NextResponse.json({
+    // Guardar en cache si corresponde
+    const responseData = {
       success: true,
       data: usersWithCanDelete,
       meta: {
@@ -203,7 +227,16 @@ export async function GET(request: NextRequest) {
           department
         }
       }
-    })
+    }
+
+    if (shouldCache && cacheKey) {
+      try {
+        const { setCache } = await import('@/lib/redis')
+        await setCache(cacheKey, responseData, 120) // 2 minutos
+      } catch { /* Redis no disponible */ }
+    }
+
+    return NextResponse.json(responseData)
   } catch (error) {
     console.error('Error in users API:', error)
     return NextResponse.json(
@@ -254,6 +287,12 @@ export async function POST(request: NextRequest) {
 
     // Crear el usuario usando el servicio
     const user = await UserService.createUser(validatedData, session.user.id)
+
+    // Invalidar cache de usuarios
+    try {
+      const { invalidateCache } = await import('@/lib/api-cache')
+      await invalidateCache(['users:*'])
+    } catch { /* Redis no disponible */ }
 
     return NextResponse.json({
       success: true,
