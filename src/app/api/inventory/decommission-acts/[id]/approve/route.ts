@@ -9,10 +9,15 @@ import { getUploadDir } from '@/lib/upload-path'
 import { mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import { notifyUser, notifyAdminsExcept, enqueueEmail } from '@/lib/api/notify'
+import { isAdminOfFamily } from '@/lib/inventory-access'
 
 /**
  * POST /api/inventory/decommission-acts/[id]/approve
- * Solo ADMIN puede aprobar
+ *
+ * Solo ADMIN puede aprobar.
+ * - SuperAdmin: puede aprobar cualquier solicitud en cualquier estado
+ * - Admin normal: solo puede aprobar solicitudes de sus familias en estado MANAGER_REVIEW
+ *   (o PENDING/TECHNICAL_REVIEW si no hay gestores asignados a esa familia)
  */
 export async function POST(
   _request: NextRequest,
@@ -23,18 +28,29 @@ export async function POST(
 
   if (session.user.role !== 'ADMIN') {
     return NextResponse.json(
-      { error: 'Solo el administrador puede aprobar o rechazar solicitudes de baja' },
+      { error: 'Solo el administrador puede aprobar solicitudes de baja' },
       { status: 403 }
     )
   }
 
+  const isSuperAdmin = (session.user as any).isSuperAdmin === true
   const { id: requestId } = await params
 
   const decommissionRequest = await prisma.decommission_requests.findUnique({
     where: { id: requestId },
     include: {
-      equipment: { select: { id: true, code: true, brand: true, model: true, serialNumber: true } },
-      license: { select: { id: true, name: true, vendor: true } },
+      equipment: {
+        select: {
+          id: true, code: true, brand: true, model: true, serialNumber: true,
+          type: { select: { familyId: true } },
+        },
+      },
+      license: {
+        select: {
+          id: true, name: true, vendor: true,
+          licenseType: { select: { familyId: true } },
+        },
+      },
       requester: { select: { id: true, name: true, email: true } },
       attachments: true,
     },
@@ -43,8 +59,37 @@ export async function POST(
   if (!decommissionRequest) {
     return NextResponse.json({ error: 'Solicitud no encontrada' }, { status: 404 })
   }
-  if (decommissionRequest.status !== 'PENDING') {
-    return NextResponse.json({ error: 'La solicitud ya fue procesada' }, { status: 409 })
+
+  // Obtener familyId del activo
+  const familyId: string | null = decommissionRequest.assetType === 'EQUIPMENT'
+    ? decommissionRequest.equipment?.type?.familyId ?? null
+    : decommissionRequest.license?.licenseType?.familyId ?? null
+
+  // Verificar que el admin tiene acceso a esta familia
+  const hasAccess = await isAdminOfFamily(session.user.id, isSuperAdmin, familyId)
+  if (!hasAccess) {
+    return NextResponse.json(
+      { error: 'No tienes permiso para aprobar bajas de esta familia' },
+      { status: 403 }
+    )
+  }
+
+  // SuperAdmin puede aprobar desde cualquier estado
+  // Admin normal solo desde MANAGER_REVIEW (o PENDING si no hay gestores en la familia)
+  const approvableStatuses = isSuperAdmin
+    ? ['PENDING', 'TECHNICAL_REVIEW', 'MANAGER_REVIEW']
+    : ['MANAGER_REVIEW', 'PENDING'] // PENDING como fallback si no hay gestores
+
+  if (!approvableStatuses.includes(decommissionRequest.status)) {
+    const statusLabels: Record<string, string> = {
+      APPROVED: 'ya fue aprobada',
+      REJECTED: 'ya fue rechazada',
+      TECHNICAL_REVIEW: 'está pendiente de elevación por el gestor',
+    }
+    return NextResponse.json(
+      { error: `La solicitud ${statusLabels[decommissionRequest.status] ?? 'no está lista para aprobación'}` },
+      { status: 409 }
+    )
   }
 
   const assetName = decommissionRequest.assetType === 'EQUIPMENT'

@@ -4,10 +4,13 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { notifyUser } from '@/lib/api/notify'
+import { isAdminOfFamily } from '@/lib/inventory-access'
 
 /**
  * POST /api/inventory/decommission-acts/[id]/reject
- * Solo ADMIN puede rechazar
+ * Solo ADMIN puede rechazar.
+ * - SuperAdmin: puede rechazar desde cualquier estado
+ * - Admin normal: solo desde MANAGER_REVIEW (o PENDING si no hay gestores)
  */
 export async function POST(
   request: NextRequest,
@@ -18,11 +21,12 @@ export async function POST(
 
   if (session.user.role !== 'ADMIN') {
     return NextResponse.json(
-      { error: 'Solo el administrador puede aprobar o rechazar solicitudes de baja' },
+      { error: 'Solo el administrador puede rechazar solicitudes de baja' },
       { status: 403 }
     )
   }
 
+  const isSuperAdmin = (session.user as any).isSuperAdmin === true
   const { id: requestId } = await params
   const body = await request.json()
   const { rejectionReason } = body
@@ -37,8 +41,18 @@ export async function POST(
   const decommissionRequest = await prisma.decommission_requests.findUnique({
     where: { id: requestId },
     include: {
-      equipment: { select: { id: true, code: true, brand: true, model: true } },
-      license: { select: { id: true, name: true } },
+      equipment: {
+        select: {
+          id: true, code: true, brand: true, model: true,
+          type: { select: { familyId: true } },
+        },
+      },
+      license: {
+        select: {
+          id: true, name: true,
+          licenseType: { select: { familyId: true } },
+        },
+      },
       requester: { select: { id: true, name: true, email: true } },
     },
   })
@@ -46,13 +60,33 @@ export async function POST(
   if (!decommissionRequest) {
     return NextResponse.json({ error: 'Solicitud no encontrada' }, { status: 404 })
   }
-  if (decommissionRequest.status !== 'PENDING') {
-    return NextResponse.json({ error: 'La solicitud ya fue procesada' }, { status: 409 })
+
+  const familyId: string | null = decommissionRequest.assetType === 'EQUIPMENT'
+    ? (decommissionRequest.equipment as any)?.type?.familyId ?? null
+    : (decommissionRequest.license as any)?.licenseType?.familyId ?? null
+
+  const hasAccess = await isAdminOfFamily(session.user.id, isSuperAdmin, familyId)
+  if (!hasAccess) {
+    return NextResponse.json(
+      { error: 'No tienes permiso para rechazar bajas de esta familia' },
+      { status: 403 }
+    )
+  }
+
+  const rejectableStatuses = isSuperAdmin
+    ? ['PENDING', 'TECHNICAL_REVIEW', 'MANAGER_REVIEW']
+    : ['MANAGER_REVIEW', 'PENDING']
+
+  if (!rejectableStatuses.includes(decommissionRequest.status)) {
+    return NextResponse.json(
+      { error: `La solicitud está en estado "${decommissionRequest.status}" y no puede ser rechazada` },
+      { status: 409 }
+    )
   }
 
   const assetName = decommissionRequest.assetType === 'EQUIPMENT'
-    ? `${decommissionRequest.equipment?.code} - ${decommissionRequest.equipment?.brand} ${decommissionRequest.equipment?.model}`
-    : decommissionRequest.license?.name || 'Activo'
+    ? `${(decommissionRequest.equipment as any)?.code} - ${(decommissionRequest.equipment as any)?.brand} ${(decommissionRequest.equipment as any)?.model}`
+    : (decommissionRequest.license as any)?.name || 'Activo'
 
   const adminName = session.user.name || session.user.email || 'Administrador'
 
@@ -70,14 +104,13 @@ export async function POST(
   const requesterEmail = decommissionRequest.requester.email
   const requesterName = decommissionRequest.requester.name || requesterEmail
 
-  // Notificación in-app + email
   await notifyUser(
     requesterId,
     'ERROR',
     'Solicitud de Baja Rechazada',
     `Tu solicitud de baja para "${assetName}" fue rechazada. Motivo: ${rejectionReason.trim().substring(0, 150)}`,
     {
-      metadata: { link: `/inventory/decommission/${requestId}` },
+      metadata: { link: `/inventory/acts?tab=decommission` },
       email: {
         to: requesterEmail,
         subject: `Solicitud de Baja Rechazada - ${assetName}`,
@@ -86,7 +119,6 @@ export async function POST(
     }
   )
 
-  // Audit log
   await prisma.audit_logs.create({
     data: {
       id: randomUUID(),
@@ -103,34 +135,13 @@ export async function POST(
 }
 
 function generateRejectionEmail(requesterName: string, assetName: string, reason: string, adminName: string): string {
-  return `
-<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8">
-<style>
-  body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-  .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-  .header { background-color: #dc2626; color: white; padding: 20px; border-radius: 5px 5px 0 0; }
-  .content { background-color: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; }
-  .info-box { background-color: white; padding: 15px; margin: 15px 0; border-left: 4px solid #dc2626; }
-  .footer { text-align: center; margin-top: 20px; color: #6b7280; font-size: 12px; }
-</style>
-</head>
-<body>
-  <div class="container">
-    <div class="header"><h2>❌ Solicitud de Baja Rechazada</h2></div>
-    <div class="content">
-      <p>Hola ${requesterName},</p>
-      <p>Tu solicitud de baja ha sido <strong>rechazada</strong> por ${adminName}.</p>
-      <div class="info-box">
-        <p><strong>Activo:</strong> ${assetName}</p>
-        <p><strong>Motivo del rechazo:</strong> ${reason}</p>
-        <p><strong>Revisado por:</strong> ${adminName}</p>
-      </div>
-      <p>El activo permanece activo en el sistema. Si tienes dudas, contacta al administrador.</p>
-    </div>
-    <div class="footer"><p>Mensaje automático del Sistema de Gestión de Inventario</p></div>
-  </div>
-</body>
-</html>`.trim()
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>body{font-family:Arial,sans-serif;line-height:1.6;color:#333}.container{max-width:600px;margin:0 auto;padding:20px}.header{background-color:#dc2626;color:white;padding:20px;border-radius:5px 5px 0 0}.content{background-color:#f9fafb;padding:20px;border:1px solid #e5e7eb}.info-box{background-color:white;padding:15px;margin:15px 0;border-left:4px solid #dc2626}.footer{text-align:center;margin-top:20px;color:#6b7280;font-size:12px}</style>
+</head><body><div class="container">
+<div class="header"><h2>❌ Solicitud de Baja Rechazada</h2></div>
+<div class="content"><p>Hola ${requesterName},</p><p>Tu solicitud de baja ha sido <strong>rechazada</strong> por ${adminName}.</p>
+<div class="info-box"><p><strong>Activo:</strong> ${assetName}</p><p><strong>Motivo del rechazo:</strong> ${reason}</p><p><strong>Revisado por:</strong> ${adminName}</p></div>
+<p>El activo permanece activo en el sistema. Si tienes dudas, contacta al administrador.</p></div>
+<div class="footer"><p>Mensaje automático del Sistema de Gestión de Inventario</p></div>
+</div></body></html>`
 }

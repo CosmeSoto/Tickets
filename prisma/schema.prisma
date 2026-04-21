@@ -425,6 +425,8 @@ model users {
   decommissionAttachments                           decommission_attachments[]
   decommissionRequests                              decommission_requests[]         @relation("DecommissionRequester")
   decommissionReviews                               decommission_requests[]         @relation("DecommissionReviewer")
+  decommissionTechnicianReviews                     decommission_requests[]         @relation("DecommissionTechnician")
+  decommissionManagerReviews                        decommission_requests[]         @relation("DecommissionManager")
   assignmentsDelivered                              equipment_assignments[]         @relation("AssignmentDeliverer")
   assignmentsReceived                               equipment_assignments[]         @relation("AssignmentReceiver")
   equipmentAttachments                              equipment_attachments[]
@@ -1203,30 +1205,45 @@ model supplier_types {
 }
 
 model decommission_requests {
-  id              String                     @id @default(cuid())
-  assetType       DecommissionAssetType      @map("asset_type")
-  equipmentId     String?                    @map("equipment_id")
-  licenseId       String?                    @map("license_id")
-  requestedById   String                     @map("requested_by_id")
-  reason          String
-  condition       EquipmentCondition?
-  status          DecommissionStatus         @default(PENDING)
-  rejectionReason String?                    @map("rejection_reason")
-  reviewedById    String?                    @map("reviewed_by_id")
-  reviewedAt      DateTime?                  @map("reviewed_at")
-  createdAt       DateTime                   @default(now()) @map("created_at")
-  updatedAt       DateTime                   @updatedAt @map("updated_at")
-  act             decommission_acts?
-  attachments     decommission_attachments[]
-  equipment       equipment?                 @relation(fields: [equipmentId], references: [id])
-  license         software_licenses?         @relation(fields: [licenseId], references: [id])
-  requester       users                      @relation("DecommissionRequester", fields: [requestedById], references: [id])
-  reviewer        users?                     @relation("DecommissionReviewer", fields: [reviewedById], references: [id])
+  id                  String                     @id @default(cuid())
+  assetType           DecommissionAssetType      @map("asset_type")
+  equipmentId         String?                    @map("equipment_id")
+  licenseId           String?                    @map("license_id")
+  requestedById       String                     @map("requested_by_id")
+  reason              String
+  condition           EquipmentCondition?
+  status              DecommissionStatus         @default(PENDING)
+  rejectionReason     String?                    @map("rejection_reason")
+  reviewedById        String?                    @map("reviewed_by_id")
+  reviewedAt          DateTime?                  @map("reviewed_at")
+
+  /// Dictamen técnico — emitido por un TECHNICIAN asignado a la familia
+  technicianId        String?                    @map("technician_id")
+  technicianOpinion   String?                    @map("technician_opinion")
+  technicianReviewAt  DateTime?                  @map("technician_review_at")
+
+  /// Elevación del gestor — emitida por el gestor de la familia
+  managerId           String?                    @map("manager_id")
+  managerNotes        String?                    @map("manager_notes")
+  managerElevatedAt   DateTime?                  @map("manager_elevated_at")
+
+  createdAt           DateTime                   @default(now()) @map("created_at")
+  updatedAt           DateTime                   @updatedAt @map("updated_at")
+  act                 decommission_acts?
+  attachments         decommission_attachments[]
+  equipment           equipment?                 @relation(fields: [equipmentId], references: [id])
+  license             software_licenses?         @relation(fields: [licenseId], references: [id])
+  requester           users                      @relation("DecommissionRequester", fields: [requestedById], references: [id])
+  reviewer            users?                     @relation("DecommissionReviewer", fields: [reviewedById], references: [id])
+  technician          users?                     @relation("DecommissionTechnician", fields: [technicianId], references: [id])
+  manager             users?                     @relation("DecommissionManager", fields: [managerId], references: [id])
 
   @@index([status, createdAt(sort: Desc)])
   @@index([requestedById])
   @@index([equipmentId])
   @@index([licenseId])
+  @@index([technicianId])
+  @@index([managerId])
   @@map("decommission_requests")
 }
 
@@ -1576,9 +1593,11 @@ enum DecommissionAssetType {
 }
 
 enum DecommissionStatus {
-  PENDING
-  APPROVED
-  REJECTED
+  PENDING            // Solicitud creada, esperando dictamen técnico
+  TECHNICAL_REVIEW   // Técnico emitió dictamen, esperando que gestor eleve
+  MANAGER_REVIEW     // Gestor elevó al admin, esperando aprobación
+  APPROVED           // Admin aprobó — activo dado de baja
+  REJECTED           // Rechazada en cualquier etapa
 }
 
 enum DeliveryActType {
