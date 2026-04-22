@@ -16,7 +16,7 @@ import { UserCog, Loader2, Info, ArrowRight } from 'lucide-react'
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
-  user: { 
+  user: {
     id: string
     name: string
     email: string
@@ -35,7 +35,7 @@ export function PromoteUserDialog({ open, onOpenChange, user, onSuccess }: Props
       const response = await fetch(`/api/users/${user.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: 'TECHNICIAN' })
+        body: JSON.stringify({ role: 'TECHNICIAN' }),
       })
 
       const result = await response.json()
@@ -44,7 +44,7 @@ export function PromoteUserDialog({ open, onOpenChange, user, onSuccess }: Props
         toast({
           title: 'Usuario promovido',
           description: `${user.name} ahora es técnico. Configura sus categorías en el módulo de técnicos.`,
-          duration: 5000
+          duration: 5000,
         })
         onSuccess()
         onOpenChange(false)
@@ -52,7 +52,7 @@ export function PromoteUserDialog({ open, onOpenChange, user, onSuccess }: Props
         toast({
           title: 'Error',
           description: result.error || 'No se pudo promover el usuario',
-          variant: 'destructive'
+          variant: 'destructive',
         })
       }
     } catch (error) {
@@ -60,7 +60,7 @@ export function PromoteUserDialog({ open, onOpenChange, user, onSuccess }: Props
       toast({
         title: 'Error de conexión',
         description: 'No se pudo conectar con el servidor',
-        variant: 'destructive'
+        variant: 'destructive',
       })
     } finally {
       setLoading(false)
@@ -69,29 +69,29 @@ export function PromoteUserDialog({ open, onOpenChange, user, onSuccess }: Props
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md" aria-describedby={undefined}>
+      <DialogContent className='max-w-md' aria-describedby={undefined}>
         <DialogHeader>
-          <div className="flex items-center space-x-2">
-            <UserCog className="h-5 w-5 text-blue-600" />
+          <div className='flex items-center space-x-2'>
+            <UserCog className='h-5 w-5 text-primary' />
             <DialogTitle>Promover a Técnico</DialogTitle>
           </div>
-          <DialogDescription>
-            Convierte este usuario en técnico del sistema
-          </DialogDescription>
+          <DialogDescription>Convierte este usuario en técnico del sistema</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <p className="text-sm">
-              ¿Estás seguro de que deseas promover a <strong>{user.name}</strong> ({user.email}) a técnico?
+        <div className='space-y-4 py-4'>
+          <div className='space-y-2'>
+            <p className='text-sm'>
+              ¿Estás seguro de que deseas promover a <strong>{user.name}</strong> ({user.email}) a
+              técnico?
             </p>
           </div>
 
           <Alert>
-            <Info className="h-4 w-4" />
-            <AlertDescription className="text-sm">
-              <strong>Siguiente paso:</strong> Después de promover, ve al módulo de Técnicos para configurar:
-              <ul className="list-disc list-inside mt-2 space-y-1 text-xs">
+            <Info className='h-4 w-4' />
+            <AlertDescription className='text-sm'>
+              <strong>Siguiente paso:</strong> Después de promover, ve al módulo de Técnicos para
+              configurar:
+              <ul className='list-disc list-inside mt-2 space-y-1 text-xs'>
                 <li>Categorías de trabajo</li>
                 <li>Niveles de prioridad</li>
                 <li>Máximo de tickets</li>
@@ -100,9 +100,9 @@ export function PromoteUserDialog({ open, onOpenChange, user, onSuccess }: Props
             </AlertDescription>
           </Alert>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <p className="text-sm text-blue-900 font-medium mb-2">El usuario podrá:</p>
-            <ul className="list-disc list-inside text-sm text-blue-800 space-y-1">
+          <div className='bg-muted/50 border rounded-lg p-3'>
+            <p className='text-sm font-medium mb-2'>El usuario podrá:</p>
+            <ul className='list-disc list-inside text-sm text-muted-foreground space-y-1'>
               <li>Ver y gestionar tickets asignados</li>
               <li>Acceder al panel de técnico</li>
               <li>Recibir asignaciones de tickets</li>
@@ -110,29 +110,29 @@ export function PromoteUserDialog({ open, onOpenChange, user, onSuccess }: Props
           </div>
         </div>
 
-        <div className="flex justify-end gap-2">
+        <div className='flex justify-end gap-2'>
           <Button
-            type="button"
-            variant="outline"
+            type='button'
+            variant='outline'
             onClick={() => onOpenChange(false)}
             disabled={loading}
           >
             Cancelar
           </Button>
           <Button
-            type="button"
+            type='button'
             onClick={handlePromote}
             disabled={loading}
-            className="bg-blue-600 hover:bg-blue-700"
+            className='bg-primary hover:bg-primary/90'
           >
             {loading ? (
               <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Loader2 className='h-4 w-4 mr-2 animate-spin' />
                 Promoviendo...
               </>
             ) : (
               <>
-                <UserCog className="h-4 w-4 mr-2" />
+                <UserCog className='h-4 w-4 mr-2' />
                 Promover a Técnico
               </>
             )}

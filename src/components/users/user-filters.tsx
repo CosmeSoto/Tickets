@@ -17,11 +17,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { 
-  USER_ROLE_FILTER_OPTIONS, 
+import {
+  USER_ROLE_FILTER_OPTIONS,
   USER_STATUS_FILTER_OPTIONS,
   USER_ROLE_ICONS,
-  type UserRole
+  type UserRole,
 } from '@/lib/constants/user-constants'
 import { cn } from '@/lib/utils'
 
@@ -52,14 +52,14 @@ export function UserFilters({
   loading,
   onRefresh,
   onClearFilters,
-  departments = []
+  departments = [],
 }: UserFiltersProps) {
   // Contar filtros activos
   const activeFiltersCount = [
     roleFilter !== 'all',
     statusFilter !== 'all',
     departmentFilter !== 'all',
-    searchTerm.length > 0
+    searchTerm.length > 0,
   ].filter(Boolean).length
 
   return (
@@ -75,18 +75,18 @@ export function UserFilters({
                 <Input
                   placeholder='Buscar por nombre, email o teléfono...'
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={e => setSearchTerm(e.target.value)}
                   className='pl-10'
                   disabled={loading}
                 />
               </div>
             </div>
-            
+
             {/* Botones de acción */}
             <div className='flex gap-2'>
               {activeFiltersCount > 0 && (
-                <Button 
-                  variant='outline' 
+                <Button
+                  variant='outline'
                   onClick={onClearFilters}
                   className='whitespace-nowrap'
                   disabled={loading}
@@ -95,12 +95,8 @@ export function UserFilters({
                   Limpiar ({activeFiltersCount})
                 </Button>
               )}
-              
-              <Button 
-                variant='outline' 
-                onClick={onRefresh}
-                disabled={loading}
-              >
+
+              <Button variant='outline' onClick={onRefresh} disabled={loading}>
                 <RefreshCw className={cn('h-4 w-4 mr-2', loading && 'animate-spin')} />
                 {loading ? 'Cargando...' : 'Actualizar'}
               </Button>
@@ -115,16 +111,16 @@ export function UserFilters({
               onClick={() => setRoleFilter('all')}
               disabled={loading}
             >
-              <Users className="h-4 w-4 mr-1" />
+              <Users className='h-4 w-4 mr-1' />
               Todos
             </Button>
-            
-            {USER_ROLE_FILTER_OPTIONS.slice(1).map((option) => {
+
+            {USER_ROLE_FILTER_OPTIONS.slice(1).map(option => {
               const isSuperAdmin = option.value === 'SUPER_ADMIN'
-              const role = isSuperAdmin ? 'ADMIN' : option.value as UserRole
+              const role = isSuperAdmin ? 'ADMIN' : (option.value as UserRole)
               const Icon = isSuperAdmin ? Crown : USER_ROLE_ICONS[role as UserRole]
               const isActive = roleFilter === option.value
-              
+
               return (
                 <Button
                   key={option.value}
@@ -132,9 +128,15 @@ export function UserFilters({
                   size='sm'
                   onClick={() => setRoleFilter(option.value)}
                   disabled={loading}
-                  className={isSuperAdmin && isActive ? 'bg-amber-500 hover:bg-amber-600 border-amber-500' : isSuperAdmin ? 'text-amber-600 border-amber-300 hover:bg-amber-50' : ''}
+                  className={
+                    isSuperAdmin && isActive
+                      ? 'bg-amber-500 hover:bg-amber-600 border-amber-500'
+                      : isSuperAdmin
+                        ? 'text-amber-600 border-amber-300 hover:bg-amber-50'
+                        : ''
+                  }
                 >
-                  <Icon className="h-4 w-4 mr-1" />
+                  <Icon className='h-4 w-4 mr-1' />
                   {option.label}
                 </Button>
               )
@@ -150,7 +152,7 @@ export function UserFilters({
               </label>
               <Select value={statusFilter} onValueChange={setStatusFilter} disabled={loading}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar estado" />
+                  <SelectValue placeholder='Seleccionar estado' />
                 </SelectTrigger>
                 <SelectContent>
                   {USER_STATUS_FILTER_OPTIONS.map(option => (
@@ -160,8 +162,8 @@ export function UserFilters({
                           <div
                             className={`w-3 h-3 rounded-full ${
                               option.value === 'true'
-                                ? 'bg-green-500'
-                                : 'bg-red-500'
+                                ? 'bg-green-500 dark:bg-green-400'
+                                : 'bg-red-500 dark:bg-red-400'
                             }`}
                           />
                         )}
@@ -178,12 +180,16 @@ export function UserFilters({
               <label className='text-xs font-medium text-muted-foreground mb-1.5 block'>
                 Departamento
               </label>
-              <Select value={departmentFilter} onValueChange={setDepartmentFilter} disabled={loading}>
+              <Select
+                value={departmentFilter}
+                onValueChange={setDepartmentFilter}
+                disabled={loading}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder="Todos los departamentos" />
+                  <SelectValue placeholder='Todos los departamentos' />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos los departamentos</SelectItem>
+                  <SelectItem value='all'>Todos los departamentos</SelectItem>
                   {departments.map(department => (
                     <SelectItem key={department.id} value={department.id}>
                       <div className='flex items-center space-x-2'>
@@ -204,9 +210,7 @@ export function UserFilters({
           {activeFiltersCount > 0 && (
             <div className='flex items-center gap-2 pt-2 border-t'>
               <Filter className='h-4 w-4 text-muted-foreground' />
-              <span className='text-sm text-muted-foreground'>
-                Filtros activos:
-              </span>
+              <span className='text-sm text-muted-foreground'>Filtros activos:</span>
               <div className='flex flex-wrap gap-2'>
                 {roleFilter !== 'all' && (
                   <Badge variant='secondary' className='text-xs'>
@@ -225,7 +229,7 @@ export function UserFilters({
                 )}
                 {searchTerm && (
                   <Badge variant='secondary' className='text-xs'>
-                    Búsqueda: "{searchTerm}"
+                    Búsqueda: &quot;{searchTerm}&quot;
                   </Badge>
                 )}
               </div>
