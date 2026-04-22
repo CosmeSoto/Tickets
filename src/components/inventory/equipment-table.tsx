@@ -35,27 +35,13 @@ interface EquipmentTableProps {
   onViewQR?: (equipment: Equipment) => void
 }
 
-const STATUS_COLORS: Record<EquipmentStatus, string> = {
-  AVAILABLE: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-  ASSIGNED: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-  MAINTENANCE: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-  DAMAGED: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
-  RETIRED: 'bg-muted text-muted-foreground',
-}
-
-const STATUS_LABELS: Record<EquipmentStatus, string> = {
-  AVAILABLE: 'Disponible',
-  ASSIGNED: 'Asignado',
-  MAINTENANCE: 'Mantenimiento',
-  DAMAGED: 'Dañado',
-  RETIRED: 'Retirado',
-}
+import { getAssetStatusColor, getAssetStatusLabel } from '@/lib/utils/inventory-utils'
 
 const CONDITION_COLORS: Record<EquipmentCondition, string> = {
   NEW: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300',
   LIKE_NEW: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
   GOOD: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-  FAIR: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
+  FAIR: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300',
   POOR: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
 }
 
@@ -83,97 +69,93 @@ export function EquipmentTable({
 
   if (equipment.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
-        <p className="text-sm text-muted-foreground">
-          No se encontraron equipos
-        </p>
+      <div className='flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center'>
+        <p className='text-sm text-muted-foreground'>No se encontraron equipos</p>
       </div>
     )
   }
 
   return (
-    <div className="overflow-x-auto rounded-md border">
+    <div className='overflow-x-auto rounded-md border'>
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Código</TableHead>
             <TableHead>Equipo</TableHead>
-            <TableHead className="hidden md:table-cell">Tipo</TableHead>
-            <TableHead className="hidden lg:table-cell">Departamento</TableHead>
+            <TableHead className='hidden md:table-cell'>Tipo</TableHead>
+            <TableHead className='hidden lg:table-cell'>Departamento</TableHead>
             <TableHead>Estado</TableHead>
-            <TableHead className="hidden md:table-cell">Condición</TableHead>
-            <TableHead className="hidden lg:table-cell">Ubicación</TableHead>
-            <TableHead className="text-right">Acciones</TableHead>
+            <TableHead className='hidden md:table-cell'>Condición</TableHead>
+            <TableHead className='hidden lg:table-cell'>Ubicación</TableHead>
+            <TableHead className='text-right'>Acciones</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {equipment.map((item) => (
+          {equipment.map(item => (
             <TableRow
               key={item.id}
-              className="cursor-pointer hover:bg-muted/50"
+              className='cursor-pointer hover:bg-muted/50'
               onClick={() => router.push(`/inventory/equipment/${item.id}`)}
             >
-              <TableCell className="font-medium">{item.code}</TableCell>
+              <TableCell className='font-medium'>{item.code}</TableCell>
               <TableCell>
                 <div>
-                  <div className="font-medium">{item.brand} {item.model}</div>
-                  <div className="text-sm text-muted-foreground">
-                    S/N: {item.serialNumber}
+                  <div className='font-medium'>
+                    {item.brand} {item.model}
                   </div>
+                  <div className='text-sm text-muted-foreground'>S/N: {item.serialNumber}</div>
                 </div>
               </TableCell>
-              <TableCell className="hidden md:table-cell">
-                <Badge variant="outline">
-                  {item.type?.name || 'Sin tipo'}
-                </Badge>
+              <TableCell className='hidden md:table-cell'>
+                <Badge variant='outline'>{item.type?.name || 'Sin tipo'}</Badge>
               </TableCell>
-              <TableCell className="hidden lg:table-cell">
+              <TableCell className='hidden lg:table-cell'>
                 {item.department ? (
                   <div>
-                    <div className="text-sm font-medium">{item.department.name}</div>
+                    <div className='text-sm font-medium'>{item.department.name}</div>
                     {item.department.family && (
-                      <div className="text-xs text-muted-foreground">{item.department.family.name}</div>
+                      <div className='text-xs text-muted-foreground'>
+                        {item.department.family.name}
+                      </div>
                     )}
                   </div>
                 ) : (
-                  <span className="text-sm text-muted-foreground">—</span>
+                  <span className='text-sm text-muted-foreground'>—</span>
                 )}
               </TableCell>
               <TableCell>
-                <Badge className={STATUS_COLORS[item.status]}>
-                  {STATUS_LABELS[item.status]}
+                <Badge className={getAssetStatusColor(item.status)}>
+                  {getAssetStatusLabel(item.status)}
                 </Badge>
               </TableCell>
-              <TableCell className="hidden md:table-cell">
+              <TableCell className='hidden md:table-cell'>
                 <Badge className={CONDITION_COLORS[item.condition]}>
                   {CONDITION_LABELS[item.condition]}
                 </Badge>
               </TableCell>
-              <TableCell className="hidden lg:table-cell">
-                <span className="text-sm text-muted-foreground">
-                  {item.location || '-'}
-                </span>
+              <TableCell className='hidden lg:table-cell'>
+                <span className='text-sm text-muted-foreground'>{item.location || '-'}</span>
               </TableCell>
-              <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+              <TableCell className='text-right' onClick={e => e.stopPropagation()}>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                      <MoreHorizontal className="h-4 w-4" />
-                      <span className="sr-only">Abrir menú</span>
+                    <Button variant='ghost' size='icon'>
+                      <MoreHorizontal className='h-4 w-4' />
+                      <span className='sr-only'>Abrir menú</span>
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
+                  <DropdownMenuContent align='end'>
                     <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
                       <Link href={`/inventory/equipment/${item.id}`}>
-                        <Eye className="mr-2 h-4 w-4" />
+                        <Eye className='mr-2 h-4 w-4' />
                         Ver detalles
                       </Link>
                     </DropdownMenuItem>
                     {onViewQR && (
                       <DropdownMenuItem onClick={() => onViewQR(item)}>
-                        <QrCode className="mr-2 h-4 w-4" />
+                        <QrCode className='mr-2 h-4 w-4' />
                         Ver código QR
                       </DropdownMenuItem>
                     )}
@@ -182,9 +164,9 @@ export function EquipmentTable({
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           onClick={() => onDelete(item)}
-                          className="text-destructive"
+                          className='text-destructive'
                         >
-                          <Trash2 className="mr-2 h-4 w-4" />
+                          <Trash2 className='mr-2 h-4 w-4' />
                           Retirar equipo
                         </DropdownMenuItem>
                       </>

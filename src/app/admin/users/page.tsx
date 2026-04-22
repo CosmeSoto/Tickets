@@ -28,12 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 // Hooks y tipos
 import { useUsers, type UserData } from '@/hooks/use-users'
@@ -46,7 +41,7 @@ export default function AdminUsersPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const { toast } = useToast()
-  
+
   // Estados de datos
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
 
@@ -60,7 +55,7 @@ export default function AdminUsersPage() {
     setFilter,
     clearFilters,
     activeFiltersCount,
-    hasActiveFilters
+    hasActiveFilters,
   } = useUserFilters()
 
   // Hook de usuarios con filtros
@@ -74,10 +69,10 @@ export default function AdminUsersPage() {
     refresh,
     goToPage,
     toggleUserStatus,
-    removeUserLocally
+    removeUserLocally,
   } = useUsers({
     pageSize: 20,
-    enableCache: true
+    enableCache: true,
   })
 
   // Estados de modales
@@ -94,7 +89,7 @@ export default function AdminUsersPage() {
   }>({
     isOpen: false,
     userId: '',
-    userName: ''
+    userName: '',
   })
   const [avatarModal, setAvatarModal] = useState<{
     isOpen: boolean
@@ -105,7 +100,7 @@ export default function AdminUsersPage() {
     isOpen: false,
     userId: '',
     userName: '',
-    currentAvatar: undefined
+    currentAvatar: undefined,
   })
   const [promotingUser, setPromotingUser] = useState<UserData | null>(null)
   const [promoteDialogOpen, setPromoteDialogOpen] = useState(false)
@@ -129,7 +124,7 @@ export default function AdminUsersPage() {
   // Aplicar filtros cuando cambien los filtros debounced
   useEffect(() => {
     const apiFilters: any = {}
-    
+
     // Solo agregar filtros si tienen valores válidos (no 'all')
     if (debouncedFilters.search && debouncedFilters.search.trim()) {
       apiFilters.search = debouncedFilters.search
@@ -163,7 +158,7 @@ export default function AdminUsersPage() {
     setUserDetailsModal({
       isOpen: true,
       userId: user.id,
-      userName: user.name
+      userName: user.name,
     })
   }
 
@@ -172,7 +167,7 @@ export default function AdminUsersPage() {
       isOpen: true,
       userId: user.id,
       userName: user.name,
-      currentAvatar: user.avatar
+      currentAvatar: user.avatar,
     })
   }
 
@@ -182,10 +177,10 @@ export default function AdminUsersPage() {
     if (success) {
       toast({
         title: user.isActive ? 'Usuario desactivado' : 'Usuario activado exitosamente',
-        description: user.isActive 
+        description: user.isActive
           ? `"${userName}" ya no podrá iniciar sesión en el sistema`
           : `"${userName}" ahora puede iniciar sesión en el sistema`,
-        duration: 4000
+        duration: 4000,
       })
       refresh()
     } else {
@@ -193,7 +188,7 @@ export default function AdminUsersPage() {
         title: 'Error al cambiar estado',
         description: `No se pudo ${user.isActive ? 'desactivar' : 'activar'} el usuario. Intenta nuevamente.`,
         variant: 'destructive',
-        duration: 5000
+        duration: 5000,
       })
     }
   }
@@ -218,7 +213,7 @@ export default function AdminUsersPage() {
     setDeleteLoading(true)
     try {
       const response = await fetch(`/api/users/${deletingUser.id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
       })
 
       const result = await response.json()
@@ -227,7 +222,7 @@ export default function AdminUsersPage() {
         toast({
           title: 'Usuario eliminado',
           description: `"${userName}" ha sido eliminado permanentemente del sistema`,
-          duration: 4000
+          duration: 4000,
         })
         setDeleteDialogOpen(false)
         setDeletingUser(null)
@@ -240,15 +235,16 @@ export default function AdminUsersPage() {
           title: 'Error al eliminar usuario',
           description: result.error || 'No se pudo eliminar el usuario. Intenta nuevamente.',
           variant: 'destructive',
-          duration: 5000
+          duration: 5000,
         })
       }
     } catch (error) {
       toast({
         title: 'Error de conexión',
-        description: 'No se pudo conectar con el servidor. Verifica tu conexión e intenta nuevamente.',
+        description:
+          'No se pudo conectar con el servidor. Verifica tu conexión e intenta nuevamente.',
         variant: 'destructive',
-        duration: 5000
+        duration: 5000,
       })
     } finally {
       setDeleteLoading(false)
@@ -268,7 +264,7 @@ export default function AdminUsersPage() {
     onAvatarEdit: handleAvatarEdit,
     onToggleStatus: handleToggleStatus,
     onPromoteUser: handlePromoteUser,
-    currentUserId: session?.user?.id
+    currentUserId: session?.user?.id,
   })
 
   if (!session || session.user.role !== 'ADMIN') {
@@ -296,20 +292,20 @@ export default function AdminUsersPage() {
         </TooltipProvider>
       }
     >
-      <div className="space-y-6">
+      <div className='space-y-6'>
         {/* Panel de Estadísticas */}
         <UserStatsPanel stats={stats} loading={loading && users.length === 0} />
 
         {/* Filtros de Usuarios */}
         <UserFilters
           searchTerm={filters.search}
-          setSearchTerm={(term) => setFilter('search', term)}
+          setSearchTerm={term => setFilter('search', term)}
           roleFilter={filters.role}
-          setRoleFilter={(role) => setFilter('role', role as UserRole | 'all')}
+          setRoleFilter={role => setFilter('role', role as UserRole | 'all')}
           statusFilter={filters.status}
-          setStatusFilter={(status) => setFilter('status', status as 'all' | 'true' | 'false')}
+          setStatusFilter={status => setFilter('status', status as 'all' | 'true' | 'false')}
           departmentFilter={filters.department}
-          setDepartmentFilter={(department) => setFilter('department', department)}
+          setDepartmentFilter={department => setFilter('department', department)}
           onRefresh={refresh}
           onClearFilters={clearFilters}
           departments={departments as any}
@@ -318,8 +314,8 @@ export default function AdminUsersPage() {
 
         {/* DataTable */}
         <DataTable
-          title={viewMode === 'table' ? "Vista de Tabla - Información detallada de usuarios" : "Información visual de usuarios"}
-          description={viewMode === 'table' ? "Información completa en formato tabular" : "Clic en usuario para ver detalles"}
+          title='Usuarios'
+          description={`${users.length} usuario${users.length !== 1 ? 's' : ''} encontrado${users.length !== 1 ? 's' : ''}`}
           data={users}
           columns={columns}
           loading={loading}
@@ -331,14 +327,14 @@ export default function AdminUsersPage() {
             page: usersPagination.page,
             limit: usersPagination.limit,
             total: usersPagination.total,
-            onPageChange: (page) => goToPage(page),
-            onLimitChange: (limit) => {
+            onPageChange: page => goToPage(page),
+            onLimitChange: limit => {
               // TODO: Implementar cambio de límite en el hook
-            }
+            },
           }}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
-          cardRenderer={(user) => (
+          cardRenderer={user => (
             <UserCard
               user={user}
               onEdit={handleUserEdit}
@@ -351,17 +347,17 @@ export default function AdminUsersPage() {
           )}
           onRefresh={refresh}
           emptyState={{
-            icon: <UsersIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />,
-            title: "No hay usuarios",
+            icon: <UsersIcon className='h-12 w-12 text-muted-foreground mx-auto mb-4' />,
+            title: 'No hay usuarios',
             description: hasActiveFilters
-              ? "No se encontraron usuarios con los filtros aplicados"
-              : "No se encontraron usuarios en el sistema",
+              ? 'No se encontraron usuarios con los filtros aplicados'
+              : 'No se encontraron usuarios en el sistema',
             action: (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button onClick={() => setShowCreateDialog(true)}>
-                      <Plus className="h-4 w-4 mr-2" />
+                      <Plus className='h-4 w-4 mr-2' />
                       Crear primer usuario
                     </Button>
                   </TooltipTrigger>
@@ -370,7 +366,7 @@ export default function AdminUsersPage() {
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-            )
+            ),
           }}
         />
       </div>
@@ -411,30 +407,31 @@ export default function AdminUsersPage() {
 
       {/* Diálogo de confirmación de eliminación */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]" aria-describedby={undefined}>
+        <DialogContent className='sm:max-w-[425px]' aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>¿Eliminar usuario?</DialogTitle>
             <DialogDescription>
               {deletingUser && (
                 <>
                   Estás a punto de eliminar a:{' '}
-                  <span className="font-semibold text-foreground">
+                  <span className='font-semibold text-foreground'>
                     {deletingUser.name} ({deletingUser.email})
                   </span>
-                  <br /><br />
+                  <br />
+                  <br />
                 </>
               )}
-              Esta acción no se puede deshacer. El usuario perderá acceso al sistema
-              y todos sus datos serán eliminados permanentemente.
+              Esta acción no se puede deshacer. El usuario perderá acceso al sistema y todos sus
+              datos serán eliminados permanentemente.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+            <Button type='button' variant='outline' onClick={() => setDeleteDialogOpen(false)}>
               Cancelar
             </Button>
             <Button
-              type="button"
-              variant="destructive"
+              type='button'
+              variant='destructive'
               onClick={handleDeleteUser}
               disabled={deleteLoading}
             >
@@ -450,12 +447,14 @@ export default function AdminUsersPage() {
         userName={avatarModal.userName}
         currentAvatar={avatarModal.currentAvatar}
         isOpen={avatarModal.isOpen}
-        onClose={() => setAvatarModal({
-          isOpen: false,
-          userId: '',
-          userName: '',
-          currentAvatar: undefined
-        })}
+        onClose={() =>
+          setAvatarModal({
+            isOpen: false,
+            userId: '',
+            userName: '',
+            currentAvatar: undefined,
+          })
+        }
         onAvatarUpdated={handleUserUpdated}
       />
 
@@ -466,7 +465,11 @@ export default function AdminUsersPage() {
         onUserCreated={handleUserUpdated}
         departments={departments as any}
         suggestedRole={
-          filters.role && filters.role !== 'all' && (filters.role as string) !== 'SUPER_ADMIN' && (filters.role as string) !== 'TECHNICIAN_MANAGER' && (filters.role as string) !== 'CLIENT_MANAGER'
+          filters.role &&
+          filters.role !== 'all' &&
+          (filters.role as string) !== 'SUPER_ADMIN' &&
+          (filters.role as string) !== 'TECHNICIAN_MANAGER' &&
+          (filters.role as string) !== 'CLIENT_MANAGER'
             ? (filters.role as UserRole)
             : undefined
         }
@@ -480,7 +483,7 @@ export default function AdminUsersPage() {
           user={{
             id: promotingUser.id,
             name: promotingUser.name,
-            email: promotingUser.email
+            email: promotingUser.email,
           }}
           onSuccess={handlePromoteSuccess}
         />
