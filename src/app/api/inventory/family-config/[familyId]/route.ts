@@ -40,7 +40,8 @@ const updateConfigSchema = z.object({
   inventoryEnabled: z.boolean().optional(),
 })
 
-export async function GET(req: NextRequest, { params }: { params: { familyId: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ familyId: string }> }) {
+  const { familyId } = await params
   const session = await getServerSession(authOptions)
   if (!session?.user) {
     return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
@@ -49,7 +50,6 @@ export async function GET(req: NextRequest, { params }: { params: { familyId: st
   const { role, id: userId } = session.user as { role: string; id: string }
   const isSuperAdmin = (session.user as any).isSuperAdmin === true
 
-  // Verificar permisos
   if (role !== 'ADMIN' && !isSuperAdmin) {
     const allowed = await canManageInventory(userId, role)
     if (!allowed) {
@@ -62,27 +62,19 @@ export async function GET(req: NextRequest, { params }: { params: { familyId: st
 
   try {
     const config = await prisma.inventory_family_config.findUnique({
-      where: { familyId: params.familyId },
+      where: { familyId },
     })
 
     if (!config) {
-      // Retornar configuración por defecto
       return NextResponse.json({
         success: true,
-        data: {
-          familyId: params.familyId,
-          ...DEFAULT_FAMILY_CONFIG,
-          inventoryEnabled: true,
-        },
+        data: { familyId, ...DEFAULT_FAMILY_CONFIG, inventoryEnabled: true },
       })
     }
 
     return NextResponse.json({
       success: true,
-      data: {
-        ...config,
-        inventoryEnabled: true, // Por ahora siempre true, se puede agregar campo en el futuro
-      },
+      data: { ...config, inventoryEnabled: true },
     })
   } catch (error) {
     console.error('Error al obtener configuración:', error)
@@ -90,7 +82,8 @@ export async function GET(req: NextRequest, { params }: { params: { familyId: st
   }
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { familyId: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ familyId: string }> }) {
+  const { familyId } = await params
   const session = await getServerSession(authOptions)
   if (!session?.user) {
     return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
@@ -99,7 +92,6 @@ export async function PUT(req: NextRequest, { params }: { params: { familyId: st
   const { role } = session.user as { role: string; id: string }
   const isSuperAdmin = (session.user as any).isSuperAdmin === true
 
-  // Verificar permisos
   if (role !== 'ADMIN' && !isSuperAdmin) {
     return NextResponse.json(
       { error: 'No tienes permiso para modificar la configuración' },
@@ -111,26 +103,17 @@ export async function PUT(req: NextRequest, { params }: { params: { familyId: st
     const body = await req.json()
     const validated = updateConfigSchema.parse(body)
 
-    // Verificar que la familia existe
-    const family = await prisma.families.findUnique({
-      where: { id: params.familyId },
-    })
-
+    const family = await prisma.families.findUnique({ where: { id: familyId } })
     if (!family) {
       return NextResponse.json({ error: 'Familia no encontrada' }, { status: 404 })
     }
 
-    // Preparar datos para actualizar (excluir inventoryEnabled que no está en el schema DB)
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { inventoryEnabled: _inv, ...configData } = validated
 
-    // Upsert configuración
     const config = await prisma.inventory_family_config.upsert({
-      where: { familyId: params.familyId },
-      create: {
-        familyId: params.familyId,
-        ...configData,
-      },
+      where: { familyId },
+      create: { familyId, ...configData },
       update: configData,
     })
 
