@@ -102,6 +102,14 @@ export function useFetch<T = any>(
     return () => { mountedRef.current = false }
   }, [])
 
+  // Guardar transform en ref para que no sea dependencia del useCallback
+  // Esto evita el loop infinito cuando transform es una función inline
+  const transformRef = useRef(transform)
+  useEffect(() => { transformRef.current = transform })
+
+  const toastRef = useRef(toast)
+  useEffect(() => { toastRef.current = toast })
+
   const fetchData = useCallback(async () => {
     if (!enabled) return
     setLoading(true)
@@ -111,8 +119,9 @@ export function useFetch<T = any>(
       const raw = await fetchWithDedup(fullUrl)
 
       let items: T[]
-      if (transform) {
-        items = transform(raw)
+      const currentTransform = transformRef.current
+      if (currentTransform) {
+        items = currentTransform(raw)
       } else if (Array.isArray(raw)) {
         items = raw
       } else if (raw.data && Array.isArray(raw.data)) {
@@ -131,12 +140,12 @@ export function useFetch<T = any>(
       const msg = err.message || 'Error al cargar datos'
       if (mountedRef.current) setError(msg)
       if (showErrorToast) {
-        toast({ title: 'Error', description: msg, variant: 'destructive' })
+        toastRef.current({ title: 'Error', description: msg, variant: 'destructive' })
       }
     } finally {
       if (mountedRef.current) setLoading(false)
     }
-  }, [fullUrl, enabled, showErrorToast, toast, transform])
+  }, [fullUrl, enabled, showErrorToast])
 
   useEffect(() => {
     fetchData()

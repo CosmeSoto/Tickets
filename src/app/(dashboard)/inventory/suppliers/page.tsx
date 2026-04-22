@@ -18,8 +18,7 @@ import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { SupplierForm } from '@/components/inventory/suppliers/SupplierForm'
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
-import { FamilyCombobox, type FamilyOption } from '@/components/ui/family-combobox'
-import { useInventoryFamilies } from '@/contexts/families-context'
+import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { useFamilyOptions } from '@/hooks/use-family-options'
 
 export default function SuppliersPage() {
@@ -251,7 +250,7 @@ export default function SuppliersPage() {
       <AlertDialog open={!!deactivatingSupplier} onOpenChange={o => !o && setDeactivatingSupplier(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Desactivar "{deactivatingSupplier?.name}"?</AlertDialogTitle>
+            <AlertDialogTitle>¿Desactivar &quot;{deactivatingSupplier?.name}&quot;?</AlertDialogTitle>
             <AlertDialogDescription>
               El proveedor quedará inactivo y no aparecerá en nuevos formularios.
               Solo se puede desactivar si no tiene equipos, consumibles o licencias asociados actualmente.

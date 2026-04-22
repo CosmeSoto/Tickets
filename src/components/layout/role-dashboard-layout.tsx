@@ -93,7 +93,7 @@ const navigationByRole: Record<string, NavItem[]> = {
         { name: 'Proveedores', href: '/inventory/suppliers', icon: Building2 },
         { name: 'Reportes', href: '/inventory/reports', icon: BarChart3 },
         { name: 'Catálogos', href: '/inventory/catalogs', icon: Database },
-        { name: 'Configuración', href: '/settings/inventory', icon: Settings },
+        { name: 'Configuración', href: '/admin/settings/inventory', icon: Settings },
       ],
     },
     { name: 'Familias', href: '/admin/families', icon: Layers },

@@ -1,79 +1,62 @@
-import { prisma } from '@/lib/prisma'
+// Configuración por defecto para familias de inventario
+// SOLO constantes y funciones puras — sin dependencias de servidor
+// Importable tanto en cliente como en servidor
 
-export type { AssetSubtype, FormSection, FamilyConfig, AcquisitionMode, SectionsByMode, ModeSectionConfig } from './family-config-types'
-export { DEFAULT_FAMILY_CONFIG, DEFAULT_MODE_CONFIG, resolveSectionsForMode } from './family-config-types'
-import type { AssetSubtype, FormSection, FamilyConfig } from './family-config-types'
-import { DEFAULT_FAMILY_CONFIG } from './family-config-types'
+import type { FamilyConfig } from './family-config-types'
 
-/**
- * Si hay exactamente un subtipo permitido, lo retorna con showSelector=false.
- * Función pura — no accede a BD.
- */
-export function resolveAutoSubtype(
-  allowedSubtypes: AssetSubtype[]
-): { autoSelected: AssetSubtype | null; showSelector: boolean } {
-  if (allowedSubtypes.length === 1) {
-    return { autoSelected: allowedSubtypes[0], showSelector: false }
-  }
-  return { autoSelected: null, showSelector: true }
+export const DEFAULT_FAMILY_CONFIG: Omit<FamilyConfig, 'familyId'> = {
+  allowedSubtypes: ['EQUIPMENT', 'MRO', 'LICENSE'],
+  visibleSections: ['FINANCIAL', 'DEPRECIATION', 'CONTRACT', 'STOCK_MRO', 'WAREHOUSE'],
+  requiredSections: [],
+  requireFinancialForNew: true,
+  sectionsByMode: undefined,
 }
 
 /**
- * Valida que el subtipo esté en los subtipos permitidos de la familia.
- * Función pura — no accede a BD.
+ * Valida si un subtipo de activo está permitido para una familia
  */
 export function validateSubtypeForFamily(
-  subtype: AssetSubtype,
+  subtype: string,
   config: FamilyConfig
 ): { valid: boolean; error?: string } {
   if (!config.allowedSubtypes.includes(subtype)) {
     return {
       valid: false,
-      error: `El subtipo '${subtype}' no está permitido para esta familia`,
+      error: `El tipo de activo "${subtype}" no está permitido para esta área`,
     }
   }
   return { valid: true }
 }
 
 /**
- * Valida la invariante: requiredSections ⊆ visibleSections.
- * Función pura — no accede a BD.
- */
-export function validateSectionsInvariant(
-  visibleSections: FormSection[],
-  requiredSections: FormSection[]
-): { valid: boolean; error?: string } {
-  const invalid = requiredSections.filter(s => !visibleSections.includes(s))
-  if (invalid.length > 0) {
-    return {
-      valid: false,
-      error: 'Las secciones obligatorias deben ser un subconjunto de las secciones visibles',
-    }
-  }
-  return { valid: true }
-}
-
-/**
- * Obtiene la configuración de una familia. Si no existe, retorna los valores por defecto.
- * No lanza excepciones por "no encontrado".
+ * Obtiene la configuración de inventario para una familia desde la DB.
+ * SOLO para uso en servidor (API routes, server actions).
+ * Importa prisma de forma lazy para no contaminar el bundle del cliente.
  */
 export async function getFamilyConfig(familyId: string): Promise<FamilyConfig> {
-  try {
-    const config = await prisma.inventory_family_config.findUnique({
-      where: { familyId },
-    })
-    if (!config) {
-      return { familyId, ...DEFAULT_FAMILY_CONFIG }
-    }
-    return {
-      familyId: config.familyId,
-      allowedSubtypes: config.allowedSubtypes as AssetSubtype[],
-      visibleSections: config.visibleSections as FormSection[],
-      requiredSections: config.requiredSections as FormSection[],
-      requireFinancialForNew: config.requireFinancialForNew,
-    }
-  } catch {
-    // Si la tabla no existe aún, devolver config por defecto
+  const { prisma } = await import('@/lib/prisma')
+  const config = await prisma.inventory_family_config.findUnique({
+    where: { familyId },
+  })
+
+  if (!config) {
     return { familyId, ...DEFAULT_FAMILY_CONFIG }
   }
+
+  return {
+    familyId: config.familyId,
+    allowedSubtypes: config.allowedSubtypes as string[],
+    visibleSections: config.visibleSections as string[],
+    requiredSections: config.requiredSections as string[],
+    requireFinancialForNew: config.requireFinancialForNew,
+    sectionsByMode: config.sectionsByMode as any,
+    defaultDepreciationMethod: config.defaultDepreciationMethod,
+    defaultUsefulLifeYears: config.defaultUsefulLifeYears,
+    defaultResidualValuePct: config.defaultResidualValuePct,
+    codePrefix: config.codePrefix,
+    autoApproveDecommission: config.autoApproveDecommission,
+    requireDeliveryAct: config.requireDeliveryAct,
+  }
 }
+
+export * from './family-config-types'

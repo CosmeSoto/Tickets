@@ -1,19 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { randomUUID } from 'crypto'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import {
-  DEFAULT_FAMILY_CONFIG,
-  validateSectionsInvariant,
-  type AssetSubtype,
-  type FormSection,
-  type SectionsByMode,
-} from '@/lib/inventory/family-config'
+import { canManageInventory } from '@/lib/inventory-access'
+import { z } from 'zod'
+import { DEFAULT_FAMILY_CONFIG } from '@/lib/inventory/family-config'
+
+const updateConfigSchema = z.object({
+  allowedSubtypes: z.array(z.enum(['EQUIPMENT', 'MRO', 'LICENSE'])).optional(),
+  visibleSections: z.array(z.enum(['FINANCIAL', 'DEPRECIATION', 'CONTRACT', 'STOCK_MRO', 'WAREHOUSE'])).optional(),
+  requiredSections: z.array(z.enum(['FINANCIAL', 'DEPRECIATION', 'CONTRACT', 'STOCK_MRO', 'WAREHOUSE'])).optional(),
+  requireFinancialForNew: z.boolean().optional(),
+  sectionsByMode: z.record(z.object({
+    visible: z.array(z.enum(['FINANCIAL', 'DEPRECIATION', 'CONTRACT', 'STOCK_MRO', 'WAREHOUSE'])),
+    required: z.array(z.enum(['FINANCIAL', 'DEPRECIATION', 'CONTRACT', 'STOCK_MRO', 'WAREHOUSE'])),
+  })).nullable().optional(),
+  defaultDepreciationMethod: z.enum(['STRAIGHT_LINE', 'DECLINING_BALANCE', 'UNITS_OF_PRODUCTION']).nullable().optional(),
+  defaultUsefulLifeYears: z.number().positive().nullable().optional(),
+  defaultResidualValuePct: z.number().min(0).max(100).nullable().optional(),
+  codePrefix: z.string().max(10).nullable().optional(),
+  autoApproveDecommission: z.boolean().optional(),
+  requireDeliveryAct: z.boolean().optional(),
+  inventoryEnabled: z.boolean().optional(),
+})
 
 export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ familyId: string }> }
+  req: NextRequest,
+  { params }: { params: { familyId: string } }
 ) {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
@@ -21,206 +34,117 @@ export async function GET(
   }
 
   const { role, id: userId } = session.user as { role: string; id: string }
+  const isSuperAdmin = (session.user as any).isSuperAdmin === true
 
-  if (role !== 'ADMIN') {
-    const { canManageInventory } = await import('@/lib/inventory-access')
+  // Verificar permisos
+  if (role !== 'ADMIN' && !isSuperAdmin) {
     const allowed = await canManageInventory(userId, role)
     if (!allowed) {
-      return NextResponse.json({ error: 'No tienes permiso para ver la configuración de familias' }, { status: 403 })
+      return NextResponse.json(
+        { error: 'No tienes permiso para ver la configuración' },
+        { status: 403 }
+      )
     }
   }
 
-  const { familyId } = await params
-
   try {
-    const config = await prisma.inventory_family_config.findUnique({ where: { familyId } })
+    const config = await prisma.inventory_family_config.findUnique({
+      where: { familyId: params.familyId },
+    })
+
     if (!config) {
+      // Retornar configuración por defecto
       return NextResponse.json({
-        familyId,
-        ...DEFAULT_FAMILY_CONFIG,
-        defaultDepreciationMethod: null,
-        defaultUsefulLifeYears: null,
-        defaultResidualValuePct: null,
-        codePrefix: null,
-        autoApproveDecommission: false,
-        requireDeliveryAct: true,
+        success: true,
+        data: {
+          familyId: params.familyId,
+          ...DEFAULT_FAMILY_CONFIG,
+          inventoryEnabled: true,
+        },
       })
     }
+
     return NextResponse.json({
-      familyId: config.familyId,
-      allowedSubtypes: config.allowedSubtypes,
-      visibleSections: config.visibleSections,
-      requiredSections: config.requiredSections,
-      requireFinancialForNew: config.requireFinancialForNew,
-      sectionsByMode: config.sectionsByMode ?? undefined,
-      // Nuevos campos
-      defaultDepreciationMethod: config.defaultDepreciationMethod ?? null,
-      defaultUsefulLifeYears:    config.defaultUsefulLifeYears ?? null,
-      defaultResidualValuePct:   config.defaultResidualValuePct ?? null,
-      codePrefix:                config.codePrefix ?? null,
-      autoApproveDecommission:   config.autoApproveDecommission,
-      requireDeliveryAct:        config.requireDeliveryAct,
+      success: true,
+      data: {
+        ...config,
+        inventoryEnabled: true, // Por ahora siempre true, se puede agregar campo en el futuro
+      },
     })
-  } catch (err) {
-    console.error('[family-config GET]', err)
-    return NextResponse.json({
-      familyId,
-      ...DEFAULT_FAMILY_CONFIG,
-      defaultDepreciationMethod: null,
-      defaultUsefulLifeYears: null,
-      defaultResidualValuePct: null,
-      codePrefix: null,
-      autoApproveDecommission: false,
-      requireDeliveryAct: true,
-    })
+  } catch (error) {
+    console.error('Error al obtener configuración:', error)
+    return NextResponse.json(
+      { error: 'Error al obtener configuración' },
+      { status: 500 }
+    )
   }
 }
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: Promise<{ familyId: string }> }
+  { params }: { params: { familyId: string } }
 ) {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
     return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
   }
 
-  const { role, id: userId } = session.user as { role: string; id: string }
+  const { role } = session.user as { role: string; id: string }
+  const isSuperAdmin = (session.user as any).isSuperAdmin === true
 
-  if (role !== 'ADMIN') {
+  // Verificar permisos
+  if (role !== 'ADMIN' && !isSuperAdmin) {
     return NextResponse.json(
-      { error: 'Solo el administrador puede configurar las secciones del formulario por familia' },
+      { error: 'No tienes permiso para modificar la configuración' },
       { status: 403 }
     )
   }
 
-  const { familyId } = await params
-  const body = await req.json()
-  const {
-    allowedSubtypes,
-    visibleSections,
-    requiredSections,
-    requireFinancialForNew = true,
-    sectionsByMode,
-    // Nuevos campos
-    defaultDepreciationMethod,
-    defaultUsefulLifeYears,
-    defaultResidualValuePct,
-    codePrefix,
-    autoApproveDecommission = false,
-    requireDeliveryAct = true,
-  } = body as {
-    allowedSubtypes: AssetSubtype[]
-    visibleSections: FormSection[]
-    requiredSections: FormSection[]
-    requireFinancialForNew?: boolean
-    sectionsByMode?: SectionsByMode
-    defaultDepreciationMethod?: string | null
-    defaultUsefulLifeYears?: number | null
-    defaultResidualValuePct?: number | null
-    codePrefix?: string | null
-    autoApproveDecommission?: boolean
-    requireDeliveryAct?: boolean
-  }
-
-  if (!Array.isArray(allowedSubtypes) || allowedSubtypes.length < 1) {
-    return NextResponse.json({ error: 'Una familia debe permitir al menos un subtipo de activo' }, { status: 422 })
-  }
-
-  // Validar invariante global
-  const sectionsCheck = validateSectionsInvariant(visibleSections ?? [], requiredSections ?? [])
-  if (!sectionsCheck.valid) {
-    return NextResponse.json({ error: sectionsCheck.error }, { status: 422 })
-  }
-
-  // Validar invariante por modalidad
-  if (sectionsByMode) {
-    for (const [mode, cfg] of Object.entries(sectionsByMode)) {
-      if (!cfg) continue
-      const check = validateSectionsInvariant(cfg.visible ?? [], cfg.required ?? [])
-      if (!check.valid) {
-        return NextResponse.json(
-          { error: `Modalidad ${mode}: ${check.error}` },
-          { status: 422 }
-        )
-      }
-    }
-  }
-
-  // Validar codePrefix
-  if (codePrefix !== undefined && codePrefix !== null && !/^[a-zA-Z0-9]{0,10}$/.test(codePrefix)) {
-    return NextResponse.json({ error: 'El prefijo de código debe ser alfanumérico y tener máximo 10 caracteres' }, { status: 422 })
-  }
-
   try {
-    const config = await prisma.inventory_family_config.upsert({
-      where: { familyId },
-      update: {
-        allowedSubtypes: allowedSubtypes as any,
-        visibleSections: (visibleSections ?? []) as any,
-        requiredSections: (requiredSections ?? []) as any,
-        requireFinancialForNew,
-        sectionsByMode: (sectionsByMode ?? null) as any,
-        defaultDepreciationMethod: (defaultDepreciationMethod ?? null) as any,
-        defaultUsefulLifeYears: defaultUsefulLifeYears ?? null,
-        defaultResidualValuePct: defaultResidualValuePct ?? null,
-        codePrefix: codePrefix ?? null,
-        autoApproveDecommission,
-        requireDeliveryAct,
-      },
-      create: {
-        id: randomUUID(),
-        familyId,
-        allowedSubtypes: allowedSubtypes as any,
-        visibleSections: (visibleSections ?? []) as any,
-        requiredSections: (requiredSections ?? []) as any,
-        requireFinancialForNew,
-        sectionsByMode: (sectionsByMode ?? null) as any,
-        defaultDepreciationMethod: (defaultDepreciationMethod ?? null) as any,
-        defaultUsefulLifeYears: defaultUsefulLifeYears ?? null,
-        defaultResidualValuePct: defaultResidualValuePct ?? null,
-        codePrefix: codePrefix ?? null,
-        autoApproveDecommission,
-        requireDeliveryAct,
-      },
+    const body = await req.json()
+    const validated = updateConfigSchema.parse(body)
+
+    // Verificar que la familia existe
+    const family = await prisma.families.findUnique({
+      where: { id: params.familyId },
     })
 
-    await prisma.audit_logs.create({
-      data: {
-        id: randomUUID(),
-        action: 'UPDATE_FAMILY_CONFIG',
-        entityType: 'inventory_family_config',
-        entityId: familyId,
-        userId,
-        details: {
-          defaultDepreciationMethod,
-          defaultUsefulLifeYears,
-          defaultResidualValuePct,
-          codePrefix,
-          autoApproveDecommission,
-          requireDeliveryAct,
-        },
+    if (!family) {
+      return NextResponse.json(
+        { error: 'Familia no encontrada' },
+        { status: 404 }
+      )
+    }
+
+    // Preparar datos para actualizar (excluir inventoryEnabled que no está en el schema)
+    const { inventoryEnabled, ...configData } = validated
+
+    // Upsert configuración
+    const config = await prisma.inventory_family_config.upsert({
+      where: { familyId: params.familyId },
+      create: {
+        familyId: params.familyId,
+        ...configData,
       },
-    }).catch(err => console.warn('[audit] family-config PUT:', err?.message))
+      update: configData,
+    })
 
     return NextResponse.json({
-      familyId: config.familyId,
-      allowedSubtypes: config.allowedSubtypes,
-      visibleSections: config.visibleSections,
-      requiredSections: config.requiredSections,
-      requireFinancialForNew: config.requireFinancialForNew,
-      sectionsByMode: config.sectionsByMode ?? undefined,
-      // Nuevos campos
-      defaultDepreciationMethod: config.defaultDepreciationMethod ?? null,
-      defaultUsefulLifeYears:    config.defaultUsefulLifeYears ?? null,
-      defaultResidualValuePct:   config.defaultResidualValuePct ?? null,
-      codePrefix:                config.codePrefix ?? null,
-      autoApproveDecommission:   config.autoApproveDecommission,
-      requireDeliveryAct:        config.requireDeliveryAct,
+      success: true,
+      message: 'Configuración actualizada correctamente',
+      data: config,
     })
-  } catch (err) {
-    console.error('[family-config PUT]', err)
-    const msg = err instanceof Error ? err.message : 'Error al guardar la configuración'
-    return NextResponse.json({ error: msg }, { status: 500 })
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Datos inválidos', details: error.errors },
+        { status: 400 }
+      )
+    }
+    console.error('Error al actualizar configuración:', error)
+    return NextResponse.json(
+      { error: 'Error al actualizar configuración' },
+      { status: 500 }
+    )
   }
 }

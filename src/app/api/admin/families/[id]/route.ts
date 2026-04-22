@@ -5,7 +5,8 @@ import prisma from '@/lib/prisma'
 
 /**
  * GET /api/admin/families/[id]
- * Retorna FamilyUnifiedResponse con todos los datos de la familia
+ * Retorna datos unificados de la familia (sin configs de tickets/inventario)
+ * Las configuraciones se gestionan desde /admin/settings/tickets y /admin/settings/inventory
  */
 export async function GET(
   request: NextRequest,
@@ -28,8 +29,14 @@ export async function GET(
       prisma.families.findUnique({
         where: { id },
         include: {
-          ticketFamilyConfig: true,
-          formConfig: true,
+          _count: {
+            select: {
+              departments: true,
+              tickets: true,
+              technicianFamilyAssignments: true,
+              managerFamilies: true,
+            },
+          },
         },
       }),
       prisma.departments.findMany({
@@ -75,8 +82,6 @@ export async function GET(
 
     return NextResponse.json({
       family,
-      ticketConfig: family.ticketFamilyConfig,
-      inventoryConfig: family.formConfig,
       departments,
       technicians,
       managers,

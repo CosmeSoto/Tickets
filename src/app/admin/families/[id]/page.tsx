@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft, RefreshCw, Ticket, Package, Users, Settings } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Users, Settings } from 'lucide-react'
 import { FamilyIcon } from '@/components/inventory/family-badge'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -10,11 +10,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { TabGeneral } from '@/components/families/tab-general'
-import { TabTickets } from '@/components/families/tab-tickets'
-import { TabInventario } from '@/components/families/tab-inventario'
 import { TabPersonal } from '@/components/families/tab-personal'
-import type { TicketFamilyConfig } from '@/components/families/tab-tickets'
-import type { InventoryFamilyConfig } from '@/components/families/tab-inventario'
 import type { TechnicianAssignment, ManagerAssignment, AdminAssignment } from '@/components/families/tab-personal'
 import type { DepartmentData } from '@/hooks/use-departments'
 
@@ -39,8 +35,6 @@ interface FamilyBase {
 
 interface FamilyUnifiedResponse {
   family: FamilyBase
-  ticketConfig: TicketFamilyConfig | null
-  inventoryConfig: InventoryFamilyConfig | null
   departments: DepartmentData[]
   technicians: TechnicianAssignment[]
   managers: ManagerAssignment[]
@@ -48,7 +42,7 @@ interface FamilyUnifiedResponse {
   currentUserIsSuperAdmin: boolean
 }
 
-const VALID_TABS = ['general', 'tickets', 'inventario', 'personal'] as const
+const VALID_TABS = ['general', 'personal'] as const
 type TabValue = (typeof VALID_TABS)[number]
 
 function isValidTab(tab: string | null): tab is TabValue {
@@ -155,14 +149,6 @@ export default function FamilyDetailPage({ params }: { params: Promise<{ id: str
     setData(prev => prev ? { ...prev, family: { ...prev.family, ...updated } } : prev)
   }
 
-  const handleTicketConfigUpdated = (config: TicketFamilyConfig) => {
-    setData(prev => prev ? { ...prev, ticketConfig: config } : prev)
-  }
-
-  const handleInventoryConfigUpdated = (config: InventoryFamilyConfig) => {
-    setData(prev => prev ? { ...prev, inventoryConfig: config } : prev)
-  }
-
   const handleDepartmentsChanged = async () => {
     // Reload only departments by re-fetching the unified endpoint
     try {
@@ -178,21 +164,24 @@ export default function FamilyDetailPage({ params }: { params: Promise<{ id: str
 
   return (
     <ModuleLayout
-      title={data ? `Familia: ${data.family.name}` : 'Detalle de Familia'}
-      subtitle={data ? `Código: ${data.family.code}` : undefined}
+      title={data ? `${data.family.name}` : 'Detalle de Familia'}
+      subtitle={
+        <button
+          onClick={() => router.push('/admin/families')}
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Familias
+        </button>
+      }
       loading={loading && !data}
       error={error}
       onRetry={loadData}
       headerActions={
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => router.push('/admin/families')}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Volver
-          </Button>
-          <Button variant="outline" size="sm" onClick={loadData} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          </Button>
-        </div>
+        <Button variant="outline" size="sm" onClick={loadData} disabled={loading}>
+          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          <span className="hidden sm:inline ml-2">Recargar</span>
+        </Button>
       }
     >
       {data && (
@@ -202,18 +191,10 @@ export default function FamilyDetailPage({ params }: { params: Promise<{ id: str
 
           {/* Tabs — active state persisted in URL via ?tab= */}
           <Tabs value={activeTab} onValueChange={handleTabChange}>
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="general" className="flex items-center gap-1.5">
                 <Settings className="h-3.5 w-3.5" />
                 General
-              </TabsTrigger>
-              <TabsTrigger value="tickets" className="flex items-center gap-1.5">
-                <Ticket className="h-3.5 w-3.5" />
-                Tickets
-              </TabsTrigger>
-              <TabsTrigger value="inventario" className="flex items-center gap-1.5">
-                <Package className="h-3.5 w-3.5" />
-                Inventario
               </TabsTrigger>
               <TabsTrigger value="personal" className="flex items-center gap-1.5">
                 <Users className="h-3.5 w-3.5" />
@@ -228,24 +209,6 @@ export default function FamilyDetailPage({ params }: { params: Promise<{ id: str
                 departments={data.departments}
                 onFamilyUpdated={handleFamilyUpdated}
                 onDepartmentsChanged={handleDepartmentsChanged}
-              />
-            </TabsContent>
-
-            {/* Tab Tickets — Req 3.1–3.5 */}
-            <TabsContent value="tickets">
-              <TabTickets
-                familyId={id}
-                ticketConfig={data.ticketConfig}
-                onConfigUpdated={handleTicketConfigUpdated}
-              />
-            </TabsContent>
-
-            {/* Tab Inventario — Req 4.1–4.5 */}
-            <TabsContent value="inventario">
-              <TabInventario
-                familyId={id}
-                inventoryConfig={data.inventoryConfig}
-                onConfigUpdated={handleInventoryConfigUpdated}
               />
             </TabsContent>
 
