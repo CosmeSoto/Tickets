@@ -63,9 +63,9 @@ export function SessionTimeoutMonitor() {
   // Mostrar advertencia 5 minutos antes de cerrar sesión
   const showWarning = useCallback(() => {
     if (warningShownRef.current) return
-    
+
     warningShownRef.current = true
-    
+
     toast({
       title: 'Sesión por expirar',
       description: `Tu sesión expirará en 5 minutos por inactividad. Realiza alguna acción para mantenerla activa.`,
@@ -77,7 +77,7 @@ export function SessionTimeoutMonitor() {
   const resetInactivityTimer = useCallback(() => {
     // Actualizar última actividad
     lastActivityRef.current = Date.now()
-    
+
     // Resetear advertencia
     warningShownRef.current = false
 
@@ -90,10 +90,10 @@ export function SessionTimeoutMonitor() {
     }
 
     // Solo configurar timers si hay sesión activa
-    if (status !== 'authenticated' || !session?.user) return
+    if (status !== 'authenticated') return
 
     const timeoutMs = sessionTimeoutMinutes.current * 60 * 1000
-    const warningMs = timeoutMs - (5 * 60 * 1000) // 5 minutos antes
+    const warningMs = timeoutMs - 5 * 60 * 1000 // 5 minutos antes
 
     // Programar advertencia (5 minutos antes del timeout)
     if (warningMs > 0) {
@@ -106,22 +106,25 @@ export function SessionTimeoutMonitor() {
     timeoutRef.current = setTimeout(() => {
       handleAutoLogout()
     }, timeoutMs)
-  }, [status, session, handleAutoLogout, showWarning])
+  }, [status, handleAutoLogout, showWarning])
 
   // Iniciar monitoreo cuando hay sesión activa
   useEffect(() => {
-    if (status === 'authenticated' && session?.user) {
+    if (status === 'authenticated') {
       fetchSessionTimeout().then(() => {
         resetInactivityTimer()
       })
 
       // Re-verificar configuración cada 2 minutos por si el admin la cambió
-      const configInterval = setInterval(async () => {
-        const changed = await fetchSessionTimeout()
-        if (changed) {
-          resetInactivityTimer()
-        }
-      }, 2 * 60 * 1000)
+      const configInterval = setInterval(
+        async () => {
+          const changed = await fetchSessionTimeout()
+          if (changed) {
+            resetInactivityTimer()
+          }
+        },
+        2 * 60 * 1000
+      )
 
       return () => {
         clearInterval(configInterval)
@@ -139,7 +142,7 @@ export function SessionTimeoutMonitor() {
         clearTimeout(warningTimeoutRef.current)
       }
     }
-  }, [status, session, fetchSessionTimeout, resetInactivityTimer])
+  }, [status, fetchSessionTimeout, resetInactivityTimer])
 
   // Detectar actividad del usuario y resetear timer
   useEffect(() => {
@@ -149,7 +152,7 @@ export function SessionTimeoutMonitor() {
     let throttleTimeout: NodeJS.Timeout | undefined
     const handleActivity = () => {
       if (throttleTimeout) return
-      
+
       throttleTimeout = setTimeout(() => {
         resetInactivityTimer()
         throttleTimeout = undefined
@@ -158,7 +161,7 @@ export function SessionTimeoutMonitor() {
 
     // Re-leer configuración cuando el admin guarda settings
     const handleSettingsUpdated = () => {
-      fetchSessionTimeout().then((changed) => {
+      fetchSessionTimeout().then(changed => {
         if (changed) resetInactivityTimer()
       })
     }
