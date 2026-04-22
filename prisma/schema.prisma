@@ -460,6 +460,8 @@ model users {
   departments                                       departments?                    @relation(fields: [departmentId], references: [id])
   managedWarehouses                                 warehouses[]                    @relation("WarehouseManager")
   webhooks_created                                  webhooks[]                      @relation("WebhookCreator")
+  contractsCreated                                  contracts[]                     @relation("ContractCreator")
+  contractAttachmentsUploaded                       contract_attachments[]          @relation("ContractAttachmentUploader")
 
   @@index([departmentId])
   @@index([name, email])
@@ -866,6 +868,7 @@ model equipment {
   maintenanceRecords    maintenance_records[]
   licenses              software_licenses[]
   stockMovements        stock_movements[]       @relation("StockMovementEquipment")
+  contractLines         contract_lines[]        @relation("ContractLineEquipment")
 
   @@index([code])
   @@index([serialNumber])
@@ -1063,6 +1066,7 @@ model software_licenses {
   user                  users?                  @relation("LicenseUser", fields: [assignedToUser], references: [id])
   supplier              suppliers?              @relation(fields: [supplierId], references: [id])
   licenseType           license_types           @relation(fields: [typeId], references: [id])
+  contractLines         contract_lines[]        @relation("ContractLineLicense")
 
   @@index([typeId, expirationDate])
   @@index([assignedToEquipment])
@@ -1180,6 +1184,7 @@ model suppliers {
   consumables       consumables[]
   equipment         equipment[]
   software_licenses software_licenses[]
+  contracts         contracts[]
 
   @@index([typeId, isActive])
   @@index([familyId, isActive])
@@ -1316,6 +1321,7 @@ model families {
   ticketCodeCounters          ticket_code_counters[]
   ticketFamilyConfig          ticket_family_config?
   tickets                     tickets[]
+  contracts                   contracts[]
 
   @@index([isActive, order])
   @@map("families")
@@ -1648,4 +1654,124 @@ enum ConsumableStatus {
   OUT_OF_STOCK
   EXPIRED
   RETIRED
+}
+
+// ── Contratos ─────────────────────────────────────────────────────────────────
+
+enum ContractStatus {
+  DRAFT
+  ACTIVE
+  EXPIRING
+  EXPIRED
+  TERMINATED
+  RENEWED
+}
+
+enum ContractCategory {
+  EQUIPMENT_RENTAL
+  SOFTWARE_LICENSE
+  SERVICE
+  MAINTENANCE
+  SUPPORT
+  OTHER
+}
+
+enum ContractLineType {
+  EQUIPMENT
+  SOFTWARE
+  SERVICE
+  CONSUMABLE
+  OTHER
+}
+
+enum BillingCycle {
+  MONTHLY
+  QUARTERLY
+  SEMIANNUAL
+  ANNUAL
+  ONE_TIME
+}
+
+model contracts {
+  id                  String           @id @default(uuid())
+  contractNumber      String?          @map("contract_number") @db.VarChar(100)
+  name                String           @db.VarChar(200)
+  description         String?
+  category            ContractCategory @default(SERVICE)
+  status              ContractStatus   @default(DRAFT)
+  supplierId          String?          @map("supplier_id")
+  familyId            String?          @map("family_id")
+  startDate           DateTime?        @map("start_date")
+  endDate             DateTime?        @map("end_date")
+  autoRenew           Boolean          @default(false) @map("auto_renew")
+  renewalNoticeDays   Int              @default(30) @map("renewal_notice_days")
+  billingCycle        BillingCycle     @default(MONTHLY) @map("billing_cycle")
+  totalValue          Float?           @map("total_value")
+  monthlyCost         Float?           @map("monthly_cost")
+  currency            String           @default("USD") @db.VarChar(3)
+  contactName         String?          @map("contact_name") @db.VarChar(200)
+  contactEmail        String?          @map("contact_email") @db.VarChar(200)
+  contactPhone        String?          @map("contact_phone") @db.VarChar(50)
+  notes               String?
+  termsUrl            String?          @map("terms_url") @db.VarChar(500)
+  expiryAlertSentAt   DateTime?        @map("expiry_alert_sent_at")
+  createdBy           String           @map("created_by")
+  createdAt           DateTime         @default(now()) @map("created_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
+
+  creator             users            @relation("ContractCreator", fields: [createdBy], references: [id])
+  supplier            suppliers?       @relation(fields: [supplierId], references: [id])
+  family              families?        @relation(fields: [familyId], references: [id])
+  lines               contract_lines[]
+  attachments         contract_attachments[]
+
+  @@index([status, endDate])
+  @@index([supplierId])
+  @@index([familyId])
+  @@index([createdBy])
+  @@index([createdAt(sort: Desc)])
+  @@map("contracts")
+}
+
+model contract_lines {
+  id           String           @id @default(uuid())
+  contractId   String           @map("contract_id")
+  type         ContractLineType @default(SERVICE)
+  description  String           @db.VarChar(500)
+  quantity     Float            @default(1)
+  unitPrice    Float?           @map("unit_price")
+  totalPrice   Float?           @map("total_price")
+  equipmentId  String?          @map("equipment_id")
+  licenseId    String?          @map("license_id")
+  notes        String?
+  order        Int              @default(0)
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  contract     contracts        @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  equipment    equipment?       @relation("ContractLineEquipment", fields: [equipmentId], references: [id], onDelete: SetNull)
+  license      software_licenses? @relation("ContractLineLicense", fields: [licenseId], references: [id], onDelete: SetNull)
+
+  @@index([contractId])
+  @@index([equipmentId])
+  @@index([licenseId])
+  @@map("contract_lines")
+}
+
+model contract_attachments {
+  id           String    @id @default(uuid())
+  contractId   String    @map("contract_id")
+  filename     String    @db.VarChar(255)
+  originalName String    @map("original_name") @db.VarChar(255)
+  mimeType     String    @map("mime_type") @db.VarChar(100)
+  size         Int
+  path         String    @db.VarChar(500)
+  uploadedBy   String    @map("uploaded_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  contract     contracts @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  uploader     users     @relation("ContractAttachmentUploader", fields: [uploadedBy], references: [id])
+
+  @@index([contractId])
+  @@map("contract_attachments")
 }

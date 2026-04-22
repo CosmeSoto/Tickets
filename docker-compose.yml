@@ -1,4 +1,19 @@
+##############################################################################
+# INFRAESTRUCTURA BASE — solo servicios de datos (postgres + redis)
+#
+# Útil para desarrollo local SIN Docker para la app (Next.js corre en el host):
+#   docker compose up -d
+#   npm run dev
+#
+# Para desarrollo completo en Docker usar:
+#   docker compose -f docker-compose.dev.yml up --build
+#
+# Para producción usar:
+#   docker compose -f docker-compose.prod.yml up -d --build
+##############################################################################
+
 services:
+
   postgres:
     image: postgres:15-alpine
     container_name: tickets-postgres
@@ -11,60 +26,35 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - tickets_network
+      - tickets-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U tickets_user -d tickets_db"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
 
   redis:
     image: redis:7-alpine
     container_name: tickets-redis
     ports:
-      - "6380:6379"
+      - "6379:6379"
     volumes:
       - redis_data:/data
     networks:
-      - tickets_network
+      - tickets-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
+      interval: 5s
       timeout: 3s
-      retries: 3
-    command: redis-server --appendonly yes
-
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: tickets-pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@tickets.local
-      PGADMIN_DEFAULT_PASSWORD: admin123
-      PGADMIN_CONFIG_SERVER_MODE: 'False'
-      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
-      # Para permitir múltiples dominios especiales:
-      PGADMIN_CONFIG_ALLOW_SPECIAL_EMAIL_DOMAINS: "'local,localhost,test'" 
-
-    ports:
-      - "8080:80"
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
-    networks:
-      - tickets_network
-    restart: unless-stopped
-    depends_on:
-      - postgres
+      retries: 5
 
 volumes:
   postgres_data:
-    driver: local
   redis_data:
-    driver: local
-  pgadmin_data:
-    driver: local
 
 networks:
-  tickets_network:
+  tickets-network:
     driver: bridge

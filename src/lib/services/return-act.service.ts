@@ -1,11 +1,10 @@
 import { randomUUID } from 'crypto'
-import { PrismaClient, EquipmentCondition, EquipmentStatus } from '@prisma/client'
+import { EquipmentCondition, EquipmentStatus } from '@prisma/client'
+import prisma from '@/lib/prisma'
 import { FolioService } from './folio.service'
 import { DigitalSignatureService } from './digital-signature.service'
 import { PDFGeneratorService } from './pdf-generator.service'
 import type { ReturnAct, UserInfo, CreateReturnActData } from '@/types/inventory/return-act'
-
-const prisma = new PrismaClient()
 
 /**
  * Servicio para gestión de actas de devolución

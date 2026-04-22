@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -9,10 +9,12 @@ import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/s
 import { InlineCreateSelect } from '@/components/ui/inline-create-select'
 import { SimpleSelect } from '@/components/ui/simple-select'
 import { FileUploadZone } from '@/components/ui/file-upload-zone'
-import { ContractSection, type ContractData } from '@/components/inventory/contract-section'
+import { ContractPicker } from '@/components/contracts/contract-picker'
 import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
 import { CatalogTypeInlineForm } from '@/components/inventory/asset-forms/CatalogTypeInlineForm'
 import type { FamilyConfig } from '@/lib/inventory/family-config-types'
+import { useFetch } from '@/hooks/common/use-fetch'
+import { useActiveDepartments } from '@/contexts/departments-context'
 import { RefreshCw } from 'lucide-react'
 
 interface LicenseAssetFormProps {
@@ -36,16 +38,31 @@ export function LicenseAssetForm({
   const [licenseKey, setLicenseKey] = useState('')
   const [scope, setScope] = useState<Scope>('Empresa')
   const [userId, setUserId] = useState('')
-  const [users, setUsers] = useState<SearchableSelectOption[]>([])
   const [departmentId, setDepartmentId] = useState('')
-  const [departments, setDepartments] = useState<SearchableSelectOption[]>([])
+
+  // ✅ Migrado a useFetch — usuarios activos (solo cuando scope=Individual)
+  const { data: rawUsers } = useFetch<{ id: string; name?: string; email?: string }>(
+    '/api/users',
+    { params: { limit: 200 }, enabled: scope === 'Individual' }
+  )
+  const users: SearchableSelectOption[] = useMemo(
+    () => rawUsers.map(u => ({ id: u.id, name: u.name ?? u.email ?? u.id })),
+    [rawUsers]
+  )
+
+  // ✅ Departamentos desde contexto global — sin petición extra
+  const { departments: rawDepartments } = useActiveDepartments()
+  const departments: SearchableSelectOption[] = useMemo(
+    () => rawDepartments.map(d => ({ id: d.id, name: d.name })),
+    [rawDepartments]
+  )
   const [supplierId, setSupplierId] = useState('')
   const [purchaseDate, setPurchaseDate] = useState('')
   const [expirationDate, setExpirationDate] = useState('')
   const [cost, setCost] = useState('')
   // Toggle suscripción recurrente (tarea 21)
   const [hasRecurring, setHasRecurring] = useState(false)
-  const [contractData, setContractData] = useState<ContractData | null>(null)
+  const [linkedContractId, setLinkedContractId] = useState<string | null>(null)
   // Campos simples de contrato (cuando no es recurrente)
   const [contractNumber, setContractNumber] = useState('')
   const [contractStartDate, setContractStartDate] = useState('')
@@ -57,24 +74,11 @@ export function LicenseAssetForm({
   // familyConfig no aplica a licencias — siempre mostramos todo
   void familyConfig
 
+  // License types siguen cargando desde API (son específicos por familia)
   useEffect(() => {
     fetch(`/api/inventory/license-types?familyId=${familyId}`)
       .then(r => r.json()).then(d => setLicenseTypes(d.types ?? d ?? []))
   }, [familyId])
-
-  useEffect(() => {
-    if (scope === 'Individual') {
-      fetch('/api/users?limit=200').then(r => r.json()).then(d => {
-        const list = d.data ?? d.users ?? []
-        setUsers(list.map((u: { id: string; name?: string; email?: string }) => ({ id: u.id, name: u.name ?? u.email ?? u.id })))
-      })
-    } else if (scope === 'Departamento') {
-      fetch('/api/departments').then(r => r.json()).then(d => {
-        const list = d.data ?? d.departments ?? []
-        setDepartments(list.map((dep: { id: string; name: string }) => ({ id: dep.id, name: dep.name })))
-      })
-    }
-  }, [scope])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -91,12 +95,7 @@ export function LicenseAssetForm({
       cost: cost ? parseFloat(cost) : undefined,
       ...(hasRecurring
         ? {
-            contractAction: contractData?.action,
-            contractId: contractData?.contractId,
-            contractNumber: contractData?.contractNumber,
-            contractStartDate: contractData?.startDate,
-            contractEndDate: contractData?.endDate,
-            contractMonthlyCost: contractData?.monthlyCost,
+            contractId: linkedContractId || undefined,
           }
         : {
             contractNumber: contractNumber || undefined,
@@ -209,10 +208,11 @@ export function LicenseAssetForm({
         </label>
 
         {hasRecurring ? (
-          <ContractSection
-            acquisitionMode="RENTAL"
+          <ContractPicker
+            value={linkedContractId}
+            onChange={setLinkedContractId}
             supplierId={supplierId || null}
-            onContractChange={setContractData}
+            familyId={familyId}
           />
         ) : (
           <div className="space-y-3">

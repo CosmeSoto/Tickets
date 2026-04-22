@@ -1,8 +1,6 @@
-import { PrismaClient } from '@prisma/client'
+import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import type { MaintenanceRecord, CreateMaintenanceData, UpdateMaintenanceData } from '@/types/inventory/maintenance'
-
-const prisma = new PrismaClient()
 
 /**
  * Servicio para gestión de registros de mantenimiento

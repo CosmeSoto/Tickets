@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import type { 
   Assignment, 
@@ -8,7 +8,7 @@ import type {
   AssignmentDetailResponse
 } from '@/types/inventory/assignment'
 
-const prisma = new PrismaClient()
+import { db as prisma } from '@/lib/server'
 
 /**
  * Servicio para gestión de asignaciones de equipos

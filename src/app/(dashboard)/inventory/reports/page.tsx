@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { useFetch } from '@/hooks/common/use-fetch'
 import { useInventoryFamilies } from '@/contexts/families-context'
+import { useFamilyOptions } from '@/hooks/use-family-options'
 
 // ── Definición completa de reportes ──────────────────────────────────────────
 
@@ -127,9 +128,8 @@ export default function InventoryReportsPage() {
 
   const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(null)
 
-  // Familias de inventario desde el contexto global (cache Redis, sin peticion extra)
-  const { families: rawFamilies } = useInventoryFamilies()
-  const families = rawFamilies.map(f => ({ id: f.id, name: f.name, code: f.code ?? f.name.slice(0, 3).toUpperCase(), color: f.color }))
+  // Familias de inventario desde el contexto global (cache Redis, sin peticion extra) - memoizadas
+  const { families } = useFamilyOptions()
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')

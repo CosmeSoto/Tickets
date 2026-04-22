@@ -1,8 +1,6 @@
-import { PrismaClient } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import { NotificationService } from '../services/notification-service'
-
-const prisma = new PrismaClient()
+import { db as prisma } from '@/lib/server'
 
 /**
  * Job para verificar contratos de renta próximos a expirar

@@ -47,6 +47,7 @@ import { useToast } from '@/hooks/use-toast'
 import { UserCombobox } from '@/components/ui/user-combobox'
 import { CategorySelectorWrapper } from '@/features/category-selection'
 import { FileInputWithCamera } from '@/components/common/file-input-with-camera'
+import { useClients } from '@/contexts/users-context'
 
 interface User {
   id: string
@@ -85,13 +86,15 @@ export default function CreateTicketPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const { toast } = useToast()
-  const [clients, setClients] = useState<User[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [selectedClient, setSelectedClient] = useState<User | null>(null)
   const [loadError, setLoadError] = useState('')
   const [createdTicketId, setCreatedTicketId] = useState<string | null>(null)
+
+  // ✅ Clientes desde contexto global — sin petición extra
+  const { clients } = useClients()
   
   // Estados para archivos
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
@@ -127,32 +130,7 @@ export default function CreateTicketPage() {
       router.push('/unauthorized')
       return
     }
-
-    // Cargar clientes
-    loadClients()
   }, [session, status, router])
-
-  const loadClients = async () => {
-    try {
-      setLoadError('')
-      
-      const clientsResponse = await fetch('/api/users?role=CLIENT&isActive=true')
-      
-      if (clientsResponse.ok) {
-        const result = await clientsResponse.json()
-        if (result.success && result.data) {
-          setClients(result.data)
-        }
-      } else {
-        setLoadError('Error al cargar los clientes')
-      }
-    } catch (error) {
-      console.error('Error loading clients:', error)
-      setLoadError('Error de conexión al cargar los datos')
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   // Manejar selección de archivos
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -260,7 +238,7 @@ export default function CreateTicketPage() {
   }
 
   const handleClientSelect = (clientId: string) => {
-    const client = clients.find(c => c.id === clientId)
+    const client = clients.find(c => c.id === clientId) as unknown as User | undefined
     setSelectedClient(client || null)
     setValue('clientId', clientId)
   }

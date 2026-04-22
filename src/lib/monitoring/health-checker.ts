@@ -240,27 +240,22 @@ export class HealthChecker {
    */
   private static async checkDatabase(): Promise<HealthCheck> {
     const startTime = performance.now()
-    
+
     try {
-      // Import Prisma client dynamically to avoid circular dependencies
-      const { PrismaClient } = await import('@prisma/client')
-      const prisma = new PrismaClient()
-      
-      // Simple connectivity test
-      await prisma.$queryRaw`SELECT 1`
-      
-      // Check connection pool status
-      const connectionInfo = await prisma.$queryRaw`
-        SELECT 
+      // Usar el singleton centralizado en lugar de crear una instancia nueva
+      const { db } = await import('@/lib/server')
+
+      await db.$queryRaw`SELECT 1`
+
+      const connectionInfo = await db.$queryRaw`
+        SELECT
           count(*) as total_connections,
           count(*) FILTER (WHERE state = 'active') as active_connections
-        FROM pg_stat_activity 
+        FROM pg_stat_activity
         WHERE datname = current_database()
       ` as any[]
 
       const responseTime = performance.now() - startTime
-      
-      await prisma.$disconnect()
 
       return {
         name: 'connectivity',
@@ -271,21 +266,20 @@ export class HealthChecker {
         message: 'Database connection successful',
         metadata: {
           totalConnections: connectionInfo[0]?.total_connections || 0,
-          activeConnections: connectionInfo[0]?.active_connections || 0
-        }
+          activeConnections: connectionInfo[0]?.active_connections || 0,
+        },
       }
-
     } catch (error) {
       const responseTime = performance.now() - startTime
       const err = error instanceof Error ? error : new Error(String(error))
-      
+
       return {
         name: 'connectivity',
         component: 'database',
         status: HealthStatus.UNHEALTHY,
         responseTime,
         timestamp: new Date(),
-        message: `Database check failed: ${err.message}`
+        message: `Database check failed: ${err.message}`,
       }
     }
   }

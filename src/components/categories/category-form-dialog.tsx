@@ -1,11 +1,13 @@
 'use client'
 
 import { RefreshCw, Building, ChevronRight, Home, Users } from 'lucide-react'
+import { useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
+import { Combobox } from '@/components/ui/combobox'
 import { CategorySelector } from '@/components/ui/category-selector'
 import { TechnicianSelector } from '@/components/ui/technician-selector'
 import { DepartmentSelector } from '@/components/ui/department-selector'
@@ -70,6 +72,17 @@ export function CategoryFormDialog({
     setFormData,
     availableTechnicians,
   })
+
+  // Memoizar opciones de familias para el Combobox
+  const familyOptions = useMemo(
+    () => families.map(f => ({
+      value: f.id,
+      label: f.name,
+      color: f.color || undefined,
+      description: f.code,
+    })),
+    [families]
+  )
 
   // Derivar familia del padre seleccionado (o del departamento actual)
   const derivedFamilyId = (() => {
@@ -264,37 +277,20 @@ export function CategoryFormDialog({
                   )}
                 </div>
               ) : (
-                <div className='flex flex-wrap gap-2'>
-                  {families.map((f) => (
-                    <button
-                      key={f.id}
-                      type='button'
-                      disabled={submitting}
-                      onClick={() => {
-                        setFormData({ ...formData, familyId: f.id, departmentId: null, parentId: null })
-                        onLoadDepartments(f.id)
-                        onLoadAvailableParents(editingCategory?.id, f.id)
-                        onLoadTechnicians(f.id)
-                      }}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors ${
-                        formData.familyId === f.id
-                          ? 'text-white border-transparent'
-                          : 'bg-background hover:bg-muted'
-                      }`}
-                      style={
-                        formData.familyId === f.id
-                          ? { backgroundColor: f.color ?? '#6B7280', borderColor: f.color ?? '#6B7280' }
-                          : { borderColor: f.color ?? '#6B7280', color: f.color ?? '#6B7280' }
-                      }
-                    >
-                      <span
-                        className='inline-block h-2 w-2 rounded-full'
-                        style={{ backgroundColor: formData.familyId === f.id ? 'white' : (f.color ?? '#6B7280') }}
-                      />
-                      {f.name}
-                    </button>
-                  ))}
-                </div>
+                <Combobox
+                  value={formData.familyId || ''}
+                  onValueChange={(familyId) => {
+                    setFormData({ ...formData, familyId, departmentId: null, parentId: null })
+                    onLoadDepartments(familyId)
+                    onLoadAvailableParents(editingCategory?.id, familyId)
+                    onLoadTechnicians(familyId)
+                  }}
+                  options={familyOptions}
+                  placeholder="Buscar familia..."
+                  searchPlaceholder="Escribe para buscar..."
+                  emptyText="No se encontraron familias"
+                  disabled={submitting}
+                />
               )}
             </div>
 

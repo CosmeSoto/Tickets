@@ -17,6 +17,7 @@ import { ArrowLeft, Save, X } from 'lucide-react'
 import Link from 'next/link'
 import { getTicketDisplayCode } from '@/hooks/use-ticket-data'
 import { useToast } from '@/hooks/use-toast'
+import { useTechnicians } from '@/contexts/users-context'
 
 interface TicketData {
   id: string
@@ -39,10 +40,12 @@ export default function EditTicketPage() {
   
   const [ticket, setTicket] = useState<TicketData | null>(null)
   const [categories, setCategories] = useState<any[]>([])
-  const [technicians, setTechnicians] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // ✅ Técnicos desde contexto global — sin petición extra
+  const { technicians } = useTechnicians()
   
   // Form data
   const [formData, setFormData] = useState({
@@ -69,36 +72,7 @@ export default function EditTicketPage() {
 
     loadTicket()
     loadCategories()
-    loadTechnicians()
   }, [session, status, router, params.id])
-
-  const loadCategories = async () => {
-    try {
-      const response = await fetch('/api/categories')
-      if (response.ok) {
-        const result = await response.json()
-        if (result.success && Array.isArray(result.data)) {
-          // Enriquecer categorías con levelName
-          const enrichedCategories = enrichCategories(result.data)
-          setCategories(enrichedCategories)
-        }
-      }
-    } catch (error) {
-      console.error('Error loading categories:', error)
-    }
-  }
-
-  const loadTechnicians = async () => {
-    try {
-      const response = await fetch('/api/users?role=TECHNICIAN&isActive=true')
-      if (response.ok) {
-        const data = await response.json()
-        setTechnicians(data.success ? data.data : [])
-      }
-    } catch (error) {
-      console.error('Error loading technicians:', error)
-    }
-  }
 
   const loadTicket = async () => {
     try {
@@ -135,6 +109,21 @@ export default function EditTicketPage() {
       })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadCategories = async () => {
+    try {
+      const response = await fetch('/api/categories')
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success && Array.isArray(result.data)) {
+          const enrichedCategories = enrichCategories(result.data)
+          setCategories(enrichedCategories)
+        }
+      }
+    } catch (error) {
+      console.error('Error loading categories:', error)
     }
   }
 
@@ -337,7 +326,7 @@ export default function EditTicketPage() {
             <div>
               <Label>Técnico Asignado</Label>
               <TechnicianSearchSelector
-                technicians={technicians}
+                technicians={technicians as any}
                 value={formData.assigneeId}
                 onChange={(assigneeId) => setFormData(prev => ({ ...prev, assigneeId: assigneeId || '' }))}
                 placeholder="Seleccionar técnico"

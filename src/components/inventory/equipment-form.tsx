@@ -29,6 +29,7 @@ import { createEquipmentSchema, type CreateEquipmentInput } from '@/lib/validati
 import type { Equipment, EquipmentFormData } from '@/types/inventory/equipment'
 import { EquipmentAttachments } from '@/components/inventory/equipment-attachments'
 import { FileUploadZone } from '@/components/ui/file-upload-zone'
+import { useActiveDepartments } from '@/contexts/departments-context'
 
 interface EquipmentFormProps {
   equipment?: Equipment
@@ -80,9 +81,7 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [loadingTypes, setLoadingTypes] = useState(true)
-  const [loadingDepartments, setLoadingDepartments] = useState(true)
   const [equipmentTypes, setEquipmentTypes] = useState<EquipmentType[]>([])
-  const [departments, setDepartments] = useState<Department[]>([])
   const [accessories, setAccessories] = useState<string[]>(equipment?.accessories || [])
   const [newAccessory, setNewAccessory] = useState('')
   const [specifications, setSpecifications] = useState<Record<string, string>>(
@@ -92,6 +91,11 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
   const [newSpecValue, setNewSpecValue] = useState('')
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [maxFileSize, setMaxFileSize] = useState(10)
+
+  // ✅ Departamentos desde contexto global — sin petición extra
+  const { departments: allDepartments } = useActiveDepartments()
+  const departments = allDepartments as Department[]
+  const loadingDepartments = false
 
   useEffect(() => {
     fetch('/api/admin/settings')
@@ -132,27 +136,6 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
     }
 
     fetchEquipmentTypes()
-  }, [])
-
-  // Cargar departamentos activos desde la API
-  useEffect(() => {
-    async function fetchDepartments() {
-      try {
-        const response = await fetch('/api/departments?isActive=true')
-        if (response.ok) {
-          const data = await response.json()
-          if (data.success && Array.isArray(data.data)) {
-            setDepartments(data.data)
-          }
-        }
-      } catch (error) {
-        console.error('Error cargando departamentos:', error)
-      } finally {
-        setLoadingDepartments(false)
-      }
-    }
-
-    fetchDepartments()
   }, [])
 
   const {

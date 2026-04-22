@@ -6,14 +6,15 @@
  * Espejo de TechnicianFamilyAssignment (by-family mode).
  */
 
-import { useState, useEffect, useCallback } from 'react'
-import { UserPlus, UserMinus, ShieldCheck, Search, RefreshCw, Crown } from 'lucide-react'
+import { useState } from 'react'
+import { UserPlus, UserMinus, ShieldCheck, Search, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { useToast } from '@/hooks/use-toast'
+import { useFetch } from '@/hooks/common/use-fetch'
 
 function getInitials(name: string): string {
   return name.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
@@ -49,28 +50,20 @@ interface Props {
 
 export function AdminFamilyAssignment({ familyId, assignedAdmins, isSuperAdmin, onChanged }: Props) {
   const { toast } = useToast()
-  const [allAdmins, setAllAdmins] = useState<AdminOption[]>([])
-  const [loadingUsers, setLoadingUsers] = useState(true)
   const [assigningId, setAssigningId] = useState<string | null>(null)
   const [unassigningId, setUnassigningId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
 
   const assignedIds = new Set(assignedAdmins.map((a) => a.adminId))
 
-  const loadAdmins = useCallback(async () => {
-    setLoadingUsers(true)
-    try {
-      const res = await fetch('/api/users?role=ADMIN&isActive=true&limit=500')
-      if (res.ok) {
-        const data = await res.json()
-        // Excluir super admins — ellos ya tienen acceso a todo
-        setAllAdmins((data.data ?? []).filter((u: AdminOption) => !u.isSuperAdmin))
-      }
-    } catch { /* silencioso */ }
-    finally { setLoadingUsers(false) }
-  }, [])
-
-  useEffect(() => { loadAdmins() }, [loadAdmins])
+  // ✅ Migrado a useFetch — administradores activos (excluyendo super admins)
+  const { data: allAdmins, loading: loadingUsers } = useFetch<AdminOption>(
+    '/api/users',
+    {
+      params: { role: 'ADMIN', isActive: true, limit: 500 },
+      transform: (d) => (d.data ?? []).filter((u: AdminOption) => !u.isSuperAdmin)
+    }
+  )
 
   const handleAssign = async (adminId: string) => {
     setAssigningId(adminId)
@@ -110,7 +103,6 @@ export function AdminFamilyAssignment({ familyId, assignedAdmins, isSuperAdmin, 
     } finally { setUnassigningId(null) }
   }
 
-  const assignedUsers = allAdmins.filter((u) => assignedIds.has(u.id))
   const unassignedUsers = allAdmins.filter(
     (u) =>
       !assignedIds.has(u.id) &&

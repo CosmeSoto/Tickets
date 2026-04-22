@@ -40,6 +40,7 @@ import { useUsers, type UserData } from '@/hooks/use-users'
 import { useUserFilters } from '@/hooks/common/use-user-filters'
 import type { UserRole } from '@/lib/constants/user-constants'
 import { useToast } from '@/hooks/use-toast'
+import { useActiveDepartments } from '@/contexts/departments-context'
 
 export default function AdminUsersPage() {
   const { data: session, status } = useSession()
@@ -47,8 +48,10 @@ export default function AdminUsersPage() {
   const { toast } = useToast()
   
   // Estados de datos
-  const [departments, setDepartments] = useState<any[]>([])
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
+
+  // ✅ Departamentos desde contexto global — sin petición extra
+  const { departments } = useActiveDepartments()
 
   // Hook de filtros unificado
   const {
@@ -120,24 +123,8 @@ export default function AdminUsersPage() {
       return
     }
 
-    // Cargar datos iniciales
-    loadDepartments()
+    // Cargar datos iniciales al verificar sesión
   }, [session, status, router])
-
-  // Cargar departamentos
-  const loadDepartments = async () => {
-    try {
-      const response = await fetch('/api/departments?isActive=true')
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success && data.data) {
-          setDepartments(data.data)
-        }
-      }
-    } catch (err) {
-      console.error('Error loading departments:', err)
-    }
-  }
 
   // Aplicar filtros cuando cambien los filtros debounced
   useEffect(() => {
@@ -325,7 +312,7 @@ export default function AdminUsersPage() {
           setDepartmentFilter={(department) => setFilter('department', department)}
           onRefresh={refresh}
           onClearFilters={clearFilters}
-          departments={departments}
+          departments={departments as any}
           loading={loading}
         />
 
@@ -397,7 +384,7 @@ export default function AdminUsersPage() {
         }}
         onUserUpdated={handleUserUpdated}
         user={editingUser}
-        departments={departments}
+        departments={departments as any}
       />
 
       {/* Modal de detalles de usuario */}
@@ -477,7 +464,7 @@ export default function AdminUsersPage() {
         isOpen={showCreateDialog}
         onClose={() => setShowCreateDialog(false)}
         onUserCreated={handleUserUpdated}
-        departments={departments}
+        departments={departments as any}
         suggestedRole={
           filters.role && filters.role !== 'all' && (filters.role as string) !== 'SUPER_ADMIN' && (filters.role as string) !== 'TECHNICIAN_MANAGER' && (filters.role as string) !== 'CLIENT_MANAGER'
             ? (filters.role as UserRole)

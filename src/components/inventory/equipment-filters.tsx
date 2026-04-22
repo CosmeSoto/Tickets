@@ -16,18 +16,14 @@ import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { EquipmentStatus, EquipmentCondition } from '@prisma/client'
 import type { EquipmentFilters as EquipmentFiltersType, EquipmentTypeInfo } from '@/types/inventory/equipment'
 import { useInventoryFamilies } from '@/contexts/families-context'
+import { useFamilyOptions } from '@/hooks/use-family-options'
+import { useActiveDepartments } from '@/contexts/departments-context'
 
 interface FamilyOption {
   id: string
   name: string
   code: string
   color?: string | null
-}
-
-interface DepartmentOption {
-  id: string
-  name: string
-  familyId: string | null
 }
 
 interface EquipmentFiltersProps {
@@ -60,13 +56,12 @@ export function EquipmentFilters({
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [equipmentTypes, setEquipmentTypes] = useState<EquipmentTypeInfo[]>([])
   const [loadingTypes, setLoadingTypes] = useState(true)
-  const [loadingFamilies, setLoadingFamilies] = useState(true)
-  const [allDepartments, setAllDepartments] = useState<DepartmentOption[]>([])
-  const [loadingDepartments, setLoadingDepartments] = useState(true)
 
-  // Familias de inventario desde el contexto global (cache Redis, sin peticion extra)
-  const { families: rawFamilies } = useInventoryFamilies()
-  const families = rawFamilies.map(f => ({ id: f.id, name: f.name, code: f.code ?? f.name.slice(0, 3).toUpperCase(), color: f.color }))
+  // ✅ Familias desde contexto global — sin petición extra (memoizadas)
+  const { families } = useFamilyOptions()
+
+  // ✅ Departamentos desde contexto global — sin petición extra
+  const { departments: allDepartments } = useActiveDepartments()
 
   // Cargar tipos de equipo desde la API
   useEffect(() => {
@@ -84,42 +79,6 @@ export function EquipmentFilters({
       }
     }
     fetchTypes()
-  }, [])
-
-  // Cargar familias desde la API de inventario
-  useEffect(() => {
-    async function fetchFamilies() {
-      try {
-        const response = await fetch('/api/inventory/families')
-        if (response.ok) {
-          const data = await response.json()
-          // families from context
-        }
-      } catch (error) {
-        console.error('Error cargando familias:', error)
-      } finally {
-        setLoadingFamilies(false)
-      }
-    }
-    fetchFamilies()
-  }, [])
-
-  // Cargar todos los departamentos activos
-  useEffect(() => {
-    async function fetchDepartments() {
-      try {
-        const response = await fetch('/api/departments?isActive=true')
-        if (response.ok) {
-          const data = await response.json()
-          setAllDepartments(data.data ?? [])
-        }
-      } catch (error) {
-        console.error('Error cargando departamentos:', error)
-      } finally {
-        setLoadingDepartments(false)
-      }
-    }
-    fetchDepartments()
   }, [])
 
   // Departamentos filtrados según la familia seleccionada
@@ -231,7 +190,7 @@ export function EquipmentFilters({
               onValueChange={handleFamilyChange}
               allowAll
               allowClear
-              disabled={loadingFamilies}
+              disabled={false}
               popoverWidth="240px"
             />
           </div>
@@ -242,18 +201,9 @@ export function EquipmentFilters({
             <Select
               value={filters.departmentId || 'all'}
               onValueChange={handleDepartmentChange}
-              disabled={loadingDepartments}
             >
               <SelectTrigger>
-                <SelectValue
-                  placeholder={
-                    loadingDepartments
-                      ? 'Cargando...'
-                      : filters.familyId
-                      ? 'Todos los departamentos'
-                      : 'Todos los departamentos'
-                  }
-                />
+                <SelectValue placeholder="Todos los departamentos" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos los departamentos</SelectItem>

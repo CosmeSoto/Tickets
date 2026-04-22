@@ -99,7 +99,7 @@ describe('UserBadge', () => {
   })
 
   it('shows role when showRole is true', () => {
-    const user = { name: 'Admin User', email: 'admin@example.com', role: 'ADMIN' }
+    const user = { name: 'Admin User', email: 'admin@example.com', role: 'ADMIN' as const }
     render(<UserBadge user={user} showRole={true} />)
     expect(screen.getByText('(admin)')).toBeInTheDocument()
   })

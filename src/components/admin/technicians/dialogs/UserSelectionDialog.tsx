@@ -28,6 +28,7 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Search, UserPlus, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
 import type { BaseUser } from '@/types/user'
+import { useClients } from '@/contexts/users-context'
 
 interface Props {
   open: boolean
@@ -43,55 +44,23 @@ interface UserWithValidation extends BaseUser {
 
 export function UserSelectionDialog({ open, onOpenChange, onUserSelected }: Props) {
   const { toast } = useToast()
-  const [users, setUsers] = useState<UserWithValidation[]>([])
-  const [loading, setLoading] = useState(false)
   const [validating, setValidating] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedUserId, setSelectedUserId] = useState<string>('')
   const [selectedUser, setSelectedUser] = useState<UserWithValidation | null>(null)
 
-  // Cargar usuarios disponibles (solo clientes)
+  // ✅ Clientes desde contexto global — sin petición extra
+  const { clients, loading } = useClients()
+  const users: UserWithValidation[] = clients as unknown as UserWithValidation[]
+
+  // Reset al cerrar
   useEffect(() => {
-    if (open) {
-      loadUsers()
-    } else {
-      // Reset al cerrar
-      setUsers([])
+    if (!open) {
       setSearchTerm('')
       setSelectedUserId('')
       setSelectedUser(null)
     }
   }, [open])
-
-  const loadUsers = async () => {
-    setLoading(true)
-    try {
-      const response = await fetch('/api/users?role=CLIENT', {
-        credentials: 'include'
-      })
-      
-      if (!response.ok) {
-        throw new Error('Error al cargar usuarios')
-      }
-
-      const result = await response.json()
-      
-      if (result.success && Array.isArray(result.data)) {
-        setUsers(result.data)
-      } else {
-        throw new Error('Formato de respuesta inválido')
-      }
-    } catch (error) {
-      console.error('Error cargando usuarios:', error)
-      toast({
-        title: 'Error',
-        description: 'No se pudieron cargar los usuarios disponibles',
-        variant: 'destructive'
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
 
   // Validar usuario seleccionado
   const validateUser = async (userId: string) => {

@@ -2,20 +2,25 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# OpenSSL requerido por Prisma en Alpine
+# Dependencias del sistema requeridas por Prisma y bcrypt en Alpine
 RUN apk add --no-cache libc6-compat curl openssl openssl-dev
 
-# Instalar dependencias ANTES de montar el volumen
+# Instalar dependencias de Node ANTES de montar el volumen fuente
+# Así el volumen no sobreescribe node_modules del contenedor
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --prefer-offline
 
-# Generar cliente Prisma para Linux
+# Generar cliente Prisma para la arquitectura Linux del contenedor
 COPY prisma ./prisma/
 RUN npx prisma generate
 
 EXPOSE 3000
 
-# 1. Sincronizar BD desde schema (dev: db push, no requiere migraciones)
-# 2. Seed (upsert — idempotente, no duplica)
-# 3. Next dev
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && npm run db:seed && npm run dev"]
+# Entrypoint de desarrollo:
+#   1. db push  — sincroniza el schema sin historial de migraciones (dev only)
+#   2. db:seed  — datos iniciales idempotentes (upsert)
+#   3. next dev — servidor con hot-reload + Turbopack
+CMD ["sh", "-c", \
+  "npx prisma db push --accept-data-loss && \
+   npm run db:seed && \
+   npm run dev"]

@@ -9,7 +9,7 @@ import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/s
 import { InlineCreateSelect } from '@/components/ui/inline-create-select'
 import { SimpleSelect } from '@/components/ui/simple-select'
 import { FileUploadZone } from '@/components/ui/file-upload-zone'
-import { ContractSection, type ContractData } from '@/components/inventory/contract-section'
+import { ContractPicker } from '@/components/contracts/contract-picker'
 import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
 import { EquipmentTypeInlineForm } from '@/components/inventory/asset-forms/EquipmentTypeInlineForm'
 import { WarehouseInlineForm } from '@/components/inventory/asset-forms/WarehouseInlineForm'
@@ -23,14 +23,8 @@ import {
   type DepreciationMethod,
 } from '@/lib/inventory/depreciation'
 import { useUserList } from '@/hooks/use-user-list'
+import { useActiveDepartments } from '@/contexts/departments-context'
 import { X, Plus, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react'
-
-interface Department {
-  id: string
-  name: string
-  familyId: string | null
-  isActive: boolean
-}
 
 interface EquipmentAssetFormProps {
   familyId: string
@@ -85,7 +79,7 @@ export function EquipmentAssetForm({
   const [specValue, setSpecValue] = useState('')
   const [specifications, setSpecifications] = useState<Record<string, string>>({})
   const [supplierId, setSupplierId] = useState('')
-  const [contractData, setContractData] = useState<ContractData | null>(null)
+  const [linkedContractId, setLinkedContractId] = useState<string | null>(null)
   const [purchaseDate, setPurchaseDate] = useState('')
   const [purchasePrice, setPurchasePrice] = useState('')
   const [invoiceNumber, setInvoiceNumber] = useState('')
@@ -100,10 +94,15 @@ export function EquipmentAssetForm({
   const [attachments, setAttachments] = useState<File[]>([])
   const [priceError, setPriceError] = useState('')
 
-  // Department selector
+  // ✅ Departamentos desde contexto global — filtrados por familyId en memoria
+  const { departments: allDepartments } = useActiveDepartments()
+  const departments = allDepartments.filter(
+    (dept): dept is typeof dept & { familyId: string } => dept.familyId === familyId
+  )
+  const loadingDepartments = false
+
+  // Department selector state
   const [departmentId, setDepartmentId] = useState('')
-  const [departments, setDepartments] = useState<Department[]>([])
-  const [loadingDepartments, setLoadingDepartments] = useState(true)
 
   // Task 19.1: family depreciation config from API
   const [familyDepConfig, setFamilyDepConfig] = useState<FamilyDepreciationConfig | null>(null)
@@ -121,20 +120,6 @@ export function EquipmentAssetForm({
       .then(r => r.json()).then(d => setEquipmentTypes(d.types ?? []))
     fetch(`/api/inventory/warehouses?familyId=${familyId}`)
       .then(r => r.json()).then(d => setWarehouses(d.warehouses ?? d ?? []))
-  }, [familyId])
-
-  // Load active departments filtered by familyId
-  useEffect(() => {
-    setLoadingDepartments(true)
-    fetch('/api/departments?isActive=true')
-      .then(r => r.json())
-      .then(d => {
-        const all: Department[] = d.data ?? []
-        // Filter by the family of this form
-        setDepartments(all.filter(dept => dept.familyId === familyId))
-      })
-      .catch(() => {})
-      .finally(() => setLoadingDepartments(false))
   }, [familyId])
 
   // Task 19.1: fetch family-config depreciation defaults when familyId changes
@@ -256,12 +241,7 @@ export function EquipmentAssetForm({
       accessories: accessories.length ? accessories : undefined,
       specifications: Object.keys(specifications).length ? specifications : undefined,
       supplierId: supplierId || undefined,
-      contractAction: contractData?.action,
-      contractId: contractData?.contractId,
-      contractNumber: contractData?.contractNumber,
-      contractStartDate: contractData?.startDate,
-      contractEndDate: contractData?.endDate,
-      contractMonthlyCost: contractData?.monthlyCost,
+      contractId: linkedContractId || undefined,
       purchaseDate: purchaseDate || undefined,
       purchasePrice: purchasePrice ? parseFloat(purchasePrice) : undefined,
       invoiceNumber: invoiceNumber || undefined,
@@ -497,10 +477,18 @@ export function EquipmentAssetForm({
         />
       </div>
 
-      {/* Contrato — solo RENTAL */}
-      {acquisitionMode === 'RENTAL' && (
+      {/* Contrato — RENTAL y LOAN */}
+      {(acquisitionMode === 'RENTAL' || acquisitionMode === 'LOAN') && (
         <div className="rounded-md border border-border p-4 space-y-3">
-          <ContractSection acquisitionMode="RENTAL" supplierId={supplierId || null} onContractChange={setContractData} />
+          <p className="text-sm font-medium">
+            {acquisitionMode === 'RENTAL' ? 'Contrato de arrendamiento' : 'Contrato del activo de tercero'}
+          </p>
+          <ContractPicker
+            value={linkedContractId}
+            onChange={setLinkedContractId}
+            supplierId={supplierId || null}
+            familyId={familyId}
+          />
         </div>
       )}
 

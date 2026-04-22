@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { AlertTriangle, RefreshCw, Save, Ticket, Users, Globe, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -74,7 +74,6 @@ function serializeDays(days: Set<string>): string {
 
 export function TabTickets({ familyId, ticketConfig, onConfigUpdated }: TabTicketsProps) {
   const { toast } = useToast()
-  const [allFamilies, setAllFamilies] = useState<Array<{ id: string; name: string; color?: string | null; code: string }>>([])
 
   const [form, setForm] = useState({
     ticketsEnabled: ticketConfig?.ticketsEnabled ?? DEFAULT_CONFIG.ticketsEnabled,
@@ -91,19 +90,11 @@ export function TabTickets({ familyId, ticketConfig, onConfigUpdated }: TabTicke
   const [saving, setSaving] = useState(false)
   const [showDisableWarning, setShowDisableWarning] = useState(false)
 
-  // Familias desde el contexto global (cache Redis, sin peticion extra)
+  // Familias desde el contexto global — sin petición extra, filtradas por familyId
   const { families } = useFamilies()
-  const isDisabled = !form.ticketsEnabled
-
-  // Cargar todas las familias para el selector de allowedFromFamilies
-  useEffect(() => {
-    fetch('/api/families?includeInactive=false')
-      .then(r => r.json())
-      .then(d => {
-        if (d.success) setAllFamilies(d.data.filter((f: any) => f.id !== familyId))
-      })
-      .catch(() => {})
-  }, [familyId])
+  const allFamilies = families
+    .filter(f => f.id !== familyId)
+    .map(f => ({ id: f.id, name: f.name, color: f.color ?? null, code: f.code ?? '' }))
 
   const toggleDay = (key: string) => {
     setForm(f => {
@@ -157,6 +148,8 @@ export function TabTickets({ familyId, ticketConfig, onConfigUpdated }: TabTicke
       setSaving(false)
     }
   }
+
+  const isDisabled = !form.ticketsEnabled
 
   const isOpenToAll = form.allowedFromFamilies.size === 0
 

@@ -1,4 +1,4 @@
-import { PrismaClient, EquipmentStatus, Prisma } from '@prisma/client'
+import { EquipmentStatus, Prisma } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import { QRCodeService } from './qr-code.service'
 import type { 
@@ -10,8 +10,7 @@ import type {
   EquipmentHistoryEvent,
   EquipmentSummary
 } from '@/types/inventory/equipment'
-
-const prisma = new PrismaClient()
+import { db as prisma } from '@/lib/server'
 
 /**
  * Servicio para gestión de equipos

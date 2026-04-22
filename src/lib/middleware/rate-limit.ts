@@ -1,18 +1,10 @@
 /**
  * Rate Limiting Middleware
- * Protege contra abuso de API usando Upstash Redis
+ * Protege contra abuso de API usando ioredis (singleton de @/lib/server)
  */
 
-import { Redis } from '@upstash/redis'
+import { getRedis } from '@/lib/server'
 import { NextRequest, NextResponse } from 'next/server'
-
-// Inicializar Redis
-const redis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
-  ? new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN,
-    })
-  : null
 
 export interface RateLimitConfig {
   maxRequests: number
@@ -66,9 +58,9 @@ export async function rateLimit(
   config: RateLimitConfig,
   identifier?: string
 ): Promise<{ success: boolean; limit: number; remaining: number; reset: number }> {
+  const redis = getRedis()
   // Si Redis no está disponible, permitir la solicitud (fail open)
   if (!redis) {
-    console.warn('[RATE-LIMIT] Redis no disponible, permitiendo solicitud')
     return {
       success: true,
       limit: config.maxRequests,
@@ -78,35 +70,26 @@ export async function rateLimit(
   }
 
   try {
-    // Identificador único (IP o userId)
     const id = identifier || getClientIdentifier(request)
     const key = `rate-limit:${id}`
 
-    // Obtener contador actual
-    const current = await redis.get<number>(key) || 0
-    const ttl = await redis.ttl(key)
-    
-    // Calcular reset time
-    const resetTime = ttl > 0 
-      ? Date.now() + (ttl * 1000)
+    const [rawCurrent, ttl] = await Promise.all([
+      redis.get(key),
+      redis.ttl(key),
+    ])
+    const current = rawCurrent ? parseInt(rawCurrent as string, 10) : 0
+
+    const resetTime = ttl > 0
+      ? Date.now() + ttl * 1000
       : Date.now() + config.windowMs
 
-    // Si excede el límite
     if (current >= config.maxRequests) {
-      return {
-        success: false,
-        limit: config.maxRequests,
-        remaining: 0,
-        reset: resetTime
-      }
+      return { success: false, limit: config.maxRequests, remaining: 0, reset: resetTime }
     }
 
-    // Incrementar contador
     if (current === 0) {
-      // Primera solicitud en la ventana
-      await redis.set(key, 1, { ex: Math.floor(config.windowMs / 1000) })
+      await redis.set(key, '1', 'EX', Math.floor(config.windowMs / 1000))
     } else {
-      // Incrementar contador existente
       await redis.incr(key)
     }
 
@@ -114,16 +97,15 @@ export async function rateLimit(
       success: true,
       limit: config.maxRequests,
       remaining: config.maxRequests - current - 1,
-      reset: resetTime
+      reset: resetTime,
     }
   } catch (error) {
     console.error('[RATE-LIMIT] Error:', error)
-    // En caso de error, permitir la solicitud (fail open)
     return {
       success: true,
       limit: config.maxRequests,
       remaining: config.maxRequests,
-      reset: Date.now() + config.windowMs
+      reset: Date.now() + config.windowMs,
     }
   }
 }
@@ -190,28 +172,23 @@ export async function rateLimitByUser(
   userId: string,
   config: RateLimitConfig
 ): Promise<{ success: boolean; remaining: number }> {
-  if (!redis) {
-    return { success: true, remaining: config.maxRequests }
-  }
+  const redis = getRedis()
+  if (!redis) return { success: true, remaining: config.maxRequests }
 
   try {
     const key = `rate-limit:user:${userId}`
-    const current = await redis.get<number>(key) || 0
+    const raw = await redis.get(key)
+    const current = raw ? parseInt(raw as string, 10) : 0
 
-    if (current >= config.maxRequests) {
-      return { success: false, remaining: 0 }
-    }
+    if (current >= config.maxRequests) return { success: false, remaining: 0 }
 
     if (current === 0) {
-      await redis.set(key, 1, { ex: Math.floor(config.windowMs / 1000) })
+      await redis.set(key, '1', 'EX', Math.floor(config.windowMs / 1000))
     } else {
       await redis.incr(key)
     }
 
-    return {
-      success: true,
-      remaining: config.maxRequests - current - 1
-    }
+    return { success: true, remaining: config.maxRequests - current - 1 }
   } catch (error) {
     console.error('[RATE-LIMIT] Error en rateLimitByUser:', error)
     return { success: true, remaining: config.maxRequests }

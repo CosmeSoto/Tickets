@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2, Plus, X } from 'lucide-react'
@@ -19,6 +19,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast'
 import { createAssignmentSchema, type CreateAssignmentInput } from '@/lib/validations/inventory/assignment'
 import type { AssignmentFormData } from '@/types/inventory/assignment'
+import { useUsers } from '@/contexts/users-context'
 
 interface AssignmentFormProps {
   equipmentId: string
@@ -26,16 +27,6 @@ interface AssignmentFormProps {
   defaultAccessories?: string[]
   onSuccess?: (assignment: any) => void
   onCancel?: () => void
-}
-
-interface User {
-  id: string
-  name: string
-  email: string
-  role: string
-  department?: {
-    name: string
-  }
 }
 
 const ASSIGNMENT_TYPE_OPTIONS = [
@@ -53,10 +44,13 @@ export function AssignmentForm({
 }: AssignmentFormProps) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
-  const [loadingUsers, setLoadingUsers] = useState(true)
-  const [users, setUsers] = useState<User[]>([])
   const [accessories, setAccessories] = useState<string[]>(defaultAccessories)
   const [newAccessory, setNewAccessory] = useState('')
+
+  // ✅ Usuarios desde contexto global — sin petición extra
+  const { users } = useUsers()
+  const assignableUsers = users.filter(u => u.role === 'CLIENT' || u.role === 'TECHNICIAN')
+  const loadingUsers = false
 
   const {
     register,
@@ -76,34 +70,6 @@ export function AssignmentForm({
 
   const assignmentType = watch('assignmentType')
   const requiresEndDate = assignmentType === 'TEMPORARY' || assignmentType === 'LOAN'
-
-  // Cargar usuarios disponibles
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        setLoadingUsers(true)
-        const response = await fetch('/api/users?role=CLIENT,TECHNICIAN')
-        
-        if (!response.ok) {
-          throw new Error('Error al cargar usuarios')
-        }
-
-        const data = await response.json()
-        setUsers(data.users || data)
-      } catch (error) {
-        console.error('Error cargando usuarios:', error)
-        toast({
-          title: 'Error',
-          description: 'No se pudieron cargar los usuarios',
-          variant: 'destructive',
-        })
-      } finally {
-        setLoadingUsers(false)
-      }
-    }
-
-    fetchUsers()
-  }, [toast])
 
   const onSubmit = async (data: any) => {
     try {
@@ -185,13 +151,12 @@ export function AssignmentForm({
                   <SelectValue placeholder="Selecciona un usuario" />
                 </SelectTrigger>
                 <SelectContent>
-                  {users.map((user) => (
+                  {assignableUsers.map((user) => (
                     <SelectItem key={user.id} value={user.id}>
                       <div className="flex flex-col">
                         <span>{user.name}</span>
                         <span className="text-xs text-muted-foreground">
                           {user.email}
-                          {user.department && ` • ${user.department.name}`}
                         </span>
                       </div>
                     </SelectItem>

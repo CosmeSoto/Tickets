@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
 import { useInventoryFamilies } from '@/contexts/families-context'
+import { useFamilyOptions } from '@/hooks/use-family-options'
 
 interface Props {
   open: boolean
@@ -41,9 +42,11 @@ export function NewMaintenanceDialog({
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
 
-  const [familyList, setFamilyList] = useState<FamilyOption[]>([])
+  // Familias de inventario desde el contexto global — sin petición extra (memoizadas)
+  const { families, loading: loadingFamilies } = useFamilyOptions()
+  const familyList: FamilyOption[] = families.map(f => ({ id: f.id, name: f.name }))
+
   const [selectedFamilyId, setSelectedFamilyId] = useState('_all')
-  const [loadingFamilies, setLoadingFamilies] = useState(false)
 
   const [equipmentList, setEquipmentList] = useState<EquipmentOption[]>([])
   const [loadingEquipment, setLoadingEquipment] = useState(false)
@@ -53,21 +56,6 @@ export function NewMaintenanceDialog({
   const [description, setDescription] = useState('')
   const [scheduledDate, setScheduledDate] = useState('')
   const [notes, setNotes] = useState('')
-
-  // Familias de inventario desde el contexto global (cache Redis, sin peticion extra)
-  const { families: rawFamilies } = useInventoryFamilies()
-  const families = rawFamilies.map(f => ({ id: f.id, name: f.name, code: f.code ?? f.name.slice(0, 3).toUpperCase(), color: f.color }))
-
-  // Cargar familias al abrir (solo admin/técnico)
-  useEffect(() => {
-    if (!open || preselectedEquipmentId || isClient) return
-    setLoadingFamilies(true)
-    fetch('/api/inventory/families', { cache: 'no-store' })
-      .then(r => r.json())
-      .then(data => setFamilyList((data.families ?? data ?? []).map((f: any) => ({ id: f.id, name: f.name }))))
-      .catch(() => {})
-      .finally(() => setLoadingFamilies(false))
-  }, [open, preselectedEquipmentId, isClient])
 
   // Cargar equipos al abrir o al cambiar familia
   useEffect(() => {

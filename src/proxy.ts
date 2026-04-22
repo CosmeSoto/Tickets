@@ -24,6 +24,7 @@ const RATE_LIMIT_EXCLUDED = [
   '/api/config/session-timeout', // consultado cada 2 min por todos los usuarios
   '/api/families',               // datos de referencia — cacheados en Redis, se leen en cada página
   '/api/inventory/families',     // ídem para el endpoint de inventario
+  '/api/inventory/suppliers',    // datos de referencia — consultado frecuentemente en formularios
   '/api/users',                  // datos de referencia — cacheados en Redis, queries pesadas
   '/api/departments',            // datos de referencia — cacheados en Redis
 ]

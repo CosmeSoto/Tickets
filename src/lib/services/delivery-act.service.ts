@@ -1,12 +1,10 @@
 import { randomUUID } from 'crypto'
-import { PrismaClient } from '@prisma/client'
 import { FolioService } from './folio.service'
 import { DigitalSignatureService } from './digital-signature.service'
 import { PDFGeneratorService } from './pdf-generator.service'
 import { InventoryNotificationService } from './inventory-notification.service'
 import type { DeliveryAct, UserInfo } from '@/types/inventory/delivery-act'
-
-const prisma = new PrismaClient()
+import { db as prisma } from '@/lib/server'
 
 /**
  * Servicio para gestión de actas de entrega digitales

@@ -1,64 +1,49 @@
-import Redis from 'ioredis'
+/**
+ * Re-exporta el cliente Redis desde @/lib/server.
+ * Mantiene compatibilidad con todos los imports existentes:
+ *   import { redis } from '@/lib/redis'
+ *   import { getCached, setCache, deleteCache } from '@/lib/redis'
+ */
+import { getRedis, getCached, setCache, deleteCache } from '@/lib/server'
+import type Redis from 'ioredis'
 
-const globalForRedis = globalThis as unknown as {
-  redis: Redis | undefined
+// Valores de retorno seguros por método cuando Redis no está disponible
+const NOOP_RETURNS: Record<string, unknown> = {
+  get: null,
+  set: 'OK',
+  setex: 'OK',
+  del: 0,
+  exists: 0,
+  expire: 0,
+  ttl: -2,
+  incr: 0,
+  incrby: 0,
+  keys: [],
+  smembers: [],
+  sadd: 0,
+  srem: 0,
+  ping: 'PONG',
+  dbsize: 0,
+  subscribe: undefined,
+  publish: 0,
+  quit: 'OK',
 }
 
-function createRedisClient(): Redis {
-  if (!process.env.REDIS_URL) {
-    // Sin REDIS_URL — cliente que falla silenciosamente
-    const dummy = new Redis({ lazyConnect: true, maxRetriesPerRequest: 0, enableOfflineQueue: false })
-    dummy.disconnect()
-    return dummy
-  }
-
-  const client = new Redis(process.env.REDIS_URL, {
-    // NO lazyConnect — conectar inmediatamente para que los comandos no fallen
-    lazyConnect: false,
-    connectTimeout: 3000,
-    commandTimeout: 2000,
-    maxRetriesPerRequest: 1,       // 1 reintento antes de fallar
-    enableOfflineQueue: false,     // No encolar si está desconectado
-    retryStrategy: (times: number) => {
-      if (times > 5) return null   // Dejar de reintentar después de 5 intentos
-      return Math.min(times * 500, 5000)
-    },
-    family: 4,
-  })
-
-  client.on('connect', () => console.log('✅ [REDIS] Conectado'))
-  client.on('error', () => { /* silencioso — degradación graceful */ })
-
-  return client
+function noop(method: string) {
+  return async (..._args: unknown[]) => NOOP_RETURNS[method] ?? null
 }
 
-export const redis = globalForRedis.redis ?? createRedisClient()
+/**
+ * Proxy lazy — delega al cliente real si Redis está disponible,
+ * o retorna valores seguros (no-op) si no lo está.
+ */
+export const redis: Redis = new Proxy({} as Redis, {
+  get(_target, prop: string) {
+    const client = getRedis()
+    if (!client) return noop(prop)
+    const value = (client as any)[prop]
+    return typeof value === 'function' ? value.bind(client) : value
+  },
+})
 
-if (process.env.NODE_ENV !== 'production') globalForRedis.redis = redis
-
-// ── Utilidades con graceful degradation ──────────────────────────────────────
-
-export async function getCached<T>(key: string): Promise<T | null> {
-  try {
-    const cached = await redis.get(key)
-    return cached ? (JSON.parse(cached) as T) : null
-  } catch {
-    return null
-  }
-}
-
-export async function setCache(key: string, value: any, ttl = 3600): Promise<void> {
-  try {
-    await redis.setex(key, ttl, JSON.stringify(value))
-  } catch {
-    // Silencioso
-  }
-}
-
-export async function deleteCache(key: string): Promise<void> {
-  try {
-    await redis.del(key)
-  } catch {
-    // Silencioso
-  }
-}
+export { getCached, setCache, deleteCache }

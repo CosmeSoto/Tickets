@@ -71,8 +71,8 @@ describe('ErrorDisplay', () => {
     let card = screen.getByText('Ha ocurrido un error').closest('.border-red-200')
     expect(card).toBeInTheDocument()
     
-    rerender(<ErrorDisplay variant="warning" />)
-    card = screen.getByText('Ha ocurrido un error').closest('.border-amber-200')
+    rerender(<ErrorDisplay variant="default" />)
+    card = screen.getByText('Ha ocurrido un error').closest('.border-border')
     expect(card).toBeInTheDocument()
   })
 })
@@ -123,7 +123,7 @@ describe('InlineError', () => {
     // Check for destructive variant (default)
     expect(screen.getByText('Error')).toBeInTheDocument()
     
-    rerender(<InlineError message="Warning" variant="warning" />)
+    rerender(<InlineError message="Warning" variant={'warning' as any} />)
     expect(screen.getByText('Warning')).toBeInTheDocument()
   })
 })

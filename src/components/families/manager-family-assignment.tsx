@@ -11,7 +11,7 @@
  *    y permite asignar/desasignar. Usado en tab-personal.tsx.
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useMemo } from 'react'
 import { UserPlus, UserMinus, Package, Search, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -20,7 +20,7 @@ import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
-import { useFamilies } from '@/contexts/families-context'
+import { useFetch } from '@/hooks/common/use-fetch'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -96,33 +96,28 @@ export function ManagerFamilyAssignment(props: Props) {
 
 function ByManagerView({ managerId, managerName, onChanged }: ByManagerProps) {
   const { toast } = useToast()
-  const [families, setFamilies] = useState<FamilyOption[]>([])
-  const [assignedFamilyIds, setAssignedFamilyIds] = useState<Set<string>>(new Set())
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const [familiesRes, assignedRes] = await Promise.all([
-        fetch('/api/families?active=true').then((r) => r.json()),
-        fetch(`/api/inventory/managers/${managerId}/families`).then((r) => r.json()),
-      ])
-      if (familiesRes.success) {
-        setFamilies(familiesRes.data.filter((f: FamilyOption) => f.isActive))
-      }
-      if (assignedRes.families) {
-        setAssignedFamilyIds(new Set(assignedRes.families.map((f: FamilyOption) => f.id)))
-      }
-    } catch {
-      // silencioso
-    } finally {
-      setLoading(false)
-    }
-  }, [managerId])
+  // ✅ Migrado a useFetch — familias activas
+  const { data: families, loading: loadingFamilies } = useFetch<FamilyOption>(
+    '/api/families',
+    { params: { active: true }, transform: (d) => d.data?.filter((f: FamilyOption) => f.isActive) ?? [] }
+  )
 
-  useEffect(() => { load() }, [load])
+  // ✅ Migrado a useFetch — familias asignadas al gestor
+  const { data: assignedData, loading: loadingAssigned, reload: reloadAssigned } = useFetch<FamilyOption>(
+    `/api/inventory/managers/${managerId}/families`,
+    { transform: (d) => d.families ?? [] }
+  )
+
+  // ✅ Derivado en memoria — sin useEffect ni estado extra
+  const assignedFamilyIds = useMemo(
+    () => new Set(assignedData.map((f) => f.id)),
+    [assignedData]
+  )
+
+  const loading = loadingFamilies || loadingAssigned
 
   const handleToggle = async (family: FamilyOption, checked: boolean) => {
     const newIds = new Set(assignedFamilyIds)
@@ -141,8 +136,8 @@ function ByManagerView({ managerId, managerName, onChanged }: ByManagerProps) {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error al actualizar')
-      setAssignedFamilyIds(newIds)
       toast({ title: checked ? `Asignado a "${family.name}"` : `Desasignado de "${family.name}"` })
+      reloadAssigned()
       onChanged?.()
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error desconocido'
@@ -237,38 +232,23 @@ function ByManagerView({ managerId, managerName, onChanged }: ByManagerProps) {
 
 function ByFamilyView({ familyId, assignedManagers, onChanged }: ByFamilyProps) {
   const { toast } = useToast()
-  const [allManagers, setAllManagers] = useState<ManagerOption[]>([])
-  const [loadingUsers, setLoadingUsers] = useState(true)
   const [assigningId, setAssigningId] = useState<string | null>(null)
   const [unassigningId, setUnassigningId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
 
-  // Familias desde el contexto global (cache Redis, sin peticion extra)
-  const { families } = useFamilies()
-
-  const assignedIds = new Set(assignedManagers.map((m) => m.managerId))
-
-  const loadManagers = useCallback(async () => {
-    setLoadingUsers(true)
-    try {
-      // Solo usuarios con canManageInventory=true aparecen como disponibles.
-      // La casilla "Gestor de Inventario" en el perfil del usuario es el requisito previo
-      // para poder asignarlo a una familia. Esto diferencia claramente ambas acciones:
-      // 1. Activar la casilla = habilitar el permiso global de gestión
-      // 2. Asignar a familia = definir el alcance (qué familias puede gestionar)
-      const res = await fetch('/api/users?isActive=true&canManageInventory=true&limit=500')
-      if (res.ok) {
-        const data = await res.json()
-        setAllManagers(data.data ?? [])
-      }
-    } catch {
-      // silencioso
-    } finally {
-      setLoadingUsers(false)
+  // ✅ Migrado a useFetch — usuarios con canManageInventory
+  const { data: allManagers, loading: loadingUsers } = useFetch<ManagerOption>(
+    '/api/users',
+    {
+      params: { isActive: true, canManageInventory: true, limit: 500 },
+      transform: (d) => d.data ?? []
     }
-  }, [])
+  )
 
-  useEffect(() => { loadManagers() }, [loadManagers])
+  const assignedIds = useMemo(
+    () => new Set(assignedManagers.map((m) => m.managerId)),
+    [assignedManagers]
+  )
 
   const handleAssign = async (userId: string) => {
     setAssigningId(userId)

@@ -4,6 +4,7 @@ import './globals.css'
 import { SessionProviderWrapper } from '@/components/providers/session-provider-wrapper'
 import { QueryProvider } from '@/components/providers/query-provider'
 import { ToastProvider } from '@/components/providers/toast-provider'
+import { AppDataProvider } from '@/components/providers/app-data-provider'
 import { Toaster } from '@/components/ui/toaster'
 import { Toaster as SonnerToaster } from 'sonner'
 import { ThemeScript } from '@/components/theme-script'
@@ -29,8 +30,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <QueryProvider>
           <ToastProvider>
             <SessionProviderWrapper>
-              <SessionTimeoutMonitor />
-              {children}
+              <AppDataProvider>
+                <SessionTimeoutMonitor />
+                {children}
+              </AppDataProvider>
             </SessionProviderWrapper>
             <Toaster />
             <SonnerToaster position="top-right" richColors />

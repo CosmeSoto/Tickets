@@ -1,4 +1,52 @@
+##############################################################################
+# DESARROLLO — hot-reload, volúmenes montados, sin build de producción
+#
+# Uso:
+#   docker compose -f docker-compose.dev.yml up --build
+#   docker compose -f docker-compose.dev.yml up          # sin reconstruir
+#   docker compose -f docker-compose.dev.yml down -v     # destruir todo
+##############################################################################
+
 services:
+
+  # ── Base de datos ───────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: tickets-postgres-dev
+    environment:
+      POSTGRES_DB: tickets_db
+      POSTGRES_USER: tickets_user
+      POSTGRES_PASSWORD: tickets_password_2024
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    networks:
+      - tickets-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tickets_user -d tickets_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  # ── Redis ───────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: tickets-redis-dev
+    ports:
+      - "6379:6379"
+    networks:
+      - tickets-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── Aplicación Next.js (dev con hot-reload) ─────────────────────────────────
   app:
     build:
       context: .
@@ -8,21 +56,22 @@ services:
       NODE_ENV: development
       DATABASE_URL: postgresql://tickets_user:tickets_password_2024@postgres:5432/tickets_db
       REDIS_URL: redis://redis:6379
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
-      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://gestion.local}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
-      STORAGE_PROVIDER: local
-      STORAGE_LOCAL_UPLOAD_PATH: ./uploads
-      STORAGE_LOCAL_PUBLIC_PATH: /uploads
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-dev-secret-change-in-production}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-MGZykJSDK3DDnCTMh5w0bJ5+7+syOXYW64Z0IAzwczk=}
       UPLOAD_DIR: /app/public/uploads
       LOG_LEVEL: DEBUG
+      # Turbopack — hot-reload más rápido
+      TURBOPACK: 1
     volumes:
+      # Código fuente montado — cualquier cambio se refleja al instante
       - .:/app
+      # node_modules del contenedor (Linux) — NO sobreescribir con el del host (macOS)
       - dev_node_modules:/app/node_modules
-      - dev_next:/app/.next
-      # public/uploads ya está incluido en .:/app — no necesita volumen separado
+      # Caché de Next.js — persiste entre reinicios para builds más rápidos
+      - dev_next_cache:/app/.next
     ports:
-      - '3000:3000'
+      - "3000:3000"
     networks:
       - tickets-network
     depends_on:
@@ -31,19 +80,16 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 10
-      start_period: 60s
+    # Sin healthcheck en dev — evita que nginx espere y bloquee el arranque
+    # El app tarda ~30s en compilar la primera vez
 
+  # ── Nginx (proxy reverso local con HTTPS) ───────────────────────────────────
   nginx:
     image: nginx:alpine
     container_name: tickets-nginx-dev
     ports:
-      - '80:80'
-      - '443:443'
+      - "80:80"
+      - "443:443"
     volumes:
       - ./docker/nginx.local.conf:/etc/nginx/nginx.conf:ro
       - ./public/uploads:/var/www/uploads:ro
@@ -51,50 +97,16 @@ services:
     networks:
       - tickets-network
     depends_on:
-      app:
-        condition: service_healthy
+      - app
     restart: unless-stopped
 
-  postgres:
-    image: postgres:15-alpine
-    container_name: tickets-postgres-dev
-    environment:
-      POSTGRES_DB: tickets_db
-      POSTGRES_USER: tickets_user
-      POSTGRES_PASSWORD: tickets_password_2024
-    ports:
-      - '5432:5432'
-    volumes:
-      - postgres_data_dev:/var/lib/postgresql/data
-    networks:
-      - tickets-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tickets_user -d tickets_db"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
-  redis:
-    image: redis:7-alpine
-    container_name: tickets-redis-dev
-    ports:
-      - '6379:6379'
-    networks:
-      - tickets-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-
+# ── Volúmenes ──────────────────────────────────────────────────────────────────
 volumes:
   postgres_data_dev:
   dev_node_modules:
-  dev_next:
+  dev_next_cache:
 
+# ── Red ────────────────────────────────────────────────────────────────────────
 networks:
   tickets-network:
     driver: bridge

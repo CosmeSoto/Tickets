@@ -1,14 +1,12 @@
 import fs from 'fs'
 import path from 'path'
 import { promisify } from 'util'
-import { PrismaClient } from '@prisma/client'
+import prisma from '@/lib/prisma'
 import { QRCodeService } from './qr-code.service'
 import { generateDeliveryActPDF } from '../templates/delivery-act-pdf.template'
 import { generateReturnActPDF } from '../templates/return-act-pdf.template'
 import type { DeliveryAct } from '@/types/inventory/delivery-act'
 import { getUploadDir } from '@/lib/upload-path'
-
-const prisma = new PrismaClient()
 const mkdir = promisify(fs.mkdir)
 const writeFile = promisify(fs.writeFile)
 

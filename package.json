@@ -6,7 +6,7 @@
     "seed": "tsx prisma/seed.ts"
   },
   "scripts": {
-    "dev": "next dev --hostname 0.0.0.0",
+    "dev": "next dev --turbopack --hostname 0.0.0.0",
     "build": "SKIP_TYPE_CHECK=true next build",
     "start": "next start --hostname 0.0.0.0",
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx --max-warnings 20",

@@ -9,8 +9,8 @@ import { useFrequentCategories } from '../hooks/useFrequentCategories';
 import type { ReactNode } from 'react';
 
 // Mock de fetch global
-const mockFetch = jest.fn();
-global.fetch = mockFetch as any;
+const mockFetch = jest.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<any>>();
+global.fetch = mockFetch as unknown as typeof fetch;
 
 describe('useFrequentCategories Hook', () => {
   let queryClient: QueryClient;

@@ -20,6 +20,7 @@ import { useExport } from '@/hooks/common/use-export'
 import { useFetch } from '@/hooks/common/use-fetch'
 import { useFormSubmit } from '@/hooks/common/use-form-submit'
 import { useInventoryFamilies } from '@/contexts/families-context'
+import { useFamilyOptions } from '@/hooks/use-family-options'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -117,9 +118,8 @@ function CatalogsContent() {
   const [deleting, setDeleting] = useState(false)
   const [form, setForm] = useState({ code: '', name: '', symbol: '', description: '', order: 999, familyId: '', location: '' })
 
-  // Familias de inventario desde el contexto global (cache Redis, sin peticion extra)
-  const { families: rawFamilies } = useInventoryFamilies()
-  const families = rawFamilies.map(f => ({ id: f.id, name: f.name, code: f.code ?? f.name.slice(0, 3).toUpperCase(), color: f.color }))
+  // Familias de inventario desde el contexto global (cache Redis, sin peticion extra) - memoizadas
+  const { families } = useFamilyOptions()
 
   const isAdmin = session?.user?.role === 'ADMIN'
 

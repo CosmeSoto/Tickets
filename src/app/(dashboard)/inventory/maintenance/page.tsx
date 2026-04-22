@@ -18,6 +18,7 @@ import { FamilyCombobox, type FamilyOption } from '@/components/ui/family-combob
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
 import { useInventoryFamilies } from '@/contexts/families-context'
+import { useFamilyOptions } from '@/hooks/use-family-options'
 
 interface MaintenanceItem {
   id: string
@@ -65,9 +66,8 @@ export default function MaintenanceListPage() {
   // Tab activo: 'family' (mantenimientos de familias) | 'mine' (mis equipos)
   const [activeTab, setActiveTab] = useState<'family' | 'mine'>(isClient && !canManageInventory ? 'mine' : 'family')
 
-  // Familias de inventario desde el contexto global (cache Redis, sin peticion extra)
-  const { families: rawFamilies } = useInventoryFamilies()
-  const families = rawFamilies.map(f => ({ id: f.id, name: f.name, code: f.code ?? f.name.slice(0, 3).toUpperCase(), color: f.color }))
+  // Familias de inventario desde el contexto global (cache Redis, sin peticion extra) - memoizadas
+  const { families } = useFamilyOptions()
 
   const fetchRecords = useCallback(async () => {
     setLoading(true)

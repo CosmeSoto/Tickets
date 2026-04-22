@@ -11,7 +11,7 @@
  *    y permite asignar/desasignar. Usado en /admin/families/[id] > Tab Personal.
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useMemo } from 'react'
 import { UserPlus, UserMinus, Layers, Search, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -20,7 +20,7 @@ import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
-import { useFamilies } from '@/contexts/families-context'
+import { useFetch } from '@/hooks/common/use-fetch'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -101,47 +101,40 @@ export function TechnicianFamilyAssignment(props: Props) {
 
 function ByTechnicianView({ technicianId, technicianName, onChanged }: ByTechnicianProps) {
   const { toast } = useToast()
-  const [families, setFamilies] = useState<FamilyOption[]>([])
-  const [assignedFamilyIds, setAssignedFamilyIds] = useState<Set<string>>(new Set())
-  const [assignmentIds, setAssignmentIds] = useState<Record<string, string>>({}) // familyId → assignmentId
-  const [activeTicketsByFamily, setActiveTicketsByFamily] = useState<Record<string, number>>({})
-  const [loading, setLoading] = useState(true)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const [familiesRes, assignmentsRes] = await Promise.all([
-        fetch('/api/families?active=true').then((r) => r.json()),
-        fetch(`/api/technician-family-assignments?technicianId=${technicianId}`).then((r) => r.json()),
-      ])
-      if (familiesRes.success) {
-        setFamilies(familiesRes.data.filter((f: FamilyOption) => f.isActive))
-      }
-      if (assignmentsRes.success) {
-        const ids = new Set<string>()
-        const aIds: Record<string, string> = {}
-        const ticketMap: Record<string, number> = {}
-        for (const a of assignmentsRes.data ?? []) {
-          if (a.isActive !== false) {
-            ids.add(a.familyId)
-            aIds[a.familyId] = a.id
-            ticketMap[a.familyId] = a.activeTickets ?? 0
-          }
-        }
-        setAssignedFamilyIds(ids)
-        setAssignmentIds(aIds)
-        setActiveTicketsByFamily(ticketMap)
-      }
-    } catch {
-      // silencioso
-    } finally {
-      setLoading(false)
-    }
-  }, [technicianId])
+  // ✅ Migrado a useFetch — familias activas
+  const { data: families, loading: loadingFamilies } = useFetch<FamilyOption>(
+    '/api/families',
+    { params: { active: true }, transform: (d) => d.data?.filter((f: FamilyOption) => f.isActive) ?? [] }
+  )
 
-  useEffect(() => { load() }, [load])
+  // ✅ Migrado a useFetch — asignaciones del técnico
+  const { data: assignments, loading: loadingAssignments, reload: reloadAssignments } = useFetch(
+    '/api/technician-family-assignments',
+    { params: { technicianId }, transform: (d) => d.data ?? [] }
+  )
+
+  // ✅ Derivados en memoria — sin useEffect ni estado extra
+  const assignedFamilyIds = useMemo(
+    () => new Set(assignments.filter((a: any) => a.isActive !== false).map((a: any) => a.familyId as string)),
+    [assignments]
+  )
+  const assignmentIds = useMemo(
+    () => Object.fromEntries(
+      assignments.filter((a: any) => a.isActive !== false).map((a: any) => [a.familyId, a.id])
+    ) as Record<string, string>,
+    [assignments]
+  )
+  const activeTicketsByFamily = useMemo(
+    () => Object.fromEntries(
+      assignments.filter((a: any) => a.isActive !== false).map((a: any) => [a.familyId, a.activeTickets ?? 0])
+    ) as Record<string, number>,
+    [assignments]
+  )
+
+  const loading = loadingFamilies || loadingAssignments
 
   const handleToggle = async (family: FamilyOption, checked: boolean) => {
     const activeTickets = activeTicketsByFamily[family.id] ?? 0
@@ -173,7 +166,7 @@ function ByTechnicianView({ technicianId, technicianName, onChanged }: ByTechnic
         if (!res.ok || !data.success) throw new Error(data.message || 'Error al desasignar')
         toast({ title: `Desasignado de "${family.name}"` })
       }
-      await load()
+      reloadAssignments() // ✅ Recargar datos actualizados
       onChanged?.()
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error desconocido'
@@ -272,33 +265,23 @@ function ByTechnicianView({ technicianId, technicianName, onChanged }: ByTechnic
 
 function ByFamilyView({ familyId, assignedTechnicians, onChanged }: ByFamilyProps) {
   const { toast } = useToast()
-  const [allTechnicians, setAllTechnicians] = useState<TechnicianOption[]>([])
-  const [loadingUsers, setLoadingUsers] = useState(true)
   const [assigningId, setAssigningId] = useState<string | null>(null)
   const [unassigningId, setUnassigningId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
 
-  // Familias desde el contexto global (cache Redis, sin peticion extra)
-  const { families } = useFamilies()
-
-  const assignedIds = new Set(assignedTechnicians.map((t) => t.technicianId))
-
-  const loadTechnicians = useCallback(async () => {
-    setLoadingUsers(true)
-    try {
-      const res = await fetch('/api/users?role=TECHNICIAN&isActive=true&limit=500')
-      if (res.ok) {
-        const data = await res.json()
-        setAllTechnicians(data.data ?? [])
-      }
-    } catch {
-      // silencioso
-    } finally {
-      setLoadingUsers(false)
+  // ✅ Migrado a useFetch — técnicos activos
+  const { data: allTechnicians, loading: loadingUsers } = useFetch<TechnicianOption>(
+    '/api/users',
+    {
+      params: { role: 'TECHNICIAN', isActive: true, limit: 500 },
+      transform: (d) => d.data ?? []
     }
-  }, [])
+  )
 
-  useEffect(() => { loadTechnicians() }, [loadTechnicians])
+  const assignedIds = useMemo(
+    () => new Set(assignedTechnicians.map((t) => t.technicianId)),
+    [assignedTechnicians]
+  )
 
   const handleAssign = async (userId: string) => {
     setAssigningId(userId)

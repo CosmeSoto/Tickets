@@ -8,6 +8,7 @@ import { EquipmentAssetForm } from '@/components/inventory/asset-forms/Equipment
 import { MROAssetForm } from '@/components/inventory/asset-forms/MROAssetForm'
 import { LicenseAssetForm } from '@/components/inventory/asset-forms/LicenseAssetForm'
 import { useInventoryFamilies } from '@/contexts/families-context'
+import { useFamilyOptions } from '@/hooks/use-family-options'
 
 interface UnifiedAssetFormProps {
   onSuccess?: (asset: unknown) => void
@@ -21,16 +22,14 @@ export function UnifiedAssetForm({ onSuccess, onCancel, defaultFamilyId }: Unifi
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(defaultFamilyId ?? null)
   const [familyConfig, setFamilyConfig] = useState<FamilyConfig | null>(null)
-  const [loadingFamilies, setLoadingFamilies] = useState(true)
   const [loadingConfig, setLoadingConfig] = useState(false)
   const [selectedSubtype, setSelectedSubtype] = useState<AssetSubtype | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [maxFileSizeMB, setMaxFileSizeMB] = useState(10)
 
-  // Familias de inventario desde el contexto global (cache Redis, sin peticion extra)
-  const { families: rawFamilies } = useInventoryFamilies()
-  const families = rawFamilies.map(f => ({ id: f.id, name: f.name, code: f.code ?? f.name.slice(0, 3).toUpperCase(), color: f.color }))
+  // Familias de inventario desde el contexto global (cache Redis, sin peticion extra) - memoizadas
+  const { families, loading: loadingFamilies } = useFamilyOptions()
 
   // Suppress unused warning for onCancel — kept for API compatibility
   void onCancel
@@ -38,10 +37,6 @@ export function UnifiedAssetForm({ onSuccess, onCancel, defaultFamilyId }: Unifi
   const initialized = useRef(false)
 
   useEffect(() => {
-    fetch('/api/inventory/families').then(r => r.json()).then(d => {
-      // families from context
-      setLoadingFamilies(false)
-    }).catch(() => setLoadingFamilies(false))
     fetch('/api/config/upload-limits').then(r => r.json()).then(d => {
       if (d.maxFileSizeMB) setMaxFileSizeMB(d.maxFileSizeMB)
     }).catch(() => {})

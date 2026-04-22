@@ -9,6 +9,7 @@ import { SearchableSelect } from '@/components/ui/searchable-select'
 import { useToast } from '@/hooks/use-toast'
 import type { InlineSelectOption } from '@/components/ui/inline-create-select'
 import { useInventoryFamilies } from '@/contexts/families-context'
+import { useFamilyOptions } from '@/hooks/use-family-options'
 
 interface Props {
   /** Si se pasa, pre-selecciona la familia y la muestra como sugerencia */
@@ -27,9 +28,8 @@ export function WarehouseInlineForm({ defaultFamilyId, onSuccess, onCancel }: Pr
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // Familias de inventario desde el contexto global (cache Redis, sin peticion extra)
-  const { families: rawFamilies } = useInventoryFamilies()
-  const families = rawFamilies.map(f => ({ id: f.id, name: f.name, code: f.code ?? f.name.slice(0, 3).toUpperCase(), color: f.color }))
+  // Familias de inventario desde el contexto global (cache Redis, sin peticion extra) - memoizadas
+  const { families } = useFamilyOptions()
 
   // Familias ya disponibles desde el contexto global
 

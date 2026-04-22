@@ -1,293 +1,382 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import {
+  Plus, Search, RefreshCw, FileSignature,
+  CheckCircle, AlertTriangle, XCircle, Clock, Pencil, Trash2,
+} from 'lucide-react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Search, FileSignature, Monitor, RefreshCw, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
-import { FamilyCombobox, type FamilyOption } from '@/components/ui/family-combobox'
+import { Badge } from '@/components/ui/badge'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
 import { useInventoryFamilies } from '@/contexts/families-context'
+import { useFamilyOptions } from '@/hooks/use-family-options'
+import { useFetch } from '@/hooks/common/use-fetch'
+import { useToast } from '@/hooks/use-toast'
+import { ContractForm } from '@/components/contracts/contract-form'
+import {
+  CONTRACT_STATUS_LABELS,
+  CONTRACT_CATEGORY_LABELS,
+  BILLING_CYCLE_LABELS,
+  type Contract,
+  type ContractStatus,
+  type ContractCategory,
+} from '@/types/contracts'
 
-interface ContractItem {
-  id: string
-  name: string
-  type: 'EQUIPMENT' | 'LICENSE'
-  contractNumber?: string
-  supplier?: string
-  startDate?: string
-  endDate?: string
-  monthlyCost?: number
-  status: 'ACTIVE' | 'EXPIRING' | 'EXPIRED'
-  daysUntilExpiry?: number
-  familyName?: string
-}
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-const STATUS_CONFIG = {
-  ACTIVE:   { label: 'Vigente',       icon: CheckCircle,    cls: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' },
-  EXPIRING: { label: 'Por vencer',    icon: AlertTriangle,  cls: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' },
-  EXPIRED:  { label: 'Vencido',       icon: XCircle,        cls: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' },
-}
-
-const TYPE_CONFIG = {
-  EQUIPMENT: { label: 'Equipo en arrendamiento', icon: Monitor,        cls: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
-  LICENSE:   { label: 'Licencia / Suscripción',  icon: FileSignature,  cls: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400' },
-}
-
-function fmtDate(d?: string) {
+function fmtDate(d?: string | null) {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
-function fmtCurrency(n?: number) {
+function fmtCurrency(n?: number | null, currency = 'USD') {
   if (n == null) return '—'
-  return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(n)
+  return new Intl.NumberFormat('es-CL', { style: 'currency', currency, minimumFractionDigits: 0 }).format(n)
 }
+
+const STATUS_CONFIG: Record<ContractStatus, { label: string; icon: any; cls: string }> = {
+  DRAFT:      { label: 'Borrador',    icon: Clock,          cls: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' },
+  ACTIVE:     { label: 'Vigente',     icon: CheckCircle,    cls: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' },
+  EXPIRING:   { label: 'Por vencer',  icon: AlertTriangle,  cls: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' },
+  EXPIRED:    { label: 'Vencido',     icon: XCircle,        cls: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' },
+  TERMINATED: { label: 'Terminado',   icon: XCircle,        cls: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' },
+  RENEWED:    { label: 'Renovado',    icon: CheckCircle,    cls: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
+}
+
+// ── Página ────────────────────────────────────────────────────────────────────
 
 export default function ContractsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const [items, setItems] = useState<ContractItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [typeFilter, setTypeFilter] = useState<'ALL' | 'EQUIPMENT' | 'LICENSE'>('ALL')
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'EXPIRING' | 'EXPIRED'>('ALL')
-  const [familyFilter, setFamilyFilter] = useState('all')
+  const { toast } = useToast()
 
-  // Familias de inventario desde el contexto global (cache Redis, sin peticion extra)
-  const { families: rawFamilies } = useInventoryFamilies()
-  const families = rawFamilies.map(f => ({ id: f.id, name: f.name, code: f.code ?? f.name.slice(0, 3).toUpperCase(), color: f.color }))
+  const [search, setSearch]               = useState('')
+  const [statusFilter, setStatusFilter]   = useState('ALL')
+  const [categoryFilter, setCategoryFilter] = useState('ALL')
+  const [familyFilter, setFamilyFilter]   = useState('all')
+  const [formOpen, setFormOpen]           = useState(false)
+  const [editingContract, setEditingContract] = useState<Contract | null>(null)
+  const [deletingContract, setDeletingContract] = useState<Contract | null>(null)
+  const [deleting, setDeleting]           = useState(false)
 
-  useEffect(() => {
-    if (status === 'unauthenticated') router.push('/login')
-  }, [status, router])
+  const { families } = useFamilyOptions()
 
-  // Familias ya disponibles desde el contexto global
+  // Carga de contratos con useFetch
+  const buildUrl = useCallback(() => {
+    const p = new URLSearchParams()
+    if (statusFilter   !== 'ALL')  p.set('status',   statusFilter)
+    if (categoryFilter !== 'ALL')  p.set('category', categoryFilter)
+    if (familyFilter   !== 'all')  p.set('familyId', familyFilter)
+    p.set('pageSize', '200')
+    return `/api/contracts?${p}`
+  }, [statusFilter, categoryFilter, familyFilter])
 
-  const fetchContracts = useCallback(async () => {
-    setLoading(true)
-    try {
-      const params = new URLSearchParams()
-      if (familyFilter !== 'all') params.set('familyId', familyFilter)
-      const res = await fetch(`/api/inventory/contracts?${params}`)
-      if (res.ok) {
-        const data = await res.json()
-        setItems(data.items ?? [])
-      }
-    } finally {
-      setLoading(false)
-    }
-  }, [familyFilter])
+  const { data: contractsRaw, loading, reload } = useFetch<Contract>(
+    buildUrl(),
+    { transform: d => d.contracts ?? [] }
+  )
 
-  useEffect(() => { fetchContracts() }, [fetchContracts])
-
-  const filtered = items.filter(item => {
-    if (typeFilter !== 'ALL' && item.type !== typeFilter) return false
-    if (statusFilter !== 'ALL' && item.status !== statusFilter) return false
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      return (
-        item.name.toLowerCase().includes(q) ||
-        (item.contractNumber ?? '').toLowerCase().includes(q) ||
-        (item.supplier ?? '').toLowerCase().includes(q)
-      )
-    }
-    return true
+  // Filtro de búsqueda en cliente
+  const contracts = contractsRaw.filter(c => {
+    if (!search.trim()) return true
+    const q = search.toLowerCase()
+    return (
+      c.name.toLowerCase().includes(q) ||
+      (c.contractNumber ?? '').toLowerCase().includes(q) ||
+      (c.supplier?.name ?? '').toLowerCase().includes(q)
+    )
   })
 
-  // Export
+  // Stats
+  const stats = {
+    total:    contractsRaw.length,
+    active:   contractsRaw.filter(c => c.status === 'ACTIVE').length,
+    expiring: contractsRaw.filter(c => c.status === 'EXPIRING').length,
+    expired:  contractsRaw.filter(c => c.status === 'EXPIRED').length,
+    monthlyCostTotal: contractsRaw.reduce((s, c) => s + (c.monthlyCost ?? 0), 0),
+  }
+
+  // Exportación
   const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
     filename: 'contratos',
-    title: 'Contratos y Suscripciones',
-    getData: () => filtered,
+    title:    'Gestión de Contratos',
+    getData:  () => contracts,
     columns: [
-      { key: 'type', label: 'Tipo', format: v => TYPE_CONFIG[v as keyof typeof TYPE_CONFIG]?.label ?? v },
-      { key: 'name', label: 'Nombre' },
-      { key: 'contractNumber', label: 'N° Contrato', format: v => v ?? '' },
-      { key: 'supplier', label: 'Proveedor', format: v => v ?? '' },
-      { key: 'startDate', label: 'Inicio', format: v => fmtDate(v) },
-      { key: 'endDate', label: 'Vencimiento', format: v => fmtDate(v) },
-      { key: 'monthlyCost', label: 'Costo mensual', format: v => v != null ? String(v) : '' },
-      { key: 'status', label: 'Estado', format: v => STATUS_CONFIG[v as keyof typeof STATUS_CONFIG]?.label ?? v },
-      { key: 'familyName', label: 'Área', format: v => v ?? '' },
+      { key: 'contractNumber', label: 'N° Contrato',    format: v => v ?? '' },
+      { key: 'name',           label: 'Nombre' },
+      { key: 'category',       label: 'Categoría',      format: v => CONTRACT_CATEGORY_LABELS[v as ContractCategory] ?? v },
+      { key: 'supplier',       label: 'Proveedor',      format: v => v?.name ?? '' },
+      { key: 'family',         label: 'Área',           format: v => v?.name ?? '' },
+      { key: 'startDate',      label: 'Inicio',         format: v => fmtDate(v) },
+      { key: 'endDate',        label: 'Vencimiento',    format: v => fmtDate(v) },
+      { key: 'billingCycle',   label: 'Ciclo',          format: (v: any) => BILLING_CYCLE_LABELS[v as keyof typeof BILLING_CYCLE_LABELS] ?? v },
+      { key: 'monthlyCost',    label: 'Costo mensual',  format: v => v != null ? String(v) : '' },
+      { key: 'status',         label: 'Estado',         format: v => CONTRACT_STATUS_LABELS[v as ContractStatus] ?? v },
     ],
   })
 
-  const counts = {
-    total: items.length,
-    active: items.filter(i => i.status === 'ACTIVE').length,
-    expiring: items.filter(i => i.status === 'EXPIRING').length,
-    expired: items.filter(i => i.status === 'EXPIRED').length,
+  const isAdmin = (session?.user as any)?.role === 'ADMIN'
+  const canManage = isAdmin || (session?.user as any)?.canManageInventory
+
+  const handleDelete = async () => {
+    if (!deletingContract) return
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/contracts/${deletingContract.id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error((await res.json()).error)
+      toast({ title: 'Contrato eliminado' })
+      setDeletingContract(null)
+      reload()
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' })
+    } finally {
+      setDeleting(false)
+    }
   }
 
   return (
     <ModuleLayout
-      title="Contratos y Suscripciones"
-      subtitle="Vista unificada de equipos en arrendamiento y licencias con suscripción activa"
+      title="Contratos"
+      subtitle="Gestión centralizada de contratos, arrendamientos y suscripciones"
+      loading={loading && contractsRaw.length === 0}
+      headerActions={
+        canManage ? (
+          <Button size="sm" onClick={() => { setEditingContract(null); setFormOpen(true) }}>
+            <Plus className="h-4 w-4 mr-2" /> Nuevo contrato
+          </Button>
+        ) : undefined
+      }
     >
       <div className="space-y-5">
-        {/* Resumen */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+
+        {/* ── Stats ─────────────────────────────────────────────────────── */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {[
-            { label: 'Total', value: counts.total, cls: 'text-foreground' },
-            { label: 'Vigentes', value: counts.active, cls: 'text-green-600' },
-            { label: 'Por vencer', value: counts.expiring, cls: 'text-amber-600' },
-            { label: 'Vencidos', value: counts.expired, cls: 'text-red-600' },
+            { label: 'Total',        value: stats.total,    cls: 'text-foreground' },
+            { label: 'Vigentes',     value: stats.active,   cls: 'text-green-600' },
+            { label: 'Por vencer',   value: stats.expiring, cls: 'text-amber-600' },
+            { label: 'Vencidos',     value: stats.expired,  cls: 'text-red-600' },
+            { label: 'Costo/mes',    value: fmtCurrency(stats.monthlyCostTotal), cls: 'text-blue-600' },
           ].map(c => (
-            <div key={c.label} className="rounded-lg border border-border bg-card p-4">
-              <p className={`text-2xl font-bold ${c.cls}`}>{c.value}</p>
+            <div key={c.label} className="rounded-lg border bg-card p-4">
+              <p className={`text-xl font-bold ${c.cls}`}>{c.value}</p>
               <p className="text-xs text-muted-foreground mt-0.5">{c.label}</p>
             </div>
           ))}
         </div>
 
-        {/* Filtros */}
+        {/* ── Filtros ───────────────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row gap-2 flex-wrap">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-            <Input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
+            <Input value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Buscar por nombre, N° contrato o proveedor..."
-              className="pl-9"
-            />
+              className="pl-9" />
           </div>
+
           <FamilyCombobox
             families={families}
             value={familyFilter}
             onValueChange={v => setFamilyFilter(v || 'all')}
-            allowNull
-            nullLabel="Todas las áreas"
+            allowAll
+            allowClear
             popoverWidth="220px"
           />
-          <select
-            value={typeFilter}
-            onChange={e => setTypeFilter(e.target.value as typeof typeFilter)}
-            className="flex h-10 rounded-md border border-border bg-card px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-52"
-          >
-            <option value="ALL">Todos los tipos</option>
-            <option value="EQUIPMENT">Equipos arrendados</option>
-            <option value="LICENSE">Licencias / Suscripciones</option>
-          </select>
-          <select
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value as typeof statusFilter)}
-            className="flex h-10 rounded-md border border-border bg-card px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-44"
-          >
-            <option value="ALL">Todos los estados</option>
-            <option value="ACTIVE">Vigentes</option>
-            <option value="EXPIRING">Por vencer</option>
-            <option value="EXPIRED">Vencidos</option>
-          </select>
-          <button
-            type="button"
-            onClick={fetchContracts}
-            className="flex h-10 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm hover:bg-accent transition-colors"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </button>
+
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="w-auto min-w-[180px]">
+              <SelectValue placeholder="Categoría" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Todas las categorías</SelectItem>
+              {Object.entries(CONTRACT_CATEGORY_LABELS).map(([k, v]) => (
+                <SelectItem key={k} value={k}>{v}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-auto min-w-[160px]">
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Todos los estados</SelectItem>
+              {Object.entries(CONTRACT_STATUS_LABELS).map(([k, v]) => (
+                <SelectItem key={k} value={k}>{v}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Button variant="outline" size="icon" onClick={reload} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+
           <ExportButton
             onExportCSV={exportCSV}
             onExportExcel={exportExcel}
             onExportPDF={exportPDF}
             loading={exporting}
-            size="sm"
+            disabled={contracts.length === 0}
           />
         </div>
 
-        {/* Tabla */}
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="min-w-full divide-y divide-border text-sm">
-            <thead className="bg-muted/50">
-              <tr>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Tipo</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Nombre</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground hidden md:table-cell">N° Contrato</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground hidden lg:table-cell">Proveedor</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground hidden lg:table-cell">Vencimiento</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground hidden xl:table-cell">Costo mensual</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Estado</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border bg-card">
-              {loading ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                      Cargando contratos…
-                    </div>
-                  </td>
-                </tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
-                    {items.length === 0
-                      ? 'No hay contratos registrados. Los contratos aparecen aquí cuando creas equipos en arrendamiento o licencias con suscripción.'
-                      : 'Sin resultados para los filtros aplicados.'}
-                  </td>
-                </tr>
-              ) : (
-                filtered.map(item => {
-                  const typeCfg = TYPE_CONFIG[item.type]
-                  const statusCfg = STATUS_CONFIG[item.status]
-                  const TypeIcon = typeCfg.icon
-                  const StatusIcon = statusCfg.icon
-                  return (
-                    <tr
-                      key={`${item.type}-${item.id}`}
-                      className="cursor-pointer hover:bg-muted/50 transition-colors"
-                      onClick={() => router.push(
-                        item.type === 'EQUIPMENT'
-                          ? `/inventory/equipment/${item.id}`
-                          : `/inventory/licenses/${item.id}`
-                      )}
-                    >
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${typeCfg.cls}`}>
-                          <TypeIcon className="h-3 w-3" />
-                          <span className="hidden sm:inline">{typeCfg.label}</span>
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-medium text-foreground">{item.name}</td>
-                      <td className="px-4 py-3 text-muted-foreground font-mono text-xs hidden md:table-cell">
-                        {item.contractNumber ?? '—'}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell">{item.supplier ?? '—'}</td>
-                      <td className="px-4 py-3 hidden lg:table-cell">
-                        <span className={item.status !== 'ACTIVE' ? 'font-medium' : ''}>
-                          {fmtDate(item.endDate)}
-                        </span>
-                        {item.daysUntilExpiry != null && item.daysUntilExpiry >= 0 && item.status !== 'ACTIVE' && (
-                          <span className="ml-1 text-xs text-muted-foreground">
-                            ({item.daysUntilExpiry}d)
+        {/* ── Tabla ─────────────────────────────────────────────────────── */}
+        {contracts.length === 0 && !loading ? (
+          <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+            <FileSignature className="h-12 w-12 mb-4 opacity-30" />
+            <p className="text-sm">
+              {search || statusFilter !== 'ALL' || categoryFilter !== 'ALL'
+                ? 'No se encontraron contratos con los filtros aplicados'
+                : 'No hay contratos registrados'}
+            </p>
+            {canManage && !search && (
+              <Button variant="outline" size="sm" className="mt-4"
+                onClick={() => { setEditingContract(null); setFormOpen(true) }}>
+                <Plus className="h-4 w-4 mr-2" /> Crear primer contrato
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="rounded-lg border overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50 border-b">
+                  <tr>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Contrato</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Categoría</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Proveedor</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Área</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Vencimiento</th>
+                    <th className="text-right px-4 py-3 font-medium text-muted-foreground">Costo/mes</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Estado</th>
+                    {canManage && <th className="px-4 py-3" />}
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {contracts.map(c => {
+                    const sc = STATUS_CONFIG[c.status] ?? STATUS_CONFIG.DRAFT
+                    const StatusIcon = sc.icon
+                    return (
+                      <tr key={c.id} className="hover:bg-muted/30 transition-colors">
+                        <td className="px-4 py-3">
+                          <p className="font-medium leading-none">{c.name}</p>
+                          {c.contractNumber && (
+                            <p className="text-xs text-muted-foreground mt-0.5 font-mono">{c.contractNumber}</p>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {CONTRACT_CATEGORY_LABELS[c.category] ?? c.category}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {c.supplier?.name ?? '—'}
+                        </td>
+                        <td className="px-4 py-3">
+                          {c.family ? (
+                            <span className="inline-flex items-center gap-1.5 text-xs">
+                              {c.family.color && (
+                                <span className="w-2 h-2 rounded-full flex-shrink-0"
+                                  style={{ backgroundColor: c.family.color }} />
+                              )}
+                              {c.family.name}
+                            </span>
+                          ) : <span className="text-muted-foreground">—</span>}
+                        </td>
+                        <td className="px-4 py-3">
+                          <p className="text-sm">{fmtDate(c.endDate)}</p>
+                          {c.daysUntilExpiry != null && c.status === 'EXPIRING' && (
+                            <p className="text-xs text-amber-600 mt-0.5">
+                              {c.daysUntilExpiry} días
+                            </p>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono text-sm">
+                          {fmtCurrency(c.monthlyCost, c.currency)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${sc.cls}`}>
+                            <StatusIcon className="h-3 w-3" />
+                            {sc.label}
                           </span>
+                        </td>
+                        {canManage && (
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1 justify-end">
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
+                                onClick={() => { setEditingContract(c); setFormOpen(true) }}>
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              {isAdmin && (
+                                <Button variant="ghost" size="sm"
+                                  className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => setDeletingContract(c)}>
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </div>
+                          </td>
                         )}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground hidden xl:table-cell">{fmtCurrency(item.monthlyCost)}</td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${statusCfg.cls}`}>
-                          <StatusIcon className="h-3 w-3" />
-                          {statusCfg.label}
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {filtered.length > 0 && (
-          <p className="text-xs text-muted-foreground text-right">
-            {filtered.length} contrato{filtered.length !== 1 ? 's' : ''}
-            {filtered.length !== items.length && ` de ${items.length}`}
-          </p>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
         )}
       </div>
+
+      {/* ── Modal formulario ──────────────────────────────────────────────── */}
+      <Dialog open={formOpen} onOpenChange={open => { if (!open) { setFormOpen(false); setEditingContract(null) } }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingContract ? 'Editar contrato' : 'Nuevo contrato'}
+            </DialogTitle>
+          </DialogHeader>
+          <ContractForm
+            contract={editingContract}
+            onSuccess={() => { setFormOpen(false); setEditingContract(null); reload() }}
+            onCancel={() => { setFormOpen(false); setEditingContract(null) }}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Confirmar eliminación ─────────────────────────────────────────── */}
+      <AlertDialog open={!!deletingContract} onOpenChange={open => { if (!open) setDeletingContract(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar contrato?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará <strong>{deletingContract?.name}</strong> y todas sus líneas y adjuntos.
+              Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deleting ? 'Eliminando...' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </ModuleLayout>
   )
 }

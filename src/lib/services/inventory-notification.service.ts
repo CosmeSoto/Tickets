@@ -1,4 +1,3 @@
-import { PrismaClient } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import { generateDeliveryActCreatedEmail } from '../email-templates/inventory/delivery-act-created'
 import { generateDeliveryActReminderEmail } from '../email-templates/inventory/delivery-act-reminder'
@@ -7,8 +6,7 @@ import { generateDeliveryActRejectedEmail } from '../email-templates/inventory/d
 import { generateDeliveryActExpiredEmail } from '../email-templates/inventory/delivery-act-expired'
 import type { DeliveryAct } from '@/types/inventory/delivery-act'
 import { NotificationService } from './notification-service'
-
-const prisma = new PrismaClient()
+import { db as prisma } from '@/lib/server'
 
 // Helper para parsear JSON de forma segura
 function parseJsonField<T>(field: any): T {

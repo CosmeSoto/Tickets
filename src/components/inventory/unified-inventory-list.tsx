@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { safeFetch } from '@/lib/auth-fetch'
@@ -11,6 +11,8 @@ import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
 import { Search } from 'lucide-react'
 import type { AssetSubtype } from '@/lib/inventory/family-config'
+import { useInventoryFamilies } from '@/contexts/families-context'
+import { useFamilyOptions } from '@/hooks/use-family-options'
 
 interface Family {
   id: string
@@ -97,7 +99,21 @@ export function UnifiedInventoryList({ initialFamilyId, personalOnly = false }: 
   const [selectedSubtype, setSelectedSubtype] = useState<AssetSubtype | ''>('')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [families, setFamilies] = useState<Family[]>([])
+
+  // ✅ Familias desde contexto global — sin petición extra (memoizadas)
+  const { families } = useFamilyOptions()
+  
+  // Memoizar opciones de familias para FamilyCombobox
+  const familyComboboxOptions = useMemo(
+    () => families.map(f => ({ 
+      id: f.id, 
+      name: f.name, 
+      code: f.code, 
+      color: f.color 
+    })),
+    [families]
+  )
+  
   const [assets, setAssets] = useState<UnifiedAsset[]>([])
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
@@ -109,17 +125,6 @@ export function UnifiedInventoryList({ initialFamilyId, personalOnly = false }: 
     const t = setTimeout(() => setDebouncedSearch(search), 350)
     return () => clearTimeout(t)
   }, [search])
-
-  useEffect(() => {
-    if (status !== 'authenticated') return
-    safeFetch('/api/inventory/families')
-      .then(r => r?.json())
-      .then(data => {
-        if (!data) return
-        if (Array.isArray(data)) setFamilies(data)
-        else if (Array.isArray(data?.families)) setFamilies(data.families)
-      })
-  }, [status])
 
   const fetchAssets = useCallback(
     async (familyId: string | null, subtype: AssetSubtype | '', q: string, currentPage: number) => {
@@ -186,7 +191,7 @@ export function UnifiedInventoryList({ initialFamilyId, personalOnly = false }: 
         {/* Área (familia) — combobox con buscador, solo en modo inventario de familias */}
         {!personalOnly && families.length > 1 && (
           <FamilyCombobox
-            families={families.map(f => ({ id: f.id, name: f.name, code: f.name.slice(0, 3).toUpperCase(), color: f.color }))}
+            families={familyComboboxOptions}
             value={selectedFamilyId ?? 'all'}
             onValueChange={(v) => handleFamilyChange(v === 'all' ? null : v)}
             allowAll

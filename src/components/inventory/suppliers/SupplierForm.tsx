@@ -14,6 +14,7 @@ import { CatalogTypeInlineForm } from '@/components/inventory/asset-forms/Catalo
 import { useFormSubmit } from '@/hooks/common/use-form-submit'
 import { useFetch } from '@/hooks/common/use-fetch'
 import { useInventoryFamilies } from '@/contexts/families-context'
+import { useFamilyOptions } from '@/hooks/use-family-options'
 
 const supplierSchema = z.object({
   name: z.string().min(1, 'El nombre del proveedor es obligatorio').max(200),
@@ -46,9 +47,8 @@ export function SupplierForm({ supplier, defaultFamilyId, onSuccess, onCancel }:
   const [typeId, setTypeId] = useState<string>(supplier?.typeId ?? '')
   const [familyId, setFamilyId] = useState<string>(supplier?.familyId ?? defaultFamilyId ?? '')
 
-  // Familias de inventario desde el contexto global (cache Redis, sin peticion extra)
-  const { families: rawFamilies } = useInventoryFamilies()
-  const families = rawFamilies.map(f => ({ id: f.id, name: f.name, code: f.code ?? f.name.slice(0, 3).toUpperCase(), color: f.color }))
+  // Familias de inventario desde el contexto global (cache Redis, sin peticion extra) - memoizadas
+  const { families } = useFamilyOptions()
 
   // Cargar tipos filtrados por familia
   const { data: supplierTypes, setData: setSupplierTypes } = useFetch<SupplierType>(

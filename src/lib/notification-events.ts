@@ -1,13 +1,14 @@
 /**
  * Pub/Sub de notificaciones en tiempo real.
  *
- * Usa Redis Pub/Sub para cruzar entre procesos/workers en producción.
+ * Usa Redis Pub/Sub (getRedisPub / getRedisSub de @/lib/server) para
+ * cruzar entre procesos/workers en producción.
  * Fallback a globalThis (in-memory) si Redis no está disponible.
  *
  * Canal Redis: "notifications:{userId}"
  */
 
-import Redis from 'ioredis'
+import { getRedisPub, getRedisSub } from '@/lib/server'
 
 type Subscriber = (data: string) => void
 
@@ -21,31 +22,9 @@ function getLocalSubscribers(): Map<string, Set<Subscriber>> {
   return (globalThis as any)[GLOBAL_KEY]
 }
 
-// ── Redis subscriber singleton ────────────────────────────────────────────────
-const REDIS_SUB_KEY = '__notificationRedisSubscriber__'
-
-function getRedisSubscriber(): Redis | null {
-  if (!(globalThis as any)[REDIS_SUB_KEY]) {
-    if (!process.env.REDIS_URL) return null
-    try {
-      const sub = new Redis(process.env.REDIS_URL, {
-        lazyConnect: true,
-        maxRetriesPerRequest: 1,
-        connectTimeout: 3000,
-        family: 4,
-      })
-      sub.on('error', () => { /* silencioso — fallback a in-memory */ })
-      ;(globalThis as any)[REDIS_SUB_KEY] = sub
-    } catch {
-      return null
-    }
-  }
-  return (globalThis as any)[REDIS_SUB_KEY] as Redis
-}
-
-// Suscribir el proceso actual a los mensajes Redis de un userId
+// ── Suscripción Redis por userId ──────────────────────────────────────────────
 async function ensureRedisSubscription(userId: string) {
-  const sub = getRedisSubscriber()
+  const sub = getRedisSub()
   if (!sub) return
 
   const channel = `notifications:${userId}`
@@ -60,29 +39,7 @@ async function ensureRedisSubscription(userId: string) {
         })
       }
     })
-  } catch { /* Redis no disponible */ }
-}
-
-// ── Publisher singleton (distinto del subscriber) ────────────────────────────
-const REDIS_PUB_KEY = '__notificationRedisPublisher__'
-
-function getRedisPublisher(): Redis | null {
-  if (!(globalThis as any)[REDIS_PUB_KEY]) {
-    if (!process.env.REDIS_URL) return null
-    try {
-      const pub = new Redis(process.env.REDIS_URL, {
-        lazyConnect: true,
-        maxRetriesPerRequest: 1,
-        connectTimeout: 3000,
-        family: 4,
-      })
-      pub.on('error', () => { /* silencioso */ })
-      ;(globalThis as any)[REDIS_PUB_KEY] = pub
-    } catch {
-      return null
-    }
-  }
-  return (globalThis as any)[REDIS_PUB_KEY] as Redis
+  } catch { /* Redis no disponible — fallback in-memory */ }
 }
 
 // ── API pública ───────────────────────────────────────────────────────────────
@@ -91,7 +48,6 @@ export const NotificationEvents = {
     const subscribers = getLocalSubscribers()
     if (!subscribers.has(userId)) {
       subscribers.set(userId, new Set())
-      // Suscribir al canal Redis de este usuario (async, no bloquea)
       ensureRedisSubscription(userId).catch(() => { /* fallback in-memory */ })
     }
     subscribers.get(userId)!.add(fn)
@@ -117,7 +73,7 @@ export const NotificationEvents = {
     }
 
     // 2. Publicar en Redis para otros procesos/workers
-    const pub = getRedisPublisher()
+    const pub = getRedisPub()
     if (pub) {
       pub.publish(`notifications:${userId}`, payload).catch(() => { /* Redis no disponible */ })
     }
