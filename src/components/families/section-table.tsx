@@ -1,10 +1,5 @@
 'use client'
 
-/**
- * SectionTable y HelpTip — componentes reutilizables extraídos de /inventory/families/page.tsx
- * Usados en TabInventario para mostrar/editar secciones visibles y obligatorias.
- */
-
 import { Checkbox } from '@/components/ui/checkbox'
 import {
   Tooltip,
@@ -31,7 +26,6 @@ export const SECTION_DESCRIPTIONS: Record<FormSection, string> = {
   WAREHOUSE: 'Bodega de almacenamiento del activo',
 }
 
-/** Tooltip de ayuda reutilizable */
 export function HelpTip({ text }: { text: string }) {
   return (
     <TooltipProvider delayDuration={200}>
@@ -47,7 +41,6 @@ export function HelpTip({ text }: { text: string }) {
   )
 }
 
-/** Tabla reutilizable de secciones visible/obligatoria */
 export function SectionTable({
   sections,
   visible,
@@ -80,7 +73,7 @@ export function SectionTable({
           <th className="text-center py-2 font-medium text-muted-foreground w-24">
             <span className="flex items-center justify-center gap-1">
               Obligatoria
-              <HelpTip text="El usuario debe completar esta sección para poder guardar el activo. Activar esto también activa Visible." />
+              <HelpTip text="El usuario debe completar esta sección para guardar el activo. Activar esto también activa Visible." />
             </span>
           </th>
         </tr>

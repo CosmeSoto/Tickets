@@ -376,7 +376,11 @@ export function TabGeneral({ family, departments, onFamilyUpdated, onDepartments
           ) : (
             <div className="divide-y">
               {departments.map((dept) => (
-                <div key={dept.id} className="flex items-center justify-between px-6 py-3 hover:bg-muted/40">
+                <div
+                  key={dept.id}
+                  className="flex items-center justify-between px-6 py-3 hover:bg-muted/40 cursor-pointer transition-colors"
+                  onClick={() => openEditDept(dept)}
+                >
                   <div className="flex items-center gap-3">
                     <div
                       className="w-3 h-3 rounded-full flex-shrink-0"
@@ -389,7 +393,7 @@ export function TabGeneral({ family, departments, onFamilyUpdated, onDepartments
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
                     {dept._count && (
                       <span className="text-xs text-muted-foreground mr-2">
                         {dept._count.users ?? 0} usuarios
@@ -422,6 +426,7 @@ export function TabGeneral({ family, departments, onFamilyUpdated, onDepartments
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </div>
                 </div>
               ))}

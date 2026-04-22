@@ -2,11 +2,9 @@
 
 import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { useSession } from 'next-auth/react'
 import {
-  Settings, Package, Save, RefreshCw, XCircle,
-  Layers, ChevronRight, Box, FileText, Warehouse,
-  TrendingDown, FileCheck, Info, ExternalLink,
+  Package, Save, RefreshCw, XCircle, Layers, ChevronRight,
+  Info, Settings, TrendingDown, FileText, Box,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -14,18 +12,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { FamilyIcon } from '@/components/inventory/family-badge'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
-import { Checkbox } from '@/components/ui/checkbox'
+import { SectionTable } from '@/components/families/section-table'
+import type {
+  AssetSubtype, FormSection, AcquisitionMode, ModeSectionConfig,
+} from '@/lib/inventory/family-config-types'
+import { DEFAULT_FAMILY_CONFIG, DEFAULT_MODE_CONFIG } from '@/lib/inventory/family-config-types'
+
+// ── Types ──────────────────────────────────────────────────────────────────
 
 interface Family {
   id: string
@@ -36,35 +38,56 @@ interface Family {
   isActive: boolean
 }
 
-interface InventoryFamilyConfig {
-  id?: string
+interface RawConfig {
   familyId: string
-  allowedSubtypes: string[]
-  visibleSections: string[]
-  requiredSections: string[]
-  requireFinancialForNew: boolean
-  sectionsByMode?: Record<string, { visible: string[]; required: string[] }> | null
+  allowedSubtypes?: string[]
+  visibleSections?: string[]
+  requiredSections?: string[]
+  requireFinancialForNew?: boolean
+  sectionsByMode?: Record<string, unknown> | null
   defaultDepreciationMethod?: string | null
   defaultUsefulLifeYears?: number | null
   defaultResidualValuePct?: number | null
   codePrefix?: string | null
-  autoApproveDecommission: boolean
-  requireDeliveryAct: boolean
-  inventoryEnabled?: boolean
+  autoApproveDecommission?: boolean
+  requireDeliveryAct?: boolean
 }
 
-const ASSET_SUBTYPES = [
-  { value: 'EQUIPMENT', label: 'Equipos', icon: Box, description: 'Activos fijos y equipamiento' },
-  { value: 'MRO', label: 'MRO', icon: Package, description: 'Mantenimiento, reparación y operaciones' },
-  { value: 'LICENSE', label: 'Licencias', icon: FileText, description: 'Software y licencias digitales' },
-]
+interface FormState {
+  allowedSubtypes: AssetSubtype[]
+  visibleSections: FormSection[]
+  requiredSections: FormSection[]
+  requireFinancialForNew: boolean
+  sectionsByMode: Partial<Record<AcquisitionMode, ModeSectionConfig>>
+  defaultDepreciationMethod: string | null
+  defaultUsefulLifeYears: string
+  defaultResidualValuePct: string
+  codePrefix: string
+  autoApproveDecommission: boolean
+  requireDeliveryAct: boolean
+}
 
-const FORM_SECTIONS = [
-  { value: 'FINANCIAL', label: 'Financiero', description: 'Costo, valor, proveedor' },
-  { value: 'DEPRECIATION', label: 'Depreciación', description: 'Método, vida útil, valor residual' },
-  { value: 'CONTRACT', label: 'Contrato', description: 'Vinculación con contratos' },
-  { value: 'STOCK_MRO', label: 'Stock MRO', description: 'Inventario y existencias' },
-  { value: 'WAREHOUSE', label: 'Almacén', description: 'Ubicación física' },
+// ── Constants ──────────────────────────────────────────────────────────────
+
+const ALL_SUBTYPES: AssetSubtype[] = ['EQUIPMENT', 'MRO', 'LICENSE']
+const ALL_SECTIONS: FormSection[] = ['FINANCIAL', 'DEPRECIATION', 'CONTRACT', 'STOCK_MRO', 'WAREHOUSE']
+
+const SUBTYPE_LABELS: Record<AssetSubtype, string> = {
+  EQUIPMENT: 'Equipo Físico',
+  MRO: 'Material MRO',
+  LICENSE: 'Contrato / Licencia',
+}
+
+const SUBTYPE_DESCRIPTIONS: Record<AssetSubtype, string> = {
+  EQUIPMENT: 'Activos fijos y equipamiento físico',
+  MRO: 'Mantenimiento, reparación y operaciones',
+  LICENSE: 'Software, licencias y contratos digitales',
+}
+
+const ACQUISITION_MODES: { value: AcquisitionMode; label: string; help: string }[] = [
+  { value: 'FIXED_ASSET', label: 'Activo Fijo', help: 'Compra directa — se deprecia' },
+  { value: 'RENTAL', label: 'Arrendamiento', help: 'Pago mensual al proveedor' },
+  { value: 'LOAN', label: 'Activo de Tercero', help: 'Préstamo sin costo' },
 ]
 
 const DEPRECIATION_METHODS = [
@@ -73,22 +96,53 @@ const DEPRECIATION_METHODS = [
   { value: 'UNITS_OF_PRODUCTION', label: 'Unidades de Producción' },
 ]
 
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function buildForm(cfg: RawConfig | null): FormState {
+  const sectionsByMode: Partial<Record<AcquisitionMode, ModeSectionConfig>> = {}
+  if (cfg?.sectionsByMode && typeof cfg.sectionsByMode === 'object') {
+    for (const mode of ['FIXED_ASSET', 'RENTAL', 'LOAN'] as AcquisitionMode[]) {
+      const raw = (cfg.sectionsByMode as Record<string, unknown>)[mode]
+      if (raw && typeof raw === 'object') {
+        const r = raw as Record<string, unknown>
+        sectionsByMode[mode] = {
+          visible: Array.isArray(r.visible) ? (r.visible as FormSection[]) : [],
+          required: Array.isArray(r.required) ? (r.required as FormSection[]) : [],
+        }
+      }
+    }
+  }
+  return {
+    allowedSubtypes: (cfg?.allowedSubtypes as AssetSubtype[]) ?? DEFAULT_FAMILY_CONFIG.allowedSubtypes,
+    visibleSections: (cfg?.visibleSections as FormSection[]) ?? DEFAULT_FAMILY_CONFIG.visibleSections,
+    requiredSections: (cfg?.requiredSections as FormSection[]) ?? DEFAULT_FAMILY_CONFIG.requiredSections,
+    requireFinancialForNew: cfg?.requireFinancialForNew ?? true,
+    sectionsByMode,
+    defaultDepreciationMethod: cfg?.defaultDepreciationMethod ?? null,
+    defaultUsefulLifeYears: cfg?.defaultUsefulLifeYears != null ? String(cfg.defaultUsefulLifeYears) : '',
+    defaultResidualValuePct: cfg?.defaultResidualValuePct != null ? String(cfg.defaultResidualValuePct) : '',
+    codePrefix: cfg?.codePrefix ?? '',
+    autoApproveDecommission: cfg?.autoApproveDecommission ?? false,
+    requireDeliveryAct: cfg?.requireDeliveryAct ?? true,
+  }
+}
+
+// ── Main component ─────────────────────────────────────────────────────────
+
 function InventorySettingsContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { toast } = useToast()
-  const { data: session } = useSession()
-  // isSuperAdmin available for future role-based restrictions
-  void session
 
   const [families, setFamilies] = useState<Family[]>([])
-  const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(
-    searchParams.get('familyId')
-  )
-  const [config, setConfig] = useState<InventoryFamilyConfig | null>(null)
+  const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(searchParams.get('familyId'))
+  const [form, setForm] = useState<FormState>(buildForm(null))
   const [loadingFamilies, setLoadingFamilies] = useState(true)
   const [loadingConfig, setLoadingConfig] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [residualError, setResidualError] = useState<string | null>(null)
+  const [activeModeTab, setActiveModeTab] = useState<AcquisitionMode>('FIXED_ASSET')
+  const [useModeConfig, setUseModeConfig] = useState(false)
 
   const loadFamilies = useCallback(async () => {
     setLoadingFamilies(true)
@@ -109,11 +163,8 @@ function InventorySettingsContent() {
       const res = await fetch(`/api/inventory/family-config/${familyId}`)
       const data = await res.json()
       if (data.success) {
-        setConfig(data.data)
-        // Mostrar sección avanzada si hay configuración por modo
-        if (data.data.sectionsByMode) {
-          setShowAdvanced(true)
-        }
+        setForm(buildForm(data.data))
+        setUseModeConfig(!!data.data.sectionsByMode && Object.keys(data.data.sectionsByMode).length > 0)
       }
     } catch {
       toast({ title: 'Error', description: 'Error al cargar configuración', variant: 'destructive' })
@@ -122,33 +173,93 @@ function InventorySettingsContent() {
     }
   }, [toast])
 
-  useEffect(() => {
-    loadFamilies()
-  }, [loadFamilies])
+  useEffect(() => { loadFamilies() }, [loadFamilies])
+  useEffect(() => { if (selectedFamilyId) loadConfig(selectedFamilyId) }, [selectedFamilyId, loadConfig])
 
-  useEffect(() => {
-    if (selectedFamilyId) loadConfig(selectedFamilyId)
-  }, [selectedFamilyId, loadConfig])
+  const setField = <K extends keyof FormState>(key: K, value: FormState[K]) =>
+    setForm(prev => ({ ...prev, [key]: value }))
 
-  const handleSelectFamily = (familyId: string) => {
-    setSelectedFamilyId(familyId)
-    router.replace(`/admin/settings/inventory?familyId=${familyId}`, { scroll: false })
+  const toggleSubtype = (subtype: AssetSubtype) =>
+    setField('allowedSubtypes', form.allowedSubtypes.includes(subtype)
+      ? form.allowedSubtypes.filter(s => s !== subtype)
+      : [...form.allowedSubtypes, subtype])
+
+  const toggleVisible = (section: FormSection, checked: boolean) => {
+    if (checked) {
+      setField('visibleSections', [...form.visibleSections, section])
+    } else {
+      setForm(prev => ({
+        ...prev,
+        visibleSections: prev.visibleSections.filter(s => s !== section),
+        requiredSections: prev.requiredSections.filter(s => s !== section),
+      }))
+    }
+  }
+
+  const toggleRequired = (section: FormSection, checked: boolean) => {
+    if (checked) {
+      setForm(prev => ({
+        ...prev,
+        requiredSections: [...prev.requiredSections, section],
+        visibleSections: prev.visibleSections.includes(section) ? prev.visibleSections : [...prev.visibleSections, section],
+      }))
+    } else {
+      setField('requiredSections', form.requiredSections.filter(s => s !== section))
+    }
+  }
+
+  const getModeConfig = (mode: AcquisitionMode): ModeSectionConfig =>
+    form.sectionsByMode[mode] ?? { ...DEFAULT_MODE_CONFIG }
+
+  const setModeVisible = (mode: AcquisitionMode, section: FormSection, checked: boolean) => {
+    const current = getModeConfig(mode)
+    const visible = checked ? [...current.visible, section] : current.visible.filter(s => s !== section)
+    const required = checked ? current.required : current.required.filter(s => s !== section)
+    setForm(prev => ({ ...prev, sectionsByMode: { ...prev.sectionsByMode, [mode]: { visible, required } } }))
+  }
+
+  const setModeRequired = (mode: AcquisitionMode, section: FormSection, checked: boolean) => {
+    const current = getModeConfig(mode)
+    const required = checked ? [...current.required, section] : current.required.filter(s => s !== section)
+    const visible = checked
+      ? current.visible.includes(section) ? current.visible : [...current.visible, section]
+      : current.visible
+    setForm(prev => ({ ...prev, sectionsByMode: { ...prev.sectionsByMode, [mode]: { visible, required } } }))
+  }
+
+  const validateResidual = (val: string) => {
+    if (val === '') { setResidualError(null); return }
+    const n = parseFloat(val)
+    if (isNaN(n) || n < 0 || n > 100) setResidualError('Debe ser un valor entre 0 y 100')
+    else setResidualError(null)
   }
 
   const handleSave = async () => {
-    if (!config || !selectedFamilyId) return
-
+    if (!selectedFamilyId) return
+    if (residualError) return
     setSaving(true)
     try {
+      const payload = {
+        allowedSubtypes: form.allowedSubtypes,
+        visibleSections: form.visibleSections,
+        requiredSections: form.requiredSections,
+        requireFinancialForNew: form.requireFinancialForNew,
+        sectionsByMode: useModeConfig ? form.sectionsByMode : null,
+        defaultDepreciationMethod: form.defaultDepreciationMethod || null,
+        defaultUsefulLifeYears: form.defaultUsefulLifeYears ? parseFloat(form.defaultUsefulLifeYears) : null,
+        defaultResidualValuePct: form.defaultResidualValuePct ? parseFloat(form.defaultResidualValuePct) : null,
+        codePrefix: form.codePrefix || null,
+        autoApproveDecommission: form.autoApproveDecommission,
+        requireDeliveryAct: form.requireDeliveryAct,
+      }
       const res = await fetch(`/api/inventory/family-config/${selectedFamilyId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
+        body: JSON.stringify(payload),
       })
       const data = await res.json()
       if (data.success) {
         toast({ title: 'Guardado', description: 'Configuración actualizada correctamente' })
-        loadConfig(selectedFamilyId)
       } else {
         toast({ title: 'Error', description: data.error || 'Error al guardar', variant: 'destructive' })
       }
@@ -159,26 +270,12 @@ function InventorySettingsContent() {
     }
   }
 
-  const toggleSubtype = (subtype: string) => {
-    if (!config) return
-    const current = config.allowedSubtypes || []
-    const next = current.includes(subtype)
-      ? current.filter((s) => s !== subtype)
-      : [...current, subtype]
-    setConfig({ ...config, allowedSubtypes: next })
+  const handleSelectFamily = (familyId: string) => {
+    setSelectedFamilyId(familyId)
+    router.replace(`/admin/settings/inventory?familyId=${familyId}`, { scroll: false })
   }
 
-  const toggleSection = (section: string, type: 'visible' | 'required') => {
-    if (!config) return
-    const key = type === 'visible' ? 'visibleSections' : 'requiredSections'
-    const current = config[key] || []
-    const next = current.includes(section)
-      ? current.filter((s) => s !== section)
-      : [...current, section]
-    setConfig({ ...config, [key]: next })
-  }
-
-  const selectedFamily = families.find((f) => f.id === selectedFamilyId)
+  const selectedFamily = families.find(f => f.id === selectedFamilyId)
 
   return (
     <ModuleLayout
@@ -190,7 +287,7 @@ function InventorySettingsContent() {
             <RefreshCw className={`h-4 w-4 ${loadingFamilies ? 'animate-spin' : ''} sm:mr-2`} />
             <span className="hidden sm:inline">Recargar</span>
           </Button>
-          <Button onClick={handleSave} disabled={saving || !config}>
+          <Button onClick={handleSave} disabled={saving || !selectedFamilyId || !!residualError}>
             <Save className={`h-4 w-4 ${saving ? 'animate-spin' : ''} sm:mr-2`} />
             <span className="hidden sm:inline">{saving ? 'Guardando...' : 'Guardar cambios'}</span>
           </Button>
@@ -209,9 +306,11 @@ function InventorySettingsContent() {
           </TabsTrigger>
         </TabsList>
 
-        {/* TAB: POR ÁREA */}
+        {/* ── TAB: POR ÁREA ── */}
         <TabsContent value="areas">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            {/* Family list */}
             <div className="lg:col-span-1">
               <Card>
                 <CardHeader className="pb-2">
@@ -219,9 +318,7 @@ function InventorySettingsContent() {
                     <Layers className="h-4 w-4" />
                     Áreas
                   </CardTitle>
-                  <CardDescription>
-                    Selecciona un área para configurar su inventario
-                  </CardDescription>
+                  <CardDescription>Selecciona un área para configurar su inventario</CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">
                   {loadingFamilies ? (
@@ -230,7 +327,7 @@ function InventorySettingsContent() {
                     </div>
                   ) : (
                     <div className="divide-y">
-                      {families.map((family) => (
+                      {families.map(family => (
                         <div
                           key={family.id}
                           className={`flex items-center justify-between p-3 hover:bg-muted/50 transition-colors cursor-pointer ${
@@ -239,7 +336,7 @@ function InventorySettingsContent() {
                           onClick={() => handleSelectFamily(family.id)}
                           role="button"
                           tabIndex={0}
-                          onKeyDown={(e) => e.key === 'Enter' && handleSelectFamily(family.id)}
+                          onKeyDown={e => e.key === 'Enter' && handleSelectFamily(family.id)}
                         >
                           <div className="flex items-center gap-2 min-w-0 flex-1">
                             <div
@@ -262,6 +359,7 @@ function InventorySettingsContent() {
               </Card>
             </div>
 
+            {/* Config panel */}
             <div className="lg:col-span-2 space-y-4">
               {!selectedFamilyId ? (
                 <Card>
@@ -277,8 +375,9 @@ function InventorySettingsContent() {
                     <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
                   </CardContent>
                 </Card>
-              ) : config ? (
+              ) : (
                 <>
+                  {/* Header */}
                   <div className="flex items-center gap-3 p-4 rounded-lg border bg-card">
                     <div
                       className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
@@ -290,325 +389,301 @@ function InventorySettingsContent() {
                       <h3 className="font-semibold truncate">{selectedFamily?.name}</h3>
                       <p className="text-xs text-muted-foreground font-mono">{selectedFamily?.code}</p>
                     </div>
-                    <Badge variant="default" className="ml-auto flex-shrink-0">
-                      Inventario habilitado
-                    </Badge>
+                    <Badge variant="default" className="ml-auto flex-shrink-0">Inventario activo</Badge>
                   </div>
 
-                  {/* Tipos de activos permitidos */}
+                  {/* Tipos de activos */}
                   <Card>
                     <CardHeader>
                       <CardTitle className="text-base flex items-center gap-2">
                         <Box className="h-4 w-4" />
                         Tipos de activos permitidos
                       </CardTitle>
-                      <CardDescription>
-                        Define qué tipos de activos puede gestionar esta área
-                      </CardDescription>
+                      <CardDescription>Define qué tipos de activos puede gestionar esta área</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-3">
-                      {ASSET_SUBTYPES.map((subtype) => {
-                        const Icon = subtype.icon
-                        const isChecked = config.allowedSubtypes?.includes(subtype.value) ?? false
-                        return (
-                          <div
-                            key={subtype.value}
-                            className="flex items-start gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors"
-                          >
-                            <Checkbox
-                              id={`subtype-${subtype.value}`}
-                              checked={isChecked}
-                              onCheckedChange={() => toggleSubtype(subtype.value)}
-                              className="mt-1"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <label
-                                htmlFor={`subtype-${subtype.value}`}
-                                className="flex items-center gap-2 font-medium text-sm cursor-pointer"
-                              >
-                                <Icon className="h-4 w-4 flex-shrink-0" />
-                                {subtype.label}
-                              </label>
-                              <p className="text-xs text-muted-foreground mt-0.5">{subtype.description}</p>
-                            </div>
+                    <CardContent className="space-y-2">
+                      {ALL_SUBTYPES.map(subtype => (
+                        <div key={subtype} className="flex items-start gap-3 p-3 border rounded-lg hover:bg-muted/30 transition-colors">
+                          <Checkbox
+                            id={`subtype-${subtype}`}
+                            checked={form.allowedSubtypes.includes(subtype)}
+                            onCheckedChange={() => toggleSubtype(subtype)}
+                            disabled={saving}
+                            className="mt-0.5"
+                          />
+                          <div className="flex-1">
+                            <label htmlFor={`subtype-${subtype}`} className="text-sm font-medium cursor-pointer">
+                              {SUBTYPE_LABELS[subtype]}
+                            </label>
+                            <p className="text-xs text-muted-foreground mt-0.5">{SUBTYPE_DESCRIPTIONS[subtype]}</p>
                           </div>
-                        )
-                      })}
+                        </div>
+                      ))}
                     </CardContent>
                   </Card>
 
                   {/* Secciones del formulario */}
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <FileText className="h-4 w-4" />
-                        Secciones del formulario
-                      </CardTitle>
-                      <CardDescription>
-                        Controla qué campos se muestran y cuáles son obligatorios
-                      </CardDescription>
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <FileText className="h-4 w-4" />
+                            Secciones del formulario
+                          </CardTitle>
+                          <CardDescription>
+                            Controla qué secciones se muestran y cuáles son obligatorias al crear activos
+                          </CardDescription>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Switch
+                            id="use-mode-config"
+                            checked={useModeConfig}
+                            onCheckedChange={setUseModeConfig}
+                            disabled={saving}
+                          />
+                          <Label htmlFor="use-mode-config" className="text-xs cursor-pointer whitespace-nowrap">
+                            Por modalidad
+                          </Label>
+                        </div>
+                      </div>
                     </CardHeader>
-                    <CardContent className="space-y-3">
-                      {FORM_SECTIONS.map((section) => {
-                        const isVisible = config.visibleSections?.includes(section.value) ?? false
-                        const isRequired = config.requiredSections?.includes(section.value) ?? false
-                        return (
-                          <div
-                            key={section.value}
-                            className="flex items-start gap-3 p-3 border rounded-lg"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm">{section.label}</p>
-                              <p className="text-xs text-muted-foreground">{section.description}</p>
-                            </div>
-                            <div className="flex items-center gap-4 flex-shrink-0">
-                              <div className="flex items-center gap-2">
-                                <Checkbox
-                                  id={`visible-${section.value}`}
-                                  checked={isVisible}
-                                  onCheckedChange={() => toggleSection(section.value, 'visible')}
-                                />
-                                <Label htmlFor={`visible-${section.value}`} className="text-xs cursor-pointer">
-                                  Visible
-                                </Label>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Checkbox
-                                  id={`required-${section.value}`}
-                                  checked={isRequired}
-                                  onCheckedChange={() => toggleSection(section.value, 'required')}
-                                  disabled={!isVisible}
-                                />
-                                <Label
-                                  htmlFor={`required-${section.value}`}
-                                  className={`text-xs cursor-pointer ${!isVisible ? 'opacity-50' : ''}`}
-                                >
-                                  Obligatorio
-                                </Label>
-                              </div>
-                            </div>
+                    <CardContent>
+                      {useModeConfig ? (
+                        <div className="space-y-3">
+                          <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                            <Info className="h-3.5 w-3.5" />
+                            Configura secciones distintas según la modalidad de adquisición del equipo
+                          </p>
+                          <div className="flex gap-2 flex-wrap">
+                            {ACQUISITION_MODES.map(m => (
+                              <button
+                                key={m.value}
+                                type="button"
+                                onClick={() => setActiveModeTab(m.value)}
+                                className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
+                                  activeModeTab === m.value
+                                    ? 'bg-primary text-primary-foreground border-primary'
+                                    : 'bg-background border-border hover:bg-muted'
+                                }`}
+                              >
+                                {m.label}
+                                <span className="ml-1.5 text-xs opacity-70">({m.help})</span>
+                              </button>
+                            ))}
                           </div>
-                        )
-                      })}
+                          <SectionTable
+                            sections={ALL_SECTIONS}
+                            visible={getModeConfig(activeModeTab).visible}
+                            required={getModeConfig(activeModeTab).required}
+                            onToggleVisible={(s, v) => setModeVisible(activeModeTab, s, v)}
+                            onToggleRequired={(s, v) => setModeRequired(activeModeTab, s, v)}
+                            disabled={saving}
+                          />
+                        </div>
+                      ) : (
+                        <SectionTable
+                          sections={ALL_SECTIONS}
+                          visible={form.visibleSections}
+                          required={form.requiredSections}
+                          onToggleVisible={toggleVisible}
+                          onToggleRequired={toggleRequired}
+                          disabled={saving}
+                        />
+                      )}
                     </CardContent>
                   </Card>
 
-                  {/* Configuración general */}
+                  {/* Reglas de registro */}
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-base">Configuración general</CardTitle>
-                      <CardDescription>Ajustes adicionales para esta área</CardDescription>
+                      <CardTitle className="text-base">Reglas de registro</CardTitle>
+                      <CardDescription>Comportamiento al crear y gestionar activos</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="code-prefix">Prefijo de código</Label>
-                          <Input
-                            id="code-prefix"
-                            value={config.codePrefix || ''}
-                            onChange={(e) => setConfig({ ...config, codePrefix: e.target.value.toUpperCase().slice(0, 10) })}
-                            placeholder={selectedFamily?.code || 'Ej: EQ'}
-                            maxLength={10}
-                            className="mt-1 font-mono"
-                          />
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Ejemplo: <span className="font-mono">{config.codePrefix || selectedFamily?.code || 'EQ'}-2026-0001</span>
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <CardContent className="space-y-2">
+                      {[
+                        {
+                          id: 'require-financial',
+                          label: 'Requerir datos financieros para nuevos activos',
+                          desc: 'Obliga a completar la sección financiera al crear un activo',
+                          key: 'requireFinancialForNew' as const,
+                        },
+                        {
+                          id: 'require-delivery-act',
+                          label: 'Requerir acta de entrega',
+                          desc: 'Se genera un acta de entrega al asignar activos de esta familia',
+                          key: 'requireDeliveryAct' as const,
+                        },
+                        {
+                          id: 'auto-approve-decommission',
+                          label: 'Auto-aprobar baja de activos',
+                          desc: 'Las solicitudes de baja se aprueban automáticamente sin revisión',
+                          key: 'autoApproveDecommission' as const,
+                        },
+                      ].map(item => (
+                        <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
                           <div>
-                            <p className="text-sm font-medium">Requerir datos financieros para nuevos activos</p>
-                            <p className="text-xs text-muted-foreground">Obliga a ingresar costo y proveedor al crear activos</p>
+                            <p className="text-sm font-medium">{item.label}</p>
+                            <p className="text-xs text-muted-foreground">{item.desc}</p>
                           </div>
                           <Switch
-                            checked={config.requireFinancialForNew}
-                            onCheckedChange={(v) => setConfig({ ...config, requireFinancialForNew: v })}
+                            id={item.id}
+                            checked={form[item.key] as boolean}
+                            onCheckedChange={v => setField(item.key, v)}
+                            disabled={saving}
                           />
                         </div>
-                        <div className="flex items-center justify-between p-3 border rounded-lg">
-                          <div>
-                            <p className="text-sm font-medium">Requerir acta de entrega</p>
-                            <p className="text-xs text-muted-foreground">Obliga a generar acta al asignar equipos a usuarios</p>
-                          </div>
-                          <Switch
-                            checked={config.requireDeliveryAct}
-                            onCheckedChange={(v) => setConfig({ ...config, requireDeliveryAct: v })}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between p-3 border rounded-lg">
-                          <div>
-                            <p className="text-sm font-medium">Auto-aprobar bajas</p>
-                            <p className="text-xs text-muted-foreground">Las solicitudes de baja se aprueban automáticamente sin revisión</p>
-                          </div>
-                          <Switch
-                            checked={config.autoApproveDecommission}
-                            onCheckedChange={(v) => setConfig({ ...config, autoApproveDecommission: v })}
-                          />
-                        </div>
-                      </div>
+                      ))}
                     </CardContent>
                   </Card>
 
-                  {/* Valores por defecto de depreciación */}
+                  {/* Depreciación por defecto */}
                   <Card>
                     <CardHeader>
                       <CardTitle className="text-base flex items-center gap-2">
                         <TrendingDown className="h-4 w-4" />
-                        Valores por defecto de depreciación
+                        Depreciación por defecto
                       </CardTitle>
                       <CardDescription>
-                        Estos valores se pre-cargan al crear nuevos activos fijos
+                        Valores pre-cargados al crear activos fijos en esta área
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div>
+                        <div className="space-y-1">
                           <Label htmlFor="depreciation-method">Método</Label>
                           <Select
-                            value={config.defaultDepreciationMethod || 'none'}
-                            onValueChange={(v) =>
-                              setConfig({ ...config, defaultDepreciationMethod: v === 'none' ? null : v })
-                            }
+                            value={form.defaultDepreciationMethod ?? '__none__'}
+                            onValueChange={v => setField('defaultDepreciationMethod', v === '__none__' ? null : v)}
+                            disabled={saving}
                           >
-                            <SelectTrigger id="depreciation-method" className="mt-1">
+                            <SelectTrigger id="depreciation-method">
                               <SelectValue placeholder="Sin método por defecto" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="none">Sin método por defecto</SelectItem>
-                              {DEPRECIATION_METHODS.map((method) => (
-                                <SelectItem key={method.value} value={method.value}>
-                                  {method.label}
-                                </SelectItem>
+                              <SelectItem value="__none__">Sin método por defecto</SelectItem>
+                              {DEPRECIATION_METHODS.map(m => (
+                                <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
                         </div>
-                        <div>
+                        <div className="space-y-1">
                           <Label htmlFor="useful-life">Vida útil (años)</Label>
                           <Input
                             id="useful-life"
                             type="number"
-                            min="0"
-                            step="0.5"
-                            value={config.defaultUsefulLifeYears ?? ''}
-                            onChange={(e) =>
-                              setConfig({
-                                ...config,
-                                defaultUsefulLifeYears: e.target.value ? parseFloat(e.target.value) : null,
-                              })
-                            }
+                            min={0}
+                            step={0.5}
+                            value={form.defaultUsefulLifeYears}
+                            onChange={e => setField('defaultUsefulLifeYears', e.target.value)}
                             placeholder="Ej: 5"
-                            className="mt-1"
+                            disabled={saving}
                           />
                         </div>
-                        <div>
-                          <Label htmlFor="residual-value">Valor residual (%)</Label>
+                        <div className="space-y-1">
+                          <Label htmlFor="residual-pct">Valor residual (%)</Label>
                           <Input
-                            id="residual-value"
+                            id="residual-pct"
                             type="number"
-                            min="0"
-                            max="100"
-                            step="1"
-                            value={config.defaultResidualValuePct ?? ''}
-                            onChange={(e) =>
-                              setConfig({
-                                ...config,
-                                defaultResidualValuePct: e.target.value ? parseFloat(e.target.value) : null,
-                              })
-                            }
+                            min={0}
+                            max={100}
+                            step={0.01}
+                            value={form.defaultResidualValuePct}
+                            onChange={e => { setField('defaultResidualValuePct', e.target.value); validateResidual(e.target.value) }}
                             placeholder="Ej: 10"
-                            className="mt-1"
+                            disabled={saving}
+                            className={residualError ? 'border-destructive' : ''}
                           />
+                          {residualError && <p className="text-xs text-destructive">{residualError}</p>}
                         </div>
+                      </div>
+
+                      <Separator />
+
+                      <div className="space-y-1 max-w-xs">
+                        <Label htmlFor="code-prefix">Prefijo de código de activo</Label>
+                        <Input
+                          id="code-prefix"
+                          value={form.codePrefix}
+                          onChange={e => setField('codePrefix', e.target.value.toUpperCase().slice(0, 10))}
+                          placeholder={`Ej: ${selectedFamily?.code || 'IT'}`}
+                          maxLength={10}
+                          disabled={saving}
+                          className="font-mono"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Ejemplo: <span className="font-mono">{form.codePrefix || selectedFamily?.code || 'IT'}-2026-0001</span>
+                        </p>
                       </div>
                     </CardContent>
                   </Card>
                 </>
-              ) : (
-                <Card>
-                  <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                    <XCircle className="h-12 w-12 mb-4 opacity-30" />
-                    <p className="text-base font-medium">Sin configuración</p>
-                    <p className="text-sm mt-1">Esta área no tiene configuración de inventario</p>
-                  </CardContent>
-                </Card>
               )}
             </div>
           </div>
         </TabsContent>
 
-        {/* TAB: REGLAS GENERALES */}
+        {/* ── TAB: REGLAS GENERALES ── */}
         <TabsContent value="global">
           <div className="max-w-2xl space-y-6">
             <div className="flex items-start gap-3 p-4 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800">
               <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
               <p className="text-sm text-blue-800 dark:text-blue-300">
-                Las reglas globales de inventario se configuran a nivel de sistema. Cada área puede personalizar su configuración en la pestaña &quot;Por área&quot;.
+                Estas reglas aplican a <strong>todo el módulo de inventario</strong>. Cada área puede personalizar su configuración en la pestaña &quot;Por área&quot;.
               </p>
             </div>
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Warehouse className="h-4 w-4" />
-                  Configuración global
-                </CardTitle>
+                <CardTitle className="text-base">Resumen de configuración por área</CardTitle>
                 <CardDescription>
-                  Ajustes que aplican a todo el módulo de inventario
+                  Estado actual de la configuración de inventario en cada área
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  La configuración global de inventario se gestiona a través de las variables de entorno y configuración del sistema.
-                  Para ajustes específicos por área, utiliza la pestaña &quot;Por área&quot;.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <FileCheck className="h-4 w-4" />
-                  Módulos relacionados
-                </CardTitle>
-                <CardDescription>
-                  Accede a otros módulos de configuración
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="text-sm font-medium">Proveedores</p>
-                    <p className="text-xs text-muted-foreground">Gestiona los proveedores de inventario</p>
+              <CardContent className="p-0">
+                {loadingFamilies ? (
+                  <div className="flex items-center justify-center py-8">
+                    <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
                   </div>
-                  <Button variant="outline" size="sm" onClick={() => router.push('/admin/inventory/suppliers')}>
-                    <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-                    Ir
-                  </Button>
-                </div>
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="text-sm font-medium">Almacenes</p>
-                    <p className="text-xs text-muted-foreground">Configura ubicaciones físicas</p>
+                ) : (
+                  <div className="divide-y">
+                    {families.map(family => (
+                      <div
+                        key={family.id}
+                        className="flex items-center justify-between px-4 py-3 hover:bg-muted/40 transition-colors cursor-pointer"
+                        onClick={() => {
+                          handleSelectFamily(family.id)
+                          // Switch to areas tab by triggering a click on the tab
+                          const areasTab = document.querySelector('[data-value="areas"]') as HTMLElement
+                          areasTab?.click()
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={e => e.key === 'Enter' && handleSelectFamily(family.id)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-7 h-7 rounded-full flex items-center justify-center text-white flex-shrink-0"
+                            style={{ backgroundColor: family.color || '#6B7280' }}
+                          >
+                            <FamilyIcon icon={family.icon} color={family.color} code={family.code} className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">{family.name}</p>
+                            <p className="text-xs text-muted-foreground font-mono">{family.code}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={family.isActive ? 'default' : 'secondary'} className="text-xs">
+                            {family.isActive ? 'Activa' : 'Inactiva'}
+                          </Badge>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <Button variant="outline" size="sm" onClick={() => router.push('/admin/inventory/warehouses')}>
-                    <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-                    Ir
-                  </Button>
-                </div>
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="text-sm font-medium">Contratos</p>
-                    <p className="text-xs text-muted-foreground">Gestiona contratos de inventario</p>
-                  </div>
-                  <Button variant="outline" size="sm" onClick={() => router.push('/admin/inventory/contracts')}>
-                    <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-                    Ir
-                  </Button>
-                </div>
+                )}
               </CardContent>
             </Card>
           </div>
