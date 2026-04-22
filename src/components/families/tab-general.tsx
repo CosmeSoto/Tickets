@@ -10,7 +10,6 @@
 import { useState } from 'react'
 import {
   Building,
-  Edit,
   Trash2,
   ToggleLeft,
   ToggleRight,
@@ -160,7 +159,8 @@ export function TabGeneral({
     setShowDeptDialog(true)
   }
 
-  const openEditDept = (dept: DepartmentData) => {
+  const openEditDept = (dept: DepartmentData, e?: React.MouseEvent) => {
+    e?.stopPropagation()
     setEditingDept(dept)
     setDeptForm({
       name: dept.name,
@@ -169,7 +169,8 @@ export function TabGeneral({
       order: dept.order ?? 0,
       isActive: dept.isActive,
     })
-    setShowDeptDialog(true)
+    // Pequeño delay para evitar que el click del row llegue al overlay del Dialog
+    setTimeout(() => setShowDeptDialog(true), 0)
   }
 
   const handleSubmitDept = async (e: React.FormEvent) => {
@@ -402,24 +403,30 @@ export function TabGeneral({
               {departments.map(dept => (
                 <div
                   key={dept.id}
-                  className='flex items-center justify-between px-6 py-3 hover:bg-muted/40 cursor-pointer transition-colors'
-                  onClick={() => openEditDept(dept)}
+                  className='flex items-center justify-between px-6 py-3 hover:bg-muted/50 cursor-pointer transition-colors group'
+                  onClick={e => openEditDept(dept, e)}
+                  role='button'
+                  tabIndex={0}
+                  onKeyDown={e => e.key === 'Enter' && openEditDept(dept)}
                 >
-                  <div className='flex items-center gap-3'>
+                  <div className='flex items-center gap-3 min-w-0 flex-1'>
                     <div
                       className='w-3 h-3 rounded-full flex-shrink-0'
                       style={{ backgroundColor: dept.color || '#3B82F6' }}
                     />
-                    <div>
+                    <div className='min-w-0'>
                       <p className='text-sm font-medium'>{dept.name}</p>
                       {dept.description && (
-                        <p className='text-xs text-muted-foreground'>{dept.description}</p>
+                        <p className='text-xs text-muted-foreground truncate'>{dept.description}</p>
                       )}
                     </div>
                   </div>
-                  <div className='flex items-center gap-2' onClick={e => e.stopPropagation()}>
+                  <div
+                    className='flex items-center gap-2 flex-shrink-0'
+                    onClick={e => e.stopPropagation()}
+                  >
                     {dept._count && (
-                      <span className='text-xs text-muted-foreground mr-2'>
+                      <span className='text-xs text-muted-foreground mr-2 hidden sm:inline'>
                         {dept._count.users ?? 0} usuarios
                       </span>
                     )}
@@ -429,17 +436,11 @@ export function TabGeneral({
                     <Button
                       variant='ghost'
                       size='sm'
-                      className='h-7 w-7 p-0'
-                      onClick={() => openEditDept(dept)}
-                      title='Editar'
-                    >
-                      <Edit className='h-3.5 w-3.5' />
-                    </Button>
-                    <Button
-                      variant='ghost'
-                      size='sm'
-                      className='h-7 w-7 p-0'
-                      onClick={() => handleToggleDept(dept)}
+                      className='h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity'
+                      onClick={e => {
+                        e.stopPropagation()
+                        handleToggleDept(dept)
+                      }}
                       disabled={togglingDept === dept.id}
                       title={dept.isActive ? 'Desactivar' : 'Activar'}
                     >
@@ -452,8 +453,9 @@ export function TabGeneral({
                     <Button
                       variant='ghost'
                       size='sm'
-                      className='h-7 w-7 p-0 text-destructive hover:text-destructive'
-                      onClick={() => {
+                      className='h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive'
+                      onClick={e => {
+                        e.stopPropagation()
                         setDeletingDept(dept)
                         setShowDeleteDeptDialog(true)
                       }}
