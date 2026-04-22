@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Switch } from '@/components/ui/switch'
 import {
   Dialog,
   DialogContent,
@@ -49,7 +50,6 @@ export function DepartmentFormDialog({
   submitting,
   departments,
 }: DepartmentFormDialogProps) {
-  
   const handleClose = () => {
     onOpenChange(false)
   }
@@ -67,7 +67,7 @@ export function DepartmentFormDialog({
               : 'Crea un nuevo departamento para tu organización'}
           </DialogDescription>
         </DialogHeader>
-        
+
         <form onSubmit={onSubmit}>
           <div className='space-y-4 py-4'>
             {/* Nombre */}
@@ -76,7 +76,7 @@ export function DepartmentFormDialog({
               <Input
                 id='name'
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={e => setFormData({ ...formData, name: e.target.value })}
                 placeholder='Ej: Soporte Técnico'
                 required
                 disabled={submitting}
@@ -89,7 +89,7 @@ export function DepartmentFormDialog({
               <Textarea
                 id='description'
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={e => setFormData({ ...formData, description: e.target.value })}
                 placeholder='Descripción del departamento'
                 rows={3}
                 disabled={submitting}
@@ -100,23 +100,22 @@ export function DepartmentFormDialog({
             <div className='space-y-2'>
               <Label>Color</Label>
               <div className='grid grid-cols-5 gap-2'>
-                {COLORS.map((color) => (
+                {COLORS.map(color => (
                   <button
                     key={color.value}
                     type='button'
                     onClick={() => setFormData({ ...formData, color: color.value })}
                     className={`h-10 w-10 rounded-full ${color.class} ${
-                      formData.color === color.value
-                        ? 'ring-2 ring-offset-2 ring-blue-500'
-                        : ''
+                      formData.color === color.value ? 'ring-2 ring-offset-2 ring-primary' : ''
                     } transition-all hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed`}
                     title={color.label}
                     disabled={submitting}
                   />
                 ))}
               </div>
-              <p className="text-xs text-muted-foreground">
-                Color seleccionado: {COLORS.find(c => c.value === formData.color)?.label || 'Personalizado'}
+              <p className='text-xs text-muted-foreground'>
+                Color seleccionado:{' '}
+                {COLORS.find(c => c.value === formData.color)?.label || 'Personalizado'}
               </p>
             </div>
 
@@ -127,53 +126,40 @@ export function DepartmentFormDialog({
                 id='order'
                 type='number'
                 value={formData.order}
-                onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) || 0 })}
+                onChange={e => setFormData({ ...formData, order: parseInt(e.target.value) || 0 })}
                 min={0}
                 max={999}
                 disabled={submitting}
               />
-              <p className="text-xs text-muted-foreground">
+              <p className='text-xs text-muted-foreground'>
                 Posición en listas y selectores (0 = primero, números menores aparecen antes)
               </p>
             </div>
 
             {/* Estado activo */}
-            <div className='flex items-center space-x-2'>
-              <input
-                type='checkbox'
-                id='isActive'
-                checked={formData.isActive}
-                onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                className='h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500'
-                disabled={submitting}
-              />
-              <Label htmlFor='isActive' className='cursor-pointer'>
-                Departamento activo
-              </Label>
-            </div>
-            
-            {!formData.isActive && (
-              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                <p className="text-sm text-yellow-800">
-                  ⚠️ Los departamentos inactivos no aparecerán en formularios de creación
+            <div className='flex items-center justify-between p-3 border rounded-lg'>
+              <div>
+                <Label htmlFor='isActive' className='cursor-pointer text-sm font-medium'>
+                  Departamento activo
+                </Label>
+                <p className='text-xs text-muted-foreground'>
+                  Los inactivos no aparecen en formularios de creación
                 </p>
               </div>
-            )}
+              <Switch
+                id='isActive'
+                checked={formData.isActive}
+                onCheckedChange={v => setFormData({ ...formData, isActive: v })}
+                disabled={submitting}
+              />
+            </div>
           </div>
-          
+
           <DialogFooter>
-            <Button 
-              type='button' 
-              variant='outline' 
-              onClick={handleClose}
-              disabled={submitting}
-            >
+            <Button type='button' variant='outline' onClick={handleClose} disabled={submitting}>
               Cancelar
             </Button>
-            <Button 
-              type='submit' 
-              disabled={submitting || !formData.name.trim()}
-            >
+            <Button type='submit' disabled={submitting || !formData.name.trim()}>
               {submitting ? (
                 <>
                   <RefreshCw className='h-4 w-4 mr-2 animate-spin' />

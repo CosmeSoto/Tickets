@@ -403,7 +403,7 @@ export function TabGeneral({
               {departments.map(dept => (
                 <div
                   key={dept.id}
-                  className='flex items-center justify-between px-6 py-3 hover:bg-muted/50 cursor-pointer transition-colors group'
+                  className='flex items-center justify-between px-6 py-3 hover:bg-muted/50 cursor-pointer transition-colors'
                   onClick={e => openEditDept(dept, e)}
                   role='button'
                   tabIndex={0}
@@ -412,7 +412,7 @@ export function TabGeneral({
                   <div className='flex items-center gap-3 min-w-0 flex-1'>
                     <div
                       className='w-3 h-3 rounded-full flex-shrink-0'
-                      style={{ backgroundColor: dept.color || '#3B82F6' }}
+                      style={{ backgroundColor: dept.color ?? '#6B7280' }}
                     />
                     <div className='min-w-0'>
                       <p className='text-sm font-medium'>{dept.name}</p>
@@ -436,7 +436,7 @@ export function TabGeneral({
                     <Button
                       variant='ghost'
                       size='sm'
-                      className='h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity'
+                      className='h-7 w-7 p-0 text-muted-foreground hover:text-foreground'
                       onClick={e => {
                         e.stopPropagation()
                         handleToggleDept(dept)
@@ -445,15 +445,15 @@ export function TabGeneral({
                       title={dept.isActive ? 'Desactivar' : 'Activar'}
                     >
                       {dept.isActive ? (
-                        <ToggleRight className='h-3.5 w-3.5 text-green-600' />
+                        <ToggleRight className='h-3.5 w-3.5 text-primary' />
                       ) : (
-                        <ToggleLeft className='h-3.5 w-3.5 text-muted-foreground' />
+                        <ToggleLeft className='h-3.5 w-3.5' />
                       )}
                     </Button>
                     <Button
                       variant='ghost'
                       size='sm'
-                      className='h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive'
+                      className='h-7 w-7 p-0 text-muted-foreground hover:text-destructive'
                       onClick={e => {
                         e.stopPropagation()
                         setDeletingDept(dept)
