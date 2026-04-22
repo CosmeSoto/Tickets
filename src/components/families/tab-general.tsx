@@ -9,8 +9,15 @@
 
 import { useState } from 'react'
 import {
-  Building, Edit, Trash2, ToggleLeft, ToggleRight,
-  Plus, RefreshCw, Save,
+  Building,
+  Edit,
+  Trash2,
+  ToggleLeft,
+  ToggleRight,
+  Plus,
+  RefreshCw,
+  Save,
+  ChevronRight,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -73,7 +80,12 @@ const FAMILY_COLORS = [
   { value: '#06B6D4', label: 'Cian' },
 ]
 
-export function TabGeneral({ family, departments, onFamilyUpdated, onDepartmentsChanged }: TabGeneralProps) {
+export function TabGeneral({
+  family,
+  departments,
+  onFamilyUpdated,
+  onDepartmentsChanged,
+}: TabGeneralProps) {
   const { toast } = useToast()
 
   // --- Basic form state ---
@@ -116,7 +128,11 @@ export function TabGeneral({ family, departments, onFamilyUpdated, onDepartments
         return
       }
       if (!res.ok) {
-        toast({ title: 'Error', description: data.error || 'Error al guardar', variant: 'destructive' })
+        toast({
+          title: 'Error',
+          description: data.error || 'Error al guardar',
+          variant: 'destructive',
+        })
         return
       }
       toast({ title: 'Guardado', description: 'Datos básicos actualizados correctamente' })
@@ -219,7 +235,11 @@ export function TabGeneral({ family, departments, onFamilyUpdated, onDepartments
         setShowDeleteDeptDialog(false)
         onDepartmentsChanged()
       } else {
-        toast({ title: 'No se puede eliminar', description: data.error || data.message, variant: 'destructive' })
+        toast({
+          title: 'No se puede eliminar',
+          description: data.error || data.message,
+          variant: 'destructive',
+        })
         setShowDeleteDeptDialog(false)
       }
     } catch {
@@ -230,58 +250,56 @@ export function TabGeneral({ family, departments, onFamilyUpdated, onDepartments
   }
 
   return (
-    <div className="space-y-6">
+    <div className='space-y-6'>
       {/* Basic data form */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Datos básicos</CardTitle>
+          <CardTitle className='text-base'>Datos básicos</CardTitle>
           <CardDescription>Edita la información principal de la familia</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <CardContent className='space-y-4'>
+          <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
             {/* Code */}
-            <div className="space-y-1">
-              <Label htmlFor="family-code">Código *</Label>
+            <div className='space-y-1'>
+              <Label htmlFor='family-code'>Código *</Label>
               <Input
-                id="family-code"
+                id='family-code'
                 value={form.code}
-                onChange={(e) => { setForm(f => ({ ...f, code: e.target.value })); setCodeError(null) }}
-                placeholder="Ej: IT"
+                onChange={e => {
+                  setForm(f => ({ ...f, code: e.target.value }))
+                  setCodeError(null)
+                }}
+                placeholder='Ej: IT'
                 disabled={saving}
               />
-              {codeError && (
-                <p className="text-xs text-destructive">{codeError}</p>
-              )}
+              {codeError && <p className='text-xs text-destructive'>{codeError}</p>}
             </div>
 
             {/* Name */}
-            <div className="space-y-1">
-              <Label htmlFor="family-name">Nombre *</Label>
+            <div className='space-y-1'>
+              <Label htmlFor='family-name'>Nombre *</Label>
               <Input
-                id="family-name"
+                id='family-name'
                 value={form.name}
-                onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
-                placeholder="Ej: Tecnología"
+                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                placeholder='Ej: Tecnología'
                 disabled={saving}
               />
             </div>
 
             {/* Icon */}
-            <div className="space-y-1 sm:col-span-2">
-              <IconPicker
-                value={form.icon}
-                onChange={(v) => setForm(f => ({ ...f, icon: v }))}
-              />
+            <div className='space-y-1 sm:col-span-2'>
+              <IconPicker value={form.icon} onChange={v => setForm(f => ({ ...f, icon: v }))} />
             </div>
 
             {/* Order */}
-            <div className="space-y-1">
-              <Label htmlFor="family-order">Orden</Label>
+            <div className='space-y-1'>
+              <Label htmlFor='family-order'>Orden</Label>
               <Input
-                id="family-order"
-                type="number"
+                id='family-order'
+                type='number'
                 value={form.order}
-                onChange={(e) => setForm(f => ({ ...f, order: parseInt(e.target.value) || 0 }))}
+                onChange={e => setForm(f => ({ ...f, order: parseInt(e.target.value) || 0 }))}
                 min={0}
                 disabled={saving}
               />
@@ -289,26 +307,26 @@ export function TabGeneral({ family, departments, onFamilyUpdated, onDepartments
           </div>
 
           {/* Description */}
-          <div className="space-y-1">
-            <Label htmlFor="family-description">Descripción</Label>
+          <div className='space-y-1'>
+            <Label htmlFor='family-description'>Descripción</Label>
             <Textarea
-              id="family-description"
+              id='family-description'
               value={form.description}
-              onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))}
-              placeholder="Descripción de la familia"
+              onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+              placeholder='Descripción de la familia'
               rows={2}
               disabled={saving}
             />
           </div>
 
           {/* Color */}
-          <div className="space-y-2">
+          <div className='space-y-2'>
             <Label>Color</Label>
-            <div className="flex flex-wrap gap-2">
-              {FAMILY_COLORS.map((c) => (
+            <div className='flex flex-wrap gap-2'>
+              {FAMILY_COLORS.map(c => (
                 <button
                   key={c.value}
-                  type="button"
+                  type='button'
                   onClick={() => setForm(f => ({ ...f, color: c.value }))}
                   className={`w-8 h-8 rounded-full transition-all hover:scale-110 ${
                     form.color === c.value ? 'ring-2 ring-offset-2 ring-primary' : ''
@@ -322,24 +340,30 @@ export function TabGeneral({ family, departments, onFamilyUpdated, onDepartments
           </div>
 
           {/* isActive */}
-          <div className="flex items-center gap-3">
+          <div className='flex items-center gap-3'>
             <Switch
-              id="family-active"
+              id='family-active'
               checked={form.isActive}
-              onCheckedChange={(v) => setForm(f => ({ ...f, isActive: v }))}
+              onCheckedChange={v => setForm(f => ({ ...f, isActive: v }))}
               disabled={saving}
             />
-            <Label htmlFor="family-active" className="cursor-pointer">
+            <Label htmlFor='family-active' className='cursor-pointer'>
               Familia activa
             </Label>
           </div>
 
-          <div className="flex justify-end pt-2">
+          <div className='flex justify-end pt-2'>
             <Button onClick={handleSave} disabled={saving}>
               {saving ? (
-                <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Guardando...</>
+                <>
+                  <RefreshCw className='h-4 w-4 mr-2 animate-spin' />
+                  Guardando...
+                </>
               ) : (
-                <><Save className="h-4 w-4 mr-2" />Guardar cambios</>
+                <>
+                  <Save className='h-4 w-4 mr-2' />
+                  Guardar cambios
+                </>
               )}
             </Button>
           </div>
@@ -349,84 +373,95 @@ export function TabGeneral({ family, departments, onFamilyUpdated, onDepartments
       {/* Departments */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className='flex items-center justify-between'>
             <div>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Building className="h-4 w-4" />
+              <CardTitle className='flex items-center gap-2 text-base'>
+                <Building className='h-4 w-4' />
                 Departamentos ({departments.length})
               </CardTitle>
               <CardDescription>Departamentos que pertenecen a esta familia</CardDescription>
             </div>
-            <Button size="sm" onClick={openCreateDept}>
-              <Plus className="h-4 w-4 mr-2" />
+            <Button size='sm' onClick={openCreateDept}>
+              <Plus className='h-4 w-4 mr-2' />
               Nuevo departamento
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className='p-0'>
           {departments.length === 0 ? (
-            <div className="text-center py-10 text-muted-foreground">
-              <Building className="h-8 w-8 mx-auto mb-2 opacity-30" />
-              <p className="text-sm">No hay departamentos en esta familia</p>
-              <Button size="sm" variant="outline" className="mt-3" onClick={openCreateDept}>
-                <Plus className="h-4 w-4 mr-2" />
+            <div className='text-center py-10 text-muted-foreground'>
+              <Building className='h-8 w-8 mx-auto mb-2 opacity-30' />
+              <p className='text-sm'>No hay departamentos en esta familia</p>
+              <Button size='sm' variant='outline' className='mt-3' onClick={openCreateDept}>
+                <Plus className='h-4 w-4 mr-2' />
                 Crear primer departamento
               </Button>
             </div>
           ) : (
-            <div className="divide-y">
-              {departments.map((dept) => (
+            <div className='divide-y'>
+              {departments.map(dept => (
                 <div
                   key={dept.id}
-                  className="flex items-center justify-between px-6 py-3 hover:bg-muted/40 cursor-pointer transition-colors"
+                  className='flex items-center justify-between px-6 py-3 hover:bg-muted/40 cursor-pointer transition-colors'
                   onClick={() => openEditDept(dept)}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className='flex items-center gap-3'>
                     <div
-                      className="w-3 h-3 rounded-full flex-shrink-0"
+                      className='w-3 h-3 rounded-full flex-shrink-0'
                       style={{ backgroundColor: dept.color || '#3B82F6' }}
                     />
                     <div>
-                      <p className="text-sm font-medium">{dept.name}</p>
+                      <p className='text-sm font-medium'>{dept.name}</p>
                       {dept.description && (
-                        <p className="text-xs text-muted-foreground">{dept.description}</p>
+                        <p className='text-xs text-muted-foreground'>{dept.description}</p>
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                  <div className='flex items-center gap-2' onClick={e => e.stopPropagation()}>
                     {dept._count && (
-                      <span className="text-xs text-muted-foreground mr-2">
+                      <span className='text-xs text-muted-foreground mr-2'>
                         {dept._count.users ?? 0} usuarios
                       </span>
                     )}
-                    <Badge variant={dept.isActive ? 'default' : 'secondary'} className="text-xs">
+                    <Badge variant={dept.isActive ? 'default' : 'secondary'} className='text-xs'>
                       {dept.isActive ? 'Activo' : 'Inactivo'}
                     </Badge>
                     <Button
-                      variant="ghost" size="sm" className="h-7 w-7 p-0"
+                      variant='ghost'
+                      size='sm'
+                      className='h-7 w-7 p-0'
                       onClick={() => openEditDept(dept)}
-                      title="Editar"
+                      title='Editar'
                     >
-                      <Edit className="h-3.5 w-3.5" />
+                      <Edit className='h-3.5 w-3.5' />
                     </Button>
                     <Button
-                      variant="ghost" size="sm" className="h-7 w-7 p-0"
+                      variant='ghost'
+                      size='sm'
+                      className='h-7 w-7 p-0'
                       onClick={() => handleToggleDept(dept)}
                       disabled={togglingDept === dept.id}
                       title={dept.isActive ? 'Desactivar' : 'Activar'}
                     >
-                      {dept.isActive
-                        ? <ToggleRight className="h-3.5 w-3.5 text-green-600" />
-                        : <ToggleLeft className="h-3.5 w-3.5 text-muted-foreground" />}
+                      {dept.isActive ? (
+                        <ToggleRight className='h-3.5 w-3.5 text-green-600' />
+                      ) : (
+                        <ToggleLeft className='h-3.5 w-3.5 text-muted-foreground' />
+                      )}
                     </Button>
                     <Button
-                      variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                      onClick={() => { setDeletingDept(dept); setShowDeleteDeptDialog(true) }}
-                      title="Eliminar"
+                      variant='ghost'
+                      size='sm'
+                      className='h-7 w-7 p-0 text-destructive hover:text-destructive'
+                      onClick={() => {
+                        setDeletingDept(dept)
+                        setShowDeleteDeptDialog(true)
+                      }}
+                      title='Eliminar'
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className='h-3.5 w-3.5' />
                     </Button>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    <ChevronRight className='h-4 w-4 text-muted-foreground' />
                   </div>
                 </div>
               ))}
@@ -455,10 +490,14 @@ export function TabGeneral({ family, departments, onFamilyUpdated, onDepartments
               {deletingDept && (
                 <>
                   Estás a punto de eliminar{' '}
-                  <span className="font-semibold text-foreground">"{deletingDept.name}"</span>.
+                  <span className='font-semibold text-foreground'>
+                    &quot;{deletingDept.name}&quot;
+                  </span>
+                  .
                   {(deletingDept._count?.users ?? 0) > 0 && (
-                    <p className="mt-2 text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded p-2">
-                      Este departamento tiene {deletingDept._count?.users} usuario(s) asignado(s). No se podrá eliminar.
+                    <p className='mt-2 text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded p-2'>
+                      Este departamento tiene {deletingDept._count?.users} usuario(s) asignado(s).
+                      No se podrá eliminar.
                     </p>
                   )}
                 </>
@@ -469,7 +508,7 @@ export function TabGeneral({ family, departments, onFamilyUpdated, onDepartments
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteDept}
-              className="bg-red-600 hover:bg-red-700"
+              className='bg-red-600 hover:bg-red-700'
               disabled={deletingDeptLoading}
             >
               {deletingDeptLoading ? 'Eliminando...' : 'Eliminar'}

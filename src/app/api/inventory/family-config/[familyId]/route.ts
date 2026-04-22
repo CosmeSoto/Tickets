@@ -8,14 +8,30 @@ import { DEFAULT_FAMILY_CONFIG } from '@/lib/inventory/family-config'
 
 const updateConfigSchema = z.object({
   allowedSubtypes: z.array(z.enum(['EQUIPMENT', 'MRO', 'LICENSE'])).optional(),
-  visibleSections: z.array(z.enum(['FINANCIAL', 'DEPRECIATION', 'CONTRACT', 'STOCK_MRO', 'WAREHOUSE'])).optional(),
-  requiredSections: z.array(z.enum(['FINANCIAL', 'DEPRECIATION', 'CONTRACT', 'STOCK_MRO', 'WAREHOUSE'])).optional(),
+  visibleSections: z
+    .array(z.enum(['FINANCIAL', 'DEPRECIATION', 'CONTRACT', 'STOCK_MRO', 'WAREHOUSE']))
+    .optional(),
+  requiredSections: z
+    .array(z.enum(['FINANCIAL', 'DEPRECIATION', 'CONTRACT', 'STOCK_MRO', 'WAREHOUSE']))
+    .optional(),
   requireFinancialForNew: z.boolean().optional(),
-  sectionsByMode: z.record(z.object({
-    visible: z.array(z.enum(['FINANCIAL', 'DEPRECIATION', 'CONTRACT', 'STOCK_MRO', 'WAREHOUSE'])),
-    required: z.array(z.enum(['FINANCIAL', 'DEPRECIATION', 'CONTRACT', 'STOCK_MRO', 'WAREHOUSE'])),
-  })).nullable().optional(),
-  defaultDepreciationMethod: z.enum(['STRAIGHT_LINE', 'DECLINING_BALANCE', 'UNITS_OF_PRODUCTION']).nullable().optional(),
+  sectionsByMode: z
+    .record(
+      z.object({
+        visible: z.array(
+          z.enum(['FINANCIAL', 'DEPRECIATION', 'CONTRACT', 'STOCK_MRO', 'WAREHOUSE'])
+        ),
+        required: z.array(
+          z.enum(['FINANCIAL', 'DEPRECIATION', 'CONTRACT', 'STOCK_MRO', 'WAREHOUSE'])
+        ),
+      })
+    )
+    .nullable()
+    .optional(),
+  defaultDepreciationMethod: z
+    .enum(['STRAIGHT_LINE', 'DECLINING_BALANCE', 'UNITS_OF_PRODUCTION'])
+    .nullable()
+    .optional(),
   defaultUsefulLifeYears: z.number().positive().nullable().optional(),
   defaultResidualValuePct: z.number().min(0).max(100).nullable().optional(),
   codePrefix: z.string().max(10).nullable().optional(),
@@ -24,10 +40,7 @@ const updateConfigSchema = z.object({
   inventoryEnabled: z.boolean().optional(),
 })
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { familyId: string } }
-) {
+export async function GET(req: NextRequest, { params }: { params: { familyId: string } }) {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
     return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
@@ -73,17 +86,11 @@ export async function GET(
     })
   } catch (error) {
     console.error('Error al obtener configuración:', error)
-    return NextResponse.json(
-      { error: 'Error al obtener configuración' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al obtener configuración' }, { status: 500 })
   }
 }
 
-export async function PUT(
-  req: NextRequest,
-  { params }: { params: { familyId: string } }
-) {
+export async function PUT(req: NextRequest, { params }: { params: { familyId: string } }) {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
     return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
@@ -110,14 +117,12 @@ export async function PUT(
     })
 
     if (!family) {
-      return NextResponse.json(
-        { error: 'Familia no encontrada' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Familia no encontrada' }, { status: 404 })
     }
 
-    // Preparar datos para actualizar (excluir inventoryEnabled que no está en el schema)
-    const { inventoryEnabled, ...configData } = validated
+    // Preparar datos para actualizar (excluir inventoryEnabled que no está en el schema DB)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { inventoryEnabled: _inv, ...configData } = validated
 
     // Upsert configuración
     const config = await prisma.inventory_family_config.upsert({
@@ -136,15 +141,9 @@ export async function PUT(
     })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Datos inválidos', details: error.errors },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Datos inválidos', details: error.errors }, { status: 400 })
     }
     console.error('Error al actualizar configuración:', error)
-    return NextResponse.json(
-      { error: 'Error al actualizar configuración' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al actualizar configuración' }, { status: 500 })
   }
 }
