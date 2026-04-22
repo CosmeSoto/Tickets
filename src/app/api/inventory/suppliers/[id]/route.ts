@@ -140,7 +140,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
 /**
  * PATCH /api/inventory/suppliers/[id]
  * Desactivar proveedor.
- * Restricción: no se puede desactivar si tiene equipos, consumibles o licencias activos.
+ * Solo ADMIN/SuperAdmin. No se puede desactivar si tiene activos asociados.
  */
 export async function PATCH(request: NextRequest, { params }: RouteContext) {
   try {
@@ -150,7 +150,10 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    if (!(await canManageInventory(session.user.id, session.user.role))) {
+    // Solo ADMIN puede desactivar — gestores solo pueden crear/editar
+    const role = session.user.role
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    if (role !== 'ADMIN' && !isSuperAdmin) {
       return inventoryForbidden()
     }
 
@@ -209,7 +212,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 /**
  * DELETE /api/inventory/suppliers/[id]
  * Eliminar proveedor permanentemente.
- * Solo si no tiene activos asociados.
+ * Solo ADMIN/SuperAdmin. Solo si no tiene activos asociados.
  */
 export async function DELETE(request: NextRequest, { params }: RouteContext) {
   try {
@@ -219,7 +222,10 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    if (!(await canManageInventory(session.user.id, session.user.role))) {
+    // Solo ADMIN puede eliminar permanentemente — gestores solo pueden crear/editar
+    const role = session.user.role
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    if (role !== 'ADMIN' && !isSuperAdmin) {
       return inventoryForbidden()
     }
 

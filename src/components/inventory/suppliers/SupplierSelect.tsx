@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useSession } from 'next-auth/react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -55,6 +56,15 @@ export function SupplierSelect({
   allowCreate = true,
 }: SupplierSelectProps) {
   const { toast } = useToast()
+  const { data: session } = useSession()
+
+  // Permisos: crear/editar → canManageInventory; desactivar/eliminar → solo ADMIN
+  const userRole = session?.user?.role
+  const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
+  const canEdit =
+    allowCreate &&
+    (userRole === 'ADMIN' || isSuperAdmin || (session?.user as any)?.canManageInventory === true)
+  const canDeactivateOrDelete = userRole === 'ADMIN' || isSuperAdmin
   const [open, setOpen] = useState(false)
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(false)
@@ -186,7 +196,7 @@ export function SupplierSelect({
             <Command>
               <CommandInput placeholder='Buscar proveedor...' />
               <CommandList>
-                {allowCreate && (
+                {canEdit && (
                   <CommandGroup>
                     <CommandItem
                       value='__create__'
@@ -201,7 +211,7 @@ export function SupplierSelect({
                 <CommandEmpty>
                   <div className='py-3 text-center space-y-2'>
                     <p className='text-sm text-muted-foreground'>No se encontraron proveedores.</p>
-                    {allowCreate && (
+                    {canEdit && (
                       <Button type='button' size='sm' variant='outline' onClick={openCreate}>
                         <Plus className='mr-1.5 h-3.5 w-3.5' />
                         Crear proveedor
@@ -231,42 +241,50 @@ export function SupplierSelect({
                           {s.taxId}
                         </span>
                       )}
-                      {/* Acciones — siempre visibles */}
-                      <div
-                        className='flex items-center gap-0.5 ml-2'
-                        onClick={e => e.stopPropagation()}
-                      >
-                        <button
-                          type='button'
-                          onClick={e => openEdit(s, e)}
-                          className='p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground'
-                          title='Editar proveedor'
+                      {/* Acciones según rol */}
+                      {(canEdit || canDeactivateOrDelete) && (
+                        <div
+                          className='flex items-center gap-0.5 ml-2'
+                          onClick={e => e.stopPropagation()}
                         >
-                          <Pencil className='h-3.5 w-3.5' />
-                        </button>
-                        <button
-                          type='button'
-                          onClick={() => {
-                            setOpen(false)
-                            setConfirm({ type: 'deactivate', supplier: s })
-                          }}
-                          className='p-1 rounded hover:bg-amber-100 dark:hover:bg-amber-900/30 text-muted-foreground hover:text-amber-700 dark:hover:text-amber-400'
-                          title='Desactivar proveedor'
-                        >
-                          <PowerOff className='h-3.5 w-3.5' />
-                        </button>
-                        <button
-                          type='button'
-                          onClick={() => {
-                            setOpen(false)
-                            setConfirm({ type: 'delete', supplier: s })
-                          }}
-                          className='p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive'
-                          title='Eliminar proveedor'
-                        >
-                          <Trash2 className='h-3.5 w-3.5' />
-                        </button>
-                      </div>
+                          {canEdit && (
+                            <button
+                              type='button'
+                              onClick={e => openEdit(s, e)}
+                              className='p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground'
+                              title='Editar proveedor'
+                            >
+                              <Pencil className='h-3.5 w-3.5' />
+                            </button>
+                          )}
+                          {canDeactivateOrDelete && (
+                            <button
+                              type='button'
+                              onClick={() => {
+                                setOpen(false)
+                                setConfirm({ type: 'deactivate', supplier: s })
+                              }}
+                              className='p-1 rounded hover:bg-amber-100 dark:hover:bg-amber-900/30 text-muted-foreground hover:text-amber-700 dark:hover:text-amber-400'
+                              title='Desactivar proveedor'
+                            >
+                              <PowerOff className='h-3.5 w-3.5' />
+                            </button>
+                          )}
+                          {canDeactivateOrDelete && (
+                            <button
+                              type='button'
+                              onClick={() => {
+                                setOpen(false)
+                                setConfirm({ type: 'delete', supplier: s })
+                              }}
+                              className='p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive'
+                              title='Eliminar proveedor'
+                            >
+                              <Trash2 className='h-3.5 w-3.5' />
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </CommandItem>
                   ))}
                 </CommandGroup>
