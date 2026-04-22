@@ -35,6 +35,12 @@ import {
   Clock,
 } from 'lucide-react'
 import Link from 'next/link'
+import {
+  getPriorityColor,
+  getPriorityLabel,
+  getStatusColor,
+  getStatusLabel,
+} from '@/lib/utils/ticket-utils'
 
 interface Ticket {
   id: string
@@ -68,25 +74,11 @@ const statusLabels = {
   CLOSED: 'Cerrado',
 }
 
-const statusColors = {
-  OPEN: 'bg-blue-100 text-blue-800',
-  IN_PROGRESS: 'bg-purple-100 text-purple-800',
-  RESOLVED: 'bg-green-100 text-green-800',
-  CLOSED: 'bg-muted text-foreground',
-}
-
 const priorityLabels = {
   LOW: 'Baja',
   MEDIUM: 'Media',
   HIGH: 'Alta',
   URGENT: 'Urgente',
-}
-
-const priorityColors = {
-  LOW: 'bg-green-100 text-green-800',
-  MEDIUM: 'bg-yellow-100 text-yellow-800',
-  HIGH: 'bg-orange-100 text-orange-800',
-  URGENT: 'bg-red-100 text-red-800',
 }
 
 export function TicketTable({
@@ -121,93 +113,98 @@ export function TicketTable({
   }, [search])
 
   // Función optimizada de carga con mejor error handling
-  const loadTickets = useCallback(async (page = 1) => {
-    if (!session?.user) {
-      setTickets([])
-      setTotal(0)
-      setTotalPages(1)
-      setCurrentPage(1)
-      setLoading(false)
-      return
-    }
-
-    setLoading(true)
-    setError(null)
-    
-    try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: '25', // Aumentado para mejor performance
-      })
-
-      // Solo agregar filtros si tienen valor
-      if (debouncedSearch.trim()) params.append('search', debouncedSearch.trim())
-      if (statusFilter !== 'all') params.append('status', statusFilter)
-      if (priorityFilter !== 'all') params.append('priority', priorityFilter)
-      if (assigneeFilter !== 'all') params.append('assigneeId', assigneeFilter)
-
-      const response = await fetch(`/api/tickets?${params}`, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
-      
-      if (!response.ok) {
-        // Error handling granular - optimización crítica
-        if (response.status === 401) {
-          throw new Error('No tienes permisos para ver los tickets')
-        } else if (response.status === 403) {
-          throw new Error('Acceso denegado a los tickets')
-        } else if (response.status === 404) {
-          throw new Error('No se encontraron tickets')
-        } else if (response.status >= 500) {
-          throw new Error('Error del servidor. Intenta de nuevo en unos momentos')
-        } else {
-          throw new Error(`Error ${response.status}: ${response.statusText}`)
-        }
-      }
-
-      const data = await response.json()
-      
-      // Manejar diferentes estructuras de respuesta con validación
-      if (data.success && data.data) {
-        const ticketsData = Array.isArray(data.data) ? data.data : []
-        setTickets(ticketsData)
-        setTotal(data.meta?.pagination?.total || ticketsData.length)
-        setTotalPages(data.meta?.pagination?.totalPages || 1)
-        setCurrentPage(data.meta?.pagination?.page || page)
-      } else if (data.tickets) {
-        const ticketsData = Array.isArray(data.tickets) ? data.tickets : []
-        setTickets(ticketsData)
-        setTotal(data.total || ticketsData.length)
-        setTotalPages(data.pages || 1)
-        setCurrentPage(data.currentPage || page)
-      } else {
-        // Respuesta válida pero sin datos
+  const loadTickets = useCallback(
+    async (page = 1) => {
+      if (!session?.user) {
         setTickets([])
         setTotal(0)
         setTotalPages(1)
         setCurrentPage(1)
+        setLoading(false)
+        return
       }
-    } catch (error) {
-      console.error('Error loading tickets:', error)
-      
-      // Error handling granular con mensajes específicos
-      if (error instanceof Error) {
-        setError(error.message)
-      } else {
-        setError('Error inesperado al cargar los tickets. Verifica tu conexión e intenta de nuevo.')
+
+      setLoading(true)
+      setError(null)
+
+      try {
+        const params = new URLSearchParams({
+          page: page.toString(),
+          limit: '25', // Aumentado para mejor performance
+        })
+
+        // Solo agregar filtros si tienen valor
+        if (debouncedSearch.trim()) params.append('search', debouncedSearch.trim())
+        if (statusFilter !== 'all') params.append('status', statusFilter)
+        if (priorityFilter !== 'all') params.append('priority', priorityFilter)
+        if (assigneeFilter !== 'all') params.append('assigneeId', assigneeFilter)
+
+        const response = await fetch(`/api/tickets?${params}`, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (!response.ok) {
+          // Error handling granular - optimización crítica
+          if (response.status === 401) {
+            throw new Error('No tienes permisos para ver los tickets')
+          } else if (response.status === 403) {
+            throw new Error('Acceso denegado a los tickets')
+          } else if (response.status === 404) {
+            throw new Error('No se encontraron tickets')
+          } else if (response.status >= 500) {
+            throw new Error('Error del servidor. Intenta de nuevo en unos momentos')
+          } else {
+            throw new Error(`Error ${response.status}: ${response.statusText}`)
+          }
+        }
+
+        const data = await response.json()
+
+        // Manejar diferentes estructuras de respuesta con validación
+        if (data.success && data.data) {
+          const ticketsData = Array.isArray(data.data) ? data.data : []
+          setTickets(ticketsData)
+          setTotal(data.meta?.pagination?.total || ticketsData.length)
+          setTotalPages(data.meta?.pagination?.totalPages || 1)
+          setCurrentPage(data.meta?.pagination?.page || page)
+        } else if (data.tickets) {
+          const ticketsData = Array.isArray(data.tickets) ? data.tickets : []
+          setTickets(ticketsData)
+          setTotal(data.total || ticketsData.length)
+          setTotalPages(data.pages || 1)
+          setCurrentPage(data.currentPage || page)
+        } else {
+          // Respuesta válida pero sin datos
+          setTickets([])
+          setTotal(0)
+          setTotalPages(1)
+          setCurrentPage(1)
+        }
+      } catch (error) {
+        console.error('Error loading tickets:', error)
+
+        // Error handling granular con mensajes específicos
+        if (error instanceof Error) {
+          setError(error.message)
+        } else {
+          setError(
+            'Error inesperado al cargar los tickets. Verifica tu conexión e intenta de nuevo.'
+          )
+        }
+
+        // Limpiar estado en caso de error
+        setTickets([])
+        setTotal(0)
+        setTotalPages(1)
+        setCurrentPage(1)
+      } finally {
+        setLoading(false)
       }
-      
-      // Limpiar estado en caso de error
-      setTickets([])
-      setTotal(0)
-      setTotalPages(1)
-      setCurrentPage(1)
-    } finally {
-      setLoading(false)
-    }
-  }, [session, debouncedSearch, statusFilter, priorityFilter, assigneeFilter])
+    },
+    [session, debouncedSearch, statusFilter, priorityFilter, assigneeFilter]
+  )
 
   // Efecto optimizado que solo se ejecuta cuando cambian los filtros debounced
   useEffect(() => {
@@ -215,11 +212,14 @@ export function TicketTable({
   }, [loadTickets])
 
   // Función memoizada para cambio de página
-  const handlePageChange = useCallback((page: number) => {
-    if (page !== currentPage && !loading) {
-      loadTickets(page)
-    }
-  }, [currentPage, loading, loadTickets])
+  const handlePageChange = useCallback(
+    (page: number) => {
+      if (page !== currentPage && !loading) {
+        loadTickets(page)
+      }
+    },
+    [currentPage, loading, loadTickets]
+  )
 
   const getTimeAgo = (dateString: string) => {
     const date = new Date(dateString)
@@ -330,7 +330,9 @@ export function TicketTable({
                       <div>
                         <div className='font-medium'>Cargando tickets...</div>
                         <div className='text-sm text-muted-foreground mt-1'>
-                          {debouncedSearch ? `Buscando "${debouncedSearch}"` : 'Obteniendo datos del servidor'}
+                          {debouncedSearch
+                            ? `Buscando "${debouncedSearch}"`
+                            : 'Obteniendo datos del servidor'}
                         </div>
                       </div>
                     </div>
@@ -340,11 +342,13 @@ export function TicketTable({
                 <TableRow>
                   <TableCell colSpan={9} className='text-center py-8'>
                     <div className='flex flex-col items-center space-y-3'>
-                      <div className='text-red-500 font-medium'>Error al cargar tickets</div>
-                      <div className='text-sm text-muted-foreground max-w-md text-center'>{error}</div>
-                      <Button 
-                        variant='outline' 
-                        size='sm' 
+                      <div className='text-destructive font-medium'>Error al cargar tickets</div>
+                      <div className='text-sm text-muted-foreground max-w-md text-center'>
+                        {error}
+                      </div>
+                      <Button
+                        variant='outline'
+                        size='sm'
                         onClick={() => loadTickets(currentPage)}
                         className='mt-2'
                       >
@@ -354,20 +358,25 @@ export function TicketTable({
                     </div>
                   </TableCell>
                 </TableRow>
-              ) : (tickets && tickets.length === 0) ? (
+              ) : tickets && tickets.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9} className='text-center py-8'>
                     <div className='flex flex-col items-center space-y-2'>
                       <div className='text-muted-foreground font-medium'>
-                        {debouncedSearch || statusFilter !== 'all' || priorityFilter !== 'all' || assigneeFilter !== 'all'
+                        {debouncedSearch ||
+                        statusFilter !== 'all' ||
+                        priorityFilter !== 'all' ||
+                        assigneeFilter !== 'all'
                           ? 'No se encontraron tickets con los filtros aplicados'
-                          : 'No hay tickets disponibles'
-                        }
+                          : 'No hay tickets disponibles'}
                       </div>
-                      {(debouncedSearch || statusFilter !== 'all' || priorityFilter !== 'all' || assigneeFilter !== 'all') && (
-                        <Button 
-                          variant='outline' 
-                          size='sm' 
+                      {(debouncedSearch ||
+                        statusFilter !== 'all' ||
+                        priorityFilter !== 'all' ||
+                        assigneeFilter !== 'all') && (
+                        <Button
+                          variant='outline'
+                          size='sm'
                           onClick={() => {
                             setSearch('')
                             setStatusFilter('all')
@@ -394,13 +403,13 @@ export function TicketTable({
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge className={statusColors[ticket.status]}>
-                        {statusLabels[ticket.status]}
+                      <Badge className={getStatusColor(ticket.status)}>
+                        {getStatusLabel(ticket.status)}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge className={priorityColors[ticket.priority]}>
-                        {priorityLabels[ticket.priority]}
+                      <Badge className={getPriorityColor(ticket.priority)}>
+                        {getPriorityLabel(ticket.priority)}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -418,7 +427,9 @@ export function TicketTable({
                           <User className='h-4 w-4 text-muted-foreground' />
                           <div>
                             <div className='font-medium text-sm'>{ticket.assignee.name}</div>
-                            <div className='text-xs text-muted-foreground'>{ticket.assignee.email}</div>
+                            <div className='text-xs text-muted-foreground'>
+                              {ticket.assignee.email}
+                            </div>
                           </div>
                         </div>
                       ) : (
@@ -482,8 +493,11 @@ export function TicketTable({
                 <>
                   Mostrando {(currentPage - 1) * 25 + 1} a {Math.min(currentPage * 25, total)} de{' '}
                   {total} tickets
-                  {(debouncedSearch || statusFilter !== 'all' || priorityFilter !== 'all' || assigneeFilter !== 'all') && (
-                    <span className='text-blue-600 ml-1'>(filtrados)</span>
+                  {(debouncedSearch ||
+                    statusFilter !== 'all' ||
+                    priorityFilter !== 'all' ||
+                    assigneeFilter !== 'all') && (
+                    <span className='text-primary ml-1'>(filtrados)</span>
                   )}
                 </>
               ) : (
@@ -500,20 +514,20 @@ export function TicketTable({
                 <ChevronLeft className='h-4 w-4' />
                 <span className='hidden sm:inline ml-1'>Anterior</span>
               </Button>
-              
+
               <div className='flex items-center space-x-1'>
                 {/* Paginación inteligente */}
                 {(() => {
                   const pages = []
                   const maxVisiblePages = 5
                   let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2))
-                  let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1)
-                  
+                  const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1)
+
                   // Ajustar si estamos cerca del final
                   if (endPage - startPage + 1 < maxVisiblePages) {
                     startPage = Math.max(1, endPage - maxVisiblePages + 1)
                   }
-                  
+
                   // Mostrar primera página si no está visible
                   if (startPage > 1) {
                     pages.push(
@@ -528,10 +542,14 @@ export function TicketTable({
                       </Button>
                     )
                     if (startPage > 2) {
-                      pages.push(<span key="ellipsis1" className='px-2 text-muted-foreground'>...</span>)
+                      pages.push(
+                        <span key='ellipsis1' className='px-2 text-muted-foreground'>
+                          ...
+                        </span>
+                      )
                     }
                   }
-                  
+
                   // Páginas visibles
                   for (let i = startPage; i <= endPage; i++) {
                     pages.push(
@@ -546,11 +564,15 @@ export function TicketTable({
                       </Button>
                     )
                   }
-                  
+
                   // Mostrar última página si no está visible
                   if (endPage < totalPages) {
                     if (endPage < totalPages - 1) {
-                      pages.push(<span key="ellipsis2" className='px-2 text-muted-foreground'>...</span>)
+                      pages.push(
+                        <span key='ellipsis2' className='px-2 text-muted-foreground'>
+                          ...
+                        </span>
+                      )
                     }
                     pages.push(
                       <Button
@@ -564,11 +586,11 @@ export function TicketTable({
                       </Button>
                     )
                   }
-                  
+
                   return pages
                 })()}
               </div>
-              
+
               <Button
                 variant='outline'
                 size='sm'
@@ -589,12 +611,17 @@ export function TicketTable({
               <div>Página actual: {currentPage}</div>
               <div>Total páginas: {totalPages}</div>
               <div>Total tickets: {total}</div>
-              <div>Filtros activos: {[
-                debouncedSearch && `búsqueda: "${debouncedSearch}"`,
-                statusFilter !== 'all' && `estado: ${statusFilter}`,
-                priorityFilter !== 'all' && `prioridad: ${priorityFilter}`,
-                assigneeFilter !== 'all' && `asignado: ${assigneeFilter}`
-              ].filter(Boolean).join(', ') || 'ninguno'}</div>
+              <div>
+                Filtros activos:{' '}
+                {[
+                  debouncedSearch && `búsqueda: "${debouncedSearch}"`,
+                  statusFilter !== 'all' && `estado: ${statusFilter}`,
+                  priorityFilter !== 'all' && `prioridad: ${priorityFilter}`,
+                  assigneeFilter !== 'all' && `asignado: ${assigneeFilter}`,
+                ]
+                  .filter(Boolean)
+                  .join(', ') || 'ninguno'}
+              </div>
             </div>
           </div>
         )}

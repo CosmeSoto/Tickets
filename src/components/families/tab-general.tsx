@@ -497,7 +497,7 @@ export function TabGeneral({
                   </span>
                   .
                   {(deletingDept._count?.users ?? 0) > 0 && (
-                    <p className='mt-2 text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded p-2'>
+                    <p className='mt-2 text-sm text-warning-foreground bg-warning/10 border border-warning/30 rounded p-2'>
                       Este departamento tiene {deletingDept._count?.users} usuario(s) asignado(s).
                       No se podrá eliminar.
                     </p>
@@ -510,7 +510,7 @@ export function TabGeneral({
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteDept}
-              className='bg-red-600 hover:bg-red-700'
+              className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
               disabled={deletingDeptLoading}
             >
               {deletingDeptLoading ? 'Eliminando...' : 'Eliminar'}

@@ -29,24 +29,24 @@ interface UploadingFile {
 
 const ALLOWED_TYPES = [
   'image/jpeg',
-  'image/png', 
+  'image/png',
   'image/gif',
   'application/pdf',
   'text/plain',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 ]
 
 const MAX_FILE_SIZE = 10 // MB
 
-export function FileUpload({ 
-  ticketId, 
-  onUploadComplete, 
+export function FileUpload({
+  ticketId,
+  onUploadComplete,
   disabled = false,
   maxFiles = 5,
-  maxFileSize = MAX_FILE_SIZE 
+  maxFileSize = MAX_FILE_SIZE,
 }: FileUploadProps) {
   const { toast } = useToast()
   const [isDragOver, setIsDragOver] = useState(false)
@@ -78,7 +78,7 @@ export function FileUpload({
     try {
       const response = await fetch(`/api/tickets/${ticketId}/attachments`, {
         method: 'POST',
-        body: formData
+        body: formData,
       })
 
       if (!response.ok) {
@@ -90,18 +90,16 @@ export function FileUpload({
       const uploadingFile: UploadingFile = {
         file,
         progress: 0,
-        status: 'uploading'
+        status: 'uploading',
       }
 
       setUploadingFiles(prev => [...prev, uploadingFile])
 
       // Simular progreso
       const progressInterval = setInterval(() => {
-        setUploadingFiles(prev => 
-          prev.map(f => 
-            f.file === file && f.progress < 90
-              ? { ...f, progress: f.progress + 10 }
-              : f
+        setUploadingFiles(prev =>
+          prev.map(f =>
+            f.file === file && f.progress < 90 ? { ...f, progress: f.progress + 10 } : f
           )
         )
       }, 100)
@@ -111,12 +109,8 @@ export function FileUpload({
       clearInterval(progressInterval)
 
       // Completar subida
-      setUploadingFiles(prev => 
-        prev.map(f => 
-          f.file === file
-            ? { ...f, progress: 100, status: 'success' }
-            : f
-        )
+      setUploadingFiles(prev =>
+        prev.map(f => (f.file === file ? { ...f, progress: 100, status: 'success' } : f))
       )
 
       // Remover de la lista después de 2 segundos
@@ -126,19 +120,18 @@ export function FileUpload({
 
       toast({
         title: 'Éxito',
-        description: `Archivo "${file.name}" subido correctamente`
+        description: `Archivo "${file.name}" subido correctamente`,
       })
 
       onUploadComplete?.()
-
     } catch (error) {
-      setUploadingFiles(prev => 
-        prev.map(f => 
+      setUploadingFiles(prev =>
+        prev.map(f =>
           f.file === file
-            ? { 
-                ...f, 
-                status: 'error', 
-                error: error instanceof Error ? error.message : 'Error desconocido'
+            ? {
+                ...f,
+                status: 'error',
+                error: error instanceof Error ? error.message : 'Error desconocido',
               }
             : f
         )
@@ -147,51 +140,57 @@ export function FileUpload({
       toast({
         title: 'Error',
         description: error instanceof Error ? error.message : 'Error al subir archivo',
-        variant: 'destructive'
+        variant: 'destructive',
       })
     }
   }
 
-  const handleFiles = useCallback(async (files: FileList) => {
-    if (disabled) return
+  const handleFiles = useCallback(
+    async (files: FileList) => {
+      if (disabled) return
 
-    const fileArray = Array.from(files)
-    
-    // Validar número de archivos
-    if (uploadingFiles.length + fileArray.length > maxFiles) {
-      toast({
-        title: 'Demasiados archivos',
-        description: `Solo puedes subir máximo ${maxFiles} archivos a la vez`,
-        variant: 'destructive'
-      })
-      return
-    }
+      const fileArray = Array.from(files)
 
-    // Validar cada archivo
-    for (const file of fileArray) {
-      const error = validateFile(file)
-      if (error) {
+      // Validar número de archivos
+      if (uploadingFiles.length + fileArray.length > maxFiles) {
         toast({
-          title: 'Archivo inválido',
-          description: `${file.name}: ${error}`,
-          variant: 'destructive'
+          title: 'Demasiados archivos',
+          description: `Solo puedes subir máximo ${maxFiles} archivos a la vez`,
+          variant: 'destructive',
         })
-        continue
+        return
       }
 
-      // Subir archivo
-      uploadFile(file)
-    }
-  }, [disabled, uploadingFiles.length, maxFiles, ticketId, toast, onUploadComplete])
+      // Validar cada archivo
+      for (const file of fileArray) {
+        const error = validateFile(file)
+        if (error) {
+          toast({
+            title: 'Archivo inválido',
+            description: `${file.name}: ${error}`,
+            variant: 'destructive',
+          })
+          continue
+        }
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragOver(false)
-    
-    if (e.dataTransfer.files) {
-      handleFiles(e.dataTransfer.files)
-    }
-  }, [handleFiles])
+        // Subir archivo
+        uploadFile(file)
+      }
+    },
+    [disabled, uploadingFiles.length, maxFiles, ticketId, toast, onUploadComplete]
+  )
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault()
+      setIsDragOver(false)
+
+      if (e.dataTransfer.files) {
+        handleFiles(e.dataTransfer.files)
+      }
+    },
+    [handleFiles]
+  )
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -203,22 +202,25 @@ export function FileUpload({
     setIsDragOver(false)
   }, [])
 
-  const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      handleFiles(e.target.files)
-      // Limpiar input para permitir subir el mismo archivo de nuevo
-      e.target.value = ''
-    }
-  }, [handleFiles])
+  const handleFileInput = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files) {
+        handleFiles(e.target.files)
+        // Limpiar input para permitir subir el mismo archivo de nuevo
+        e.target.value = ''
+      }
+    },
+    [handleFiles]
+  )
 
   const removeUploadingFile = (file: File) => {
     setUploadingFiles(prev => prev.filter(f => f.file !== file))
   }
 
   const getFileIcon = (type: string) => {
-    if (type.startsWith('image/')) return <Image className="h-4 w-4" />
-    if (type === 'application/pdf') return <FileText className="h-4 w-4" />
-    return <File className="h-4 w-4" />
+    if (type.startsWith('image/')) return <Image className='h-4 w-4' />
+    if (type === 'application/pdf') return <FileText className='h-4 w-4' />
+    return <File className='h-4 w-4' />
   }
 
   const formatFileSize = (bytes: number): string => {
@@ -232,94 +234,93 @@ export function FileUpload({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <Upload className="h-5 w-5" />
+        <CardTitle className='flex items-center space-x-2'>
+          <Upload className='h-5 w-5' />
           <span>Subir Archivos</span>
         </CardTitle>
         <CardDescription>
           Arrastra archivos aquí o haz clic para seleccionar. Máximo {maxFileSize}MB por archivo.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        
+      <CardContent className='space-y-4'>
         {/* Zona de drop */}
         <div
           className={cn(
-            "border-2 border-dashed rounded-lg p-6 text-center transition-colors",
-            isDragOver 
-              ? "border-green-500 bg-green-50" 
-              : "border-muted-foreground/25 hover:border-muted-foreground/50",
-            disabled && "opacity-50 cursor-not-allowed"
+            'border-2 border-dashed rounded-lg p-6 text-center transition-colors',
+            isDragOver
+              ? 'border-primary bg-primary/5'
+              : 'border-muted-foreground/25 hover:border-muted-foreground/50',
+            disabled && 'opacity-50 cursor-not-allowed'
           )}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
         >
-          <Upload className={cn(
-            "h-8 w-8 mx-auto mb-2",
-            isDragOver ? "text-green-500" : "text-muted-foreground"
-          )} />
-          <p className="text-sm text-muted-foreground mb-2">
+          <Upload
+            className={cn(
+              'h-8 w-8 mx-auto mb-2',
+              isDragOver ? 'text-primary' : 'text-muted-foreground'
+            )}
+          />
+          <p className='text-sm text-muted-foreground mb-2'>
             Arrastra archivos aquí o{' '}
-            <label className="text-green-600 hover:text-green-700 cursor-pointer underline">
+            <label className='text-primary hover:text-primary/80 cursor-pointer underline'>
               selecciona archivos
               <input
-                type="file"
+                type='file'
                 multiple
                 accept={ALLOWED_TYPES.join(',')}
                 onChange={handleFileInput}
                 disabled={disabled}
-                className="hidden"
+                className='hidden'
               />
             </label>
           </p>
-          <p className="text-xs text-muted-foreground">
+          <p className='text-xs text-muted-foreground'>
             Tipos permitidos: Imágenes, PDF, Documentos de Office, Texto plano
           </p>
         </div>
 
         {/* Lista de archivos subiendo */}
         {uploadingFiles.length > 0 && (
-          <div className="space-y-2">
-            <h4 className="text-sm font-medium">Subiendo archivos:</h4>
+          <div className='space-y-2'>
+            <h4 className='text-sm font-medium'>Subiendo archivos:</h4>
             {uploadingFiles.map((uploadingFile, index) => (
-              <div key={index} className="flex items-center space-x-3 p-3 bg-muted/50 rounded-lg">
-                <div className="flex items-center space-x-2 flex-1">
+              <div key={index} className='flex items-center space-x-3 p-3 bg-muted/50 rounded-lg'>
+                <div className='flex items-center space-x-2 flex-1'>
                   {getFileIcon(uploadingFile.file.type)}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {uploadingFile.file.name}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
+                  <div className='flex-1 min-w-0'>
+                    <p className='text-sm font-medium truncate'>{uploadingFile.file.name}</p>
+                    <p className='text-xs text-muted-foreground'>
                       {formatFileSize(uploadingFile.file.size)}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
+                <div className='flex items-center space-x-2'>
                   {uploadingFile.status === 'uploading' && (
-                    <div className="w-20">
-                      <Progress value={uploadingFile.progress} className="h-2" />
+                    <div className='w-20'>
+                      <Progress value={uploadingFile.progress} className='h-2' />
                     </div>
                   )}
-                  
+
                   {uploadingFile.status === 'success' && (
-                    <div className="text-green-600 text-sm">✓</div>
+                    <div className='text-primary text-sm'>✓</div>
                   )}
-                  
+
                   {uploadingFile.status === 'error' && (
-                    <div className="flex items-center space-x-1 text-red-600">
-                      <AlertCircle className="h-4 w-4" />
-                      <span className="text-xs">{uploadingFile.error}</span>
+                    <div className='flex items-center space-x-1 text-destructive'>
+                      <AlertCircle className='h-4 w-4' />
+                      <span className='text-xs'>{uploadingFile.error}</span>
                     </div>
                   )}
 
                   <Button
-                    variant="ghost"
-                    size="sm"
+                    variant='ghost'
+                    size='sm'
                     onClick={() => removeUploadingFile(uploadingFile.file)}
                   >
-                    <X className="h-4 w-4" />
+                    <X className='h-4 w-4' />
                   </Button>
                 </div>
               </div>
