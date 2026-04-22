@@ -16,7 +16,13 @@ interface UnifiedAssetFormProps {
   defaultFamilyId?: string
 }
 
-interface Family { id: string; name: string; icon?: string | null; color?: string | null; code: string }
+interface Family {
+  id: string
+  name: string
+  icon?: string | null
+  color?: string | null
+  code: string
+}
 
 export function UnifiedAssetForm({ onSuccess, onCancel, defaultFamilyId }: UnifiedAssetFormProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1)
@@ -37,9 +43,12 @@ export function UnifiedAssetForm({ onSuccess, onCancel, defaultFamilyId }: Unifi
   const initialized = useRef(false)
 
   useEffect(() => {
-    fetch('/api/config/upload-limits').then(r => r.json()).then(d => {
-      if (d.maxFileSizeMB) setMaxFileSizeMB(d.maxFileSizeMB)
-    }).catch(() => {})
+    fetch('/api/config/upload-limits')
+      .then(r => r.json())
+      .then(d => {
+        if (d.maxFileSizeMB) setMaxFileSizeMB(d.maxFileSizeMB)
+      })
+      .catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -55,10 +64,12 @@ export function UnifiedAssetForm({ onSuccess, onCancel, defaultFamilyId }: Unifi
     try {
       const res = await fetch(`/api/inventory/family-config/${familyId}`)
       if (res.ok) {
-        const config: FamilyConfig = await res.json()
+        const json = await res.json()
+        const config: FamilyConfig = json.data ?? json
         setFamilyConfig(config)
-        if (config.allowedSubtypes.length === 1) {
-          setSelectedSubtype(config.allowedSubtypes[0])
+        const subtypes = config.allowedSubtypes ?? []
+        if (subtypes.length === 1) {
+          setSelectedSubtype(subtypes[0])
           setStep(3)
         } else {
           setStep(2)
@@ -75,7 +86,7 @@ export function UnifiedAssetForm({ onSuccess, onCancel, defaultFamilyId }: Unifi
   }
 
   const handleBack = () => {
-    if (familyConfig && familyConfig.allowedSubtypes.length > 1) {
+    if (familyConfig && (familyConfig.allowedSubtypes ?? []).length > 1) {
       setStep(2)
     } else {
       setStep(1)
@@ -107,24 +118,42 @@ export function UnifiedAssetForm({ onSuccess, onCancel, defaultFamilyId }: Unifi
   }
 
   return (
-    <div className="space-y-6">
+    <div className='space-y-6'>
       {/* Paso 1 */}
       {step === 1 && (
-        <div className="space-y-4">
-          <p className="text-sm font-medium">Selecciona una familia</p>
-          {loadingFamilies ? <p className="text-sm text-muted-foreground">Cargando familias...</p> : (
-            <FamilySelector families={families} selectedId={selectedFamilyId} onSelect={handleFamilySelect} disabled={loadingConfig} />
+        <div className='space-y-4'>
+          <p className='text-sm font-medium'>Selecciona una familia</p>
+          {loadingFamilies ? (
+            <p className='text-sm text-muted-foreground'>Cargando familias...</p>
+          ) : (
+            <FamilySelector
+              families={families}
+              selectedId={selectedFamilyId}
+              onSelect={handleFamilySelect}
+              disabled={loadingConfig}
+            />
           )}
-          {loadingConfig && <p className="text-sm text-muted-foreground">Cargando configuración...</p>}
+          {loadingConfig && (
+            <p className='text-sm text-muted-foreground'>Cargando configuración...</p>
+          )}
         </div>
       )}
 
       {/* Paso 2 */}
       {step === 2 && familyConfig && (
-        <div className="space-y-4">
-          <button type="button" onClick={() => setStep(1)} className="text-sm text-muted-foreground hover:text-foreground">← Cambiar familia</button>
-          <p className="text-sm font-medium">Selecciona el tipo de activo</p>
-          <SubtypeSelector allowedSubtypes={familyConfig.allowedSubtypes} onSelect={handleSubtypeSelect} />
+        <div className='space-y-4'>
+          <button
+            type='button'
+            onClick={() => setStep(1)}
+            className='text-sm text-muted-foreground hover:text-foreground'
+          >
+            ← Cambiar familia
+          </button>
+          <p className='text-sm font-medium'>Selecciona el tipo de activo</p>
+          <SubtypeSelector
+            allowedSubtypes={familyConfig.allowedSubtypes}
+            onSelect={handleSubtypeSelect}
+          />
         </div>
       )}
 
