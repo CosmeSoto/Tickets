@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { z } from 'zod'
 import { randomUUID } from 'crypto'
+import { withCache, invalidateCache } from '@/lib/api-cache'
 
 // Schema de validación extendido para todas las preferencias de notificaciones
 const userSettingsSchema = z.object({
@@ -56,154 +57,161 @@ export async function GET(request: NextRequest) {
 
     const userId = session.user.id
 
-    // Verificar que el usuario existe en la BD
-    const userExists = await prisma.users.findUnique({
-      where: { id: userId },
-      select: { id: true },
-    })
+    // Caché 3 minutos por usuario — settings cambian raramente
+    const cached = await withCache(`user:settings:${userId}`, 180, async () => {
+      // Verificar que el usuario existe en la BD
+      const userExists = await prisma.users.findUnique({
+        where: { id: userId },
+        select: { id: true },
+      })
 
-    if (!userExists) {
-      // Usuario no existe en BD — sesión huérfana, devolver defaults sin error 404
-      return NextResponse.json({
+      if (!userExists) {
+        // Usuario no existe en BD — sesión huérfana, devolver defaults sin error 404
+        return {
+          success: true,
+          settings: {
+            emailNotifications: true,
+            pushNotifications: true,
+            ticketUpdates: true,
+            systemAlerts: true,
+            weeklyReport: false,
+            soundEnabled: true,
+            ticketCreated: true,
+            ticketAssigned: true,
+            statusChanged: true,
+            newComments: true,
+            ticketUpdated: true,
+            quietHours: { enabled: false, startTime: '22:00', endTime: '08:00' },
+            autoAssignEnabled: true,
+            maxConcurrentTickets: 10,
+            theme: 'light',
+            language: 'es',
+            timezone: 'America/Guayaquil',
+            profileVisible: true,
+            activityVisible: true,
+          },
+        }
+      }
+
+      // Buscar configuración existente — con manejo de registros corruptos
+      let settings = await prisma.user_settings
+        .findUnique({
+          where: { userId },
+        })
+        .catch(() => null) // Si falla la deserialización (campos null), tratar como no existente
+
+      // Si no existe o falló la lectura, crear/reparar con upsert completo
+      if (!settings) {
+        const now = new Date()
+        settings = await prisma.user_settings.upsert({
+          where: { userId },
+          update: {
+            theme: 'light',
+            language: 'es',
+            timezone: 'America/Guayaquil',
+            systemAlerts: true,
+            weeklyReport: false,
+            soundEnabled: true,
+            ticketUpdates: true,
+            ticketCreated: true,
+            ticketAssigned: true,
+            statusChanged: true,
+            newComments: true,
+            ticketUpdated: true,
+            autoAssignEnabled: true,
+            maxConcurrentTickets: 10,
+            quietHoursEnabled: false,
+            quietHoursStart: '22:00',
+            quietHoursEnd: '08:00',
+            updatedAt: now,
+          },
+          create: {
+            id: randomUUID(),
+            userId,
+            emailNotifications: true,
+            pushNotifications: true,
+            ticketUpdates: true,
+            systemAlerts: true,
+            weeklyReport: false,
+            soundEnabled: true,
+            ticketCreated: true,
+            ticketAssigned: true,
+            statusChanged: true,
+            newComments: true,
+            ticketUpdated: true,
+            quietHoursEnabled: false,
+            quietHoursStart: '22:00',
+            quietHoursEnd: '08:00',
+            autoAssignEnabled: true,
+            maxConcurrentTickets: 10,
+            theme: 'light',
+            language: 'es',
+            timezone: 'America/Guayaquil',
+            updatedAt: now,
+          },
+        })
+      }
+
+      // Reparar registros con campos null (creados con schema incompleto o updatedAt null)
+      const needsRepair =
+        !settings.theme || !settings.language || !settings.timezone || !settings.updatedAt
+      if (needsRepair) {
+        settings = await prisma.user_settings.update({
+          where: { userId },
+          data: {
+            theme: settings.theme ?? 'light',
+            language: settings.language ?? 'es',
+            timezone: settings.timezone ?? 'America/Guayaquil',
+            systemAlerts: settings.systemAlerts ?? true,
+            weeklyReport: settings.weeklyReport ?? false,
+            soundEnabled: settings.soundEnabled ?? true,
+            ticketUpdates: settings.ticketUpdates ?? true,
+            ticketCreated: settings.ticketCreated ?? true,
+            ticketAssigned: settings.ticketAssigned ?? true,
+            statusChanged: settings.statusChanged ?? true,
+            newComments: settings.newComments ?? true,
+            ticketUpdated: settings.ticketUpdated ?? true,
+            autoAssignEnabled: settings.autoAssignEnabled ?? true,
+            maxConcurrentTickets: settings.maxConcurrentTickets ?? 10,
+            quietHoursEnabled: settings.quietHoursEnabled ?? false,
+            quietHoursStart: settings.quietHoursStart ?? '22:00',
+            quietHoursEnd: settings.quietHoursEnd ?? '08:00',
+            updatedAt: new Date(),
+          },
+        })
+      }
+
+      return {
         success: true,
         settings: {
-          emailNotifications: true,
-          pushNotifications: true,
-          ticketUpdates: true,
-          systemAlerts: true,
-          weeklyReport: false,
-          soundEnabled: true,
-          ticketCreated: true,
-          ticketAssigned: true,
-          statusChanged: true,
-          newComments: true,
-          ticketUpdated: true,
-          quietHours: { enabled: false, startTime: '22:00', endTime: '08:00' },
-          autoAssignEnabled: true,
-          maxConcurrentTickets: 10,
-          theme: 'light',
-          language: 'es',
-          timezone: 'America/Guayaquil',
+          emailNotifications: settings.emailNotifications,
+          pushNotifications: settings.pushNotifications,
+          ticketUpdates: settings.ticketUpdates,
+          systemAlerts: settings.systemAlerts,
+          weeklyReport: settings.weeklyReport,
+          soundEnabled: settings.soundEnabled,
+          ticketCreated: settings.ticketCreated,
+          ticketAssigned: settings.ticketAssigned,
+          statusChanged: settings.statusChanged,
+          newComments: settings.newComments,
+          ticketUpdated: settings.ticketUpdated,
+          quietHours: {
+            enabled: settings.quietHoursEnabled,
+            startTime: settings.quietHoursStart,
+            endTime: settings.quietHoursEnd,
+          },
+          autoAssignEnabled: settings.autoAssignEnabled,
+          maxConcurrentTickets: settings.maxConcurrentTickets,
+          theme: settings.theme,
+          language: settings.language,
+          timezone: settings.timezone,
           profileVisible: true,
           activityVisible: true,
         },
-      })
-    }
+      }
+    }) // fin withCache
 
-    // Buscar configuración existente — con manejo de registros corruptos
-    let settings = await prisma.user_settings.findUnique({
-      where: { userId },
-    }).catch(() => null) // Si falla la deserialización (campos null), tratar como no existente
-
-    // Si no existe o falló la lectura, crear/reparar con upsert completo
-    if (!settings) {
-      const now = new Date()
-      settings = await prisma.user_settings.upsert({
-        where: { userId },
-        update: {
-          theme: 'light',
-          language: 'es',
-          timezone: 'America/Guayaquil',
-          systemAlerts: true,
-          weeklyReport: false,
-          soundEnabled: true,
-          ticketUpdates: true,
-          ticketCreated: true,
-          ticketAssigned: true,
-          statusChanged: true,
-          newComments: true,
-          ticketUpdated: true,
-          autoAssignEnabled: true,
-          maxConcurrentTickets: 10,
-          quietHoursEnabled: false,
-          quietHoursStart: '22:00',
-          quietHoursEnd: '08:00',
-          updatedAt: now,
-        },
-        create: {
-          id: randomUUID(),
-          userId,
-          emailNotifications: true,
-          pushNotifications: true,
-          ticketUpdates: true,
-          systemAlerts: true,
-          weeklyReport: false,
-          soundEnabled: true,
-          ticketCreated: true,
-          ticketAssigned: true,
-          statusChanged: true,
-          newComments: true,
-          ticketUpdated: true,
-          quietHoursEnabled: false,
-          quietHoursStart: '22:00',
-          quietHoursEnd: '08:00',
-          autoAssignEnabled: true,
-          maxConcurrentTickets: 10,
-          theme: 'light',
-          language: 'es',
-          timezone: 'America/Guayaquil',
-          updatedAt: now,
-        },
-      })
-    }
-
-    // Reparar registros con campos null (creados con schema incompleto o updatedAt null)
-    const needsRepair = !settings.theme || !settings.language || !settings.timezone || !settings.updatedAt
-    if (needsRepair) {
-      settings = await prisma.user_settings.update({
-        where: { userId },
-        data: {
-          theme: settings.theme ?? 'light',
-          language: settings.language ?? 'es',
-          timezone: settings.timezone ?? 'America/Guayaquil',
-          systemAlerts: settings.systemAlerts ?? true,
-          weeklyReport: settings.weeklyReport ?? false,
-          soundEnabled: settings.soundEnabled ?? true,
-          ticketUpdates: settings.ticketUpdates ?? true,
-          ticketCreated: settings.ticketCreated ?? true,
-          ticketAssigned: settings.ticketAssigned ?? true,
-          statusChanged: settings.statusChanged ?? true,
-          newComments: settings.newComments ?? true,
-          ticketUpdated: settings.ticketUpdated ?? true,
-          autoAssignEnabled: settings.autoAssignEnabled ?? true,
-          maxConcurrentTickets: settings.maxConcurrentTickets ?? 10,
-          quietHoursEnabled: settings.quietHoursEnabled ?? false,
-          quietHoursStart: settings.quietHoursStart ?? '22:00',
-          quietHoursEnd: settings.quietHoursEnd ?? '08:00',
-          updatedAt: new Date(),
-        },
-      })
-    }
-
-    return NextResponse.json({
-      success: true,
-      settings: {
-        emailNotifications: settings.emailNotifications,
-        pushNotifications: settings.pushNotifications,
-        ticketUpdates: settings.ticketUpdates,
-        systemAlerts: settings.systemAlerts,
-        weeklyReport: settings.weeklyReport,
-        soundEnabled: settings.soundEnabled,
-        ticketCreated: settings.ticketCreated,
-        ticketAssigned: settings.ticketAssigned,
-        statusChanged: settings.statusChanged,
-        newComments: settings.newComments,
-        ticketUpdated: settings.ticketUpdated,
-        quietHours: {
-          enabled: settings.quietHoursEnabled,
-          startTime: settings.quietHoursStart,
-          endTime: settings.quietHoursEnd,
-        },
-        autoAssignEnabled: settings.autoAssignEnabled,
-        maxConcurrentTickets: settings.maxConcurrentTickets,
-        theme: settings.theme,
-        language: settings.language,
-        timezone: settings.timezone,
-        // Privacidad — valores por defecto (migrado de user_preferences)
-        profileVisible: true,
-        activityVisible: true,
-      },
-    })
+    return NextResponse.json(cached)
   } catch (error) {
     console.error('[API-USER-SETTINGS] GET Error:', error)
     return NextResponse.json(
@@ -309,6 +317,11 @@ export async function PUT(request: NextRequest) {
         updatedAt: new Date(),
       },
     })
+
+    // Invalidar caché del usuario
+    try {
+      await invalidateCache(`user:settings:${session.user.id}`)
+    } catch {}
 
     return NextResponse.json({
       success: true,

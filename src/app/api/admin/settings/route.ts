@@ -80,43 +80,47 @@ export async function GET() {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // Buscar configuración existente
-    const existingSettings = await prisma.system_settings.findMany()
+    // Caché 5 minutos — configuración del sistema cambia raramente
+    const { withCache } = await import('@/lib/api-cache')
+    const settings = await withCache('admin:settings', 300, async () => {
+      const existingSettings = await prisma.system_settings.findMany()
+      const result = { ...defaultSettings } as any
 
-    // Convertir array de configuraciones a objeto
-    const settings = { ...defaultSettings }
-
-    existingSettings.forEach(setting => {
-      const value = setting.value
-
-      // Convertir tipos según sea necesario
-      if (
-        setting.key === 'maxTicketsPerUser' ||
-        setting.key === 'smtpPort' ||
-        setting.key === 'sessionTimeout' ||
-        setting.key === 'maxLoginAttempts' ||
-        setting.key === 'passwordMinLength' ||
-        setting.key === 'maxFileSize' ||
-        setting.key === 'backupRetention' ||
-        setting.key === 'autoCloseDays'
-      ) {
-        ;(settings as any)[setting.key] = parseInt(value)
-      } else if (
-        setting.key === 'autoAssignmentEnabled' ||
-        setting.key === 'emailEnabled' ||
-        setting.key === 'smtpSecure' ||
-        setting.key === 'notificationsEnabled' ||
-        setting.key === 'emailNotifications' ||
-        setting.key === 'browserNotifications' ||
-        setting.key === 'requirePasswordChange' ||
-        setting.key === 'backupEnabled'
-      ) {
-        ;(settings as any)[setting.key] = value === 'true'
-      } else if (setting.key === 'allowedFileTypes') {
-        ;(settings as any)[setting.key] = JSON.parse(value)
-      } else {
-        ;(settings as any)[setting.key] = value
-      }
+      existingSettings.forEach(setting => {
+        const value = setting.value
+        if (
+          [
+            'maxTicketsPerUser',
+            'smtpPort',
+            'sessionTimeout',
+            'maxLoginAttempts',
+            'passwordMinLength',
+            'maxFileSize',
+            'backupRetention',
+            'autoCloseDays',
+          ].includes(setting.key)
+        ) {
+          result[setting.key] = parseInt(value)
+        } else if (
+          [
+            'autoAssignmentEnabled',
+            'emailEnabled',
+            'smtpSecure',
+            'notificationsEnabled',
+            'emailNotifications',
+            'browserNotifications',
+            'requirePasswordChange',
+            'backupEnabled',
+          ].includes(setting.key)
+        ) {
+          result[setting.key] = value === 'true'
+        } else if (setting.key === 'allowedFileTypes') {
+          result[setting.key] = JSON.parse(value)
+        } else {
+          result[setting.key] = value
+        }
+      })
+      return result
     })
 
     return NextResponse.json(settings)
@@ -210,8 +214,12 @@ export async function PUT(request: NextRequest) {
 
     // Invalidar caché de settings afectados
     try {
-      const { invalidateSettings } = await import('@/lib/api-cache')
-      await invalidateSettings([...Object.keys(validatedData), 'config:session-timeout'])
+      const { invalidateSettings, invalidateCache } = await import('@/lib/api-cache')
+      await Promise.all([
+        invalidateCache('admin:settings'),
+        invalidateCache('config:session-timeout'),
+        invalidateSettings(Object.keys(validatedData)),
+      ])
     } catch {
       /* Redis no disponible */
     }

@@ -5,19 +5,11 @@ import { prisma } from '@/lib/prisma'
 import { canManageInventory } from '@/lib/inventory-access'
 import { getAccessibleFamilyIds } from '@/lib/inventory/family-access'
 import { randomUUID } from 'crypto'
+import { withCache, buildCacheKey, invalidateCache } from '@/lib/api-cache'
 
-/**
- * GET /api/inventory/families
- * Lista familias de inventario según el rol del usuario:
- * - SuperAdmin: todas las activas
- * - Admin normal: solo sus familias asignadas en admin_family_assignments
- * - Gestor (canManageInventory): solo sus familias en inventory_manager_families
- * - TECHNICIAN / CLIENT sin gestión: todas las activas (solo lectura para filtros de UI)
- */
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-
     if (!session?.user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
@@ -26,36 +18,46 @@ export async function GET(request: NextRequest) {
     const isAdmin = user.role === 'ADMIN'
     const isSuperAdmin = (user as any).isSuperAdmin === true
     const userCanManageInventory = (user as any).canManageInventory === true
-    const isManager = !isAdmin && await canManageInventory(user.id, user.role)
-
+    const isManager = !isAdmin && (await canManageInventory(user.id, user.role))
     const includeInactive =
       isAdmin && isSuperAdmin && request.nextUrl.searchParams.get('includeInactive') === 'true'
 
-    if (isAdmin || isManager) {
-      const accessibleIds = await getAccessibleFamilyIds(user.id, user.role, isSuperAdmin, userCanManageInventory)
-
-      const families = await prisma.families.findMany({
-        where: {
-          ...(includeInactive ? {} : { isActive: true }),
-          ...(accessibleIds !== undefined ? { id: { in: accessibleIds } } : {}),
-        },
-        orderBy: { order: 'asc' },
-      })
-      return NextResponse.json({ families })
-    }
-
-    // TECHNICIAN / CLIENT sin gestión: todas las familias activas (solo lectura para filtros)
-    const families = await prisma.families.findMany({
-      where: { isActive: true },
-      orderBy: { order: 'asc' },
-      select: { id: true, name: true, code: true, color: true, icon: true, order: true },
+    // Caché 5 min — familias de inventario cambian raramente
+    const cacheKey = buildCacheKey('inv:families', {
+      uid: user.id,
+      role: user.role,
+      isSuperAdmin,
+      includeInactive,
     })
-    return NextResponse.json({ families })
-  } catch {
+
     return NextResponse.json(
-      { error: 'Error al obtener familias' },
-      { status: 500 }
+      await withCache(cacheKey, 300, async () => {
+        if (isAdmin || isManager) {
+          const accessibleIds = await getAccessibleFamilyIds(
+            user.id,
+            user.role,
+            isSuperAdmin,
+            userCanManageInventory
+          )
+          const families = await prisma.families.findMany({
+            where: {
+              ...(includeInactive ? {} : { isActive: true }),
+              ...(accessibleIds !== undefined ? { id: { in: accessibleIds } } : {}),
+            },
+            orderBy: { order: 'asc' },
+          })
+          return { families }
+        }
+        const families = await prisma.families.findMany({
+          where: { isActive: true },
+          orderBy: { order: 'asc' },
+          select: { id: true, name: true, code: true, color: true, icon: true, order: true },
+        })
+        return { families }
+      })
     )
+  } catch {
+    return NextResponse.json({ error: 'Error al obtener familias' }, { status: 500 })
   }
 }
 
@@ -88,8 +90,15 @@ export async function POST(request: NextRequest) {
 
     // Generar code a partir del nombre si no se provee
     const familyCode: string = code
-      ? String(code).toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '')
-      : name.trim().toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '')
+      ? String(code)
+          .toUpperCase()
+          .replace(/\s+/g, '_')
+          .replace(/[^A-Z0-9_]/g, '')
+      : name
+          .trim()
+          .toUpperCase()
+          .replace(/\s+/g, '_')
+          .replace(/[^A-Z0-9_]/g, '')
 
     const family = await prisma.families.create({
       data: {
@@ -103,22 +112,26 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    await prisma.audit_logs.create({
-      data: {
-        id: randomUUID(),
-        action: 'CREATE',
-        entityType: 'inventory_family',
-        entityId: family.id,
-        userId: session.user.id,
-        details: { name: family.name },
-      },
-    }).catch(err => console.warn('[audit] families POST:', err?.message))
+    await prisma.audit_logs
+      .create({
+        data: {
+          id: randomUUID(),
+          action: 'CREATE',
+          entityType: 'inventory_family',
+          entityId: family.id,
+          userId: session.user.id,
+          details: { name: family.name },
+        },
+      })
+      .catch(err => console.warn('[audit] families POST:', err?.message))
+
+    // Invalidar caché de familias de inventario
+    try {
+      await invalidateCache('inv:families:*')
+    } catch {}
 
     return NextResponse.json({ family }, { status: 201 })
   } catch {
-    return NextResponse.json(
-      { error: 'Error al crear la familia' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al crear la familia' }, { status: 500 })
   }
 }

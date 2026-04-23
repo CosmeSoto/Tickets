@@ -1,26 +1,7 @@
 /**
- * Rate Limiting Simple - Sin dependencias externas
- * Protege contra abuso de endpoints costosos
+ * Rate Limiting con Redis (con fallback a memoria si Redis no está disponible).
+ * Funciona correctamente en múltiples instancias/workers.
  */
-
-interface RateLimitEntry {
-  count: number
-  resetAt: number
-  firstRequest: number
-}
-
-// Almacenamiento en memoria (se reinicia con el servidor)
-const rateLimitMap = new Map<string, RateLimitEntry>()
-
-// Limpieza automática cada 5 minutos
-setInterval(() => {
-  const now = Date.now()
-  for (const [key, entry] of rateLimitMap.entries()) {
-    if (now > entry.resetAt) {
-      rateLimitMap.delete(key)
-    }
-  }
-}, 5 * 60 * 1000)
 
 export interface RateLimitResult {
   success: boolean
@@ -30,131 +11,101 @@ export interface RateLimitResult {
   retryAfter?: number
 }
 
-/**
- * Verifica si una solicitud está dentro del límite de rate
- * 
- * @param identifier - Identificador único (userId, IP, etc.)
- * @param maxRequests - Número máximo de solicitudes permitidas
- * @param windowMs - Ventana de tiempo en milisegundos
- * @returns Resultado del rate limit
- * 
- * @example
- * ```typescript
- * const result = checkRateLimit(userId, 10, 60000) // 10 req/min
- * if (!result.success) {
- *   return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
- * }
- * ```
- */
-export function checkRateLimit(
-  identifier: string,
-  maxRequests: number = 10,
-  windowMs: number = 60000 // 1 minuto por defecto
-): RateLimitResult {
-  const now = Date.now()
-  const entry = rateLimitMap.get(identifier)
+// Fallback en memoria para cuando Redis no está disponible
+interface MemEntry {
+  count: number
+  resetAt: number
+}
+const memMap = new Map<string, MemEntry>()
+setInterval(
+  () => {
+    const now = Date.now()
+    for (const [k, e] of memMap) if (now > e.resetAt) memMap.delete(k)
+  },
+  5 * 60 * 1000
+)
 
-  // Primera solicitud o ventana expirada
+function checkMemory(id: string, max: number, windowMs: number): RateLimitResult {
+  const now = Date.now()
+  const entry = memMap.get(id)
   if (!entry || now > entry.resetAt) {
-    const resetAt = now + windowMs
-    rateLimitMap.set(identifier, {
-      count: 1,
-      resetAt,
-      firstRequest: now
-    })
+    memMap.set(id, { count: 1, resetAt: now + windowMs })
+    return { success: true, limit: max, remaining: max - 1, reset: now + windowMs }
+  }
+  if (entry.count >= max) {
+    return {
+      success: false,
+      limit: max,
+      remaining: 0,
+      reset: entry.resetAt,
+      retryAfter: Math.ceil((entry.resetAt - now) / 1000),
+    }
+  }
+  entry.count++
+  return { success: true, limit: max, remaining: max - entry.count, reset: entry.resetAt }
+}
+
+/**
+ * Verifica rate limit usando Redis INCR + EXPIRE (atómico, distribuido).
+ * Fallback automático a memoria si Redis no está disponible.
+ */
+export async function checkRateLimit(
+  identifier: string,
+  maxRequests = 10,
+  windowMs = 60_000
+): Promise<RateLimitResult> {
+  const windowSec = Math.ceil(windowMs / 1000)
+  const resetAt = Date.now() + windowMs
+
+  try {
+    const { redis } = await import('@/lib/redis')
+    const key = `rl:${identifier}`
+
+    // Pipeline: INCR + EXPIRE en una sola operación
+    const count = await redis.incr(key)
+    if (count === 1) {
+      // Primera request en esta ventana — establecer TTL
+      await redis.expire(key, windowSec)
+    }
+
+    const ttl = await redis.ttl(key)
+    const actualReset = Date.now() + (ttl > 0 ? ttl * 1000 : windowMs)
+
+    if (count > maxRequests) {
+      return {
+        success: false,
+        limit: maxRequests,
+        remaining: 0,
+        reset: actualReset,
+        retryAfter: ttl > 0 ? ttl : windowSec,
+      }
+    }
 
     return {
       success: true,
       limit: maxRequests,
-      remaining: maxRequests - 1,
-      reset: resetAt
+      remaining: Math.max(0, maxRequests - count),
+      reset: actualReset,
     }
-  }
-
-  // Dentro de la ventana
-  if (entry.count >= maxRequests) {
-    // Límite excedido
-    return {
-      success: false,
-      limit: maxRequests,
-      remaining: 0,
-      reset: entry.resetAt,
-      retryAfter: Math.ceil((entry.resetAt - now) / 1000) // segundos
-    }
-  }
-
-  // Incrementar contador
-  entry.count++
-
-  return {
-    success: true,
-    limit: maxRequests,
-    remaining: maxRequests - entry.count,
-    reset: entry.resetAt
+  } catch {
+    // Redis no disponible — usar memoria
+    return checkMemory(identifier, maxRequests, windowMs)
   }
 }
 
-/**
- * Rate limiters predefinidos para diferentes endpoints
- */
 export const RateLimiters = {
-  /**
-   * Para exportaciones de reportes (costosas)
-   * 10 exportaciones por minuto por usuario
-   */
-  reports: (userId: string) => checkRateLimit(`reports:${userId}`, 10, 60000),
-
-  /**
-   * Para generación de reportes (menos costoso)
-   * 30 solicitudes por minuto por usuario
-   */
-  reportsView: (userId: string) => checkRateLimit(`reports-view:${userId}`, 30, 60000),
-
-  /**
-   * Para API general
-   * 100 solicitudes por minuto por usuario
-   */
-  api: (userId: string) => checkRateLimit(`api:${userId}`, 100, 60000),
-
-  /**
-   * Para login (prevenir fuerza bruta)
-   * 5 intentos por 5 minutos por IP
-   */
-  login: (ip: string) => checkRateLimit(`login:${ip}`, 5, 5 * 60000),
-
-  /**
-   * Para creación de tickets
-   * 20 tickets por hora por usuario
-   */
-  createTicket: (userId: string) => checkRateLimit(`create-ticket:${userId}`, 20, 60 * 60000),
+  reports: (userId: string) => checkRateLimit(`reports:${userId}`, 10, 60_000),
+  reportsView: (userId: string) => checkRateLimit(`reports-view:${userId}`, 30, 60_000),
+  api: (userId: string) => checkRateLimit(`api:${userId}`, 100, 60_000),
+  login: (ip: string) => checkRateLimit(`login:${ip}`, 5, 5 * 60_000),
+  createTicket: (userId: string) => checkRateLimit(`create-ticket:${userId}`, 20, 60 * 60_000),
 }
 
-/**
- * Resetea el rate limit para un identificador específico
- * Útil para testing o casos especiales
- */
-export function resetRateLimit(identifier: string): void {
-  rateLimitMap.delete(identifier)
-}
-
-/**
- * Obtiene estadísticas del rate limiter
- * Útil para monitoreo
- */
-export function getRateLimitStats() {
-  const now = Date.now()
-  const active = Array.from(rateLimitMap.entries())
-    .filter(([_, entry]) => now <= entry.resetAt)
-    .map(([key, entry]) => ({
-      identifier: key,
-      count: entry.count,
-      resetIn: Math.ceil((entry.resetAt - now) / 1000),
-      duration: Math.ceil((now - entry.firstRequest) / 1000)
-    }))
-
-  return {
-    totalEntries: rateLimitMap.size,
-    activeEntries: active.length,
-    active
+export async function resetRateLimit(identifier: string): Promise<void> {
+  try {
+    const { redis } = await import('@/lib/redis')
+    await redis.del(`rl:${identifier}`)
+  } catch {
+    memMap.delete(identifier)
   }
 }
