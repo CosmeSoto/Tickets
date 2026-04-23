@@ -115,7 +115,8 @@ export function SessionTimeoutMonitor() {
         resetInactivityTimer()
       })
 
-      // Re-verificar configuración cada 2 minutos por si el admin la cambió
+      // Re-verificar configuración cada 15 minutos — el caché del servidor es de 10 min
+      // No tiene sentido verificar más seguido que el TTL del caché
       const configInterval = setInterval(
         async () => {
           const changed = await fetchSessionTimeout()
@@ -123,7 +124,7 @@ export function SessionTimeoutMonitor() {
             resetInactivityTimer()
           }
         },
-        2 * 60 * 1000
+        15 * 60 * 1000
       )
 
       return () => {

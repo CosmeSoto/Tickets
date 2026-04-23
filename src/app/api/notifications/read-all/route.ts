@@ -2,33 +2,27 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { NotificationService } from '@/lib/services/notification-service'
+import { invalidateCache } from '@/lib/api-cache'
 
-/**
- * Función compartida para marcar todas las notificaciones como leídas
- */
 async function markAllNotificationsAsRead(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
     const result = await NotificationService.markAllAsRead(session.user.id)
 
-    return NextResponse.json({
-      success: true,
-      count: result.count,
-    })
+    // Invalidar caché de lista
+    try {
+      await invalidateCache(`notif:list:${session.user.id}:*`)
+    } catch {}
+
+    return NextResponse.json({ success: true, count: result.count })
   } catch (error) {
     console.error('Error marking all as read:', error)
-    return NextResponse.json(
-      { error: 'Error al marcar todas como leídas' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al marcar todas como leídas' }, { status: 500 })
   }
 }
 

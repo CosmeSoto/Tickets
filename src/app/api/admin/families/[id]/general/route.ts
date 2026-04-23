@@ -8,14 +8,12 @@ import prisma from '@/lib/prisma'
  * Actualiza campos básicos de families: name, description, color, icon, isActive, order, code
  * Valida unicidad de code contra otras familias → HTTP 409 si colisiona
  */
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    if (session.user.role !== 'ADMIN') return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
+    if (session.user.role !== 'ADMIN')
+      return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
 
     const { id } = await params
 
@@ -52,6 +50,18 @@ export async function PATCH(
         ...(order !== undefined && { order }),
       },
     })
+
+    // Invalidar caché de la familia y listas de familias
+    try {
+      const { invalidateCache } = await import('@/lib/api-cache')
+      await Promise.all([
+        invalidateCache(`admin:family:id=${id}`),
+        invalidateCache('families:*'),
+        invalidateCache('inv:families:*'),
+      ])
+    } catch {
+      /* Redis no disponible */
+    }
 
     return NextResponse.json(updated)
   } catch (error) {

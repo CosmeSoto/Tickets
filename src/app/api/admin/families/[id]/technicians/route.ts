@@ -10,14 +10,12 @@ import { randomUUID } from 'crypto'
  * Crea registro en technician_family_assignments con isActive: true
  * HTTP 409 si ya existe el par (technicianId, familyId)
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    if (session.user.role !== 'ADMIN') return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
+    if (session.user.role !== 'ADMIN')
+      return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
 
     const { id } = await params
 
@@ -52,6 +50,14 @@ export async function POST(
         },
       },
     })
+
+    // Invalidar caché de la familia
+    try {
+      const { invalidateCache } = await import('@/lib/api-cache')
+      await invalidateCache(`admin:family:id=${id}`)
+    } catch {
+      /* Redis no disponible */
+    }
 
     return NextResponse.json(assignment, { status: 201 })
   } catch (error) {

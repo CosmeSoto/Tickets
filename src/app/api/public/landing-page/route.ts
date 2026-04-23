@@ -4,7 +4,7 @@ import { withCache, invalidateCache } from '@/lib/api-cache'
 
 export async function GET() {
   try {
-    const data = await withCache('landing:page', 300, async () => {
+    const data = await withCache('landing:page', 1800, async () => {
       const [content, services, banners] = await Promise.all([
         prisma.landing_page_content.findFirst({ where: { id: 'default' } }),
         prisma.landing_page_services.findMany({
