@@ -288,19 +288,10 @@ export default function AdminUsersPage() {
       subtitle='Administrar cuentas de usuario del sistema'
       loading={loading && users.length === 0}
       headerActions={
-        <div className='flex items-center gap-2'>
-          <ExportButton
-            onExportCSV={exportCSV}
-            onExportExcel={exportExcel}
-            onExportPDF={exportPDF}
-            loading={exporting}
-            disabled={users.length === 0}
-          />
-          <Button size='sm' onClick={() => setShowCreateDialog(true)}>
-            <Plus className='h-4 w-4 mr-2' />
-            Nuevo usuario
-          </Button>
-        </div>
+        <Button size='sm' onClick={() => setShowCreateDialog(true)}>
+          <Plus className='h-4 w-4 mr-2' />
+          Nuevo usuario
+        </Button>
       }
     >
       <div className='space-y-4'>
@@ -322,6 +313,8 @@ export default function AdminUsersPage() {
 
         {/* DataTable */}
         <DataTable
+          title={`${usersPagination.total} usuario${usersPagination.total !== 1 ? 's' : ''}`}
+          description={hasActiveFilters ? 'Resultados filtrados' : 'Todos los usuarios del sistema'}
           data={users}
           columns={columns}
           loading={loading}
@@ -338,6 +331,15 @@ export default function AdminUsersPage() {
           }}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
+          actions={
+            <ExportButton
+              onExportCSV={exportCSV}
+              onExportExcel={exportExcel}
+              onExportPDF={exportPDF}
+              loading={exporting}
+              disabled={users.length === 0}
+            />
+          }
           cardRenderer={user => (
             <UserCard
               user={user}

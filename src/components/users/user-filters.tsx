@@ -64,175 +64,140 @@ export function UserFilters({
 
   return (
     <Card>
-      <CardContent className='pt-6'>
-        <div className='space-y-4'>
-          {/* Primera fila: Búsqueda y botones */}
-          <div className='flex flex-col sm:flex-row gap-3'>
-            {/* Búsqueda */}
-            <div className='flex-1'>
-              <div className='relative'>
-                <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4' />
-                <Input
-                  placeholder='Buscar por nombre, email o teléfono...'
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                  className='pl-10'
-                  disabled={loading}
-                />
-              </div>
+      <CardContent className='pt-4 pb-4'>
+        <div className='space-y-3'>
+          {/* Fila 1: Búsqueda + botones */}
+          <div className='flex flex-col sm:flex-row gap-2'>
+            <div className='flex-1 relative'>
+              <Search className='absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4' />
+              <Input
+                placeholder='Buscar por nombre, email o teléfono...'
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className='pl-9 h-9'
+                disabled={loading}
+              />
             </div>
-
-            {/* Botones de acción */}
-            <div className='flex gap-2'>
+            <div className='flex gap-2 flex-shrink-0'>
               {activeFiltersCount > 0 && (
-                <Button
-                  variant='outline'
-                  onClick={onClearFilters}
-                  className='whitespace-nowrap'
-                  disabled={loading}
-                >
-                  <X className='h-4 w-4 mr-2' />
+                <Button variant='outline' size='sm' onClick={onClearFilters} disabled={loading}>
+                  <X className='h-3.5 w-3.5 mr-1.5' />
                   Limpiar ({activeFiltersCount})
                 </Button>
               )}
-
-              <Button variant='outline' onClick={onRefresh} disabled={loading}>
-                <RefreshCw className={cn('h-4 w-4 mr-2', loading && 'animate-spin')} />
+              <Button variant='outline' size='sm' onClick={onRefresh} disabled={loading}>
+                <RefreshCw className={cn('h-3.5 w-3.5 mr-1.5', loading && 'animate-spin')} />
                 {loading ? 'Cargando...' : 'Actualizar'}
               </Button>
             </div>
           </div>
 
-          {/* Segunda fila: Filtros rápidos por rol */}
-          <div className='flex flex-wrap gap-2'>
+          {/* Fila 2: Filtros rápidos por rol */}
+          <div className='flex flex-wrap gap-1.5'>
             <Button
               variant={roleFilter === 'all' ? 'default' : 'outline'}
               size='sm'
+              className='h-7 text-xs px-2.5'
               onClick={() => setRoleFilter('all')}
               disabled={loading}
             >
-              <Users className='h-4 w-4 mr-1' />
+              <Users className='h-3.5 w-3.5 mr-1' />
               Todos
             </Button>
-
             {USER_ROLE_FILTER_OPTIONS.slice(1).map(option => {
               const isSuperAdmin = option.value === 'SUPER_ADMIN'
               const role = isSuperAdmin ? 'ADMIN' : (option.value as UserRole)
               const Icon = isSuperAdmin ? Crown : USER_ROLE_ICONS[role as UserRole]
               const isActive = roleFilter === option.value
-
               return (
                 <Button
                   key={option.value}
                   variant={isActive ? 'default' : 'outline'}
                   size='sm'
+                  className={cn(
+                    'h-7 text-xs px-2.5',
+                    isSuperAdmin && isActive && 'bg-amber-500 hover:bg-amber-600 border-amber-500',
+                    isSuperAdmin &&
+                      !isActive &&
+                      'text-amber-600 border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/30'
+                  )}
                   onClick={() => setRoleFilter(option.value)}
                   disabled={loading}
-                  className={
-                    isSuperAdmin && isActive
-                      ? 'bg-amber-500 hover:bg-amber-600 border-amber-500'
-                      : isSuperAdmin
-                        ? 'text-amber-600 border-amber-300 hover:bg-amber-50'
-                        : ''
-                  }
                 >
-                  <Icon className='h-4 w-4 mr-1' />
+                  <Icon className='h-3.5 w-3.5 mr-1' />
                   {option.label}
                 </Button>
               )
             })}
           </div>
 
-          {/* Tercera fila: Filtros avanzados */}
-          <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-3'>
-            {/* Filtro de Estado */}
-            <div>
-              <label className='text-xs font-medium text-muted-foreground mb-1.5 block'>
-                Estado
-              </label>
-              <Select value={statusFilter} onValueChange={setStatusFilter} disabled={loading}>
-                <SelectTrigger>
-                  <SelectValue placeholder='Seleccionar estado' />
-                </SelectTrigger>
-                <SelectContent>
-                  {USER_STATUS_FILTER_OPTIONS.map(option => (
-                    <SelectItem key={option.value} value={option.value}>
-                      <div className='flex items-center space-x-2'>
-                        {option.value !== 'all' && (
-                          <div
-                            className={`w-3 h-3 rounded-full ${
-                              option.value === 'true'
-                                ? 'bg-green-500 dark:bg-green-400'
-                                : 'bg-red-500 dark:bg-red-400'
-                            }`}
-                          />
-                        )}
-                        <span>{option.label}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Filtro de Departamento */}
-            <div>
-              <label className='text-xs font-medium text-muted-foreground mb-1.5 block'>
-                Departamento
-              </label>
-              <Select
-                value={departmentFilter}
-                onValueChange={setDepartmentFilter}
-                disabled={loading}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder='Todos los departamentos' />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value='all'>Todos los departamentos</SelectItem>
-                  {departments.map(department => (
-                    <SelectItem key={department.id} value={department.id}>
-                      <div className='flex items-center space-x-2'>
+          {/* Fila 3: Estado + Departamento */}
+          <div className='grid grid-cols-1 sm:grid-cols-2 gap-2'>
+            <Select value={statusFilter} onValueChange={setStatusFilter} disabled={loading}>
+              <SelectTrigger className='h-8 text-sm'>
+                <SelectValue placeholder='Todos los estados' />
+              </SelectTrigger>
+              <SelectContent>
+                {USER_STATUS_FILTER_OPTIONS.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    <div className='flex items-center gap-2'>
+                      {option.value !== 'all' && (
                         <div
-                          className='w-3 h-3 rounded-full'
-                          style={{ backgroundColor: department.color }}
+                          className={`w-2 h-2 rounded-full ${option.value === 'true' ? 'bg-green-500' : 'bg-muted-foreground'}`}
                         />
-                        <span>{department.name}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                      )}
+                      {option.label}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={departmentFilter} onValueChange={setDepartmentFilter} disabled={loading}>
+              <SelectTrigger className='h-8 text-sm'>
+                <SelectValue placeholder='Todos los departamentos' />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='all'>Todos los departamentos</SelectItem>
+                {departments.map(dept => (
+                  <SelectItem key={dept.id} value={dept.id}>
+                    <div className='flex items-center gap-2'>
+                      <div
+                        className='w-2 h-2 rounded-full'
+                        style={{ backgroundColor: dept.color }}
+                      />
+                      {dept.name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Indicador de filtros activos */}
+          {/* Badges de filtros activos */}
           {activeFiltersCount > 0 && (
-            <div className='flex items-center gap-2 pt-2 border-t'>
-              <Filter className='h-4 w-4 text-muted-foreground' />
-              <span className='text-sm text-muted-foreground'>Filtros activos:</span>
-              <div className='flex flex-wrap gap-2'>
-                {roleFilter !== 'all' && (
-                  <Badge variant='secondary' className='text-xs'>
-                    Rol: {USER_ROLE_FILTER_OPTIONS.find(o => o.value === roleFilter)?.label}
-                  </Badge>
-                )}
-                {statusFilter !== 'all' && (
-                  <Badge variant='secondary' className='text-xs'>
-                    Estado: {USER_STATUS_FILTER_OPTIONS.find(o => o.value === statusFilter)?.label}
-                  </Badge>
-                )}
-                {departmentFilter !== 'all' && (
-                  <Badge variant='secondary' className='text-xs'>
-                    Departamento: {departments.find(d => d.id === departmentFilter)?.name}
-                  </Badge>
-                )}
-                {searchTerm && (
-                  <Badge variant='secondary' className='text-xs'>
-                    Búsqueda: &quot;{searchTerm}&quot;
-                  </Badge>
-                )}
-              </div>
+            <div className='flex items-center gap-1.5 flex-wrap pt-1 border-t'>
+              <Filter className='h-3.5 w-3.5 text-muted-foreground flex-shrink-0' />
+              {roleFilter !== 'all' && (
+                <Badge variant='secondary' className='text-xs h-5 px-1.5'>
+                  {USER_ROLE_FILTER_OPTIONS.find(o => o.value === roleFilter)?.label}
+                </Badge>
+              )}
+              {statusFilter !== 'all' && (
+                <Badge variant='secondary' className='text-xs h-5 px-1.5'>
+                  {USER_STATUS_FILTER_OPTIONS.find(o => o.value === statusFilter)?.label}
+                </Badge>
+              )}
+              {departmentFilter !== 'all' && (
+                <Badge variant='secondary' className='text-xs h-5 px-1.5'>
+                  {departments.find(d => d.id === departmentFilter)?.name}
+                </Badge>
+              )}
+              {searchTerm && (
+                <Badge variant='secondary' className='text-xs h-5 px-1.5'>
+                  &quot;{searchTerm}&quot;
+                </Badge>
+              )}
             </div>
           )}
         </div>
