@@ -7,7 +7,7 @@
 
 import { useState, useMemo, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
-import { ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, RefreshCw } from 'lucide-react'
+import { ArrowUpDown, ArrowUp, ArrowDown, RefreshCw } from 'lucide-react'
 import {
   Table,
   TableBody,
@@ -19,15 +19,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 
 // Tipos base
@@ -85,14 +76,14 @@ export interface DataTableAdvancedProps<T> {
   // Datos
   data: T[]
   columns: ColumnConfig<T>[]
-  
+
   // Identificación
   getRowId?: (item: T) => string
-  
+
   // Header
   title?: string
   description?: string
-  
+
   // Filtros y búsqueda
   filters?: FilterConfig[]
   searchConfig?: {
@@ -100,41 +91,41 @@ export interface DataTableAdvancedProps<T> {
     placeholder?: string
     debounceMs?: number
   }
-  
+
   // Paginación
   pagination?: PaginationConfig
-  
+
   // Interacción
   onRowClick?: (item: T) => void
   selectable?: boolean
   selectedItems?: T[]
   onSelectionChange?: (items: T[]) => void
-  
+
   // Acciones
   actions?: ActionConfig<T>[]
   massActions?: MassActionConfig<T>[]
-  
+
   // Estados
   loading?: boolean
   error?: string | null
-  
+
   // Ordenamiento
   sortable?: boolean
   defaultSort?: { key: keyof T; direction: 'asc' | 'desc' }
-  
+
   // Rol-based
   userRole?: 'ADMIN' | 'TECHNICIAN' | 'CLIENT'
-  
+
   // Estilos y variantes
   variant?: 'default' | 'detailed'
   height?: number
   className?: string
-  
+
   // Callbacks
   onRefresh?: () => void
   onFiltersChange?: (filters: Record<string, any>) => void
   onSearchChange?: (search: string) => void
-  
+
   // Configuración adicional
   emptyMessage?: string
   showStats?: boolean
@@ -148,22 +139,22 @@ const ROLE_THEMES = {
     border: 'border-l-4 border-blue-500',
     bg: 'bg-blue-50 dark:bg-blue-950/50',
     text: 'text-blue-700 dark:text-blue-300',
-    accent: 'text-blue-600'
+    accent: 'text-blue-600',
   },
   TECHNICIAN: {
     primary: 'green',
     border: 'border-l-4 border-green-500',
     bg: 'bg-green-50 dark:bg-green-950/50',
     text: 'text-green-700 dark:text-green-300',
-    accent: 'text-green-600'
+    accent: 'text-green-600',
   },
   CLIENT: {
     primary: 'purple',
     border: 'border-l-4 border-purple-500',
     bg: 'bg-purple-50 dark:bg-purple-950/50',
     text: 'text-purple-700 dark:text-purple-300',
-    accent: 'text-purple-600'
-  }
+    accent: 'text-purple-600',
+  },
 }
 
 export function DataTableAdvanced<T>({
@@ -194,15 +185,16 @@ export function DataTableAdvanced<T>({
   onSearchChange,
   emptyMessage = 'No hay datos para mostrar',
   showStats = false,
-  exportable = false
+  exportable = false,
 }: DataTableAdvancedProps<T>) {
   const { data: session } = useSession()
   const theme = ROLE_THEMES[userRole]
-  
+
   // Estados locales
-  const [sortConfig, setSortConfig] = useState<{ key: keyof T | null; direction: 'asc' | 'desc' | null }>(
-    defaultSort || { key: null, direction: null }
-  )
+  const [sortConfig, setSortConfig] = useState<{
+    key: keyof T | null
+    direction: 'asc' | 'desc' | null
+  }>(defaultSort || { key: null, direction: null })
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({})
   const [searchTerm, setSearchTerm] = useState('')
   const [isPerformingMassAction, setIsPerformingMassAction] = useState(false)
@@ -214,7 +206,7 @@ export function DataTableAdvanced<T>({
     // Aplicar búsqueda
     if (searchTerm && searchConfig?.fields) {
       const searchLower = searchTerm.toLowerCase()
-      result = result.filter(item => 
+      result = result.filter(item =>
         searchConfig.fields.some(field => {
           const value = (item as any)[field]
           return value && value.toString().toLowerCase().includes(searchLower)
@@ -252,19 +244,25 @@ export function DataTableAdvanced<T>({
   }, [])
 
   // Manejar selección
-  const isSelected = useCallback((item: T) => {
-    return selectedItems.some(selected => getRowId(selected) === getRowId(item))
-  }, [selectedItems, getRowId])
+  const isSelected = useCallback(
+    (item: T) => {
+      return selectedItems.some(selected => getRowId(selected) === getRowId(item))
+    },
+    [selectedItems, getRowId]
+  )
 
-  const toggleSelection = useCallback((item: T) => {
-    if (!onSelectionChange) return
+  const toggleSelection = useCallback(
+    (item: T) => {
+      if (!onSelectionChange) return
 
-    if (isSelected(item)) {
-      onSelectionChange(selectedItems.filter(selected => getRowId(selected) !== getRowId(item)))
-    } else {
-      onSelectionChange([...selectedItems, item])
-    }
-  }, [selectedItems, onSelectionChange, isSelected, getRowId])
+      if (isSelected(item)) {
+        onSelectionChange(selectedItems.filter(selected => getRowId(selected) !== getRowId(item)))
+      } else {
+        onSelectionChange([...selectedItems, item])
+      }
+    },
+    [selectedItems, onSelectionChange, isSelected, getRowId]
+  )
 
   const toggleSelectAll = useCallback(() => {
     if (!onSelectionChange) return
@@ -277,19 +275,22 @@ export function DataTableAdvanced<T>({
   }, [selectedItems.length, processedData, onSelectionChange])
 
   // Manejar acciones masivas
-  const handleMassAction = useCallback(async (action: MassActionConfig<T>) => {
-    if (selectedItems.length === 0) return
+  const handleMassAction = useCallback(
+    async (action: MassActionConfig<T>) => {
+      if (selectedItems.length === 0) return
 
-    setIsPerformingMassAction(true)
-    try {
-      await action.onClick(selectedItems)
-      onSelectionChange?.([])
-    } catch (error) {
-      console.error('Error executing mass action:', error)
-    } finally {
-      setIsPerformingMassAction(false)
-    }
-  }, [selectedItems, onSelectionChange])
+      setIsPerformingMassAction(true)
+      try {
+        await action.onClick(selectedItems)
+        onSelectionChange?.([])
+      } catch (error) {
+        console.error('Error executing mass action:', error)
+      } finally {
+        setIsPerformingMassAction(false)
+      }
+    },
+    [selectedItems, onSelectionChange]
+  )
 
   // Obtener valor de celda
   const getCellValue = useCallback((item: T, column: ColumnConfig<T>) => {
@@ -297,11 +298,11 @@ export function DataTableAdvanced<T>({
       const value = column.accessor ? column.accessor(item) : (item as any)[column.key]
       return column.render(item, value)
     }
-    
+
     if (column.accessor) {
       return column.accessor(item)
     }
-    
+
     return (item as any)[column.key]
   }, [])
 
@@ -311,30 +312,25 @@ export function DataTableAdvanced<T>({
   return (
     <Card className={cn('overflow-hidden', theme.border, className)} style={{ height }}>
       {(title || description) && (
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
+        <CardHeader className='pb-4'>
+          <div className='flex items-center justify-between'>
             <div>
-              {title && <CardTitle className="flex items-center space-x-2">{title}</CardTitle>}
+              {title && <CardTitle className='flex items-center space-x-2'>{title}</CardTitle>}
               {description && (
-                <CardDescription className="mt-1">
+                <CardDescription className='mt-1'>
                   {description}
                   {pagination && ` • ${pagination.total} elementos total`}
                 </CardDescription>
               )}
             </div>
-            <div className="flex items-center space-x-2">
+            <div className='flex items-center space-x-2'>
               {exportable && (
-                <Button variant="outline" size="sm">
+                <Button variant='outline' size='sm'>
                   Exportar
                 </Button>
               )}
               {onRefresh && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onRefresh}
-                  disabled={loading}
-                >
+                <Button variant='outline' size='sm' onClick={onRefresh} disabled={loading}>
                   <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
                 </Button>
               )}
@@ -343,37 +339,38 @@ export function DataTableAdvanced<T>({
         </CardHeader>
       )}
 
-      <CardContent className="p-0">
+      <CardContent className='p-0'>
         {/* Barra de acciones masivas */}
         {selectable && selectedItems.length > 0 && massActions.length > 0 && (
           <div className={cn('flex items-center justify-between p-4 border-b', theme.bg)}>
-            <div className="flex items-center space-x-3">
+            <div className='flex items-center space-x-3'>
               <span className={cn('text-sm font-medium', theme.text)}>
-                {selectedItems.length} elemento{selectedItems.length > 1 ? 's' : ''} seleccionado{selectedItems.length > 1 ? 's' : ''}
+                {selectedItems.length} elemento{selectedItems.length > 1 ? 's' : ''} seleccionado
+                {selectedItems.length > 1 ? 's' : ''}
               </span>
               <Button
-                variant="outline"
-                size="sm"
+                variant='outline'
+                size='sm'
                 onClick={() => onSelectionChange?.([])}
                 disabled={isPerformingMassAction}
               >
                 Limpiar selección
               </Button>
             </div>
-            <div className="flex items-center space-x-2">
-              {massActions.map((action) => {
+            <div className='flex items-center space-x-2'>
+              {massActions.map(action => {
                 const Icon = action.icon
                 return (
                   <Button
                     key={action.key}
                     variant={action.variant || 'outline'}
-                    size="sm"
+                    size='sm'
                     onClick={() => handleMassAction(action)}
                     disabled={isPerformingMassAction || action.disabled?.(selectedItems)}
-                    className="flex items-center space-x-1"
+                    className='flex items-center space-x-1'
                   >
-                    {Icon && <Icon className="h-4 w-4" />}
-                    <span className="hidden sm:inline">{action.label}</span>
+                    {Icon && <Icon className='h-4 w-4' />}
+                    <span className='hidden sm:inline'>{action.label}</span>
                   </Button>
                 )
               })}
@@ -382,21 +379,21 @@ export function DataTableAdvanced<T>({
         )}
 
         {/* Tabla */}
-        <div className="overflow-x-auto">
+        <div className='overflow-x-auto'>
           <Table>
             <TableHeader>
               <TableRow>
                 {selectable && (
-                  <TableHead className="w-12">
+                  <TableHead className='w-12'>
                     <Checkbox
                       checked={isAllSelected}
                       onCheckedChange={toggleSelectAll}
-                      aria-label="Seleccionar todos"
+                      aria-label='Seleccionar todos'
                       {...(isIndeterminate ? { 'data-indeterminate': true } : {})}
                     />
                   </TableHead>
                 )}
-                {columns.map((column) => (
+                {columns.map(column => (
                   <TableHead
                     key={column.key.toString()}
                     style={{ width: column.width }}
@@ -408,20 +405,20 @@ export function DataTableAdvanced<T>({
                   >
                     {column.sortable && sortable ? (
                       <Button
-                        variant="ghost"
-                        size="sm"
+                        variant='ghost'
+                        size='sm'
                         onClick={() => handleSort(column.key as keyof T)}
-                        className="-ml-3 h-8"
+                        className='-ml-3 h-8'
                       >
                         {column.header}
                         {sortConfig.key === column.key && sortConfig.direction === 'asc' && (
-                          <ArrowUp className="ml-2 h-4 w-4" />
+                          <ArrowUp className='ml-2 h-4 w-4' />
                         )}
                         {sortConfig.key === column.key && sortConfig.direction === 'desc' && (
-                          <ArrowDown className="ml-2 h-4 w-4" />
+                          <ArrowDown className='ml-2 h-4 w-4' />
                         )}
                         {sortConfig.key !== column.key && (
-                          <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />
+                          <ArrowUpDown className='ml-2 h-4 w-4 opacity-50' />
                         )}
                       </Button>
                     ) : (
@@ -429,21 +426,24 @@ export function DataTableAdvanced<T>({
                     )}
                   </TableHead>
                 ))}
-                {actions.length > 0 && (
-                  <TableHead className="text-right w-20">Acciones</TableHead>
-                )}
+                {actions.length > 0 && <TableHead className='text-right w-20'>Acciones</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={columns.length + (selectable ? 1 : 0) + (actions.length > 0 ? 1 : 0)} className="text-center py-8">
-                    <div className="flex items-center justify-center">
-                      <RefreshCw className="h-6 w-6 animate-spin mr-2" />
+                  <TableCell
+                    colSpan={columns.length + (selectable ? 1 : 0) + (actions.length > 0 ? 1 : 0)}
+                    className='text-center py-8'
+                  >
+                    <div className='flex items-center justify-center'>
+                      <RefreshCw className='h-6 w-6 animate-spin mr-2' />
                       <div>
-                        <div className="font-medium">Cargando datos...</div>
-                        <div className="text-sm text-muted-foreground mt-1">
-                          {searchTerm ? `Buscando "${searchTerm}"` : 'Obteniendo información del servidor'}
+                        <div className='font-medium'>Cargando datos...</div>
+                        <div className='text-sm text-muted-foreground mt-1'>
+                          {searchTerm
+                            ? `Buscando "${searchTerm}"`
+                            : 'Obteniendo información del servidor'}
                         </div>
                       </div>
                     </div>
@@ -451,13 +451,18 @@ export function DataTableAdvanced<T>({
                 </TableRow>
               ) : error ? (
                 <TableRow>
-                  <TableCell colSpan={columns.length + (selectable ? 1 : 0) + (actions.length > 0 ? 1 : 0)} className="text-center py-8">
-                    <div className="flex flex-col items-center space-y-3">
-                      <div className="text-red-500 font-medium">Error al cargar datos</div>
-                      <div className="text-sm text-muted-foreground max-w-md text-center">{error}</div>
+                  <TableCell
+                    colSpan={columns.length + (selectable ? 1 : 0) + (actions.length > 0 ? 1 : 0)}
+                    className='text-center py-8'
+                  >
+                    <div className='flex flex-col items-center space-y-3'>
+                      <div className='text-red-500 font-medium'>Error al cargar datos</div>
+                      <div className='text-sm text-muted-foreground max-w-md text-center'>
+                        {error}
+                      </div>
                       {onRefresh && (
-                        <Button variant="outline" size="sm" onClick={onRefresh} className="mt-2">
-                          <RefreshCw className="h-4 w-4 mr-2" />
+                        <Button variant='outline' size='sm' onClick={onRefresh} className='mt-2'>
+                          <RefreshCw className='h-4 w-4 mr-2' />
                           Reintentar
                         </Button>
                       )}
@@ -466,20 +471,23 @@ export function DataTableAdvanced<T>({
                 </TableRow>
               ) : processedData.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={columns.length + (selectable ? 1 : 0) + (actions.length > 0 ? 1 : 0)} className="text-center py-8">
-                    <div className="flex flex-col items-center space-y-2">
-                      <div className="text-muted-foreground font-medium">{emptyMessage}</div>
+                  <TableCell
+                    colSpan={columns.length + (selectable ? 1 : 0) + (actions.length > 0 ? 1 : 0)}
+                    className='text-center py-8'
+                  >
+                    <div className='flex flex-col items-center space-y-2'>
+                      <div className='text-muted-foreground font-medium'>{emptyMessage}</div>
                       {(searchTerm || Object.keys(currentFilters).length > 0) && (
                         <Button
-                          variant="outline"
-                          size="sm"
+                          variant='outline'
+                          size='sm'
                           onClick={() => {
                             setSearchTerm('')
                             setCurrentFilters({})
                             onSearchChange?.('')
                             onFiltersChange?.({})
                           }}
-                          className="mt-2"
+                          className='mt-2'
                         >
                           Limpiar filtros
                         </Button>
@@ -488,7 +496,7 @@ export function DataTableAdvanced<T>({
                   </TableCell>
                 </TableRow>
               ) : (
-                processedData.map((item) => (
+                processedData.map(item => (
                   <TableRow
                     key={getRowId(item)}
                     className={cn(
@@ -499,7 +507,7 @@ export function DataTableAdvanced<T>({
                     onClick={() => onRowClick?.(item)}
                   >
                     {selectable && (
-                      <TableCell onClick={(e) => e.stopPropagation()}>
+                      <TableCell onClick={e => e.stopPropagation()}>
                         <Checkbox
                           checked={isSelected(item)}
                           onCheckedChange={() => toggleSelection(item)}
@@ -507,7 +515,7 @@ export function DataTableAdvanced<T>({
                         />
                       </TableCell>
                     )}
-                    {columns.map((column) => (
+                    {columns.map(column => (
                       <TableCell
                         key={column.key.toString()}
                         className={cn(
@@ -520,34 +528,32 @@ export function DataTableAdvanced<T>({
                       </TableCell>
                     ))}
                     {actions.length > 0 && (
-                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            {actions
-                              .filter(action => !action.show || action.show(item))
-                              .map((action) => {
-                                const Icon = action.icon
-                                return (
-                                  <DropdownMenuItem
-                                    key={action.key}
-                                    onClick={() => action.onClick(item)}
-                                    disabled={action.disabled?.(item)}
-                                    className={action.variant === 'destructive' ? 'text-red-600' : ''}
-                                  >
-                                    {Icon && <Icon className="h-4 w-4 mr-2" />}
-                                    {action.label}
-                                  </DropdownMenuItem>
-                                )
-                              })}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                      <TableCell className='text-right' onClick={e => e.stopPropagation()}>
+                        <div className='flex items-center justify-end gap-0.5'>
+                          {actions
+                            .filter(action => !action.show || action.show(item))
+                            .map(action => {
+                              const Icon = action.icon
+                              return (
+                                <Button
+                                  key={action.key}
+                                  variant='ghost'
+                                  size='sm'
+                                  className={cn(
+                                    'h-8 w-8 p-0',
+                                    action.variant === 'destructive'
+                                      ? 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'
+                                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                                  )}
+                                  onClick={() => action.onClick(item)}
+                                  disabled={action.disabled?.(item)}
+                                  title={action.label}
+                                >
+                                  {Icon && <Icon className='h-4 w-4' />}
+                                </Button>
+                              )
+                            })}
+                        </div>
                       </TableCell>
                     )}
                   </TableRow>
@@ -559,12 +565,13 @@ export function DataTableAdvanced<T>({
 
         {/* Paginación */}
         {pagination && pagination.totalPages > 1 && !loading && !error && (
-          <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t gap-4">
-            <div className="text-sm text-muted-foreground">
+          <div className='flex flex-col sm:flex-row items-center justify-between p-4 border-t gap-4'>
+            <div className='text-sm text-muted-foreground'>
               {pagination.total > 0 ? (
                 <>
                   Mostrando {(pagination.page - 1) * pagination.limit + 1} a{' '}
-                  {Math.min(pagination.page * pagination.limit, pagination.total)} de {pagination.total} elementos
+                  {Math.min(pagination.page * pagination.limit, pagination.total)} de{' '}
+                  {pagination.total} elementos
                   {(searchTerm || Object.keys(currentFilters).length > 0) && (
                     <span className={cn('ml-1', theme.accent)}>(filtrados)</span>
                   )}
@@ -573,80 +580,88 @@ export function DataTableAdvanced<T>({
                 'No hay elementos para mostrar'
               )}
             </div>
-            <div className="flex items-center space-x-2">
+            <div className='flex items-center space-x-2'>
               <Button
-                variant="outline"
-                size="sm"
+                variant='outline'
+                size='sm'
                 onClick={() => pagination.onPageChange(pagination.page - 1)}
                 disabled={pagination.page === 1}
               >
                 Anterior
               </Button>
-              
+
               {/* Paginación inteligente */}
-              <div className="flex items-center space-x-1">
+              <div className='flex items-center space-x-1'>
                 {(() => {
                   const pages = []
                   const maxVisiblePages = 5
                   let startPage = Math.max(1, pagination.page - Math.floor(maxVisiblePages / 2))
-                  let endPage = Math.min(pagination.totalPages, startPage + maxVisiblePages - 1)
-                  
+                  const endPage = Math.min(pagination.totalPages, startPage + maxVisiblePages - 1)
+
                   if (endPage - startPage + 1 < maxVisiblePages) {
                     startPage = Math.max(1, endPage - maxVisiblePages + 1)
                   }
-                  
+
                   if (startPage > 1) {
                     pages.push(
                       <Button
                         key={1}
-                        variant="outline"
-                        size="sm"
+                        variant='outline'
+                        size='sm'
                         onClick={() => pagination.onPageChange(1)}
                       >
                         1
                       </Button>
                     )
                     if (startPage > 2) {
-                      pages.push(<span key="ellipsis1" className="px-2 text-muted-foreground">...</span>)
+                      pages.push(
+                        <span key='ellipsis1' className='px-2 text-muted-foreground'>
+                          ...
+                        </span>
+                      )
                     }
                   }
-                  
+
                   for (let i = startPage; i <= endPage; i++) {
                     pages.push(
                       <Button
                         key={i}
                         variant={pagination.page === i ? 'default' : 'outline'}
-                        size="sm"
+                        size='sm'
                         onClick={() => pagination.onPageChange(i)}
                       >
                         {i}
                       </Button>
                     )
                   }
-                  
+
                   if (endPage < pagination.totalPages) {
                     if (endPage < pagination.totalPages - 1) {
-                      pages.push(<span key="ellipsis2" className="px-2 text-muted-foreground">...</span>)
+                      pages.push(
+                        <span key='ellipsis2' className='px-2 text-muted-foreground'>
+                          ...
+                        </span>
+                      )
                     }
                     pages.push(
                       <Button
                         key={pagination.totalPages}
-                        variant="outline"
-                        size="sm"
+                        variant='outline'
+                        size='sm'
                         onClick={() => pagination.onPageChange(pagination.totalPages)}
                       >
                         {pagination.totalPages}
                       </Button>
                     )
                   }
-                  
+
                   return pages
                 })()}
               </div>
-              
+
               <Button
-                variant="outline"
-                size="sm"
+                variant='outline'
+                size='sm'
                 onClick={() => pagination.onPageChange(pagination.page + 1)}
                 disabled={pagination.page === pagination.totalPages}
               >
