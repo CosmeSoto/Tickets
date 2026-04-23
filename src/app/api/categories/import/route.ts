@@ -24,10 +24,17 @@ interface ParsedRow {
 interface ImportResult {
   total: number
   created: number
+  updated: number
   skipped: number
   errors: Array<{ row: number; nombre: string; error: string }>
   preview?: ParsedRow[]
 }
+
+// Modo de importación:
+// 'add'     → solo crea las que no existen (por nombre)
+// 'update'  → crea nuevas + actualiza las existentes
+// 'replace' → elimina todas las del área y crea desde cero
+type ImportMode = 'add' | 'update' | 'replace'
 
 function parseCSV(text: string): string[][] {
   const lines = text
@@ -82,6 +89,7 @@ export async function POST(request: NextRequest) {
     const file = formData.get('file') as File | null
     const dryRun = formData.get('dryRun') === 'true'
     const familyIdFilter = formData.get('familyId') as string | null
+    const mode = (formData.get('mode') as ImportMode) || 'add'
 
     if (!file) {
       return NextResponse.json({ error: 'No se proporcionó archivo' }, { status: 400 })
@@ -274,13 +282,14 @@ export async function POST(request: NextRequest) {
     const result: ImportResult = {
       total: dataRows.length,
       created: 0,
+      updated: 0,
       skipped: errors.length,
       errors,
     }
 
     if (dryRun) {
       result.preview = parsed
-      return NextResponse.json({ success: true, ...result })
+      return NextResponse.json({ success: true, mode, ...result })
     }
 
     if (parsed.length === 0) {
@@ -290,63 +299,87 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Crear en transacción — dos pasadas para resolver padres pendientes
+    // Transacción con soporte de 3 modos
     await prisma.$transaction(async tx => {
-      const createdMap = new Map<string, string>() // nombre.lower → id creado
-
-      // Primera pasada: crear categorías sin padre pendiente
-      for (const row of parsed) {
-        if (row._parentId?.startsWith('__pending__')) continue
-
-        const created = await tx.categories.create({
-          data: {
-            id: randomUUID(),
-            name: row.nombre,
-            description: row.descripcion || null,
-            level: row._level!,
-            parentId: row._parentId || null,
-            departmentId: row._departmentId || null,
-            color: row.color || '#6B7280',
-            isActive: row.activa,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
+      // Modo replace: eliminar categorías existentes del área (sin tickets)
+      if (mode === 'replace' && familyIdFilter) {
+        const existing = await tx.categories.findMany({
+          where: { departments: { familyId: familyIdFilter } },
+          select: { id: true, level: true, _count: { select: { tickets: true } } },
         })
-        createdMap.set(row.nombre.toLowerCase(), created.id)
-        result.created++
+        const toDelete = existing.filter(c => c._count.tickets === 0).map(c => c.id)
+        for (let level = 4; level >= 1; level--) {
+          await tx.categories.deleteMany({ where: { id: { in: toDelete }, level } })
+        }
+        // Recargar mapa sin las eliminadas
+        const remaining = await tx.categories.findMany({
+          select: { id: true, name: true, level: true, departmentId: true },
+        })
+        categoryNameMap.clear()
+        remaining.forEach(c => categoryNameMap.set(c.name.toLowerCase(), c))
       }
 
-      // Segunda pasada: crear categorías con padre pendiente
+      const createdMap = new Map<string, string>()
+
+      const upsertRow = async (row: ParsedRow, parentId: string | null, level: number) => {
+        const existing = categoryNameMap.get(row.nombre.toLowerCase())
+        if (existing && mode === 'add') {
+          result.skipped++
+          return
+        }
+        if (existing && (mode === 'update' || mode === 'replace')) {
+          await tx.categories.update({
+            where: { id: existing.id },
+            data: {
+              description: row.descripcion ?? null,
+              color: row.color || '#6B7280',
+              isActive: row.activa,
+              departmentId: row._departmentId || null,
+              updatedAt: new Date(),
+            },
+          })
+          createdMap.set(row.nombre.toLowerCase(), existing.id)
+          result.updated++
+        } else {
+          const created = await tx.categories.create({
+            data: {
+              id: randomUUID(),
+              name: row.nombre,
+              description: row.descripcion || null,
+              level,
+              parentId,
+              departmentId: row._departmentId || null,
+              color: row.color || '#6B7280',
+              isActive: row.activa,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          })
+          createdMap.set(row.nombre.toLowerCase(), created.id)
+          result.created++
+        }
+      }
+
+      // Primera pasada: sin padre pendiente
+      for (const row of parsed) {
+        if (row._parentId?.startsWith('__pending__')) continue
+        await upsertRow(row, row._parentId || null, row._level!)
+      }
+
+      // Segunda pasada: con padre pendiente
       for (const row of parsed) {
         if (!row._parentId?.startsWith('__pending__')) continue
-
         const parentName = row._parentId.replace('__pending__', '')
         const parentId =
           createdMap.get(parentName.toLowerCase()) ||
           categoryNameMap.get(parentName.toLowerCase())?.id ||
           null
-
         const parentLevel = parentId
           ? createdMap.has(parentName.toLowerCase())
             ? (parsed.find(p => p.nombre.toLowerCase() === parentName.toLowerCase())?._level ?? 1)
             : (categoryNameMap.get(parentName.toLowerCase())?.level ?? 1)
           : 0
-
-        await tx.categories.create({
-          data: {
-            id: randomUUID(),
-            name: row.nombre,
-            description: row.descripcion || null,
-            level: Math.min(parentLevel + 1, 4),
-            parentId: parentId,
-            departmentId: row._departmentId || null,
-            color: row.color || '#6B7280',
-            isActive: row.activa,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        })
-        result.created++
+        await upsertRow(row, parentId, Math.min(parentLevel + 1, 4))
       }
     })
 

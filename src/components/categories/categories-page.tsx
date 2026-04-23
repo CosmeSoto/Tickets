@@ -57,7 +57,7 @@ import { CategoryTree } from '@/components/ui/category-tree'
 import { useCategories } from '@/hooks/categories'
 import { CategoryFormDialog } from './category-form-dialog'
 import { CategoryStatsPanel } from './category-stats-panel'
-import { CategoryImportModal } from './category-import-modal'
+import { CategoryImportModal, CategoryBulkDeleteModal } from './category-import-modal'
 import { getCategoryLevelIcon } from '@/lib/constants/category-constants'
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
@@ -69,6 +69,7 @@ export default function CategoriesPage() {
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
   const [familyFilter, setFamilyFilter] = useState('all')
   const [showImportModal, setShowImportModal] = useState(false)
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false)
   // Familias que el admin tiene asignadas (para validar permisos en UI)
   const [adminFamilyIds, setAdminFamilyIds] = useState<Set<string> | null>(null)
 
@@ -428,10 +429,6 @@ export default function CategoriesPage() {
       onRetry={refresh}
       headerActions={
         <div className='flex items-center gap-2'>
-          <Button variant='outline' size='sm' onClick={() => setShowImportModal(true)}>
-            <Upload className='h-4 w-4 mr-2' />
-            Importar CSV
-          </Button>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -529,7 +526,7 @@ export default function CategoriesPage() {
                       <p>Actualizar lista de categorías</p>
                     </TooltipContent>
                   </Tooltip>
-                  {/* Exportar — junto a la tabla para que el usuario sepa qué exporta */}
+                  {/* Exportar, Importar y Eliminar — junto a la tabla */}
                   <ExportButton
                     onExportCSV={exportCSV}
                     onExportExcel={exportExcel}
@@ -537,6 +534,33 @@ export default function CategoriesPage() {
                     loading={exporting}
                     disabled={familyFilteredCategories.length === 0}
                   />
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    onClick={() => setShowImportModal(true)}
+                    title='Importar categorías desde CSV'
+                  >
+                    <Upload className='h-4 w-4 sm:mr-1.5' />
+                    <span className='hidden sm:inline'>Importar</span>
+                  </Button>
+                  {/* Eliminar masivo — solo visible con área seleccionada o para SuperAdmin */}
+                  {(familyFilter !== 'all' || isSuperAdmin) &&
+                    familyFilteredCategories.length > 0 && (
+                      <Button
+                        variant='outline'
+                        size='sm'
+                        onClick={() => setShowBulkDeleteModal(true)}
+                        className='text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive'
+                        title={
+                          familyFilter !== 'all'
+                            ? 'Eliminar todas las categorías de esta área'
+                            : 'Eliminar todas las categorías del sistema'
+                        }
+                      >
+                        <Trash2 className='h-4 w-4 sm:mr-1.5' />
+                        <span className='hidden sm:inline'>Eliminar área</span>
+                      </Button>
+                    )}
                   <div className='flex items-center border rounded-md'>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -791,6 +815,20 @@ export default function CategoriesPage() {
           onOpenChange={setShowImportModal}
           onSuccess={refresh}
           familyId={familyFilter !== 'all' ? familyFilter : undefined}
+          familyName={
+            familyFilter !== 'all' ? families.find(f => f.id === familyFilter)?.name : undefined
+          }
+        />
+
+        <CategoryBulkDeleteModal
+          open={showBulkDeleteModal}
+          onOpenChange={setShowBulkDeleteModal}
+          onSuccess={refresh}
+          familyId={familyFilter !== 'all' ? familyFilter : undefined}
+          familyName={
+            familyFilter !== 'all' ? families.find(f => f.id === familyFilter)?.name : undefined
+          }
+          isSuperAdmin={isSuperAdmin}
         />
 
         <CategoryFormDialog
