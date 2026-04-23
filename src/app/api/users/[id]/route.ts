@@ -19,12 +19,16 @@ const updateUserSchema = z.object({
   isActive: z.boolean().optional(),
   canManageInventory: z.boolean().optional(),
   isSuperAdmin: z.boolean().optional(),
-  assignedCategories: z.array(z.object({
-    categoryId: z.string(),
-    priority: z.number().min(1).max(10),
-    maxTickets: z.number().min(1).optional(),
-    autoAssign: z.boolean().optional().default(true),
-  })).optional(),
+  assignedCategories: z
+    .array(
+      z.object({
+        categoryId: z.string(),
+        priority: z.number().min(1).max(10),
+        maxTickets: z.number().min(1).optional(),
+        autoAssign: z.boolean().optional().default(true),
+      })
+    )
+    .optional(),
 })
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -43,22 +47,28 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const user = await UserService.getUserById((await params).id)
 
     if (!user) {
-      return NextResponse.json({ 
-        success: false,
-        error: 'Usuario no encontrado' 
-      }, { status: 404 })
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Usuario no encontrado',
+        },
+        { status: 404 }
+      )
     }
 
     return NextResponse.json({
       success: true,
-      user
+      user,
     })
   } catch (error) {
     console.error('Error fetching user:', error)
-    return NextResponse.json({ 
-      success: false,
-      error: 'Error interno del servidor' 
-    }, { status: 500 })
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Error interno del servidor',
+      },
+      { status: 500 }
+    )
   }
 }
 
@@ -83,10 +93,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // Obtener datos del usuario antes de la actualización para comparar cambios
     const currentUser = await UserService.getUserById((await params).id)
     if (!currentUser) {
-      return NextResponse.json({ 
-        success: false,
-        error: 'Usuario no encontrado' 
-      }, { status: 404 })
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Usuario no encontrado',
+        },
+        { status: 404 }
+      )
     }
 
     // Si no es admin, no puede cambiar rol o estado activo
@@ -101,18 +114,24 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     // Un admin no puede desactivar su propia cuenta
     if (isSelf && validatedData.isActive === false) {
-      return NextResponse.json({ 
-        success: false,
-        error: 'No puedes desactivar tu propia cuenta' 
-      }, { status: 400 })
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'No puedes desactivar tu propia cuenta',
+        },
+        { status: 400 }
+      )
     }
 
     // Un admin no puede cambiar su propio rol (evita auto-degradación accidental)
     if (isSelf && validatedData.role && validatedData.role !== session.user.role) {
-      return NextResponse.json({ 
-        success: false,
-        error: 'No puedes cambiar tu propio rol' 
-      }, { status: 400 })
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'No puedes cambiar tu propio rol',
+        },
+        { status: 400 }
+      )
     }
 
     // Solo un super admin puede cambiar el flag isSuperAdmin de otro usuario
@@ -126,7 +145,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // Registrar auditoría de cambios
     try {
       // Detectar cambios importantes comparando valores anteriores con nuevos
-      const changes: Record<string, { old: any, new: any }> = {}
+      const changes: Record<string, { old: any; new: any }> = {}
       const oldValues: Record<string, any> = {}
       const newValues: Record<string, any> = {}
 
@@ -135,17 +154,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         oldValues.name = currentUser.name
         newValues.name = validatedData.name
       }
-      
+
       if (validatedData.email && validatedData.email !== currentUser.email) {
         changes.email = { old: currentUser.email, new: validatedData.email }
         oldValues.email = currentUser.email
         newValues.email = validatedData.email
       }
-      
+
       if (validatedData.role && validatedData.role !== currentUser.role) {
-        changes.role = { 
-          old: IdResolverService.getRoleDisplayName(currentUser.role), 
-          new: IdResolverService.getRoleDisplayName(validatedData.role)
+        changes.role = {
+          old: IdResolverService.getRoleDisplayName(currentUser.role),
+          new: IdResolverService.getRoleDisplayName(validatedData.role),
         }
         oldValues.role = currentUser.role
         newValues.role = validatedData.role
@@ -157,56 +176,74 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           newRole: validatedData.role,
         })
       }
-      
+
       if (validatedData.departmentId !== undefined) {
         const currentDeptId = currentUser.departmentId
         if (validatedData.departmentId !== currentDeptId) {
           // Obtener nombres de departamentos para auditoría legible
           const oldDeptName = await IdResolverService.resolveDepartmentId(currentDeptId)
-          const newDeptName = await IdResolverService.resolveDepartmentId(validatedData.departmentId)
-          
+          const newDeptName = await IdResolverService.resolveDepartmentId(
+            validatedData.departmentId
+          )
+
           changes.departmentId = { old: oldDeptName, new: newDeptName }
           oldValues.departmentId = currentDeptId
           newValues.departmentId = validatedData.departmentId
         }
       }
-      
+
       if (validatedData.phone !== undefined && validatedData.phone !== currentUser.phone) {
-        changes.phone = { old: currentUser.phone || 'Sin teléfono', new: validatedData.phone || 'Sin teléfono' }
+        changes.phone = {
+          old: currentUser.phone || 'Sin teléfono',
+          new: validatedData.phone || 'Sin teléfono',
+        }
         oldValues.phone = currentUser.phone
         newValues.phone = validatedData.phone
       }
-      
+
       if (validatedData.isActive !== undefined && validatedData.isActive !== currentUser.isActive) {
-        changes.isActive = { 
-          old: IdResolverService.getBooleanDisplayName(currentUser.isActive), 
-          new: IdResolverService.getBooleanDisplayName(validatedData.isActive)
+        changes.isActive = {
+          old: IdResolverService.getBooleanDisplayName(currentUser.isActive),
+          new: IdResolverService.getBooleanDisplayName(validatedData.isActive),
         }
         oldValues.isActive = currentUser.isActive
         newValues.isActive = validatedData.isActive
 
         // Si se desactiva el usuario, notificarle para que cierre sesión
         if (!validatedData.isActive) {
-          NotificationEvents.emit(targetId, { type: 'session_refresh', reason: 'account_deactivated' })
+          NotificationEvents.emit(targetId, {
+            type: 'session_refresh',
+            reason: 'account_deactivated',
+          })
         }
       }
 
       // Si cambia canManageInventory, notificar para refrescar sesión
-      if ((validatedData as any).canManageInventory !== undefined &&
-          (validatedData as any).canManageInventory !== (currentUser as any).canManageInventory) {
-        NotificationEvents.emit(targetId, { type: 'session_refresh', reason: 'permissions_changed' })
+      if (
+        (validatedData as any).canManageInventory !== undefined &&
+        (validatedData as any).canManageInventory !== (currentUser as any).canManageInventory
+      ) {
+        NotificationEvents.emit(targetId, {
+          type: 'session_refresh',
+          reason: 'permissions_changed',
+        })
       }
 
       // Si cambia isSuperAdmin, registrar acción específica y notificar
-      if (validatedData.isSuperAdmin !== undefined &&
-          validatedData.isSuperAdmin !== (currentUser as any).isSuperAdmin) {
+      if (
+        validatedData.isSuperAdmin !== undefined &&
+        validatedData.isSuperAdmin !== (currentUser as any).isSuperAdmin
+      ) {
         changes.isSuperAdmin = {
           old: (currentUser as any).isSuperAdmin ? 'Super Admin' : 'Admin normal',
           new: validatedData.isSuperAdmin ? 'Super Admin' : 'Admin normal',
         }
         oldValues.isSuperAdmin = (currentUser as any).isSuperAdmin
         newValues.isSuperAdmin = validatedData.isSuperAdmin
-        NotificationEvents.emit(targetId, { type: 'session_refresh', reason: 'permissions_changed' })
+        NotificationEvents.emit(targetId, {
+          type: 'session_refresh',
+          reason: 'permissions_changed',
+        })
       }
 
       // Registrar en auditoría si hay cambios
@@ -219,58 +256,80 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           details: {
             userName: currentUser.name,
             userEmail: currentUser.email,
-            changes
+            changes,
           },
           oldValues,
           newValues,
           metadata: {
             userAgent: request.headers.get('user-agent') || 'Unknown',
-            ip: request.headers.get('x-forwarded-for') || 'Unknown'
-          }
+            ip: request.headers.get('x-forwarded-for') || 'Unknown',
+          },
         })
       }
     } catch (auditError) {
       console.error('Error registrando auditoría:', auditError)
-      // No fallar la actualización por errores de auditoría
+    }
+
+    // Invalidar caché de auth para que el JWT callback lea datos frescos
+    try {
+      const { invalidateCache } = await import('@/lib/api-cache')
+      await Promise.all([
+        invalidateCache(`auth:user:${targetId}`),
+        invalidateCache(`perm:inv:${targetId}`),
+        invalidateCache(`user:settings:${targetId}`),
+      ])
+    } catch {
+      /* Redis no disponible */
     }
 
     return NextResponse.json({
       success: true,
       data: user,
-      message: 'Usuario actualizado correctamente'
+      message: 'Usuario actualizado correctamente',
     })
   } catch (error) {
     console.error('Error updating user:', error)
 
     if (error instanceof Error) {
       if (error.name === 'ZodError') {
-        return NextResponse.json({ 
-          success: false,
-          error: 'Datos inválidos', 
-          details: (error as any).errors 
-        }, { status: 400 })
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Datos inválidos',
+            details: (error as any).errors,
+          },
+          { status: 400 }
+        )
       }
 
       if (error.message.includes('Usuario no encontrado')) {
-        return NextResponse.json({ 
-          success: false,
-          error: error.message 
-        }, { status: 404 })
+        return NextResponse.json(
+          {
+            success: false,
+            error: error.message,
+          },
+          { status: 404 }
+        )
       }
 
       if (error.message.includes('Ya existe un usuario')) {
-        return NextResponse.json({ 
-          success: false,
-          error: error.message 
-        }, { status: 409 })
+        return NextResponse.json(
+          {
+            success: false,
+            error: error.message,
+          },
+          { status: 409 }
+        )
       }
     }
 
-    
-    return NextResponse.json({ 
-      success: false,
-      error: 'Error interno del servidor' 
-    }, { status: 500 })
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Error interno del servidor',
+      },
+      { status: 500 }
+    )
   }
 }
 
@@ -282,30 +341,52 @@ export async function DELETE(
     const session = await getServerSession(authOptions)
 
     if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ 
-        success: false,
-        error: 'No autorizado' 
-      }, { status: 401 })
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'No autorizado',
+        },
+        { status: 401 }
+      )
     }
 
     // No permitir que el admin se elimine a sí mismo
     if (session.user.id === (await params).id) {
-      return NextResponse.json({ 
-        success: false,
-        error: 'No puedes eliminar tu propia cuenta' 
-      }, { status: 400 })
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'No puedes eliminar tu propia cuenta',
+        },
+        { status: 400 }
+      )
     }
 
     // Obtener datos del usuario antes de eliminarlo para las notificaciones
     const userToDelete = await UserService.getUserById((await params).id)
     if (!userToDelete) {
-      return NextResponse.json({ 
-        success: false,
-        error: 'Usuario no encontrado' 
-      }, { status: 404 })
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Usuario no encontrado',
+        },
+        { status: 404 }
+      )
     }
 
     await UserService.deleteUser((await params).id)
+
+    // Invalidar caché del usuario eliminado
+    try {
+      const { invalidateCache } = await import('@/lib/api-cache')
+      const deletedId = (await params).id
+      await Promise.all([
+        invalidateCache(`auth:user:${deletedId}`),
+        invalidateCache(`perm:inv:${deletedId}`),
+        invalidateCache(`user:settings:${deletedId}`),
+      ])
+    } catch {
+      /* Redis no disponible */
+    }
 
     // ⭐ AUDITORÍA: Registrar eliminación de usuario
     await AuditServiceComplete.log({
@@ -317,15 +398,15 @@ export async function DELETE(
         userName: userToDelete.name,
         userEmail: userToDelete.email,
         userRole: userToDelete.role,
-        deletedBy: session.user.name
+        deletedBy: session.user.name,
       },
-      request: request
+      request: request,
     })
 
     // Enviar notificaciones de usuario eliminado (log para auditoría)
     try {
       console.log(`[INFO] User deleted: ${(await params).id} by user ${session.user.id}`)
-      
+
       // Log específico para técnicos
       if (userToDelete.role === 'TECHNICIAN') {
         console.log(`[INFO] Technician deleted: ${(await params).id} by user ${session.user.id}`)
@@ -335,38 +416,50 @@ export async function DELETE(
       // No fallar la eliminación por errores de notificación
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
-      message: 'Usuario eliminado exitosamente' 
+      message: 'Usuario eliminado exitosamente',
     })
   } catch (error) {
     console.error('Error deleting user:', error)
 
     if (error instanceof Error) {
       if (error.message.includes('Usuario no encontrado')) {
-        return NextResponse.json({ 
-          success: false,
-          error: error.message 
-        }, { status: 404 })
+        return NextResponse.json(
+          {
+            success: false,
+            error: error.message,
+          },
+          { status: 404 }
+        )
       }
 
       if (error.message.includes('tickets asignados')) {
-        return NextResponse.json({ 
-          success: false,
-          error: error.message 
-        }, { status: 400 })
+        return NextResponse.json(
+          {
+            success: false,
+            error: error.message,
+          },
+          { status: 400 }
+        )
       }
 
       // Exponer el error real para diagnóstico
-      return NextResponse.json({ 
-        success: false,
-        error: error.message 
-      }, { status: 500 })
+      return NextResponse.json(
+        {
+          success: false,
+          error: error.message,
+        },
+        { status: 500 }
+      )
     }
 
-    return NextResponse.json({ 
-      success: false,
-      error: 'Error interno del servidor' 
-    }, { status: 500 })
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Error interno del servidor',
+      },
+      { status: 500 }
+    )
   }
 }

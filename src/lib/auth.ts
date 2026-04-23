@@ -28,9 +28,12 @@ export const authOptions: NextAuthOptions = {
           // NUEVO: Verificar si la cuenta está bloqueada por intentos fallidos
           const { SecurityConfigService } = await import('./services/security-config-service')
           const ipAddress = 'unknown' // En producción, obtener IP real del request
-          
-          const lockStatus = await SecurityConfigService.isAccountLocked(credentials.email, ipAddress)
-          
+
+          const lockStatus = await SecurityConfigService.isAccountLocked(
+            credentials.email,
+            ipAddress
+          )
+
           if (lockStatus.locked) {
             // Registrar intento de acceso a cuenta bloqueada
             try {
@@ -43,17 +46,19 @@ export const authOptions: NextAuthOptions = {
                 details: {
                   email: credentials.email,
                   reason: 'account_locked',
-                  timestamp: new Date().toISOString()
+                  timestamp: new Date().toISOString(),
                 },
                 result: 'ERROR',
                 errorCode: 'AUTH_ACCOUNT_LOCKED',
-                errorMessage: 'Cuenta bloqueada por múltiples intentos fallidos'
+                errorMessage: 'Cuenta bloqueada por múltiples intentos fallidos',
               })
             } catch (auditError) {
               console.error('[AUTH] Error registrando intento bloqueado:', auditError)
             }
-            
-            throw new Error('Cuenta bloqueada temporalmente por múltiples intentos fallidos. Intenta de nuevo en 30 minutos.')
+
+            throw new Error(
+              'Cuenta bloqueada temporalmente por múltiples intentos fallidos. Intenta de nuevo en 30 minutos.'
+            )
           }
 
           const user = await prisma.users.findUnique({
@@ -61,8 +66,8 @@ export const authOptions: NextAuthOptions = {
               email: credentials.email,
             },
             include: {
-              departments: true
-            }
+              departments: true,
+            },
           })
 
           // Usuario no encontrado
@@ -75,7 +80,9 @@ export const authOptions: NextAuthOptions = {
           // Sin contraseña configurada (usuario OAuth o creado sin password)
           if (!user.passwordHash) {
             console.error(`[AUTH] Usuario ${credentials.email} no tiene passwordHash configurado`)
-            throw new Error('Esta cuenta no tiene contraseña configurada. Contacta al administrador.')
+            throw new Error(
+              'Esta cuenta no tiene contraseña configurada. Contacta al administrador.'
+            )
           }
 
           // Usuario desactivado
@@ -91,16 +98,16 @@ export const authOptions: NextAuthOptions = {
                 details: {
                   email: credentials.email,
                   reason: 'account_disabled',
-                  timestamp: new Date().toISOString()
+                  timestamp: new Date().toISOString(),
                 },
                 result: 'ERROR',
                 errorCode: 'AUTH_ACCOUNT_DISABLED',
-                errorMessage: 'Intento de acceso a cuenta desactivada'
+                errorMessage: 'Intento de acceso a cuenta desactivada',
               })
             } catch (auditError) {
               console.error('[AUTH] Error registrando intento fallido:', auditError)
             }
-            
+
             throw new Error('Usuario desactivado')
           }
 
@@ -110,10 +117,13 @@ export const authOptions: NextAuthOptions = {
           if (!isPasswordValid) {
             // NUEVO: Registrar intento fallido
             await SecurityConfigService.recordFailedLogin(credentials.email, ipAddress)
-            
+
             // Obtener intentos restantes
-            const updatedLockStatus = await SecurityConfigService.isAccountLocked(credentials.email, ipAddress)
-            
+            const updatedLockStatus = await SecurityConfigService.isAccountLocked(
+              credentials.email,
+              ipAddress
+            )
+
             // Registrar contraseña incorrecta
             try {
               const { AuditServiceComplete } = await import('./services/audit-service-complete')
@@ -126,20 +136,20 @@ export const authOptions: NextAuthOptions = {
                   email: credentials.email,
                   reason: 'invalid_password',
                   attemptsRemaining: updatedLockStatus.attemptsRemaining,
-                  timestamp: new Date().toISOString()
+                  timestamp: new Date().toISOString(),
                 },
                 result: 'ERROR',
                 errorCode: 'AUTH_INVALID_PASSWORD',
-                errorMessage: 'Contraseña incorrecta'
+                errorMessage: 'Contraseña incorrecta',
               })
             } catch (auditError) {
               console.error('[AUTH] Error registrando intento fallido:', auditError)
             }
-            
-            const remainingMessage = updatedLockStatus.attemptsRemaining 
+
+            const remainingMessage = updatedLockStatus.attemptsRemaining
               ? ` (${updatedLockStatus.attemptsRemaining} intentos restantes)`
               : ''
-            
+
             throw new Error(`Credenciales inválidas${remainingMessage}`)
           }
 
@@ -170,53 +180,57 @@ export const authOptions: NextAuthOptions = {
     }),
 
     // Proveedor de Google OAuth (solo si está configurado)
-    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET ? [
-      GoogleProvider({
-        clientId: process.env.GOOGLE_CLIENT_ID,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-        authorization: {
-          params: {
-            prompt: 'consent',
-            access_type: 'offline',
-            response_type: 'code'
-          }
-        },
-        profile(profile) {
-          return {
-            id: profile.sub,
-            name: profile.name,
-            email: profile.email,
-            image: profile.picture,
-            role: 'CLIENT' as UserRole, // Por defecto, los usuarios OAuth son clientes
-            emailVerified: profile.email_verified,
-          }
-        }
-      })
-    ] : []),
+    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+      ? [
+          GoogleProvider({
+            clientId: process.env.GOOGLE_CLIENT_ID,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+            authorization: {
+              params: {
+                prompt: 'consent',
+                access_type: 'offline',
+                response_type: 'code',
+              },
+            },
+            profile(profile) {
+              return {
+                id: profile.sub,
+                name: profile.name,
+                email: profile.email,
+                image: profile.picture,
+                role: 'CLIENT' as UserRole, // Por defecto, los usuarios OAuth son clientes
+                emailVerified: profile.email_verified,
+              }
+            },
+          }),
+        ]
+      : []),
 
     // Proveedor de Microsoft/Outlook OAuth (solo si está configurado)
-    ...(process.env.AZURE_AD_CLIENT_ID && process.env.AZURE_AD_CLIENT_SECRET ? [
-      AzureADProvider({
-        clientId: process.env.AZURE_AD_CLIENT_ID,
-        clientSecret: process.env.AZURE_AD_CLIENT_SECRET,
-        tenantId: process.env.AZURE_AD_TENANT_ID || 'common', // 'common' permite cuentas personales y organizacionales
-        authorization: {
-          params: {
-            scope: 'openid profile email User.Read'
-          }
-        },
-        profile(profile) {
-          return {
-            id: profile.sub || profile.oid,
-            name: profile.name,
-            email: profile.email || profile.preferred_username,
-            image: profile.picture,
-            role: 'CLIENT' as UserRole,
-            emailVerified: true,
-          }
-        }
-      })
-    ] : []),
+    ...(process.env.AZURE_AD_CLIENT_ID && process.env.AZURE_AD_CLIENT_SECRET
+      ? [
+          AzureADProvider({
+            clientId: process.env.AZURE_AD_CLIENT_ID,
+            clientSecret: process.env.AZURE_AD_CLIENT_SECRET,
+            tenantId: process.env.AZURE_AD_TENANT_ID || 'common', // 'common' permite cuentas personales y organizacionales
+            authorization: {
+              params: {
+                scope: 'openid profile email User.Read',
+              },
+            },
+            profile(profile) {
+              return {
+                id: profile.sub || profile.oid,
+                name: profile.name,
+                email: profile.email || profile.preferred_username,
+                image: profile.picture,
+                role: 'CLIENT' as UserRole,
+                emailVerified: true,
+              }
+            },
+          }),
+        ]
+      : []),
   ],
   session: {
     strategy: 'jwt',
@@ -234,7 +248,7 @@ export const authOptions: NextAuthOptions = {
           try {
             // Buscar si el usuario ya existe
             const existingUser = await prisma.users.findUnique({
-              where: { email: user.email! }
+              where: { email: user.email! },
             })
 
             if (existingUser) {
@@ -247,7 +261,7 @@ export const authOptions: NextAuthOptions = {
                   isEmailVerified: true,
                   oauthProvider: account.provider,
                   oauthId: account.providerAccountId,
-                }
+                },
               })
 
               // Verificar si está activo
@@ -272,7 +286,7 @@ export const authOptions: NextAuthOptions = {
                   lastLogin: new Date(),
                   createdAt: new Date(),
                   updatedAt: new Date(),
-                }
+                },
               })
 
               // Crear configuración por defecto (user_settings unificado)
@@ -286,7 +300,7 @@ export const authOptions: NextAuthOptions = {
                   timezone: 'America/Guayaquil',
                   language: 'es',
                   updatedAt: new Date(),
-                }
+                },
               })
 
               // Crear preferencias de notificación por defecto
@@ -300,7 +314,7 @@ export const authOptions: NextAuthOptions = {
                   ticketAssigned: true,
                   ticketResolved: true,
                   commentAdded: true,
-                }
+                },
               })
 
               return true
@@ -325,7 +339,7 @@ export const authOptions: NextAuthOptions = {
         if (user) {
           // Agregar timestamp de login para validar timeout
           token.loginTime = Date.now()
-          
+
           // Para OAuth, obtener el usuario de la base de datos
           if (account?.provider === 'google' || account?.provider === 'azure-ad') {
             try {
@@ -374,23 +388,25 @@ export const authOptions: NextAuthOptions = {
           }
         }
 
-        // Refrescar rol y permisos desde la BD en cada request
-        // Esto garantiza que cambios de rol/permisos se reflejen sin cerrar sesión
+        // Refrescar rol y permisos desde la BD — cacheado 2 min por usuario
+        // Garantiza que cambios de rol/permisos se reflejen sin cerrar sesión
         if (!user && token.sub) {
           try {
-            const dbUser = await prisma.users.findUnique({
-              where: { id: token.sub },
-              select: {
-                role: true,
-                isActive: true,
-                canManageInventory: true,
-                isSuperAdmin: true,
-                departmentId: true,
-                departments: { select: { name: true } },
-              },
-            })
+            const { withCache } = await import('@/lib/api-cache')
+            const dbUser = await withCache(`auth:user:${token.sub}`, 120, () =>
+              prisma.users.findUnique({
+                where: { id: token.sub! },
+                select: {
+                  role: true,
+                  isActive: true,
+                  canManageInventory: true,
+                  isSuperAdmin: true,
+                  departmentId: true,
+                  departments: { select: { name: true } },
+                },
+              })
+            )
             if (dbUser) {
-              // Si el usuario fue desactivado, invalidar el token
               if (!dbUser.isActive) {
                 return { ...token, error: 'UserDeactivated' }
               }
@@ -404,12 +420,12 @@ export const authOptions: NextAuthOptions = {
             // Si falla la BD, continuar con el token existente
           }
         }
-        
+
         // Si es una actualización de sesión explícita, aplicar los datos
         if (trigger === 'update' && session) {
           token = { ...token, ...session }
         }
-        
+
         return token
       } catch (error) {
         console.error('Error en JWT callback:', error)
@@ -434,10 +450,10 @@ export const authOptions: NextAuthOptions = {
           session.user.isOAuth = (token.isOAuth as boolean) || false
           ;(session.user as any).canManageInventory = (token.canManageInventory as boolean) || false
           ;(session.user as any).isSuperAdmin = (token.isSuperAdmin as boolean) || false
-          
+
           // IMPORTANTE: Pasar loginTime a la sesión para el monitor de timeout
           if (token.loginTime) {
-            (session as any).loginTime = token.loginTime
+            ;(session as any).loginTime = token.loginTime
           }
         }
         return session
@@ -453,7 +469,7 @@ export const authOptions: NextAuthOptions = {
       if (url.startsWith('/')) {
         return `${baseUrl}${url}`
       }
-      
+
       // Si la URL contiene callbackUrl, extraerlo
       if (url.includes('callbackUrl=')) {
         const urlObj = new URL(url)
@@ -462,12 +478,12 @@ export const authOptions: NextAuthOptions = {
           return `${baseUrl}${callbackUrl}`
         }
       }
-      
+
       // Si la URL es del mismo dominio, permitir
       if (new URL(url).origin === baseUrl) {
         return url
       }
-      
+
       // Por defecto, redirigir a baseUrl
       return baseUrl
     },
@@ -482,7 +498,7 @@ export const authOptions: NextAuthOptions = {
       // Registrar inicio de sesión en auditoría
       try {
         const { AuditServiceComplete } = await import('./services/audit-service-complete')
-        
+
         await AuditServiceComplete.log({
           action: isNewUser ? 'user_registered' : 'login',
           entityType: 'user',
@@ -494,9 +510,9 @@ export const authOptions: NextAuthOptions = {
             email: user.email,
             name: user.name,
             loginMethod: account?.type || 'credentials',
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           },
-          result: 'SUCCESS'
+          result: 'SUCCESS',
         })
       } catch (error) {
         console.error('[AUTH] Error registrando login en auditoría:', error)
@@ -507,9 +523,9 @@ export const authOptions: NextAuthOptions = {
       // Registrar cierre de sesión en auditoría
       try {
         const { AuditServiceComplete } = await import('./services/audit-service-complete')
-        
+
         const userId = (session?.user?.id || token?.sub) as string
-        
+
         if (userId) {
           await AuditServiceComplete.log({
             action: 'logout',
@@ -518,11 +534,11 @@ export const authOptions: NextAuthOptions = {
             userId: userId,
             details: {
               timestamp: new Date().toISOString(),
-              sessionDuration: session?.expires ? 
-                Math.floor((new Date(session.expires).getTime() - Date.now()) / 1000) : 
-                undefined
+              sessionDuration: session?.expires
+                ? Math.floor((new Date(session.expires).getTime() - Date.now()) / 1000)
+                : undefined,
             },
-            result: 'SUCCESS'
+            result: 'SUCCESS',
           })
         }
       } catch (error) {
