@@ -16,7 +16,15 @@ export async function GET() {
       return setting ? parseInt(setting.value) : DEFAULT_SESSION_TIMEOUT
     })
 
-    return NextResponse.json({ sessionTimeout, success: true })
+    return NextResponse.json(
+      { sessionTimeout, success: true },
+      {
+        headers: {
+          // Browser puede cachear 10 min — coincide con el TTL de Redis
+          'Cache-Control': 'public, max-age=600, stale-while-revalidate=300',
+        },
+      }
+    )
   } catch (error) {
     console.error('[API] Error obteniendo session timeout:', error)
     return NextResponse.json({

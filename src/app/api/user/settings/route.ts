@@ -211,7 +211,9 @@ export async function GET(request: NextRequest) {
       }
     }) // fin withCache
 
-    return NextResponse.json(cached)
+    return NextResponse.json(cached, {
+      headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' },
+    })
   } catch (error) {
     console.error('[API-USER-SETTINGS] GET Error:', error)
     return NextResponse.json(

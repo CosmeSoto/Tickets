@@ -25,7 +25,12 @@ export async function GET() {
       return { content: content || {}, services, banners }
     })
 
-    return NextResponse.json(data)
+    return NextResponse.json(data, {
+      headers: {
+        // Browser puede cachear 5 min, CDN/proxy 30 min
+        'Cache-Control': 'public, s-maxage=1800, stale-while-revalidate=300',
+      },
+    })
   } catch (error) {
     console.error('Error loading landing page:', error)
     return NextResponse.json({ error: 'Error al cargar la página' }, { status: 500 })

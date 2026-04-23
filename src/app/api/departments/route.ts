@@ -11,7 +11,10 @@ import { buildCacheKey } from '@/lib/api-cache'
 const departmentSchema = z.object({
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(100),
   description: z.string().optional(),
-  color: z.string().regex(/^#[0-9A-F]{6}$/i, 'Color inválido').optional(),
+  color: z
+    .string()
+    .regex(/^#[0-9A-F]{6}$/i, 'Color inválido')
+    .optional(),
   isActive: z.boolean().optional(),
   order: z.number().int().min(0).optional(),
   familyId: z.string().nullable().optional(),
@@ -38,7 +41,9 @@ export async function GET(request: NextRequest) {
       const { getCached } = await import('@/lib/redis')
       const cached = await getCached<any>(cacheKey)
       if (cached) return NextResponse.json(cached)
-    } catch { /* Redis no disponible */ }
+    } catch {
+      /* Redis no disponible */
+    }
 
     // Si es acceso público (para registro), solo mostrar departamentos activos sin autenticación
     if (publicAccess) {
@@ -50,19 +55,21 @@ export async function GET(request: NextRequest) {
           description: true,
           color: true,
         },
-        orderBy: [
-          { order: 'asc' },
-          { name: 'asc' }
-        ]
+        orderBy: [{ order: 'asc' }, { name: 'asc' }],
       })
 
       const responseData = {
         success: true,
-        departments: departments
+        departments: departments,
       }
 
-      try { const { setCache } = await import('@/lib/redis'); await setCache(cacheKey, responseData, 300) } catch {}
-      return NextResponse.json(responseData)
+      try {
+        const { setCache } = await import('@/lib/redis')
+        await setCache(cacheKey, responseData, 300)
+      } catch {}
+      return NextResponse.json(responseData, {
+        headers: { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=240' },
+      })
     }
 
     // Para acceso autenticado, requerir sesión
@@ -81,10 +88,7 @@ export async function GET(request: NextRequest) {
 
     const departments = await prisma.departments.findMany({
       where,
-      orderBy: [
-        { order: 'asc' },
-        { name: 'asc' }
-      ],
+      orderBy: [{ order: 'asc' }, { name: 'asc' }],
       include: {
         family: {
           select: {
@@ -92,35 +96,40 @@ export async function GET(request: NextRequest) {
             name: true,
             code: true,
             color: true,
-          }
+          },
         },
         _count: {
           select: {
             users: true,
-            categories: true
-          }
-        }
-      }
+            categories: true,
+          },
+        },
+      },
     })
 
     if (process.env.NODE_ENV === 'development') {
-      console.log('📊 Departamentos cargados:', departments.length)
+      // console.log('📊 Departamentos cargados:', departments.length)
     }
 
     const responseData = {
       success: true,
-      data: departments
+      data: departments,
     }
 
-    try { const { setCache } = await import('@/lib/redis'); await setCache(cacheKey, responseData, 300) } catch {}
-    return NextResponse.json(responseData)
+    try {
+      const { setCache } = await import('@/lib/redis')
+      await setCache(cacheKey, responseData, 300)
+    } catch {}
+    return NextResponse.json(responseData, {
+      headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=240' },
+    })
   } catch (error) {
     console.error('❌ Error al cargar departamentos:', error)
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Error al cargar departamentos',
-        details: error instanceof Error ? error.message : 'Error desconocido'
+        details: error instanceof Error ? error.message : 'Error desconocido',
       },
       { status: 500 }
     )
@@ -140,14 +149,14 @@ export async function POST(request: NextRequest) {
 
     // Verificar si ya existe un departamento con ese nombre
     const existing = await prisma.departments.findUnique({
-      where: { name: validatedData.name }
+      where: { name: validatedData.name },
     })
 
     if (existing) {
       return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Ya existe un departamento con ese nombre' 
+        {
+          success: false,
+          error: 'Ya existe un departamento con ese nombre',
         },
         { status: 400 }
       )
@@ -169,10 +178,10 @@ export async function POST(request: NextRequest) {
         _count: {
           select: {
             users: true,
-            categories: true
-          }
-        }
-      }
+            categories: true,
+          },
+        },
+      },
     })
 
     // Registrar en auditoría
@@ -185,16 +194,18 @@ export async function POST(request: NextRequest) {
         departmentName: department.name,
         description: department.description,
         color: department.color,
-        isActive: department.isActive
+        isActive: department.isActive,
       },
-      request
+      request,
     })
 
     // Invalidar cache de departamentos
     try {
       const { invalidateCache } = await import('@/lib/api-cache')
       await invalidateCache(['departments:*'])
-    } catch { /* Redis no disponible */ }
+    } catch {
+      /* Redis no disponible */
+    }
 
     if (process.env.NODE_ENV === 'development') {
       console.log('✅ Departamento creado:', department.name)
@@ -203,28 +214,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: department,
-      message: `Departamento "${department.name}" creado exitosamente`
+      message: `Departamento "${department.name}" creado exitosamente`,
     })
   } catch (error) {
     console.error('❌ Error al crear departamento:', error)
-    
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { 
-          success: false, 
+        {
+          success: false,
           error: 'Datos inválidos',
-          details: error.errors
+          details: error.errors,
         },
         { status: 400 }
       )
     }
 
-    
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Error al crear departamento',
-        details: error instanceof Error ? error.message : 'Error desconocido'
+        details: error instanceof Error ? error.message : 'Error desconocido',
       },
       { status: 500 }
     )

@@ -30,34 +30,41 @@ export async function GET(request: NextRequest) {
       const { getCached } = await import('@/lib/redis')
       const cached = await getCached<any>(cacheKey)
       if (cached) return NextResponse.json(cached)
-    } catch { /* Redis no disponible */ }
+    } catch {
+      /* Redis no disponible */
+    }
 
     // ── Clientes y técnicos: todas las familias habilitadas para tickets ────
     if (session.user.role !== 'ADMIN') {
       // Obtener la familia del departamento del usuario (para marcarla como "su familia")
       const user = await prisma.users.findUnique({
         where: { id: session.user.id },
-        select: { departments: { select: { familyId: true } } }
+        select: { departments: { select: { familyId: true } } },
       })
       const userFamilyId = user?.departments?.familyId ?? null
 
-      const families = await (prisma.families.findMany as any)({
+      const families = (await (prisma.families.findMany as any)({
         where: {
           isActive: true,
           ticketFamilyConfig: { ticketsEnabled: true },
         },
         select: {
-          id: true, name: true, code: true, color: true, icon: true,
-          description: true, isActive: true,
+          id: true,
+          name: true,
+          code: true,
+          color: true,
+          icon: true,
+          description: true,
+          isActive: true,
           ticketFamilyConfig: {
             select: {
               ticketsEnabled: true,
               allowedFromFamilies: true,
-            }
-          }
+            },
+          },
         },
-        orderBy: { order: 'asc' }
-      }) as any[]
+        orderBy: { order: 'asc' },
+      })) as any[]
 
       // Filtrar: si allowedFromFamilies tiene valores, el cliente solo puede
       // crear tickets aquí si su familia está en la lista
@@ -75,10 +82,15 @@ export async function GET(request: NextRequest) {
           ...f,
           isOwnFamily: f.id === userFamilyId,
           isRestricted: (f.ticketFamilyConfig?.allowedFromFamilies ?? []).length > 0,
-        }))
+        })),
       }
-      try { const { setCache } = await import('@/lib/redis'); await setCache(cacheKey, responseData, 300) } catch {}
-      return NextResponse.json(responseData)
+      try {
+        const { setCache } = await import('@/lib/redis')
+        await setCache(cacheKey, responseData, 300)
+      } catch {}
+      return NextResponse.json(responseData, {
+        headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=240' },
+      })
     }
 
     // ── ADMIN ────────────────────────────────────────────────────────────────
@@ -98,8 +110,8 @@ export async function GET(request: NextRequest) {
         // Si tiene asignaciones específicas, filtrar; si no tiene ninguna, devolver todas
         // (compatibilidad con admins existentes antes de la feature)
         if (assignments.length > 0) {
-          const allowedIds = new Set(assignments.map((a) => a.familyId))
-          families = families.filter((f) => allowedIds.has(f.id))
+          const allowedIds = new Set(assignments.map(a => a.familyId))
+          families = families.filter(f => allowedIds.has(f.id))
         }
       } catch {
         // Si la tabla aún no existe o hay error, devolver todas (fallback seguro)
@@ -107,8 +119,13 @@ export async function GET(request: NextRequest) {
     }
 
     const adminResponse = { success: true, data: families }
-    try { const { setCache } = await import('@/lib/redis'); await setCache(cacheKey, adminResponse, 300) } catch {}
-    return NextResponse.json(adminResponse)
+    try {
+      const { setCache } = await import('@/lib/redis')
+      await setCache(cacheKey, adminResponse, 300)
+    } catch {}
+    return NextResponse.json(adminResponse, {
+      headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=240' },
+    })
   } catch (error) {
     console.error('[GET /api/families]', error)
     return NextResponse.json(
@@ -184,7 +201,11 @@ export async function POST(request: NextRequest) {
     })
 
     // Invalidar caché de familias para todos los roles
-    await invalidateCache(['families:role=ADMIN*', 'families:role=TECHNICIAN*', 'families:role=CLIENT*']).catch(() => {})
+    await invalidateCache([
+      'families:role=ADMIN*',
+      'families:role=TECHNICIAN*',
+      'families:role=CLIENT*',
+    ]).catch(() => {})
 
     return NextResponse.json(
       { success: true, data: family, message: `Familia "${family.name}" creada exitosamente` },
@@ -192,9 +213,6 @@ export async function POST(request: NextRequest) {
     )
   } catch (error) {
     console.error('[POST /api/families]', error)
-    return NextResponse.json(
-      { success: false, message: 'Error al crear familia' },
-      { status: 500 }
-    )
+    return NextResponse.json({ success: false, message: 'Error al crear familia' }, { status: 500 })
   }
 }
