@@ -23,7 +23,6 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import {
   AlertDialog,
@@ -254,15 +253,29 @@ export function TabGeneral({
     <div className='space-y-6'>
       {/* Basic data form */}
       <Card>
-        <CardHeader>
-          <CardTitle className='text-base'>Datos básicos</CardTitle>
-          <CardDescription>Edita la información principal de la familia</CardDescription>
+        <CardHeader className='pb-3'>
+          <div className='flex items-center justify-between'>
+            <div>
+              <CardTitle className='text-base'>Datos básicos</CardTitle>
+              <CardDescription>Información principal de la familia</CardDescription>
+            </div>
+            <Button onClick={handleSave} disabled={saving} size='sm'>
+              {saving ? (
+                <RefreshCw className='h-4 w-4 animate-spin' />
+              ) : (
+                <Save className='h-4 w-4' />
+              )}
+              <span className='ml-2 hidden sm:inline'>{saving ? 'Guardando...' : 'Guardar'}</span>
+            </Button>
+          </div>
         </CardHeader>
-        <CardContent className='space-y-4'>
-          <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-            {/* Code */}
+        <CardContent className='space-y-3'>
+          {/* Código + Nombre en la misma fila */}
+          <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
             <div className='space-y-1'>
-              <Label htmlFor='family-code'>Código *</Label>
+              <Label htmlFor='family-code' className='text-xs'>
+                Código *
+              </Label>
               <Input
                 id='family-code'
                 value={form.code}
@@ -272,30 +285,49 @@ export function TabGeneral({
                 }}
                 placeholder='Ej: IT'
                 disabled={saving}
+                className='h-8 text-sm'
               />
               {codeError && <p className='text-xs text-destructive'>{codeError}</p>}
             </div>
-
-            {/* Name */}
             <div className='space-y-1'>
-              <Label htmlFor='family-name'>Nombre *</Label>
+              <Label htmlFor='family-name' className='text-xs'>
+                Nombre *
+              </Label>
               <Input
                 id='family-name'
                 value={form.name}
                 onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                 placeholder='Ej: Tecnología'
                 disabled={saving}
+                className='h-8 text-sm'
               />
             </div>
+          </div>
 
-            {/* Icon */}
-            <div className='space-y-1 sm:col-span-2'>
-              <IconPicker value={form.icon} onChange={v => setForm(f => ({ ...f, icon: v }))} />
+          {/* Ícono */}
+          <div className='space-y-1'>
+            <IconPicker value={form.icon} onChange={v => setForm(f => ({ ...f, icon: v }))} />
+          </div>
+
+          {/* Descripción + Orden en la misma fila */}
+          <div className='grid grid-cols-1 sm:grid-cols-4 gap-3'>
+            <div className='space-y-1 sm:col-span-3'>
+              <Label htmlFor='family-description' className='text-xs'>
+                Descripción
+              </Label>
+              <Input
+                id='family-description'
+                value={form.description}
+                onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                placeholder='Descripción de la familia'
+                disabled={saving}
+                className='h-8 text-sm'
+              />
             </div>
-
-            {/* Order */}
             <div className='space-y-1'>
-              <Label htmlFor='family-order'>Orden</Label>
+              <Label htmlFor='family-order' className='text-xs'>
+                Orden
+              </Label>
               <Input
                 id='family-order'
                 type='number'
@@ -303,70 +335,42 @@ export function TabGeneral({
                 onChange={e => setForm(f => ({ ...f, order: parseInt(e.target.value) || 0 }))}
                 min={0}
                 disabled={saving}
+                className='h-8 text-sm'
               />
             </div>
           </div>
 
-          {/* Description */}
-          <div className='space-y-1'>
-            <Label htmlFor='family-description'>Descripción</Label>
-            <Textarea
-              id='family-description'
-              value={form.description}
-              onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-              placeholder='Descripción de la familia'
-              rows={2}
-              disabled={saving}
-            />
-          </div>
-
-          {/* Color */}
-          <div className='space-y-2'>
-            <Label>Color</Label>
-            <div className='flex flex-wrap gap-2'>
-              {FAMILY_COLORS.map(c => (
-                <button
-                  key={c.value}
-                  type='button'
-                  onClick={() => setForm(f => ({ ...f, color: c.value }))}
-                  className={`w-8 h-8 rounded-full transition-all hover:scale-110 ${
-                    form.color === c.value ? 'ring-2 ring-offset-2 ring-primary' : ''
-                  }`}
-                  style={{ backgroundColor: c.value }}
-                  title={c.label}
-                  disabled={saving}
-                />
-              ))}
+          {/* Color + Estado en la misma fila */}
+          <div className='flex items-center gap-4 flex-wrap'>
+            <div className='space-y-1'>
+              <Label className='text-xs'>Color</Label>
+              <div className='flex flex-wrap gap-1.5'>
+                {FAMILY_COLORS.map(c => (
+                  <button
+                    key={c.value}
+                    type='button'
+                    onClick={() => setForm(f => ({ ...f, color: c.value }))}
+                    className={`w-6 h-6 rounded-full transition-all hover:scale-110 ${
+                      form.color === c.value ? 'ring-2 ring-offset-1 ring-primary' : ''
+                    }`}
+                    style={{ backgroundColor: c.value }}
+                    title={c.label}
+                    disabled={saving}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
-
-          {/* isActive */}
-          <div className='flex items-center gap-3'>
-            <Switch
-              id='family-active'
-              checked={form.isActive}
-              onCheckedChange={v => setForm(f => ({ ...f, isActive: v }))}
-              disabled={saving}
-            />
-            <Label htmlFor='family-active' className='cursor-pointer'>
-              Familia activa
-            </Label>
-          </div>
-
-          <div className='flex justify-end pt-2'>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? (
-                <>
-                  <RefreshCw className='h-4 w-4 mr-2 animate-spin' />
-                  Guardando...
-                </>
-              ) : (
-                <>
-                  <Save className='h-4 w-4 mr-2' />
-                  Guardar cambios
-                </>
-              )}
-            </Button>
+            <div className='flex items-center gap-2 ml-auto'>
+              <Switch
+                id='family-active'
+                checked={form.isActive}
+                onCheckedChange={v => setForm(f => ({ ...f, isActive: v }))}
+                disabled={saving}
+              />
+              <Label htmlFor='family-active' className='cursor-pointer text-sm'>
+                {form.isActive ? 'Activa' : 'Inactiva'}
+              </Label>
+            </div>
           </div>
         </CardContent>
       </Card>
