@@ -95,3 +95,65 @@ export async function invalidateSettings(keys: string | string[]): Promise<void>
   const list = Array.isArray(keys) ? keys : [keys]
   await invalidateCache(list.map(k => `setting:${k}`))
 }
+
+/**
+ * Cache para reportes y queries de agregación pesadas.
+ * TTL largo (15 min por defecto) porque los reportes cambian poco.
+ * Ideal para dashboards, estadísticas y cualquier módulo nuevo.
+ *
+ * @example
+ * // En cualquier endpoint de reporte nuevo:
+ * const data = await withReportCache('ventas:mensual', { mes: '2026-04' }, () =>
+ *   prisma.ventas.aggregate({ ... })
+ * )
+ */
+export async function withReportCache<T>(
+  prefix: string,
+  params: Record<string, unknown>,
+  fn: () => Promise<T>,
+  ttlSeconds = 900 // 15 minutos por defecto
+): Promise<T> {
+  const key = buildCacheKey(`report:${prefix}`, params)
+  return withCache(key, ttlSeconds, fn)
+}
+
+/**
+ * Invalida todos los reportes de un módulo.
+ * Llamar después de cualquier mutación que afecte los datos del reporte.
+ *
+ * @example
+ * // Después de crear un ticket:
+ * await invalidateReports('tickets')
+ * // Después de crear un activo:
+ * await invalidateReports('inventory')
+ */
+export async function invalidateReports(module: string): Promise<void> {
+  await invalidateCache(`report:${module}:*`)
+}
+
+/**
+ * Patrón completo para un nuevo módulo.
+ * Incluye caché de lista, detalle e invalidación.
+ *
+ * @example
+ * // En GET /api/nuevo-modulo:
+ * const { getList, getDetail, invalidate } = createModuleCache('nuevo-modulo')
+ * const items = await getList({ userId, filtros }, () => prisma.query())
+ *
+ * // En POST/PUT/DELETE:
+ * await invalidate()
+ */
+export function createModuleCache(moduleName: string, ttl = 300) {
+  return {
+    getList: <T>(params: Record<string, unknown>, fn: () => Promise<T>) =>
+      withCache(buildCacheKey(`${moduleName}:list`, params), ttl, fn),
+
+    getDetail: <T>(id: string, fn: () => Promise<T>) =>
+      withCache(`${moduleName}:detail:${id}`, ttl, fn),
+
+    invalidate: (id?: string) =>
+      id
+        ? invalidateCache([`${moduleName}:list:*`, `${moduleName}:detail:${id}`])
+        : invalidateCache(`${moduleName}:*`),
+  }
+}
