@@ -2,121 +2,242 @@
 
 ## Requisitos Previos
 
-- Node.js 18+ (recomendado 20+)
-- Docker y Docker Compose
-- npm o yarn
+- Docker Desktop 4.x+
+- Node.js 20+ (solo para desarrollo local sin Docker)
+- Git
 
-## 1. Clonar el Repositorio
+---
+
+## Opción A — Docker (Recomendado)
+
+Todo corre dentro de contenedores: PostgreSQL, Redis, Nginx y la app Next.js.
+
+### 1. Clonar el repositorio
 
 ```bash
 git clone https://github.com/CosmeSoto/Tickets.git
-cd Tickets
+cd Tickets/sistema-tickets-nextjs
 ```
 
-## 2. Levantar Servicios con Docker
-
-PostgreSQL, Redis y pgAdmin corren en contenedores Docker:
+### 2. Configurar variables de entorno
 
 ```bash
-docker-compose up -d
+cp .env.example .env.local
 ```
 
-Servicios disponibles:
-| Servicio   | Puerto | Descripción                    |
-|------------|--------|--------------------------------|
-| PostgreSQL | 5432   | Base de datos principal         |
-| Redis      | 6380   | Cache y colas                   |
-| pgAdmin    | 8080   | Administrador visual de la BD   |
-
-Credenciales pgAdmin:
-- Email: `admin@tickets.local`
-- Password: `admin123`
-
-## 3. Configurar Variables de Entorno
-
-```bash
-cp .env.example .env
-```
-
-Variables mínimas requeridas:
+Variables mínimas requeridas en `.env.local`:
 
 ```env
-# Base de datos (coincide con docker-compose.yml)
-DATABASE_URL="postgresql://tickets_user:tickets_password_2024@localhost:5432/tickets_db"
+# Base de datos
+DATABASE_URL="postgresql://tickets_user:tickets_password@localhost:5432/tickets_db"
+
+# Redis
+REDIS_URL="redis://localhost:6379"
 
 # NextAuth
-NEXTAUTH_SECRET="genera-un-secret-aleatorio-aqui"
-NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="genera-con: openssl rand -base64 32"
+NEXTAUTH_URL="https://gestion.local"
 
-# Cron
-CRON_SECRET="cambia-esto-en-produccion"
-
-# Encriptación para credenciales OAuth
-ENCRYPTION_KEY="genera-con-openssl-rand-base64-32"
+# Encriptación para claves de licencias
+ENCRYPTION_KEY="genera-con: openssl rand -base64 32"
 ```
 
 Para generar secrets seguros:
+
 ```bash
-openssl rand -base64 32   # Para NEXTAUTH_SECRET
-openssl rand -base64 32   # Para ENCRYPTION_KEY
+openssl rand -base64 32
 ```
 
-## 4. Instalar Dependencias
+### 3. Levantar servicios
+
+```bash
+docker compose -f docker-compose.dev.yml up -d
+```
+
+Esto levanta:
+| Contenedor | Puerto | Descripción |
+|------------|--------|-------------|
+| `tickets-app-dev` | 3000 | App Next.js (Turbopack) |
+| `tickets-postgres-dev` | 5432 | PostgreSQL 15 |
+| `tickets-redis-dev` | 6379 | Redis 7 |
+| `tickets-nginx-dev` | 443 | Nginx (HTTPS local) |
+
+El seed se ejecuta automáticamente al iniciar. Acceder en `https://gestion.local` o `http://localhost:3000`.
+
+### 4. Credenciales por defecto
+
+| Rol         | Email                      | Contraseña |
+| ----------- | -------------------------- | ---------- |
+| Super Admin | internet.freecom@gmail.com | admin123   |
+
+---
+
+## Opción B — Local (sin Docker)
+
+### 1. Instalar dependencias
 
 ```bash
 npm install
 ```
 
-## 5. Configurar Base de Datos
+### 2. Levantar PostgreSQL y Redis
 
 ```bash
-# Generar cliente Prisma
+# Solo la BD y Redis en Docker
+docker compose up postgres redis -d
+```
+
+### 3. Configurar BD
+
+```bash
 npx prisma generate
-
-# Sincronizar schema con la BD
-npx prisma db push
-
-# Cargar datos iniciales (admin, departamentos, catálogos, SLA, etc.)
+npx prisma migrate deploy
 npm run db:seed
 ```
 
-## 6. Iniciar en Desarrollo
+### 4. Iniciar
 
 ```bash
 npm run dev
 ```
 
-Acceder a http://localhost:3000
+---
 
-## Credenciales por Defecto
+## Variables de Entorno Completas
 
-| Rol   | Email              | Contraseña |
-|-------|--------------------|------------|
-| Admin | internet.freecom@gmail.com  | admin123   |
+```env
+# ── Base de datos ──────────────────────────────────────────────────────────
+DATABASE_URL="postgresql://tickets_user:tickets_password@localhost:5432/tickets_db"
 
-## Resetear Base de Datos
+# ── Redis ──────────────────────────────────────────────────────────────────
+REDIS_URL="redis://localhost:6379"
 
-Si necesitas empezar de cero:
+# ── NextAuth ───────────────────────────────────────────────────────────────
+NEXTAUTH_SECRET="tu-secret-super-seguro"
+NEXTAUTH_URL="https://gestion.local"
 
-```bash
-npm run db:reset
+# ── Encriptación (claves de licencias) ────────────────────────────────────
+ENCRYPTION_KEY="tu-encryption-key-base64"
+
+# ── Email (opcional) ───────────────────────────────────────────────────────
+EMAIL_SERVER_HOST="smtp.gmail.com"
+EMAIL_SERVER_PORT=587
+EMAIL_SERVER_USER="tu-email@gmail.com"
+EMAIL_SERVER_PASSWORD="tu-app-password"
+EMAIL_FROM="tu-email@gmail.com"
+
+# ── OAuth (opcional) ───────────────────────────────────────────────────────
+GOOGLE_CLIENT_ID="tu-google-client-id"
+GOOGLE_CLIENT_SECRET="tu-google-client-secret"
+AZURE_AD_CLIENT_ID="tu-azure-client-id"
+AZURE_AD_CLIENT_SECRET="tu-azure-client-secret"
+AZURE_AD_TENANT_ID="common"
+
+# ── Logs ───────────────────────────────────────────────────────────────────
+LOG_LEVEL="ERROR"
+NEXT_PUBLIC_LOG_LEVEL="ERROR"
+NODE_ENV="development"
 ```
 
-Esto ejecuta `prisma db push --force-reset` + seed.
+---
 
-## Trabajar en Múltiples Computadoras
+## Comandos de Referencia
 
-El proyecto usa Git para sincronización:
+### Desarrollo diario
 
 ```bash
-# Al llegar a otra computadora
+# Iniciar (si ya está construido)
+docker compose -f docker-compose.dev.yml up -d
+
+# Ver logs
+docker compose -f docker-compose.dev.yml logs -f app
+
+# Reiniciar solo la app
+docker restart tickets-app-dev
+
+# Detener todo
+docker compose -f docker-compose.dev.yml down
+```
+
+### Prisma (dentro del contenedor)
+
+```bash
+# Crear migración
+docker exec tickets-app-dev npx prisma migrate dev --name descripcion
+
+# Aplicar migraciones existentes
+docker exec tickets-app-dev npx prisma migrate deploy
+
+# Regenerar cliente (después de cambiar schema)
+docker exec tickets-app-dev npx prisma generate
+
+# Seed (seguro repetirlo)
+docker exec tickets-app-dev npm run db:seed
+
+# Reset completo de BD
+docker exec tickets-app-dev npm run db:reset
+```
+
+### Redis
+
+```bash
+# Ver claves en caché
+docker exec tickets-redis-dev redis-cli KEYS "*"
+
+# Ver estadísticas de hits/misses
+docker exec tickets-redis-dev redis-cli INFO stats | grep keyspace
+
+# Limpiar caché completo
+docker exec tickets-redis-dev redis-cli FLUSHALL
+```
+
+### Git (trabajo en múltiples equipos)
+
+```bash
+# Al llegar a otro equipo
 git pull origin main
-npm install                  # Si hubo cambios en package.json
-npx prisma generate          # Si hubo cambios en schema.prisma
-npx prisma db push           # Si hubo cambios en schema.prisma
-
-# Al terminar de trabajar
-git add -A
-git commit -m "descripción"
-git push origin main
+npm install          # si hubo cambios en package.json
+# Reiniciar Docker para tomar cambios de código
+docker restart tickets-app-dev
 ```
+
+---
+
+## Solución de Problemas Comunes
+
+### La app no arranca
+
+```bash
+# Ver logs detallados
+docker compose -f docker-compose.dev.yml logs app
+
+# Reconstruir desde cero
+docker compose -f docker-compose.dev.yml down -v
+docker compose -f docker-compose.dev.yml up --build -d
+```
+
+### Error de Prisma "Table does not exist"
+
+```bash
+docker exec tickets-app-dev npx prisma migrate deploy
+docker exec tickets-app-dev npx prisma generate
+docker restart tickets-app-dev
+```
+
+### Redis no conecta
+
+```bash
+# Verificar que Redis está corriendo
+docker exec tickets-redis-dev redis-cli ping
+# Debe responder: PONG
+```
+
+### Cambios de código no se reflejan
+
+```bash
+# Turbopack debería detectarlos automáticamente
+# Si no, reiniciar la app
+docker restart tickets-app-dev
+```
+
+Ver [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) para más casos.
