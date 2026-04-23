@@ -59,10 +59,7 @@ export async function GET() {
     })
   } catch (error) {
     console.error('Error loading landing page content:', error)
-    return NextResponse.json(
-      { error: 'Error al cargar contenido' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al cargar contenido' }, { status: 500 })
   }
 }
 
@@ -122,11 +119,18 @@ export async function PUT(request: NextRequest) {
     })
 
     return NextResponse.json({ success: true, content })
+
+    // Invalidar caché de landing page
+    try {
+      const { invalidateCache } = await import('@/lib/api-cache')
+      await invalidateCache('landing:page')
+    } catch {
+      /* Redis no disponible */
+    }
+
+    return NextResponse.json({ success: true, content })
   } catch (error) {
     console.error('Error updating landing page content:', error)
-    return NextResponse.json(
-      { error: 'Error al actualizar contenido' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al actualizar contenido' }, { status: 500 })
   }
 }

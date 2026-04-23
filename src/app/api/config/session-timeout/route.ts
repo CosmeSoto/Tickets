@@ -1,40 +1,28 @@
-/**
- * Endpoint público para obtener el timeout de sesión configurado
- * No requiere autenticación ya que es información necesaria para todos los usuarios
- */
-
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { withCache } from '@/lib/api-cache'
 
 export const dynamic = 'force-dynamic'
 
-const DEFAULT_SESSION_TIMEOUT = 1440 // 24 horas en minutos
+const DEFAULT_SESSION_TIMEOUT = 1440
 
 export async function GET() {
   try {
-    // Buscar configuración de sessionTimeout
-    const setting = await prisma.system_settings.findUnique({
-      where: { key: 'sessionTimeout' }
+    // Caché 10 minutos — la configuración de timeout cambia raramente
+    const sessionTimeout = await withCache('config:session-timeout', 600, async () => {
+      const setting = await prisma.system_settings.findUnique({
+        where: { key: 'sessionTimeout' },
+      })
+      return setting ? parseInt(setting.value) : DEFAULT_SESSION_TIMEOUT
     })
 
-    const sessionTimeout = setting 
-      ? parseInt(setting.value) 
-      : DEFAULT_SESSION_TIMEOUT
-
-    return NextResponse.json({ 
-      sessionTimeout,
-      success: true 
-    }, {
-      headers: { 'Cache-Control': 'no-store, max-age=0' }
-    })
+    return NextResponse.json({ sessionTimeout, success: true })
   } catch (error) {
     console.error('[API] Error obteniendo session timeout:', error)
-    
-    // En caso de error, retornar valor por defecto
-    return NextResponse.json({ 
+    return NextResponse.json({
       sessionTimeout: DEFAULT_SESSION_TIMEOUT,
       success: true,
-      fallback: true
+      fallback: true,
     })
   }
 }

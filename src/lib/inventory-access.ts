@@ -1,20 +1,24 @@
 import prisma from '@/lib/prisma'
+import { withCache } from '@/lib/api-cache'
 
 /**
  * Verifica si un usuario tiene permiso GLOBAL de gestión de inventario.
  * - ADMIN: siempre sí
  * - Cualquier otro rol: solo si canManageInventory === true en la BD
+ * Resultado cacheado 5 minutos en Redis para evitar queries repetidas.
  */
 export async function canManageInventory(userId: string, role: string): Promise<boolean> {
   if (role === 'ADMIN') return true
 
   try {
-    const user = await prisma.users.findUnique({
-      where: { id: userId },
-      select: { canManageInventory: true, isActive: true },
+    return await withCache(`perm:inv:${userId}`, 300, async () => {
+      const user = await prisma.users.findUnique({
+        where: { id: userId },
+        select: { canManageInventory: true, isActive: true },
+      })
+      if (!user || !user.isActive) return false
+      return user.canManageInventory === true
     })
-    if (!user || !user.isActive) return false
-    return user.canManageInventory === true
   } catch {
     return false
   }
@@ -107,10 +111,7 @@ export async function isTechnicianOfFamily(
  * Verifica si un usuario es GESTOR de una familia específica.
  * (canManageInventory = true + asignado a esa familia en inventory_manager_families)
  */
-export async function isManagerOfFamily(
-  userId: string,
-  familyId: string
-): Promise<boolean> {
+export async function isManagerOfFamily(userId: string, familyId: string): Promise<boolean> {
   try {
     const user = await prisma.users.findUnique({
       where: { id: userId },
@@ -156,8 +157,5 @@ export async function isAdminOfFamily(
  * Respuesta estándar de acceso denegado para inventario
  */
 export function inventoryForbidden() {
-  return Response.json(
-    { error: 'No tienes permiso para gestionar el inventario' },
-    { status: 403 }
-  )
+  return Response.json({ error: 'No tienes permiso para gestionar el inventario' }, { status: 403 })
 }

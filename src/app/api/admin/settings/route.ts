@@ -5,33 +5,35 @@ import prisma from '@/lib/prisma'
 import { z } from 'zod'
 import { randomUUID } from 'crypto'
 
-const settingsSchema = z.object({
-  systemName: z.string().max(100).optional(),
-  systemDescription: z.string().max(500).optional(),
-  supportEmail: z.string().email().optional().or(z.literal('')),
-  maxTicketsPerUser: z.coerce.number().min(1).max(100).optional(),
-  autoAssignmentEnabled: z.boolean().optional(),
-  emailEnabled: z.boolean().optional(),
-  smtpHost: z.string().optional(),
-  smtpPort: z.coerce.number().optional(),
-  smtpUser: z.string().optional(),
-  smtpPassword: z.string().optional(),
-  smtpSecure: z.boolean().optional(),
-  emailFrom: z.string().email().optional().or(z.literal('')),
-  notificationsEnabled: z.boolean().optional(),
-  emailNotifications: z.boolean().optional(),
-  browserNotifications: z.boolean().optional(),
-  sessionTimeout: z.coerce.number().min(5).max(1440).optional(),
-  maxLoginAttempts: z.coerce.number().min(3).max(10).optional(),
-  passwordMinLength: z.coerce.number().min(6).max(20).optional(),
-  requirePasswordChange: z.boolean().optional(),
-  maxFileSize: z.coerce.number().min(1).max(100).optional(),
-  autoCloseDays: z.coerce.number().min(1).max(30).optional(),
-  allowedFileTypes: z.array(z.string()).optional(),
-  backupEnabled: z.boolean().optional(),
-  backupFrequency: z.enum(['daily', 'weekly', 'monthly']).optional(),
-  backupRetention: z.coerce.number().min(7).max(365).optional(),
-}).passthrough()
+const settingsSchema = z
+  .object({
+    systemName: z.string().max(100).optional(),
+    systemDescription: z.string().max(500).optional(),
+    supportEmail: z.string().email().optional().or(z.literal('')),
+    maxTicketsPerUser: z.coerce.number().min(1).max(100).optional(),
+    autoAssignmentEnabled: z.boolean().optional(),
+    emailEnabled: z.boolean().optional(),
+    smtpHost: z.string().optional(),
+    smtpPort: z.coerce.number().optional(),
+    smtpUser: z.string().optional(),
+    smtpPassword: z.string().optional(),
+    smtpSecure: z.boolean().optional(),
+    emailFrom: z.string().email().optional().or(z.literal('')),
+    notificationsEnabled: z.boolean().optional(),
+    emailNotifications: z.boolean().optional(),
+    browserNotifications: z.boolean().optional(),
+    sessionTimeout: z.coerce.number().min(5).max(1440).optional(),
+    maxLoginAttempts: z.coerce.number().min(3).max(10).optional(),
+    passwordMinLength: z.coerce.number().min(6).max(20).optional(),
+    requirePasswordChange: z.boolean().optional(),
+    maxFileSize: z.coerce.number().min(1).max(100).optional(),
+    autoCloseDays: z.coerce.number().min(1).max(30).optional(),
+    allowedFileTypes: z.array(z.string()).optional(),
+    backupEnabled: z.boolean().optional(),
+    backupFrequency: z.enum(['daily', 'weekly', 'monthly']).optional(),
+    backupRetention: z.coerce.number().min(7).max(365).optional(),
+  })
+  .passthrough()
 
 // Configuración por defecto
 const defaultSettings = {
@@ -133,48 +135,53 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    
+
     // Validar datos
     const validation = settingsSchema.safeParse(body)
-    
+
     if (!validation.success) {
       console.error('Error de validación:', validation.error.errors)
-      return NextResponse.json({ 
-        error: 'Datos inválidos', 
-        details: validation.error.errors 
-      }, { status: 400 })
+      return NextResponse.json(
+        {
+          error: 'Datos inválidos',
+          details: validation.error.errors,
+        },
+        { status: 400 }
+      )
     }
-    
+
     const validatedData = validation.data
 
     // Actualizar configuraciones en la base de datos
-    const updatePromises = Object.entries(validatedData).map(([key, value]) => {
-      let stringValue: string
+    const updatePromises = Object.entries(validatedData)
+      .map(([key, value]) => {
+        let stringValue: string
 
-      if (typeof value === 'boolean') {
-        stringValue = value.toString()
-      } else if (typeof value === 'number') {
-        stringValue = value.toString()
-      } else if (Array.isArray(value)) {
-        stringValue = JSON.stringify(value)
-      } else if (value === null || value === undefined) {
-        return null // Skip null/undefined values
-      } else {
-        stringValue = value as string
-      }
+        if (typeof value === 'boolean') {
+          stringValue = value.toString()
+        } else if (typeof value === 'number') {
+          stringValue = value.toString()
+        } else if (Array.isArray(value)) {
+          stringValue = JSON.stringify(value)
+        } else if (value === null || value === undefined) {
+          return null // Skip null/undefined values
+        } else {
+          stringValue = value as string
+        }
 
-      return prisma.system_settings.upsert({
-        where: { key },
-        update: { value: stringValue, updatedAt: new Date() },
-        create: { 
-          id: randomUUID(),
-          key, 
-          value: stringValue,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        },
+        return prisma.system_settings.upsert({
+          where: { key },
+          update: { value: stringValue, updatedAt: new Date() },
+          create: {
+            id: randomUUID(),
+            key,
+            value: stringValue,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        })
       })
-    }).filter(Boolean) // Remove null entries
+      .filter(Boolean) // Remove null entries
 
     await Promise.all(updatePromises)
 
@@ -201,17 +208,28 @@ export async function PUT(request: NextRequest) {
       },
     })
 
+    // Invalidar caché de settings afectados
+    try {
+      const { invalidateSettings } = await import('@/lib/api-cache')
+      await invalidateSettings([...Object.keys(validatedData), 'config:session-timeout'])
+    } catch {
+      /* Redis no disponible */
+    }
+
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error al actualizar configuración:', error)
-    
+
     if (error instanceof Error) {
-      return NextResponse.json({ 
-        error: 'Error interno del servidor',
-        message: error.message 
-      }, { status: 500 })
+      return NextResponse.json(
+        {
+          error: 'Error interno del servidor',
+          message: error.message,
+        },
+        { status: 500 }
+      )
     }
-    
+
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }
