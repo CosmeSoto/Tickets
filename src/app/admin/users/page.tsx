@@ -4,14 +4,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Plus, UsersIcon } from 'lucide-react'
-import Link from 'next/link'
 
-// Componentes estandarizados
 import { ModuleLayout } from '@/components/common/layout/module-layout'
-
-// Componentes específicos del módulo
 import { DataTable } from '@/components/ui/data-table'
-import { UserStatsPanel } from '@/components/users/user-stats-panel'
 import { UserFilters } from '@/components/users/user-filters'
 import { UserDetailsModal } from '@/components/ui/user-details-modal'
 import { AvatarUploadModal } from '@/components/users/avatar-upload-modal'
@@ -19,6 +14,7 @@ import { CreateUserModal } from '@/components/users/create-user-modal'
 import { EditUserModal } from '@/components/users/edit-user-modal'
 import { PromoteUserDialog } from '@/components/users/promote-user-dialog'
 import { createUserColumns, UserCard } from '@/components/users/admin/user-columns'
+import { ExportButton } from '@/components/common/export-button'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -28,11 +24,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
-// Hooks y tipos
 import { useUsers, type UserData } from '@/hooks/use-users'
 import { useUserFilters } from '@/hooks/common/use-user-filters'
+import { useExport } from '@/hooks/common/use-export'
 import type { UserRole } from '@/lib/constants/user-constants'
 import { useToast } from '@/hooks/use-toast'
 import { useActiveDepartments } from '@/contexts/departments-context'
@@ -42,21 +37,13 @@ export default function AdminUsersPage() {
   const router = useRouter()
   const { toast } = useToast()
 
-  // Estados de datos
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
 
   // ✅ Departamentos desde contexto global — sin petición extra
   const { departments } = useActiveDepartments()
 
   // Hook de filtros unificado
-  const {
-    filters,
-    debouncedFilters,
-    setFilter,
-    clearFilters,
-    activeFiltersCount,
-    hasActiveFilters,
-  } = useUserFilters()
+  const { filters, setFilter, clearFilters, hasActiveFilters } = useUserFilters()
 
   // Hook de usuarios con filtros
   const {
@@ -64,7 +51,6 @@ export default function AdminUsersPage() {
     loading,
     error,
     pagination: usersPagination,
-    stats,
     setFilters,
     refresh,
     goToPage,
@@ -73,6 +59,41 @@ export default function AdminUsersPage() {
   } = useUsers({
     pageSize: 20,
     enableCache: true,
+  })
+
+  // Exportación — usa los usuarios visibles con filtros activos
+  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+    filename: 'usuarios',
+    title: 'Reporte de Usuarios',
+    subtitle: `Generado el ${new Date().toLocaleDateString('es-EC')}`,
+    columns: [
+      { key: 'name', label: 'Nombre' },
+      { key: 'email', label: 'Email' },
+      {
+        key: 'role',
+        label: 'Rol',
+        format: (v: string) =>
+          ({ ADMIN: 'Administrador', TECHNICIAN: 'Técnico', CLIENT: 'Cliente' })[v] ?? v,
+      },
+      {
+        key: 'department',
+        label: 'Departamento',
+        format: (v: any) => (typeof v === 'string' ? v : (v?.name ?? '—')),
+      },
+      { key: 'phone', label: 'Teléfono', format: (v: any) => v ?? '—' },
+      { key: 'isActive', label: 'Estado', format: (v: boolean) => (v ? 'Activo' : 'Inactivo') },
+      {
+        key: 'lastLogin',
+        label: 'Último acceso',
+        format: (v: any) => (v ? new Date(v).toLocaleDateString('es-EC') : 'Nunca'),
+      },
+      {
+        key: 'createdAt',
+        label: 'Creado',
+        format: (v: any) => new Date(v).toLocaleDateString('es-EC'),
+      },
+    ],
+    getData: () => users,
   })
 
   // Estados de modales
@@ -121,26 +142,16 @@ export default function AdminUsersPage() {
     // Cargar datos iniciales al verificar sesión
   }, [session, status, router])
 
-  // Aplicar filtros cuando cambien los filtros debounced
+  // Aplicar filtros cuando cambien
   useEffect(() => {
-    const apiFilters: any = {}
-
-    // Solo agregar filtros si tienen valores válidos (no 'all')
-    if (debouncedFilters.search && debouncedFilters.search.trim()) {
-      apiFilters.search = debouncedFilters.search
-    }
-    if (debouncedFilters.role && debouncedFilters.role !== 'all') {
-      apiFilters.role = debouncedFilters.role
-    }
-    if (debouncedFilters.status && debouncedFilters.status !== 'all') {
-      apiFilters.isActive = debouncedFilters.status
-    }
-    if (debouncedFilters.department && debouncedFilters.department !== 'all') {
-      apiFilters.departmentId = debouncedFilters.department
-    }
-
+    const apiFilters: Record<string, string> = {}
+    if (filters.search?.trim()) apiFilters.search = filters.search
+    if (filters.role && filters.role !== 'all') apiFilters.role = filters.role
+    if (filters.status && filters.status !== 'all') apiFilters.isActive = filters.status
+    if (filters.department && filters.department !== 'all')
+      apiFilters.departmentId = filters.department
     setFilters(apiFilters)
-  }, [debouncedFilters, setFilters])
+  }, [filters.search, filters.role, filters.status, filters.department, setFilters])
 
   // Funciones de manejo de modales
   const handleUserEdit = (user: UserData) => {
@@ -277,26 +288,23 @@ export default function AdminUsersPage() {
       subtitle='Administrar cuentas de usuario del sistema'
       loading={loading && users.length === 0}
       headerActions={
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button size='sm' onClick={() => setShowCreateDialog(true)}>
-                <Plus className='h-4 w-4 mr-2' />
-                Nuevo Usuario
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Crea un nuevo usuario en el sistema</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <div className='flex items-center gap-2'>
+          <ExportButton
+            onExportCSV={exportCSV}
+            onExportExcel={exportExcel}
+            onExportPDF={exportPDF}
+            loading={exporting}
+            disabled={users.length === 0}
+          />
+          <Button size='sm' onClick={() => setShowCreateDialog(true)}>
+            <Plus className='h-4 w-4 mr-2' />
+            Nuevo usuario
+          </Button>
+        </div>
       }
     >
-      <div className='space-y-6'>
-        {/* Panel de Estadísticas */}
-        <UserStatsPanel stats={stats} loading={loading && users.length === 0} />
-
-        {/* Filtros de Usuarios */}
+      <div className='space-y-4'>
+        {/* Filtros */}
         <UserFilters
           searchTerm={filters.search}
           setSearchTerm={term => setFilter('search', term)}
@@ -314,8 +322,6 @@ export default function AdminUsersPage() {
 
         {/* DataTable */}
         <DataTable
-          title='Usuarios'
-          description={`${users.length} usuario${users.length !== 1 ? 's' : ''} encontrado${users.length !== 1 ? 's' : ''}`}
           data={users}
           columns={columns}
           loading={loading}
@@ -328,9 +334,7 @@ export default function AdminUsersPage() {
             limit: usersPagination.limit,
             total: usersPagination.total,
             onPageChange: page => goToPage(page),
-            onLimitChange: limit => {
-              // TODO: Implementar cambio de límite en el hook
-            },
+            onLimitChange: _limit => {},
           }}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
@@ -340,32 +344,22 @@ export default function AdminUsersPage() {
               onEdit={handleUserEdit}
               onDelete={handleUserDelete}
               onDetails={handleUserDetails}
-              onAvatarEdit={handleAvatarEdit}
               onToggleStatus={handleToggleStatus}
               currentUserId={session?.user?.id}
             />
           )}
           onRefresh={refresh}
           emptyState={{
-            icon: <UsersIcon className='h-12 w-12 text-muted-foreground mx-auto mb-4' />,
+            icon: <UsersIcon className='h-10 w-10 text-muted-foreground mx-auto mb-3' />,
             title: 'No hay usuarios',
             description: hasActiveFilters
               ? 'No se encontraron usuarios con los filtros aplicados'
               : 'No se encontraron usuarios en el sistema',
             action: (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button onClick={() => setShowCreateDialog(true)}>
-                      <Plus className='h-4 w-4 mr-2' />
-                      Crear primer usuario
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Crea el primer usuario del sistema</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <Button size='sm' onClick={() => setShowCreateDialog(true)}>
+                <Plus className='h-4 w-4 mr-2' />
+                Crear primer usuario
+              </Button>
             ),
           }}
         />
