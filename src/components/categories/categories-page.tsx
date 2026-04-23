@@ -10,6 +10,7 @@ import {
   ChevronDown,
   ChevronRight,
   List,
+  Upload,
   Edit,
   Trash2,
   Ticket,
@@ -56,6 +57,7 @@ import { CategoryTree } from '@/components/ui/category-tree'
 import { useCategories } from '@/hooks/categories'
 import { CategoryFormDialog } from './category-form-dialog'
 import { CategoryStatsPanel } from './category-stats-panel'
+import { CategoryImportModal } from './category-import-modal'
 import { getCategoryLevelIcon } from '@/lib/constants/category-constants'
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
@@ -66,6 +68,7 @@ export default function CategoriesPage() {
   const { data: session } = useSession()
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
   const [familyFilter, setFamilyFilter] = useState('all')
+  const [showImportModal, setShowImportModal] = useState(false)
   // Familias que el admin tiene asignadas (para validar permisos en UI)
   const [adminFamilyIds, setAdminFamilyIds] = useState<Set<string> | null>(null)
 
@@ -424,7 +427,11 @@ export default function CategoriesPage() {
       error={error && categories.length === 0 ? error : null}
       onRetry={refresh}
       headerActions={
-        <div className='flex items-center space-x-2'>
+        <div className='flex items-center gap-2'>
+          <Button variant='outline' size='sm' onClick={() => setShowImportModal(true)}>
+            <Upload className='h-4 w-4 mr-2' />
+            Importar CSV
+          </Button>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -779,6 +786,13 @@ export default function CategoriesPage() {
         </Card>
 
         {/* Dialog para crear/editar categoría */}
+        <CategoryImportModal
+          open={showImportModal}
+          onOpenChange={setShowImportModal}
+          onSuccess={refresh}
+          familyId={familyFilter !== 'all' ? familyFilter : undefined}
+        />
+
         <CategoryFormDialog
           isOpen={isDialogOpen}
           onOpenChange={setIsDialogOpen}
