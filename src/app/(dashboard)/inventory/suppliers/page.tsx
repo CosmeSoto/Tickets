@@ -5,15 +5,34 @@ import { Plus, Pencil, PowerOff, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel,
-  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
-  AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { useToast } from '@/hooks/use-toast'
+import { useTableSort, SortIcon, sortableHeaderClass } from '@/hooks/common/use-table-sort'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { SupplierForm } from '@/components/inventory/suppliers/SupplierForm'
 import { ExportButton } from '@/components/common/export-button'
@@ -48,13 +67,19 @@ export default function SuppliersPage() {
       const data = await res.json()
       setSuppliers(Array.isArray(data) ? data : (data.suppliers ?? []))
     } catch {
-      toast({ title: 'Error', description: 'No se pudieron cargar los proveedores', variant: 'destructive' })
+      toast({
+        title: 'Error',
+        description: 'No se pudieron cargar los proveedores',
+        variant: 'destructive',
+      })
     } finally {
       setLoading(false)
     }
   }, [search, activeFilter, familyFilter, toast])
 
-  useEffect(() => { fetchSuppliers() }, [fetchSuppliers])
+  useEffect(() => {
+    fetchSuppliers()
+  }, [fetchSuppliers])
 
   // Exportación
   const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
@@ -69,7 +94,7 @@ export default function SuppliersPage() {
       { key: 'email', label: 'Email', format: v => v ?? '' },
       { key: 'phone', label: 'Teléfono', format: v => v ?? '' },
       { key: 'contactName', label: 'Contacto', format: v => v ?? '' },
-      { key: 'isActive', label: 'Estado', format: v => v ? 'Activo' : 'Inactivo' },
+      { key: 'isActive', label: 'Estado', format: v => (v ? 'Activo' : 'Inactivo') },
     ],
   })
 
@@ -77,7 +102,9 @@ export default function SuppliersPage() {
     if (!deactivatingSupplier) return
     setDeactivating(true)
     try {
-      const res = await fetch(`/api/inventory/suppliers/${deactivatingSupplier.id}`, { method: 'PATCH' })
+      const res = await fetch(`/api/inventory/suppliers/${deactivatingSupplier.id}`, {
+        method: 'PATCH',
+      })
       const data = await res.json()
       if (!res.ok) {
         // 409 = tiene activos asociados
@@ -88,7 +115,11 @@ export default function SuppliersPage() {
       setDeactivatingSupplier(null)
       fetchSuppliers()
     } catch {
-      toast({ title: 'Error', description: 'No se pudo desactivar el proveedor', variant: 'destructive' })
+      toast({
+        title: 'Error',
+        description: 'No se pudo desactivar el proveedor',
+        variant: 'destructive',
+      })
     } finally {
       setDeactivating(false)
     }
@@ -96,31 +127,38 @@ export default function SuppliersPage() {
 
   const total = suppliers.length
 
+  const { sorted: sortedSuppliers, sortKey, sortDir, toggleSort } = useTableSort(suppliers, 'name')
+
   return (
     <ModuleLayout
-      title="Proveedores"
+      title='Proveedores'
       subtitle={`${total} proveedor${total !== 1 ? 'es' : ''} ${activeFilter === 'true' ? 'activos' : activeFilter === 'false' ? 'inactivos' : 'en total'}`}
       headerActions={
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={fetchSuppliers} disabled={loading}>
+        <div className='flex flex-wrap gap-2'>
+          <Button variant='outline' size='sm' onClick={fetchSuppliers} disabled={loading}>
             <RefreshCw className={`h-4 w-4 sm:mr-2 ${loading ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Actualizar</span>
+            <span className='hidden sm:inline'>Actualizar</span>
           </Button>
-          <Button onClick={() => { setEditingSupplier(null); setFormOpen(true) }}>
-            <Plus className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Nuevo proveedor</span>
+          <Button
+            onClick={() => {
+              setEditingSupplier(null)
+              setFormOpen(true)
+            }}
+          >
+            <Plus className='h-4 w-4 sm:mr-2' />
+            <span className='hidden sm:inline'>Nuevo proveedor</span>
           </Button>
         </div>
       }
     >
-      <div className="space-y-6">
+      <div className='space-y-6'>
         {/* Filtros */}
-        <div className="flex flex-wrap gap-3">
+        <div className='flex flex-wrap gap-3'>
           <Input
-            placeholder="Buscar por nombre o RUC/NIT..."
+            placeholder='Buscar por nombre o RUC/NIT...'
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="flex-1 min-w-[200px]"
+            className='flex-1 min-w-[200px]'
           />
           {families.length > 1 && (
             <FamilyCombobox
@@ -129,18 +167,18 @@ export default function SuppliersPage() {
               onValueChange={setFamilyFilter}
               allowAll
               allowClear
-              popoverWidth="240px"
-              className="w-full sm:w-52"
+              popoverWidth='240px'
+              className='w-full sm:w-52'
             />
           )}
           <Select value={activeFilter} onValueChange={setActiveFilter}>
-            <SelectTrigger className="w-full sm:w-36">
-              <SelectValue placeholder="Estado" />
+            <SelectTrigger className='w-full sm:w-36'>
+              <SelectValue placeholder='Estado' />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="true">Activos</SelectItem>
-              <SelectItem value="false">Inactivos</SelectItem>
+              <SelectItem value='all'>Todos</SelectItem>
+              <SelectItem value='true'>Activos</SelectItem>
+              <SelectItem value='false'>Inactivos</SelectItem>
             </SelectContent>
           </Select>
           <ExportButton
@@ -153,80 +191,113 @@ export default function SuppliersPage() {
         </div>
 
         {/* Tabla */}
-        <div className="overflow-x-auto rounded-md border">
+        <div className='overflow-x-auto rounded-md border'>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Nombre</TableHead>
-                <TableHead className="hidden md:table-cell">Tipo</TableHead>
-                <TableHead className="hidden md:table-cell">Área</TableHead>
-                <TableHead className="hidden lg:table-cell">RUC / NIT</TableHead>
-                <TableHead className="hidden lg:table-cell">Email</TableHead>
-                <TableHead className="hidden xl:table-cell">Teléfono</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
+                <TableHead className={sortableHeaderClass} onClick={() => toggleSort('name')}>
+                  Nombre {SortIcon('name', sortKey, sortDir)}
+                </TableHead>
+                <TableHead
+                  className={`hidden md:table-cell ${sortableHeaderClass}`}
+                  onClick={() => toggleSort('type')}
+                >
+                  Tipo {SortIcon('type', sortKey, sortDir)}
+                </TableHead>
+                <TableHead className='hidden md:table-cell'>Área</TableHead>
+                <TableHead className='hidden lg:table-cell'>RUC / NIT</TableHead>
+                <TableHead className='hidden lg:table-cell'>Email</TableHead>
+                <TableHead className='hidden xl:table-cell'>Teléfono</TableHead>
+                <TableHead className={sortableHeaderClass} onClick={() => toggleSort('isActive')}>
+                  Estado {SortIcon('isActive', sortKey, sortDir)}
+                </TableHead>
+                <TableHead className='text-right'>Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                    <RefreshCw className="h-4 w-4 animate-spin mx-auto mb-2" />
+                  <TableCell colSpan={8} className='text-center py-8 text-muted-foreground'>
+                    <RefreshCw className='h-4 w-4 animate-spin mx-auto mb-2' />
                     Cargando...
                   </TableCell>
                 </TableRow>
               ) : suppliers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className='text-center py-8 text-muted-foreground'>
                     No se encontraron proveedores
                     {activeFilter === 'true' && (
-                      <p className="text-xs mt-1">
-                        <button className="underline" onClick={() => setActiveFilter('all')}>Ver todos</button>
+                      <p className='text-xs mt-1'>
+                        <button className='underline' onClick={() => setActiveFilter('all')}>
+                          Ver todos
+                        </button>
                       </p>
                     )}
                   </TableCell>
                 </TableRow>
-              ) : suppliers.map(s => (
-                <TableRow
-                  key={s.id}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => { setEditingSupplier(s); setFormOpen(true) }}
-                >
-                  <TableCell className="font-medium">{s.name}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground hidden md:table-cell">
-                    {s.supplierType?.name ?? s.type ?? '—'}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground hidden md:table-cell">
-                    {s.family?.name ?? '—'}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground hidden lg:table-cell">{s.taxId || '—'}</TableCell>
-                  <TableCell className="text-muted-foreground hidden lg:table-cell">{s.email || '—'}</TableCell>
-                  <TableCell className="text-muted-foreground hidden xl:table-cell">{s.phone || '—'}</TableCell>
-                  <TableCell>
-                    <Badge variant={s.isActive ? 'default' : 'secondary'}>
-                      {s.isActive ? 'Activo' : 'Inactivo'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost" size="icon" title="Editar"
-                        onClick={(e) => { e.stopPropagation(); setEditingSupplier(s); setFormOpen(true) }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      {s.isActive && (
+              ) : (
+                sortedSuppliers.map(s => (
+                  <TableRow
+                    key={s.id}
+                    className='cursor-pointer hover:bg-muted/50'
+                    onClick={() => {
+                      setEditingSupplier(s)
+                      setFormOpen(true)
+                    }}
+                  >
+                    <TableCell className='font-medium'>{s.name}</TableCell>
+                    <TableCell className='text-sm text-muted-foreground hidden md:table-cell'>
+                      {s.supplierType?.name ?? s.type ?? '—'}
+                    </TableCell>
+                    <TableCell className='text-sm text-muted-foreground hidden md:table-cell'>
+                      {s.family?.name ?? '—'}
+                    </TableCell>
+                    <TableCell className='text-muted-foreground hidden lg:table-cell'>
+                      {s.taxId || '—'}
+                    </TableCell>
+                    <TableCell className='text-muted-foreground hidden lg:table-cell'>
+                      {s.email || '—'}
+                    </TableCell>
+                    <TableCell className='text-muted-foreground hidden xl:table-cell'>
+                      {s.phone || '—'}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={s.isActive ? 'default' : 'secondary'}>
+                        {s.isActive ? 'Activo' : 'Inactivo'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className='text-right'>
+                      <div className='flex justify-end gap-1'>
                         <Button
-                          variant="ghost" size="icon" title="Desactivar"
-                          onClick={(e) => { e.stopPropagation(); setDeactivatingSupplier(s) }}
+                          variant='ghost'
+                          size='icon'
+                          title='Editar'
+                          onClick={e => {
+                            e.stopPropagation()
+                            setEditingSupplier(s)
+                            setFormOpen(true)
+                          }}
                         >
-                          <PowerOff className="h-4 w-4 text-destructive" />
+                          <Pencil className='h-4 w-4' />
                         </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                        {s.isActive && (
+                          <Button
+                            variant='ghost'
+                            size='icon'
+                            title='Desactivar'
+                            onClick={e => {
+                              e.stopPropagation()
+                              setDeactivatingSupplier(s)
+                            }}
+                          >
+                            <PowerOff className='h-4 w-4 text-destructive' />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </div>
@@ -234,26 +305,34 @@ export default function SuppliersPage() {
 
       {/* Dialog formulario */}
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="max-w-2xl" aria-describedby={undefined}>
+        <DialogContent className='max-w-2xl' aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>{editingSupplier ? 'Editar proveedor' : 'Nuevo proveedor'}</DialogTitle>
           </DialogHeader>
           <SupplierForm
             supplier={editingSupplier}
-            onSuccess={() => { setFormOpen(false); fetchSuppliers() }}
+            onSuccess={() => {
+              setFormOpen(false)
+              fetchSuppliers()
+            }}
             onCancel={() => setFormOpen(false)}
           />
         </DialogContent>
       </Dialog>
 
       {/* AlertDialog desactivar */}
-      <AlertDialog open={!!deactivatingSupplier} onOpenChange={o => !o && setDeactivatingSupplier(null)}>
+      <AlertDialog
+        open={!!deactivatingSupplier}
+        onOpenChange={o => !o && setDeactivatingSupplier(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Desactivar &quot;{deactivatingSupplier?.name}&quot;?</AlertDialogTitle>
+            <AlertDialogTitle>
+              ¿Desactivar &quot;{deactivatingSupplier?.name}&quot;?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              El proveedor quedará inactivo y no aparecerá en nuevos formularios.
-              Solo se puede desactivar si no tiene equipos, consumibles o licencias asociados actualmente.
+              El proveedor quedará inactivo y no aparecerá en nuevos formularios. Solo se puede
+              desactivar si no tiene equipos, consumibles o licencias asociados actualmente.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -261,7 +340,7 @@ export default function SuppliersPage() {
             <AlertDialogAction
               onClick={handleDeactivate}
               disabled={deactivating}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
             >
               {deactivating ? 'Verificando...' : 'Desactivar'}
             </AlertDialogAction>

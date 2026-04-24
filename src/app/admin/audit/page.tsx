@@ -3,11 +3,11 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { 
-  Shield, 
-  Activity, 
-  Users, 
-  FileText, 
+import {
+  Shield,
+  Activity,
+  Users,
+  FileText,
   Download,
   Calendar,
   Filter,
@@ -17,7 +17,7 @@ import {
   CheckCircle,
   Clock,
   X,
-  Loader2
+  Loader2,
 } from 'lucide-react'
 
 // Componentes
@@ -99,7 +99,7 @@ function AuditDetailsResolver({ details }: { details: any }) {
         try {
           // Obtener todos los valores únicos que necesitan resolución
           const allValues: Record<string, any> = {}
-          
+
           Object.keys(details.newValues).forEach(key => {
             if (details.oldValues[key] !== details.newValues[key]) {
               allValues[`old_${key}`] = details.oldValues[key]
@@ -111,25 +111,25 @@ function AuditDetailsResolver({ details }: { details: any }) {
           const response = await fetch('/api/admin/audit/resolve-ids', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ values: allValues })
+            body: JSON.stringify({ values: allValues }),
           })
 
           if (response.ok) {
             const { resolved } = await response.json()
-            
+
             // Reconstruir cambios con valores resueltos
             const changes: Record<string, { old: string; new: string; field: string }> = {}
-            
+
             Object.keys(details.newValues).forEach(key => {
               if (details.oldValues[key] !== details.newValues[key]) {
                 changes[key] = {
                   field: getFieldDisplayName(key),
                   old: resolved[`old_${key}`] || String(details.oldValues[key] || 'vacío'),
-                  new: resolved[`new_${key}`] || String(details.newValues[key] || 'vacío')
+                  new: resolved[`new_${key}`] || String(details.newValues[key] || 'vacío'),
                 }
               }
             })
-            
+
             setResolvedDetails({ type: 'resolved', data: changes })
           } else {
             // Si falla, usar valores sin resolver
@@ -139,7 +139,7 @@ function AuditDetailsResolver({ details }: { details: any }) {
                 changes[key] = {
                   field: getFieldDisplayName(key),
                   old: String(details.oldValues[key] || 'vacío'),
-                  new: String(details.newValues[key] || 'vacío')
+                  new: String(details.newValues[key] || 'vacío'),
                 }
               }
             })
@@ -154,7 +154,7 @@ function AuditDetailsResolver({ details }: { details: any }) {
               changes[key] = {
                 field: getFieldDisplayName(key),
                 old: String(details.oldValues[key] || 'vacío'),
-                new: String(details.newValues[key] || 'vacío')
+                new: String(details.newValues[key] || 'vacío'),
               }
             }
           })
@@ -187,84 +187,89 @@ function AuditDetailsResolver({ details }: { details: any }) {
   // Función para obtener nombre amigable del campo
   const getFieldDisplayName = (fieldName: string): string => {
     const fieldNames: Record<string, string> = {
-      'name': 'Nombre',
-      'email': 'Correo Electrónico',
-      'role': 'Rol',
-      'departmentId': 'Departamento',
-      'phone': 'Teléfono',
-      'isActive': 'Estado',
-      'avatar': 'Avatar',
-      'password': 'Contraseña',
-      'createdById': 'Creado por',
-      'assigneeId': 'Asignado a',
-      'ticketId': 'Ticket',
-      'title': 'Título',
-      'description': 'Descripción',
-      'status': 'Estado',
-      'priority': 'Prioridad',
-      'categoryId': 'Categoría',
-      'ticketNumber': 'Número de Ticket',
-      'color': 'Color',
-      'parentId': 'Categoría Padre',
-      'level': 'Nivel',
-      'order': 'Orden',
-      'createdAt': 'Fecha de Creación',
-      'updatedAt': 'Última Actualización',
-      'isEmailVerified': 'Email Verificado',
-      'lastLogin': 'Último Acceso'
+      name: 'Nombre',
+      email: 'Correo Electrónico',
+      role: 'Rol',
+      departmentId: 'Departamento',
+      phone: 'Teléfono',
+      isActive: 'Estado',
+      avatar: 'Avatar',
+      password: 'Contraseña',
+      createdById: 'Creado por',
+      assigneeId: 'Asignado a',
+      ticketId: 'Ticket',
+      title: 'Título',
+      description: 'Descripción',
+      status: 'Estado',
+      priority: 'Prioridad',
+      categoryId: 'Categoría',
+      ticketNumber: 'Número de Ticket',
+      color: 'Color',
+      parentId: 'Categoría Padre',
+      level: 'Nivel',
+      order: 'Orden',
+      createdAt: 'Fecha de Creación',
+      updatedAt: 'Última Actualización',
+      isEmailVerified: 'Email Verificado',
+      lastLogin: 'Último Acceso',
     }
     return fieldNames[fieldName] || fieldName
   }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-        <span className="ml-2 text-sm text-muted-foreground">Resolviendo información...</span>
+      <div className='flex items-center justify-center py-8'>
+        <Loader2 className='h-6 w-6 animate-spin text-blue-600' />
+        <span className='ml-2 text-sm text-muted-foreground'>Resolviendo información...</span>
       </div>
     )
   }
 
   if (!resolvedDetails) {
-    return (
-      <div className="text-sm text-muted-foreground">Cargando detalles...</div>
-    )
+    return <div className='text-sm text-muted-foreground'>Cargando detalles...</div>
   }
 
   // Renderizar según el tipo
-  if (resolvedDetails.type === 'changes' || resolvedDetails.type === 'resolved' || resolvedDetails.type === 'unresolved' || resolvedDetails.type === 'error') {
-    const changesArray = Object.entries(resolvedDetails.data).map(([key, value]: [string, any]) => ({
-      campo: value.field || getFieldDisplayName(key),
-      campoTecnico: key,
-      anterior: value.old,
-      nuevo: value.new
-    }))
+  if (
+    resolvedDetails.type === 'changes' ||
+    resolvedDetails.type === 'resolved' ||
+    resolvedDetails.type === 'unresolved' ||
+    resolvedDetails.type === 'error'
+  ) {
+    const changesArray = Object.entries(resolvedDetails.data).map(
+      ([key, value]: [string, any]) => ({
+        campo: value.field || getFieldDisplayName(key),
+        campoTecnico: key,
+        anterior: value.old,
+        nuevo: value.new,
+      })
+    )
 
     if (changesArray.length > 0) {
       return (
-        <div className="space-y-2">
-          <div className="font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-2">
+        <div className='space-y-2'>
+          <div className='font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-2'>
             📝 Cambios Realizados ({changesArray.length})
             {resolvedDetails.type === 'resolved' && (
-              <span className="text-xs text-green-600 dark:text-green-400 font-normal">
+              <span className='text-xs text-green-600 dark:text-green-400 font-normal'>
                 ✓ IDs resueltos
               </span>
             )}
             {resolvedDetails.type === 'changes' && (
-              <span className="text-xs text-green-600 dark:text-green-400 font-normal">
+              <span className='text-xs text-green-600 dark:text-green-400 font-normal'>
                 ✓ Resuelto automáticamente
               </span>
             )}
           </div>
           {changesArray.map((change, idx) => (
-            <div key={idx} className="bg-muted/50 p-3 rounded text-sm space-y-1">
-              <div className="font-medium text-foreground">
-                Campo: <span className="text-blue-600">{change.campo}</span>
+            <div key={idx} className='bg-muted/50 p-3 rounded text-sm space-y-1'>
+              <div className='font-medium text-foreground'>
+                Campo: <span className='text-blue-600'>{change.campo}</span>
               </div>
-              <div className="text-red-600 dark:text-red-400">
+              <div className='text-red-600 dark:text-red-400'>
                 ❌ Anterior: {String(change.anterior || 'vacío')}
               </div>
-              <div className="text-green-600 dark:text-green-400">
+              <div className='text-green-600 dark:text-green-400'>
                 ✅ Nuevo: {String(change.nuevo || 'vacío')}
               </div>
             </div>
@@ -276,15 +281,13 @@ function AuditDetailsResolver({ details }: { details: any }) {
 
   if (resolvedDetails.type === 'metadata') {
     return (
-      <div className="space-y-2">
-        <div className="font-semibold text-purple-600 dark:text-purple-400">
-          📊 Metadatos
-        </div>
-        <div className="bg-muted/50 p-3 rounded text-sm space-y-1">
+      <div className='space-y-2'>
+        <div className='font-semibold text-purple-600 dark:text-purple-400'>📊 Metadatos</div>
+        <div className='bg-muted/50 p-3 rounded text-sm space-y-1'>
           {Object.entries(resolvedDetails.data).map(([key, value]) => (
             <div key={key}>
-              <span className="font-medium">{key}:</span>{' '}
-              <span className="text-muted-foreground">
+              <span className='font-medium'>{key}:</span>{' '}
+              <span className='text-muted-foreground'>
                 {typeof value === 'object' ? JSON.stringify(value) : String(value)}
               </span>
             </div>
@@ -303,7 +306,7 @@ function AuditDetailsResolver({ details }: { details: any }) {
         if (key === 'checksum' || key === 'hash') {
           return '(Verificación de integridad)'
         }
-        
+
         // Formatear tamaños de archivo
         if (key === 'size' && typeof value === 'number') {
           const kb = value / 1024
@@ -313,7 +316,7 @@ function AuditDetailsResolver({ details }: { details: any }) {
           }
           return `${kb.toFixed(2)} KB`
         }
-        
+
         // Formatear fechas
         if ((key.includes('At') || key.includes('Date')) && typeof value === 'string') {
           try {
@@ -322,64 +325,64 @@ function AuditDetailsResolver({ details }: { details: any }) {
               month: 'long',
               year: 'numeric',
               hour: '2-digit',
-              minute: '2-digit'
+              minute: '2-digit',
             })
           } catch {
             return String(value)
           }
         }
-        
+
         // Formatear tipos
         if (key === 'type') {
           const types: Record<string, string> = {
-            'manual': 'Manual',
-            'automatic': 'Automático',
-            'scheduled': 'Programado',
-            'full': 'Completo',
-            'incremental': 'Incremental'
+            manual: 'Manual',
+            automatic: 'Automático',
+            scheduled: 'Programado',
+            full: 'Completo',
+            incremental: 'Incremental',
           }
           return types[String(value)] || String(value)
         }
-        
+
         // Formatear booleanos
         if (typeof value === 'boolean') {
           return value ? 'Sí' : 'No'
         }
-        
+
         // Formatear objetos
         if (typeof value === 'object' && value !== null) {
           return JSON.stringify(value, null, 2)
         }
-        
+
         return String(value)
       }
 
       // Función para obtener nombre amigable del campo
       const getFieldLabel = (key: string): string => {
         const labels: Record<string, string> = {
-          'filename': 'Nombre del Archivo',
-          'size': 'Tamaño',
-          'type': 'Tipo',
-          'checksum': 'Suma de Verificación',
-          'entityName': 'Nombre',
-          'deletedAt': 'Fecha de Eliminación',
-          'createdAt': 'Fecha de Creación',
-          'updatedAt': 'Última Actualización',
-          'compressed': 'Comprimido',
-          'encrypted': 'Encriptado',
-          'status': 'Estado',
-          'error': 'Error',
-          'duration': 'Duración',
-          'records': 'Registros',
-          'tables': 'Tablas',
-          'CategoriesCount': 'Cantidad de Categorías',
-          'TotalCurrentTickets': 'Tickets Actuales',
-          'isPublished': 'Publicado',
-          'title': 'Título',
-          'content': 'Contenido',
-          'views': 'Visualizaciones',
-          'helpful': 'Útil',
-          'notHelpful': 'No Útil'
+          filename: 'Nombre del Archivo',
+          size: 'Tamaño',
+          type: 'Tipo',
+          checksum: 'Suma de Verificación',
+          entityName: 'Nombre',
+          deletedAt: 'Fecha de Eliminación',
+          createdAt: 'Fecha de Creación',
+          updatedAt: 'Última Actualización',
+          compressed: 'Comprimido',
+          encrypted: 'Encriptado',
+          status: 'Estado',
+          error: 'Error',
+          duration: 'Duración',
+          records: 'Registros',
+          tables: 'Tablas',
+          CategoriesCount: 'Cantidad de Categorías',
+          TotalCurrentTickets: 'Tickets Actuales',
+          isPublished: 'Publicado',
+          title: 'Título',
+          content: 'Contenido',
+          views: 'Visualizaciones',
+          helpful: 'Útil',
+          notHelpful: 'No Útil',
         }
         return labels[key] || key.charAt(0).toUpperCase() + key.slice(1)
       }
@@ -401,22 +404,26 @@ function AuditDetailsResolver({ details }: { details: any }) {
         if (key === 'source' && resolvedDetails.data[key] === 'SYSTEM') return false
         if (key === 'result' && resolvedDetails.data[key] === 'SUCCESS') return false
         // Ocultar contadores si son 0
-        if ((key === 'CategoriesCount' || key === 'TotalCurrentTickets') && resolvedDetails.data[key] === 0) return false
+        if (
+          (key === 'CategoriesCount' || key === 'TotalCurrentTickets') &&
+          resolvedDetails.data[key] === 0
+        )
+          return false
         return true
       })
 
       return (
-        <div className="space-y-2">
-          <div className="font-semibold text-gray-600 dark:text-gray-400">
+        <div className='space-y-2'>
+          <div className='font-semibold text-gray-600 dark:text-gray-400'>
             📦 Información Adicional
           </div>
-          <div className="bg-muted/50 p-4 rounded-lg space-y-3">
+          <div className='bg-muted/50 p-4 rounded-lg space-y-3'>
             {filteredEntries.map(([key, value]) => (
-              <div key={key} className="flex flex-col space-y-1">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              <div key={key} className='flex flex-col space-y-1'>
+                <span className='text-xs font-medium text-muted-foreground uppercase tracking-wide'>
                   {getFieldLabel(key)}
                 </span>
-                <span className="text-sm text-foreground font-medium">
+                <span className='text-sm text-foreground font-medium'>
                   {formatValue(key, value)}
                 </span>
               </div>
@@ -429,7 +436,7 @@ function AuditDetailsResolver({ details }: { details: any }) {
 
   // Fallback: JSON formateado
   return (
-    <pre className="text-xs bg-muted p-3 rounded overflow-auto max-h-60">
+    <pre className='text-xs bg-muted p-3 rounded overflow-auto max-h-60'>
       {JSON.stringify(resolvedDetails.data, null, 2)}
     </pre>
   )
@@ -464,7 +471,7 @@ export default function AuditPage() {
     page: 1,
     limit: 20,
     total: 0,
-    hasMore: false
+    hasMore: false,
   })
   const [filters, setFilters] = useState({
     search: '',
@@ -505,14 +512,17 @@ export default function AuditPage() {
   const loadAuditData = async (page = 1, limit = 20) => {
     try {
       setLoading(true)
-      
+
       // Cargar logs con paginación
-      const logsResponse = await fetch('/api/admin/audit/logs?' + new URLSearchParams({
-        ...filters,
-        limit: limit.toString(),
-        offset: ((page - 1) * limit).toString()
-      }))
-      
+      const logsResponse = await fetch(
+        '/api/admin/audit/logs?' +
+          new URLSearchParams({
+            ...filters,
+            limit: limit.toString(),
+            offset: ((page - 1) * limit).toString(),
+          })
+      )
+
       if (logsResponse.ok) {
         const logsData = await logsResponse.json()
         setLogs(logsData.logs || [])
@@ -520,25 +530,24 @@ export default function AuditPage() {
           page,
           limit,
           total: logsData.total || 0,
-          hasMore: logsData.hasMore || false
+          hasMore: logsData.hasMore || false,
         })
       }
 
       // Cargar estadísticas solo en la primera página
       if (page === 1) {
         const statsResponse = await fetch(`/api/admin/audit/stats?days=${filters.days}`)
-        
+
         if (statsResponse.ok) {
           const statsData = await statsResponse.json()
           setStats(statsData)
         }
       }
-
     } catch (error) {
       toast({
         title: 'Error',
         description: 'No se pudieron cargar los datos de auditoría',
-        variant: 'destructive'
+        variant: 'destructive',
       })
     } finally {
       setLoading(false)
@@ -548,35 +557,35 @@ export default function AuditPage() {
   // Función auxiliar para traducir acciones
   const translateAction = (action: string): string => {
     const actionMap: Record<string, string> = {
-      'created': 'Creó',
-      'updated': 'Actualizó',
-      'deleted': 'Eliminó',
-      'login': 'Inició sesión',
-      'logout': 'Cerró sesión',
-      'assigned': 'Asignó',
-      'resolved': 'Resolvió',
-      'closed': 'Cerró',
-      'role_changed': 'Cambió rol'
+      created: 'Creó',
+      updated: 'Actualizó',
+      deleted: 'Eliminó',
+      login: 'Inició sesión',
+      logout: 'Cerró sesión',
+      assigned: 'Asignó',
+      resolved: 'Resolvió',
+      closed: 'Cerró',
+      role_changed: 'Cambió rol',
     }
-    
+
     for (const [key, value] of Object.entries(actionMap)) {
       if (action.toLowerCase().includes(key)) {
         return value
       }
     }
-    
+
     return action
   }
 
   // Función auxiliar para traducir tipos de entidad
   const translateEntityType = (entityType: string): string => {
     const entityMap: Record<string, string> = {
-      'ticket': 'Ticket',
-      'user': 'Usuario',
-      'category': 'Categoría',
-      'department': 'Departamento',
-      'comment': 'Comentario',
-      'system': 'Sistema'
+      ticket: 'Ticket',
+      user: 'Usuario',
+      category: 'Categoría',
+      department: 'Departamento',
+      comment: 'Comentario',
+      system: 'Sistema',
     }
     return entityMap[entityType.toLowerCase()] || entityType
   }
@@ -584,7 +593,7 @@ export default function AuditPage() {
   const exportAuditReport = async (format: 'csv' | 'json' = 'csv') => {
     try {
       setLoading(true)
-      
+
       toast({
         title: '📤 Exportando...',
         description: `Preparando archivo ${format.toUpperCase()}. Esto puede tomar unos momentos.`,
@@ -602,45 +611,49 @@ export default function AuditPage() {
           filters: {
             ...filters,
             limit: 50000, // Límite de seguridad
-            offset: 0
-          }
-        })
+            offset: 0,
+          },
+        }),
       })
-      
+
       if (response.ok) {
         // Obtener advertencias del header
         const warnings = response.headers.get('X-Warnings')
         const totalRecords = response.headers.get('X-Total-Records')
         const exportedRecords = response.headers.get('X-Exported-Records')
-        
+
         const blob = await response.blob()
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        
+
         // Obtener nombre del archivo del header Content-Disposition
         const contentDisposition = response.headers.get('Content-Disposition')
         const filenameMatch = contentDisposition?.match(/filename="(.+)"/)
-        const filename = filenameMatch ? filenameMatch[1] : `audit-logs-${new Date().toISOString().split('T')[0]}.${format}`
-        
+        const filename = filenameMatch
+          ? filenameMatch[1]
+          : `audit-logs-${new Date().toISOString().split('T')[0]}.${format}`
+
         a.download = filename
         document.body.appendChild(a)
         a.click()
         window.URL.revokeObjectURL(url)
         document.body.removeChild(a)
-        
+
         // Mostrar resultado con advertencias si existen
         let description = `✅ ${exportedRecords || 0} registros exportados`
         if (totalRecords && exportedRecords && totalRecords !== exportedRecords) {
           description += ` de ${totalRecords} total`
         }
-        
+
         toast({
           title: '✅ Exportación Completada',
-          description: description + (warnings && JSON.parse(warnings).length > 0 
-            ? `\n⚠️ Advertencias: ${JSON.parse(warnings).join(', ')}` 
-            : ''),
-          duration: 10000
+          description:
+            description +
+            (warnings && JSON.parse(warnings).length > 0
+              ? `\n⚠️ Advertencias: ${JSON.parse(warnings).join(', ')}`
+              : ''),
+          duration: 10000,
         })
       } else {
         const error = await response.json()
@@ -652,7 +665,7 @@ export default function AuditPage() {
         title: '❌ Error en Exportación',
         description: error instanceof Error ? error.message : 'No se pudo exportar el reporte',
         variant: 'destructive',
-        duration: 8000
+        duration: 8000,
       })
     } finally {
       setLoading(false)
@@ -663,6 +676,7 @@ export default function AuditPage() {
     {
       key: 'createdAt',
       label: 'Fecha y Hora',
+      sortable: true,
       render: (log: any) => {
         const date = new Date(log.createdAt)
         const now = new Date()
@@ -670,83 +684,84 @@ export default function AuditPage() {
         const diffMins = Math.floor(diffMs / 60000)
         const diffHours = Math.floor(diffMs / 3600000)
         const diffDays = Math.floor(diffMs / 86400000)
-        
+
         let timeAgo = ''
         if (diffMins < 1) timeAgo = 'Hace un momento'
         else if (diffMins < 60) timeAgo = `Hace ${diffMins} min`
         else if (diffHours < 24) timeAgo = `Hace ${diffHours}h`
         else if (diffDays < 7) timeAgo = `Hace ${diffDays}d`
         else timeAgo = date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })
-        
+
         return (
-          <div className="text-sm">
-            <div className="font-medium">{date.toLocaleDateString('es-ES', { 
-              day: '2-digit', 
-              month: 'short',
-              year: 'numeric'
-            })}</div>
-            <div className="text-muted-foreground text-xs">
-              {date.toLocaleTimeString('es-ES', { 
-                hour: '2-digit', 
-                minute: '2-digit' 
+          <div className='text-sm'>
+            <div className='font-medium'>
+              {date.toLocaleDateString('es-ES', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
               })}
             </div>
-            <div className="text-muted-foreground text-xs italic">
-              {timeAgo}
+            <div className='text-muted-foreground text-xs'>
+              {date.toLocaleTimeString('es-ES', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
             </div>
+            <div className='text-muted-foreground text-xs italic'>{timeAgo}</div>
           </div>
         )
-      }
+      },
     },
     {
       key: 'action',
       label: 'Acción',
+      sortable: true,
       render: (log: any) => {
         const action = log.action
         const entityType = log.entityType
-        
+
         // Traducir acciones a español
         const actionTranslations: Record<string, string> = {
-          'created': 'Creado',
-          'updated': 'Actualizado',
-          'deleted': 'Eliminado',
-          'login': 'Inicio de sesión',
-          'logout': 'Cierre de sesión',
-          'login_failed': 'Intento de login fallido',
-          'assigned': 'Asignado',
-          'unassigned': 'Desasignado',
-          'status_changed': 'Estado cambiado',
-          'priority_changed': 'Prioridad cambiada',
-          'resolved': 'Resuelto',
-          'closed': 'Cerrado',
-          'role_changed': 'Rol cambiado',
-          'password_changed': 'Contraseña cambiada',
-          'promoted': 'Promovido',
-          'demoted': 'Degradado',
-          'uploaded': 'Subido',
-          'downloaded': 'Descargado',
-          'exported': 'Exportado',
-          'generated': 'Generado',
-          'backup': 'Respaldo',
-          'restore': 'Restauración',
-          'config_changed': 'Configuración cambiada',
+          created: 'Creado',
+          updated: 'Actualizado',
+          deleted: 'Eliminado',
+          login: 'Inicio de sesión',
+          logout: 'Cierre de sesión',
+          login_failed: 'Intento de login fallido',
+          assigned: 'Asignado',
+          unassigned: 'Desasignado',
+          status_changed: 'Estado cambiado',
+          priority_changed: 'Prioridad cambiada',
+          resolved: 'Resuelto',
+          closed: 'Cerrado',
+          role_changed: 'Rol cambiado',
+          password_changed: 'Contraseña cambiada',
+          promoted: 'Promovido',
+          demoted: 'Degradado',
+          uploaded: 'Subido',
+          downloaded: 'Descargado',
+          exported: 'Exportado',
+          generated: 'Generado',
+          backup: 'Respaldo',
+          restore: 'Restauración',
+          config_changed: 'Configuración cambiada',
         }
-        
+
         // Traducir tipos de entidad
         const entityTranslations: Record<string, string> = {
-          'ticket': '🎫 Ticket',
-          'user': '👤 Usuario',
-          'category': '📂 Categoría',
-          'department': '🏢 Departamento',
-          'technician': '🔧 Técnico',
-          'comment': '💬 Comentario',
-          'attachment': '📎 Archivo',
-          'system': '⚙️ Sistema',
-          'report': '📊 Reporte',
-          'settings': '🛠️ Configuración',
-          'assignment': '📌 Asignación',
+          ticket: '🎫 Ticket',
+          user: '👤 Usuario',
+          category: '📂 Categoría',
+          department: '🏢 Departamento',
+          technician: '🔧 Técnico',
+          comment: '💬 Comentario',
+          attachment: '📎 Archivo',
+          system: '⚙️ Sistema',
+          report: '📊 Reporte',
+          settings: '🛠️ Configuración',
+          assignment: '📌 Asignación',
         }
-        
+
         // Obtener traducción de la acción
         let translatedAction = action
         for (const [key, value] of Object.entries(actionTranslations)) {
@@ -755,73 +770,78 @@ export default function AuditPage() {
             break
           }
         }
-        
+
         const getActionColor = (action: string) => {
-          if (action.includes('created')) return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-          if (action.includes('updated')) return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-          if (action.includes('deleted')) return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-          if (action.includes('login')) return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-          if (action.includes('assigned')) return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
-          if (action.includes('resolved') || action.includes('closed')) return 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200'
+          if (action.includes('created'))
+            return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+          if (action.includes('updated'))
+            return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+          if (action.includes('deleted'))
+            return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+          if (action.includes('login'))
+            return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+          if (action.includes('assigned'))
+            return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
+          if (action.includes('resolved') || action.includes('closed'))
+            return 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200'
           return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
         }
 
         return (
-          <div className="space-y-1">
-            <Badge className={getActionColor(action)}>
-              {translatedAction}
-            </Badge>
-            <div className="text-xs text-muted-foreground">
+          <div className='space-y-1'>
+            <Badge className={getActionColor(action)}>{translatedAction}</Badge>
+            <div className='text-xs text-muted-foreground'>
               {entityTranslations[entityType] || entityType}
             </div>
           </div>
         )
-      }
+      },
     },
     {
       key: 'users',
       label: 'Usuario',
       render: (log: any) => {
         const user = log.users
-        if (!user) return (
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-              <Shield className="h-4 w-4 text-gray-500" />
+        if (!user)
+          return (
+            <div className='flex items-center gap-2'>
+              <div className='w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center'>
+                <Shield className='h-4 w-4 text-gray-500' />
+              </div>
+              <div>
+                <div className='text-sm font-medium'>Sistema</div>
+                <div className='text-xs text-muted-foreground'>Acción automática</div>
+              </div>
             </div>
-            <div>
-              <div className="text-sm font-medium">Sistema</div>
-              <div className="text-xs text-muted-foreground">Acción automática</div>
-            </div>
-          </div>
-        )
-        
+          )
+
         const roleColors: Record<string, string> = {
-          'ADMIN': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-          'TECHNICIAN': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-          'CLIENT': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+          ADMIN: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+          TECHNICIAN: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+          CLIENT: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
         }
-        
+
         const roleLabels: Record<string, string> = {
-          'ADMIN': 'Administrador',
-          'TECHNICIAN': 'Técnico',
-          'CLIENT': 'Cliente',
+          ADMIN: 'Administrador',
+          TECHNICIAN: 'Técnico',
+          CLIENT: 'Cliente',
         }
-        
+
         return (
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center font-semibold text-primary">
+          <div className='flex items-center gap-2'>
+            <div className='w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center font-semibold text-primary'>
               {user.name.charAt(0).toUpperCase()}
             </div>
             <div>
-              <div className="text-sm font-medium">{user.name}</div>
-              <div className="text-xs text-muted-foreground">{user.email}</div>
-              <Badge variant="outline" className={`text-xs mt-0.5 ${roleColors[user.role] || ''}`}>
+              <div className='text-sm font-medium'>{user.name}</div>
+              <div className='text-xs text-muted-foreground'>{user.email}</div>
+              <Badge variant='outline' className={`text-xs mt-0.5 ${roleColors[user.role] || ''}`}>
                 {roleLabels[user.role] || user.role}
               </Badge>
             </div>
           </div>
         )
-      }
+      },
     },
     {
       key: 'entityId',
@@ -831,16 +851,16 @@ export default function AuditPage() {
         const action = log.action
         const entityType = log.entityType
         const userName = log.users?.name || 'Sistema'
-        
+
         // Construir descripción natural y legible
         let mainDescription = ''
         let subDescription = ''
         let icon = '📝'
-        
+
         if (entityType === 'comment') {
           icon = '💬'
           mainDescription = 'Agregó un comentario'
-          
+
           // Extraer el contenido del comentario
           if (details?.content) {
             const preview = String(details.content).slice(0, 80)
@@ -852,7 +872,7 @@ export default function AuditPage() {
             const preview = String(details.message).slice(0, 80)
             subDescription = `"${preview}${details.message.length > 80 ? '...' : ''}"`
           }
-          
+
           // Indicar si es interno o público
           if (details?.metadata?.isInternal === true) {
             mainDescription += ' (nota interna)'
@@ -904,14 +924,18 @@ export default function AuditPage() {
           }
         } else if (entityType === 'category') {
           icon = '📂'
-          mainDescription = action.includes('created') ? 'Creó una categoría' : 
-                           action.includes('updated') ? 'Actualizó una categoría' : 
-                           'Modificó una categoría'
+          mainDescription = action.includes('created')
+            ? 'Creó una categoría'
+            : action.includes('updated')
+              ? 'Actualizó una categoría'
+              : 'Modificó una categoría'
         } else if (entityType === 'department') {
           icon = '🏢'
-          mainDescription = action.includes('created') ? 'Creó un departamento' : 
-                           action.includes('updated') ? 'Actualizó un departamento' : 
-                           'Modificó un departamento'
+          mainDescription = action.includes('created')
+            ? 'Creó un departamento'
+            : action.includes('updated')
+              ? 'Actualizó un departamento'
+              : 'Modificó un departamento'
         } else if (action.includes('login')) {
           icon = '🔐'
           mainDescription = 'Inició sesión'
@@ -924,17 +948,15 @@ export default function AuditPage() {
           const entityTranslated = translateEntityType(entityType)
           mainDescription = `${actionTranslated} ${entityTranslated.toLowerCase()}`
         }
-        
+
         return (
-          <div className="text-sm space-y-1 max-w-md">
-            <div className="flex items-start gap-2">
-              <span className="text-lg">{icon}</span>
-              <div className="flex-1 min-w-0">
-                <div className="font-medium text-foreground">
-                  {mainDescription}
-                </div>
+          <div className='text-sm space-y-1 max-w-md'>
+            <div className='flex items-start gap-2'>
+              <span className='text-lg'>{icon}</span>
+              <div className='flex-1 min-w-0'>
+                <div className='font-medium text-foreground'>{mainDescription}</div>
                 {subDescription && (
-                  <div className="text-xs text-muted-foreground italic mt-1 line-clamp-2">
+                  <div className='text-xs text-muted-foreground italic mt-1 line-clamp-2'>
                     {subDescription}
                   </div>
                 )}
@@ -942,7 +964,7 @@ export default function AuditPage() {
             </div>
           </div>
         )
-      }
+      },
     },
     {
       key: 'ipAddress',
@@ -951,32 +973,32 @@ export default function AuditPage() {
         const ip = log.ipAddress
         const userAgent = log.userAgent
         const context = log.details?.context
-        
+
         // Detectar navegador y SO del userAgent (fallback si no hay context)
         let browser = context?.browser || 'Desconocido'
         let os = context?.os || 'Desconocido'
-        let deviceType = context?.deviceType
-        let source = context?.source
-        
+        const deviceType = context?.deviceType
+        const source = context?.source
+
         if (!context && userAgent) {
           if (userAgent.includes('Chrome')) browser = '🌐 Chrome'
           else if (userAgent.includes('Firefox')) browser = '🦊 Firefox'
           else if (userAgent.includes('Safari')) browser = '🧭 Safari'
           else if (userAgent.includes('Edge')) browser = '🌊 Edge'
-          
+
           if (userAgent.includes('Windows')) os = '🪟 Windows'
           else if (userAgent.includes('Mac')) os = '🍎 macOS'
           else if (userAgent.includes('Linux')) os = '🐧 Linux'
           else if (userAgent.includes('Android')) os = '🤖 Android'
           else if (userAgent.includes('iOS')) os = '📱 iOS'
         }
-        
+
         return (
-          <div className="text-sm space-y-1">
+          <div className='text-sm space-y-1'>
             {/* Origen */}
             {source && (
-              <div className="flex items-center gap-1">
-                <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
+              <div className='flex items-center gap-1'>
+                <span className='text-xs font-semibold text-blue-600 dark:text-blue-400'>
                   {source === 'WEB' && '🌐 Web'}
                   {source === 'API' && '⚡ API'}
                   {source === 'MOBILE' && '📱 Móvil'}
@@ -984,52 +1006,48 @@ export default function AuditPage() {
                 </span>
               </div>
             )}
-            
+
             {/* IP */}
             {ip ? (
-              <div className="flex items-center gap-1">
-                <span className="text-muted-foreground text-xs">IP:</span>
-                <code className="text-xs bg-muted px-1 py-0.5 rounded font-mono">
-                  {ip}
-                </code>
+              <div className='flex items-center gap-1'>
+                <span className='text-muted-foreground text-xs'>IP:</span>
+                <code className='text-xs bg-muted px-1 py-0.5 rounded font-mono'>{ip}</code>
               </div>
             ) : (
-              <span className="text-muted-foreground text-xs">Sin IP</span>
+              <span className='text-muted-foreground text-xs'>Sin IP</span>
             )}
-            
+
             {/* Dispositivo */}
             {deviceType && (
-              <div className="text-xs text-muted-foreground">
+              <div className='text-xs text-muted-foreground'>
                 {deviceType === 'Desktop' && '🖥️ Escritorio'}
                 {deviceType === 'Mobile' && '📱 Móvil'}
                 {deviceType === 'Tablet' && '📱 Tablet'}
               </div>
             )}
-            
+
             {/* Navegador y SO */}
             {userAgent && (
               <>
-                <div className="text-xs text-muted-foreground">{browser}</div>
-                <div className="text-xs text-muted-foreground">{os}</div>
+                <div className='text-xs text-muted-foreground'>{browser}</div>
+                <div className='text-xs text-muted-foreground'>{os}</div>
               </>
             )}
-            
+
             {/* Duración (si existe) */}
             {context?.duration && (
-              <div className="text-xs text-purple-600 dark:text-purple-400">
+              <div className='text-xs text-purple-600 dark:text-purple-400'>
                 ⏱️ {context.duration}ms
               </div>
             )}
-            
+
             {/* Resultado (si es error) */}
             {context?.result === 'ERROR' && (
-              <div className="text-xs text-red-600 dark:text-red-400 font-semibold">
-                ❌ Error
-              </div>
+              <div className='text-xs text-red-600 dark:text-red-400 font-semibold'>❌ Error</div>
             )}
           </div>
         )
-      }
+      },
     },
     {
       key: 'actions',
@@ -1037,27 +1055,27 @@ export default function AuditPage() {
       render: (log: any) => {
         return (
           <Button
-            variant="ghost"
-            size="sm"
+            variant='ghost'
+            size='sm'
             onClick={() => {
               setSelectedLog(log)
               setIsDialogOpen(true)
             }}
           >
-            <Eye className="h-4 w-4 mr-1" />
+            <Eye className='h-4 w-4 mr-1' />
             Ver
           </Button>
         )
-      }
-    }
+      },
+    },
   ]
 
   if (status === 'loading') {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
-          <p className="mt-2 text-muted-foreground">Cargando...</p>
+      <div className='flex items-center justify-center h-64'>
+        <div className='text-center'>
+          <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto'></div>
+          <p className='mt-2 text-muted-foreground'>Cargando...</p>
         </div>
       </div>
     )
@@ -1069,141 +1087,154 @@ export default function AuditPage() {
 
   return (
     <ModuleLayout
-      title="Sistema de Auditoría"
-      subtitle="Monitoreo y logs de actividad del sistema"
+      title='Sistema de Auditoría'
+      subtitle='Monitoreo y logs de actividad del sistema'
       loading={loading}
     >
-      <div className="space-y-6">
-        
+      <div className='space-y-6'>
         {/* Estadísticas de Auditoría */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
           <SymmetricStatsCard
-            title="Total de Eventos"
+            title='Total de Eventos'
             value={stats?.totalLogs || 0}
             icon={FileText}
-            color="blue"
+            color='blue'
           />
-          
+
           <SymmetricStatsCard
-            title="Usuarios Activos"
+            title='Usuarios Activos'
             value={stats?.topUsers?.length || 0}
             icon={Users}
-            color="green"
+            color='green'
           />
-          
+
           <SymmetricStatsCard
-            title="Acciones Críticas"
-            value={stats?.actionStats?.filter(s => 
-              s.action.includes('deleted') || 
-              s.action.includes('role_changed') ||
-              s.action.includes('login_failed')
-            ).reduce((acc, s) => acc + s._count.id, 0) || 0}
+            title='Acciones Críticas'
+            value={
+              stats?.actionStats
+                ?.filter(
+                  s =>
+                    s.action.includes('deleted') ||
+                    s.action.includes('role_changed') ||
+                    s.action.includes('login_failed')
+                )
+                .reduce((acc, s) => acc + s._count.id, 0) || 0
+            }
             icon={AlertTriangle}
-            color="orange"
-            status={(stats?.actionStats?.filter(s => 
-              s.action.includes('deleted') || 
-              s.action.includes('role_changed') ||
-              s.action.includes('login_failed')
-            ).reduce((acc, s) => acc + s._count.id, 0) || 0) > 10 ? 'warning' : 'normal'}
+            color='orange'
+            status={
+              (stats?.actionStats
+                ?.filter(
+                  s =>
+                    s.action.includes('deleted') ||
+                    s.action.includes('role_changed') ||
+                    s.action.includes('login_failed')
+                )
+                .reduce((acc, s) => acc + s._count.id, 0) || 0) > 10
+                ? 'warning'
+                : 'normal'
+            }
           />
-          
+
           <SymmetricStatsCard
-            title="Módulos Activos"
+            title='Módulos Activos'
             value={stats?.actionStats?.length || 0}
             icon={Activity}
-            color="purple"
+            color='purple'
           />
         </div>
 
         {/* Filtros de Auditoría */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Filter className="h-5 w-5" />
+            <CardTitle className='flex items-center gap-2'>
+              <Filter className='h-5 w-5' />
               Filtros de Auditoría
             </CardTitle>
             <CardDescription>
-              Filtra los logs de auditoría por diferentes criterios. Máximo 50,000 registros por exportación.
+              Filtra los logs de auditoría por diferentes criterios. Máximo 50,000 registros por
+              exportación.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-              
+            <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4'>
               {/* Búsqueda */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Búsqueda</label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <div className='space-y-2'>
+                <label className='text-sm font-medium'>Búsqueda</label>
+                <div className='relative'>
+                  <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4' />
                   <Input
-                    placeholder="Buscar en logs..."
+                    placeholder='Buscar en logs...'
                     value={filters.search}
-                    onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-                    className="pl-10"
+                    onChange={e => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                    className='pl-10'
                   />
                 </div>
               </div>
 
               {/* Tipo de Entidad */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Módulo</label>
-                <Select 
-                  value={filters.entityType} 
-                  onValueChange={(value) => setFilters(prev => ({ ...prev, entityType: value }))}
+              <div className='space-y-2'>
+                <label className='text-sm font-medium'>Módulo</label>
+                <Select
+                  value={filters.entityType}
+                  onValueChange={value => setFilters(prev => ({ ...prev, entityType: value }))}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Todos los Módulos</SelectItem>
-                    <SelectItem value="ticket">🎫 Tickets</SelectItem>
-                    <SelectItem value="user">👥 Usuarios</SelectItem>
-                    <SelectItem value="category">📂 Categorías</SelectItem>
-                    <SelectItem value="department">🏢 Departamentos</SelectItem>
-                    <SelectItem value="technician">🔧 Técnicos</SelectItem>
-                    <SelectItem value="system">⚙️ Sistema</SelectItem>
-                    <SelectItem value="report">📊 Reportes</SelectItem>
-                    <SelectItem value="settings">🛠️ Configuración</SelectItem>
+                    <SelectItem value='all'>Todos los Módulos</SelectItem>
+                    <SelectItem value='ticket'>🎫 Tickets</SelectItem>
+                    <SelectItem value='user'>👥 Usuarios</SelectItem>
+                    <SelectItem value='category'>📂 Categorías</SelectItem>
+                    <SelectItem value='department'>🏢 Departamentos</SelectItem>
+                    <SelectItem value='technician'>🔧 Técnicos</SelectItem>
+                    <SelectItem value='system'>⚙️ Sistema</SelectItem>
+                    <SelectItem value='report'>📊 Reportes</SelectItem>
+                    <SelectItem value='settings'>🛠️ Configuración</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               {/* Período */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Período</label>
-                <Select 
-                  value={filters.days} 
-                  onValueChange={(value) => setFilters(prev => ({ ...prev, days: value }))}
+              <div className='space-y-2'>
+                <label className='text-sm font-medium'>Período</label>
+                <Select
+                  value={filters.days}
+                  onValueChange={value => setFilters(prev => ({ ...prev, days: value }))}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="1">Último día</SelectItem>
-                    <SelectItem value="7">Última semana</SelectItem>
-                    <SelectItem value="30">Último mes</SelectItem>
-                    <SelectItem value="90">Últimos 3 meses</SelectItem>
-                    <SelectItem value="180">Últimos 6 meses</SelectItem>
-                    <SelectItem value="365">Último año</SelectItem>
+                    <SelectItem value='1'>Último día</SelectItem>
+                    <SelectItem value='7'>Última semana</SelectItem>
+                    <SelectItem value='30'>Último mes</SelectItem>
+                    <SelectItem value='90'>Últimos 3 meses</SelectItem>
+                    <SelectItem value='180'>Últimos 6 meses</SelectItem>
+                    <SelectItem value='365'>Último año</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               {/* Acción */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Acción</label>
+              <div className='space-y-2'>
+                <label className='text-sm font-medium'>Acción</label>
                 <Input
-                  placeholder="Ej: created, updated..."
+                  placeholder='Ej: created, updated...'
                   value={filters.action}
-                  onChange={(e) => setFilters(prev => ({ ...prev, action: e.target.value }))}
+                  onChange={e => setFilters(prev => ({ ...prev, action: e.target.value }))}
                 />
               </div>
 
               {/* Familia */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Familia</label>
+              <div className='space-y-2'>
+                <label className='text-sm font-medium'>Familia</label>
                 <Select
                   value={filters.familyId || 'all'}
-                  onValueChange={(value) => setFilters(prev => ({ ...prev, familyId: value === 'all' ? '' : value }))}
+                  onValueChange={value =>
+                    setFilters(prev => ({ ...prev, familyId: value === 'all' ? '' : value }))
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder='Todas las familias' />
@@ -1213,7 +1244,12 @@ export default function AuditPage() {
                     {families.map(f => (
                       <SelectItem key={f.id} value={f.id}>
                         <div className='flex items-center space-x-2'>
-                          {f.color && <div className='w-2 h-2 rounded-full' style={{ backgroundColor: f.color }} />}
+                          {f.color && (
+                            <div
+                              className='w-2 h-2 rounded-full'
+                              style={{ backgroundColor: f.color }}
+                            />
+                          )}
                           <span>{f.name}</span>
                         </div>
                       </SelectItem>
@@ -1223,52 +1259,57 @@ export default function AuditPage() {
               </div>
 
               {/* Exportar y Acciones */}
-              <div className="space-y-2 lg:col-span-2">
-                <label className="text-sm font-medium">Exportar y Acciones</label>
-                <div className="grid grid-cols-3 gap-2">
-                  <Button 
+              <div className='space-y-2 lg:col-span-2'>
+                <label className='text-sm font-medium'>Exportar y Acciones</label>
+                <div className='grid grid-cols-3 gap-2'>
+                  <Button
                     onClick={() => exportAuditReport('csv')}
-                    variant="outline"
-                    size="sm"
+                    variant='outline'
+                    size='sm'
                     disabled={loading}
                   >
-                    <Download className="h-4 w-4 mr-1" />
+                    <Download className='h-4 w-4 mr-1' />
                     CSV
                   </Button>
-                  <Button 
+                  <Button
                     onClick={() => exportAuditReport('json')}
-                    variant="outline"
-                    size="sm"
+                    variant='outline'
+                    size='sm'
                     disabled={loading}
                   >
-                    <Download className="h-4 w-4 mr-1" />
+                    <Download className='h-4 w-4 mr-1' />
                     JSON
                   </Button>
-                  <Button 
-                    onClick={() => setFilters({
-                      search: '',
-                      entityType: 'all',
-                      action: '',
-                      userId: '',
-                      days: '30',
-                      familyId: '',
-                    })}
-                    variant="outline"
-                    size="sm"
+                  <Button
+                    onClick={() =>
+                      setFilters({
+                        search: '',
+                        entityType: 'all',
+                        action: '',
+                        userId: '',
+                        days: '30',
+                        familyId: '',
+                      })
+                    }
+                    variant='outline'
+                    size='sm'
                   >
                     Limpiar
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className='text-xs text-muted-foreground'>
                   Máx. 50,000 registros por exportación
                 </p>
               </div>
             </div>
-            
+
             {/* Información de filtros activos */}
-            {(filters.search || filters.entityType !== 'all' || filters.action || filters.days !== '30') && (
-              <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
-                <div className="text-sm text-blue-800 dark:text-blue-200">
+            {(filters.search ||
+              filters.entityType !== 'all' ||
+              filters.action ||
+              filters.days !== '30') && (
+              <div className='mt-4 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg'>
+                <div className='text-sm text-blue-800 dark:text-blue-200'>
                   <strong>Filtros activos:</strong>
                   {filters.search && ` Búsqueda: "${filters.search}"`}
                   {filters.entityType !== 'all' && ` | Módulo: ${filters.entityType}`}
@@ -1283,13 +1324,13 @@ export default function AuditPage() {
         {/* Tabla de Logs */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Activity className="h-5 w-5" />
+            <CardTitle className='flex items-center justify-between'>
+              <div className='flex items-center gap-2'>
+                <Activity className='h-5 w-5' />
                 Logs de Auditoría
               </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Clock className="h-4 w-4" />
+              <div className='flex items-center gap-2 text-sm text-muted-foreground'>
+                <Clock className='h-4 w-4' />
                 Mostrando {logs.length} de {pagination.total} registros
               </div>
             </CardTitle>
@@ -1299,22 +1340,24 @@ export default function AuditPage() {
           </CardHeader>
           <CardContent>
             {logs.length === 0 && !loading ? (
-              <div className="text-center py-12">
-                <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
-                <h3 className="text-lg font-semibold mb-2">No hay logs de auditoría</h3>
-                <p className="text-muted-foreground mb-4">
+              <div className='text-center py-12'>
+                <FileText className='h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50' />
+                <h3 className='text-lg font-semibold mb-2'>No hay logs de auditoría</h3>
+                <p className='text-muted-foreground mb-4'>
                   No se encontraron registros con los filtros aplicados
                 </p>
                 <Button
-                  variant="outline"
-                  onClick={() => setFilters({
-                    search: '',
-                    entityType: 'all',
-                    action: '',
-                    userId: '',
-                    days: '30',
-                    familyId: '',
-                  })}
+                  variant='outline'
+                  onClick={() =>
+                    setFilters({
+                      search: '',
+                      entityType: 'all',
+                      action: '',
+                      userId: '',
+                      days: '30',
+                      familyId: '',
+                    })
+                  }
                 >
                   Limpiar filtros
                 </Button>
@@ -1329,13 +1372,13 @@ export default function AuditPage() {
                   page: pagination.page,
                   limit: pagination.limit,
                   total: pagination.total,
-                  onPageChange: (page) => loadAuditData(page, pagination.limit),
-                  onLimitChange: (limit) => loadAuditData(1, limit)
+                  onPageChange: page => loadAuditData(page, pagination.limit),
+                  onLimitChange: limit => loadAuditData(1, limit),
                 }}
                 emptyState={{
-                  icon: <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />,
-                  title: "No hay logs de auditoría",
-                  description: "No se encontraron registros con los filtros aplicados"
+                  icon: <FileText className='h-12 w-12 text-muted-foreground mx-auto mb-4' />,
+                  title: 'No hay logs de auditoría',
+                  description: 'No se encontraron registros con los filtros aplicados',
                 }}
               />
             )}
@@ -1345,108 +1388,109 @@ export default function AuditPage() {
 
       {/* Modal de Detalles */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto" aria-describedby={undefined}>
+        <DialogContent
+          className='max-w-3xl max-h-[80vh] overflow-y-auto'
+          aria-describedby={undefined}
+        >
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5 text-blue-600" />
+            <DialogTitle className='flex items-center gap-2'>
+              <Shield className='h-5 w-5 text-blue-600' />
               Detalles del Registro de Auditoría
             </DialogTitle>
-            <DialogDescription>
-              Información completa del evento registrado
-            </DialogDescription>
+            <DialogDescription>Información completa del evento registrado</DialogDescription>
           </DialogHeader>
 
           {selectedLog && (
-            <div className="space-y-4 mt-4">
+            <div className='space-y-4 mt-4'>
               {/* Información básica */}
-              <div className="bg-muted/30 p-4 rounded-lg space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold">Acción:</span>
-                  <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+              <div className='bg-muted/30 p-4 rounded-lg space-y-3'>
+                <div className='flex items-center gap-2'>
+                  <span className='font-semibold'>Acción:</span>
+                  <Badge className='bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'>
                     {(() => {
                       const actionLabels: Record<string, string> = {
                         // Backups
-                        'backup_created': 'Respaldo Creado',
-                        'backup_deleted': 'Respaldo Eliminado',
-                        'backup_restored': 'Respaldo Restaurado',
+                        backup_created: 'Respaldo Creado',
+                        backup_deleted: 'Respaldo Eliminado',
+                        backup_restored: 'Respaldo Restaurado',
                         // Usuarios
-                        'user_created': 'Usuario Creado',
-                        'user_updated': 'Usuario Actualizado',
-                        'user_deleted': 'Usuario Eliminado',
-                        'user_login': 'Inicio de Sesión',
-                        'user_logout': 'Cierre de Sesión',
+                        user_created: 'Usuario Creado',
+                        user_updated: 'Usuario Actualizado',
+                        user_deleted: 'Usuario Eliminado',
+                        user_login: 'Inicio de Sesión',
+                        user_logout: 'Cierre de Sesión',
                         // Tickets
-                        'ticket_created': 'Ticket Creado',
-                        'ticket_updated': 'Ticket Actualizado',
-                        'ticket_deleted': 'Ticket Eliminado',
-                        'ticket_assigned': 'Ticket Asignado',
-                        'ticket_closed': 'Ticket Cerrado',
-                        'ticket_reopened': 'Ticket Reabierto',
-                        'ticket_viewed': 'Ticket Visualizado',
+                        ticket_created: 'Ticket Creado',
+                        ticket_updated: 'Ticket Actualizado',
+                        ticket_deleted: 'Ticket Eliminado',
+                        ticket_assigned: 'Ticket Asignado',
+                        ticket_closed: 'Ticket Cerrado',
+                        ticket_reopened: 'Ticket Reabierto',
+                        ticket_viewed: 'Ticket Visualizado',
                         // Categorías
-                        'category_created': 'Categoría Creada',
-                        'category_updated': 'Categoría Actualizada',
-                        'category_deleted': 'Categoría Eliminada',
-                        'category_view': 'Categoría Visualizada',
+                        category_created: 'Categoría Creada',
+                        category_updated: 'Categoría Actualizada',
+                        category_deleted: 'Categoría Eliminada',
+                        category_view: 'Categoría Visualizada',
                         // Departamentos
-                        'department_created': 'Departamento Creado',
-                        'department_updated': 'Departamento Actualizado',
-                        'department_deleted': 'Departamento Eliminado',
+                        department_created: 'Departamento Creado',
+                        department_updated: 'Departamento Actualizado',
+                        department_deleted: 'Departamento Eliminado',
                         // Artículos de conocimiento
-                        'knowledge_article_created': 'Artículo Creado',
-                        'knowledge_article_updated': 'Artículo Actualizado',
-                        'knowledge_article_deleted': 'Artículo Eliminado',
-                        'knowledge_article_published': 'Artículo Publicado',
-                        'knowledge_article_unpublished': 'Artículo Despublicado',
+                        knowledge_article_created: 'Artículo Creado',
+                        knowledge_article_updated: 'Artículo Actualizado',
+                        knowledge_article_deleted: 'Artículo Eliminado',
+                        knowledge_article_published: 'Artículo Publicado',
+                        knowledge_article_unpublished: 'Artículo Despublicado',
                         // Configuración
-                        'settings_updated': 'Configuración Actualizada',
-                        'settings_viewed': 'Configuración Visualizada',
+                        settings_updated: 'Configuración Actualizada',
+                        settings_viewed: 'Configuración Visualizada',
                         // Autenticación
-                        'login': 'Inicio de Sesión',
-                        'logout': 'Cierre de Sesión',
-                        'password_changed': 'Contraseña Cambiada',
-                        'password_reset': 'Contraseña Restablecida',
+                        login: 'Inicio de Sesión',
+                        logout: 'Cierre de Sesión',
+                        password_changed: 'Contraseña Cambiada',
+                        password_reset: 'Contraseña Restablecida',
                         // Operaciones genéricas
-                        'CREATE': 'Creación',
-                        'UPDATE': 'Actualización',
-                        'DELETE': 'Eliminación',
-                        'VIEW': 'Visualización',
-                        'READ': 'Lectura',
+                        CREATE: 'Creación',
+                        UPDATE: 'Actualización',
+                        DELETE: 'Eliminación',
+                        VIEW: 'Visualización',
+                        READ: 'Lectura',
                         // Colaboradores
-                        'collaborator_added': 'Colaborador Agregado',
-                        'collaborator_removed': 'Colaborador Eliminado',
+                        collaborator_added: 'Colaborador Agregado',
+                        collaborator_removed: 'Colaborador Eliminado',
                         // Familias — admin
-                        'admin_family_assigned': 'Admin Asignado a Familia',
-                        'admin_family_unassigned': 'Admin Desasignado de Familia',
+                        admin_family_assigned: 'Admin Asignado a Familia',
+                        admin_family_unassigned: 'Admin Desasignado de Familia',
                         // Super admin
-                        'super_admin_granted': 'Super Admin Otorgado',
-                        'super_admin_revoked': 'Super Admin Revocado',
+                        super_admin_granted: 'Super Admin Otorgado',
+                        super_admin_revoked: 'Super Admin Revocado',
                       }
                       return actionLabels[selectedLog.action] || selectedLog.action
                     })()}
                   </Badge>
                 </div>
                 <div>
-                  <span className="font-semibold">Módulo:</span>{' '}
-                  <span className="text-muted-foreground">
+                  <span className='font-semibold'>Módulo:</span>{' '}
+                  <span className='text-muted-foreground'>
                     {(() => {
                       const entityLabels: Record<string, string> = {
-                        'System': 'Sistema',
-                        'system': 'Sistema',
-                        'user': 'Usuarios',
-                        'ticket': 'Tickets',
-                        'category': 'Categorías',
-                        'department': 'Departamentos',
-                        'settings': 'Configuración',
-                        'backup': 'Respaldos',
-                        'auth': 'Autenticación',
-                        'knowledge_article': 'Base de Conocimiento',
-                        'comment': 'Comentarios',
-                        'attachment': 'Archivos Adjuntos',
-                        'notification': 'Notificaciones',
-                        'sla': 'Acuerdos de Nivel de Servicio',
-                        'report': 'Reportes',
-                        'audit': 'Auditoría'
+                        System: 'Sistema',
+                        system: 'Sistema',
+                        user: 'Usuarios',
+                        ticket: 'Tickets',
+                        category: 'Categorías',
+                        department: 'Departamentos',
+                        settings: 'Configuración',
+                        backup: 'Respaldos',
+                        auth: 'Autenticación',
+                        knowledge_article: 'Base de Conocimiento',
+                        comment: 'Comentarios',
+                        attachment: 'Archivos Adjuntos',
+                        notification: 'Notificaciones',
+                        sla: 'Acuerdos de Nivel de Servicio',
+                        report: 'Reportes',
+                        audit: 'Auditoría',
                       }
                       return entityLabels[selectedLog.entityType] || selectedLog.entityType
                     })()}
@@ -1454,72 +1498,79 @@ export default function AuditPage() {
                 </div>
                 {selectedLog.entityId && (
                   <div>
-                    <span className="font-semibold">
-                      {selectedLog.entityType === 'user' ? 'Usuario Afectado:' : 
-                       selectedLog.entityType === 'ticket' ? 'Ticket:' :
-                       selectedLog.entityType === 'category' ? 'Categoría:' :
-                       selectedLog.entityType === 'department' ? 'Departamento:' :
-                       selectedLog.entityType === 'System' ? 'Elemento:' :
-                       'Elemento Afectado:'}
+                    <span className='font-semibold'>
+                      {selectedLog.entityType === 'user'
+                        ? 'Usuario Afectado:'
+                        : selectedLog.entityType === 'ticket'
+                          ? 'Ticket:'
+                          : selectedLog.entityType === 'category'
+                            ? 'Categoría:'
+                            : selectedLog.entityType === 'department'
+                              ? 'Departamento:'
+                              : selectedLog.entityType === 'System'
+                                ? 'Elemento:'
+                                : 'Elemento Afectado:'}
                     </span>{' '}
                     {/* PRIORIDAD 1: Usar entityName si está disponible (ya resuelto) */}
                     {selectedLog.details?.entityName ? (
-                      <span className="text-muted-foreground font-medium text-blue-600">
+                      <span className='text-muted-foreground font-medium text-blue-600'>
                         {selectedLog.details.entityName}
                       </span>
                     ) : /* PRIORIDAD 2: Usar nombres específicos del details */
-                      selectedLog.entityType === 'user' && selectedLog.details?.userName ? (
-                      <span className="text-muted-foreground">
+                    selectedLog.entityType === 'user' && selectedLog.details?.userName ? (
+                      <span className='text-muted-foreground'>
                         {selectedLog.details.userName}
                         {selectedLog.details.userEmail && (
-                          <span className="text-xs ml-2">({selectedLog.details.userEmail})</span>
+                          <span className='text-xs ml-2'>({selectedLog.details.userEmail})</span>
                         )}
                       </span>
                     ) : selectedLog.entityType === 'ticket' && selectedLog.details?.ticketTitle ? (
-                      <span className="text-muted-foreground">
+                      <span className='text-muted-foreground'>
                         {selectedLog.details.ticketTitle}
                       </span>
-                    ) : selectedLog.entityType === 'category' && selectedLog.details?.categoryName ? (
-                      <span className="text-muted-foreground">
+                    ) : selectedLog.entityType === 'category' &&
+                      selectedLog.details?.categoryName ? (
+                      <span className='text-muted-foreground'>
                         {selectedLog.details.categoryName}
                       </span>
-                    ) : selectedLog.entityType === 'department' && selectedLog.details?.departmentName ? (
-                      <span className="text-muted-foreground">
+                    ) : selectedLog.entityType === 'department' &&
+                      selectedLog.details?.departmentName ? (
+                      <span className='text-muted-foreground'>
                         {selectedLog.details.departmentName}
                       </span>
-                    ) : /* FALLBACK: Mostrar UUID solo si no hay nada más */
-                    (
-                      <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                    ) : (
+                      /* FALLBACK: Mostrar UUID solo si no hay nada más */
+                      <code className='text-xs bg-muted px-2 py-1 rounded font-mono'>
                         {selectedLog.entityId}
                       </code>
                     )}
                   </div>
                 )}
                 <div>
-                  <span className="font-semibold">Fecha:</span>{' '}
-                  <span className="text-muted-foreground">
+                  <span className='font-semibold'>Fecha:</span>{' '}
+                  <span className='text-muted-foreground'>
                     {new Date(selectedLog.createdAt).toLocaleString('es-ES', {
                       day: '2-digit',
                       month: 'long',
                       year: 'numeric',
                       hour: '2-digit',
                       minute: '2-digit',
-                      second: '2-digit'
+                      second: '2-digit',
                     })}
                   </span>
                 </div>
                 {selectedLog.users && (
                   <div>
-                    <span className="font-semibold">Usuario:</span>{' '}
-                    <span className="text-muted-foreground">
+                    <span className='font-semibold'>Usuario:</span>{' '}
+                    <span className='text-muted-foreground'>
                       {selectedLog.users.name} ({selectedLog.users.email})
                     </span>
                   </div>
                 )}
                 {selectedLog.ipAddress && (
                   <div>
-                    <span className="font-semibold">IP:</span>{' '}
-                    <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                    <span className='font-semibold'>IP:</span>{' '}
+                    <code className='text-xs bg-muted px-2 py-1 rounded font-mono'>
                       {selectedLog.ipAddress}
                     </code>
                   </div>
@@ -1528,7 +1579,7 @@ export default function AuditPage() {
 
               {/* Detalles formateados */}
               {selectedLog.details && (
-                <div className="border-t pt-4">
+                <div className='border-t pt-4'>
                   <AuditDetailsResolver details={selectedLog.details} />
                 </div>
               )}
