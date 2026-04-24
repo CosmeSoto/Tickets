@@ -66,6 +66,7 @@ export function createUserColumns({
     {
       key: 'user',
       label: 'Usuario',
+      sortable: true,
       render: (user: UserData) => {
         const RoleIcon = USER_ROLE_ICONS[user.role]
         return (
@@ -99,6 +100,7 @@ export function createUserColumns({
     {
       key: 'role',
       label: 'Rol',
+      sortable: true,
       render: (user: UserData) => (
         <RoleBadge role={user.role} isSuperAdmin={(user as any).isSuperAdmin} iconSize='sm' />
       ),
@@ -147,6 +149,7 @@ export function createUserColumns({
     {
       key: 'lastLogin',
       label: 'Último acceso',
+      sortable: true,
       render: (user: UserData) => (
         <span className={`text-sm ${user.lastLogin ? 'text-foreground' : 'text-muted-foreground'}`}>
           {user.lastLogin ? formatTimeAgo(user.lastLogin) : 'Nunca'}

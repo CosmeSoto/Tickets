@@ -18,6 +18,7 @@ export function createClientTicketColumns({
     {
       key: 'title',
       label: 'Ticket',
+      sortable: true,
       render: (ticket: TicketType) => (
         <div className='min-w-0'>
           <div className='font-medium text-foreground truncate max-w-[200px]'>{ticket.title}</div>
@@ -47,11 +48,13 @@ export function createClientTicketColumns({
     {
       key: 'status',
       label: 'Estado',
+      sortable: true,
       render: (ticket: TicketType) => <StatusBadge status={ticket.status} size='sm' />,
     },
     {
       key: 'priority',
       label: 'Prioridad',
+      sortable: true,
       render: (ticket: TicketType) => <PriorityBadge priority={ticket.priority} size='sm' />,
     },
     {
@@ -85,6 +88,7 @@ export function createClientTicketColumns({
     {
       key: 'createdAt',
       label: 'Creado',
+      sortable: true,
       render: (ticket: TicketType) => (
         <div className='flex items-center gap-1 text-sm text-muted-foreground'>
           <Calendar className='h-3.5 w-3.5' />
@@ -93,8 +97,9 @@ export function createClientTicketColumns({
       ),
     },
     {
-      key: 'activity',
+      key: 'updatedAt',
       label: 'Actividad',
+      sortable: true,
       render: (ticket: TicketType) => (
         <div className='flex items-center gap-3 text-sm text-muted-foreground'>
           {!!ticket._count?.comments && (
@@ -135,5 +140,4 @@ export function createClientTicketColumns({
   ]
 }
 
-// Legacy export
 export const clientTicketColumns = createClientTicketColumns({ onView: () => {} })

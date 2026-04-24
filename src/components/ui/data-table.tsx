@@ -155,14 +155,37 @@ export function DataTable<T extends { id: string }>({
     return data
   }, [data])
 
+  // Orden semántico para campos especiales
+  const PRIORITY_ORDER: Record<string, number> = { URGENT: 4, HIGH: 3, MEDIUM: 2, LOW: 1 }
+  const STATUS_ORDER: Record<string, number> = { OPEN: 4, IN_PROGRESS: 3, RESOLVED: 2, CLOSED: 1 }
+
   const sortedData = useMemo(() => {
     if (!sortConfig) return safeData
     return [...safeData].sort((a, b) => {
       const aVal = (a as any)[sortConfig.key]
       const bVal = (b as any)[sortConfig.key]
-      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1
-      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1
-      return 0
+      const dir = sortConfig.direction === 'asc' ? 1 : -1
+
+      // Orden semántico para prioridad
+      if (sortConfig.key === 'priority') {
+        return ((PRIORITY_ORDER[aVal] ?? 0) - (PRIORITY_ORDER[bVal] ?? 0)) * dir
+      }
+      // Orden semántico para estado
+      if (sortConfig.key === 'status') {
+        return ((STATUS_ORDER[aVal] ?? 0) - (STATUS_ORDER[bVal] ?? 0)) * dir
+      }
+      // Fechas
+      if (aVal instanceof Date || (typeof aVal === 'string' && /^\d{4}-\d{2}/.test(aVal))) {
+        return (new Date(aVal).getTime() - new Date(bVal).getTime()) * dir
+      }
+      // Nulos al final
+      if (aVal == null) return 1
+      if (bVal == null) return -1
+      // Strings
+      if (typeof aVal === 'string')
+        return aVal.localeCompare(bVal, 'es', { sensitivity: 'base' }) * dir
+      // Números
+      return (aVal - bVal) * dir
     })
   }, [safeData, sortConfig])
 

@@ -216,14 +216,28 @@ export function DataTableAdvanced<T>({
 
     // Aplicar ordenamiento
     if (sortConfig.key && sortConfig.direction) {
+      const PRIORITY_ORDER: Record<string, number> = { URGENT: 4, HIGH: 3, MEDIUM: 2, LOW: 1 }
+      const STATUS_ORDER: Record<string, number> = {
+        OPEN: 4,
+        IN_PROGRESS: 3,
+        RESOLVED: 2,
+        CLOSED: 1,
+      }
+      const dir = sortConfig.direction === 'asc' ? 1 : -1
+
       result.sort((a, b) => {
         const aValue = (a as any)[sortConfig.key!]
         const bValue = (b as any)[sortConfig.key!]
 
-        if (aValue === bValue) return 0
-
-        const comparison = aValue < bValue ? -1 : 1
-        return sortConfig.direction === 'asc' ? comparison : -comparison
+        if (sortConfig.key === 'priority')
+          return ((PRIORITY_ORDER[aValue] ?? 0) - (PRIORITY_ORDER[bValue] ?? 0)) * dir
+        if (sortConfig.key === 'status')
+          return ((STATUS_ORDER[aValue] ?? 0) - (STATUS_ORDER[bValue] ?? 0)) * dir
+        if (aValue == null) return 1
+        if (bValue == null) return -1
+        if (typeof aValue === 'string')
+          return aValue.localeCompare(bValue, 'es', { sensitivity: 'base' }) * dir
+        return (aValue < bValue ? -1 : aValue > bValue ? 1 : 0) * dir
       })
     }
 
