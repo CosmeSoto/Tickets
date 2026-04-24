@@ -41,6 +41,7 @@ import {
   getStatusColor,
   getStatusLabel,
 } from '@/lib/utils/ticket-utils'
+import { useTableSort, SortIcon, sortableHeaderClass } from '@/hooks/common/use-table-sort'
 
 interface Ticket {
   id: string
@@ -95,6 +96,13 @@ export function TicketTable({
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [error, setError] = useState<string | null>(null)
+
+  const {
+    sorted: sortedTickets,
+    sortKey,
+    sortDir,
+    toggleSort,
+  } = useTableSort(tickets, 'createdAt', 'desc')
 
   // Filtros con debounce optimizado
   const [search, setSearch] = useState('')
@@ -310,14 +318,24 @@ export function TicketTable({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Ticket</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Prioridad</TableHead>
+                <TableHead className={sortableHeaderClass} onClick={() => toggleSort('title')}>
+                  Ticket {SortIcon('title', sortKey, sortDir)}
+                </TableHead>
+                <TableHead className={sortableHeaderClass} onClick={() => toggleSort('status')}>
+                  Estado {SortIcon('status', sortKey, sortDir)}
+                </TableHead>
+                <TableHead className={sortableHeaderClass} onClick={() => toggleSort('priority')}>
+                  Prioridad {SortIcon('priority', sortKey, sortDir)}
+                </TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Asignado</TableHead>
                 <TableHead>Categoría</TableHead>
-                <TableHead>Creado</TableHead>
-                <TableHead>Actividad</TableHead>
+                <TableHead className={sortableHeaderClass} onClick={() => toggleSort('createdAt')}>
+                  Creado {SortIcon('createdAt', sortKey, sortDir)}
+                </TableHead>
+                <TableHead className={sortableHeaderClass} onClick={() => toggleSort('updatedAt')}>
+                  Actividad {SortIcon('updatedAt', sortKey, sortDir)}
+                </TableHead>
                 <TableHead className='text-right'>Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -392,7 +410,7 @@ export function TicketTable({
                   </TableCell>
                 </TableRow>
               ) : (
-                (tickets || []).map(ticket => (
+                (sortedTickets || []).map(ticket => (
                   <TableRow key={ticket.id} className='hover:bg-muted'>
                     <TableCell>
                       <div>

@@ -40,6 +40,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { useTableSort, SortIcon, sortableHeaderClass } from '@/hooks/common/use-table-sort'
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -53,14 +54,22 @@ export default function AdminDashboard() {
     error: dashboardError,
     stats,
     recentActivity,
-    refetch: refetchDashboard
+    refetch: refetchDashboard,
   } = useUnifiedDashboard({ role: 'ADMIN' })
 
-  const { 
-    systemStatus, 
-    isLoading: systemLoading, 
-    error: systemError, 
-    refetch: refetchSystem 
+  // Sort para la tabla de métricas por familia
+  const {
+    sorted: sortedFamilyMetrics,
+    sortKey: familySortKey,
+    sortDir: familySortDir,
+    toggleSort: toggleFamilySort,
+  } = useTableSort(stats?.familyMetrics ?? [], 'openTickets', 'desc')
+
+  const {
+    systemStatus,
+    isLoading: systemLoading,
+    error: systemError,
+    refetch: refetchSystem,
   } = useSystemStatus()
 
   // Combinar estados de carga
@@ -80,29 +89,33 @@ export default function AdminDashboard() {
   return (
     <UnifiedDashboardBase
       userName={userName}
-      userRole="ADMIN"
+      userRole='ADMIN'
       isLoading={isLoading}
       isAuthorized={isAuthorized}
       error={error}
-      title={isSuperAdmin ? "Dashboard Super Admin" : "Dashboard Administrativo"}
-      subtitle={isSuperAdmin ? "Vista global del sistema — acceso total" : "Vista general de tus familias asignadas"}
-      loadingMessage="Cargando estadísticas del sistema..."
+      title={isSuperAdmin ? 'Dashboard Super Admin' : 'Dashboard Administrativo'}
+      subtitle={
+        isSuperAdmin
+          ? 'Vista global del sistema — acceso total'
+          : 'Vista general de tus familias asignadas'
+      }
+      loadingMessage='Cargando estadísticas del sistema...'
       onRefresh={handleRefresh}
       notificationsMaxVisible={3}
       statusBadge={{
         text: `Sistema: ${systemHealth === 'excellent' ? 'Excelente' : 'Normal'}`,
         variant: systemHealth === 'excellent' ? 'default' : 'secondary',
-        className: systemHealth === 'excellent' ? 'bg-green-100 text-green-800' : ''
+        className: systemHealth === 'excellent' ? 'bg-green-100 text-green-800' : '',
       }}
     >
       {/* Error adicional de sistema */}
       {systemError && !dashboardError && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription className="flex items-center justify-between">
+        <Alert variant='destructive' className='mb-6'>
+          <AlertTriangle className='h-4 w-4' />
+          <AlertDescription className='flex items-center justify-between'>
             <span>Error al cargar estado del sistema: {systemError}</span>
-            <Button variant="outline" size="sm" onClick={refetchSystem}>
-              <RefreshCw className="h-4 w-4 mr-2" />
+            <Button variant='outline' size='sm' onClick={refetchSystem}>
+              <RefreshCw className='h-4 w-4 mr-2' />
               Reintentar Sistema
             </Button>
           </AlertDescription>
@@ -134,9 +147,9 @@ export default function AdminDashboard() {
           icon={AlertCircle}
           color='orange'
           status={stats.openTickets && stats.openTickets > 20 ? 'warning' : 'normal'}
-          badge={{ 
-            text: `${stats.urgentTickets || 0} urgentes`, 
-            variant: stats.urgentTickets && stats.urgentTickets > 0 ? 'destructive' : 'default' 
+          badge={{
+            text: `${stats.urgentTickets || 0} urgentes`,
+            variant: stats.urgentTickets && stats.urgentTickets > 0 ? 'destructive' : 'default',
           }}
         />
 
@@ -155,7 +168,7 @@ export default function AdminDashboard() {
           <AssignedFamiliesPanel
             families={stats.assignedFamilies ?? []}
             isSuperAdmin={stats.isSuperAdmin}
-            role="ADMIN"
+            role='ADMIN'
           />
         </div>
       )}
@@ -192,10 +205,16 @@ export default function AdminDashboard() {
             value={`${stats.resolutionPlans.efficiency}%`}
             icon={Activity}
             color='purple'
-            status={stats.resolutionPlans.efficiency >= 90 ? 'success' : stats.resolutionPlans.efficiency >= 70 ? 'normal' : 'warning'}
-            badge={{ 
-              text: `${stats.resolutionPlans.taskCompletionRate}% tareas`, 
-              variant: 'default' 
+            status={
+              stats.resolutionPlans.efficiency >= 90
+                ? 'success'
+                : stats.resolutionPlans.efficiency >= 70
+                  ? 'normal'
+                  : 'warning'
+            }
+            badge={{
+              text: `${stats.resolutionPlans.taskCompletionRate}% tareas`,
+              variant: 'default',
             }}
           />
         </div>
@@ -215,25 +234,50 @@ export default function AdminDashboard() {
                   <Link href='/admin/families'>Ver Familias</Link>
                 </Button>
               </CardTitle>
-              <CardDescription>Distribución de tickets y técnicos por familia global</CardDescription>
+              <CardDescription>
+                Distribución de tickets y técnicos por familia global
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Familia</TableHead>
-                    <TableHead className='text-center'>Abiertos</TableHead>
-                    <TableHead className='text-center'>En Progreso</TableHead>
-                    <TableHead className='text-center'>Técnicos</TableHead>
+                    <TableHead
+                      className={sortableHeaderClass}
+                      onClick={() => toggleFamilySort('familyName')}
+                    >
+                      Familia {SortIcon('familyName', familySortKey, familySortDir)}
+                    </TableHead>
+                    <TableHead
+                      className={`text-center ${sortableHeaderClass}`}
+                      onClick={() => toggleFamilySort('openTickets')}
+                    >
+                      Abiertos {SortIcon('openTickets', familySortKey, familySortDir)}
+                    </TableHead>
+                    <TableHead
+                      className={`text-center ${sortableHeaderClass}`}
+                      onClick={() => toggleFamilySort('inProgressTickets')}
+                    >
+                      En Progreso {SortIcon('inProgressTickets', familySortKey, familySortDir)}
+                    </TableHead>
+                    <TableHead
+                      className={`text-center ${sortableHeaderClass}`}
+                      onClick={() => toggleFamilySort('technicianCount')}
+                    >
+                      Técnicos {SortIcon('technicianCount', familySortKey, familySortDir)}
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {stats.familyMetrics.map((fm: any) => (
+                  {sortedFamilyMetrics.map((fm: any) => (
                     <TableRow key={fm.familyId}>
                       <TableCell>
                         <div className='flex items-center space-x-2'>
                           {fm.color && (
-                            <div className='w-3 h-3 rounded-full flex-shrink-0' style={{ backgroundColor: fm.color }} />
+                            <div
+                              className='w-3 h-3 rounded-full flex-shrink-0'
+                              style={{ backgroundColor: fm.color }}
+                            />
                           )}
                           <span className='font-medium'>{fm.familyName}</span>
                         </div>
@@ -270,7 +314,9 @@ export default function AdminDashboard() {
                 <AlertTriangle className='h-5 w-5 mr-2 text-yellow-600' />
                 Alertas Proactivas
               </CardTitle>
-              <CardDescription>Situaciones que requieren atención del administrador</CardDescription>
+              <CardDescription>
+                Situaciones que requieren atención del administrador
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className='space-y-3'>
@@ -283,8 +329,8 @@ export default function AdminDashboard() {
                         sev === 'critical'
                           ? 'border-red-300 bg-red-50 dark:bg-red-950/30'
                           : sev === 'warning'
-                          ? 'border-yellow-300 bg-yellow-50 dark:bg-yellow-950/30'
-                          : 'border-blue-300 bg-blue-50 dark:bg-blue-950/30'
+                            ? 'border-yellow-300 bg-yellow-50 dark:bg-yellow-950/30'
+                            : 'border-blue-300 bg-blue-50 dark:bg-blue-950/30'
                       }
                     >
                       {sev === 'critical' ? (
@@ -299,8 +345,8 @@ export default function AdminDashboard() {
                           sev === 'critical'
                             ? 'text-red-800 dark:text-red-200'
                             : sev === 'warning'
-                            ? 'text-yellow-800 dark:text-yellow-200'
-                            : 'text-blue-800 dark:text-blue-200'
+                              ? 'text-yellow-800 dark:text-yellow-200'
+                              : 'text-blue-800 dark:text-blue-200'
                         }
                       >
                         {alert.message}
@@ -324,11 +370,13 @@ export default function AdminDashboard() {
                   <Zap className='h-5 w-5 mr-2 text-blue-600' />
                   Acciones Rápidas
                 </div>
-                <Badge variant="outline" className="text-xs">
+                <Badge variant='outline' className='text-xs'>
                   Gestión del Sistema
                 </Badge>
               </CardTitle>
-              <CardDescription>Administra los aspectos principales del sistema de tickets</CardDescription>
+              <CardDescription>
+                Administra los aspectos principales del sistema de tickets
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
@@ -396,7 +444,7 @@ export default function AdminDashboard() {
                   Actividad Reciente
                 </div>
                 <Button variant='ghost' size='sm' asChild>
-                  <Link href="/admin/reports?view=activity">
+                  <Link href='/admin/reports?view=activity'>
                     <Eye className='h-4 w-4' />
                   </Link>
                 </Button>
@@ -435,19 +483,25 @@ export default function AdminDashboard() {
                         )}
                       </div>
                       <div className='flex-1 min-w-0'>
-                        <p className='text-sm font-medium text-foreground line-clamp-1'>{activity.title}</p>
-                        <p className='text-xs text-muted-foreground mt-1 line-clamp-2'>{activity.description}</p>
+                        <p className='text-sm font-medium text-foreground line-clamp-1'>
+                          {activity.title}
+                        </p>
+                        <p className='text-xs text-muted-foreground mt-1 line-clamp-2'>
+                          {activity.description}
+                        </p>
                         <div className='flex items-center justify-between mt-2'>
-                          <span className='text-xs font-medium text-muted-foreground'>{activity.user}</span>
+                          <span className='text-xs font-medium text-muted-foreground'>
+                            {activity.user}
+                          </span>
                           <span className='text-xs text-muted-foreground'>{activity.time}</span>
                         </div>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div className="text-center py-6">
-                    <Activity className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
-                    <p className="text-sm text-muted-foreground">No hay actividad reciente</p>
+                  <div className='text-center py-6'>
+                    <Activity className='h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50' />
+                    <p className='text-sm text-muted-foreground'>No hay actividad reciente</p>
                   </div>
                 )}
               </div>
@@ -465,16 +519,19 @@ export default function AdminDashboard() {
                 <Activity className='h-5 w-5 mr-2 text-green-600' />
                 Estado del Sistema
               </div>
-              <div className="flex items-center space-x-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">
-                  Actualizado: {systemStatus ? new Date(systemStatus.lastUpdated).toLocaleTimeString('es-ES', { 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                  }) : '--:--'}
+              <div className='flex items-center space-x-2'>
+                <Calendar className='h-4 w-4 text-muted-foreground' />
+                <span className='text-sm text-muted-foreground'>
+                  Actualizado:{' '}
+                  {systemStatus
+                    ? new Date(systemStatus.lastUpdated).toLocaleTimeString('es-ES', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
+                    : '--:--'}
                 </span>
-                <Button variant="outline" size="sm" onClick={refetchSystem}>
-                  <RefreshCw className="h-4 w-4" />
+                <Button variant='outline' size='sm' onClick={refetchSystem}>
+                  <RefreshCw className='h-4 w-4' />
                 </Button>
               </div>
             </CardTitle>
@@ -483,47 +540,60 @@ export default function AdminDashboard() {
             {systemStatus ? (
               <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
                 {/* Base de Datos */}
-                <div className={`flex flex-col p-4 rounded-lg border ${
-                  systemStatus.database.status === 'active' 
-                    ? 'bg-green-50 dark:bg-green-950/50 border-green-200 dark:border-green-800'
-                    : 'bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-800'
-                }`}>
-                  <div className="flex items-center justify-between mb-2">
+                <div
+                  className={`flex flex-col p-4 rounded-lg border ${
+                    systemStatus.database.status === 'active'
+                      ? 'bg-green-50 dark:bg-green-950/50 border-green-200 dark:border-green-800'
+                      : 'bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-800'
+                  }`}
+                >
+                  <div className='flex items-center justify-between mb-2'>
                     <p className='text-sm font-semibold text-foreground'>Base de Datos</p>
-                    <Badge variant='default' className={`text-xs ${
-                      systemStatus.database.status === 'active'
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                        : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                    }`}>
+                    <Badge
+                      variant='default'
+                      className={`text-xs ${
+                        systemStatus.database.status === 'active'
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                      }`}
+                    >
                       {systemStatus.database.status === 'active' ? '✓ Activo' : '✗ Error'}
                     </Badge>
                   </div>
                   <p className='text-xs text-muted-foreground'>{systemStatus.database.type}</p>
                   {systemStatus.database.connections ? (
                     <p className='text-xs text-muted-foreground'>
-                      Conexiones: {systemStatus.database.connections.active}/{systemStatus.database.connections.max}
+                      Conexiones: {systemStatus.database.connections.active}/
+                      {systemStatus.database.connections.max}
                     </p>
                   ) : (
                     <p className='text-xs text-red-500'>{systemStatus.database.error}</p>
                   )}
                   {systemStatus.database.responseTime && (
-                    <p className='text-xs text-muted-foreground'>Respuesta: {systemStatus.database.responseTime}</p>
+                    <p className='text-xs text-muted-foreground'>
+                      Respuesta: {systemStatus.database.responseTime}
+                    </p>
                   )}
                 </div>
-                
+
                 {/* Cache */}
-                <div className={`flex flex-col p-4 rounded-lg border ${
-                  systemStatus.cache.status === 'active' 
-                    ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800'
-                    : 'bg-yellow-50 dark:bg-yellow-950/50 border-yellow-200 dark:border-yellow-800'
-                }`}>
-                  <div className="flex items-center justify-between mb-2">
+                <div
+                  className={`flex flex-col p-4 rounded-lg border ${
+                    systemStatus.cache.status === 'active'
+                      ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800'
+                      : 'bg-yellow-50 dark:bg-yellow-950/50 border-yellow-200 dark:border-yellow-800'
+                  }`}
+                >
+                  <div className='flex items-center justify-between mb-2'>
                     <p className='text-sm font-semibold text-foreground'>Cache</p>
-                    <Badge variant='default' className={`text-xs ${
-                      systemStatus.cache.status === 'active'
-                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                        : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                    }`}>
+                    <Badge
+                      variant='default'
+                      className={`text-xs ${
+                        systemStatus.cache.status === 'active'
+                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                      }`}
+                    >
                       {systemStatus.cache.status === 'active' ? '✓ Activo' : '? Desconocido'}
                     </Badge>
                   </div>
@@ -536,23 +606,30 @@ export default function AdminDashboard() {
                     <p className='text-xs text-yellow-600'>Estado desconocido</p>
                   )}
                   {systemStatus.cache.hitRate && (
-                    <p className='text-xs text-muted-foreground'>Hit rate: {systemStatus.cache.hitRate}%</p>
+                    <p className='text-xs text-muted-foreground'>
+                      Hit rate: {systemStatus.cache.hitRate}%
+                    </p>
                   )}
                 </div>
-                
+
                 {/* Email Service */}
-                <div className={`flex flex-col p-4 rounded-lg border ${
-                  systemStatus.email.status === 'active' 
-                    ? 'bg-purple-50 dark:bg-purple-950/50 border-purple-200 dark:border-purple-800'
-                    : 'bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-800'
-                }`}>
-                  <div className="flex items-center justify-between mb-2">
+                <div
+                  className={`flex flex-col p-4 rounded-lg border ${
+                    systemStatus.email.status === 'active'
+                      ? 'bg-purple-50 dark:bg-purple-950/50 border-purple-200 dark:border-purple-800'
+                      : 'bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-800'
+                  }`}
+                >
+                  <div className='flex items-center justify-between mb-2'>
                     <p className='text-sm font-semibold text-foreground'>Email Service</p>
-                    <Badge variant='default' className={`text-xs ${
-                      systemStatus.email.status === 'active'
-                        ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-                        : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                    }`}>
+                    <Badge
+                      variant='default'
+                      className={`text-xs ${
+                        systemStatus.email.status === 'active'
+                          ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                      }`}
+                    >
                       {systemStatus.email.status === 'active' ? '✓ Activo' : '✗ Error'}
                     </Badge>
                   </div>
@@ -565,29 +642,39 @@ export default function AdminDashboard() {
                     <p className='text-xs text-red-500'>{systemStatus.email.error}</p>
                   )}
                   {systemStatus.email.queue !== undefined && (
-                    <p className='text-xs text-muted-foreground'>Cola: {systemStatus.email.queue}</p>
+                    <p className='text-xs text-muted-foreground'>
+                      Cola: {systemStatus.email.queue}
+                    </p>
                   )}
                 </div>
-                
+
                 {/* Backup */}
-                <div className={`flex flex-col p-4 rounded-lg border ${
-                  systemStatus.backup.status === 'scheduled' 
-                    ? 'bg-green-50 dark:bg-green-950/50 border-green-200 dark:border-green-800'
-                    : systemStatus.backup.status === 'overdue'
-                    ? 'bg-yellow-50 dark:bg-yellow-950/50 border-yellow-200 dark:border-yellow-800'
-                    : 'bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-800'
-                }`}>
-                  <div className="flex items-center justify-between mb-2">
+                <div
+                  className={`flex flex-col p-4 rounded-lg border ${
+                    systemStatus.backup.status === 'scheduled'
+                      ? 'bg-green-50 dark:bg-green-950/50 border-green-200 dark:border-green-800'
+                      : systemStatus.backup.status === 'overdue'
+                        ? 'bg-yellow-50 dark:bg-yellow-950/50 border-yellow-200 dark:border-yellow-800'
+                        : 'bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-800'
+                  }`}
+                >
+                  <div className='flex items-center justify-between mb-2'>
                     <p className='text-sm font-semibold text-foreground'>Backup</p>
-                    <Badge variant='default' className={`text-xs ${
-                      systemStatus.backup.status === 'scheduled'
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                    <Badge
+                      variant='default'
+                      className={`text-xs ${
+                        systemStatus.backup.status === 'scheduled'
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                          : systemStatus.backup.status === 'overdue'
+                            ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                      }`}
+                    >
+                      {systemStatus.backup.status === 'scheduled'
+                        ? '✓ Programado'
                         : systemStatus.backup.status === 'overdue'
-                        ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                        : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                    }`}>
-                      {systemStatus.backup.status === 'scheduled' ? '✓ Programado' : 
-                       systemStatus.backup.status === 'overdue' ? '⚠ Atrasado' : '✗ Error'}
+                          ? '⚠ Atrasado'
+                          : '✗ Error'}
                     </Badge>
                   </div>
                   <p className='text-xs text-muted-foreground'>{systemStatus.backup.type}</p>
@@ -599,14 +686,16 @@ export default function AdminDashboard() {
                     <p className='text-xs text-red-500'>{systemStatus.backup.error}</p>
                   )}
                   {systemStatus.backup.lastBackup?.size && (
-                    <p className='text-xs text-muted-foreground'>Tamaño: {systemStatus.backup.lastBackup.size}</p>
+                    <p className='text-xs text-muted-foreground'>
+                      Tamaño: {systemStatus.backup.lastBackup.size}
+                    </p>
                   )}
                 </div>
               </div>
             ) : (
-              <div className="text-center py-8">
-                <Activity className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
-                <p className="text-sm text-muted-foreground">Cargando estado del sistema...</p>
+              <div className='text-center py-8'>
+                <Activity className='h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50' />
+                <p className='text-sm text-muted-foreground'>Cargando estado del sistema...</p>
               </div>
             )}
           </CardContent>
