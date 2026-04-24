@@ -126,8 +126,8 @@ async function getFamilyMetrics() {
         },
         inventory_family_config: {
           select: {
+            inventoryEnabled: true,
             allowedSubtypes: true,
-            // inventoryEnabled no existe en BD — se infiere de allowedSubtypes
           },
         },
       },
@@ -136,10 +136,10 @@ async function getFamilyMetrics() {
     const metrics = await Promise.all(
       families.map(async family => {
         const ticketsEnabled = family.ticketFamilyConfig?.ticketsEnabled ?? false
-        // Inventario habilitado si tiene config con al menos un subtipo permitido
+        // Inventario habilitado: campo real inventoryEnabled (default true si tiene config)
         const inventoryEnabled =
           family.inventory_family_config !== null &&
-          (family.inventory_family_config.allowedSubtypes?.length ?? 0) > 0
+          (family.inventory_family_config.inventoryEnabled ?? true)
 
         // Solo consultar métricas de tickets si el módulo está habilitado
         const ticketMetrics = ticketsEnabled
@@ -278,6 +278,31 @@ async function getProactiveAlerts() {
   }
 
   return alerts
+}
+
+// Enriquece un array de familias con sus módulos activos (tickets + inventario)
+async function enrichFamiliesWithModules(families: any[]) {
+  if (families.length === 0) return families
+  const ids = families.map(f => f.id)
+  const [ticketConfigs, invConfigs] = await Promise.all([
+    prisma.ticket_family_config.findMany({
+      where: { familyId: { in: ids } },
+      select: { familyId: true, ticketsEnabled: true },
+    }),
+    prisma.inventory_family_config.findMany({
+      where: { familyId: { in: ids } },
+      select: { familyId: true, inventoryEnabled: true },
+    }),
+  ])
+  const ticketMap = new Map(ticketConfigs.map(c => [c.familyId, c.ticketsEnabled]))
+  const invMap = new Map(invConfigs.map(c => [c.familyId, c.inventoryEnabled]))
+  return families.map(f => ({
+    ...f,
+    modules: {
+      tickets: ticketMap.get(f.id) ?? false,
+      inventory: invMap.get(f.id) ?? false,
+    },
+  }))
 }
 
 export async function GET(request: NextRequest) {
@@ -438,14 +463,14 @@ export async function GET(request: NextRequest) {
         proactiveAlerts: await getProactiveAlerts(),
       }
 
-      // Familias asignadas al admin (o todas si es super admin)
+      // Familias asignadas al admin (o todas si es super admin) — con módulos activos
       const isSuperAdmin = (session.user as any).isSuperAdmin === true
       if (isSuperAdmin) {
         const allFamilies = await prisma.families.findMany({
           where: { isActive: true },
           select: { id: true, name: true, code: true, color: true, icon: true },
         })
-        stats.assignedFamilies = allFamilies
+        stats.assignedFamilies = await enrichFamiliesWithModules(allFamilies)
         stats.isSuperAdmin = true
       } else {
         const adminFamilies = await prisma.admin_family_assignments.findMany({
@@ -454,7 +479,7 @@ export async function GET(request: NextRequest) {
             family: { select: { id: true, name: true, code: true, color: true, icon: true } },
           },
         })
-        stats.assignedFamilies = adminFamilies.map(a => a.family)
+        stats.assignedFamilies = await enrichFamiliesWithModules(adminFamilies.map(a => a.family))
         stats.isSuperAdmin = false
       }
     } else if (role === 'TECHNICIAN') {
@@ -591,14 +616,14 @@ export async function GET(request: NextRequest) {
         },
       }
 
-      // Agregar familias asignadas al técnico
+      // Agregar familias asignadas al técnico — con módulos activos
       const techFamilies = await prisma.technician_family_assignments.findMany({
         where: { technicianId: userId, isActive: true },
         select: {
           family: { select: { id: true, name: true, code: true, color: true, icon: true } },
         },
       })
-      stats.assignedFamilies = techFamilies.map(a => a.family)
+      stats.assignedFamilies = await enrichFamiliesWithModules(techFamilies.map(a => a.family))
       stats.isInventoryManager = (session.user as any).canManageInventory === true
 
       // Si es gestor de inventario, agregar familias de inventario
@@ -609,7 +634,7 @@ export async function GET(request: NextRequest) {
             family: { select: { id: true, name: true, code: true, color: true, icon: true } },
           },
         })
-        stats.inventoryFamilies = invFamilies.map(a => a.family)
+        stats.inventoryFamilies = await enrichFamiliesWithModules(invFamilies.map(a => a.family))
       }
     } else if (role === 'CLIENT') {
       // Estadísticas profesionales para cliente
@@ -703,7 +728,7 @@ export async function GET(request: NextRequest) {
         supportQuality: avgRating >= 4.5 ? 'excellent' : avgRating >= 4 ? 'good' : 'fair',
       }
 
-      // Familias del cliente: las de sus tickets + familias de inventario si es gestor
+      // Familias del cliente — con módulos activos
       const canManageInv = (session.user as any).canManageInventory === true
       stats.isInventoryManager = canManageInv
       if (canManageInv) {
@@ -713,10 +738,10 @@ export async function GET(request: NextRequest) {
             family: { select: { id: true, name: true, code: true, color: true, icon: true } },
           },
         })
-        stats.inventoryFamilies = invFamilies.map(a => a.family)
-        stats.assignedFamilies = invFamilies.map(a => a.family)
+        const enriched = await enrichFamiliesWithModules(invFamilies.map(a => a.family))
+        stats.inventoryFamilies = enriched
+        stats.assignedFamilies = enriched
       } else {
-        // Familias de los tickets del cliente
         const clientTicketFamilies = await prisma.tickets.findMany({
           where: { clientId: userId, familyId: { not: null } },
           select: {
@@ -725,7 +750,8 @@ export async function GET(request: NextRequest) {
           },
           distinct: ['familyId'],
         })
-        stats.assignedFamilies = clientTicketFamilies.filter(t => t.family).map(t => t.family!)
+        const raw = clientTicketFamilies.filter(t => t.family).map(t => t.family!)
+        stats.assignedFamilies = await enrichFamiliesWithModules(raw)
       }
     }
 

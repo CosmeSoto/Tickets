@@ -52,6 +52,7 @@ interface Family {
   color?: string | null
   icon?: string | null
   isActive: boolean
+  inventoryEnabled?: boolean // cargado desde inventory_family_config
 }
 
 interface RawConfig {
@@ -192,15 +193,68 @@ function InventorySettingsContent() {
   const loadFamilies = useCallback(async () => {
     setLoadingFamilies(true)
     try {
-      const res = await fetch('/api/families?includeInactive=true')
-      const data = await res.json()
-      if (data.success) setFamilies(data.data)
+      // Una sola request para familias + una para todos los estados de inventario
+      const [familiesRes, configsRes] = await Promise.all([
+        fetch('/api/families?includeInactive=true'),
+        fetch('/api/inventory/family-config'),
+      ])
+      const familiesData = await familiesRes.json()
+      const configsData = configsRes.ok ? await configsRes.json() : { data: {} }
+
+      if (familiesData.success) {
+        const configMap: Record<string, boolean> = configsData.data ?? {}
+        setFamilies(
+          familiesData.data.map((f: Family) => ({
+            ...f,
+            // Si no tiene config aún, por defecto habilitado
+            inventoryEnabled: configMap[f.id] ?? true,
+          }))
+        )
+      }
     } catch {
       toast({ title: 'Error', description: 'Error al cargar familias', variant: 'destructive' })
     } finally {
       setLoadingFamilies(false)
     }
   }, [toast])
+
+  const handleToggleInventory = async (family: Family) => {
+    const newValue = !(family.inventoryEnabled ?? true)
+    // Optimistic update
+    setFamilies(prev =>
+      prev.map(f => (f.id === family.id ? { ...f, inventoryEnabled: newValue } : f))
+    )
+    try {
+      const res = await fetch(`/api/inventory/family-config/${family.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inventoryEnabled: newValue }),
+      })
+      const data = await res.json()
+      if (!data.success) {
+        // Revertir si falla
+        setFamilies(prev =>
+          prev.map(f => (f.id === family.id ? { ...f, inventoryEnabled: !newValue } : f))
+        )
+        toast({
+          title: 'Error',
+          description: data.error || 'Error al actualizar',
+          variant: 'destructive',
+        })
+      } else {
+        toast({
+          title: 'Éxito',
+          description: `Inventario ${newValue ? 'habilitado' : 'deshabilitado'} para ${family.name}`,
+        })
+        if (selectedFamilyId === family.id) loadConfig(family.id)
+      }
+    } catch {
+      setFamilies(prev =>
+        prev.map(f => (f.id === family.id ? { ...f, inventoryEnabled: !newValue } : f))
+      )
+      toast({ title: 'Error', description: 'Error de conexión', variant: 'destructive' })
+    }
+  }
 
   const loadConfig = useCallback(
     async (familyId: string) => {
@@ -485,7 +539,17 @@ function InventorySettingsContent() {
                               </p>
                             </div>
                           </div>
-                          <ChevronRight className='h-4 w-4 text-muted-foreground flex-shrink-0' />
+                          <div
+                            className='flex items-center gap-1 flex-shrink-0 ml-2'
+                            onClick={e => e.stopPropagation()}
+                          >
+                            <Switch
+                              checked={family.inventoryEnabled ?? true}
+                              onCheckedChange={() => handleToggleInventory(family)}
+                              className='scale-75'
+                            />
+                            <ChevronRight className='h-4 w-4 text-muted-foreground' />
+                          </div>
                         </div>
                       ))}
                     </div>

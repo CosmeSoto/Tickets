@@ -1381,13 +1381,11 @@ model license_attachments {
 model inventory_family_config {
   id                        String              @id @default(uuid())
   familyId                  String              @unique @map("family_id")
+  inventoryEnabled          Boolean             @default(true) @map("inventory_enabled")
   allowedSubtypes           AssetSubtype[]      @map("allowed_subtypes")
   visibleSections           FormSection[]       @map("visible_sections")
   requiredSections          FormSection[]       @map("required_sections")
   requireFinancialForNew    Boolean             @default(true) @map("require_financial_for_new")
-  /// Config de secciones por modalidad de adquisición para EQUIPMENT.
-  /// Estructura: { FIXED_ASSET?: { visible: FormSection[], required: FormSection[] }, RENTAL?: {...}, LOAN?: {...} }
-  /// Si es null, se usan visibleSections/requiredSections como fallback global.
   sectionsByMode            Json?               @map("sections_by_mode")
   defaultDepreciationMethod DepreciationMethod? @map("default_depreciation_method")
   defaultUsefulLifeYears    Float?              @map("default_useful_life_years")

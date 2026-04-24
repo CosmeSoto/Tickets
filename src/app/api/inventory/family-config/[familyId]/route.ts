@@ -74,7 +74,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ fami
 
     return NextResponse.json({
       success: true,
-      data: { ...config, inventoryEnabled: true },
+      data: { ...config, inventoryEnabled: config.inventoryEnabled ?? true },
     })
   } catch (error) {
     console.error('Error al obtener configuración:', error)
@@ -111,10 +111,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ fami
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { inventoryEnabled: _inv, ...configData } = validated
 
+    // inventoryEnabled ahora es un campo real en la BD
     const config = await prisma.inventory_family_config.upsert({
       where: { familyId },
-      create: { familyId, ...configData },
-      update: configData,
+      create: { familyId, inventoryEnabled: validated.inventoryEnabled ?? true, ...configData },
+      update: { inventoryEnabled: validated.inventoryEnabled ?? true, ...configData },
     })
 
     return NextResponse.json({

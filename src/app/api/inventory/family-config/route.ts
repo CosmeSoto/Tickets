@@ -1,48 +1,33 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { DEFAULT_FAMILY_CONFIG } from '@/lib/inventory/family-config'
 
-export async function GET(_req: NextRequest) {
+/**
+ * GET /api/inventory/family-config
+ * Devuelve el estado inventoryEnabled de todas las familias en una sola query.
+ * Usado por la página de configuración de inventario para mostrar los toggles.
+ */
+export async function GET() {
   const session = await getServerSession(authOptions)
-  if (!session?.user) {
-    return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+  if (!session?.user || session.user.role !== 'ADMIN') {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   }
 
-  const { role, id: userId } = session.user as { role: string; id: string }
+  try {
+    const configs = await prisma.inventory_family_config.findMany({
+      select: { familyId: true, inventoryEnabled: true },
+    })
 
-  if (role !== 'ADMIN') {
-    const { canManageInventory } = await import('@/lib/inventory-access')
-    const allowed = await canManageInventory(userId, role)
-    if (!allowed) {
-      return NextResponse.json(
-        { error: 'No tienes permiso para ver la configuración de familias' },
-        { status: 403 }
-      )
-    }
+    // Mapa familyId → inventoryEnabled
+    const map: Record<string, boolean> = {}
+    configs.forEach(c => {
+      map[c.familyId] = c.inventoryEnabled
+    })
+
+    return NextResponse.json({ success: true, data: map })
+  } catch (error) {
+    console.error('[inventory-config] GET all:', error)
+    return NextResponse.json({ error: 'Error al obtener configuraciones' }, { status: 500 })
   }
-
-  const families = await prisma.families.findMany({
-    where: { isActive: true },
-    include: { formConfig: true },
-  })
-
-  const configs = families.map((family) => {
-    if (!family.formConfig) {
-      return {
-        familyId: family.id,
-        ...DEFAULT_FAMILY_CONFIG,
-      }
-    }
-    return {
-      familyId: family.formConfig.familyId,
-      allowedSubtypes: family.formConfig.allowedSubtypes,
-      visibleSections: family.formConfig.visibleSections,
-      requiredSections: family.formConfig.requiredSections,
-      requireFinancialForNew: family.formConfig.requireFinancialForNew,
-    }
-  })
-
-  return NextResponse.json(configs)
 }
