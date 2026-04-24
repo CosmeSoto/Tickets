@@ -7,19 +7,19 @@ import { withCache, buildCacheKey } from '@/lib/api-cache'
 // Función para calcular tiempo promedio de resolución
 function calculateAvgResolutionTime(tickets: any[]): string {
   if (tickets.length === 0) return '0h'
-  
+
   const totalMinutes = tickets.reduce((acc, ticket) => {
     if (ticket.resolvedAt && ticket.createdAt) {
       const diff = new Date(ticket.resolvedAt).getTime() - new Date(ticket.createdAt).getTime()
-      return acc + (diff / (1000 * 60)) // convertir a minutos
+      return acc + diff / (1000 * 60) // convertir a minutos
     }
     return acc
   }, 0)
-  
+
   const avgMinutes = totalMinutes / tickets.length
   const hours = Math.floor(avgMinutes / 60)
   const minutes = Math.floor(avgMinutes % 60)
-  
+
   if (hours > 0) return `${hours}h ${minutes}min`
   return `${minutes}min`
 }
@@ -30,8 +30,8 @@ async function calculateAvgResponseTime(): Promise<string> {
     const ticketsWithComments = await prisma.tickets.findMany({
       where: {
         comments: {
-          some: {}
-        }
+          some: {},
+        },
       },
       select: {
         id: true,
@@ -39,9 +39,9 @@ async function calculateAvgResponseTime(): Promise<string> {
         comments: {
           orderBy: { createdAt: 'asc' },
           take: 1,
-          select: { createdAt: true }
-        }
-      }
+          select: { createdAt: true },
+        },
+      },
     })
 
     if (ticketsWithComments.length === 0) return '2h'
@@ -49,7 +49,7 @@ async function calculateAvgResponseTime(): Promise<string> {
     const totalMinutes = ticketsWithComments.reduce((acc, ticket) => {
       if (ticket.comments[0]) {
         const diff = ticket.comments[0].createdAt.getTime() - ticket.createdAt.getTime()
-        return acc + (diff / (1000 * 60))
+        return acc + diff / (1000 * 60)
       }
       return acc
     }, 0)
@@ -69,7 +69,7 @@ async function calculateAvgResponseTime(): Promise<string> {
 // Función para generar actividad reciente
 async function getRecentActivity(role: string, userId: string) {
   const activities: any[] = []
-  
+
   if (role === 'ADMIN') {
     // Actividad reciente para admin
     const recentTickets = await prisma.tickets.findMany({
@@ -77,10 +77,10 @@ async function getRecentActivity(role: string, userId: string) {
       orderBy: { createdAt: 'desc' },
       include: {
         users_tickets_clientIdTousers: { select: { name: true } },
-        users_tickets_assigneeIdTousers: { select: { name: true } }
-      }
+        users_tickets_assigneeIdTousers: { select: { name: true } },
+      },
     })
-    
+
     recentTickets.forEach(ticket => {
       activities.push({
         id: `ticket_${ticket.id}`,
@@ -89,11 +89,11 @@ async function getRecentActivity(role: string, userId: string) {
         description: `Creado por ${ticket.users_tickets_clientIdTousers?.name || 'Usuario'}`,
         time: formatTimeAgo(ticket.createdAt),
         user: ticket.users_tickets_clientIdTousers?.name || 'Sistema',
-        ticketId: ticket.id
+        ticketId: ticket.id,
       })
     })
   }
-  
+
   return activities.slice(0, 5)
 }
 
@@ -103,29 +103,94 @@ function formatTimeAgo(date: Date): string {
   const minutes = Math.floor(diff / (1000 * 60))
   const hours = Math.floor(minutes / 60)
   const days = Math.floor(hours / 24)
-  
+
   if (days > 0) return `hace ${days}d`
   if (hours > 0) return `hace ${hours}h`
   if (minutes > 0) return `hace ${minutes}min`
   return 'ahora'
 }
 
-// Función para obtener métricas por familia
+// Función para obtener métricas por familia — incluye estado de módulos activos
 async function getFamilyMetrics() {
   try {
     const families = await prisma.families.findMany({
       where: { isActive: true },
-      select: { id: true, name: true },
+      select: {
+        id: true,
+        name: true,
+        color: true,
+        icon: true,
+        code: true,
+        ticketFamilyConfig: {
+          select: { ticketsEnabled: true },
+        },
+        inventory_family_config: {
+          select: {
+            allowedSubtypes: true,
+            // inventoryEnabled no existe en BD — se infiere de allowedSubtypes
+          },
+        },
+      },
     })
 
     const metrics = await Promise.all(
-      families.map(async (family) => {
-        const [openTickets, inProgressTickets, technicianCount] = await Promise.all([
-          prisma.tickets.count({ where: { familyId: family.id, status: 'OPEN' } }),
-          prisma.tickets.count({ where: { familyId: family.id, status: 'IN_PROGRESS' } }),
-          prisma.technician_family_assignments.count({ where: { familyId: family.id, isActive: true } }),
-        ])
-        return { familyId: family.id, familyName: family.name, openTickets, inProgressTickets, technicianCount }
+      families.map(async family => {
+        const ticketsEnabled = family.ticketFamilyConfig?.ticketsEnabled ?? false
+        // Inventario habilitado si tiene config con al menos un subtipo permitido
+        const inventoryEnabled =
+          family.inventory_family_config !== null &&
+          (family.inventory_family_config.allowedSubtypes?.length ?? 0) > 0
+
+        // Solo consultar métricas de tickets si el módulo está habilitado
+        const ticketMetrics = ticketsEnabled
+          ? await Promise.all([
+              prisma.tickets.count({ where: { familyId: family.id, status: 'OPEN' } }),
+              prisma.tickets.count({ where: { familyId: family.id, status: 'IN_PROGRESS' } }),
+              prisma.technician_family_assignments.count({
+                where: { familyId: family.id, isActive: true },
+              }),
+            ]).then(([open, inProgress, techs]) => ({
+              openTickets: open,
+              inProgressTickets: inProgress,
+              technicianCount: techs,
+            }))
+          : { openTickets: 0, inProgressTickets: 0, technicianCount: 0 }
+
+        // Solo consultar métricas de inventario si el módulo está habilitado
+        const inventoryMetrics = inventoryEnabled
+          ? await Promise.all([
+              prisma.equipment.count({
+                where: { type: { familyId: family.id }, status: 'AVAILABLE' },
+              }),
+              prisma.equipment.count({
+                where: { type: { familyId: family.id }, status: 'ASSIGNED' },
+              }),
+              prisma.equipment.count({
+                where: { type: { familyId: family.id }, status: 'MAINTENANCE' },
+              }),
+            ]).then(([available, assigned, maintenance]) => ({
+              availableAssets: available,
+              assignedAssets: assigned,
+              maintenanceAssets: maintenance,
+              totalAssets: available + assigned + maintenance,
+            }))
+          : null
+
+        return {
+          familyId: family.id,
+          familyName: family.name,
+          familyColor: family.color,
+          familyCode: family.code,
+          // Módulos activos
+          modules: {
+            tickets: ticketsEnabled,
+            inventory: inventoryEnabled,
+          },
+          // Métricas de tickets (solo si habilitado)
+          ...(ticketsEnabled ? ticketMetrics : {}),
+          // Métricas de inventario (solo si habilitado)
+          ...(inventoryEnabled && inventoryMetrics ? { inventory: inventoryMetrics } : {}),
+        }
       })
     )
     return metrics
@@ -152,7 +217,7 @@ async function getProactiveAlerts() {
       },
       take: 10,
     })
-    slaViolations.forEach((sv) => {
+    slaViolations.forEach(sv => {
       alerts.push({
         type: 'SLA_EXPIRING',
         severity: 'WARNING',
@@ -171,7 +236,7 @@ async function getProactiveAlerts() {
       },
       select: { id: true, name: true },
     })
-    familiesWithoutTechnicians.forEach((family) => {
+    familiesWithoutTechnicians.forEach(family => {
       alerts.push({
         type: 'NO_TECHNICIANS',
         severity: 'CRITICAL',
@@ -197,7 +262,7 @@ async function getProactiveAlerts() {
         },
       },
     })
-    overloadedTechnicians.forEach((tech) => {
+    overloadedTechnicians.forEach(tech => {
       const count = tech._count.tickets_tickets_assigneeIdTousers
       if (count > 15) {
         alerts.push({
@@ -236,7 +301,9 @@ export async function GET(request: NextRequest) {
       const { getCached } = await import('@/lib/redis')
       const cached = await getCached<any>(cacheKey)
       if (cached) return NextResponse.json(cached)
-    } catch { /* Redis no disponible — continuar sin caché */ }
+    } catch {
+      /* Redis no disponible — continuar sin caché */
+    }
 
     let stats: any = {}
 
@@ -255,7 +322,7 @@ export async function GET(request: NextRequest) {
         thisWeekTickets,
         resolvedTicketsWithTime,
         plansStats,
-        avgFirstResponseTime
+        avgFirstResponseTime,
       ] = await Promise.all([
         prisma.users.count(),
         prisma.tickets.count(),
@@ -264,11 +331,11 @@ export async function GET(request: NextRequest) {
         prisma.tickets.count({ where: { status: 'RESOLVED' } }),
         prisma.tickets.count({ where: { status: 'CLOSED' } }),
         // Tickets urgentes: prioridad HIGH y aún no resueltos
-        prisma.tickets.count({ 
-          where: { 
+        prisma.tickets.count({
+          where: {
             priority: 'HIGH',
-            status: { in: ['OPEN', 'IN_PROGRESS'] }
-          } 
+            status: { in: ['OPEN', 'IN_PROGRESS'] },
+          },
         }),
         // Tickets vencidos: más de 4h para HIGH, 8h para MEDIUM, 24h para LOW
         prisma.tickets.count({
@@ -277,67 +344,70 @@ export async function GET(request: NextRequest) {
             OR: [
               {
                 priority: 'HIGH',
-                createdAt: { lt: new Date(now.getTime() - 4 * 60 * 60 * 1000) }
+                createdAt: { lt: new Date(now.getTime() - 4 * 60 * 60 * 1000) },
               },
               {
                 priority: 'MEDIUM',
-                createdAt: { lt: new Date(now.getTime() - 8 * 60 * 60 * 1000) }
+                createdAt: { lt: new Date(now.getTime() - 8 * 60 * 60 * 1000) },
               },
               {
                 priority: 'LOW',
-                createdAt: { lt: new Date(now.getTime() - 24 * 60 * 60 * 1000) }
-              }
-            ]
-          }
+                createdAt: { lt: new Date(now.getTime() - 24 * 60 * 60 * 1000) },
+              },
+            ],
+          },
         }),
-        prisma.tickets.count({ 
-          where: { 
-            createdAt: { 
-              gte: new Date(new Date().setHours(0, 0, 0, 0)) 
-            } 
-          } 
+        prisma.tickets.count({
+          where: {
+            createdAt: {
+              gte: new Date(new Date().setHours(0, 0, 0, 0)),
+            },
+          },
         }),
-        prisma.tickets.count({ 
-          where: { 
-            createdAt: { 
-              gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) 
-            } 
-          } 
+        prisma.tickets.count({
+          where: {
+            createdAt: {
+              gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+            },
+          },
         }),
         prisma.tickets.findMany({
-          where: { 
+          where: {
             status: { in: ['RESOLVED', 'CLOSED'] },
-            resolvedAt: { not: null }
+            resolvedAt: { not: null },
           },
-          select: { createdAt: true, resolvedAt: true }
+          select: { createdAt: true, resolvedAt: true },
         }),
         // Estadísticas de planes de resolución
         prisma.resolution_plans.aggregate({
           _count: { id: true },
-          _avg: { 
+          _avg: {
             estimatedHours: true,
             actualHours: true,
             completedTasks: true,
-            totalTasks: true
-          }
+            totalTasks: true,
+          },
         }),
         // Calcular tiempo promedio de primera respuesta
-        calculateAvgResponseTime()
+        calculateAvgResponseTime(),
       ])
-      
+
       const avgResolutionTime = calculateAvgResolutionTime(resolvedTicketsWithTime)
-      const resolutionRate = totalTickets > 0 ? Math.round(((resolvedTickets + closedTickets) / totalTickets) * 100) : 0
-      
+      const resolutionRate =
+        totalTickets > 0 ? Math.round(((resolvedTickets + closedTickets) / totalTickets) * 100) : 0
+
       // Calcular eficiencia de planes (tiempo real vs estimado)
-      const planEfficiency = plansStats._avg.estimatedHours && plansStats._avg.actualHours
-        ? Math.round((plansStats._avg.estimatedHours / plansStats._avg.actualHours) * 100)
-        : 100
-      
+      const planEfficiency =
+        plansStats._avg.estimatedHours && plansStats._avg.actualHours
+          ? Math.round((plansStats._avg.estimatedHours / plansStats._avg.actualHours) * 100)
+          : 100
+
       // Calcular tasa de completitud de tareas
-      const taskCompletionRate = plansStats._avg.totalTasks && plansStats._avg.completedTasks
-        ? Math.round((plansStats._avg.completedTasks / plansStats._avg.totalTasks) * 100)
-        : 0
-      
+      const taskCompletionRate =
+        plansStats._avg.totalTasks && plansStats._avg.completedTasks
+          ? Math.round((plansStats._avg.completedTasks / plansStats._avg.totalTasks) * 100)
+          : 0
+
       stats = {
         totalUsers,
         totalTickets,
@@ -353,14 +423,15 @@ export async function GET(request: NextRequest) {
         avgFirstResponseTime,
         resolutionRate,
         activeTickets: openTickets + inProgressTickets,
-        systemHealth: resolutionRate >= 85 ? 'excellent' : resolutionRate >= 70 ? 'good' : 'needs_attention',
+        systemHealth:
+          resolutionRate >= 85 ? 'excellent' : resolutionRate >= 70 ? 'good' : 'needs_attention',
         // Métricas de planes de resolución
         resolutionPlans: {
           total: plansStats._count.id,
           avgEstimatedHours: Math.round((plansStats._avg.estimatedHours || 0) * 10) / 10,
           avgActualHours: Math.round((plansStats._avg.actualHours || 0) * 10) / 10,
           efficiency: planEfficiency,
-          taskCompletionRate
+          taskCompletionRate,
         },
         recentActivity: await getRecentActivity(role, userId),
         familyMetrics: await getFamilyMetrics(),
@@ -372,7 +443,7 @@ export async function GET(request: NextRequest) {
       if (isSuperAdmin) {
         const allFamilies = await prisma.families.findMany({
           where: { isActive: true },
-          select: { id: true, name: true, code: true, color: true, icon: true }
+          select: { id: true, name: true, code: true, color: true, icon: true },
         })
         stats.assignedFamilies = allFamilies
         stats.isSuperAdmin = true
@@ -380,8 +451,8 @@ export async function GET(request: NextRequest) {
         const adminFamilies = await prisma.admin_family_assignments.findMany({
           where: { adminId: userId, isActive: true },
           select: {
-            family: { select: { id: true, name: true, code: true, color: true, icon: true } }
-          }
+            family: { select: { id: true, name: true, code: true, color: true, icon: true } },
+          },
         })
         stats.assignedFamilies = adminFamilies.map(a => a.family)
         stats.isSuperAdmin = false
@@ -398,52 +469,54 @@ export async function GET(request: NextRequest) {
         resolvedTicketsWithTime,
         ratings,
         myPlansStats,
-        avgFirstResponseTime
+        avgFirstResponseTime,
       ] = await Promise.all([
         prisma.tickets.count({ where: { assigneeId: userId } }),
-        prisma.tickets.count({ where: { assigneeId: userId, status: { in: ['RESOLVED', 'CLOSED'] } } }),
-        prisma.tickets.count({ where: { assigneeId: userId, status: 'IN_PROGRESS' } }),
-        prisma.tickets.count({ 
-          where: { 
-            assigneeId: userId,
-            status: { in: ['RESOLVED', 'CLOSED'] },
-            resolvedAt: { 
-              gte: new Date(new Date().setHours(0, 0, 0, 0)) 
-            } 
-          } 
+        prisma.tickets.count({
+          where: { assigneeId: userId, status: { in: ['RESOLVED', 'CLOSED'] } },
         }),
-        prisma.tickets.count({ 
-          where: { 
+        prisma.tickets.count({ where: { assigneeId: userId, status: 'IN_PROGRESS' } }),
+        prisma.tickets.count({
+          where: {
             assigneeId: userId,
             status: { in: ['RESOLVED', 'CLOSED'] },
-            resolvedAt: { 
-              gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) 
-            } 
-          } 
+            resolvedAt: {
+              gte: new Date(new Date().setHours(0, 0, 0, 0)),
+            },
+          },
+        }),
+        prisma.tickets.count({
+          where: {
+            assigneeId: userId,
+            status: { in: ['RESOLVED', 'CLOSED'] },
+            resolvedAt: {
+              gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+            },
+          },
         }),
         prisma.tickets.count({ where: { assigneeId: userId, priority: 'HIGH' } }),
         prisma.tickets.findMany({
-          where: { 
+          where: {
             assigneeId: userId,
             status: { in: ['RESOLVED', 'CLOSED'] },
-            resolvedAt: { not: null }
+            resolvedAt: { not: null },
           },
-          select: { createdAt: true, resolvedAt: true }
+          select: { createdAt: true, resolvedAt: true },
         }),
         prisma.ticket_ratings.findMany({
-          where: { 
-            tickets: { assigneeId: userId }
+          where: {
+            tickets: { assigneeId: userId },
           },
-          select: { rating: true }
+          select: { rating: true },
         }),
         // Estadísticas de mis planes de resolución
         (async () => {
           const myTickets = await prisma.tickets.findMany({
             where: { assigneeId: userId },
-            select: { id: true }
+            select: { id: true },
           })
           const myTicketIds = myTickets.map(t => t.id)
-          
+
           if (myTicketIds.length === 0) {
             return {
               _count: { id: 0 },
@@ -451,43 +524,44 @@ export async function GET(request: NextRequest) {
                 estimatedHours: null,
                 actualHours: null,
                 completedTasks: null,
-                totalTasks: null
-              }
+                totalTasks: null,
+              },
             }
           }
-          
+
           return prisma.resolution_plans.aggregate({
             where: {
-              ticketId: { in: myTicketIds }
+              ticketId: { in: myTicketIds },
             },
             _count: { id: true },
-            _avg: { 
+            _avg: {
               estimatedHours: true,
               actualHours: true,
               completedTasks: true,
-              totalTasks: true
-            }
+              totalTasks: true,
+            },
           })
         })(),
         // Calcular mi tiempo promedio de primera respuesta
-        calculateAvgResponseTime()
+        calculateAvgResponseTime(),
       ])
-      
+
       const avgResolutionTime = calculateAvgResolutionTime(resolvedTicketsWithTime)
-      const avgRating = ratings.length > 0 
-        ? ratings.reduce((acc, r) => acc + r.rating, 0) / ratings.length 
-        : 0
-      
+      const avgRating =
+        ratings.length > 0 ? ratings.reduce((acc, r) => acc + r.rating, 0) / ratings.length : 0
+
       // Calcular eficiencia de mis planes
-      const myPlanEfficiency = myPlansStats._avg.estimatedHours && myPlansStats._avg.actualHours
-        ? Math.round((myPlansStats._avg.estimatedHours / myPlansStats._avg.actualHours) * 100)
-        : 100
-      
+      const myPlanEfficiency =
+        myPlansStats._avg.estimatedHours && myPlansStats._avg.actualHours
+          ? Math.round((myPlansStats._avg.estimatedHours / myPlansStats._avg.actualHours) * 100)
+          : 100
+
       // Calcular mi tasa de completitud de tareas
-      const myTaskCompletionRate = myPlansStats._avg.totalTasks && myPlansStats._avg.completedTasks
-        ? Math.round((myPlansStats._avg.completedTasks / myPlansStats._avg.totalTasks) * 100)
-        : 0
-      
+      const myTaskCompletionRate =
+        myPlansStats._avg.totalTasks && myPlansStats._avg.completedTasks
+          ? Math.round((myPlansStats._avg.completedTasks / myPlansStats._avg.totalTasks) * 100)
+          : 0
+
       stats = {
         assignedTickets,
         resolvedTickets,
@@ -513,16 +587,16 @@ export async function GET(request: NextRequest) {
           avgEstimatedHours: Math.round((myPlansStats._avg.estimatedHours || 0) * 10) / 10,
           avgActualHours: Math.round((myPlansStats._avg.actualHours || 0) * 10) / 10,
           efficiency: myPlanEfficiency,
-          taskCompletionRate: myTaskCompletionRate
-        }
+          taskCompletionRate: myTaskCompletionRate,
+        },
       }
 
       // Agregar familias asignadas al técnico
       const techFamilies = await prisma.technician_family_assignments.findMany({
         where: { technicianId: userId, isActive: true },
         select: {
-          family: { select: { id: true, name: true, code: true, color: true, icon: true } }
-        }
+          family: { select: { id: true, name: true, code: true, color: true, icon: true } },
+        },
       })
       stats.assignedFamilies = techFamilies.map(a => a.family)
       stats.isInventoryManager = (session.user as any).canManageInventory === true
@@ -532,8 +606,8 @@ export async function GET(request: NextRequest) {
         const invFamilies = await prisma.inventory_manager_families.findMany({
           where: { managerId: userId },
           select: {
-            family: { select: { id: true, name: true, code: true, color: true, icon: true } }
-          }
+            family: { select: { id: true, name: true, code: true, color: true, icon: true } },
+          },
         })
         stats.inventoryFamilies = invFamilies.map(a => a.family)
       }
@@ -553,63 +627,66 @@ export async function GET(request: NextRequest) {
         prisma.tickets.count({ where: { clientId: userId } }),
         prisma.tickets.count({ where: { clientId: userId, status: 'OPEN' } }),
         prisma.tickets.count({ where: { clientId: userId, status: 'IN_PROGRESS' } }),
-        prisma.tickets.count({ where: { clientId: userId, status: { in: ['RESOLVED', 'CLOSED'] } } }),
-        prisma.tickets.count({ 
-          where: { 
+        prisma.tickets.count({
+          where: { clientId: userId, status: { in: ['RESOLVED', 'CLOSED'] } },
+        }),
+        prisma.tickets.count({
+          where: {
             clientId: userId,
             createdAt: {
-              gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-            }
-          } 
+              gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+            },
+          },
         }),
         prisma.tickets.findMany({
-          where: { 
+          where: {
             clientId: userId,
             status: { in: ['RESOLVED', 'CLOSED'] },
-            resolvedAt: { not: null }
+            resolvedAt: { not: null },
           },
-          select: { createdAt: true, resolvedAt: true }
+          select: { createdAt: true, resolvedAt: true },
         }),
         prisma.ticket_ratings.findMany({
           where: { tickets: { clientId: userId } },
-          select: { rating: true }
+          select: { rating: true },
         }),
         // Equipos asignados al cliente
         prisma.equipment_assignments.count({
-          where: { receiverId: userId, isActive: true }
+          where: { receiverId: userId, isActive: true },
         }),
         // Mantenimientos pendientes: primero obtenemos los equipos del cliente
-        prisma.equipment_assignments.findMany({
-          where: { receiverId: userId, isActive: true },
-          select: { equipmentId: true }
-        }).then(async (assignments) => {
-          if (assignments.length === 0) return 0
-          return prisma.maintenance_records.count({
-            where: {
-              equipmentId: { in: assignments.map(a => a.equipmentId) },
-              status: { in: ['REQUESTED', 'SCHEDULED', 'ACCEPTED'] }
-            }
+        prisma.equipment_assignments
+          .findMany({
+            where: { receiverId: userId, isActive: true },
+            select: { equipmentId: true },
           })
-        }),
+          .then(async assignments => {
+            if (assignments.length === 0) return 0
+            return prisma.maintenance_records.count({
+              where: {
+                equipmentId: { in: assignments.map(a => a.equipmentId) },
+                status: { in: ['REQUESTED', 'SCHEDULED', 'ACCEPTED'] },
+              },
+            })
+          }),
       ])
-      
+
       const avgResolutionTime = calculateAvgResolutionTime(resolvedTicketsWithTime)
-      const avgRating = ratings.length > 0 
-        ? ratings.reduce((acc, r) => acc + r.rating, 0) / ratings.length 
-        : 0
-      
+      const avgRating =
+        ratings.length > 0 ? ratings.reduce((acc, r) => acc + r.rating, 0) / ratings.length : 0
+
       // Contar tickets que pueden ser calificados (RESOLVED o CLOSED sin calificación)
       const ticketsToRate = await prisma.tickets.count({
         where: {
           clientId: userId,
           status: { in: ['RESOLVED', 'CLOSED'] },
-          ticket_ratings: null
-        }
+          ticket_ratings: null,
+        },
       })
-      
+
       // Calcular tiempo de respuesta real
       const responseTime = await calculateAvgResponseTime()
-      
+
       stats = {
         totalTickets,
         openTickets,
@@ -623,7 +700,7 @@ export async function GET(request: NextRequest) {
         responseTime,
         assignedEquipment,
         pendingMaintenance,
-        supportQuality: avgRating >= 4.5 ? 'excellent' : avgRating >= 4 ? 'good' : 'fair'
+        supportQuality: avgRating >= 4.5 ? 'excellent' : avgRating >= 4 ? 'good' : 'fair',
       }
 
       // Familias del cliente: las de sus tickets + familias de inventario si es gestor
@@ -633,8 +710,8 @@ export async function GET(request: NextRequest) {
         const invFamilies = await prisma.inventory_manager_families.findMany({
           where: { managerId: userId },
           select: {
-            family: { select: { id: true, name: true, code: true, color: true, icon: true } }
-          }
+            family: { select: { id: true, name: true, code: true, color: true, icon: true } },
+          },
         })
         stats.inventoryFamilies = invFamilies.map(a => a.family)
         stats.assignedFamilies = invFamilies.map(a => a.family)
@@ -642,12 +719,13 @@ export async function GET(request: NextRequest) {
         // Familias de los tickets del cliente
         const clientTicketFamilies = await prisma.tickets.findMany({
           where: { clientId: userId, familyId: { not: null } },
-          select: { familyId: true, family: { select: { id: true, name: true, code: true, color: true, icon: true } } },
-          distinct: ['familyId']
+          select: {
+            familyId: true,
+            family: { select: { id: true, name: true, code: true, color: true, icon: true } },
+          },
+          distinct: ['familyId'],
         })
-        stats.assignedFamilies = clientTicketFamilies
-          .filter(t => t.family)
-          .map(t => t.family!)
+        stats.assignedFamilies = clientTicketFamilies.filter(t => t.family).map(t => t.family!)
       }
     }
 
@@ -655,7 +733,9 @@ export async function GET(request: NextRequest) {
     try {
       const { setCache } = await import('@/lib/redis')
       await setCache(cacheKey, stats, ttl)
-    } catch { /* Redis no disponible */ }
+    } catch {
+      /* Redis no disponible */
+    }
 
     return NextResponse.json(stats)
   } catch (error) {

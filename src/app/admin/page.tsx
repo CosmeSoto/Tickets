@@ -27,6 +27,7 @@ import {
   Clock,
   Layers,
   Settings,
+  Package,
 } from 'lucide-react'
 import { useUnifiedDashboard } from '@/hooks/use-unified-dashboard'
 import { useSystemStatus } from '@/hooks/use-system-status'
@@ -220,23 +221,21 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Métricas por Familia */}
+      {/* Métricas por Familia — dinámicas según módulos activos */}
       {stats.familyMetrics && stats.familyMetrics.length > 0 && (
         <div className='mb-6'>
           <Card>
             <CardHeader>
               <CardTitle className='flex items-center justify-between'>
-                <div className='flex items-center'>
-                  <Layers className='h-5 w-5 mr-2 text-indigo-600' />
+                <div className='flex items-center gap-2'>
+                  <Layers className='h-5 w-5 text-muted-foreground' />
                   Métricas por Familia
                 </div>
                 <Button variant='outline' size='sm' asChild>
                   <Link href='/admin/families'>Ver Familias</Link>
                 </Button>
               </CardTitle>
-              <CardDescription>
-                Distribución de tickets y técnicos por familia global
-              </CardDescription>
+              <CardDescription>Estado de módulos activos y métricas por área</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
@@ -248,17 +247,18 @@ export default function AdminDashboard() {
                     >
                       Familia {SortIcon('familyName', familySortKey, familySortDir)}
                     </TableHead>
+                    <TableHead>Módulos</TableHead>
                     <TableHead
                       className={`text-center ${sortableHeaderClass}`}
                       onClick={() => toggleFamilySort('openTickets')}
                     >
-                      Abiertos {SortIcon('openTickets', familySortKey, familySortDir)}
+                      Tickets abiertos {SortIcon('openTickets', familySortKey, familySortDir)}
                     </TableHead>
                     <TableHead
                       className={`text-center ${sortableHeaderClass}`}
                       onClick={() => toggleFamilySort('inProgressTickets')}
                     >
-                      En Progreso {SortIcon('inProgressTickets', familySortKey, familySortDir)}
+                      En progreso {SortIcon('inProgressTickets', familySortKey, familySortDir)}
                     </TableHead>
                     <TableHead
                       className={`text-center ${sortableHeaderClass}`}
@@ -266,38 +266,108 @@ export default function AdminDashboard() {
                     >
                       Técnicos {SortIcon('technicianCount', familySortKey, familySortDir)}
                     </TableHead>
+                    <TableHead className='text-center hidden lg:table-cell'>Inventario</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortedFamilyMetrics.map((fm: any) => (
-                    <TableRow key={fm.familyId}>
-                      <TableCell>
-                        <div className='flex items-center space-x-2'>
-                          {fm.color && (
-                            <div
-                              className='w-3 h-3 rounded-full flex-shrink-0'
-                              style={{ backgroundColor: fm.color }}
-                            />
+                  {sortedFamilyMetrics.map((fm: any) => {
+                    const ticketsOn = fm.modules?.tickets ?? true
+                    const inventoryOn = fm.modules?.inventory ?? false
+                    return (
+                      <TableRow
+                        key={fm.familyId}
+                        className='cursor-pointer hover:bg-muted/50'
+                        onClick={() => router.push(`/admin/families/${fm.familyId}`)}
+                      >
+                        <TableCell>
+                          <div className='flex items-center gap-2'>
+                            {fm.familyColor && (
+                              <div
+                                className='w-2.5 h-2.5 rounded-full flex-shrink-0'
+                                style={{ backgroundColor: fm.familyColor }}
+                              />
+                            )}
+                            <span className='font-medium text-sm'>{fm.familyName}</span>
+                            {fm.familyCode && (
+                              <Badge
+                                variant='outline'
+                                className='text-xs font-mono hidden sm:inline-flex'
+                              >
+                                {fm.familyCode}
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className='flex items-center gap-1.5'>
+                            <Badge
+                              variant={ticketsOn ? 'default' : 'secondary'}
+                              className='text-xs h-5 px-1.5'
+                            >
+                              <Ticket className='h-3 w-3 mr-1' />
+                              Tickets
+                            </Badge>
+                            <Badge
+                              variant={inventoryOn ? 'default' : 'secondary'}
+                              className='text-xs h-5 px-1.5'
+                            >
+                              <Package className='h-3 w-3 mr-1' />
+                              Inv.
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell className='text-center'>
+                          {ticketsOn ? (
+                            <Badge
+                              variant={
+                                fm.openTickets > 10
+                                  ? 'destructive'
+                                  : fm.openTickets > 0
+                                    ? 'default'
+                                    : 'secondary'
+                              }
+                            >
+                              {fm.openTickets ?? 0}
+                            </Badge>
+                          ) : (
+                            <span className='text-xs text-muted-foreground'>—</span>
                           )}
-                          <span className='font-medium'>{fm.familyName}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className='text-center'>
-                        <Badge variant={fm.openTickets > 10 ? 'destructive' : 'secondary'}>
-                          {fm.openTickets}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className='text-center'>
-                        <Badge variant='outline'>{fm.inProgressTickets ?? 0}</Badge>
-                      </TableCell>
-                      <TableCell className='text-center'>
-                        <div className='flex items-center justify-center space-x-1'>
-                          <Users className='h-3 w-3 text-muted-foreground' />
-                          <span className='text-sm'>{fm.technicianCount}</span>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                        <TableCell className='text-center'>
+                          {ticketsOn ? (
+                            <Badge variant='outline'>{fm.inProgressTickets ?? 0}</Badge>
+                          ) : (
+                            <span className='text-xs text-muted-foreground'>—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className='text-center'>
+                          {ticketsOn ? (
+                            <div className='flex items-center justify-center gap-1'>
+                              <Users className='h-3 w-3 text-muted-foreground' />
+                              <span className='text-sm'>{fm.technicianCount ?? 0}</span>
+                            </div>
+                          ) : (
+                            <span className='text-xs text-muted-foreground'>—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className='text-center hidden lg:table-cell'>
+                          {inventoryOn && fm.inventory ? (
+                            <div className='text-xs text-muted-foreground space-y-0.5'>
+                              <div>{fm.inventory.availableAssets} disp.</div>
+                              <div>{fm.inventory.assignedAssets} asig.</div>
+                              {fm.inventory.maintenanceAssets > 0 && (
+                                <div className='text-amber-600'>
+                                  {fm.inventory.maintenanceAssets} mant.
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className='text-xs text-muted-foreground'>—</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
                 </TableBody>
               </Table>
             </CardContent>
