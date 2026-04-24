@@ -1,19 +1,10 @@
 'use client'
 
-import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { MoreHorizontal, Eye, Edit, Trash2, QrCode } from 'lucide-react'
+import { Eye, Trash2, QrCode } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import {
   Table,
   TableBody,
@@ -22,9 +13,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { EquipmentStatus, EquipmentCondition } from '@prisma/client'
+import { EquipmentCondition } from '@prisma/client'
 import type { Equipment } from '@/types/inventory/equipment'
-import { formatDate } from '@/lib/utils'
+import { useTableSort, SortIcon, sortableHeaderClass } from '@/hooks/common/use-table-sort'
 
 interface EquipmentTableProps {
   equipment: Equipment[]
@@ -57,15 +48,14 @@ export function EquipmentTable({
   equipment,
   userRole,
   canManageInventory = false,
-  onEdit,
   onDelete,
   onViewQR,
-}: EquipmentTableProps) {
+}: Omit<EquipmentTableProps, 'onEdit'> & { onEdit?: (e: Equipment) => void }) {
   const router = useRouter()
   const isAdmin = userRole === 'ADMIN'
-  const isTechnician = userRole === 'TECHNICIAN'
-  const canEdit = isAdmin || isTechnician || canManageInventory
   const canDelete = isAdmin || canManageInventory
+
+  const { sorted, sortKey, sortDir, toggleSort } = useTableSort(equipment, 'code')
 
   if (equipment.length === 0) {
     return (
@@ -80,18 +70,29 @@ export function EquipmentTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Código</TableHead>
-            <TableHead>Equipo</TableHead>
+            <TableHead className={sortableHeaderClass} onClick={() => toggleSort('code')}>
+              Código {SortIcon('code', sortKey, sortDir)}
+            </TableHead>
+            <TableHead className={sortableHeaderClass} onClick={() => toggleSort('brand')}>
+              Equipo {SortIcon('brand', sortKey, sortDir)}
+            </TableHead>
             <TableHead className='hidden md:table-cell'>Tipo</TableHead>
             <TableHead className='hidden lg:table-cell'>Departamento</TableHead>
-            <TableHead>Estado</TableHead>
-            <TableHead className='hidden md:table-cell'>Condición</TableHead>
+            <TableHead className={sortableHeaderClass} onClick={() => toggleSort('status')}>
+              Estado {SortIcon('status', sortKey, sortDir)}
+            </TableHead>
+            <TableHead
+              className={`hidden md:table-cell ${sortableHeaderClass}`}
+              onClick={() => toggleSort('condition')}
+            >
+              Condición {SortIcon('condition', sortKey, sortDir)}
+            </TableHead>
             <TableHead className='hidden lg:table-cell'>Ubicación</TableHead>
             <TableHead className='text-right'>Acciones</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {equipment.map(item => (
+          {sorted.map(item => (
             <TableRow
               key={item.id}
               className='cursor-pointer hover:bg-muted/50'
@@ -137,42 +138,43 @@ export function EquipmentTable({
                 <span className='text-sm text-muted-foreground'>{item.location || '-'}</span>
               </TableCell>
               <TableCell className='text-right' onClick={e => e.stopPropagation()}>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant='ghost' size='icon'>
-                      <MoreHorizontal className='h-4 w-4' />
-                      <span className='sr-only'>Abrir menú</span>
+                <div className='flex items-center justify-end gap-0.5'>
+                  <Button
+                    variant='ghost'
+                    size='sm'
+                    className='h-8 w-8 p-0 text-muted-foreground hover:text-foreground'
+                    asChild
+                  >
+                    <Link
+                      href={`/inventory/equipment/${item.id}`}
+                      onClick={e => e.stopPropagation()}
+                    >
+                      <Eye className='h-4 w-4' />
+                    </Link>
+                  </Button>
+                  {onViewQR && (
+                    <Button
+                      variant='ghost'
+                      size='sm'
+                      className='h-8 w-8 p-0 text-muted-foreground hover:text-foreground'
+                      onClick={() => onViewQR(item)}
+                      title='Ver código QR'
+                    >
+                      <QrCode className='h-4 w-4' />
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align='end'>
-                    <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <Link href={`/inventory/equipment/${item.id}`}>
-                        <Eye className='mr-2 h-4 w-4' />
-                        Ver detalles
-                      </Link>
-                    </DropdownMenuItem>
-                    {onViewQR && (
-                      <DropdownMenuItem onClick={() => onViewQR(item)}>
-                        <QrCode className='mr-2 h-4 w-4' />
-                        Ver código QR
-                      </DropdownMenuItem>
-                    )}
-                    {canDelete && onDelete && item.status !== 'RETIRED' && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => onDelete(item)}
-                          className='text-destructive'
-                        >
-                          <Trash2 className='mr-2 h-4 w-4' />
-                          Retirar equipo
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                  )}
+                  {canDelete && onDelete && item.status !== 'RETIRED' && (
+                    <Button
+                      variant='ghost'
+                      size='sm'
+                      className='h-8 w-8 p-0 text-muted-foreground hover:text-destructive'
+                      onClick={() => onDelete(item)}
+                      title='Retirar equipo'
+                    >
+                      <Trash2 className='h-4 w-4' />
+                    </Button>
+                  )}
+                </div>
               </TableCell>
             </TableRow>
           ))}
