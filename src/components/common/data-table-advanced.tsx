@@ -225,9 +225,13 @@ export function DataTableAdvanced<T>({
       }
       const dir = sortConfig.direction === 'asc' ? 1 : -1
 
+      // Buscar el accessor de la columna activa para sort correcto en campos anidados
+      const sortColumn = columns.find(c => c.key === sortConfig.key)
+
       result.sort((a, b) => {
-        const aValue = (a as any)[sortConfig.key!]
-        const bValue = (b as any)[sortConfig.key!]
+        // Usar accessor si existe (para campos anidados como _count.tickets)
+        const aValue = sortColumn?.accessor ? sortColumn.accessor(a) : (a as any)[sortConfig.key!]
+        const bValue = sortColumn?.accessor ? sortColumn.accessor(b) : (b as any)[sortConfig.key!]
 
         if (sortConfig.key === 'priority')
           return ((PRIORITY_ORDER[aValue] ?? 0) - (PRIORITY_ORDER[bValue] ?? 0)) * dir

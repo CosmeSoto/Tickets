@@ -233,6 +233,7 @@ export default function CategoriesPage() {
       key: 'name',
       header: 'Categoría',
       sortable: true,
+      accessor: (category: any) => category.name ?? '',
       render: (category: any) => (
         <div className='flex items-center gap-3 min-w-0'>
           <div
@@ -281,6 +282,8 @@ export default function CategoriesPage() {
     {
       key: 'family',
       header: 'Área',
+      sortable: true,
+      accessor: (category: any) => category.departments?.family?.name ?? '',
       className: 'hidden sm:table-cell',
       render: (category: any) => {
         const family = category.departments?.family
@@ -301,6 +304,8 @@ export default function CategoriesPage() {
     {
       key: 'tickets',
       header: 'Tickets',
+      sortable: true,
+      accessor: (category: any) => category._count?.tickets ?? 0,
       className: 'hidden md:table-cell',
       align: 'center' as const,
       render: (category: any) => (
@@ -320,6 +325,8 @@ export default function CategoriesPage() {
     {
       key: 'technicians',
       header: 'Técnicos',
+      sortable: true,
+      accessor: (category: any) => category.technician_assignments?.length ?? 0,
       className: 'hidden md:table-cell',
       align: 'center' as const,
       render: (category: any) => (
@@ -339,6 +346,8 @@ export default function CategoriesPage() {
     {
       key: 'subcategories',
       header: 'Subcats.',
+      sortable: true,
+      accessor: (category: any) => category._count?.other_categories ?? 0,
       className: 'hidden lg:table-cell',
       align: 'center' as const,
       render: (category: any) => (
