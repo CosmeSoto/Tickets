@@ -32,7 +32,6 @@ import {
   FileSignature,
   FileText,
   Building2,
-  Trash2,
   Layers,
   ExternalLink,
 } from 'lucide-react'
@@ -50,6 +49,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { getRoleLabel as getRoleLabelFn, getRoleColor } from '@/components/ui/role-badge'
+import { useUserModules } from '@/hooks/use-user-modules'
 
 interface RoleDashboardLayoutProps {
   children: ReactNode
@@ -210,7 +210,17 @@ const navigationByRole: Record<string, NavItem[]> = {
   ],
 }
 
-function NavItemComponent({ item, pathname, onNavigate, depth = 0 }: { item: NavItem; pathname: string | null; onNavigate?: () => void; depth?: number }) {
+function NavItemComponent({
+  item,
+  pathname,
+  onNavigate,
+  depth = 0,
+}: {
+  item: NavItem
+  pathname: string | null
+  onNavigate?: () => void
+  depth?: number
+}) {
   const hasChildren = item.children && item.children.length > 0
 
   const isDescendantActive = (navItem: NavItem): boolean => {
@@ -239,7 +249,9 @@ function NavItemComponent({ item, pathname, onNavigate, depth = 0 }: { item: Nav
             : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
         }`}
       >
-        <Icon className={`h-4 w-4 mr-2.5 flex-shrink-0 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
+        <Icon
+          className={`h-4 w-4 mr-2.5 flex-shrink-0 ${isActive ? 'text-primary' : 'text-muted-foreground'}`}
+        />
         {item.name}
       </Link>
     )
@@ -256,13 +268,20 @@ function NavItemComponent({ item, pathname, onNavigate, depth = 0 }: { item: Nav
             : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
         }`}
       >
-        <Icon className={`h-4 w-4 mr-2.5 flex-shrink-0 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
-        <span className="flex-1 text-left">{item.name}</span>
-        <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        <Icon
+          className={`h-4 w-4 mr-2.5 flex-shrink-0 ${isActive ? 'text-primary' : 'text-muted-foreground'}`}
+        />
+        <span className='flex-1 text-left'>{item.name}</span>
+        <ChevronDown
+          className={`h-4 w-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+        />
       </button>
       {isOpen && (
-        <div className="mt-0.5 space-y-0.5 border-l-2 border-border" style={{ marginLeft: `${20 + indent}px`, paddingLeft: '8px' }}>
-          {item.children!.map((child) => (
+        <div
+          className='mt-0.5 space-y-0.5 border-l-2 border-border'
+          style={{ marginLeft: `${20 + indent}px`, paddingLeft: '8px' }}
+        >
+          {item.children!.map(child => (
             <NavItemComponent
               key={child.href + child.name}
               item={child}
@@ -287,12 +306,14 @@ export function RoleDashboardLayout({
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
+  // Módulos activos — debe estar antes de cualquier return condicional
+  const { tickets: hasTickets, inventory: hasInventory } = useUserModules()
+
   if (!session) {
     return null
   }
 
   const userRole = session.user.role as string
-
   const canManageInventory = (session.user as any).canManageInventory
   const isSuperAdmin = (session.user as any).isSuperAdmin === true
 
@@ -313,13 +334,25 @@ export function RoleDashboardLayout({
     })
     navigation = adminNav
   } else {
-    navigation = navigationByRole[navKey] || []
+    // Para TECHNICIAN y CLIENT: filtrar módulos según familias activas
+    const baseNav = navigationByRole[navKey] || []
+    navigation = baseNav.filter(item => {
+      // Ocultar Tickets si ninguna familia del usuario lo tiene habilitado
+      if (item.href === '/technician/tickets' || item.href === '/client/tickets') {
+        return hasTickets
+      }
+      // Ocultar Inventario/Equipos si ninguna familia lo tiene habilitado
+      if (item.href === '/inventory') {
+        return hasInventory
+      }
+      return true
+    })
   }
 
   const handleLogout = async () => {
-    await signOut({ 
+    await signOut({
       callbackUrl: '/login',
-      redirect: true 
+      redirect: true,
     })
   }
 
@@ -349,47 +382,45 @@ export function RoleDashboardLayout({
   const closeSidebar = () => setSidebarOpen(false)
 
   return (
-    <div className="min-h-screen bg-background">
-
+    <div className='min-h-screen bg-background'>
       {/* Overlay móvil */}
       {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
-          onClick={closeSidebar}
-        />
+        <div className='fixed inset-0 z-40 bg-black/50 lg:hidden' onClick={closeSidebar} />
       )}
 
       {/* Sidebar */}
-      <aside className={`
+      <aside
+        className={`
         fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border
         transform transition-transform duration-300 ease-in-out
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         lg:translate-x-0
-      `}>
+      `}
+      >
         {/* Logo + botón cerrar en móvil */}
-        <div className="flex items-center justify-between h-20 border-b border-border px-4">
+        <div className='flex items-center justify-between h-20 border-b border-border px-4'>
           {/* Espacio reservado en móvil para balancear el botón X */}
-          <div className="lg:hidden w-7" />
+          <div className='lg:hidden w-7' />
           <Link
             href={`/${userRole.toLowerCase() === 'technician_manager' ? 'technician' : userRole.toLowerCase()}`}
             onClick={closeSidebar}
-            className="flex-1 flex justify-center"
+            className='flex-1 flex justify-center'
           >
-            <SystemLogo size="xl" showText={true} />
+            <SystemLogo size='xl' showText={true} />
           </Link>
           <button
             onClick={closeSidebar}
-            className="lg:hidden p-1 rounded-md text-muted-foreground hover:text-foreground"
+            className='lg:hidden p-1 rounded-md text-muted-foreground hover:text-foreground'
           >
-            <X className="h-5 w-5" />
+            <X className='h-5 w-5' />
           </button>
           {/* Espacio reservado en desktop para mantener el logo centrado */}
-          <div className="hidden lg:block w-7" />
+          <div className='hidden lg:block w-7' />
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto h-[calc(100vh-5rem)]">
-          {navigation.map((item) => (
+        <nav className='flex-1 px-3 py-4 space-y-1 overflow-y-auto h-[calc(100vh-5rem)]'>
+          {navigation.map(item => (
             <NavItemComponent
               key={item.name}
               item={item}
@@ -401,67 +432,68 @@ export function RoleDashboardLayout({
       </aside>
 
       {/* Main Content */}
-      <div className="lg:pl-64">
+      <div className='lg:pl-64'>
         {/* Header */}
-        <header className="bg-card border-b border-border sticky top-0 z-40">
-          <div className="px-4 sm:px-8 py-4">
-            <div className="flex items-center justify-between gap-2">
-
+        <header className='bg-card border-b border-border sticky top-0 z-40'>
+          <div className='px-4 sm:px-8 py-4'>
+            <div className='flex items-center justify-between gap-2'>
               {/* Hamburguesa + título */}
-              <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className='flex items-center gap-3 min-w-0 flex-1'>
                 <button
                   onClick={() => setSidebarOpen(true)}
-                  className="lg:hidden p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent flex-shrink-0"
+                  className='lg:hidden p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent flex-shrink-0'
                 >
-                  <Menu className="h-5 w-5" />
+                  <Menu className='h-5 w-5' />
                 </button>
-                <div className="min-w-0 flex-1">
+                <div className='min-w-0 flex-1'>
                   {title && (
-                    <h1 className="text-base sm:text-xl font-bold text-foreground truncate leading-tight">{title}</h1>
+                    <h1 className='text-base sm:text-xl font-bold text-foreground truncate leading-tight'>
+                      {title}
+                    </h1>
                   )}
                   {subtitle && (
-                    <div className="mt-0.5 text-xs text-muted-foreground hidden sm:flex items-center flex-wrap gap-1">{subtitle}</div>
+                    <div className='mt-0.5 text-xs text-muted-foreground hidden sm:flex items-center flex-wrap gap-1'>
+                      {subtitle}
+                    </div>
                   )}
                 </div>
               </div>
 
               {/* Acciones + notificaciones + avatar */}
-              <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-                {headerActions && (
-                  <div className="hidden sm:block">{headerActions}</div>
-                )}
+              <div className='flex items-center gap-2 sm:gap-4 flex-shrink-0'>
+                {headerActions && <div className='hidden sm:block'>{headerActions}</div>}
 
                 {/* Ver Página Pública — visible para todos los roles */}
                 <Link
-                  href="/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="Ver Página Pública"
-                  className="hidden lg:flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors border border-border rounded-md px-2 py-1.5 hover:bg-accent"
+                  href='/'
+                  target='_blank'
+                  rel='noopener noreferrer'
+                  title='Ver Página Pública'
+                  className='hidden lg:flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors border border-border rounded-md px-2 py-1.5 hover:bg-accent'
                 >
-                  <Globe className="h-3.5 w-3.5 flex-shrink-0" />
-                  <span className="hidden xl:inline">Página Pública</span>
-                  <ExternalLink className="h-3 w-3 opacity-60 hidden xl:inline" />
+                  <Globe className='h-3.5 w-3.5 flex-shrink-0' />
+                  <span className='hidden xl:inline'>Página Pública</span>
+                  <ExternalLink className='h-3 w-3 opacity-60 hidden xl:inline' />
                 </Link>
-                
-                <Notifications variant="bell" />
-                
+
+                <Notifications variant='bell' />
+
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0">
-                      <Avatar className="h-9 w-9">
+                    <Button variant='ghost' className='relative h-9 w-9 rounded-full p-0'>
+                      <Avatar className='h-9 w-9'>
                         <AvatarImage src={session.user.avatar} alt={session.user.name} />
-                        <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                        <AvatarFallback className='bg-primary/10 text-primary text-sm'>
                           {getInitials(session.user.name)}
                         </AvatarFallback>
                       </Avatar>
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuContent align='end' className='w-56'>
                     <DropdownMenuLabel>
-                      <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none">{session.user.name}</p>
-                        <p className="text-xs leading-none text-muted-foreground">
+                      <div className='flex flex-col space-y-1'>
+                        <p className='text-sm font-medium leading-none'>{session.user.name}</p>
+                        <p className='text-xs leading-none text-muted-foreground'>
                           {session.user.email}
                         </p>
                         <Badge className={`text-xs w-fit mt-1 ${getRoleBadgeColor(userRole)}`}>
@@ -471,20 +503,20 @@ export function RoleDashboardLayout({
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
-                      <Link href="/profile">
-                        <User className="h-4 w-4 mr-2" />
+                      <Link href='/profile'>
+                        <User className='h-4 w-4 mr-2' />
                         Mi Perfil
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link href="/settings">
-                        <Settings className="h-4 w-4 mr-2" />
+                      <Link href='/settings'>
+                        <Settings className='h-4 w-4 mr-2' />
                         Configuración Personal
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleLogout} className="text-destructive">
-                      <LogOut className="h-4 w-4 mr-2" />
+                    <DropdownMenuItem onClick={handleLogout} className='text-destructive'>
+                      <LogOut className='h-4 w-4 mr-2' />
                       Cerrar Sesión
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -493,18 +525,12 @@ export function RoleDashboardLayout({
             </div>
 
             {/* headerActions en móvil (segunda fila) */}
-            {headerActions && (
-              <div className="sm:hidden mt-2">
-                {headerActions}
-              </div>
-            )}
+            {headerActions && <div className='sm:hidden mt-2'>{headerActions}</div>}
           </div>
         </header>
 
         {/* Page Content */}
-        <main className="p-4 sm:p-8">
-          {children}
-        </main>
+        <main className='p-4 sm:p-8'>{children}</main>
       </div>
     </div>
   )
