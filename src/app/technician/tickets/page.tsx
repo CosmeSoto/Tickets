@@ -3,10 +3,10 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { 
-  Clock, 
-  AlertCircle, 
-  CheckCircle, 
+import {
+  Clock,
+  AlertCircle,
+  CheckCircle,
   Target,
   Ticket as TicketIcon,
   BarChart3,
@@ -30,6 +30,7 @@ import { usePagination } from '@/hooks/common/use-pagination'
 import { useExport } from '@/hooks/common/use-export'
 import type { Ticket as TicketType } from '@/hooks/use-ticket-data'
 import { filterTicketsTechnician } from '@/lib/utils/ticket-filters'
+import { TECHNICIAN_TICKET_EXPORT_COLUMNS } from '@/lib/utils/ticket-utils'
 import { useFamilies } from '@/contexts/families-context'
 
 interface FamilyOption {
@@ -46,14 +47,20 @@ export default function TechnicianTicketsPage() {
   // Familias desde el contexto global (cache Redis, sin peticion extra)
   const { families } = useFamilies()
 
-  const { data: allTickets, loading, error, reload } = useModuleData<TicketType>({
+  const {
+    data: allTickets,
+    loading,
+    error,
+    reload,
+  } = useModuleData<TicketType>({
     endpoint: '/api/tickets',
     initialLoad: true,
   })
 
   // Familias ya disponibles desde el contexto global
 
-  const { filters, debouncedFilters, setFilter, clearFilters, hasActiveFilters } = useTicketFilters()
+  const { filters, debouncedFilters, setFilter, clearFilters, hasActiveFilters } =
+    useTicketFilters()
 
   // Resetear categoría cuando cambia la familia
   const prevFamilyRef = useRef(filters.family)
@@ -74,9 +81,10 @@ export default function TechnicianTicketsPage() {
     if (!session?.user?.id) return []
     const seen = new Map<string, { id: string; name: string }>()
     allTickets
-      .filter(t =>
-        t.assignee?.id === session.user.id &&
-        (debouncedFilters.family === 'all' || t.family?.id === debouncedFilters.family)
+      .filter(
+        t =>
+          t.assignee?.id === session.user.id &&
+          (debouncedFilters.family === 'all' || t.family?.id === debouncedFilters.family)
       )
       .forEach(t => {
         if (t.category && !seen.has(t.category.id)) {
@@ -128,17 +136,7 @@ export default function TechnicianTicketsPage() {
     title: 'Mis Tickets Asignados',
     subtitle: `${session?.user?.name ?? ''} • ${filteredTickets.length} tickets`,
     getData: () => filteredTickets,
-    columns: [
-      { key: 'ticketCode', label: 'Código', format: (v, r) => v ?? r.id.slice(-8).toUpperCase() },
-      { key: 'title', label: 'Título' },
-      { key: 'status', label: 'Estado', format: (v: string) => ({ OPEN: 'Abierto', IN_PROGRESS: 'En Progreso', RESOLVED: 'Resuelto', CLOSED: 'Cerrado', ON_HOLD: 'En Espera' } as Record<string, string>)[v] ?? v },
-      { key: 'priority', label: 'Prioridad', format: (v: string) => ({ LOW: 'Baja', MEDIUM: 'Media', HIGH: 'Alta', URGENT: 'Urgente' } as Record<string, string>)[v] ?? v },
-      { key: 'client', label: 'Cliente', format: v => v?.name ?? '' },
-      { key: 'category', label: 'Categoría', format: v => v?.name ?? '' },
-      { key: 'family', label: 'Área', format: v => v?.name ?? '' },
-      { key: 'createdAt', label: 'Creado', format: v => v ? new Date(v).toLocaleDateString('es-ES') : '' },
-      { key: 'resolvedAt', label: 'Resuelto', format: v => v ? new Date(v).toLocaleDateString('es-ES') : '' },
-    ],
+    columns: TECHNICIAN_TICKET_EXPORT_COLUMNS,
   })
 
   const paginationConfig = {
@@ -159,54 +157,74 @@ export default function TechnicianTicketsPage() {
       error={error}
       onRetry={reload}
       headerActions={
-        <div className="flex gap-2 flex-wrap">
-          <Link href="/technician/stats">
-            <Button variant="outline" size="sm">
-              <BarChart3 className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Estadísticas</span>
+        <div className='flex gap-2 flex-wrap'>
+          <Link href='/technician/stats'>
+            <Button variant='outline' size='sm'>
+              <BarChart3 className='h-4 w-4 sm:mr-2' />
+              <span className='hidden sm:inline'>Estadísticas</span>
             </Button>
           </Link>
-          <Link href="/technician/categories">
-            <Button variant="outline" size="sm">
-              <FolderTree className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Mis Categorías</span>
+          <Link href='/technician/categories'>
+            <Button variant='outline' size='sm'>
+              <FolderTree className='h-4 w-4 sm:mr-2' />
+              <span className='hidden sm:inline'>Mis Categorías</span>
             </Button>
           </Link>
-          <Link href="/technician/knowledge">
-            <Button variant="outline" size="sm">
-              <BookOpen className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Conocimientos</span>
+          <Link href='/technician/knowledge'>
+            <Button variant='outline' size='sm'>
+              <BookOpen className='h-4 w-4 sm:mr-2' />
+              <span className='hidden sm:inline'>Conocimientos</span>
             </Button>
           </Link>
         </div>
       }
     >
-      <div className="space-y-6">
+      <div className='space-y-6'>
         <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
           <SymmetricStatsCard
-            title="Abiertos"
+            title='Abiertos'
             value={stats.open}
             icon={AlertCircle}
-            color="orange"
-            badge={stats.total > 0 ? { text: `${Math.round((stats.open / stats.total) * 100)}%`, variant: 'secondary' } : undefined}
+            color='orange'
+            badge={
+              stats.total > 0
+                ? { text: `${Math.round((stats.open / stats.total) * 100)}%`, variant: 'secondary' }
+                : undefined
+            }
             status={stats.open > 5 ? 'warning' : 'normal'}
           />
           <SymmetricStatsCard
-            title="En Progreso"
+            title='En Progreso'
             value={stats.inProgress}
             icon={Clock}
-            color="blue"
-            badge={stats.total > 0 ? { text: `${Math.round((stats.inProgress / stats.total) * 100)}%`, variant: 'secondary' } : undefined}
+            color='blue'
+            badge={
+              stats.total > 0
+                ? {
+                    text: `${Math.round((stats.inProgress / stats.total) * 100)}%`,
+                    variant: 'secondary',
+                  }
+                : undefined
+            }
           />
           <SymmetricStatsCard
-            title="Resueltos Hoy"
+            title='Resueltos Hoy'
             value={stats.resolvedToday}
             icon={CheckCircle}
-            color="green"
-            status="success"
-            trend={stats.resolvedToday > 0 ? { value: stats.resolvedToday, label: 'completados', isPositive: true } : undefined}
+            color='green'
+            status='success'
+            trend={
+              stats.resolvedToday > 0
+                ? { value: stats.resolvedToday, label: 'completados', isPositive: true }
+                : undefined
+            }
           />
-          <SymmetricStatsCard title="Tiempo Promedio" value={stats.avgResolutionTime} icon={Target} color="purple" />
+          <SymmetricStatsCard
+            title='Tiempo Promedio'
+            value={stats.avgResolutionTime}
+            icon={Target}
+            color='purple'
+          />
         </div>
 
         <TicketFilters
@@ -216,25 +234,25 @@ export default function TechnicianTicketsPage() {
           categoryFilter={filters.category}
           dateFilter={filters.dateRange}
           familyFilter={filters.family}
-          setSearchTerm={(term) => setFilter('search', term)}
-          onStatusChange={(status) => setFilter('status', status)}
-          onPriorityChange={(priority) => setFilter('priority', priority)}
-          onCategoryChange={(category) => setFilter('category', category)}
-          onDateChange={(date) => setFilter('dateRange', date)}
-          onFamilyChange={(family) => setFilter('family', family)}
+          setSearchTerm={term => setFilter('search', term)}
+          onStatusChange={status => setFilter('status', status)}
+          onPriorityChange={priority => setFilter('priority', priority)}
+          onCategoryChange={category => setFilter('category', category)}
+          onDateChange={date => setFilter('dateRange', date)}
+          onFamilyChange={family => setFilter('family', family)}
           onRefresh={reload}
           onClearFilters={clearFilters}
           categories={categories}
           families={families}
-          variant="technician"
+          variant='technician'
           loading={loading}
           showDateFilter={true}
           showAssigneeFilter={false}
-          searchPlaceholder="Buscar por título, descripción o cliente..."
+          searchPlaceholder='Buscar por título, descripción o cliente...'
         />
 
         <DataTable
-          title="Mis Tickets Asignados"
+          title='Mis Tickets Asignados'
           description={`Tickets que tienes asignados para resolver (${filteredTickets.length} tickets)`}
           data={pagination.currentItems}
           columns={createTechnicianTicketColumns({ onView: handleViewTicket })}
@@ -254,13 +272,15 @@ export default function TechnicianTicketsPage() {
             />
           }
           emptyState={{
-            icon: <TicketIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />,
-            title: hasActiveFilters ? "No se encontraron tickets" : "No hay tickets asignados",
+            icon: <TicketIcon className='h-12 w-12 text-muted-foreground mx-auto mb-4' />,
+            title: hasActiveFilters ? 'No se encontraron tickets' : 'No hay tickets asignados',
             description: hasActiveFilters
-              ? "Intenta ajustar los filtros de búsqueda"
-              : "No tienes tickets asignados en este momento",
+              ? 'Intenta ajustar los filtros de búsqueda'
+              : 'No tienes tickets asignados en este momento',
             action: hasActiveFilters ? (
-              <Button variant="outline" onClick={clearFilters}>Limpiar filtros</Button>
+              <Button variant='outline' onClick={clearFilters}>
+                Limpiar filtros
+              </Button>
             ) : undefined,
           }}
         />

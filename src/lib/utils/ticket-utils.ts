@@ -155,7 +155,10 @@ export const getTicketUrgencyScore = (
     CLOSED: 0,
   }
 
-  const timeScore = Math.min(30, Math.floor(Number(formatTimeElapsed(createdAt).replace(/\D/g, '') || 0)))
+  const timeScore = Math.min(
+    30,
+    Math.floor(Number(formatTimeElapsed(createdAt).replace(/\D/g, '') || 0))
+  )
 
   return (priorityScores[priority] || 0) + (statusScores[status] || 0) + timeScore
 }
@@ -184,7 +187,7 @@ export const filterTickets = <T extends { priority: string; status: string; titl
  * Ordena tickets por urgencia
  */
 export const sortTicketsByUrgency = <
-  T extends { priority: string; status: string; createdAt: string }
+  T extends { priority: string; status: string; createdAt: string },
 >(
   tickets: T[]
 ): T[] => {
@@ -194,3 +197,73 @@ export const sortTicketsByUrgency = <
     return scoreB - scoreA
   })
 }
+
+// ── Columnas de exportación centralizadas ────────────────────────────────────
+// Evita duplicar la misma definición en admin/tickets, client/tickets y technician/tickets
+
+import type { ExportColumn } from '@/lib/utils/export'
+
+const STATUS_LABELS_ES: Record<string, string> = {
+  OPEN: 'Abierto',
+  IN_PROGRESS: 'En Progreso',
+  RESOLVED: 'Resuelto',
+  CLOSED: 'Cerrado',
+  ON_HOLD: 'En Espera',
+}
+const PRIORITY_LABELS_ES: Record<string, string> = {
+  LOW: 'Baja',
+  MEDIUM: 'Media',
+  HIGH: 'Alta',
+  URGENT: 'Urgente',
+}
+
+/** Columnas base compartidas por todos los roles */
+const BASE_TICKET_EXPORT_COLUMNS: ExportColumn[] = [
+  {
+    key: 'ticketCode',
+    label: 'Código',
+    format: (v: any, r: any) => v ?? r?.id?.slice(-8)?.toUpperCase() ?? '',
+  },
+  { key: 'title', label: 'Título' },
+  { key: 'status', label: 'Estado', format: (v: string) => STATUS_LABELS_ES[v] ?? v },
+  { key: 'priority', label: 'Prioridad', format: (v: string) => PRIORITY_LABELS_ES[v] ?? v },
+  { key: 'category', label: 'Categoría', format: (v: any) => v?.name ?? '' },
+  { key: 'family', label: 'Área', format: (v: any) => v?.name ?? '' },
+  {
+    key: 'createdAt',
+    label: 'Creado',
+    format: (v: any) => (v ? new Date(v).toLocaleDateString('es-ES') : ''),
+  },
+  {
+    key: 'updatedAt',
+    label: 'Actualizado',
+    format: (v: any) => (v ? new Date(v).toLocaleDateString('es-ES') : ''),
+  },
+]
+
+/** Columnas de exportación para ADMIN (incluye cliente y técnico asignado) */
+export const ADMIN_TICKET_EXPORT_COLUMNS: ExportColumn[] = [
+  ...BASE_TICKET_EXPORT_COLUMNS.slice(0, 4),
+  { key: 'client', label: 'Cliente', format: (v: any) => v?.name ?? '' },
+  { key: 'assignee', label: 'Técnico', format: (v: any) => v?.name ?? 'Sin asignar' },
+  ...BASE_TICKET_EXPORT_COLUMNS.slice(4),
+]
+
+/** Columnas de exportación para TECHNICIAN (incluye cliente, sin técnico asignado) */
+export const TECHNICIAN_TICKET_EXPORT_COLUMNS: ExportColumn[] = [
+  ...BASE_TICKET_EXPORT_COLUMNS.slice(0, 4),
+  { key: 'client', label: 'Cliente', format: (v: any) => v?.name ?? '' },
+  ...BASE_TICKET_EXPORT_COLUMNS.slice(4, -1), // sin updatedAt
+  {
+    key: 'resolvedAt',
+    label: 'Resuelto',
+    format: (v: any) => (v ? new Date(v).toLocaleDateString('es-ES') : ''),
+  },
+]
+
+/** Columnas de exportación para CLIENT (sin cliente, incluye técnico asignado) */
+export const CLIENT_TICKET_EXPORT_COLUMNS: ExportColumn[] = [
+  ...BASE_TICKET_EXPORT_COLUMNS.slice(0, 4),
+  { key: 'assignee', label: 'Técnico', format: (v: any) => v?.name ?? 'Sin asignar' },
+  ...BASE_TICKET_EXPORT_COLUMNS.slice(4),
+]
