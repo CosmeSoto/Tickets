@@ -31,6 +31,8 @@ import { useToast } from '@/hooks/use-toast'
 import { UserData } from '@/hooks/use-users'
 import { USER_ROLE_FORM_OPTIONS, type UserRole } from '@/lib/constants/user-constants'
 import { DepartmentSelector } from '@/components/ui/department-selector'
+import { Switch } from '@/components/ui/switch'
+import { useEffect as useEffectHook, useState as useStateHook } from 'react'
 
 interface EditUserModalProps {
   isOpen: boolean
@@ -51,6 +53,84 @@ interface EditUserData {
   isSuperAdmin: boolean
   avatar?: File
 }
+
+// ── Componente informativo de módulos activos del usuario ─────────────────
+
+function UserModulesInfo({
+  userId,
+  role,
+  canManageInventory,
+}: {
+  userId: string
+  role: string
+  canManageInventory: boolean
+}) {
+  const [data, setData] = useStateHook<{
+    tickets: boolean
+    inventory: boolean
+    families: Array<{
+      id: string
+      name: string
+      code: string
+      color?: string | null
+      modules: { tickets: boolean; inventory: boolean }
+    }>
+  } | null>(null)
+
+  useEffectHook(() => {
+    // Carga los módulos activos del usuario para mostrarlos informativamente
+    fetch(`/api/user/modules?userId=${userId}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (d) setData(d)
+      })
+      .catch(() => {})
+  }, [userId, canManageInventory])
+
+  if (!data || data.families.length === 0) return null
+
+  return (
+    <div className='rounded-lg border bg-muted/30 p-3 space-y-2'>
+      <p className='text-xs font-medium text-muted-foreground flex items-center gap-1.5'>
+        <Activity className='h-3.5 w-3.5' />
+        Módulos activos según familias asignadas
+      </p>
+      <div className='flex flex-wrap gap-1.5'>
+        {data.families.map(f => (
+          <span
+            key={f.id}
+            className='inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border bg-background'
+          >
+            {f.color && (
+              <span
+                className='w-2 h-2 rounded-full flex-shrink-0'
+                style={{ backgroundColor: f.color }}
+              />
+            )}
+            <span className='font-medium'>{f.name}</span>
+            {f.modules.tickets && (
+              <span className='text-primary' title='Tickets habilitado'>
+                🎫
+              </span>
+            )}
+            {f.modules.inventory && (
+              <span className='text-primary' title='Inventario habilitado'>
+                📦
+              </span>
+            )}
+          </span>
+        ))}
+      </div>
+      {!data.tickets && !data.inventory && (
+        <p className='text-xs text-amber-600 dark:text-amber-400'>
+          ⚠️ Ningún módulo activo — el usuario no verá Tickets ni Inventario en su navegación
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ── Modal principal ────────────────────────────────────────────────────────
 
 export function EditUserModal({
   isOpen,
@@ -531,38 +611,33 @@ export function EditUserModal({
             <h3 className='text-sm font-semibold text-foreground'>Estado y permisos</h3>
             <div className='space-y-2'>
               {/* Estado activo */}
-              <div className='flex items-center justify-between rounded-lg border border-border px-3 py-2.5'>
+              <div className='flex items-center justify-between rounded-lg border px-3 py-2.5'>
                 <div>
                   <p className='text-sm font-medium'>Usuario activo</p>
                   <p className='text-xs text-muted-foreground'>
                     El usuario puede iniciar sesión y usar el sistema
                   </p>
                 </div>
-                <input
-                  type='checkbox'
+                <Switch
                   checked={formData.isActive}
-                  onChange={e => setFormData(p => ({ ...p, isActive: e.target.checked }))}
+                  onCheckedChange={v => setFormData(p => ({ ...p, isActive: v }))}
                   disabled={isCurrentUser}
-                  className='h-4 w-4 rounded border-border disabled:opacity-50'
                 />
               </div>
 
               {/* Gestor de inventario — solo no-ADMIN */}
               {formData.role !== 'ADMIN' && (
-                <div className='flex items-center justify-between rounded-lg border border-border px-3 py-2.5'>
+                <div className='flex items-center justify-between rounded-lg border px-3 py-2.5'>
                   <div>
                     <p className='text-sm font-medium'>Gestor de Inventario</p>
                     <p className='text-xs text-muted-foreground'>
-                      Permite gestionar activos, consumibles y configuración de inventario
+                      Puede gestionar activos, consumibles y configuración de inventario en sus
+                      familias asignadas
                     </p>
                   </div>
-                  <input
-                    type='checkbox'
+                  <Switch
                     checked={formData.canManageInventory}
-                    onChange={e =>
-                      setFormData(p => ({ ...p, canManageInventory: e.target.checked }))
-                    }
-                    className='h-4 w-4 rounded border-border'
+                    onCheckedChange={v => setFormData(p => ({ ...p, canManageInventory: v }))}
                   />
                 </div>
               )}
@@ -576,15 +651,22 @@ export function EditUserModal({
                       Acceso total a todas las familias y configuraciones del sistema.
                     </p>
                   </div>
-                  <input
-                    type='checkbox'
+                  <Switch
                     checked={formData.isSuperAdmin}
-                    onChange={e => setFormData(p => ({ ...p, isSuperAdmin: e.target.checked }))}
-                    className='h-4 w-4 rounded border-border'
+                    onCheckedChange={v => setFormData(p => ({ ...p, isSuperAdmin: v }))}
                   />
                 </div>
               )}
             </div>
+
+            {/* Módulos activos — informativo, muestra qué ve el usuario */}
+            {user && formData.role !== 'ADMIN' && (
+              <UserModulesInfo
+                userId={user.id}
+                role={formData.role}
+                canManageInventory={formData.canManageInventory}
+              />
+            )}
           </div>
 
           <Separator />

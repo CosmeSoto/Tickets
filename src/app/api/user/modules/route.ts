@@ -3,7 +3,6 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { withCache } from '@/lib/api-cache'
-
 /**
  * GET /api/user/modules
  * Devuelve los módulos activos para el usuario autenticado según sus familias asignadas.
@@ -16,16 +15,38 @@ import { withCache } from '@/lib/api-cache'
  *   families: Array<{ id, name, modules: { tickets, inventory } }>
  * }
  */
-export async function GET() {
+export async function GET(request: Request) {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
     return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
   }
 
-  const userId = session.user.id
-  const role = session.user.role
-  const isSuperAdmin = (session.user as any).isSuperAdmin === true
-  const canManageInventory = (session.user as any).canManageInventory === true
+  const { searchParams } = new URL(request.url)
+  // Admin puede consultar módulos de otro usuario (para el modal de edición)
+  const targetUserId = searchParams.get('userId')
+  const isAdmin = session.user.role === 'ADMIN'
+
+  if (targetUserId && targetUserId !== session.user.id && !isAdmin) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+  }
+
+  // Si se pasa userId, cargar el rol y permisos del usuario objetivo
+  let userId = session.user.id
+  let role = session.user.role
+  let isSuperAdmin = (session.user as any).isSuperAdmin === true
+  let canManageInventory = (session.user as any).canManageInventory === true
+
+  if (targetUserId && targetUserId !== session.user.id) {
+    const targetUser = await prisma.users.findUnique({
+      where: { id: targetUserId },
+      select: { id: true, role: true, isSuperAdmin: true, canManageInventory: true },
+    })
+    if (!targetUser) return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
+    userId = targetUser.id
+    role = targetUser.role
+    isSuperAdmin = targetUser.isSuperAdmin ?? false
+    canManageInventory = targetUser.canManageInventory ?? false
+  }
 
   const cacheKey = `user:modules:${userId}`
 
