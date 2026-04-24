@@ -126,10 +126,11 @@ export function CategoryImportModal({
   }
 
   const handleFile = (f: File) => {
-    if (!f.name.endsWith('.csv') && !f.name.endsWith('.txt')) {
+    const valid = f.name.endsWith('.csv') || f.name.endsWith('.txt') || f.name.endsWith('.xlsx')
+    if (!valid) {
       toast({
         title: 'Formato inválido',
-        description: 'Solo se aceptan archivos CSV',
+        description: 'Se aceptan CSV o Excel (.xlsx)',
         variant: 'destructive',
       })
       return
@@ -224,7 +225,7 @@ export function CategoryImportModal({
                 onClick={() => window.open('/api/categories/import/template', '_blank')}
               >
                 <Download className='h-3.5 w-3.5 mr-1.5' />
-                Descargar
+                Plantilla Excel
               </Button>
             </div>
 
@@ -294,7 +295,7 @@ export function CategoryImportModal({
               <input
                 ref={fileRef}
                 type='file'
-                accept='.csv,.txt'
+                accept='.csv,.txt,.xlsx'
                 className='hidden'
                 onChange={e => {
                   const f = e.target.files?.[0]
@@ -322,21 +323,24 @@ export function CategoryImportModal({
               ) : (
                 <div className='flex flex-col items-center gap-1.5'>
                   <Upload className='h-7 w-7 text-muted-foreground' />
-                  <p className='text-sm font-medium'>Arrastra tu CSV aquí o haz clic</p>
-                  <p className='text-xs text-muted-foreground'>Máximo 500 categorías · 2 MB</p>
+                  <p className='text-sm font-medium'>Arrastra tu archivo aquí o haz clic</p>
+                  <p className='text-xs text-muted-foreground'>
+                    CSV o Excel (.xlsx) · Máx. 500 categorías · 2 MB
+                  </p>
                 </div>
               )}
             </div>
 
             {/* Columnas */}
             <p className='text-xs text-muted-foreground p-2 bg-muted/30 rounded'>
-              <span className='font-medium text-foreground'>Columnas: </span>
-              <span className='font-mono'>nombre</span>* ·{' '}
-              <span className='font-mono'>descripcion</span> ·{' '}
-              <span className='font-mono'>nivel</span> · <span className='font-mono'>padre</span> ·{' '}
-              <span className='font-mono'>departamento</span> ·{' '}
-              <span className='font-mono'>area</span> · <span className='font-mono'>color</span> ·{' '}
-              <span className='font-mono'>activa</span>
+              <span className='font-medium text-foreground'>Columnas del Excel/CSV: </span>
+              <span className='font-mono'>Nombre</span>* ·{' '}
+              <span className='font-mono'>Descripción</span> ·{' '}
+              <span className='font-mono'>Nivel</span> ·{' '}
+              <span className='font-mono'>Categoría Padre</span> ·{' '}
+              <span className='font-mono'>Departamento</span> ·{' '}
+              <span className='font-mono'>Área</span> · <span className='font-mono'>Color</span> ·{' '}
+              <span className='font-mono'>Activa</span>
             </p>
           </div>
         )}
@@ -562,16 +566,33 @@ export function CategoryBulkDeleteModal({
           </AlertDialogTitle>
           <AlertDialogDescription asChild>
             <div className='space-y-3'>
+              {isSystem && (
+                <div className='p-3 bg-destructive/10 border border-destructive/30 rounded-lg'>
+                  <p className='text-sm font-semibold text-destructive'>
+                    ⚠️ Acción de Super Admin — afecta TODO el sistema
+                  </p>
+                  <p className='text-xs text-destructive/80 mt-1'>
+                    Se eliminarán las categorías de TODAS las áreas y familias.
+                  </p>
+                </div>
+              )}
               <p>
                 {isSystem
-                  ? 'Se eliminarán TODAS las categorías del sistema.'
-                  : `Se eliminarán todas las categorías del área "${familyName}".`}{' '}
-                Las categorías con tickets asociados <strong>no se eliminarán</strong>.
+                  ? 'Se eliminarán todas las categorías del sistema que no tengan tickets.'
+                  : `Se eliminarán todas las categorías del área "${familyName}" que no tengan tickets.`}
               </p>
-              <p className='text-sm font-medium'>Esta acción no se puede deshacer.</p>
+              <p className='text-xs text-muted-foreground'>
+                Las categorías con tickets asociados <strong>no se eliminarán</strong> — se
+                reportarán como omitidas.
+              </p>
+              <p className='text-sm font-semibold text-destructive'>
+                Esta acción no se puede deshacer.
+              </p>
               <div className='space-y-1.5'>
                 <Label className='text-sm'>
-                  Escribe <span className='font-mono font-bold'>{confirmWord}</span> para confirmar:
+                  Escribe{' '}
+                  <span className='font-mono font-bold bg-muted px-1 rounded'>{confirmWord}</span>{' '}
+                  para confirmar:
                 </Label>
                 <Input
                   value={confirm}

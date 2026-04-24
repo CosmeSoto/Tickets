@@ -110,23 +110,43 @@ export async function POST(request: NextRequest) {
     }
 
     // Detectar si la primera fila es encabezado
-    const firstRow = rows[0].map(c => c.toLowerCase())
-    const hasHeader = firstRow.includes('nombre') || firstRow.includes('name')
+    const firstRow = rows[0].map(c => c.toLowerCase().trim())
+    const hasHeader = firstRow.some(c => ['nombre', 'name', 'nombre *', 'nombre*'].includes(c))
     const dataRows = hasHeader ? rows.slice(1) : rows
 
-    // Mapear índices de columnas
+    // Función para buscar columna por múltiples alias (encabezados técnicos y amigables)
+    const findCol = (row: string[], ...aliases: string[]) => {
+      for (const alias of aliases) {
+        const i = row.indexOf(alias.toLowerCase())
+        if (i !== -1) return i
+      }
+      return -1
+    }
+
+    // Mapear índices — acepta tanto nombres técnicos (CSV) como amigables (Excel)
     const headerRow = hasHeader
       ? firstRow
       : ['nombre', 'descripcion', 'nivel', 'padre', 'departamento', 'area', 'color', 'activa']
     const idx = {
-      nombre: headerRow.indexOf('nombre') !== -1 ? headerRow.indexOf('nombre') : 0,
-      descripcion: headerRow.indexOf('descripcion'),
-      nivel: headerRow.indexOf('nivel'),
-      padre: headerRow.indexOf('padre'),
-      departamento: headerRow.indexOf('departamento'),
-      area: headerRow.indexOf('area'),
-      color: headerRow.indexOf('color'),
-      activa: headerRow.indexOf('activa'),
+      nombre:
+        findCol(headerRow, 'nombre', 'nombre *', 'nombre*', 'name') !== -1
+          ? findCol(headerRow, 'nombre', 'nombre *', 'nombre*', 'name')
+          : 0,
+      descripcion: findCol(headerRow, 'descripcion', 'descripción', 'description'),
+      nivel: findCol(headerRow, 'nivel', 'nivel (1-4)', 'level'),
+      padre: findCol(headerRow, 'padre', 'categoría padre', 'categoria padre', 'parent'),
+      departamento: findCol(headerRow, 'departamento', 'department'),
+      area: findCol(
+        headerRow,
+        'area',
+        'área',
+        'área / familia',
+        'area / familia',
+        'familia',
+        'family'
+      ),
+      color: findCol(headerRow, 'color', 'color (hex)'),
+      activa: findCol(headerRow, 'activa', 'activa (true/false)', 'active'),
     }
 
     if (dataRows.length > 500) {
@@ -144,14 +164,26 @@ export async function POST(request: NextRequest) {
 
     // Verificar familias permitidas para admin no-superadmin
     let allowedFamilyIds: Set<string> | null = null
+    let hasExplicitAssignments = false
     if (!isSuperAdmin) {
       const assignments = await prisma.admin_family_assignments.findMany({
         where: { adminId: session.user.id, isActive: true },
         select: { familyId: true },
       })
-      if (assignments.length > 0) {
+      hasExplicitAssignments = assignments.length > 0
+      if (hasExplicitAssignments) {
         allowedFamilyIds = new Set(assignments.map(a => a.familyId))
       }
+      // Si no tiene asignaciones explícitas → acceso total (admin legacy)
+      // Si tiene asignaciones → solo esas familias
+    }
+
+    // Modo replace sin familyId → solo SuperAdmin
+    if (mode === 'replace' && !familyIdFilter && !isSuperAdmin) {
+      return NextResponse.json(
+        { error: 'El modo "Reemplazar" requiere seleccionar un área específica' },
+        { status: 403 }
+      )
     }
 
     // Parsear y validar filas
@@ -205,6 +237,15 @@ export async function POST(request: NextRequest) {
           row: rowNum,
           nombre,
           error: `No tienes permiso para crear categorías en esa área`,
+        })
+        continue
+      }
+      // Si no tiene área resuelta y el admin tiene asignaciones explícitas → denegar
+      if (!resolvedFamilyId && hasExplicitAssignments && !isSuperAdmin) {
+        errors.push({
+          row: rowNum,
+          nombre,
+          error: 'Debes especificar el Área / Familia para esta categoría',
         })
         continue
       }
