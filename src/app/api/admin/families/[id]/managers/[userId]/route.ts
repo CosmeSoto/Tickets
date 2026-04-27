@@ -16,7 +16,8 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    if (session.user.role !== 'ADMIN') return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
+    if (session.user.role !== 'ADMIN')
+      return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
 
     const { id, userId } = await params
 
@@ -34,6 +35,18 @@ export async function DELETE(
 
     // Notificar al usuario para que refresque su sesión
     NotificationEvents.emit(userId, { type: 'session_refresh', reason: 'permissions_changed' })
+
+    // Invalidar caché de módulos del gestor desasignado
+    try {
+      const { invalidateCache } = await import('@/lib/api-cache')
+      await Promise.all([
+        invalidateCache(`admin:family:id=${id}`),
+        invalidateCache(`user:modules:${userId}`),
+        invalidateCache(`perm:inv:${userId}`),
+      ])
+    } catch {
+      /* Redis no disponible */
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

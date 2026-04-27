@@ -1,15 +1,5 @@
 'use client'
 
-/**
- * Hook que carga los módulos activos del usuario según sus familias asignadas.
- * Alimenta la navegación lateral para mostrar/ocultar secciones dinámicamente.
- *
- * Uso:
- *   const { tickets, inventory, loading } = useUserModules()
- *   // tickets=true → el usuario tiene al menos una familia con tickets habilitado
- *   // inventory=true → el usuario tiene al menos una familia con inventario habilitado
- */
-
 import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 
@@ -41,7 +31,7 @@ export function useUserModules() {
         setModules(data)
       }
     } catch {
-      // Fallback: mostrar todo (fail-open para no bloquear al usuario)
+      // Fail-open: si falla, mostrar todo para no bloquear al usuario
       setModules(DEFAULT)
     } finally {
       setLoading(false)
@@ -50,6 +40,20 @@ export function useUserModules() {
 
   useEffect(() => {
     load()
+  }, [load])
+
+  // Recargar cuando el admin cambia configuración de módulos o asignaciones de familias
+  useEffect(() => {
+    const reload = () => load()
+    window.addEventListener('settings-updated', reload)
+    window.addEventListener('modules-updated', reload)
+    // El SSE emite session_refresh cuando cambian permisos/asignaciones
+    window.addEventListener('session_refresh', reload)
+    return () => {
+      window.removeEventListener('settings-updated', reload)
+      window.removeEventListener('modules-updated', reload)
+      window.removeEventListener('session_refresh', reload)
+    }
   }, [load])
 
   return { ...modules, loading, reload: load }

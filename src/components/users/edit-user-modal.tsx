@@ -327,6 +327,8 @@ export function EditUserModal({
           title: 'Usuario actualizado',
           description: `${formData.name} actualizado correctamente`,
         })
+        // Emitir evento para que useUserModules recargue la navegación
+        window.dispatchEvent(new CustomEvent('modules-updated'))
         handleClose()
         onUserUpdated()
       } else {

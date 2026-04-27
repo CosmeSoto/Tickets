@@ -277,6 +277,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         invalidateCache(`auth:user:${targetId}`),
         invalidateCache(`perm:inv:${targetId}`),
         invalidateCache(`user:settings:${targetId}`),
+        invalidateCache(`user:modules:${targetId}`), // módulos activos pueden cambiar con rol/permisos
       ])
     } catch {
       /* Redis no disponible */
@@ -383,6 +384,7 @@ export async function DELETE(
         invalidateCache(`auth:user:${deletedId}`),
         invalidateCache(`perm:inv:${deletedId}`),
         invalidateCache(`user:settings:${deletedId}`),
+        invalidateCache(`user:modules:${deletedId}`),
       ])
     } catch {
       /* Redis no disponible */

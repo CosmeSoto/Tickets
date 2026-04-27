@@ -51,10 +51,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       },
     })
 
-    // Invalidar caché de la familia
+    // Invalidar caché de la familia y módulos del técnico asignado
     try {
       const { invalidateCache } = await import('@/lib/api-cache')
-      await invalidateCache(`admin:family:id=${id}`)
+      await Promise.all([
+        invalidateCache(`admin:family:id=${id}`),
+        invalidateCache(`user:modules:${userId}`),
+      ])
     } catch {
       /* Redis no disponible */
     }

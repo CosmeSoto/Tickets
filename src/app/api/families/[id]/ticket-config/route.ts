@@ -2,12 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { TicketFamilyConfigService } from '@/lib/services/ticket-family-config.service'
+import { invalidateCache } from '@/lib/api-cache'
 
 // GET /api/families/[id]/ticket-config
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session || session.user.role !== 'ADMIN') {
@@ -35,10 +33,7 @@ export async function GET(
 }
 
 // PUT /api/families/[id]/ticket-config
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session || session.user.role !== 'ADMIN') {
@@ -49,6 +44,13 @@ export async function PUT(
     const body = await request.json()
 
     const updated = await TicketFamilyConfigService.update(id, body, session.user.id)
+
+    // Invalidar caché de módulos de todos los usuarios — ticketsEnabled cambió
+    try {
+      await Promise.all([invalidateCache('user:modules:*'), invalidateCache('dashboard:*')])
+    } catch {
+      /* Redis no disponible */
+    }
 
     return NextResponse.json({
       success: true,

@@ -11,14 +11,12 @@ import { NotificationEvents } from '@/lib/notification-events'
  * Crea registro en inventory_manager_families
  * HTTP 409 si ya existe el par (managerId, familyId)
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    if (session.user.role !== 'ADMIN') return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
+    if (session.user.role !== 'ADMIN')
+      return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
 
     const { id } = await params
 
@@ -40,7 +38,7 @@ export async function POST(
       )
     }
 
-    const assignment = await prisma.$transaction(async (tx) => {
+    const assignment = await prisma.$transaction(async tx => {
       // Crear la asignación a la familia
       const created = await tx.inventory_manager_families.create({
         data: {
@@ -76,6 +74,18 @@ export async function POST(
 
     // Notificar al usuario para que refresque su sesión y vea el menú de gestor
     NotificationEvents.emit(userId, { type: 'session_refresh', reason: 'permissions_changed' })
+
+    // Invalidar caché de módulos del gestor asignado
+    try {
+      const { invalidateCache } = await import('@/lib/api-cache')
+      await Promise.all([
+        invalidateCache(`admin:family:id=${id}`),
+        invalidateCache(`user:modules:${userId}`),
+        invalidateCache(`perm:inv:${userId}`),
+      ])
+    } catch {
+      /* Redis no disponible */
+    }
 
     return NextResponse.json(assignment, { status: 201 })
   } catch (error) {

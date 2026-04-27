@@ -118,6 +118,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ fami
       update: { inventoryEnabled: validated.inventoryEnabled ?? true, ...configData },
     })
 
+    // Invalidar caché de módulos — inventoryEnabled cambió
+    try {
+      const { invalidateCache } = await import('@/lib/api-cache')
+      await Promise.all([invalidateCache('user:modules:*'), invalidateCache('dashboard:*')])
+    } catch {
+      /* Redis no disponible */
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Configuración actualizada correctamente',

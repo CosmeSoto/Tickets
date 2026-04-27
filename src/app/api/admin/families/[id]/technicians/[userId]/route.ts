@@ -15,7 +15,8 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    if (session.user.role !== 'ADMIN') return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
+    if (session.user.role !== 'ADMIN')
+      return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
 
     const { id, userId } = await params
 
@@ -30,6 +31,17 @@ export async function DELETE(
     await prisma.technician_family_assignments.delete({
       where: { technicianId_familyId: { technicianId: userId, familyId: id } },
     })
+
+    // Invalidar caché de módulos del técnico desasignado
+    try {
+      const { invalidateCache } = await import('@/lib/api-cache')
+      await Promise.all([
+        invalidateCache(`admin:family:id=${id}`),
+        invalidateCache(`user:modules:${userId}`),
+      ])
+    } catch {
+      /* Redis no disponible */
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

@@ -246,6 +246,8 @@ function InventorySettingsContent() {
           title: 'Éxito',
           description: `Inventario ${newValue ? 'habilitado' : 'deshabilitado'} para ${family.name}`,
         })
+        // Notificar a useUserModules para que recargue la navegación
+        window.dispatchEvent(new CustomEvent('modules-updated'))
         if (selectedFamilyId === family.id) loadConfig(family.id)
       }
     } catch {
