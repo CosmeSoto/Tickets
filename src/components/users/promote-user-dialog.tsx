@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useToast } from '@/hooks/use-toast'
 import {
   Dialog,
@@ -11,7 +11,8 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { UserCog, Loader2, Info, ArrowRight } from 'lucide-react'
+import { UserCog, Loader2, Info } from 'lucide-react'
+import { extractApiError, extractCatchError } from '@/lib/utils/api-error'
 
 interface Props {
   open: boolean
@@ -49,19 +50,10 @@ export function PromoteUserDialog({ open, onOpenChange, user, onSuccess }: Props
         onSuccess()
         onOpenChange(false)
       } else {
-        toast({
-          title: 'Error',
-          description: result.error || 'No se pudo promover el usuario',
-          variant: 'destructive',
-        })
+        toast({ title: 'Error al promover usuario', description: extractApiError(result), variant: 'destructive' })
       }
-    } catch (error) {
-      console.error('Error promoting user:', error)
-      toast({
-        title: 'Error de conexión',
-        description: 'No se pudo conectar con el servidor',
-        variant: 'destructive',
-      })
+    } catch (err) {
+      toast({ title: 'Error de conexión', description: extractCatchError(err), variant: 'destructive' })
     } finally {
       setLoading(false)
     }

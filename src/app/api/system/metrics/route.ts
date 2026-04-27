@@ -117,7 +117,8 @@ async function getSupportSchedule() {
 async function calculateGlobalSatisfaction() {
   try {
     const ratings = await prisma.ticket_ratings.findMany({
-      select: { rating: true }
+      select: { rating: true },
+      take: 10000, // cap de seguridad para el cálculo de promedio
     })
 
     if (ratings.length === 0) {

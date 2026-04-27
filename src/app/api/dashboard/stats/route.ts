@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { withCache, buildCacheKey } from '@/lib/api-cache'
+import { buildCacheKey } from '@/lib/api-cache'
 
 // Función para calcular tiempo promedio de resolución
 function calculateAvgResolutionTime(tickets: any[]): string {
@@ -67,7 +67,7 @@ async function calculateAvgResponseTime(): Promise<string> {
 }
 
 // Función para generar actividad reciente
-async function getRecentActivity(role: string, userId: string) {
+async function getRecentActivity(role: string, _userId: string) {
   const activities: any[] = []
 
   if (role === 'ADMIN') {
@@ -202,7 +202,6 @@ async function getFamilyMetrics() {
 // Función para obtener alertas proactivas
 async function getProactiveAlerts() {
   const alerts: any[] = []
-  const now = new Date()
 
   try {
     // 1. Alertas de SLA — violaciones activas sin resolver
@@ -461,6 +460,36 @@ export async function GET(request: NextRequest) {
         recentActivity: await getRecentActivity(role, userId),
         familyMetrics: await getFamilyMetrics(),
         proactiveAlerts: await getProactiveAlerts(),
+      }
+
+      // Métricas globales de inventario (agregado de todas las familias con inventario activo)
+      try {
+        const [totalAssets, availableAssets, assignedAssets, maintenanceAssets,
+               totalConsumables, lowStockConsumables, totalLicenses, expiredLicenses] =
+          await Promise.all([
+            prisma.equipment.count({ where: { status: { not: 'RETIRED' } } }),
+            prisma.equipment.count({ where: { status: 'AVAILABLE' } }),
+            prisma.equipment.count({ where: { status: 'ASSIGNED' } }),
+            prisma.equipment.count({ where: { status: 'MAINTENANCE' } }),
+            prisma.consumables.count(),
+            prisma.$queryRaw<Array<{ count: bigint }>>`
+              SELECT COUNT(*) as count FROM consumables WHERE current_stock <= min_stock
+            `.then(r => Number(r[0]?.count ?? 0)),
+            prisma.software_licenses.count(),
+            prisma.software_licenses.count({ where: { expirationDate: { lt: new Date() } } }),
+          ])
+        stats.inventoryStats = {
+          totalAssets,
+          availableAssets,
+          assignedAssets,
+          maintenanceAssets,
+          totalConsumables,
+          lowStockConsumables,
+          totalLicenses,
+          expiredLicenses,
+        }
+      } catch {
+        // Si el módulo de inventario no está disponible, no incluir stats
       }
 
       // Familias asignadas al admin (o todas si es super admin) — con módulos activos

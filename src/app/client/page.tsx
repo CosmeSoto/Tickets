@@ -1,7 +1,8 @@
 'use client'
 
 import { UnifiedDashboardBase } from '@/components/dashboard/unified-dashboard-base'
-import { SymmetricStatsCard } from '@/components/shared/stats-card'
+import { TicketsStatsSection } from '@/components/dashboard/modules/tickets-stats-section'
+import { InventoryStatsSection } from '@/components/dashboard/modules/inventory-stats-section'
 import { ActionGrid } from '@/components/common/action-card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -9,8 +10,6 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
   Ticket,
-  CheckCircle,
-  AlertCircle,
   Clock,
   User,
   Bell,
@@ -119,87 +118,23 @@ export default function ClientDashboard() {
         </Alert>
       )}
 
-      {/* Stats Cards */}
-      <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8'>
-        <SymmetricStatsCard
-          title='Total Tickets'
-          value={stats.totalTickets || 0}
-          icon={Ticket}
-          color='blue'
-          role='CLIENT'
-          trend={{ 
-            value: stats.thisMonthTickets || 0, 
-            label: 'este mes', 
-            isPositive: true 
-          }}
-        />
-
-        <SymmetricStatsCard
-          title='Tickets Abiertos'
-          value={stats.openTickets || 0}
-          icon={AlertCircle}
-          color='orange'
-          role='CLIENT'
-          status={hasOpenTickets ? 'warning' : 'normal'}
-        />
-
-        <SymmetricStatsCard
-          title='Tickets Resueltos'
-          value={stats.resolvedTickets || 0}
-          icon={CheckCircle}
-          color='green'
-          role='CLIENT'
-          status='success'
-        />
-
-        <SymmetricStatsCard
-          title='Mi Satisfacción'
-          value={`${stats.satisfactionRating || 0}/5`}
-          icon={Star}
-          color='purple'
-          role='CLIENT'
-          status={(stats.satisfactionRating || 0) >= 4.5 ? 'success' : (stats.satisfactionRating || 0) >= 4 ? 'normal' : 'warning'}
-          badge={{ 
-            text: `${Math.floor((stats.satisfactionRating || 0) * 20)}%`,
-            variant: 'default'
-          }}
-        />
-      </div>
-
-      {/* Stats de equipos — solo si tiene equipos asignados */}
-      {(stats.assignedEquipment || 0) > 0 && (
-        <div className='grid grid-cols-1 md:grid-cols-2 gap-4 mb-8'>
-          <SymmetricStatsCard
-            title='Equipos Asignados'
-            value={stats.assignedEquipment || 0}
-            icon={Activity}
-            color='blue'
-            role='CLIENT'
-            badge={{ text: 'A tu cargo', variant: 'secondary' }}
-          />
-          <SymmetricStatsCard
-            title='Mantenimientos Pendientes'
-            value={stats.pendingMaintenance || 0}
-            icon={Calendar}
-            color='orange'
-            role='CLIENT'
-            status={(stats.pendingMaintenance || 0) > 0 ? 'warning' : 'normal'}
-            badge={{ text: 'Tus equipos', variant: 'default' }}
-          />
-        </div>
-      )}
-
-      {/* Familias asignadas */}
+      {/* 1. Contexto del usuario — áreas de soporte */}
       {(stats.assignedFamilies?.length > 0 || stats.inventoryFamilies?.length > 0) && (
         <div className='mb-8'>
           <AssignedFamiliesPanel
             families={stats.assignedFamilies ?? []}
             inventoryFamilies={stats.inventoryFamilies}
             isInventoryManager={stats.isInventoryManager}
-            role="CLIENT"
+            role='CLIENT'
           />
         </div>
       )}
+
+      {/* 2. Módulo Tickets */}
+      <TicketsStatsSection stats={stats} role='CLIENT' />
+
+      {/* 3. Módulo Inventario (autocontenido: equipos asignados o gestor) */}
+      <InventoryStatsSection role='CLIENT' />
 
       {/* Crear Ticket - Destacado */}
       <div className='mb-8'>

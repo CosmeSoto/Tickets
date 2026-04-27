@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import bcrypt from 'bcryptjs'
 
 export async function GET(request: NextRequest) {
   try {
@@ -99,7 +100,8 @@ export async function GET(request: NextRequest) {
       },
       orderBy: [
         { name: 'asc' }
-      ]
+      ],
+      take: 500,
     })
 
     return NextResponse.json({
@@ -161,7 +163,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Crear técnico
-    const bcrypt = require('bcryptjs')
     const hashedPassword = await bcrypt.hash(password, 10)
 
     const technician = await prisma.users.create({

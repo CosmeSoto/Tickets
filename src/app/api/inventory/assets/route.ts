@@ -132,7 +132,11 @@ export async function GET(req: NextRequest) {
     return {}
   }
 
-  // Ejecutar 3 queries en paralelo
+  // Ejecutar 3 queries en paralelo — con paginación aproximada en DB para evitar traer todo a memoria
+  // Nota: como combinamos 3 tablas y ordenamos por createdAt global, hacemos take con margen
+  // y luego paginamos en memoria solo sobre el slice necesario. Para inventarios muy grandes
+  // se recomienda filtrar siempre por familyId o subtype.
+  const dbLimit = (page * pageSize) + pageSize // traer solo lo necesario
   const [equipmentItems, consumableItems, licenseItems] = await Promise.all([
     // EQUIPMENT
     subtypeParam && subtypeParam !== 'EQUIPMENT'
@@ -141,6 +145,7 @@ export async function GET(req: NextRequest) {
           where: buildEquipmentWhere(),
           include: { type: { include: { family: true } } },
           orderBy: { createdAt: 'desc' },
+          take: dbLimit,
         }),
 
     // MRO — clientes sin gestión no ven MRO
@@ -152,6 +157,7 @@ export async function GET(req: NextRequest) {
             : undefined,
           include: { consumableType: { include: { family: true } } },
           orderBy: { createdAt: 'desc' },
+          take: dbLimit,
         }),
 
     // LICENSE — clientes sin gestión no ven licencias
@@ -163,6 +169,7 @@ export async function GET(req: NextRequest) {
             : undefined,
           include: { licenseType: { include: { family: true } } },
           orderBy: { createdAt: 'desc' },
+          take: dbLimit,
         }),
   ])
 
@@ -447,6 +454,10 @@ export async function POST(req: NextRequest) {
       },
     },
   })
+
+  // Invalidar caché de inventario para que la lista se actualice inmediatamente
+  const { invalidateCache } = await import('@/lib/api-cache')
+  await invalidateCache(['inventory:equipment:*', 'inventory:consumables:*', 'inventory:licenses:*']).catch(() => {})
 
   return NextResponse.json({ ...asset, subtype }, { status: 201 })
 }

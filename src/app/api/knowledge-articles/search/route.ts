@@ -21,7 +21,8 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('query') || '';
-    const limit = parseInt(searchParams.get('limit') || '10', 10);
+    const limitRaw = parseInt(searchParams.get('limit') || '10', 10);
+    const limit = Math.min(Math.max(1, limitRaw), 50); // máximo 50 resultados
 
     if (query.trim().length < 2) {
       return NextResponse.json(

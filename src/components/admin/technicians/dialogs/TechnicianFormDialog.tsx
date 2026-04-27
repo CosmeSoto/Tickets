@@ -27,14 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { 
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
-import { Badge } from '@/components/ui/badge'
-import { Plus, X, Save, User, HelpCircle, Info, Zap, Users, Shield } from 'lucide-react'
+import { Save, User } from 'lucide-react'
 import type { 
   Technician, 
   TechnicianFormData, 
@@ -42,6 +35,7 @@ import type {
   Category 
 } from '@/types/technicians'
 import { validateTechnicianForm } from '../TechnicianManagement.module'
+import { extractApiError, extractCatchError } from '@/lib/utils/api-error'
 import { SimpleCategoryAssignment } from './SimpleCategoryAssignment'
 
 interface Props {
@@ -190,39 +184,25 @@ export function TechnicianFormDialog({
       if (response.ok && result.success) {
         toast({
           title: 'Éxito',
-          description: isEditing 
+          description: isEditing
             ? 'Asignaciones de técnico actualizadas correctamente'
-            : isPromoting 
+            : isPromoting
               ? 'Usuario promovido a técnico correctamente'
-              : 'Técnico creado correctamente'
+              : 'Técnico creado correctamente',
         })
         onSuccess()
         onClose()
       } else {
-        // Manejar errores específicos de validación
+        // Marcar errores de campo si vienen del servidor
         if (result.details && Array.isArray(result.details)) {
           const fieldErrors: Record<string, string> = {}
-          result.details.forEach((detail: any) => {
-            if (detail.field) {
-              fieldErrors[detail.field] = detail.message
-            }
-          })
+          result.details.forEach((d: any) => { if (d.field) fieldErrors[d.field] = d.message })
           setErrors(fieldErrors)
         }
-        
-        toast({
-          title: 'Error',
-          description: result.error || 'Error desconocido',
-          variant: 'destructive'
-        })
+        toast({ title: 'Error', description: extractApiError(result), variant: 'destructive' })
       }
-    } catch (error) {
-      console.error('❌ [TECHNICIAN-FORM] Error:', error)
-      toast({
-        title: 'Error de conexión',
-        description: 'No se pudo conectar con el servidor. Verifica tu conexión e intenta nuevamente.',
-        variant: 'destructive'
-      })
+    } catch (err) {
+      toast({ title: 'Error de conexión', description: extractCatchError(err), variant: 'destructive' })
     } finally {
       setLoading(false)
     }

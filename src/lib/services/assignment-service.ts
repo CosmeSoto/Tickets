@@ -1,5 +1,4 @@
 import prisma from '@/lib/prisma'
-import { UserService } from './user-service'
 import { randomUUID } from 'crypto'
 
 export interface AssignmentCriteria {
@@ -150,8 +149,12 @@ export class AssignmentService {
         triggerTicketAssignedToTechnicianEmail,
         triggerTicketAssignedToClientEmail 
       } = await import('@/lib/email-triggers')
-      triggerTicketAssignedToTechnicianEmail(ticketId)
-      triggerTicketAssignedToClientEmail(ticketId)
+      triggerTicketAssignedToTechnicianEmail(ticketId).catch((err: Error) => {
+        console.error('[EMAIL] Error enviando email de asignación a técnico:', err)
+      })
+      triggerTicketAssignedToClientEmail(ticketId).catch((err: Error) => {
+        console.error('[EMAIL] Error enviando email de asignación a cliente:', err)
+      })
 
       return {
         ticket: updatedTicket,

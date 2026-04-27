@@ -29,6 +29,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Search, UserPlus, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
 import type { BaseUser } from '@/types/user'
 import { useClients } from '@/contexts/users-context'
+import { extractApiError, extractCatchError } from '@/lib/utils/api-error'
 
 interface Props {
   open: boolean
@@ -75,28 +76,18 @@ export function UserSelectionDialog({ open, onOpenChange, onUserSelected }: Prop
       if (result.success) {
         const user = users.find(u => u.id === userId)
         if (user) {
-          const validatedUser: UserWithValidation = {
+          setSelectedUser({
             ...user,
             pendingTickets: result.data.pendingTickets || 0,
             canPromote: result.data.canPromote,
-            validationMessage: result.data.message
-          }
-          setSelectedUser(validatedUser)
+            validationMessage: result.data.message,
+          })
         }
       } else {
-        toast({
-          title: 'Error de validación',
-          description: result.error || 'No se pudo validar el usuario',
-          variant: 'destructive'
-        })
+        toast({ title: 'Error de validación', description: extractApiError(result), variant: 'destructive' })
       }
-    } catch (error) {
-      console.error('Error validando usuario:', error)
-      toast({
-        title: 'Error',
-        description: 'No se pudo validar el usuario',
-        variant: 'destructive'
-      })
+    } catch (err) {
+      toast({ title: 'Error', description: extractCatchError(err, 'No se pudo validar el usuario'), variant: 'destructive' })
     } finally {
       setValidating(false)
     }

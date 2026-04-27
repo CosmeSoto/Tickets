@@ -1,10 +1,6 @@
-/**
- * Error Management API
- * 
- * API endpoints for error tracking dashboard
- */
-
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { ErrorTracker } from '@/lib/monitoring/error-tracker'
 import { ApplicationLogger } from '@/lib/logging'
 import { ApiResponseBuilder } from '@/lib/api/response-builder'
@@ -13,6 +9,11 @@ import { ApiResponseBuilder } from '@/lib/api/response-builder'
  * GET /api/admin/errors - Get error statistics and reports
  */
 export async function GET(request: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session || session.user.role !== 'ADMIN') {
+    return ApiResponseBuilder.unauthorized('No autorizado')
+  }
+
   const timer = ApplicationLogger.timer('get_error_stats', {
     component: 'error-management-api'
   })
@@ -69,6 +70,11 @@ export async function GET(request: NextRequest) {
  * POST /api/admin/errors - Resolve or manage errors
  */
 export async function POST(request: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session || session.user.role !== 'ADMIN') {
+    return ApiResponseBuilder.unauthorized('No autorizado')
+  }
+
   const timer = ApplicationLogger.timer('manage_error', {
     component: 'error-management-api'
   })
@@ -132,6 +138,11 @@ export async function POST(request: NextRequest) {
  * PUT /api/admin/errors/config - Update error tracking configuration
  */
 export async function PUT(request: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session || session.user.role !== 'ADMIN') {
+    return ApiResponseBuilder.unauthorized('No autorizado')
+  }
+
   const timer = ApplicationLogger.timer('update_error_config', {
     component: 'error-management-api'
   })

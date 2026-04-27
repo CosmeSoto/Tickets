@@ -20,7 +20,8 @@ const webhookSchema = z.object({
  * GET /api/admin/webhooks
  * Obtener todos los webhooks
  */
-export async function GET(request: NextRequest) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function GET(_request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session || session.user.role !== 'ADMIN') {
@@ -32,6 +33,7 @@ export async function GET(request: NextRequest) {
 
     const webhooks = await prisma.webhooks.findMany({
       orderBy: { createdAt: 'desc' },
+      take: 200,
       include: {
         creator: {
           select: {

@@ -8,7 +8,6 @@ import { EmailService } from '@/lib/services/email/email-service'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { NotificationService } from '@/lib/services/notification-service'
 import { TicketService } from '@/lib/services/ticket-service'
-import { withCache, invalidateCache, buildCacheKey } from '@/lib/api-cache'
 
 export async function GET(request: NextRequest) {
   try {
@@ -100,19 +99,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Clave de caché: incluye rol, userId y todos los filtros activos
-    // TTL: 30s — balance entre frescura y rendimiento
-    // El SSE notifica cambios en tiempo real, así que 30s es seguro
-    const cacheKey = buildCacheKey('tickets', {
-      role: session.user.role,
-      uid: session.user.id,
-      page, limit, status, priority, search, assigneeId, categoryId, familyId,
-    })
-
-    const result = await withCache(cacheKey, 30, async () => {
-      // Obtener tickets con relaciones — select explícito para evitar traer campos pesados
-      const [tickets, total] = await Promise.all([
-        prisma.tickets.findMany({
+    // Obtener tickets con relaciones — select explícito para evitar traer campos pesados
+    const [tickets, total] = await Promise.all([
+      prisma.tickets.findMany({
           where,
           select: {
             id: true,
@@ -162,7 +151,7 @@ export async function GET(request: NextRequest) {
         family: ticket.family,
       }))
 
-      return {
+      return NextResponse.json({
         success: true,
         data: mappedTickets,
         meta: {
@@ -174,10 +163,7 @@ export async function GET(request: NextRequest) {
           },
           filters: { status, priority, search, assigneeId, categoryId, familyId }
         }
-      }
-    })
-
-    return NextResponse.json(result)
+      })
   } catch (error) {
     console.error('Error in tickets API:', error)
     return NextResponse.json(
@@ -349,7 +335,9 @@ export async function POST(request: NextRequest) {
 
     // ⭐ NUEVO: Enviar email al administrador para que asigne el ticket
     const { triggerTicketCreatedToAdminEmail } = await import('@/lib/email-triggers')
-    triggerTicketCreatedToAdminEmail(newTicket.id)
+    triggerTicketCreatedToAdminEmail(newTicket.id).catch(err => {
+      console.error('[EMAIL] Error enviando email de ticket creado a admin:', err)
+    })
 
     // ⭐ NUEVO: Enviar notificaciones in-app a todos los admins
     await NotificationService.notifyTicketCreated(newTicket.id).catch(err => {
@@ -362,10 +350,6 @@ export async function POST(request: NextRequest) {
         console.error('[NOTIFICATION] Error enviando notificación de asignación:', err)
       })
     }
-
-    // Invalidar caché de tickets para todos los usuarios relevantes
-    // (patrón wildcard — borra todas las variantes de filtros)
-    await invalidateCache(['tickets:role=ADMIN*', 'tickets:role=TECHNICIAN*', `tickets:role=CLIENT:uid=${session.user.id}*`, 'dashboard:*']).catch(() => {})
 
     // Mapear los datos para que coincidan con lo que espera el frontend
     const mappedTicket = {

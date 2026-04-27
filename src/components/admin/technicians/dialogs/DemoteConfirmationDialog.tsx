@@ -7,7 +7,6 @@
 
 import { useState } from 'react'
 import { useToast } from '@/hooks/use-toast'
-import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,8 +18,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
-import { AlertTriangle, UserX, Users, Tag, CheckCircle, XCircle } from 'lucide-react'
+import { AlertTriangle, UserX, CheckCircle, XCircle } from 'lucide-react'
 import type { Technician, DemoteValidation } from '@/types/technicians'
+import { extractCatchError } from '@/lib/utils/api-error'
 
 interface Props {
   open: boolean
@@ -55,12 +55,8 @@ export function DemoteConfirmationDialog({
     setLoading(true)
     try {
       await onConfirm()
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'No se pudo convertir el técnico a cliente',
-        variant: 'destructive'
-      })
+    } catch (err) {
+      toast({ title: 'Error al convertir', description: extractCatchError(err, 'No se pudo convertir el técnico a cliente'), variant: 'destructive' })
     } finally {
       setLoading(false)
     }

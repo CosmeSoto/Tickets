@@ -1,16 +1,22 @@
 import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
+  const session = await getServerSession(authOptions)
+
+  // Solo ADMIN puede ver variables de entorno
+  if (!session || session.user.role !== 'ADMIN') {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  }
+
   return NextResponse.json({
     encryptionKeySet: !!process.env.ENCRYPTION_KEY,
-    encryptionKeyLength: process.env.ENCRYPTION_KEY?.length || 0,
     nodeEnv: process.env.NODE_ENV,
-    // Mostrar solo los últimos 8 caracteres para seguridad
-    encryptionKeyPreview: process.env.ENCRYPTION_KEY 
-      ? '***' + process.env.ENCRYPTION_KEY.slice(-8) 
-      : 'NOT SET',
-    allEnvKeys: Object.keys(process.env).filter(k => k.includes('ENCRYPTION') || k.includes('NEXTAUTH'))
+    nextauthUrlSet: !!process.env.NEXTAUTH_URL,
+    databaseUrlSet: !!process.env.DATABASE_URL,
+    redisUrlSet: !!process.env.REDIS_URL,
   })
 }

@@ -7,9 +7,9 @@ import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
 import { ZodError } from 'zod'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import prisma from '@/lib/prisma'
-import { randomUUID } from 'crypto'
 import { NotificationService } from '@/lib/services/notification-service'
 import { getRenewalAlertStatus } from '@/lib/inventory/renewal-alert'
+import { withCache, invalidateCache, buildCacheKey } from '@/lib/api-cache'
 
 /**
  * GET /api/inventory/licenses
@@ -42,7 +42,6 @@ export async function GET(request: NextRequest) {
 
     // Build where clause manually to support supplierId filter
     const where: any = {}
-
     if (validatedFilters.search) {
       where.OR = [
         { name: { contains: validatedFilters.search, mode: 'insensitive' } },
@@ -94,31 +93,44 @@ export async function GET(request: NextRequest) {
       where.expirationDate = { gte: now, lte: thirtyDays }
     }
 
+    const page = validatedFilters.page || 1
+    const limit = validatedFilters.limit || 10
+
     const orderBy = orderByParam === 'renewalDate'
       ? { renewalDate: 'asc' as const }
       : { createdAt: 'desc' as const }
 
-    const page = validatedFilters.page || 1
-    const limit = validatedFilters.limit || 10
+    const cacheKey = buildCacheKey('inventory:licenses', {
+      uid: session.user.id,
+      role: session.user.role,
+      page, limit,
+      search: validatedFilters.search,
+      assigned: validatedFilters.assigned,
+      expired: validatedFilters.expired,
+      supplierId, familyId, contractType, licenseScope, orderByParam,
+    })
 
-    const [licenses, total] = await Promise.all([
-      prisma.software_licenses.findMany({
-        where,
-        include: {
-          licenseType: { include: { family: true } },
-          equipment: true,
-          user: true,
-          department: true,
-          supplier: { select: { id: true, name: true } },
-        },
-        orderBy,
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      prisma.software_licenses.count({ where }),
-    ])
+    const { licenses: rawLicenses, total } = await withCache(cacheKey, 10, async () => {
+      const [licenses, total] = await Promise.all([
+        prisma.software_licenses.findMany({
+          where,
+          include: {
+            licenseType: { include: { family: true } },
+            equipment: true,
+            user: true,
+            department: true,
+            supplier: { select: { id: true, name: true } },
+          },
+          orderBy,
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+        prisma.software_licenses.count({ where }),
+      ])
+      return { licenses, total }
+    })
 
-    const processedLicenses = licenses.map(l => {
+    const processedLicenses = rawLicenses.map((l: any) => {
       const renewalAlertStatus = getRenewalAlertStatus(l.renewalDate ? new Date(l.renewalDate) : null)
       const base = session.user.role === 'ADMIN' || session.user.role === 'TECHNICIAN'
         ? l
@@ -168,6 +180,8 @@ export async function POST(request: NextRequest) {
       ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
     }).catch(err => console.error('[AUDIT] Error registrando creación de licencia:', err))
+
+    await invalidateCache('inventory:licenses:*').catch(() => {})
 
     // Notificar a admins (asíncrono)
     notifyAdminsNewLicense(license.name, license.licenseType?.name || 'Sin tipo', validatedData.cost).catch(

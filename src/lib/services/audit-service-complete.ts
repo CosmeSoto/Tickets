@@ -5,7 +5,7 @@
 
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
-import { AuditContextEnricher, EnrichedContext } from './audit-context-enricher'
+import { AuditContextEnricher } from './audit-context-enricher'
 import { NextRequest } from 'next/server'
 
 export interface AuditLogData {
@@ -182,14 +182,8 @@ export class AuditServiceComplete {
 
       const total = await prisma.audit_logs.count({ where })
 
-      // NUEVO: Resolver IDs a nombres legibles
-      const enrichedLogs = await Promise.all(logs.map(async (log) => {
-        const enrichedDetails = await this.enrichLogDetails(log)
-        return {
-          ...log,
-          details: enrichedDetails
-        }
-      }))
+      // Resolver IDs a nombres legibles — batch para evitar N+1
+      const enrichedLogs = await this.enrichLogsBatch(logs)
 
       return {
         logs: enrichedLogs,
@@ -203,7 +197,80 @@ export class AuditServiceComplete {
   }
 
   /**
-   * NUEVO: Enriquece los detalles del log resolviendo IDs a nombres
+   * Enriquece un lote de logs resolviendo IDs a nombres en batch (evita N+1)
+   */
+  private static async enrichLogsBatch(logs: any[]): Promise<any[]> {
+    if (logs.length === 0) return logs
+
+    // Recolectar todos los IDs únicos que necesitamos resolver
+    const userIds = new Set<string>()
+    const ticketIds = new Set<string>()
+    const categoryIds = new Set<string>()
+    const departmentIds = new Set<string>()
+
+    for (const log of logs) {
+      if (log.entityId) {
+        const t = log.entityType?.toLowerCase()
+        if (t === 'user') userIds.add(log.entityId)
+        else if (t === 'ticket') ticketIds.add(log.entityId)
+        else if (t === 'category') categoryIds.add(log.entityId)
+        else if (t === 'department') departmentIds.add(log.entityId)
+      }
+      const d = log.details || {}
+      if (d.userId) userIds.add(d.userId)
+      if (d.assigneeId) userIds.add(d.assigneeId)
+      if (d.categoryId) categoryIds.add(d.categoryId)
+      if (d.departmentId) departmentIds.add(d.departmentId)
+      if (d.ticketId) ticketIds.add(d.ticketId)
+    }
+
+    // Resolver todos en paralelo con queries batch
+    const [users, tickets, categories, departments] = await Promise.all([
+      userIds.size > 0
+        ? prisma.users.findMany({ where: { id: { in: [...userIds] } }, select: { id: true, name: true, email: true } })
+        : [],
+      ticketIds.size > 0
+        ? prisma.tickets.findMany({ where: { id: { in: [...ticketIds] } }, select: { id: true, title: true } })
+        : [],
+      categoryIds.size > 0
+        ? prisma.categories.findMany({ where: { id: { in: [...categoryIds] } }, select: { id: true, name: true } })
+        : [],
+      departmentIds.size > 0
+        ? prisma.departments.findMany({ where: { id: { in: [...departmentIds] } }, select: { id: true, name: true } })
+        : [],
+    ])
+
+    const userMap = new Map(users.map(u => [u.id, `${u.name} (${u.email})`]))
+    const ticketMap = new Map(tickets.map(t => [t.id, t.title]))
+    const categoryMap = new Map(categories.map(c => [c.id, c.name]))
+    const departmentMap = new Map(departments.map(d => [d.id, d.name]))
+
+    return logs.map(log => {
+      const details = log.details || {}
+      const enriched: any = { ...details }
+
+      // Resolver entityId
+      if (log.entityId) {
+        const t = log.entityType?.toLowerCase()
+        if (t === 'user') enriched.entityName = userMap.get(log.entityId) ?? log.entityId
+        else if (t === 'ticket') enriched.entityName = ticketMap.get(log.entityId) ?? log.entityId
+        else if (t === 'category') enriched.entityName = categoryMap.get(log.entityId) ?? log.entityId
+        else if (t === 'department') enriched.entityName = departmentMap.get(log.entityId) ?? log.entityId
+      }
+
+      // Resolver IDs en details
+      if (details.userId) enriched.userName = userMap.get(details.userId) ?? details.userId
+      if (details.assigneeId) enriched.assigneeName = userMap.get(details.assigneeId) ?? details.assigneeId
+      if (details.categoryId) enriched.categoryName = categoryMap.get(details.categoryId) ?? details.categoryId
+      if (details.departmentId) enriched.departmentName = departmentMap.get(details.departmentId) ?? details.departmentId
+      if (details.ticketId) enriched.ticketTitle = ticketMap.get(details.ticketId) ?? details.ticketId
+
+      return { ...log, details: enriched }
+    })
+  }
+
+  /**
+   * Enriquece los detalles de un log individual resolviendo IDs a nombres
    */
   private static async enrichLogDetails(log: any): Promise<any> {
     const details = log.details || {}

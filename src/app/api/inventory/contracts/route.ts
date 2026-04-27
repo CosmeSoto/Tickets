@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
     prisma.equipment.findMany({
       where: {
         ownershipType: { in: ['RENTAL', 'LOAN'] },
-        // Filtrar por familia a través del tipo de equipo
+        status: { not: 'RETIRED' },
         ...(familyId ? { type: { familyId } } : {}),
       },
       select: {
@@ -53,16 +53,15 @@ export async function GET(req: NextRequest) {
         },
       },
       orderBy: { rentalEndDate: 'asc' },
+      take: 500,
     }),
 
-    // Licencias con fecha de vencimiento o costo de renovación (tienen suscripción)
     prisma.software_licenses.findMany({
       where: {
         OR: [
           { expirationDate: { not: null } },
           { renewalCost: { not: null } },
         ],
-        // Filtrar por familia a través del tipo de licencia
         ...(familyId ? { licenseType: { familyId } } : {}),
       },
       select: {
@@ -79,6 +78,7 @@ export async function GET(req: NextRequest) {
         },
       },
       orderBy: { expirationDate: 'asc' },
+      take: 500,
     }),
   ])
 

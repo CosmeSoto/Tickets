@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { InventoryReportService } from '@/lib/services/inventory-report.service'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
+import { withReportCache } from '@/lib/api-cache'
 
 /**
  * GET /api/inventory/reports
@@ -30,34 +31,44 @@ export async function GET(request: NextRequest) {
     const days = parseInt(searchParams.get('days') || '30')
 
     let data: any
+    const reportParams = { startDate: startDate?.toISOString(), endDate: endDate?.toISOString(), departmentId, days }
 
     switch (reportType) {
       case 'equipment-summary':
-        data = await InventoryReportService.getEquipmentSummaryReport({ startDate, endDate, departmentId })
+        data = await withReportCache('inventory:equipment-summary', reportParams,
+          () => InventoryReportService.getEquipmentSummaryReport({ startDate, endDate, departmentId }), 600)
         break
       case 'assignments':
-        data = await InventoryReportService.getAssignmentsReport({ startDate, endDate })
+        data = await withReportCache('inventory:assignments', reportParams,
+          () => InventoryReportService.getAssignmentsReport({ startDate, endDate }), 300)
         break
       case 'pending-acts':
-        data = await InventoryReportService.getPendingActsReport()
+        data = await withReportCache('inventory:pending-acts', {},
+          () => InventoryReportService.getPendingActsReport(), 120)
         break
       case 'maintenance-costs':
-        data = await InventoryReportService.getMaintenanceCostsReport({ startDate, endDate })
+        data = await withReportCache('inventory:maintenance-costs', reportParams,
+          () => InventoryReportService.getMaintenanceCostsReport({ startDate, endDate }), 600)
         break
       case 'consumable-usage':
-        data = await InventoryReportService.getConsumableUsageReport({ startDate, endDate })
+        data = await withReportCache('inventory:consumable-usage', reportParams,
+          () => InventoryReportService.getConsumableUsageReport({ startDate, endDate }), 300)
         break
       case 'license-expiration':
-        data = await InventoryReportService.getLicenseExpirationReport(days)
+        data = await withReportCache('inventory:license-expiration', { days },
+          () => InventoryReportService.getLicenseExpirationReport(days), 600)
         break
       case 'inventory-value':
-        data = await InventoryReportService.getInventoryValueReport()
+        data = await withReportCache('inventory:inventory-value', {},
+          () => InventoryReportService.getInventoryValueReport(), 900)
         break
       case 'rental-equipment':
-        data = await InventoryReportService.getRentalEquipmentReport()
+        data = await withReportCache('inventory:rental-equipment', {},
+          () => InventoryReportService.getRentalEquipmentReport(), 600)
         break
       case 'acts-history':
-        data = await getActsHistoryReport({ startDate, endDate })
+        data = await withReportCache('inventory:acts-history', reportParams,
+          () => getActsHistoryReport({ startDate, endDate }), 300)
         break
       default:
         return NextResponse.json({ error: 'Tipo de reporte no válido' }, { status: 400 })

@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Rate limiting: 100 eventos por minuto por usuario
-    const rateLimitResult = checkRateLimit(
+    const rateLimitResult = await checkRateLimit(
       `analytics:${session.user.id}`,
       100,
       60000

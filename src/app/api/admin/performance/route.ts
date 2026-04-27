@@ -5,6 +5,8 @@
  */
 
 import { NextRequest } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { PerformanceMonitor } from '@/lib/monitoring/performance-monitor'
 import { ApplicationLogger } from '@/lib/logging'
 import { ApiResponseBuilder } from '@/lib/api/response-builder'
@@ -13,6 +15,11 @@ import { ApiResponseBuilder } from '@/lib/api/response-builder'
  * GET /api/admin/performance - Get performance statistics and metrics
  */
 export async function GET(request: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session || session.user.role !== 'ADMIN') {
+    return ApiResponseBuilder.unauthorized('No autorizado')
+  }
+
   const timer = ApplicationLogger.timer('get_performance_stats', {
     component: 'performance-management-api'
   })
@@ -117,6 +124,11 @@ export async function GET(request: NextRequest) {
  * POST /api/admin/performance - Manage performance monitoring
  */
 export async function POST(request: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session || session.user.role !== 'ADMIN') {
+    return ApiResponseBuilder.unauthorized('No autorizado')
+  }
+
   const timer = ApplicationLogger.timer('manage_performance', {
     component: 'performance-management-api'
   })
@@ -194,6 +206,11 @@ export async function POST(request: NextRequest) {
  * PUT /api/admin/performance/config - Update performance monitoring configuration
  */
 export async function PUT(request: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session || session.user.role !== 'ADMIN') {
+    return ApiResponseBuilder.unauthorized('No autorizado')
+  }
+
   const timer = ApplicationLogger.timer('update_performance_config', {
     component: 'performance-management-api'
   })

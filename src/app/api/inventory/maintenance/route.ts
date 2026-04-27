@@ -3,7 +3,6 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { MaintenanceService } from '@/lib/services/maintenance.service'
 import prisma from '@/lib/prisma'
-import { randomUUID } from 'crypto'
 import { notifyUser, notifyMany } from '@/lib/api/notify'
 
 /**
@@ -49,6 +48,7 @@ export async function GET(request: NextRequest) {
     const records = await prisma.maintenance_records.findMany({
       where,
       orderBy: { createdAt: 'desc' },
+      take: 200, // cap razonable — si necesitan más, usar paginación
       include: {
         equipment: {
           select: { id: true, code: true, brand: true, model: true, status: true, type: { select: { name: true } } },

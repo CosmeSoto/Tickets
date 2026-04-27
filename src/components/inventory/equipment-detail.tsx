@@ -56,6 +56,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { UserCombobox } from '@/components/ui/user-combobox'
 import { useToast } from '@/hooks/use-toast'
+import { extractCatchError } from '@/lib/utils/api-error'
 import { EquipmentHistory } from '@/components/inventory/equipment-history'
 import { EquipmentAttachments } from '@/components/inventory/equipment-attachments'
 import { formatDate, formatCurrency } from '@/lib/utils'
@@ -172,13 +173,8 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
 
       const result = await response.json()
       setData(result)
-    } catch (error) {
-      console.error('Error cargando equipo:', error)
-      toast({
-        title: 'Error',
-        description: 'No se pudo cargar el equipo',
-        variant: 'destructive',
-      })
+    } catch (err) {
+      toast({ title: 'Error', description: extractCatchError(err, 'No se pudo cargar el equipo'), variant: 'destructive' })
     } finally {
       setLoading(false)
     }

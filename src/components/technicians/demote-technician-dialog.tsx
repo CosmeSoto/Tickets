@@ -13,6 +13,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { AlertTriangle, UserMinus, Loader2 } from 'lucide-react'
+import { extractApiError, extractCatchError } from '@/lib/utils/api-error'
 
 interface Props {
   open: boolean
@@ -57,13 +58,8 @@ export function DemoteTechnicianDialog({ open, onOpenChange, technician, onSucce
           message: result.error || 'Error al validar'
         })
       }
-    } catch (error) {
-      console.error('Error validating demotion:', error)
-      setValidation({
-        canDemote: false,
-        assignedTickets: 0,
-        message: 'Error de conexión al validar'
-      })
+    } catch (err) {
+      setValidation({ canDemote: false, assignedTickets: 0, message: extractCatchError(err, 'Error de conexión al validar') })
     } finally {
       setValidating(false)
     }
@@ -81,26 +77,14 @@ export function DemoteTechnicianDialog({ open, onOpenChange, technician, onSucce
       const result = await response.json()
 
       if (response.ok && result.success) {
-        toast({
-          title: 'Técnico despromovido',
-          description: `${technician.name} ahora es cliente`
-        })
+        toast({ title: 'Técnico despromovido', description: `${technician.name} ahora es cliente` })
         onSuccess()
         onOpenChange(false)
       } else {
-        toast({
-          title: 'Error',
-          description: result.error || 'No se pudo despromover el técnico',
-          variant: 'destructive'
-        })
+        toast({ title: 'Error al despromover', description: extractApiError(result), variant: 'destructive' })
       }
-    } catch (error) {
-      console.error('Error demoting technician:', error)
-      toast({
-        title: 'Error de conexión',
-        description: 'No se pudo conectar con el servidor',
-        variant: 'destructive'
-      })
+    } catch (err) {
+      toast({ title: 'Error de conexión', description: extractCatchError(err), variant: 'destructive' })
     } finally {
       setLoading(false)
     }

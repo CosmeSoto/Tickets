@@ -27,6 +27,7 @@ import {
 import { cn } from '@/lib/utils'
 import { SupplierForm } from './SupplierForm'
 import { useToast } from '@/hooks/use-toast'
+import { extractCatchError } from '@/lib/utils/api-error'
 
 interface Supplier {
   id: string
@@ -153,12 +154,8 @@ export function SupplierSelect({
         if (value === confirm.supplier.id) onChange(null)
         loadSuppliers()
       }
-    } catch {
-      toast({
-        title: 'Error',
-        description: 'No se pudo completar la acción',
-        variant: 'destructive',
-      })
+    } catch (err) {
+      toast({ title: 'Error', description: extractCatchError(err, 'No se pudo completar la acción'), variant: 'destructive' })
     } finally {
       setActionLoading(false)
       setConfirm(null)

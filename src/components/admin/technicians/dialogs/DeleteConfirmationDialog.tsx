@@ -7,7 +7,6 @@
 
 import { useState } from 'react'
 import { useToast } from '@/hooks/use-toast'
-import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,6 +21,7 @@ import { Badge } from '@/components/ui/badge'
 import { AlertTriangle, Trash2, Users, Tag } from 'lucide-react'
 import type { Technician } from '@/types/technicians'
 import { canDeleteTechnician } from '../TechnicianManagement.module'
+import { extractCatchError } from '@/lib/utils/api-error'
 
 interface Props {
   open: boolean
@@ -56,11 +56,11 @@ export function DeleteConfirmationDialog({
     setLoading(true)
     try {
       await onConfirm()
-    } catch (error) {
+    } catch (err) {
       toast({
-        title: 'Error',
-        description: 'No se pudo eliminar el técnico',
-        variant: 'destructive'
+        title: 'Error al eliminar',
+        description: extractCatchError(err, 'No se pudo eliminar el técnico'),
+        variant: 'destructive',
       })
     } finally {
       setLoading(false)

@@ -2,12 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { exec } from 'child_process'
-import { promisify } from 'util'
+import os from 'os'
 
-const execAsync = promisify(exec)
-
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
 
@@ -243,8 +240,6 @@ async function getBackupStatus() {
 // Estado del servidor
 async function getServerStatus() {
   try {
-    const startTime = process.hrtime()
-    
     // Información del proceso Node.js
     const memoryUsage = process.memoryUsage()
     const uptime = process.uptime()
@@ -262,7 +257,7 @@ async function getServerStatus() {
       },
       cpu: {
         usage: Math.floor(Math.random() * 20 + 10), // Simulado entre 10-30%
-        cores: require('os').cpus().length
+        cores: os.cpus().length
       },
       nodeVersion: process.version,
       platform: process.platform,

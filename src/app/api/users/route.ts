@@ -4,9 +4,6 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { UserService } from '@/lib/services/user-service'
 import { z } from 'zod'
-import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
-import { buildCacheKey } from '@/lib/api-cache'
-
 const createUserSchema = z.object({
   email: z.string().email('Email inválido'),
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
@@ -30,38 +27,15 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     
-    // Parámetros de consulta
     const role = searchParams.get('role')
     const isActive = searchParams.get('isActive')
     const departmentId = searchParams.get('departmentId')
-    const department = searchParams.get('department') // Deprecated, usar departmentId
-    const familyId = searchParams.get('familyId') // Filtrar técnicos por familia asignada
-    const search = searchParams.get('search') // Búsqueda por nombre o email
-    const limit = searchParams.get('limit') // Límite de resultados
-    const canManageInventory = searchParams.get('canManageInventory') // Filtrar por permiso de gestión
-    const isSuperAdmin = searchParams.get('isSuperAdmin') // Filtrar super admins
-
-    // Cache de 2 minutos — usuarios cambian con poca frecuencia
-    // No cachear búsquedas (search) porque son dinámicas
-    const shouldCache = !search
-    const cacheKey = shouldCache ? buildCacheKey('users', {
-      role,
-      isActive,
-      departmentId,
-      department,
-      familyId,
-      limit,
-      canManageInventory,
-      isSuperAdmin,
-    }) : null
-
-    if (shouldCache && cacheKey) {
-      try {
-        const { getCached } = await import('@/lib/redis')
-        const cached = await getCached<any>(cacheKey)
-        if (cached) return NextResponse.json(cached)
-      } catch { /* Redis no disponible */ }
-    }
+    const department = searchParams.get('department')
+    const familyId = searchParams.get('familyId')
+    const search = searchParams.get('search')
+    const limit = searchParams.get('limit')
+    const canManageInventory = searchParams.get('canManageInventory')
+    const isSuperAdmin = searchParams.get('isSuperAdmin')
 
     // Construir filtros para Prisma
     const where: any = {}
@@ -169,7 +143,7 @@ export async function GET(request: NextRequest) {
         name: 'asc'
       },
       // Aplicar límite si se especifica
-      take: limit ? parseInt(limit) : undefined
+      take: limit ? Math.min(parseInt(limit), 500) : undefined
     })
 
     // Agregar levelName a las categorías de técnicos
@@ -214,26 +188,13 @@ export async function GET(request: NextRequest) {
       return normalizedUser
     })
 
-    // Guardar en cache si corresponde
     const responseData = {
       success: true,
       data: usersWithCanDelete,
       meta: {
         total: users.length,
-        filters: {
-          role,
-          isActive,
-          departmentId,
-          department
-        }
+        filters: { role, isActive, departmentId, department }
       }
-    }
-
-    if (shouldCache && cacheKey) {
-      try {
-        const { setCache } = await import('@/lib/redis')
-        await setCache(cacheKey, responseData, 120) // 2 minutos
-      } catch { /* Redis no disponible */ }
     }
 
     return NextResponse.json(responseData)
@@ -288,12 +249,6 @@ export async function POST(request: NextRequest) {
     // Crear el usuario usando el servicio
     const user = await UserService.createUser(validatedData, session.user.id)
 
-    // Invalidar cache de usuarios
-    try {
-      const { invalidateCache } = await import('@/lib/api-cache')
-      await invalidateCache(['users:*'])
-    } catch { /* Redis no disponible */ }
-
     return NextResponse.json({
       success: true,
       data: user,
@@ -302,29 +257,42 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error creating user:', error)
 
-    if (error instanceof Error) {
-      if (error.name === 'ZodError') {
-        return NextResponse.json({ 
-          success: false,
-          error: 'Datos inválidos', 
-          details: (error as any).errors 
-        }, { status: 400 })
+    // Error de validación Zod — devolver el primer mensaje en español
+    if (error instanceof z.ZodError) {
+      const firstIssue = error.issues[0]
+      const fieldLabels: Record<string, string> = {
+        email: 'Email',
+        name: 'Nombre',
+        password: 'Contraseña',
+        role: 'Rol',
+        departmentId: 'Departamento',
+        phone: 'Teléfono',
       }
+      const field = firstIssue.path[0] ? String(firstIssue.path[0]) : ''
+      const fieldLabel = fieldLabels[field] || field
+      const message = fieldLabel ? `${fieldLabel}: ${firstIssue.message}` : firstIssue.message
 
+      return NextResponse.json({
+        success: false,
+        error: message,
+        details: error.issues.map(i => ({
+          path: i.path,
+          message: i.message,
+        })),
+      }, { status: 400 })
+    }
+
+    if (error instanceof Error) {
       if (error.message.includes('Ya existe un usuario')) {
-        return NextResponse.json({ 
+        return NextResponse.json({
           success: false,
-          error: error.message 
+          error: error.message,
         }, { status: 409 })
       }
     }
 
-    
     return NextResponse.json(
-      {
-        success: false,
-        error: 'Error interno del servidor'
-      },
+      { success: false, error: 'Error interno del servidor' },
       { status: 500 }
     )
   }

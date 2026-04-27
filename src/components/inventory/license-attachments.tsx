@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { useToast } from '@/hooks/use-toast'
 import { FileInputWithCamera } from '@/components/common/file-input-with-camera'
+import { extractCatchError } from '@/lib/utils/api-error'
 
 interface Attachment {
   id: string
@@ -109,8 +110,8 @@ export function LicenseAttachments({ licenseId, canManage }: LicenseAttachmentsP
       if (!res.ok) throw new Error()
       setAttachments(prev => prev.filter(a => a.id !== deleteTarget.id))
       toast({ title: 'Archivo eliminado' })
-    } catch {
-      toast({ title: 'Error', description: 'No se pudo eliminar el archivo', variant: 'destructive' })
+    } catch (err) {
+      toast({ title: 'Error', description: extractCatchError(err, 'No se pudo eliminar el archivo'), variant: 'destructive' })
     } finally {
       setDeleteTarget(null)
     }

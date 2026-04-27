@@ -106,8 +106,12 @@ export async function PATCH(
         triggerTicketAssignedToClientEmail 
       } = await import('@/lib/email-triggers')
       
-      triggerTicketAssignedToTechnicianEmail(ticketId)
-      triggerTicketAssignedToClientEmail(ticketId)
+      triggerTicketAssignedToTechnicianEmail(ticketId).catch((err: Error) => {
+        console.error('[EMAIL] Error enviando email de asignación a técnico:', err)
+      })
+      triggerTicketAssignedToClientEmail(ticketId).catch((err: Error) => {
+        console.error('[EMAIL] Error enviando email de asignación a cliente:', err)
+      })
     }
 
     // Notificar al técnico anterior cuando es desasignado

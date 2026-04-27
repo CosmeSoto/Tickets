@@ -152,6 +152,7 @@ export class InventoryReportService {
             },
           },
           orderBy: { startDate: 'desc' },
+          take: 1000, // cap de seguridad
         }),
         prisma.equipment_assignments.count({ where }),
         prisma.$queryRaw<Array<{ avg: number }>>`
@@ -280,6 +281,7 @@ export class InventoryReportService {
             },
           },
           orderBy: { date: 'desc' },
+          take: 500,
         }),
         prisma.maintenance_records.aggregate({
           where,
@@ -356,6 +358,7 @@ export class InventoryReportService {
             },
           },
           orderBy: { createdAt: 'desc' },
+          take: 1000,
         }),
         prisma.stock_movements.groupBy({
           by: ['type'],

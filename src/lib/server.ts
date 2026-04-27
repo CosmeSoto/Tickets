@@ -72,7 +72,7 @@ export { db as prisma }
 
 function createIoRedis(url: string): Redis {
   // Importación dinámica para evitar que el módulo se evalúe en build time
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
   const Redis = require('ioredis')
   return new Redis(url, {
     lazyConnect: true,
@@ -181,7 +181,21 @@ export async function deleteCache(key: string): Promise<void> {
   try {
     const client = getRedis()
     if (!client) return
-    await client.del(key)
+    // Si la clave contiene wildcard, usar SCAN para encontrar y borrar todas las coincidencias
+    if (key.includes('*')) {
+      const keys: string[] = []
+      let cursor = '0'
+      do {
+        const [nextCursor, found] = await client.scan(cursor, 'MATCH', key, 'COUNT', 100)
+        cursor = nextCursor
+        keys.push(...found)
+      } while (cursor !== '0')
+      if (keys.length > 0) {
+        await client.del(...keys)
+      }
+    } else {
+      await client.del(key)
+    }
   } catch {
     // silencioso
   }

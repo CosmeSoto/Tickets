@@ -5,7 +5,6 @@ import prisma from '@/lib/prisma'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { NotificationService } from '@/lib/services/notification-service'
 import { canManageCategory, getDepartmentFamilyId } from '@/lib/category-access'
-import { buildCacheKey, invalidateCache } from '@/lib/api-cache'
 
 /**
  * Obtiene el nombre del nivel basado en el número
@@ -32,23 +31,10 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     
-    // Parámetros de consulta
     const isActive = searchParams.get('isActive')
     const level = searchParams.get('level')
     const parentId = searchParams.get('parentId')
     const familyId = searchParams.get('familyId')
-
-    // Caché 3 minutos — categorías cambian raramente
-    const cacheKey = buildCacheKey('categories', {
-      role: session.user.role,
-      uid: session.user.id,
-      isActive, level, parentId, familyId,
-    })
-    try {
-      const { getCached } = await import('@/lib/redis')
-      const cached = await getCached<any>(cacheKey)
-      if (cached) return NextResponse.json(cached)
-    } catch { /* Redis no disponible */ }
 
     // Construir filtros para Prisma
     const where: any = {}
@@ -95,8 +81,7 @@ export async function GET(request: NextRequest) {
     // Obtener categorías con relaciones
     const categories = await prisma.categories.findMany({
       where,
-      select: {
-        id: true,
+      select: {        id: true,
         name: true,
         description: true,
         level: true,
@@ -195,7 +180,8 @@ export async function GET(request: NextRequest) {
         { level: 'asc' },
         { order: 'asc' },
         { name: 'asc' }
-      ]
+      ],
+      take: 2000, // cap de seguridad — árbol de categorías raramente supera esto
     })
 
     // Enriquecer categorías con canDelete y levelName

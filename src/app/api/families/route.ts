@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { FamilyService } from '@/lib/services/family.service'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
 import prisma from '@/lib/prisma'
-import { withCache, invalidateCache, buildCacheKey } from '@/lib/api-cache'
+import { invalidateCache } from '@/lib/api-cache'
 
 // GET /api/families — Lista familias; ADMIN ve todas las suyas, otros roles ven las habilitadas para tickets
 export async function GET(request: NextRequest) {
@@ -16,27 +16,9 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const includeInactive = searchParams.get('includeInactive') === 'true'
-    const ticketsEnabled = searchParams.get('ticketsEnabled') === 'true'
-
-    // Caché 5 minutos — familias cambian raramente
-    const cacheKey = buildCacheKey('families', {
-      role: session.user.role,
-      uid: session.user.id,
-      includeInactive,
-      ticketsEnabled,
-    })
-
-    try {
-      const { getCached } = await import('@/lib/redis')
-      const cached = await getCached<any>(cacheKey)
-      if (cached) return NextResponse.json(cached)
-    } catch {
-      /* Redis no disponible */
-    }
 
     // ── Clientes y técnicos: todas las familias habilitadas para tickets ────
     if (session.user.role !== 'ADMIN') {
-      // Obtener la familia del departamento del usuario (para marcarla como "su familia")
       const user = await prisma.users.findUnique({
         where: { id: session.user.id },
         select: { departments: { select: { familyId: true } } },
@@ -44,52 +26,29 @@ export async function GET(request: NextRequest) {
       const userFamilyId = user?.departments?.familyId ?? null
 
       const families = (await (prisma.families.findMany as any)({
-        where: {
-          isActive: true,
-          ticketFamilyConfig: { ticketsEnabled: true },
-        },
+        where: { isActive: true, ticketFamilyConfig: { ticketsEnabled: true } },
         select: {
-          id: true,
-          name: true,
-          code: true,
-          color: true,
-          icon: true,
-          description: true,
-          isActive: true,
-          ticketFamilyConfig: {
-            select: {
-              ticketsEnabled: true,
-              allowedFromFamilies: true,
-            },
-          },
+          id: true, name: true, code: true, color: true, icon: true,
+          description: true, isActive: true,
+          ticketFamilyConfig: { select: { ticketsEnabled: true, allowedFromFamilies: true } },
         },
         orderBy: { order: 'asc' },
       })) as any[]
 
-      // Filtrar: si allowedFromFamilies tiene valores, el cliente solo puede
-      // crear tickets aquí si su familia está en la lista
       const accessible = families.filter(f => {
         const allowed = f.ticketFamilyConfig?.allowedFromFamilies ?? []
-        if (allowed.length === 0) return true // abierta a todos
-        if (!userFamilyId) return true // sin departamento → acceso total
+        if (allowed.length === 0) return true
+        if (!userFamilyId) return true
         return allowed.includes(userFamilyId)
       })
 
-      // Marcar cuál es la familia "propia" del cliente
-      const responseData = {
+      return NextResponse.json({
         success: true,
         data: accessible.map(f => ({
           ...f,
           isOwnFamily: f.id === userFamilyId,
           isRestricted: (f.ticketFamilyConfig?.allowedFromFamilies ?? []).length > 0,
         })),
-      }
-      try {
-        const { setCache } = await import('@/lib/redis')
-        await setCache(cacheKey, responseData, 300)
-      } catch {}
-      return NextResponse.json(responseData, {
-        headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=240' },
       })
     }
 
@@ -107,31 +66,17 @@ export async function GET(request: NextRequest) {
           where: { adminId: session.user.id, isActive: true },
           select: { familyId: true },
         })
-        // Si tiene asignaciones específicas, filtrar; si no tiene ninguna, devolver todas
-        // (compatibilidad con admins existentes antes de la feature)
         if (assignments.length > 0) {
           const allowedIds = new Set(assignments.map(a => a.familyId))
           families = families.filter(f => allowedIds.has(f.id))
         }
-      } catch {
-        // Si la tabla aún no existe o hay error, devolver todas (fallback seguro)
-      }
+      } catch { /* fallback seguro */ }
     }
 
-    const adminResponse = { success: true, data: families }
-    try {
-      const { setCache } = await import('@/lib/redis')
-      await setCache(cacheKey, adminResponse, 300)
-    } catch {}
-    return NextResponse.json(adminResponse, {
-      headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=240' },
-    })
+    return NextResponse.json({ success: true, data: families })
   } catch (error) {
     console.error('[GET /api/families]', error)
-    return NextResponse.json(
-      { success: false, message: 'Error al obtener familias' },
-      { status: 500 }
-    )
+    return NextResponse.json({ success: false, message: 'Error al obtener familias' }, { status: 500 })
   }
 }
 

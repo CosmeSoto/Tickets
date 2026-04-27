@@ -6,6 +6,7 @@ import { createConsumableSchema, consumableFiltersSchema } from '@/lib/validatio
 import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
 import { ZodError } from 'zod'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
+import { withCache, invalidateCache, buildCacheKey } from '@/lib/api-cache'
 
 /**
  * GET /api/inventory/consumables
@@ -29,7 +30,12 @@ export async function GET(request: NextRequest) {
     }
 
     const validatedFilters = consumableFiltersSchema.parse(filters)
-    const result = await ConsumableService.listConsumables(validatedFilters)
+
+    const cacheKey = buildCacheKey('inventory:consumables', {
+      role: session.user.id,
+      ...validatedFilters,
+    })
+    const result = await withCache(cacheKey, 10, () => ConsumableService.listConsumables(validatedFilters))
 
     return NextResponse.json({
       ...result,
@@ -77,6 +83,8 @@ export async function POST(request: NextRequest) {
       ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
     }).catch(err => console.error('[AUDIT] Error registrando creación de consumible:', err))
+
+    await invalidateCache('inventory:consumables:*').catch(() => {})
 
     return NextResponse.json(consumable, { status: 201 })
   } catch (error) {

@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
         action: 'EXPIRY_CHECK_RUN',
         entityType: 'system',
         entityId: 'cron',
+        userId: 'system',
         details: { timestamp: new Date().toISOString() },
       },
     })

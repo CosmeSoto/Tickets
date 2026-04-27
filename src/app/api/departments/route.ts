@@ -5,7 +5,6 @@ import prisma from '@/lib/prisma'
 import { z } from 'zod'
 import { randomUUID } from 'crypto'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
-import { buildCacheKey } from '@/lib/api-cache'
 
 // Schema de validación
 const departmentSchema = z.object({
@@ -25,104 +24,43 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const isActive = searchParams.get('isActive')
-    const includeCount = searchParams.get('includeCount') === 'true'
     const publicAccess = searchParams.get('public') === 'true'
     const familyId = searchParams.get('familyId')
 
-    // Cache de 5 minutos — departamentos cambian raramente
-    const cacheKey = buildCacheKey('departments', {
-      isActive,
-      includeCount,
-      publicAccess,
-      familyId,
-    })
-
-    try {
-      const { getCached } = await import('@/lib/redis')
-      const cached = await getCached<any>(cacheKey)
-      if (cached) return NextResponse.json(cached)
-    } catch {
-      /* Redis no disponible */
-    }
-
-    // Si es acceso público (para registro), solo mostrar departamentos activos sin autenticación
+    // Acceso público — departamentos activos sin autenticación (para registro)
     if (publicAccess) {
       const departments = await prisma.departments.findMany({
         where: { isActive: true },
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          color: true,
-        },
+        select: { id: true, name: true, description: true, color: true },
         orderBy: [{ order: 'asc' }, { name: 'asc' }],
       })
-
-      const responseData = {
-        success: true,
-        departments: departments,
-      }
-
-      try {
-        const { setCache } = await import('@/lib/redis')
-        await setCache(cacheKey, responseData, 300)
-      } catch {}
-      return NextResponse.json(responseData, {
-        headers: { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=240' },
-      })
+      return NextResponse.json(
+        { success: true, departments },
+        { headers: { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=240' } }
+      )
     }
 
-    // Para acceso autenticado, requerir sesión
+    // Acceso autenticado
     const session = await getServerSession(authOptions)
     if (!session) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
     const where: any = {}
-    if (isActive !== null) {
-      where.isActive = isActive === 'true'
-    }
-    if (familyId) {
-      where.familyId = familyId
-    }
+    if (isActive !== null) where.isActive = isActive === 'true'
+    if (familyId) where.familyId = familyId
 
     const departments = await prisma.departments.findMany({
       where,
       orderBy: [{ order: 'asc' }, { name: 'asc' }],
+      take: 500,
       include: {
-        family: {
-          select: {
-            id: true,
-            name: true,
-            code: true,
-            color: true,
-          },
-        },
-        _count: {
-          select: {
-            users: true,
-            categories: true,
-          },
-        },
+        family: { select: { id: true, name: true, code: true, color: true } },
+        _count: { select: { users: true, categories: true } },
       },
     })
 
-    if (process.env.NODE_ENV === 'development') {
-      // console.log('📊 Departamentos cargados:', departments.length)
-    }
-
-    const responseData = {
-      success: true,
-      data: departments,
-    }
-
-    try {
-      const { setCache } = await import('@/lib/redis')
-      await setCache(cacheKey, responseData, 300)
-    } catch {}
-    return NextResponse.json(responseData, {
-      headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=240' },
-    })
+    return NextResponse.json({ success: true, data: departments })
   } catch (error) {
     console.error('❌ Error al cargar departamentos:', error)
     return NextResponse.json(

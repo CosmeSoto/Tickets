@@ -5,6 +5,8 @@
  */
 
 import { NextRequest } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { HealthChecker } from '@/lib/monitoring/health-checker'
 import { ApplicationLogger } from '@/lib/logging'
 import { ApiResponseBuilder } from '@/lib/api/response-builder'
@@ -13,6 +15,11 @@ import { ApiResponseBuilder } from '@/lib/api/response-builder'
  * GET /api/admin/health - Get detailed health information and history
  */
 export async function GET(request: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session || session.user.role !== 'ADMIN') {
+    return ApiResponseBuilder.unauthorized('No autorizado')
+  }
+
   const timer = ApplicationLogger.timer('get_health_admin_data', {
     component: 'health-management-api'
   })
@@ -82,6 +89,11 @@ export async function GET(request: NextRequest) {
  * POST /api/admin/health - Manage health check system
  */
 export async function POST(request: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session || session.user.role !== 'ADMIN') {
+    return ApiResponseBuilder.unauthorized('No autorizado')
+  }
+
   const timer = ApplicationLogger.timer('manage_health_system', {
     component: 'health-management-api'
   })
@@ -170,6 +182,11 @@ export async function POST(request: NextRequest) {
  * PUT /api/admin/health/config - Update health check configuration
  */
 export async function PUT(request: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session || session.user.role !== 'ADMIN') {
+    return ApiResponseBuilder.unauthorized('No autorizado')
+  }
+
   const timer = ApplicationLogger.timer('update_health_config', {
     component: 'health-management-api'
   })

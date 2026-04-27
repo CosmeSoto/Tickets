@@ -2,13 +2,19 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
+    // Solo ADMIN puede usar este endpoint de diagnóstico
+    if (!session || session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     return NextResponse.json({
       success: true,
-      session: session,
+      userId: session.user.id,
+      role: session.user.role,
       timestamp: new Date().toISOString(),
       env: {
         NEXTAUTH_SECRET: !!process.env.NEXTAUTH_SECRET,

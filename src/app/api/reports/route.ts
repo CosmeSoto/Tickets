@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Rate limiting - 10 exportaciones por minuto
-    const rateLimitResult = RateLimiters.reports(session.user.id)
+    const rateLimitResult = await RateLimiters.reports(session.user.id)
     
     if (!rateLimitResult.success) {
       return NextResponse.json({
@@ -239,7 +239,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Rate limiting
-    const rateLimitResult = RateLimiters.reports(session.user.id)
+    const rateLimitResult = await RateLimiters.reports(session.user.id)
     
     if (!rateLimitResult.success) {
       return NextResponse.json({
@@ -274,18 +274,6 @@ export async function POST(request: NextRequest) {
     if (session.user.role === 'TECHNICIAN') {
       reportFilters.assigneeId = session.user.id
     }
-
-    // Generar reporte usando el mismo flujo que GET
-    const params = new URLSearchParams({
-      type: reportType,
-      format,
-      ...Object.fromEntries(
-        Object.entries(reportFilters).map(([key, value]) => [
-          key,
-          value instanceof Date ? value.toISOString().split('T')[0] : String(value || '')
-        ])
-      )
-    })
 
     // Reutilizar la lógica de GET
     const reportData = await (async () => {

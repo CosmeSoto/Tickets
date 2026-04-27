@@ -57,6 +57,7 @@ export async function GET(request: NextRequest) {
         family: { select: { id: true, name: true, color: true } },
       },
       orderBy: { name: 'asc' },
+      take: 500,
     })
 
     return NextResponse.json(suppliers)

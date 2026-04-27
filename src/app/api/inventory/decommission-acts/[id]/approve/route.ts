@@ -8,7 +8,7 @@ import { generateDecommissionActPDF } from '@/lib/templates/decommission-act-pdf
 import { getUploadDir } from '@/lib/upload-path'
 import { mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
-import { notifyUser, notifyAdminsExcept, enqueueEmail } from '@/lib/api/notify'
+import { notifyUser } from '@/lib/api/notify'
 import { isAdminOfFamily } from '@/lib/inventory-access'
 
 /**
@@ -178,7 +178,7 @@ export async function POST(
       }
     }
 
-    // Audit log de baja con info de contrato
+    // Audit log de baja con info de contrato (único — el de dentro de la transacción ya no existe)
     await prisma.audit_logs.create({
       data: {
         id: randomUUID(),
@@ -187,6 +187,8 @@ export async function POST(
         entityId: decommissionRequest.equipmentId ?? decommissionRequest.licenseId ?? requestId,
         userId: session.user.id,
         details: {
+          folio: act.folio,
+          assetName,
           contractId: contractWarning?.contractId ?? lastAssetForContract?.contractId ?? null,
         },
         createdAt: new Date(),

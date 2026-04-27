@@ -2,7 +2,6 @@
 
 import { useRouter } from 'next/navigation'
 import { UnifiedDashboardBase } from '@/components/dashboard/unified-dashboard-base'
-import { SymmetricStatsCard } from '@/components/shared/stats-card'
 import { ActionCard } from '@/components/common/action-card'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -24,7 +23,6 @@ import {
   Calendar,
   RefreshCw,
   AlertTriangle,
-  Clock,
   Layers,
   Settings,
   Package,
@@ -33,6 +31,8 @@ import { useUnifiedDashboard } from '@/hooks/use-unified-dashboard'
 import { useSystemStatus } from '@/hooks/use-system-status'
 import { useSession } from 'next-auth/react'
 import { AssignedFamiliesPanel } from '@/components/dashboard/assigned-families-panel'
+import { TicketsStatsSection } from '@/components/dashboard/modules/tickets-stats-section'
+import { InventoryStatsSection } from '@/components/dashboard/modules/inventory-stats-section'
 import {
   Table,
   TableBody,
@@ -84,7 +84,6 @@ export default function AdminDashboard() {
   }
 
   // Calcular métricas
-  const resolutionRate = stats.resolutionRate || 0
   const systemHealth = stats.systemHealth || 'good'
 
   return (
@@ -123,47 +122,7 @@ export default function AdminDashboard() {
         </Alert>
       )}
 
-      {/* Stats Cards */}
-      <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8'>
-        <SymmetricStatsCard
-          title='Total Usuarios'
-          value={stats.totalUsers || 0}
-          icon={Users}
-          color='blue'
-          badge={{ text: `${stats.todayTickets || 0} nuevos hoy`, variant: 'secondary' }}
-          status='success'
-        />
-
-        <SymmetricStatsCard
-          title='Total Tickets'
-          value={stats.totalTickets || 0}
-          icon={Ticket}
-          color='green'
-          badge={{ text: `${stats.activeTickets || 0} activos`, variant: 'default' }}
-        />
-
-        <SymmetricStatsCard
-          title='Tickets Abiertos'
-          value={stats.openTickets || 0}
-          icon={AlertCircle}
-          color='orange'
-          status={stats.openTickets && stats.openTickets > 20 ? 'warning' : 'normal'}
-          badge={{
-            text: `${stats.urgentTickets || 0} urgentes`,
-            variant: stats.urgentTickets && stats.urgentTickets > 0 ? 'destructive' : 'default',
-          }}
-        />
-
-        <SymmetricStatsCard
-          title='Tasa de Resolución'
-          value={`${resolutionRate}%`}
-          icon={CheckCircle}
-          color='purple'
-          status={resolutionRate >= 85 ? 'success' : resolutionRate >= 70 ? 'warning' : 'error'}
-        />
-      </div>
-
-      {/* Familias asignadas */}
+      {/* 1. Contexto del usuario — familias y acceso */}
       {stats.assignedFamilies !== undefined && (
         <div className='mb-8'>
           <AssignedFamiliesPanel
@@ -174,52 +133,11 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Métricas de Planes de Resolución */}
-      {stats.resolutionPlans && stats.resolutionPlans.total > 0 && (
-        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8'>
-          <SymmetricStatsCard
-            title='Planes Creados'
-            value={stats.resolutionPlans.total}
-            icon={FileText}
-            color='blue'
-            badge={{ text: 'Total', variant: 'secondary' }}
-          />
+      {/* 2. Módulo Tickets */}
+      <TicketsStatsSection stats={stats} role='ADMIN' />
 
-          <SymmetricStatsCard
-            title='Tiempo Estimado Promedio'
-            value={`${stats.resolutionPlans.avgEstimatedHours}h`}
-            icon={Calendar}
-            color='green'
-            badge={{ text: 'Planificado', variant: 'default' }}
-          />
-
-          <SymmetricStatsCard
-            title='Tiempo Real Promedio'
-            value={`${stats.resolutionPlans.avgActualHours}h`}
-            icon={Clock}
-            color='orange'
-            badge={{ text: 'Ejecutado', variant: 'default' }}
-          />
-
-          <SymmetricStatsCard
-            title='Eficiencia de Planes'
-            value={`${stats.resolutionPlans.efficiency}%`}
-            icon={Activity}
-            color='purple'
-            status={
-              stats.resolutionPlans.efficiency >= 90
-                ? 'success'
-                : stats.resolutionPlans.efficiency >= 70
-                  ? 'normal'
-                  : 'warning'
-            }
-            badge={{
-              text: `${stats.resolutionPlans.taskCompletionRate}% tareas`,
-              variant: 'default',
-            }}
-          />
-        </div>
-      )}
+      {/* 3. Módulo Inventario (autocontenido, aparece solo si hay acceso) */}
+      <InventoryStatsSection role='ADMIN' />
 
       {/* Métricas por Familia — dinámicas según módulos activos */}
       {stats.familyMetrics && stats.familyMetrics.length > 0 && (
@@ -352,15 +270,24 @@ export default function AdminDashboard() {
                         </TableCell>
                         <TableCell className='text-center hidden lg:table-cell'>
                           {inventoryOn && fm.inventory ? (
-                            <div className='text-xs text-muted-foreground space-y-0.5'>
-                              <div>{fm.inventory.availableAssets} disp.</div>
-                              <div>{fm.inventory.assignedAssets} asig.</div>
+                            <div className='flex items-center justify-center gap-2 text-xs'>
+                              <span className='text-green-600 font-medium' title='Disponibles'>
+                                {fm.inventory.availableAssets}↑
+                              </span>
+                              <span className='text-blue-600' title='Asignados'>
+                                {fm.inventory.assignedAssets}⇒
+                              </span>
                               {fm.inventory.maintenanceAssets > 0 && (
-                                <div className='text-amber-600'>
-                                  {fm.inventory.maintenanceAssets} mant.
-                                </div>
+                                <span className='text-amber-600 font-medium' title='En mantenimiento'>
+                                  {fm.inventory.maintenanceAssets}⚙
+                                </span>
                               )}
+                              <Badge variant='outline' className='text-xs h-5 px-1.5 ml-1'>
+                                {fm.inventory.totalAssets} total
+                              </Badge>
                             </div>
+                          ) : inventoryOn ? (
+                            <span className='text-xs text-muted-foreground'>Sin activos</span>
                           ) : (
                             <span className='text-xs text-muted-foreground'>—</span>
                           )}
@@ -499,6 +426,18 @@ export default function AdminDashboard() {
                   description='Configuración de tickets por familia'
                   color='purple'
                 />
+
+                {/* Acción de Inventario — solo si hay activos */}
+                {stats.inventoryStats && stats.inventoryStats.totalAssets > 0 && (
+                  <ActionCard
+                    href='/inventory'
+                    icon={Package}
+                    title='Gestión de Inventario'
+                    description='Equipos, consumibles y licencias'
+                    color='orange'
+                    badge={stats.inventoryStats.totalAssets}
+                  />
+                )}
               </div>
             </CardContent>
           </Card>

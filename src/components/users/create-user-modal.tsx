@@ -18,7 +18,6 @@ import { Separator } from '@/components/ui/separator'
 import {
   User,
   Mail,
-  Phone,
   Building,
   Camera,
   UserPlus,
@@ -132,6 +131,7 @@ export function CreateUserModal({
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
     if (!formData.name.trim()) newErrors.name = 'El nombre es requerido'
+    else if (formData.name.trim().length < 2) newErrors.name = 'Mínimo 2 caracteres'
     if (!formData.email.trim()) newErrors.email = 'El email es requerido'
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Email inválido'
     if (!formData.password.trim()) newErrors.password = 'La contraseña es requerida'
@@ -145,7 +145,18 @@ export function CreateUserModal({
   }
 
   const handleSubmit = async () => {
-    if (!validateForm()) return
+    if (!validateForm()) {
+      // Mostrar resumen de errores de validación local
+      const errorList = Object.values(errors).filter(Boolean)
+      if (errorList.length > 0) {
+        toast({
+          title: 'Completa los campos requeridos',
+          description: errorList[0], // mostrar el primer error
+          variant: 'destructive',
+        })
+      }
+      return
+    }
     setLoading(true)
     try {
       const response = await fetch('/api/users', {
@@ -164,10 +175,10 @@ export function CreateUserModal({
       })
       const result = await response.json()
       if (response.ok && result.success) {
-        if (formData.avatar && result.user?.id) {
+        if (formData.avatar && result.data?.id) {
           const fd = new FormData()
           fd.append('avatar', formData.avatar)
-          await fetch(`/api/users/${result.user.id}/avatar`, { method: 'POST', body: fd })
+          await fetch(`/api/users/${result.data.id}/avatar`, { method: 'POST', body: fd })
         }
         const roleLabel = USER_ROLE_FORM_OPTIONS.find(r => r.value === formData.role)?.label
         toast({
@@ -177,16 +188,31 @@ export function CreateUserModal({
         handleClose()
         onUserCreated()
       } else {
+        // Extraer el mensaje más específico disponible
+        let description = result.error || result.message || 'No se pudo crear el usuario'
+
+        // Si hay detalles de validación Zod, mostrar el primero
+        if (result.details && Array.isArray(result.details) && result.details.length > 0) {
+          const firstDetail = result.details[0]
+          const field = firstDetail.path?.[0] ? `${firstDetail.path[0]}: ` : ''
+          description = `${field}${firstDetail.message}`
+        }
+
+        // Marcar el campo con error si viene del servidor
+        if (response.status === 409 && result.error?.toLowerCase().includes('email')) {
+          setErrors(prev => ({ ...prev, email: 'Este email ya está registrado' }))
+        }
+
         toast({
-          title: 'Error al crear usuario',
-          description: result.error || 'No se pudo crear el usuario',
+          title: response.status === 409 ? 'Email ya registrado' : 'Error al crear usuario',
+          description,
           variant: 'destructive',
         })
       }
-    } catch {
+    } catch (err) {
       toast({
         title: 'Error de conexión',
-        description: 'No se pudo conectar con el servidor',
+        description: err instanceof Error ? err.message : 'No se pudo conectar con el servidor',
         variant: 'destructive',
       })
     } finally {

@@ -11,21 +11,8 @@ import { Badge } from '@/components/ui/badge'
 import { RoleBadge } from '@/components/ui/role-badge'
 import { Separator } from '@/components/ui/separator'
 import {
-  User,
-  Mail,
-  Phone,
-  Building,
-  Camera,
-  Save,
-  AlertCircle,
-  AlertTriangle,
-  Activity,
-  RotateCcw,
-  X,
-  Lock,
-  Unlock,
-  Calendar,
-  Ticket,
+  User, Building, Camera, Save, AlertCircle, AlertTriangle,
+  Activity, RotateCcw, X, Lock, Unlock, Calendar, Ticket,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { UserData } from '@/hooks/use-users'
@@ -33,6 +20,7 @@ import { USER_ROLE_FORM_OPTIONS, type UserRole } from '@/lib/constants/user-cons
 import { DepartmentSelector } from '@/components/ui/department-selector'
 import { Switch } from '@/components/ui/switch'
 import { useEffect as useEffectHook, useState as useStateHook } from 'react'
+import { extractApiError, extractCatchError } from '@/lib/utils/api-error'
 
 interface EditUserModalProps {
   isOpen: boolean
@@ -54,36 +42,20 @@ interface EditUserData {
   avatar?: File
 }
 
-// ── Componente informativo de módulos activos del usuario ─────────────────
+// ── Módulos activos del usuario (informativo) ─────────────────────────────
 
-function UserModulesInfo({
-  userId,
-  role,
-  canManageInventory,
-}: {
-  userId: string
-  role: string
-  canManageInventory: boolean
+function UserModulesInfo({ userId, canManageInventory }: {
+  userId: string; role: string; canManageInventory: boolean
 }) {
   const [data, setData] = useStateHook<{
-    tickets: boolean
-    inventory: boolean
-    families: Array<{
-      id: string
-      name: string
-      code: string
-      color?: string | null
-      modules: { tickets: boolean; inventory: boolean }
-    }>
+    tickets: boolean; inventory: boolean
+    families: Array<{ id: string; name: string; code: string; color?: string | null; modules: { tickets: boolean; inventory: boolean } }>
   } | null>(null)
 
   useEffectHook(() => {
-    // Carga los módulos activos del usuario para mostrarlos informativamente
     fetch(`/api/user/modules?userId=${userId}`)
       .then(r => (r.ok ? r.json() : null))
-      .then(d => {
-        if (d) setData(d)
-      })
+      .then(d => { if (d) setData(d) })
       .catch(() => {})
   }, [userId, canManageInventory])
 
@@ -97,27 +69,11 @@ function UserModulesInfo({
       </p>
       <div className='flex flex-wrap gap-1.5'>
         {data.families.map(f => (
-          <span
-            key={f.id}
-            className='inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border bg-background'
-          >
-            {f.color && (
-              <span
-                className='w-2 h-2 rounded-full flex-shrink-0'
-                style={{ backgroundColor: f.color }}
-              />
-            )}
+          <span key={f.id} className='inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border bg-background'>
+            {f.color && <span className='w-2 h-2 rounded-full flex-shrink-0' style={{ backgroundColor: f.color }} />}
             <span className='font-medium'>{f.name}</span>
-            {f.modules.tickets && (
-              <span className='text-primary' title='Tickets habilitado'>
-                🎫
-              </span>
-            )}
-            {f.modules.inventory && (
-              <span className='text-primary' title='Inventario habilitado'>
-                📦
-              </span>
-            )}
+            {f.modules.tickets && <span className='text-primary' title='Tickets habilitado'>🎫</span>}
+            {f.modules.inventory && <span className='text-primary' title='Inventario habilitado'>📦</span>}
           </span>
         ))}
       </div>
@@ -132,13 +88,7 @@ function UserModulesInfo({
 
 // ── Modal principal ────────────────────────────────────────────────────────
 
-export function EditUserModal({
-  isOpen,
-  onClose,
-  onUserUpdated,
-  user,
-  departments,
-}: EditUserModalProps) {
+export function EditUserModal({ isOpen, onClose, onUserUpdated, user, departments }: EditUserModalProps) {
   const { data: session } = useSession()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
@@ -148,18 +98,18 @@ export function EditUserModal({
   const [showResetPassword, setShowResetPassword] = useState(false)
   const [unlockLoading, setUnlockLoading] = useState(false)
   const [isLocked, setIsLocked] = useState(false)
-
   const [formData, setFormData] = useState<EditUserData>({
-    name: '',
-    email: '',
-    role: 'CLIENT',
-    departmentId: '',
-    phone: '',
-    isActive: true,
-    canManageInventory: false,
-    isSuperAdmin: false,
+    name: '', email: '', role: 'CLIENT', departmentId: '', phone: '',
+    isActive: true, canManageInventory: false, isSuperAdmin: false,
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  const showApiError = (title: string, result: any, fallback?: string) => {
+    toast({ title, description: extractApiError(result, fallback), variant: 'destructive' })
+  }
+  const showNetworkError = (err: unknown) => {
+    toast({ title: 'Error de conexión', description: extractCatchError(err), variant: 'destructive' })
+  }
 
   useEffect(() => {
     if (user && isOpen) {
@@ -167,8 +117,7 @@ export function EditUserModal({
         name: user.name,
         email: user.email,
         role: user.role,
-        departmentId:
-          typeof user.department === 'object' ? user.department?.id || '' : user.department || '',
+        departmentId: typeof user.department === 'object' ? user.department?.id || '' : user.department || '',
         phone: user.phone || '',
         isActive: user.isActive,
         canManageInventory: (user as any).canManageInventory ?? false,
@@ -210,14 +159,10 @@ export function EditUserModal({
         setShowResetPassword(false)
         setNewPassword('')
       } else {
-        toast({
-          title: 'Error',
-          description: result.error || 'No se pudo actualizar',
-          variant: 'destructive',
-        })
+        showApiError('Error al resetear contraseña', result)
       }
-    } catch {
-      toast({ title: 'Error de conexión', variant: 'destructive' })
+    } catch (err) {
+      showNetworkError(err)
     } finally {
       setResetPasswordLoading(false)
     }
@@ -233,10 +178,10 @@ export function EditUserModal({
         toast({ title: 'Acceso desbloqueado', description: result.message })
         setIsLocked(false)
       } else {
-        toast({ title: 'Error', description: result.error, variant: 'destructive' })
+        showApiError('Error al desbloquear', result)
       }
-    } catch {
-      toast({ title: 'Error de conexión', variant: 'destructive' })
+    } catch (err) {
+      showNetworkError(err)
     } finally {
       setUnlockLoading(false)
     }
@@ -246,19 +191,11 @@ export function EditUserModal({
     const file = e.target.files?.[0]
     if (!file) return
     if (!file.type.startsWith('image/')) {
-      toast({
-        title: 'Archivo inválido',
-        description: 'Selecciona una imagen válida',
-        variant: 'destructive',
-      })
+      toast({ title: 'Archivo inválido', description: 'Selecciona una imagen válida', variant: 'destructive' })
       return
     }
     if (file.size > 5 * 1024 * 1024) {
-      toast({
-        title: 'Archivo muy grande',
-        description: 'La imagen debe ser menor a 5MB',
-        variant: 'destructive',
-      })
+      toast({ title: 'Archivo muy grande', description: 'La imagen debe ser menor a 5MB', variant: 'destructive' })
       return
     }
     setFormData(p => ({ ...p, avatar: file }))
@@ -278,22 +215,21 @@ export function EditUserModal({
         toast({ title: 'Avatar eliminado' })
         onUserUpdated()
       } else {
-        toast({ title: 'Error', description: result.error, variant: 'destructive' })
+        showApiError('Error al eliminar avatar', result)
       }
-    } catch {
-      toast({ title: 'Error de conexión', variant: 'destructive' })
+    } catch (err) {
+      showNetworkError(err)
     }
   }
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
     if (!formData.name.trim()) newErrors.name = 'El nombre es requerido'
+    else if (formData.name.trim().length < 2) newErrors.name = 'Mínimo 2 caracteres'
     if (!formData.email.trim()) newErrors.email = 'El email es requerido'
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Email inválido'
-    if (formData.phone && !/^[\d\s\-\+\(\)]+$/.test(formData.phone))
-      newErrors.phone = 'Formato inválido'
-    if (formData.role !== 'ADMIN' && !formData.departmentId)
-      newErrors.departmentId = 'Requerido para este rol'
+    if (formData.phone && !/^[\d\s\-\+\(\)]+$/.test(formData.phone)) newErrors.phone = 'Formato inválido'
+    if (formData.role !== 'ADMIN' && !formData.departmentId) newErrors.departmentId = 'Requerido para este rol'
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -323,50 +259,34 @@ export function EditUserModal({
           fd.append('avatar', formData.avatar)
           await fetch(`/api/users/${user.id}/avatar`, { method: 'POST', body: fd })
         }
-        toast({
-          title: 'Usuario actualizado',
-          description: `${formData.name} actualizado correctamente`,
-        })
-        // Emitir evento para que useUserModules recargue la navegación
+        toast({ title: 'Usuario actualizado', description: `${formData.name} actualizado correctamente` })
         window.dispatchEvent(new CustomEvent('modules-updated'))
         handleClose()
         onUserUpdated()
       } else {
-        toast({
-          title: 'Error',
-          description: result.error || 'No se pudo actualizar',
-          variant: 'destructive',
-        })
+        if (res.status === 409 && extractApiError(result).toLowerCase().includes('email')) {
+          setErrors(prev => ({ ...prev, email: 'Este email ya está registrado' }))
+        }
+        showApiError('Error al actualizar usuario', result)
       }
-    } catch {
-      toast({ title: 'Error de conexión', variant: 'destructive' })
+    } catch (err) {
+      showNetworkError(err)
     } finally {
       setLoading(false)
     }
   }
 
   const isCurrentUser = user?.id === session?.user?.id
-  const selectedDepartment = departments.find(d => d.id === formData.departmentId)
-
   const formatDate = (dateString?: string) =>
-    dateString
-      ? new Date(dateString).toLocaleDateString('es-ES', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        })
-      : '—'
+    dateString ? new Date(dateString).toLocaleDateString('es-ES', {
+      year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+    }) : '—'
 
   if (!user) return null
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent
-        className='max-w-2xl max-h-[90vh] overflow-y-auto'
-        aria-describedby={undefined}
-      >
+      <DialogContent className='max-w-2xl max-h-[90vh] overflow-y-auto' aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className='flex items-center gap-2'>
             <User className='h-5 w-5 text-primary' />
@@ -375,394 +295,148 @@ export function EditUserModal({
         </DialogHeader>
 
         <div className='space-y-6'>
-          {/* ── CABECERA: Avatar + info básica ─────────────────────── */}
+          {/* Cabecera: Avatar + info */}
           <div className='flex items-center gap-4 p-4 rounded-lg bg-muted/40 border border-border'>
-            {/* Avatar con controles */}
             <div className='relative group shrink-0'>
               <Avatar className='h-16 w-16 border-2 border-background shadow'>
                 <AvatarImage src={avatarPreview || user.avatar || undefined} alt={user.name} />
                 <AvatarFallback className='text-base font-semibold bg-primary/10 text-primary'>
-                  {user.name
-                    .split(' ')
-                    .slice(0, 2)
-                    .map(n => n[0])
-                    .join('')
-                    .toUpperCase()}
+                  {user.name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()}
                 </AvatarFallback>
               </Avatar>
-              {/* Overlay de acciones al hover */}
               <div className='absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1'>
-                <button
-                  type='button'
-                  title='Cambiar foto'
-                  onClick={() => document.getElementById('edit-avatar-input')?.click()}
-                  className='p-1 rounded-full bg-white/20 hover:bg-white/40 text-white'
-                >
-                  <Camera className='h-3.5 w-3.5' />
-                </button>
-                {(avatarPreview || user.avatar) && (
-                  <button
-                    type='button'
-                    title='Eliminar foto'
-                    onClick={handleDeleteAvatar}
-                    className='p-1 rounded-full bg-white/20 hover:bg-red-500/60 text-white'
-                  >
-                    <X className='h-3.5 w-3.5' />
-                  </button>
-                )}
-                {formData.avatar && (
-                  <button
-                    type='button'
-                    title='Deshacer cambio'
-                    onClick={() => {
-                      setFormData(p => ({ ...p, avatar: undefined }))
-                      setAvatarPreview(user.avatar || null)
-                    }}
-                    className='p-1 rounded-full bg-white/20 hover:bg-amber-500/60 text-white'
-                  >
-                    <RotateCcw className='h-3.5 w-3.5' />
-                  </button>
-                )}
+                <button type='button' title='Cambiar foto' onClick={() => document.getElementById('edit-avatar-input')?.click()} className='p-1 rounded-full bg-white/20 hover:bg-white/40 text-white'><Camera className='h-3.5 w-3.5' /></button>
+                {(avatarPreview || user.avatar) && <button type='button' title='Eliminar foto' onClick={handleDeleteAvatar} className='p-1 rounded-full bg-white/20 hover:bg-red-500/60 text-white'><X className='h-3.5 w-3.5' /></button>}
+                {formData.avatar && <button type='button' title='Deshacer' onClick={() => { setFormData(p => ({ ...p, avatar: undefined })); setAvatarPreview(user.avatar || null) }} className='p-1 rounded-full bg-white/20 hover:bg-amber-500/60 text-white'><RotateCcw className='h-3.5 w-3.5' /></button>}
               </div>
-              <input
-                id='edit-avatar-input'
-                type='file'
-                accept='image/*'
-                onChange={handleAvatarChange}
-                className='hidden'
-              />
+              <input id='edit-avatar-input' type='file' accept='image/*' onChange={handleAvatarChange} className='hidden' />
             </div>
-
-            {/* Info del usuario */}
             <div className='flex-1 min-w-0'>
               <div className='flex items-center gap-2 flex-wrap'>
                 <span className='font-semibold text-foreground truncate'>{user.name}</span>
                 <RoleBadge role={formData.role} isSuperAdmin={formData.isSuperAdmin} />
-                {isCurrentUser && (
-                  <Badge variant='outline' className='text-xs'>
-                    Tu cuenta
-                  </Badge>
-                )}
-                {isLocked && (
-                  <Badge variant='destructive' className='text-xs flex items-center gap-1'>
-                    <Lock className='h-3 w-3' />
-                    Bloqueado
-                  </Badge>
-                )}
+                {isCurrentUser && <Badge variant='outline' className='text-xs'>Tu cuenta</Badge>}
+                {isLocked && <Badge variant='destructive' className='text-xs flex items-center gap-1'><Lock className='h-3 w-3' />Bloqueado</Badge>}
               </div>
               <p className='text-sm text-muted-foreground mt-0.5'>{user.email}</p>
               <div className='flex items-center gap-3 mt-1.5 text-xs text-muted-foreground'>
-                <span className='flex items-center gap-1'>
-                  <Calendar className='h-3 w-3' />
-                  Registro: {formatDate(user.createdAt)}
-                </span>
-                <span className='flex items-center gap-1'>
-                  <Activity className='h-3 w-3' />
-                  Último acceso: {formatDate(user.lastLogin)}
-                </span>
+                <span className='flex items-center gap-1'><Calendar className='h-3 w-3' />Registro: {formatDate(user.createdAt)}</span>
+                <span className='flex items-center gap-1'><Activity className='h-3 w-3' />Último acceso: {formatDate(user.lastLogin)}</span>
               </div>
             </div>
-
-            {/* Estadísticas rápidas */}
             <div className='flex gap-3 shrink-0'>
               <div className='text-center'>
-                <p className='text-lg font-bold text-primary'>
-                  {(user._count as any)?.tickets_tickets_clientIdTousers ?? 0}
-                </p>
-                <p className='text-xs text-muted-foreground flex items-center gap-0.5'>
-                  <Ticket className='h-3 w-3' />
-                  Tickets
-                </p>
+                <p className='text-lg font-bold text-primary'>{(user._count as any)?.tickets_tickets_clientIdTousers ?? 0}</p>
+                <p className='text-xs text-muted-foreground flex items-center gap-0.5'><Ticket className='h-3 w-3' />Tickets</p>
               </div>
               <div className='text-center'>
-                <p className='text-lg font-bold text-green-600 dark:text-green-400'>
-                  {user._count?.tickets_tickets_assigneeIdTousers ?? 0}
-                </p>
+                <p className='text-lg font-bold text-green-600 dark:text-green-400'>{user._count?.tickets_tickets_assigneeIdTousers ?? 0}</p>
                 <p className='text-xs text-muted-foreground'>Asignados</p>
               </div>
             </div>
           </div>
 
-          {/* Alerta usuario actual */}
           {isCurrentUser && (
             <div className='flex items-start gap-2 rounded-lg bg-muted/50 border px-3 py-2 text-sm text-muted-foreground'>
               <AlertTriangle className='h-4 w-4 mt-0.5 shrink-0' />
-              <span>
-                Estás editando tu propia cuenta. No puedes cambiar tu rol ni desactivarla.
-              </span>
+              <span>Estás editando tu propia cuenta. No puedes cambiar tu rol ni desactivarla.</span>
             </div>
           )}
 
-          {/* ── SECCIÓN 1: Datos personales ────────────────────────── */}
+          {/* Datos personales */}
           <div className='space-y-3'>
-            <h3 className='text-sm font-semibold text-foreground flex items-center gap-1.5'>
-              <User className='h-4 w-4 text-muted-foreground' />
-              Datos personales
-            </h3>
+            <h3 className='text-sm font-semibold text-foreground flex items-center gap-1.5'><User className='h-4 w-4 text-muted-foreground' />Datos personales</h3>
             <div className='grid grid-cols-2 gap-3'>
-              <div className='space-y-1'>
-                <Label htmlFor='edit-name'>
-                  Nombre completo <span className='text-destructive'>*</span>
-                </Label>
-                <Input
-                  id='edit-name'
-                  value={formData.name}
-                  onChange={e => setFormData(p => ({ ...p, name: e.target.value }))}
-                  placeholder='Juan Pérez'
-                  className={errors.name ? 'border-destructive' : ''}
-                />
-                {errors.name && (
-                  <p className='text-xs text-destructive flex items-center gap-1'>
-                    <AlertCircle className='h-3 w-3' />
-                    {errors.name}
-                  </p>
-                )}
-              </div>
-              <div className='space-y-1'>
-                <Label htmlFor='edit-email'>
-                  Email <span className='text-destructive'>*</span>
-                </Label>
-                <Input
-                  id='edit-email'
-                  type='email'
-                  value={formData.email}
-                  onChange={e => setFormData(p => ({ ...p, email: e.target.value }))}
-                  placeholder='usuario@empresa.com'
-                  className={errors.email ? 'border-destructive' : ''}
-                />
-                {errors.email && (
-                  <p className='text-xs text-destructive flex items-center gap-1'>
-                    <AlertCircle className='h-3 w-3' />
-                    {errors.email}
-                  </p>
-                )}
-              </div>
-              <div className='space-y-1'>
-                <Label htmlFor='edit-phone'>Teléfono</Label>
-                <Input
-                  id='edit-phone'
-                  value={formData.phone}
-                  onChange={e => setFormData(p => ({ ...p, phone: e.target.value }))}
-                  placeholder='+593 99 999 9999'
-                  className={errors.phone ? 'border-destructive' : ''}
-                />
-                {errors.phone && (
-                  <p className='text-xs text-destructive flex items-center gap-1'>
-                    <AlertCircle className='h-3 w-3' />
-                    {errors.phone}
-                  </p>
-                )}
-              </div>
+              {([
+                { id: 'edit-name', label: 'Nombre completo', key: 'name', placeholder: 'Juan Pérez', required: true },
+                { id: 'edit-email', label: 'Email', key: 'email', placeholder: 'usuario@empresa.com', type: 'email', required: true },
+                { id: 'edit-phone', label: 'Teléfono', key: 'phone', placeholder: '+593 99 999 9999' },
+              ] as const).map(({ id, label, key, placeholder, type, required }) => (
+                <div key={id} className='space-y-1'>
+                  <Label htmlFor={id}>{label} {required && <span className='text-destructive'>*</span>}</Label>
+                  <Input id={id} type={type} value={(formData as any)[key]} onChange={e => setFormData(p => ({ ...p, [key]: e.target.value }))} placeholder={placeholder} className={errors[key] ? 'border-destructive' : ''} />
+                  {errors[key] && <p className='text-xs text-destructive flex items-center gap-1'><AlertCircle className='h-3 w-3' />{errors[key]}</p>}
+                </div>
+              ))}
             </div>
           </div>
 
           <Separator />
 
-          {/* ── SECCIÓN 2: Rol y departamento ──────────────────────── */}
+          {/* Rol y departamento */}
           <div className='space-y-3'>
-            <h3 className='text-sm font-semibold text-foreground flex items-center gap-1.5'>
-              <Building className='h-4 w-4 text-muted-foreground' />
-              Rol y departamento
-            </h3>
+            <h3 className='text-sm font-semibold text-foreground flex items-center gap-1.5'><Building className='h-4 w-4 text-muted-foreground' />Rol y departamento</h3>
             <div className='grid grid-cols-2 gap-3'>
               <div className='space-y-1'>
-                <Label htmlFor='edit-role'>
-                  Rol del usuario <span className='text-destructive'>*</span>
-                </Label>
-                <select
-                  id='edit-role'
-                  value={formData.role}
-                  disabled={isCurrentUser}
-                  onChange={e => {
-                    const r = e.target.value as UserRole
-                    setFormData(p => ({ ...p, role: r }))
-                    if (r === 'ADMIN') setErrors(p => ({ ...p, departmentId: '' }))
-                  }}
-                  className='flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed'
-                >
-                  {USER_ROLE_FORM_OPTIONS.map(r => (
-                    <option key={r.value} value={r.value}>
-                      {r.label}
-                    </option>
-                  ))}
+                <Label htmlFor='edit-role'>Rol del usuario <span className='text-destructive'>*</span></Label>
+                <select id='edit-role' value={formData.role} disabled={isCurrentUser}
+                  onChange={e => { const r = e.target.value as UserRole; setFormData(p => ({ ...p, role: r })); if (r === 'ADMIN') setErrors(p => ({ ...p, departmentId: '' })) }}
+                  className='flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed'>
+                  {USER_ROLE_FORM_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                 </select>
-                {isCurrentUser && (
-                  <p className='text-xs text-amber-600'>No puedes cambiar tu propio rol</p>
-                )}
+                {isCurrentUser && <p className='text-xs text-amber-600'>No puedes cambiar tu propio rol</p>}
               </div>
               <div className='space-y-1'>
-                <Label>
-                  Departamento{' '}
-                  {formData.role !== 'ADMIN' && <span className='text-destructive'>*</span>}
-                </Label>
-                <DepartmentSelector
-                  value={formData.departmentId || null}
-                  onChange={val => setFormData(p => ({ ...p, departmentId: val ?? '' }))}
-                  departments={departments as any}
-                  placeholder='Buscar departamento...'
-                  error={errors.departmentId}
-                />
+                <Label>Departamento {formData.role !== 'ADMIN' && <span className='text-destructive'>*</span>}</Label>
+                <DepartmentSelector value={formData.departmentId || null} onChange={val => setFormData(p => ({ ...p, departmentId: val ?? '' }))} departments={departments as any} placeholder='Buscar departamento...' error={errors.departmentId} />
               </div>
             </div>
           </div>
 
           <Separator />
 
-          {/* ── SECCIÓN 3: Estado y permisos ───────────────────────── */}
+          {/* Estado y permisos */}
           <div className='space-y-3'>
             <h3 className='text-sm font-semibold text-foreground'>Estado y permisos</h3>
             <div className='space-y-2'>
-              {/* Estado activo */}
               <div className='flex items-center justify-between rounded-lg border px-3 py-2.5'>
-                <div>
-                  <p className='text-sm font-medium'>Usuario activo</p>
-                  <p className='text-xs text-muted-foreground'>
-                    El usuario puede iniciar sesión y usar el sistema
-                  </p>
-                </div>
-                <Switch
-                  checked={formData.isActive}
-                  onCheckedChange={v => setFormData(p => ({ ...p, isActive: v }))}
-                  disabled={isCurrentUser}
-                />
+                <div><p className='text-sm font-medium'>Usuario activo</p><p className='text-xs text-muted-foreground'>El usuario puede iniciar sesión y usar el sistema</p></div>
+                <Switch checked={formData.isActive} onCheckedChange={v => setFormData(p => ({ ...p, isActive: v }))} disabled={isCurrentUser} />
               </div>
-
-              {/* Gestor de inventario — solo no-ADMIN */}
               {formData.role !== 'ADMIN' && (
                 <div className='flex items-center justify-between rounded-lg border px-3 py-2.5'>
-                  <div>
-                    <p className='text-sm font-medium'>Gestor de Inventario</p>
-                    <p className='text-xs text-muted-foreground'>
-                      Puede gestionar activos, consumibles y configuración de inventario en sus
-                      familias asignadas
-                    </p>
-                  </div>
-                  <Switch
-                    checked={formData.canManageInventory}
-                    onCheckedChange={v => setFormData(p => ({ ...p, canManageInventory: v }))}
-                  />
+                  <div><p className='text-sm font-medium'>Gestor de Inventario</p><p className='text-xs text-muted-foreground'>Puede gestionar activos, consumibles y configuración de inventario en sus familias asignadas</p></div>
+                  <Switch checked={formData.canManageInventory} onCheckedChange={v => setFormData(p => ({ ...p, canManageInventory: v }))} />
                 </div>
               )}
-
-              {/* Super Admin — solo ADMIN y no es el usuario actual */}
               {formData.role === 'ADMIN' && !isCurrentUser && (
                 <div className='flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 px-3 py-2.5'>
-                  <div>
-                    <p className='text-sm font-medium'>Administrador Principal (Super Admin)</p>
-                    <p className='text-xs text-muted-foreground'>
-                      Acceso total a todas las familias y configuraciones del sistema.
-                    </p>
-                  </div>
-                  <Switch
-                    checked={formData.isSuperAdmin}
-                    onCheckedChange={v => setFormData(p => ({ ...p, isSuperAdmin: v }))}
-                  />
+                  <div><p className='text-sm font-medium'>Administrador Principal (Super Admin)</p><p className='text-xs text-muted-foreground'>Acceso total a todas las familias y configuraciones del sistema.</p></div>
+                  <Switch checked={formData.isSuperAdmin} onCheckedChange={v => setFormData(p => ({ ...p, isSuperAdmin: v }))} />
                 </div>
               )}
             </div>
-
-            {/* Módulos activos — informativo, muestra qué ve el usuario */}
             {user && formData.role !== 'ADMIN' && (
-              <UserModulesInfo
-                userId={user.id}
-                role={formData.role}
-                canManageInventory={formData.canManageInventory}
-              />
+              <UserModulesInfo userId={user.id} role={formData.role} canManageInventory={formData.canManageInventory} />
             )}
           </div>
 
           <Separator />
 
-          {/* ── SECCIÓN 4: Seguridad ───────────────────────────────── */}
+          {/* Seguridad */}
           <div className='space-y-3'>
-            <h3 className='text-sm font-semibold text-foreground flex items-center gap-1.5'>
-              <Lock className='h-4 w-4 text-muted-foreground' />
-              Seguridad
-            </h3>
+            <h3 className='text-sm font-semibold text-foreground flex items-center gap-1.5'><Lock className='h-4 w-4 text-muted-foreground' />Seguridad</h3>
             <div className='flex flex-wrap gap-2'>
               {!showResetPassword ? (
                 <>
-                  <Button
-                    type='button'
-                    variant='outline'
-                    size='sm'
-                    onClick={() => setShowResetPassword(true)}
-                    className='text-amber-600 border-amber-300 hover:bg-amber-50'
-                  >
-                    <Lock className='h-3.5 w-3.5 mr-1.5' />
-                    Resetear contraseña
-                  </Button>
-                  {isLocked && (
-                    <Button
-                      type='button'
-                      variant='outline'
-                      size='sm'
-                      onClick={handleUnlockAccess}
-                      disabled={unlockLoading}
-                      className='text-primary border-primary/30 hover:bg-primary/10'
-                    >
-                      <Unlock className='h-3.5 w-3.5 mr-1.5' />
-                      {unlockLoading ? 'Desbloqueando...' : 'Desbloquear acceso'}
-                    </Button>
-                  )}
+                  <Button type='button' variant='outline' size='sm' onClick={() => setShowResetPassword(true)} className='text-amber-600 border-amber-300 hover:bg-amber-50'><Lock className='h-3.5 w-3.5 mr-1.5' />Resetear contraseña</Button>
+                  {isLocked && <Button type='button' variant='outline' size='sm' onClick={handleUnlockAccess} disabled={unlockLoading} className='text-primary border-primary/30 hover:bg-primary/10'><Unlock className='h-3.5 w-3.5 mr-1.5' />{unlockLoading ? 'Desbloqueando...' : 'Desbloquear acceso'}</Button>}
                 </>
               ) : (
                 <div className='flex items-center gap-2 w-full'>
-                  <Input
-                    type='password'
-                    placeholder='Nueva contraseña (mín. 6 caracteres)'
-                    value={newPassword}
-                    onChange={e => setNewPassword(e.target.value)}
-                    className='flex-1 h-8 text-sm'
-                    autoFocus
-                  />
-                  <Button
-                    type='button'
-                    size='sm'
-                    onClick={handleResetPassword}
-                    disabled={resetPasswordLoading || newPassword.length < 6}
-                    className='bg-amber-600 hover:bg-amber-700 text-white shrink-0'
-                  >
-                    {resetPasswordLoading ? 'Guardando...' : 'Confirmar'}
-                  </Button>
-                  <Button
-                    type='button'
-                    variant='ghost'
-                    size='sm'
-                    onClick={() => {
-                      setShowResetPassword(false)
-                      setNewPassword('')
-                    }}
-                    className='shrink-0'
-                  >
-                    <X className='h-4 w-4' />
-                  </Button>
+                  <Input type='password' placeholder='Nueva contraseña (mín. 6 caracteres)' value={newPassword} onChange={e => setNewPassword(e.target.value)} className='flex-1 h-8 text-sm' autoFocus />
+                  <Button type='button' size='sm' onClick={handleResetPassword} disabled={resetPasswordLoading || newPassword.length < 6} className='bg-amber-600 hover:bg-amber-700 text-white shrink-0'>{resetPasswordLoading ? 'Guardando...' : 'Confirmar'}</Button>
+                  <Button type='button' variant='ghost' size='sm' onClick={() => { setShowResetPassword(false); setNewPassword('') }} className='shrink-0'><X className='h-4 w-4' /></Button>
                 </div>
               )}
             </div>
           </div>
 
-          {/* ── FOOTER ────────────────────────────────────────────── */}
+          {/* Footer */}
           <div className='flex justify-end gap-2 pt-2'>
-            <Button type='button' variant='outline' onClick={handleClose} disabled={loading}>
-              Cancelar
-            </Button>
-            <Button
-              type='button'
-              onClick={handleSubmit}
-              disabled={loading || !formData.name || !formData.email}
-            >
-              {loading ? (
-                <>
-                  <Save className='h-4 w-4 mr-2 animate-spin' />
-                  Guardando...
-                </>
-              ) : (
-                <>
-                  <Save className='h-4 w-4 mr-2' />
-                  Guardar cambios
-                </>
-              )}
+            <Button type='button' variant='outline' onClick={handleClose} disabled={loading}>Cancelar</Button>
+            <Button type='button' onClick={handleSubmit} disabled={loading || !formData.name || !formData.email}>
+              {loading ? <><Save className='h-4 w-4 mr-2 animate-spin' />Guardando...</> : <><Save className='h-4 w-4 mr-2' />Guardar cambios</>}
             </Button>
           </div>
         </div>

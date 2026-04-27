@@ -5,7 +5,7 @@ import { EquipmentService } from '@/lib/services/equipment.service'
 import { createEquipmentSchema, equipmentFiltersSchema } from '@/lib/validations/inventory/equipment'
 import { ZodError } from 'zod'
 import { prisma } from '@/lib/prisma'
-
+import { withCache, invalidateCache, buildCacheKey } from '@/lib/api-cache'
 import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
 
 /**
@@ -40,13 +40,21 @@ export async function GET(request: NextRequest) {
     // Validar filtros
     const validatedFilters = equipmentFiltersSchema.parse(filters)
 
-    // Obtener equipos
-    const result = await EquipmentService.listEquipment(
-      validatedFilters,
-      validatedFilters.page,
-      validatedFilters.limit,
-      session.user.id,
-      session.user.role
+    // Caché 60s — se invalida en POST/PUT/DELETE
+    const cacheKey = buildCacheKey('inventory:equipment', {
+      uid: session.user.id,
+      role: session.user.role,
+      ...validatedFilters,
+    })
+
+    const result = await withCache(cacheKey, 10, () =>
+      EquipmentService.listEquipment(
+        validatedFilters,
+        validatedFilters.page,
+        validatedFilters.limit,
+        session.user.id,
+        session.user.role
+      )
     )
 
     return NextResponse.json(result)
@@ -114,8 +122,8 @@ export async function POST(request: NextRequest) {
       session.user.id
     )
 
-    // Registrar en auditoría
-    // (ya se registra en EquipmentService.createEquipment)
+    // Invalidar caché de equipos
+    await invalidateCache('inventory:equipment:*').catch(() => {})
 
     return NextResponse.json(equipment, { status: 201 })
   } catch (error) {

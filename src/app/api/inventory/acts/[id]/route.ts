@@ -53,32 +53,39 @@ export async function GET(
     }
 
     // Verificar permisos: deliverer, receiver, ADMIN (cualquier admin), o gestor de inventario
-    const userId = session!.user.id
-    const userRole = session!.user.role
-    const isSuperAdmin = (session!.user as any).isSuperAdmin === true
-    const canManage = await import('@/lib/inventory-access').then(m =>
-      m.canManageInventory(userId, userRole)
-    )
+    // Si se accedió por token, no hay sesión — el token ya es la autorización
+    if (!token) {
+      if (!session?.user) {
+        return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+      }
 
-    const isDeliverer = (act as any).delivererInfo?.id === userId
-    const isReceiver  = (act as any).receiverInfo?.id  === userId
-    const isAdmin     = userRole === 'ADMIN'
-    const isManager   = canManage
-
-    // Para acceso por token no se requiere verificación de permisos (el token es la autorización)
-    if (!token && !isDeliverer && !isReceiver && !isAdmin && !isManager) {
-      return NextResponse.json(
-        { error: 'No tienes permisos para ver esta acta' },
-        { status: 403 }
+      const userId = session.user.id
+      const userRole = session.user.role
+      const isSuperAdmin = (session.user as any).isSuperAdmin === true
+      const canManage = await import('@/lib/inventory-access').then(m =>
+        m.canManageInventory(userId, userRole)
       )
+
+      const isDeliverer = (act as any).delivererInfo?.id === userId
+      const isReceiver  = (act as any).receiverInfo?.id  === userId
+      const isAdmin     = userRole === 'ADMIN'
+      const isManager   = canManage
+
+      if (!isDeliverer && !isReceiver && !isAdmin && !isManager) {
+        return NextResponse.json(
+          { error: 'No tienes permisos para ver esta acta' },
+          { status: 403 }
+        )
+      }
+
+      const accessLevel = isSuperAdmin ? 'superadmin' : isAdmin ? 'admin' : isManager ? 'manager' : 'participant'
+      const isExpired = DeliveryActService.isActExpired(act)
+      const canAccept = act.status === 'PENDING' && !isExpired
+
+      return NextResponse.json({ act, canAccept, isExpired, accessLevel })
     }
 
-    // Nivel de acceso para la UI
-    const accessLevel = !token
-      ? (isSuperAdmin ? 'superadmin' : isAdmin ? 'admin' : isManager ? 'manager' : 'participant')
-      : 'participant'
-
-    // Verificar si está expirada
+    // Acceso por token — sin verificación de permisos adicional
     const isExpired = DeliveryActService.isActExpired(act)
     const canAccept = act.status === 'PENDING' && !isExpired
 
@@ -86,7 +93,7 @@ export async function GET(
       act,
       canAccept,
       isExpired,
-      accessLevel,
+      accessLevel: 'participant',
     })
   } catch (error) {
     console.error('Error en GET /api/inventory/acts/[id]:', error)

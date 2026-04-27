@@ -211,10 +211,6 @@ export async function PUT(
     }
 
     // CONTROL DE PERMISOS POR ROL
-    // Variables compartidas entre bloques de rol
-    const allowedFields = session.user.role === 'CLIENT'
-      ? ['title', 'description']
-      : ['status', 'priority', 'assigneeId', 'categoryId', 'title', 'description', 'location']
     const filteredUpdates: any = {}
 
     if (session.user.role === 'CLIENT') {
@@ -557,7 +553,9 @@ export async function PUT(
 
           // ⭐ NUEVO: Notificar al administrador que el ticket fue resuelto
           const { triggerTicketResolvedToAdminEmail } = await import('@/lib/email-triggers')
-          triggerTicketResolvedToAdminEmail(finalId)
+          triggerTicketResolvedToAdminEmail(finalId).catch((err: Error) => {
+            console.error('[EMAIL] Error enviando email de ticket resuelto a admin:', err)
+          })
         }
 
         // ⭐ NUEVO: Disparar webhook de ticket cerrado

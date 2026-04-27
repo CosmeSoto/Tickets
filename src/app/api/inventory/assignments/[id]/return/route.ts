@@ -3,7 +3,6 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { ReturnActService } from '@/lib/services/return-act.service'
 import { canManageInventory } from '@/lib/inventory-access'
-import { randomUUID } from 'crypto'
 import prisma from '@/lib/prisma'
 import { notifyUser } from '@/lib/api/notify'
 
@@ -127,23 +126,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         },
       }
     )
-
-    // Audit log
-    await prisma.audit_logs.create({
-      data: {
-        id: randomUUID(),
-        action: 'RETURN_ACT_CREATED',
-        entityType: 'inventory',
-        entityId: assignmentId,
-        userId: session.user.id,
-        details: {
-          folio: (returnAct as any).folio,
-          returnCondition,
-          equipmentCode: assignment.equipment.code,
-        },
-        createdAt: new Date(),
-      },
-    }).catch(() => {})
 
     return NextResponse.json({ returnAct }, { status: 201 })
   } catch (error) {
