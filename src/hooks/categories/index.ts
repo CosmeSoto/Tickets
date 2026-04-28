@@ -26,24 +26,24 @@ export function useCategories(options: UseCategoriesOptions = {}) {
     pageSize = 20,
     enableMassActions = true,
   } = options
-  
+
   // Estados de filtros
   const [searchTerm, setSearchTerm] = useState('')
   const [levelFilter, setLevelFilter] = useState<CategoryLevel>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [departmentFilter, setDepartmentFilter] = useState<string>('all')
   const [viewMode, setViewMode] = useState<'tree' | 'table'>('table')
-  
+
   // Hook de datos
   const dataHook = useCategoriesData({ cacheTTL, enableCache })
-  
+
   // Hook de formularios
   const formHook = useCategoriesForm({
     onSuccess: () => {
       dataHook.loadCategories(searchTerm, levelFilter, true)
     },
   })
-  
+
   // Cargar datos iniciales
   useEffect(() => {
     dataHook.loadCategories(searchTerm, levelFilter)
@@ -52,7 +52,7 @@ export function useCategories(options: UseCategoriesOptions = {}) {
     dataHook.loadDepartments()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // Solo al montar
-  
+
   // Auto-refresh
   useEffect(() => {
     if (!autoRefresh) return
@@ -62,108 +62,112 @@ export function useCategories(options: UseCategoriesOptions = {}) {
     return () => clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRefresh, refreshInterval])
-  
+
   // NO recargar cuando cambien los filtros - el filtrado se hace en el cliente
   // El filtrado se maneja en filteredCategories con useMemo
-  
+
   // Categorías filtradas
   const filteredCategories = useMemo(() => {
     return dataHook.categories.filter(category => {
       // Filtro de búsqueda
-      const matchesSearch = !searchTerm || 
+      const matchesSearch =
+        !searchTerm ||
         category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (category.description && category.description.toLowerCase().includes(searchTerm.toLowerCase()))
-      
+        (category.description &&
+          category.description.toLowerCase().includes(searchTerm.toLowerCase()))
+
       // Filtro de nivel
       const matchesLevel = levelFilter === 'all' || category.level.toString() === levelFilter
-      
+
       // Filtro de estado
-      const matchesStatus = statusFilter === 'all' || 
+      const matchesStatus =
+        statusFilter === 'all' ||
         (statusFilter === 'active' && category.isActive) ||
         (statusFilter === 'inactive' && !category.isActive)
-      
+
       // NO filtrar por departamento aquí — se hace en el componente junto con familia
-      
+
       return matchesSearch && matchesLevel && matchesStatus
     })
   }, [dataHook.categories, searchTerm, levelFilter, statusFilter])
-  
+
   // Estadísticas
   const stats = useMemo(() => {
     const total = dataHook.categories.length
     const active = dataHook.categories.filter(c => c.isActive).length
     const inactive = total - active
     const filtered = filteredCategories.length
-    const withTechnicians = dataHook.categories.filter(c => 
-      c.technician_assignments && c.technician_assignments.length > 0
+    const withTechnicians = dataHook.categories.filter(
+      c => c.technician_assignments && c.technician_assignments.length > 0
     ).length
-    
+
     const byLevel = {
       level1: dataHook.categories.filter(c => c.level === 1).length,
       level2: dataHook.categories.filter(c => c.level === 2).length,
       level3: dataHook.categories.filter(c => c.level === 3).length,
       level4: dataHook.categories.filter(c => c.level === 4).length,
     }
-    
+
     return { total, active, inactive, filtered, withTechnicians, byLevel }
   }, [dataHook.categories, filteredCategories])
-  
-  // Paginación
-  const pagination = enablePagination
-    ? usePagination(filteredCategories, { pageSize })
-    : null
-  
-  // Acciones masivas
-  const massActionsHook = enableMassActions 
-    ? useMassActions<any>({
-        getItemId: (item) => item.id,
-        getItemName: (item) => item.name,
-        onBulkDelete: async (items) => {
-          // Implementar eliminación masiva
-          await Promise.all(items.map(item => 
-            fetch(`/api/categories/${item.id}`, { method: 'DELETE' })
-          ))
-          dataHook.loadCategories(searchTerm, levelFilter, true)
-        },
-        onBulkActivate: async (items) => {
-          // Implementar activación masiva
-          await Promise.all(items.map(item =>
-            fetch(`/api/categories/${item.id}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ isActive: true })
-            })
-          ))
-          dataHook.loadCategories(searchTerm, levelFilter, true)
-        },
-        onBulkDeactivate: async (items) => {
-          // Implementar desactivación masiva
-          await Promise.all(items.map(item =>
-            fetch(`/api/categories/${item.id}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ isActive: false })
-            })
-          ))
-          dataHook.loadCategories(searchTerm, levelFilter, true)
-        },
-        onBulkExport: async (items) => {
-          // Implementar exportación
-          const csv = items.map(item => 
-            `${item.id},${item.name},${item.level},${item.isActive}`
-          ).join('\n')
-          const blob = new Blob([csv], { type: 'text/csv' })
-          const url = URL.createObjectURL(blob)
-          const a = document.createElement('a')
-          a.href = url
-          a.download = 'categories.csv'
-          a.click()
-        }
-      })
-    : null
-  
-  const massActions = massActionsHook
-  
+
+  // Paginación - siempre llamar el hook, pero retornar null si está deshabilitado
+  const paginationHook = usePagination(filteredCategories, { pageSize })
+  const pagination = enablePagination ? paginationHook : null
+
+  // Acciones masivas - siempre llamar el hook, pero retornar null si está deshabilitado
+  const massActionsHook = useMassActions<any>({
+    getItemId: item => item.id,
+    getItemName: item => item.name,
+    onBulkDelete: async items => {
+      // Implementar eliminación masiva
+      await Promise.all(
+        items.map(item => fetch(`/api/categories/${item.id}`, { method: 'DELETE' }))
+      )
+      dataHook.loadCategories(searchTerm, levelFilter, true)
+    },
+    onBulkActivate: async items => {
+      // Implementar activación masiva
+      await Promise.all(
+        items.map(item =>
+          fetch(`/api/categories/${item.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ isActive: true }),
+          })
+        )
+      )
+      dataHook.loadCategories(searchTerm, levelFilter, true)
+    },
+    onBulkDeactivate: async items => {
+      // Implementar desactivación masiva
+      await Promise.all(
+        items.map(item =>
+          fetch(`/api/categories/${item.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ isActive: false }),
+          })
+        )
+      )
+      dataHook.loadCategories(searchTerm, levelFilter, true)
+    },
+    onBulkExport: async items => {
+      // Implementar exportación
+      const csv = items
+        .map(item => `${item.id},${item.name},${item.level},${item.isActive}`)
+        .join('\n')
+      const blob = new Blob([csv], { type: 'text/csv' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'categories.csv'
+      a.click()
+    },
+  })
+
+  const massActions = enableMassActions ? massActionsHook : null
+
   // Función de refresh
   const refresh = useCallback(() => {
     dataHook.loadCategories(searchTerm, levelFilter, true)
@@ -171,35 +175,40 @@ export function useCategories(options: UseCategoriesOptions = {}) {
     dataHook.loadAvailableTechnicians()
     dataHook.loadDepartments()
   }, [searchTerm, levelFilter])
-  
+
   // Wrapper para handleSubmit
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault()
-    await formHook.handleSubmit(
-      dataHook.invalidateCache,
-      () => dataHook.loadCategories(searchTerm, levelFilter, true),
-      dataHook.availableParents // ← PASAR availableParents
-    )
-  }, [formHook, dataHook, searchTerm, levelFilter])
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault()
+      await formHook.handleSubmit(
+        dataHook.invalidateCache,
+        () => dataHook.loadCategories(searchTerm, levelFilter, true),
+        dataHook.availableParents // ← PASAR availableParents
+      )
+    },
+    [formHook, dataHook, searchTerm, levelFilter]
+  )
 
   // Wrapper para handleDelete
   const handleDelete = useCallback(async () => {
-    await formHook.handleDelete(
-      dataHook.invalidateCache,
-      () => dataHook.loadCategories(searchTerm, levelFilter, true)
+    await formHook.handleDelete(dataHook.invalidateCache, () =>
+      dataHook.loadCategories(searchTerm, levelFilter, true)
     )
   }, [formHook, dataHook, searchTerm, levelFilter])
 
   // Wrapper para handleEdit — recarga departamentos filtrados por familia
-  const handleEdit = useCallback((category: any) => {
-    formHook.handleEdit(category)
-    // Recargar departamentos, padres y técnicos filtrados por la familia de la categoría
-    const familyId = category.departments?.familyId ?? category.department?.familyId ?? null
-    dataHook.loadDepartments(familyId)
-    dataHook.loadAvailableParents(category.id, familyId ?? undefined)
-    dataHook.loadAvailableTechnicians(familyId ?? undefined)
-  }, [formHook, dataHook])
-  
+  const handleEdit = useCallback(
+    (category: any) => {
+      formHook.handleEdit(category)
+      // Recargar departamentos, padres y técnicos filtrados por la familia de la categoría
+      const familyId = category.departments?.familyId ?? category.department?.familyId ?? null
+      dataHook.loadDepartments(familyId)
+      dataHook.loadAvailableParents(category.id, familyId ?? undefined)
+      dataHook.loadAvailableTechnicians(familyId ?? undefined)
+    },
+    [formHook, dataHook]
+  )
+
   return {
     // Estados de datos
     categories: dataHook.categories,
@@ -208,7 +217,7 @@ export function useCategories(options: UseCategoriesOptions = {}) {
     departments: dataHook.departments,
     loading: dataHook.loading,
     error: dataHook.error,
-    
+
     // Estados de filtros
     searchTerm,
     setSearchTerm,
@@ -220,7 +229,7 @@ export function useCategories(options: UseCategoriesOptions = {}) {
     setDepartmentFilter,
     viewMode,
     setViewMode,
-    
+
     // Estados de formulario
     isDialogOpen: formHook.isDialogOpen,
     setIsDialogOpen: formHook.setIsDialogOpen,
@@ -232,15 +241,15 @@ export function useCategories(options: UseCategoriesOptions = {}) {
     formErrors: formHook.formErrors,
     submitting: formHook.submitting,
     deleting: formHook.deleting,
-    
+
     // Datos procesados
     filteredCategories,
     stats,
-    
+
     // Paginación y acciones masivas
     pagination,
     massActions,
-    
+
     // Funciones principales
     loadCategories: dataHook.loadCategories,
     loadAvailableParents: dataHook.loadAvailableParents,
@@ -257,7 +266,7 @@ export function useCategories(options: UseCategoriesOptions = {}) {
       dataHook.loadAvailableTechnicians()
     }, [formHook, dataHook]),
     resetForm: formHook.resetForm,
-    
+
     // Funciones de utilidad
     refresh,
   }

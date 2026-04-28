@@ -16,12 +16,12 @@ export async function POST(request: NextRequest) {
     // Buscar backups fallidos
     const failedBackups = await prisma.backups.findMany({
       where: {
-        status: 'failed'
-      }
+        status: 'failed',
+      },
     })
 
     let cleanedCount = 0
-    let errors: string[] = []
+    const errors: string[] = []
 
     for (const backup of failedBackups) {
       try {
@@ -36,12 +36,11 @@ export async function POST(request: NextRequest) {
 
         // Eliminar registro de base de datos
         await prisma.backups.delete({
-          where: { id: backup.id }
+          where: { id: backup.id },
         })
 
         cleanedCount++
         console.log(`Backup fallido eliminado: ${backup.id}`)
-
       } catch (error) {
         const errorMsg = `Error eliminando backup ${backup.id}: ${error instanceof Error ? error.message : 'Error desconocido'}`
         console.error(errorMsg)
@@ -76,15 +75,14 @@ export async function POST(request: NextRequest) {
       data: {
         cleanedCount,
         totalFailed: failedBackups.length,
-        errors: errors.length > 0 ? errors : undefined
-      }
+        errors: errors.length > 0 ? errors : undefined,
+      },
     })
-
   } catch (error) {
     console.error('Error en limpieza de backups:', error)
-    
+
     return NextResponse.json(
-      { 
+      {
         error: error instanceof Error ? error.message : 'Error en limpieza de backups',
       },
       { status: 500 }

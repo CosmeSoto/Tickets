@@ -26,7 +26,7 @@ export class SecurityConfigService {
   static async getConfig(): Promise<SecurityConfig> {
     // Usar caché si está disponible y no ha expirado
     const now = Date.now()
-    if (this.cache && (now - this.cacheTime) < this.CACHE_TTL) {
+    if (this.cache && now - this.cacheTime < this.CACHE_TTL) {
       return this.cache
     }
 
@@ -41,10 +41,10 @@ export class SecurityConfigService {
               'passwordMinLength',
               'requirePasswordChange',
               'maxFileSize',
-              'allowedFileTypes'
-            ]
-          }
-        }
+              'allowedFileTypes',
+            ],
+          },
+        },
       })
 
       // Convertir a objeto
@@ -75,8 +75,8 @@ export class SecurityConfigService {
           'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
           'application/vnd.ms-excel',
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'text/plain'
-        ]
+          'text/plain',
+        ],
       }
 
       // Actualizar caché
@@ -86,7 +86,7 @@ export class SecurityConfigService {
       return securityConfig
     } catch (error) {
       console.error('[SECURITY CONFIG] Error obteniendo configuración:', error)
-      
+
       // Retornar valores por defecto en caso de error
       return {
         sessionTimeout: 1440,
@@ -94,13 +94,7 @@ export class SecurityConfigService {
         passwordMinLength: 8,
         requirePasswordChange: false,
         maxFileSize: 10,
-        allowedFileTypes: [
-          'image/jpeg',
-          'image/png',
-          'image/gif',
-          'application/pdf',
-          'text/plain'
-        ]
+        allowedFileTypes: ['image/jpeg', 'image/png', 'image/gif', 'application/pdf', 'text/plain'],
       }
     }
   }
@@ -116,13 +110,15 @@ export class SecurityConfigService {
   /**
    * Validar longitud de contraseña según configuración
    */
-  static async validatePasswordLength(password: string): Promise<{ valid: boolean; message?: string }> {
+  static async validatePasswordLength(
+    password: string
+  ): Promise<{ valid: boolean; message?: string }> {
     const config = await this.getConfig()
-    
+
     if (password.length < config.passwordMinLength) {
       return {
         valid: false,
-        message: `La contraseña debe tener al menos ${config.passwordMinLength} caracteres`
+        message: `La contraseña debe tener al menos ${config.passwordMinLength} caracteres`,
       }
     }
 
@@ -132,14 +128,16 @@ export class SecurityConfigService {
   /**
    * Validar tamaño de archivo según configuración
    */
-  static async validateFileSize(fileSizeBytes: number): Promise<{ valid: boolean; message?: string }> {
+  static async validateFileSize(
+    fileSizeBytes: number
+  ): Promise<{ valid: boolean; message?: string }> {
     const config = await this.getConfig()
     const maxSizeBytes = config.maxFileSize * 1024 * 1024 // Convertir MB a bytes
 
     if (fileSizeBytes > maxSizeBytes) {
       return {
         valid: false,
-        message: `El archivo excede el tamaño máximo permitido de ${config.maxFileSize} MB`
+        message: `El archivo excede el tamaño máximo permitido de ${config.maxFileSize} MB`,
       }
     }
 
@@ -155,7 +153,7 @@ export class SecurityConfigService {
     if (!config.allowedFileTypes.includes(mimeType)) {
       return {
         valid: false,
-        message: `Tipo de archivo no permitido. Tipos permitidos: ${config.allowedFileTypes.join(', ')}`
+        message: `Tipo de archivo no permitido. Tipos permitidos: ${config.allowedFileTypes.join(', ')}`,
       }
     }
 
@@ -171,8 +169,8 @@ export class SecurityConfigService {
       const now = Date.now()
 
       // Buscar registro existente
-      let record = await prisma.system_settings.findUnique({
-        where: { key }
+      const record = await prisma.system_settings.findUnique({
+        where: { key },
       })
 
       if (record) {
@@ -183,7 +181,7 @@ export class SecurityConfigService {
 
         await prisma.system_settings.update({
           where: { key },
-          data: { value: JSON.stringify(data) }
+          data: { value: JSON.stringify(data) },
         })
       } else {
         // Crear nuevo registro
@@ -193,11 +191,11 @@ export class SecurityConfigService {
             key,
             value: JSON.stringify({
               attempts: 1,
-              lastAttempt: now
+              lastAttempt: now,
             }),
             createdAt: new Date(),
-            updatedAt: new Date()
-          }
+            updatedAt: new Date(),
+          },
         })
       }
     } catch (error) {
@@ -208,13 +206,16 @@ export class SecurityConfigService {
   /**
    * Verificar si una cuenta está bloqueada por intentos fallidos
    */
-  static async isAccountLocked(email: string, ipAddress: string): Promise<{ locked: boolean; attemptsRemaining?: number }> {
+  static async isAccountLocked(
+    email: string,
+    ipAddress: string
+  ): Promise<{ locked: boolean; attemptsRemaining?: number }> {
     try {
       const config = await this.getConfig()
       const key = `failed_login:${email}:${ipAddress}`
 
       const record = await prisma.system_settings.findUnique({
-        where: { key }
+        where: { key },
       })
 
       if (!record) {
@@ -239,9 +240,9 @@ export class SecurityConfigService {
         return { locked: true, attemptsRemaining: 0 }
       }
 
-      return { 
-        locked: false, 
-        attemptsRemaining: config.maxLoginAttempts - attempts 
+      return {
+        locked: false,
+        attemptsRemaining: config.maxLoginAttempts - attempts,
       }
     } catch (error) {
       console.error('[SECURITY CONFIG] Error verificando bloqueo:', error)
@@ -256,7 +257,7 @@ export class SecurityConfigService {
     try {
       const key = `failed_login:${email}:${ipAddress}`
       await prisma.system_settings.deleteMany({
-        where: { key }
+        where: { key },
       })
     } catch (error) {
       console.error('[SECURITY CONFIG] Error limpiando intentos fallidos:', error)
