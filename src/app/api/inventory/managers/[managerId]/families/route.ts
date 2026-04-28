@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { NotificationEvents } from '@/lib/notification-events'
+import { invalidateCache } from '@/lib/api-cache'
 
 /**
  * GET /api/inventory/managers/[managerId]/families
@@ -35,14 +36,11 @@ export async function GET(
       include: { family: true },
     })
 
-    const families = assignments.map((a) => a.family)
+    const families = assignments.map(a => a.family)
 
     return NextResponse.json({ families })
   } catch {
-    return NextResponse.json(
-      { error: 'Error al obtener familias del gestor' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al obtener familias del gestor' }, { status: 500 })
   }
 }
 
@@ -75,10 +73,7 @@ export async function PUT(
     const { familyIds } = body as { familyIds: string[] }
 
     if (!Array.isArray(familyIds)) {
-      return NextResponse.json(
-        { error: 'familyIds debe ser un arreglo' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'familyIds debe ser un arreglo' }, { status: 400 })
     }
 
     // Validar que todos los familyIds existan
@@ -89,22 +84,19 @@ export async function PUT(
       })
 
       if (existingFamilies.length !== familyIds.length) {
-        return NextResponse.json(
-          { error: 'La familia especificada no existe' },
-          { status: 400 }
-        )
+        return NextResponse.json({ error: 'La familia especificada no existe' }, { status: 400 })
       }
     }
 
     // Operación atómica: delete + createMany
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async tx => {
       await tx.inventory_manager_families.deleteMany({
         where: { managerId },
       })
 
       if (familyIds.length > 0) {
         await tx.inventory_manager_families.createMany({
-          data: familyIds.map((familyId) => ({
+          data: familyIds.map(familyId => ({
             id: randomUUID(),
             managerId,
             familyId,
@@ -131,16 +123,17 @@ export async function PUT(
       include: { family: true },
     })
 
-    const families = assignments.map((a) => a.family)
+    const families = assignments.map(a => a.family)
+
+    // Invalidar caché de módulos y permisos del gestor
+    await invalidateCache(`user:modules:${managerId}`)
+    await invalidateCache(`perm:inv:${managerId}`)
 
     // Notificar al gestor para que refresque su sesión
     NotificationEvents.emit(managerId, { type: 'session_refresh', reason: 'permissions_changed' })
 
     return NextResponse.json({ families })
   } catch {
-    return NextResponse.json(
-      { error: 'Error al actualizar familias del gestor' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al actualizar familias del gestor' }, { status: 500 })
   }
 }

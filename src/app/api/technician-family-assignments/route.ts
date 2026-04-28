@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import { invalidateCache } from '@/lib/api-cache'
 
 // GET /api/technician-family-assignments — Lista asignaciones; solo ADMIN
 export async function GET(request: NextRequest) {
@@ -108,6 +109,9 @@ export async function POST(request: NextRequest) {
         family: { select: { id: true, name: true, code: true, color: true } },
       },
     })
+
+    // Invalidar caché de módulos del técnico
+    await invalidateCache(`user:modules:${technicianId}`)
 
     return NextResponse.json(
       { success: true, data: assignment, message: 'Asignación creada exitosamente' },
