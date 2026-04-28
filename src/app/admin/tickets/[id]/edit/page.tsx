@@ -37,7 +37,7 @@ export default function EditTicketPage() {
   const router = useRouter()
   const params = useParams()
   const { toast } = useToast()
-  
+
   const [ticket, setTicket] = useState<TicketData | null>(null)
   const [categories, setCategories] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -46,7 +46,7 @@ export default function EditTicketPage() {
 
   // ✅ Técnicos desde contexto global — sin petición extra
   const { technicians } = useTechnicians()
-  
+
   // Form data
   const [formData, setFormData] = useState({
     title: '',
@@ -54,7 +54,7 @@ export default function EditTicketPage() {
     priority: 'MEDIUM' as const,
     status: 'OPEN' as const,
     categoryId: '',
-    assigneeId: ''
+    assigneeId: '',
   })
 
   useEffect(() => {
@@ -78,13 +78,13 @@ export default function EditTicketPage() {
     try {
       setLoading(true)
       const response = await fetch(`/api/tickets/${params.id}`)
-      
+
       if (!response.ok) {
         throw new Error('Error al cargar el ticket')
       }
 
       const data = await response.json()
-      
+
       if (data.success && data.data) {
         const ticketData = data.data
         setTicket(ticketData)
@@ -94,7 +94,7 @@ export default function EditTicketPage() {
           priority: ticketData.priority,
           status: ticketData.status,
           categoryId: ticketData.category.id,
-          assigneeId: ticketData.assignee?.id || ''
+          assigneeId: ticketData.assignee?.id || '',
         })
       } else {
         throw new Error(data.message || 'Error al cargar el ticket')
@@ -103,9 +103,9 @@ export default function EditTicketPage() {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
       setError(errorMessage)
       toast({
-        variant: "destructive",
-        title: "Error",
-        description: errorMessage
+        variant: 'destructive',
+        title: 'Error',
+        description: errorMessage,
       })
     } finally {
       setLoading(false)
@@ -130,13 +130,13 @@ export default function EditTicketPage() {
   const handleSave = async () => {
     try {
       setSaving(true)
-      
+
       const response = await fetch(`/api/tickets/${params.id}`, {
         method: 'PUT',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(formData),
       })
 
       if (!response.ok) {
@@ -144,11 +144,11 @@ export default function EditTicketPage() {
       }
 
       const data = await response.json()
-      
+
       if (data.success) {
         toast({
-          title: "Ticket actualizado",
-          description: "Los cambios se han guardado exitosamente."
+          title: 'Ticket actualizado',
+          description: 'Los cambios se han guardado exitosamente.',
         })
         router.push(`/admin/tickets/${params.id}`)
       } else {
@@ -157,9 +157,9 @@ export default function EditTicketPage() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
       toast({
-        variant: "destructive",
-        title: "Error",
-        description: errorMessage
+        variant: 'destructive',
+        title: 'Error',
+        description: errorMessage,
       })
     } finally {
       setSaving(false)
@@ -170,7 +170,7 @@ export default function EditTicketPage() {
     return (
       <RoleDashboardLayout title='Editar Ticket' subtitle='Modificar información del ticket'>
         <div className='flex items-center justify-center h-64'>
-          <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600'></div>
+          <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-primary'></div>
         </div>
       </RoleDashboardLayout>
     )
@@ -184,13 +184,13 @@ export default function EditTicketPage() {
     return (
       <RoleDashboardLayout title='Error' subtitle='No se pudo cargar el ticket'>
         <Card>
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <div className="text-red-500 mb-2">Error al cargar el ticket</div>
-              <div className="text-muted-foreground text-sm mb-4">{error}</div>
+          <CardContent className='pt-6'>
+            <div className='text-center'>
+              <div className='text-red-500 mb-2'>Error al cargar el ticket</div>
+              <div className='text-muted-foreground text-sm mb-4'>{error}</div>
               <Button asChild>
-                <Link href="/admin/tickets">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
+                <Link href='/admin/tickets'>
+                  <ArrowLeft className='h-4 w-4 mr-2' />
                   Volver a tickets
                 </Link>
               </Button>
@@ -222,33 +222,31 @@ export default function EditTicketPage() {
       subtitle={ticket.title}
       headerActions={headerActions}
     >
-      <div className="space-y-6">
+      <div className='space-y-6'>
         {/* Información básica */}
         <Card>
           <CardHeader>
             <CardTitle>Información Básica</CardTitle>
-            <CardDescription>
-              Modifica los datos principales del ticket
-            </CardDescription>
+            <CardDescription>Modifica los datos principales del ticket</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className='space-y-4'>
             <div>
-              <Label htmlFor="title">Título</Label>
+              <Label htmlFor='title'>Título</Label>
               <Input
-                id="title"
+                id='title'
                 value={formData.title}
-                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                placeholder="Título del ticket"
+                onChange={e => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                placeholder='Título del ticket'
               />
             </div>
-            
+
             <div>
-              <Label htmlFor="description">Descripción</Label>
+              <Label htmlFor='description'>Descripción</Label>
               <Textarea
-                id="description"
+                id='description'
                 value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Descripción detallada del problema"
+                onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                placeholder='Descripción detallada del problema'
                 rows={4}
               />
             </div>
@@ -259,45 +257,47 @@ export default function EditTicketPage() {
         <Card>
           <CardHeader>
             <CardTitle>Estado y Prioridad</CardTitle>
-            <CardDescription>
-              Configura el estado actual y la prioridad del ticket
-            </CardDescription>
+            <CardDescription>Configura el estado actual y la prioridad del ticket</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <CardContent className='space-y-4'>
+            <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
               <div>
-                <Label htmlFor="status">Estado</Label>
+                <Label htmlFor='status'>Estado</Label>
                 <select
-                  id="status"
+                  id='status'
                   value={formData.status}
-                  onChange={(e) => setFormData(prev => ({ 
-                    ...prev, 
-                    status: e.target.value as typeof formData.status 
-                  }))}
-                  className="w-full px-3 py-2 border border-border rounded-md"
+                  onChange={e =>
+                    setFormData(prev => ({
+                      ...prev,
+                      status: e.target.value as typeof formData.status,
+                    }))
+                  }
+                  className='w-full px-3 py-2 border border-border rounded-md'
                 >
-                  <option value="OPEN">Abierto</option>
-                  <option value="IN_PROGRESS">En Progreso</option>
-                  <option value="RESOLVED">Resuelto</option>
-                  <option value="CLOSED">Cerrado</option>
+                  <option value='OPEN'>Abierto</option>
+                  <option value='IN_PROGRESS'>En Progreso</option>
+                  <option value='RESOLVED'>Resuelto</option>
+                  <option value='CLOSED'>Cerrado</option>
                 </select>
               </div>
-              
+
               <div>
-                <Label htmlFor="priority">Prioridad</Label>
+                <Label htmlFor='priority'>Prioridad</Label>
                 <select
-                  id="priority"
+                  id='priority'
                   value={formData.priority}
-                  onChange={(e) => setFormData(prev => ({ 
-                    ...prev, 
-                    priority: e.target.value as typeof formData.priority 
-                  }))}
-                  className="w-full px-3 py-2 border border-border rounded-md"
+                  onChange={e =>
+                    setFormData(prev => ({
+                      ...prev,
+                      priority: e.target.value as typeof formData.priority,
+                    }))
+                  }
+                  className='w-full px-3 py-2 border border-border rounded-md'
                 >
-                  <option value="LOW">Baja</option>
-                  <option value="MEDIUM">Media</option>
-                  <option value="HIGH">Alta</option>
-                  <option value="URGENT">Urgente</option>
+                  <option value='LOW'>Baja</option>
+                  <option value='MEDIUM'>Media</option>
+                  <option value='HIGH'>Alta</option>
+                  <option value='URGENT'>Urgente</option>
                 </select>
               </div>
             </div>
@@ -312,24 +312,28 @@ export default function EditTicketPage() {
               Asigna el ticket a un técnico y selecciona la categoría
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className='space-y-4'>
             <div>
               <Label>Categoría</Label>
               <CategorySelector
                 categories={categories}
                 value={formData.categoryId}
-                onChange={(categoryId) => setFormData(prev => ({ ...prev, categoryId: categoryId || '' }))}
-                placeholder="Seleccionar categoría"
+                onChange={categoryId =>
+                  setFormData(prev => ({ ...prev, categoryId: categoryId || '' }))
+                }
+                placeholder='Seleccionar categoría'
               />
             </div>
-            
+
             <div>
               <Label>Técnico Asignado</Label>
               <TechnicianSearchSelector
                 technicians={technicians as any}
                 value={formData.assigneeId}
-                onChange={(assigneeId) => setFormData(prev => ({ ...prev, assigneeId: assigneeId || '' }))}
-                placeholder="Seleccionar técnico"
+                onChange={assigneeId =>
+                  setFormData(prev => ({ ...prev, assigneeId: assigneeId || '' }))
+                }
+                placeholder='Seleccionar técnico'
               />
             </div>
           </CardContent>
@@ -339,12 +343,10 @@ export default function EditTicketPage() {
         <Card>
           <CardHeader>
             <CardTitle>Vista Previa</CardTitle>
-            <CardDescription>
-              Cómo se verá el ticket después de los cambios
-            </CardDescription>
+            <CardDescription>Cómo se verá el ticket después de los cambios</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center space-x-4">
+            <div className='flex items-center space-x-4'>
               <StatusBadge status={formData.status} />
               <PriorityBadge priority={formData.priority} />
             </div>

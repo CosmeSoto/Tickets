@@ -581,7 +581,7 @@ export default function AdminTicketDetailPage() {
                   <p className='text-xs'>Creado: {formatDate(ticket.createdAt)}</p>
                   <p className='text-xs'>Actualizado: {formatDate(ticket.updatedAt)}</p>
                   {ticket.resolvedAt && (
-                    <p className='text-xs text-green-600'>
+                    <p className='text-xs text-emerald-600 dark:text-emerald-400'>
                       Resuelto: {formatDate(ticket.resolvedAt)}
                     </p>
                   )}

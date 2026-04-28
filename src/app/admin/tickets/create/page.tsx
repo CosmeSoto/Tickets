@@ -24,13 +24,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
 import { createTicketSchema, CreateTicketData } from '@/lib/schemas/ticket-schemas'
 import { TicketPriority } from '@prisma/client'
-import { 
-  Ticket, 
-  AlertCircle, 
-  CheckCircle, 
-  Loader2, 
-  ArrowLeft, 
-  User, 
+import {
+  Ticket,
+  AlertCircle,
+  CheckCircle,
+  Loader2,
+  ArrowLeft,
+  User,
   Tag,
   FileText,
   Zap,
@@ -95,7 +95,7 @@ export default function CreateTicketPage() {
 
   // ✅ Clientes desde contexto global — sin petición extra
   const { clients } = useClients()
-  
+
   // Estados para archivos
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
 
@@ -142,7 +142,7 @@ export default function CreateTicketPage() {
       toast({
         title: 'Límite excedido',
         description: 'Máximo 5 archivos permitidos',
-        variant: 'destructive'
+        variant: 'destructive',
       })
       return
     }
@@ -153,7 +153,7 @@ export default function CreateTicketPage() {
       toast({
         title: 'Archivo muy grande',
         description: 'Los archivos no deben superar 10MB',
-        variant: 'destructive'
+        variant: 'destructive',
       })
       return
     }
@@ -175,7 +175,7 @@ export default function CreateTicketPage() {
       try {
         await fetch(`/api/tickets/${ticketId}/attachments`, {
           method: 'POST',
-          body: formData
+          body: formData,
         })
       } catch (error) {
         console.error('Error uploading file:', error)
@@ -199,10 +199,10 @@ export default function CreateTicketPage() {
         const result = await response.json()
         const ticketId = result.data.id
         setCreatedTicketId(ticketId)
-        
+
         // Subir archivos si hay
         await uploadFiles(ticketId)
-        
+
         setSubmitSuccess(true)
 
         // Disparar evento para actualizar notificaciones inmediatamente
@@ -210,7 +210,7 @@ export default function CreateTicketPage() {
 
         toast({
           title: 'Éxito',
-          description: 'Ticket creado exitosamente'
+          description: 'Ticket creado exitosamente',
         })
 
         // Redirigir después de 2 segundos
@@ -222,7 +222,7 @@ export default function CreateTicketPage() {
         toast({
           title: 'Error',
           description: error.message || 'Error al crear el ticket',
-          variant: 'destructive'
+          variant: 'destructive',
         })
       }
     } catch (error) {
@@ -230,7 +230,7 @@ export default function CreateTicketPage() {
       toast({
         title: 'Error',
         description: 'Error de conexión al crear el ticket',
-        variant: 'destructive'
+        variant: 'destructive',
       })
     } finally {
       setIsSubmitting(false)
@@ -257,13 +257,13 @@ export default function CreateTicketPage() {
         <Card className='max-w-2xl mx-auto'>
           <CardContent className='pt-6'>
             <div className='text-center'>
-              <CheckCircle className='h-16 w-16 text-green-600 mx-auto mb-4' />
+              <CheckCircle className='h-16 w-16 text-emerald-600 dark:text-emerald-400 mx-auto mb-4' />
               <h2 className='text-2xl font-semibold text-foreground mb-2'>
                 ¡Ticket creado exitosamente!
               </h2>
               <p className='text-muted-foreground mb-6'>
-                El ticket ha sido creado y será atendido por el equipo de soporte.
-                El cliente recibirá notificaciones sobre el progreso.
+                El ticket ha sido creado y será atendido por el equipo de soporte. El cliente
+                recibirá notificaciones sobre el progreso.
               </p>
               <div className='flex flex-col sm:flex-row items-center justify-center gap-3'>
                 <Button asChild className='w-full sm:w-auto'>
@@ -302,27 +302,27 @@ export default function CreateTicketPage() {
             <AlertDescription>{loadError}</AlertDescription>
           </Alert>
         )}
-        
+
         <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
           {/* Formulario Principal */}
           <div className='lg:col-span-2'>
-            <Tabs defaultValue="details" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="details">
+            <Tabs defaultValue='details' className='w-full'>
+              <TabsList className='grid w-full grid-cols-2'>
+                <TabsTrigger value='details'>
                   <FileText className='h-4 w-4 mr-2' />
                   Detalles del Ticket
                 </TabsTrigger>
-                <TabsTrigger value="preview">
+                <TabsTrigger value='preview'>
                   <Zap className='h-4 w-4 mr-2' />
                   Vista Previa
                 </TabsTrigger>
               </TabsList>
-              
-              <TabsContent value="details" className="space-y-6 mt-6">
+
+              <TabsContent value='details' className='space-y-6 mt-6'>
                 <Card>
                   <CardHeader>
                     <CardTitle className='flex items-center'>
-                      <Ticket className='h-5 w-5 mr-2 text-blue-600' />
+                      <Ticket className='h-5 w-5 mr-2 text-primary' />
                       Información del Ticket
                     </CardTitle>
                     <CardDescription>
@@ -338,22 +338,25 @@ export default function CreateTicketPage() {
                           Cliente *
                         </Label>
                         <UserCombobox
-                          role="CLIENT"
+                          role='CLIENT'
                           value={watch('clientId')}
-                          onValueChange={(clientId) => {
+                          onValueChange={clientId => {
                             setValue('clientId', clientId)
                             handleClientSelect(clientId)
                           }}
-                          placeholder="Buscar cliente por nombre o email..."
-                          emptyText="No se encontraron clientes"
+                          placeholder='Buscar cliente por nombre o email...'
+                          emptyText='No se encontraron clientes'
                           showEmail={true}
                           showDepartment={true}
                           className={errors.clientId ? 'border-red-500' : ''}
                         />
-                        {errors.clientId && <p className='text-sm text-red-600'>{errors.clientId.message}</p>}
+                        {errors.clientId && (
+                          <p className='text-sm text-destructive'>{errors.clientId.message}</p>
+                        )}
                         {selectedClient && (
                           <p className='text-xs text-muted-foreground'>
-                            💡 Tip: El cliente recibirá notificaciones automáticas sobre el progreso del ticket
+                            💡 Tip: El cliente recibirá notificaciones automáticas sobre el progreso
+                            del ticket
                           </p>
                         )}
                       </div>
@@ -369,7 +372,9 @@ export default function CreateTicketPage() {
                           {...register('title')}
                           className={errors.title ? 'border-red-500' : ''}
                         />
-                        {errors.title && <p className='text-sm text-red-600'>{errors.title.message}</p>}
+                        {errors.title && (
+                          <p className='text-sm text-destructive'>{errors.title.message}</p>
+                        )}
                         <p className='text-xs text-muted-foreground'>
                           Usa un título claro y descriptivo que resuma el problema
                         </p>
@@ -386,7 +391,7 @@ export default function CreateTicketPage() {
                           className={errors.description ? 'border-red-500' : ''}
                         />
                         {errors.description && (
-                          <p className='text-sm text-red-600'>{errors.description.message}</p>
+                          <p className='text-sm text-destructive'>{errors.description.message}</p>
                         )}
                       </div>
 
@@ -395,7 +400,9 @@ export default function CreateTicketPage() {
                         <Label htmlFor='location' className='flex items-center gap-1.5'>
                           <MapPin className='h-4 w-4' />
                           Ubicación / Área
-                          <span className='text-muted-foreground font-normal text-xs'>(opcional)</span>
+                          <span className='text-muted-foreground font-normal text-xs'>
+                            (opcional)
+                          </span>
                         </Label>
                         <Input
                           id='location'
@@ -442,11 +449,20 @@ export default function CreateTicketPage() {
                           </SelectContent>
                         </Select>
                         {errors.priority && (
-                          <p className='text-sm text-red-600'>{errors.priority.message}</p>
+                          <p className='text-sm text-destructive'>{errors.priority.message}</p>
                         )}
                         {selectedPriority && (
-                          <div className={`p-3 rounded-lg text-xs ${priorityColors[selectedPriority as keyof typeof priorityColors]}`}>
-                            <strong>{priorityLabels[selectedPriority as keyof typeof priorityLabels]}:</strong> {priorityDescriptions[selectedPriority as keyof typeof priorityDescriptions]}
+                          <div
+                            className={`p-3 rounded-lg text-xs ${priorityColors[selectedPriority as keyof typeof priorityColors]}`}
+                          >
+                            <strong>
+                              {priorityLabels[selectedPriority as keyof typeof priorityLabels]}:
+                            </strong>{' '}
+                            {
+                              priorityDescriptions[
+                                selectedPriority as keyof typeof priorityDescriptions
+                              ]
+                            }
                           </div>
                         )}
                       </div>
@@ -460,12 +476,13 @@ export default function CreateTicketPage() {
                           Categoría del Ticket *
                         </Label>
                         <p className='text-sm text-muted-foreground mb-3'>
-                          Selecciona la categoría más específica que describa el problema. Puedes usar la búsqueda (Ctrl+K) o navegar por el árbol.
+                          Selecciona la categoría más específica que describa el problema. Puedes
+                          usar la búsqueda (Ctrl+K) o navegar por el árbol.
                         </p>
                         <div className='border rounded-lg p-4 bg-muted/30'>
                           <CategorySelectorWrapper
                             value={selectedCategoryId}
-                            onChange={(categoryId) => setValue('categoryId', categoryId)}
+                            onChange={categoryId => setValue('categoryId', categoryId)}
                             ticketTitle={ticketTitle || ''}
                             ticketDescription={ticketDescription || ''}
                             clientId={clientId || ''}
@@ -524,7 +541,9 @@ export default function CreateTicketPage() {
                         {/* Lista de archivos seleccionados */}
                         {selectedFiles.length > 0 && (
                           <div className='space-y-2 mt-3'>
-                            <p className='text-sm font-medium'>Archivos seleccionados ({selectedFiles.length}/5):</p>
+                            <p className='text-sm font-medium'>
+                              Archivos seleccionados ({selectedFiles.length}/5):
+                            </p>
                             {selectedFiles.map((file, index) => (
                               <div
                                 key={index}
@@ -576,8 +595,8 @@ export default function CreateTicketPage() {
                   </CardContent>
                 </Card>
               </TabsContent>
-              
-              <TabsContent value="preview" className="space-y-6 mt-6">
+
+              <TabsContent value='preview' className='space-y-6 mt-6'>
                 <Card>
                   <CardHeader>
                     <CardTitle>Vista Previa del Ticket</CardTitle>
@@ -591,9 +610,11 @@ export default function CreateTicketPage() {
                         <Label className='text-sm font-medium text-muted-foreground'>Título</Label>
                         <p className='text-lg font-semibold'>{watch('title') || 'Sin título'}</p>
                       </div>
-                      
+
                       <div>
-                        <Label className='text-sm font-medium text-muted-foreground'>Descripción</Label>
+                        <Label className='text-sm font-medium text-muted-foreground'>
+                          Descripción
+                        </Label>
                         <div className='mt-1 p-3 bg-muted rounded-lg'>
                           <p className='whitespace-pre-wrap text-sm'>
                             {watch('description') || 'Sin descripción'}
@@ -603,30 +624,38 @@ export default function CreateTicketPage() {
 
                       {watch('location') && (
                         <div>
-                          <Label className='text-sm font-medium text-muted-foreground'>Ubicación</Label>
+                          <Label className='text-sm font-medium text-muted-foreground'>
+                            Ubicación
+                          </Label>
                           <div className='mt-1 flex items-center gap-2 text-sm'>
                             <MapPin className='h-3.5 w-3.5 text-amber-600' />
                             <span>{watch('location')}</span>
                           </div>
                         </div>
                       )}
-                      
+
                       <div className='grid grid-cols-2 gap-4'>
                         <div>
-                          <Label className='text-sm font-medium text-muted-foreground'>Prioridad</Label>
+                          <Label className='text-sm font-medium text-muted-foreground'>
+                            Prioridad
+                          </Label>
                           {selectedPriority && (
-                            <Badge className={priorityColors[selectedPriority as keyof typeof priorityColors]}>
+                            <Badge
+                              className={
+                                priorityColors[selectedPriority as keyof typeof priorityColors]
+                              }
+                            >
                               {priorityLabels[selectedPriority as keyof typeof priorityLabels]}
                             </Badge>
                           )}
                         </div>
-                        
+
                         <div>
-                          <Label className='text-sm font-medium text-muted-foreground'>Categoría</Label>
+                          <Label className='text-sm font-medium text-muted-foreground'>
+                            Categoría
+                          </Label>
                           {selectedCategoryId ? (
-                            <Badge variant="outline">
-                              Categoría seleccionada
-                            </Badge>
+                            <Badge variant='outline'>Categoría seleccionada</Badge>
                           ) : (
                             <p className='text-sm text-muted-foreground'>Sin categoría</p>
                           )}
@@ -657,11 +686,11 @@ export default function CreateTicketPage() {
                       <p className='text-sm text-muted-foreground'>{selectedClient.email}</p>
                     </div>
                     {selectedClient.department && (
-                      <Badge 
-                        variant="outline"
-                        style={{ 
+                      <Badge
+                        variant='outline'
+                        style={{
                           borderColor: selectedClient.department.color,
-                          color: selectedClient.department.color
+                          color: selectedClient.department.color,
                         }}
                       >
                         {selectedClient.department.name}
@@ -683,23 +712,23 @@ export default function CreateTicketPage() {
               <CardContent>
                 <div className='space-y-3 text-sm'>
                   <div className='flex items-start space-x-2'>
-                    <CheckCircle className='h-4 w-4 text-green-600 mt-0.5 flex-shrink-0' />
+                    <CheckCircle className='h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0' />
                     <p>Usa un título claro que resuma el problema o solicitud</p>
                   </div>
                   <div className='flex items-start space-x-2'>
-                    <CheckCircle className='h-4 w-4 text-green-600 mt-0.5 flex-shrink-0' />
+                    <CheckCircle className='h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0' />
                     <p>Describe con detalle qué ocurrió, cuándo y dónde</p>
                   </div>
                   <div className='flex items-start space-x-2'>
-                    <CheckCircle className='h-4 w-4 text-green-600 mt-0.5 flex-shrink-0' />
+                    <CheckCircle className='h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0' />
                     <p>Indica si el problema es recurrente o puntual</p>
                   </div>
                   <div className='flex items-start space-x-2'>
-                    <CheckCircle className='h-4 w-4 text-green-600 mt-0.5 flex-shrink-0' />
+                    <CheckCircle className='h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0' />
                     <p>Adjunta fotos, capturas o documentos de respaldo si aplica</p>
                   </div>
                   <div className='flex items-start space-x-2'>
-                    <CheckCircle className='h-4 w-4 text-green-600 mt-0.5 flex-shrink-0' />
+                    <CheckCircle className='h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0' />
                     <p>Selecciona la prioridad según el impacto real en tu trabajo</p>
                   </div>
                 </div>
@@ -710,8 +739,8 @@ export default function CreateTicketPage() {
             <Alert>
               <AlertCircle className='h-4 w-4' />
               <AlertDescription>
-                <strong>Nota:</strong> Este ticket se creará en nombre del cliente seleccionado.
-                El cliente recibirá notificaciones automáticas sobre el progreso del ticket.
+                <strong>Nota:</strong> Este ticket se creará en nombre del cliente seleccionado. El
+                cliente recibirá notificaciones automáticas sobre el progreso del ticket.
               </AlertDescription>
             </Alert>
           </div>

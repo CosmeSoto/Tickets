@@ -271,14 +271,20 @@ export default function AdminDashboard() {
                         <TableCell className='text-center hidden lg:table-cell'>
                           {inventoryOn && fm.inventory ? (
                             <div className='flex items-center justify-center gap-2 text-xs'>
-                              <span className='text-green-600 font-medium' title='Disponibles'>
+                              <span
+                                className='text-emerald-600 dark:text-emerald-400 font-medium'
+                                title='Disponibles'
+                              >
                                 {fm.inventory.availableAssets}↑
                               </span>
-                              <span className='text-blue-600' title='Asignados'>
+                              <span className='text-blue-600 dark:text-blue-400' title='Asignados'>
                                 {fm.inventory.assignedAssets}⇒
                               </span>
                               {fm.inventory.maintenanceAssets > 0 && (
-                                <span className='text-amber-600 font-medium' title='En mantenimiento'>
+                                <span
+                                  className='text-amber-600 font-medium'
+                                  title='En mantenimiento'
+                                >
                                   {fm.inventory.maintenanceAssets}⚙
                                 </span>
                               )}
@@ -308,7 +314,7 @@ export default function AdminDashboard() {
           <Card>
             <CardHeader>
               <CardTitle className='flex items-center'>
-                <AlertTriangle className='h-5 w-5 mr-2 text-yellow-600' />
+                <AlertTriangle className='h-5 w-5 mr-2 text-amber-600 dark:text-amber-400' />
                 Alertas Proactivas
               </CardTitle>
               <CardDescription>
@@ -326,23 +332,23 @@ export default function AdminDashboard() {
                         sev === 'critical'
                           ? 'border-red-300 bg-red-50 dark:bg-red-950/30'
                           : sev === 'warning'
-                            ? 'border-yellow-300 bg-yellow-50 dark:bg-yellow-950/30'
+                            ? 'border-amber-300 bg-amber-50 dark:bg-amber-950/30'
                             : 'border-blue-300 bg-blue-50 dark:bg-blue-950/30'
                       }
                     >
                       {sev === 'critical' ? (
-                        <AlertCircle className='h-4 w-4 text-red-600' />
+                        <AlertCircle className='h-4 w-4 text-red-600 dark:text-red-400' />
                       ) : sev === 'warning' ? (
-                        <AlertTriangle className='h-4 w-4 text-yellow-600' />
+                        <AlertTriangle className='h-4 w-4 text-amber-600 dark:text-amber-400' />
                       ) : (
-                        <Activity className='h-4 w-4 text-blue-600' />
+                        <Activity className='h-4 w-4 text-blue-600 dark:text-blue-400' />
                       )}
                       <AlertDescription
                         className={
                           sev === 'critical'
                             ? 'text-red-800 dark:text-red-200'
                             : sev === 'warning'
-                              ? 'text-yellow-800 dark:text-yellow-200'
+                              ? 'text-amber-800 dark:text-amber-200'
                               : 'text-blue-800 dark:text-blue-200'
                         }
                       >

@@ -12,7 +12,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/hooks/use-toast'
-import { getRoleLabel as getRoleLabelFn, getRoleColor as getRoleColorFn } from '@/components/ui/role-badge'
+import {
+  getRoleLabel as getRoleLabelFn,
+  getRoleColor as getRoleColorFn,
+} from '@/components/ui/role-badge'
 import {
   Dialog,
   DialogContent,
@@ -47,7 +50,7 @@ import {
   X,
   Key,
   Eye,
-  EyeOff
+  EyeOff,
 } from 'lucide-react'
 
 export default function ProfilePage() {
@@ -55,7 +58,7 @@ export default function ProfilePage() {
   const router = useRouter()
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
-  
+
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState(false)
   const [avatarUploading, setAvatarUploading] = useState(false)
@@ -64,7 +67,7 @@ export default function ProfilePage() {
   const [previewAvatar, setPreviewAvatar] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [currentAvatar, setCurrentAvatar] = useState<string | null>(null)
-  
+
   // Estados para cambio de contraseña
   const [changingPassword, setChangingPassword] = useState(false)
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
@@ -75,7 +78,7 @@ export default function ProfilePage() {
     newPassword: '',
     confirmPassword: '',
   })
-  
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -116,7 +119,7 @@ export default function ProfilePage() {
         })
       }
     }
-    
+
     loadUserData()
   }, [session, status, router])
 
@@ -170,10 +173,10 @@ export default function ProfilePage() {
     }
 
     setSelectedFile(file)
-    
+
     // Crear preview
     const reader = new FileReader()
-    reader.onload = (e) => {
+    reader.onload = e => {
       setPreviewAvatar(e.target?.result as string)
       setShowAvatarDialog(true)
     }
@@ -201,17 +204,18 @@ export default function ProfilePage() {
         setShowAvatarDialog(false)
         setSelectedFile(null)
         setPreviewAvatar(null)
-        
+
         // Disparar evento para actualizar header
-        window.dispatchEvent(new CustomEvent('avatarUpdated', { 
-          detail: { avatarUrl: result.data.avatarUrl } 
-        }))
-        
+        window.dispatchEvent(
+          new CustomEvent('avatarUpdated', {
+            detail: { avatarUrl: result.data.avatarUrl },
+          })
+        )
+
         toast({
           title: 'Avatar actualizado',
           description: 'Tu foto de perfil se ha actualizado correctamente',
         })
-        
       } else {
         toast({
           title: 'Error al subir avatar',
@@ -246,17 +250,18 @@ export default function ProfilePage() {
         // Actualizar avatar local
         setCurrentAvatar(null)
         setShowRemoveAvatarDialog(false)
-        
+
         // Disparar evento para actualizar header
-        window.dispatchEvent(new CustomEvent('avatarUpdated', { 
-          detail: { avatarUrl: null } 
-        }))
-        
+        window.dispatchEvent(
+          new CustomEvent('avatarUpdated', {
+            detail: { avatarUrl: null },
+          })
+        )
+
         toast({
           title: 'Avatar eliminado',
           description: 'Tu foto de perfil se ha eliminado correctamente',
         })
-        
       } else {
         toast({
           title: 'Error al eliminar avatar',
@@ -300,7 +305,7 @@ export default function ProfilePage() {
           description: 'Tu información ha sido guardada exitosamente',
         })
         setEditing(false)
-        
+
         // Recargar la página para reflejar los cambios
         window.location.reload()
       } else {
@@ -324,7 +329,11 @@ export default function ProfilePage() {
 
   const handleChangePassword = async () => {
     // Validaciones básicas
-    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
+    if (
+      !passwordForm.currentPassword ||
+      !passwordForm.newPassword ||
+      !passwordForm.confirmPassword
+    ) {
       toast({
         title: 'Campos incompletos',
         description: 'Por favor completa todos los campos',
@@ -368,7 +377,7 @@ export default function ProfilePage() {
           title: 'Contraseña actualizada',
           description: 'Tu contraseña ha sido cambiada exitosamente',
         })
-        
+
         // Limpiar formulario
         setPasswordForm({
           currentPassword: '',
@@ -400,7 +409,7 @@ export default function ProfilePage() {
     return (
       <RoleDashboardLayout title='Mi Perfil' subtitle='Gestiona tu información personal'>
         <div className='flex items-center justify-center h-64'>
-          <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600'></div>
+          <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto'></div>
         </div>
       </RoleDashboardLayout>
     )
@@ -419,71 +428,70 @@ export default function ProfilePage() {
         {/* Información Principal */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <User className="h-5 w-5" />
+            <CardTitle className='flex items-center space-x-2'>
+              <User className='h-5 w-5' />
               <span>Información Personal</span>
             </CardTitle>
-            <CardDescription>
-              Actualiza tu información personal y de contacto
-            </CardDescription>
+            <CardDescription>Actualiza tu información personal y de contacto</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className='space-y-6'>
             {/* Avatar y Rol - MEJORADO */}
-            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6">
-              <div className="relative group flex-shrink-0">
-                <Avatar className="h-20 w-20">
+            <div className='flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6'>
+              <div className='relative group flex-shrink-0'>
+                <Avatar className='h-20 w-20'>
                   <AvatarImage src={currentAvatar || undefined} />
-                  <AvatarFallback className="text-lg">
-                    <RoleIcon className="h-8 w-8" />
+                  <AvatarFallback className='text-lg'>
+                    <RoleIcon className='h-8 w-8' />
                   </AvatarFallback>
                 </Avatar>
                 {/* Botón para cambiar foto */}
                 <Button
-                  size="sm"
-                  variant="outline"
-                  className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full p-0 shadow-sm"
-                  title="Cambiar foto"
+                  size='sm'
+                  variant='outline'
+                  className='absolute -bottom-2 -right-2 h-8 w-8 rounded-full p-0 shadow-sm'
+                  title='Cambiar foto'
                   onClick={() => fileInputRef.current?.click()}
                   disabled={avatarUploading}
                 >
                   {avatarUploading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className='h-4 w-4 animate-spin' />
                   ) : (
-                    <Camera className="h-4 w-4" />
+                    <Camera className='h-4 w-4' />
                   )}
                 </Button>
                 {/* Botón para eliminar foto - Solo visible si hay avatar */}
                 {currentAvatar && (
                   <Button
-                    size="sm"
-                    variant="outline"
-                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0 shadow-sm bg-white hover:bg-red-50 border-red-200 opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Eliminar foto"
+                    size='sm'
+                    variant='outline'
+                    className='absolute -top-2 -right-2 h-6 w-6 rounded-full p-0 shadow-sm hover:bg-destructive/10 border-destructive/30'
+                    title='Eliminar foto'
                     onClick={() => setShowRemoveAvatarDialog(true)}
                     disabled={avatarUploading}
                   >
-                    <X className="h-3 w-3 text-red-600" />
+                    <X className='h-3 w-3 text-destructive' />
                   </Button>
                 )}
                 <input
                   ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
+                  type='file'
+                  accept='image/*'
                   onChange={handleFileSelect}
-                  className="hidden"
+                  className='hidden'
                 />
               </div>
-              <div className="space-y-2 text-center sm:text-left">
-                <h3 className="text-xl font-semibold">{session.user.name}</h3>
+              <div className='space-y-2 text-center sm:text-left'>
+                <h3 className='text-xl font-semibold'>{session.user.name}</h3>
                 <Badge className={getRoleColor()}>
-                  <RoleIcon className="h-3 w-3 mr-1" />
+                  <RoleIcon className='h-3 w-3 mr-1' />
                   {getRoleLabel()}
                 </Badge>
-                <p className="text-sm text-muted-foreground">
-                  Miembro desde {new Date().toLocaleDateString('es-ES', {
+                <p className='text-sm text-muted-foreground'>
+                  Miembro desde{' '}
+                  {new Date().toLocaleDateString('es-ES', {
                     year: 'numeric',
                     month: 'long',
-                    day: 'numeric'
+                    day: 'numeric',
                   })}
                 </p>
               </div>
@@ -492,75 +500,75 @@ export default function ProfilePage() {
             <Separator />
 
             {/* Formulario */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nombre completo</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
+              <div className='space-y-2'>
+                <Label htmlFor='name'>Nombre completo</Label>
+                <div className='relative'>
+                  <User className='absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4' />
                   <Input
-                    id="name"
+                    id='name'
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={e => setFormData({ ...formData, name: e.target.value })}
                     disabled={!editing}
-                    className="pl-10"
+                    className='pl-10'
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="email">Correo electrónico</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <div className='space-y-2'>
+                <Label htmlFor='email'>Correo electrónico</Label>
+                <div className='relative'>
+                  <Mail className='absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4' />
                   <Input
-                    id="email"
-                    type="email"
+                    id='email'
+                    type='email'
                     value={formData.email}
                     disabled={true}
-                    className="pl-10 bg-muted"
+                    className='pl-10 bg-muted'
                   />
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className='text-xs text-muted-foreground'>
                   El email no se puede cambiar por seguridad
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="phone">Teléfono</Label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <div className='space-y-2'>
+                <Label htmlFor='phone'>Teléfono</Label>
+                <div className='relative'>
+                  <Phone className='absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4' />
                   <Input
-                    id="phone"
+                    id='phone'
                     value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    onChange={e => setFormData({ ...formData, phone: e.target.value })}
                     disabled={!editing}
-                    className="pl-10"
-                    placeholder="Opcional"
+                    className='pl-10'
+                    placeholder='Opcional'
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className='space-y-2'>
                 <Label>Departamento</Label>
-                <div className="relative">
-                  <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <div className='relative'>
+                  <Building className='absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4' />
                   <Input
                     value={session.user.department || 'Sin departamento'}
                     disabled={true}
-                    className="pl-10 bg-muted"
+                    className='pl-10 bg-muted'
                   />
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className='text-xs text-muted-foreground'>
                   Contacta al administrador para cambiar de departamento
                 </p>
               </div>
             </div>
 
             {/* Botones de acción */}
-            <div className="flex items-center justify-end space-x-3">
+            <div className='flex items-center justify-end space-x-3'>
               {editing ? (
                 <>
                   <Button
-                    variant="outline"
+                    variant='outline'
                     onClick={() => {
                       setEditing(false)
                       setFormData({
@@ -573,17 +581,14 @@ export default function ProfilePage() {
                   >
                     Cancelar
                   </Button>
-                  <Button
-                    onClick={handleSave}
-                    disabled={loading || !formData.name}
-                  >
-                    <Save className="h-4 w-4 mr-2" />
+                  <Button onClick={handleSave} disabled={loading || !formData.name}>
+                    <Save className='h-4 w-4 mr-2' />
                     {loading ? 'Guardando...' : 'Guardar Cambios'}
                   </Button>
                 </>
               ) : (
                 <Button onClick={() => setEditing(true)}>
-                  <Edit className="h-4 w-4 mr-2" />
+                  <Edit className='h-4 w-4 mr-2' />
                   Editar Perfil
                 </Button>
               )}
@@ -594,89 +599,106 @@ export default function ProfilePage() {
         {/* Seguridad */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Key className="h-5 w-5" />
+            <CardTitle className='flex items-center space-x-2'>
+              <Key className='h-5 w-5' />
               <span>Seguridad</span>
             </CardTitle>
-            <CardDescription>
-              Cambia tu contraseña para mantener tu cuenta segura
-            </CardDescription>
+            <CardDescription>Cambia tu contraseña para mantener tu cuenta segura</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="currentPassword">Contraseña actual</Label>
-                <div className="relative">
-                  <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <CardContent className='space-y-6'>
+            <div className='grid grid-cols-1 gap-6'>
+              <div className='space-y-2'>
+                <Label htmlFor='currentPassword'>Contraseña actual</Label>
+                <div className='relative'>
+                  <Key className='absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4' />
                   <Input
-                    id="currentPassword"
+                    id='currentPassword'
                     type={showCurrentPassword ? 'text' : 'password'}
                     value={passwordForm.currentPassword}
-                    onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                    className="pl-10 pr-10"
-                    placeholder="Ingresa tu contraseña actual"
+                    onChange={e =>
+                      setPasswordForm({ ...passwordForm, currentPassword: e.target.value })
+                    }
+                    className='pl-10 pr-10'
+                    placeholder='Ingresa tu contraseña actual'
                   />
                   <button
-                    type="button"
+                    type='button'
                     onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    className='absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground'
                   >
-                    {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showCurrentPassword ? (
+                      <EyeOff className='h-4 w-4' />
+                    ) : (
+                      <Eye className='h-4 w-4' />
+                    )}
                   </button>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="newPassword">Nueva contraseña</Label>
-                <div className="relative">
-                  <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <div className='space-y-2'>
+                <Label htmlFor='newPassword'>Nueva contraseña</Label>
+                <div className='relative'>
+                  <Key className='absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4' />
                   <Input
-                    id="newPassword"
+                    id='newPassword'
                     type={showNewPassword ? 'text' : 'password'}
                     value={passwordForm.newPassword}
-                    onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                    className="pl-10 pr-10"
-                    placeholder="Mínimo 6 caracteres"
+                    onChange={e =>
+                      setPasswordForm({ ...passwordForm, newPassword: e.target.value })
+                    }
+                    className='pl-10 pr-10'
+                    placeholder='Mínimo 6 caracteres'
                   />
                   <button
-                    type="button"
+                    type='button'
                     onClick={() => setShowNewPassword(!showNewPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    className='absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground'
                   >
-                    {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showNewPassword ? <EyeOff className='h-4 w-4' /> : <Eye className='h-4 w-4' />}
                   </button>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirmar nueva contraseña</Label>
-                <div className="relative">
-                  <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <div className='space-y-2'>
+                <Label htmlFor='confirmPassword'>Confirmar nueva contraseña</Label>
+                <div className='relative'>
+                  <Key className='absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4' />
                   <Input
-                    id="confirmPassword"
+                    id='confirmPassword'
                     type={showConfirmPassword ? 'text' : 'password'}
                     value={passwordForm.confirmPassword}
-                    onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                    className="pl-10 pr-10"
-                    placeholder="Repite la nueva contraseña"
+                    onChange={e =>
+                      setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })
+                    }
+                    className='pl-10 pr-10'
+                    placeholder='Repite la nueva contraseña'
                   />
                   <button
-                    type="button"
+                    type='button'
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    className='absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground'
                   >
-                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showConfirmPassword ? (
+                      <EyeOff className='h-4 w-4' />
+                    ) : (
+                      <Eye className='h-4 w-4' />
+                    )}
                   </button>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center justify-end">
+            <div className='flex items-center justify-end'>
               <Button
                 onClick={handleChangePassword}
-                disabled={changingPassword || !passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword}
+                disabled={
+                  changingPassword ||
+                  !passwordForm.currentPassword ||
+                  !passwordForm.newPassword ||
+                  !passwordForm.confirmPassword
+                }
               >
-                <Key className="h-4 w-4 mr-2" />
+                <Key className='h-4 w-4 mr-2' />
                 {changingPassword ? 'Cambiando...' : 'Cambiar Contraseña'}
               </Button>
             </div>
@@ -686,24 +708,22 @@ export default function ProfilePage() {
 
       {/* Modal de confirmación de avatar - NUEVO */}
       <Dialog open={showAvatarDialog} onOpenChange={setShowAvatarDialog}>
-        <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
+        <DialogContent className='sm:max-w-md' aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Confirmar nueva foto de perfil</DialogTitle>
-            <DialogDescription>
-              ¿Te gusta cómo se ve tu nueva foto de perfil?
-            </DialogDescription>
+            <DialogDescription>¿Te gusta cómo se ve tu nueva foto de perfil?</DialogDescription>
           </DialogHeader>
-          <div className="flex justify-center py-4">
-            <Avatar className="h-32 w-32">
-              <AvatarImage src={previewAvatar || undefined} alt="Preview" />
+          <div className='flex justify-center py-4'>
+            <Avatar className='h-32 w-32'>
+              <AvatarImage src={previewAvatar || undefined} alt='Preview' />
               <AvatarFallback>
-                <RoleIcon className="h-16 w-16" />
+                <RoleIcon className='h-16 w-16' />
               </AvatarFallback>
             </Avatar>
           </div>
-          <DialogFooter className="flex-col sm:flex-row gap-2">
+          <DialogFooter className='flex-col sm:flex-row gap-2'>
             <Button
-              variant="outline"
+              variant='outline'
               onClick={() => {
                 setShowAvatarDialog(false)
                 setPreviewAvatar(null)
@@ -714,8 +734,8 @@ export default function ProfilePage() {
               Cancelar
             </Button>
             <Button onClick={handleAvatarUpload} disabled={avatarUploading}>
-              {avatarUploading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              <Upload className="h-4 w-4 mr-2" />
+              {avatarUploading && <Loader2 className='h-4 w-4 mr-2 animate-spin' />}
+              <Upload className='h-4 w-4 mr-2' />
               Subir Foto
             </Button>
           </DialogFooter>
@@ -728,19 +748,18 @@ export default function ProfilePage() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar foto de perfil?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción eliminará tu foto de perfil actual. Podrás subir una nueva foto en cualquier momento.
+              Esta acción eliminará tu foto de perfil actual. Podrás subir una nueva foto en
+              cualquier momento.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={avatarUploading}>
-              Cancelar
-            </AlertDialogCancel>
+            <AlertDialogCancel disabled={avatarUploading}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleRemoveAvatar}
               disabled={avatarUploading}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
             >
-              {avatarUploading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {avatarUploading && <Loader2 className='h-4 w-4 mr-2 animate-spin' />}
               Eliminar
             </AlertDialogAction>
           </AlertDialogFooter>
