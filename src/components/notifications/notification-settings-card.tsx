@@ -27,14 +27,19 @@ import {
   NotificationPreferences,
   NotificationSettingsProps,
 } from '@/types/notification-preferences'
-import { requestNotificationPermission, getNotificationPermission } from '@/hooks/use-notification-sse'
+import {
+  requestNotificationPermission,
+  getNotificationPermission,
+} from '@/hooks/use-notification-sse'
 
 /**
  * Fila de configuración para notificaciones nativas del navegador/SO.
  * Muestra el estado actual del permiso y permite solicitarlo.
  */
 function NotificationPermissionRow() {
-  const [permission, setPermission] = useState<'granted' | 'denied' | 'default' | 'unsupported'>('default')
+  const [permission, setPermission] = useState<'granted' | 'denied' | 'default' | 'unsupported'>(
+    'default'
+  )
   const [requesting, setRequesting] = useState(false)
 
   useEffect(() => {
@@ -54,21 +59,23 @@ function NotificationPermissionRow() {
     <div className='flex items-center justify-between'>
       <div className='space-y-0.5'>
         <Label className='text-base flex items-center space-x-2'>
-          <Smartphone className='h-4 w-4 text-blue-600' />
+          <Smartphone className='h-4 w-4 text-blue-600 dark:text-blue-400' />
           <span>Notificaciones cuando la app está en segundo plano</span>
         </Label>
         <p className='text-sm text-muted-foreground'>
-          Recibe alertas del sistema operativo aunque tengas el navegador minimizado o la pantalla bloqueada
+          Recibe alertas del sistema operativo aunque tengas el navegador minimizado o la pantalla
+          bloqueada
         </p>
         {permission === 'denied' && (
           <p className='text-xs text-amber-600 mt-1'>
-            ⚠️ Permiso denegado. Para activarlo ve a la configuración de tu navegador → Notificaciones.
+            ⚠️ Permiso denegado. Para activarlo ve a la configuración de tu navegador →
+            Notificaciones.
           </p>
         )}
       </div>
       <div className='flex-shrink-0 ml-4'>
         {permission === 'granted' ? (
-          <Badge className='bg-green-100 text-green-700 border-green-200'>
+          <Badge className='bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800'>
             <Bell className='h-3 w-3 mr-1' />
             Activadas
           </Badge>
@@ -145,7 +152,7 @@ export function NotificationSettingsCard({
           <div className='flex items-center justify-between'>
             <div className='space-y-0.5'>
               <Label className='text-base flex items-center space-x-2'>
-                <Mail className='h-4 w-4 text-blue-600' />
+                <Mail className='h-4 w-4 text-blue-600 dark:text-blue-400' />
                 <span>Notificaciones por email</span>
               </Label>
               <p className='text-sm text-muted-foreground'>
@@ -163,7 +170,7 @@ export function NotificationSettingsCard({
           <div className='flex items-center justify-between'>
             <div className='space-y-0.5'>
               <Label className='text-base flex items-center space-x-2'>
-                <Bell className='h-4 w-4 text-purple-600' />
+                <Bell className='h-4 w-4 text-purple-600 dark:text-purple-400' />
                 <span>Notificaciones push</span>
               </Label>
               <p className='text-sm text-muted-foreground'>
@@ -182,9 +189,9 @@ export function NotificationSettingsCard({
             <div className='space-y-0.5'>
               <Label className='text-base flex items-center space-x-2'>
                 {preferences.soundEnabled ? (
-                  <Volume2 className='h-4 w-4 text-blue-600' />
+                  <Volume2 className='h-4 w-4 text-blue-600 dark:text-blue-400' />
                 ) : (
-                  <VolumeX className='h-4 w-4 text-gray-400' />
+                  <VolumeX className='h-4 w-4 text-muted-foreground' />
                 )}
                 <span>Sonido de notificaciones</span>
               </Label>
@@ -216,7 +223,7 @@ export function NotificationSettingsCard({
               <div className='flex items-center justify-between'>
                 <div className='space-y-0.5'>
                   <Label className='text-base flex items-center space-x-2'>
-                    <Ticket className='h-4 w-4 text-blue-600' />
+                    <Ticket className='h-4 w-4 text-blue-600 dark:text-blue-400' />
                     <span>Actualizaciones de tickets</span>
                   </Label>
                   <p className='text-sm text-muted-foreground'>
@@ -234,7 +241,7 @@ export function NotificationSettingsCard({
               <div className='flex items-center justify-between'>
                 <div className='space-y-0.5'>
                   <Label className='text-base flex items-center space-x-2'>
-                    <MessageCircle className='h-4 w-4 text-purple-600' />
+                    <MessageCircle className='h-4 w-4 text-purple-600 dark:text-purple-400' />
                     <span>Nuevos comentarios</span>
                   </Label>
                   <p className='text-sm text-muted-foreground'>
@@ -252,7 +259,7 @@ export function NotificationSettingsCard({
               <div className='flex items-center justify-between'>
                 <div className='space-y-0.5'>
                   <Label className='text-base flex items-center space-x-2'>
-                    <RefreshCw className='h-4 w-4 text-orange-600' />
+                    <RefreshCw className='h-4 w-4 text-orange-600 dark:text-orange-400' />
                     <span>Cambios de estado</span>
                   </Label>
                   <p className='text-sm text-muted-foreground'>
@@ -272,7 +279,7 @@ export function NotificationSettingsCard({
                   <div className='flex items-center justify-between'>
                     <div className='space-y-0.5'>
                       <Label className='text-base flex items-center space-x-2'>
-                        <AlertCircle className='h-4 w-4 text-orange-600' />
+                        <AlertCircle className='h-4 w-4 text-amber-600 dark:text-amber-400' />
                         <span>Alertas del sistema</span>
                       </Label>
                       <p className='text-sm text-muted-foreground'>
@@ -290,7 +297,7 @@ export function NotificationSettingsCard({
                   <div className='flex items-center justify-between'>
                     <div className='space-y-0.5'>
                       <Label className='text-base flex items-center space-x-2'>
-                        <Clock className='h-4 w-4 text-green-600' />
+                        <Clock className='h-4 w-4 text-emerald-600 dark:text-emerald-400' />
                         <span>Reporte semanal</span>
                       </Label>
                       <p className='text-sm text-muted-foreground'>
@@ -320,7 +327,7 @@ export function NotificationSettingsCard({
               <div className='flex items-center justify-between'>
                 <div className='space-y-0.5'>
                   <Label className='text-base flex items-center space-x-2'>
-                    <Ticket className='h-4 w-4 text-blue-600' />
+                    <Ticket className='h-4 w-4 text-blue-600 dark:text-blue-400' />
                     <span>Tickets creados</span>
                   </Label>
                   <p className='text-sm text-muted-foreground'>
@@ -338,7 +345,7 @@ export function NotificationSettingsCard({
               <div className='flex items-center justify-between'>
                 <div className='space-y-0.5'>
                   <Label className='text-base flex items-center space-x-2'>
-                    <User className='h-4 w-4 text-green-600' />
+                    <User className='h-4 w-4 text-green-600 dark:text-green-400' />
                     <span>Tickets asignados</span>
                   </Label>
                   <p className='text-sm text-muted-foreground'>Cuando te asignan un ticket</p>
@@ -354,7 +361,7 @@ export function NotificationSettingsCard({
               <div className='flex items-center justify-between'>
                 <div className='space-y-0.5'>
                   <Label className='text-base flex items-center space-x-2'>
-                    <RefreshCw className='h-4 w-4 text-orange-600' />
+                    <RefreshCw className='h-4 w-4 text-orange-600 dark:text-orange-400' />
                     <span>Cambios de estado</span>
                   </Label>
                   <p className='text-sm text-muted-foreground'>
@@ -372,7 +379,7 @@ export function NotificationSettingsCard({
               <div className='flex items-center justify-between'>
                 <div className='space-y-0.5'>
                   <Label className='text-base flex items-center space-x-2'>
-                    <MessageCircle className='h-4 w-4 text-purple-600' />
+                    <MessageCircle className='h-4 w-4 text-purple-600 dark:text-purple-400' />
                     <span>Nuevos comentarios</span>
                   </Label>
                   <p className='text-sm text-muted-foreground'>
@@ -391,7 +398,7 @@ export function NotificationSettingsCard({
                 <div className='flex items-center justify-between'>
                   <div className='space-y-0.5'>
                     <Label className='text-base flex items-center space-x-2'>
-                      <Clock className='h-4 w-4 text-indigo-600' />
+                      <Clock className='h-4 w-4 text-indigo-600 dark:text-indigo-400' />
                       <span>Horarios silenciosos</span>
                     </Label>
                     <p className='text-sm text-muted-foreground'>
@@ -405,7 +412,7 @@ export function NotificationSettingsCard({
                 </div>
 
                 {preferences.quietHours.enabled && (
-                  <div className='grid grid-cols-2 gap-4 pt-4 pl-6 border-l-2 border-indigo-200'>
+                  <div className='grid grid-cols-2 gap-4 pt-4 pl-6 border-l-2 border-indigo-200 dark:border-indigo-800'>
                     <div className='space-y-2'>
                       <Label htmlFor='startTime' className='text-sm font-medium'>
                         Hora de inicio

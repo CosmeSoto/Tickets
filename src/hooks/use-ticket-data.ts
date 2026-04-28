@@ -95,153 +95,167 @@ export function useTicketData() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const handleApiCall = useCallback(async <T>(
-    apiCall: () => Promise<Response>,
-    successMessage?: string,
-    suppressErrorToast?: boolean
-  ): Promise<T | null> => {
-    try {
-      setLoading(true)
-      setError(null)
-      
-      const response = await apiCall()
-      
-      if (!response.ok) {
-        // Manejo especial para 404
-        if (response.status === 404) {
-          const errorData = await response.json().catch(() => ({ message: 'Recurso no encontrado' }))
-          throw new Error(errorData.message || 'Recurso no encontrado')
+  const handleApiCall = useCallback(
+    async <T>(
+      apiCall: () => Promise<Response>,
+      successMessage?: string,
+      suppressErrorToast?: boolean
+    ): Promise<T | null> => {
+      try {
+        setLoading(true)
+        setError(null)
+
+        const response = await apiCall()
+
+        if (!response.ok) {
+          // Manejo especial para 404
+          if (response.status === 404) {
+            const errorData = await response
+              .json()
+              .catch(() => ({ message: 'Recurso no encontrado' }))
+            throw new Error(errorData.message || 'Recurso no encontrado')
+          }
+
+          const errorData = await response.json().catch(() => ({ message: 'Error desconocido' }))
+          throw new Error(errorData.message || `Error ${response.status}`)
         }
-        
-        const errorData = await response.json().catch(() => ({ message: 'Error desconocido' }))
-        throw new Error(errorData.message || `Error ${response.status}`)
-      }
 
-      const data = await response.json()
-      
-      if (!data.success) {
-        throw new Error(data.message || 'Error en la respuesta del servidor')
-      }
+        const data = await response.json()
 
-      if (successMessage) {
-        toast({
-          title: "Éxito",
-          description: successMessage
-        })
-      }
+        if (!data.success) {
+          throw new Error(data.message || 'Error en la respuesta del servidor')
+        }
 
-      return data.data
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
-      setError(errorMessage)
-      
-      if (!suppressErrorToast) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: errorMessage
-        })
+        if (successMessage) {
+          toast({
+            title: 'Éxito',
+            description: successMessage,
+          })
+        }
+
+        return data.data
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
+        setError(errorMessage)
+
+        if (!suppressErrorToast) {
+          toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: errorMessage,
+          })
+        }
+        return null
+      } finally {
+        setLoading(false)
       }
-      return null
-    } finally {
-      setLoading(false)
-    }
-  }, [toast])
+    },
+    [toast]
+  )
 
   // Obtener ticket por ID
-  const getTicket = useCallback(async (id: string): Promise<Ticket | null> => {
-    return handleApiCall<Ticket>(
-      () => fetch(`/api/tickets/${id}`)
-    )
-  }, [handleApiCall])
+  const getTicket = useCallback(
+    async (id: string): Promise<Ticket | null> => {
+      return handleApiCall<Ticket>(() => fetch(`/api/tickets/${id}`))
+    },
+    [handleApiCall]
+  )
 
   // Obtener lista de tickets con filtros
-  const getTickets = useCallback(async (params: {
-    page?: number
-    limit?: number
-    status?: string
-    priority?: string
-    assigneeId?: string
-    categoryId?: string
-    clientId?: string
-    search?: string
-  } = {}): Promise<{ data: Ticket[], meta: any } | null> => {
-    try {
-      const searchParams = new URLSearchParams()
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== '') {
-          searchParams.append(key, value.toString())
+  const getTickets = useCallback(
+    async (
+      params: {
+        page?: number
+        limit?: number
+        status?: string
+        priority?: string
+        assigneeId?: string
+        categoryId?: string
+        clientId?: string
+        search?: string
+      } = {}
+    ): Promise<{ data: Ticket[]; meta: any } | null> => {
+      try {
+        const searchParams = new URLSearchParams()
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined && value !== '') {
+            searchParams.append(key, value.toString())
+          }
+        })
+
+        setLoading(true)
+        setError(null)
+
+        const response = await fetch(`/api/tickets?${searchParams}`)
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ message: 'Error desconocido' }))
+          throw new Error(errorData.message || `Error ${response.status}`)
         }
-      })
 
-      setLoading(true)
-      setError(null)
-      
-      const response = await fetch(`/api/tickets?${searchParams}`)
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'Error desconocido' }))
-        throw new Error(errorData.message || `Error ${response.status}`)
-      }
+        const apiResponse = await response.json()
 
-      const apiResponse = await response.json()
-      
-      if (!apiResponse.success) {
-        throw new Error(apiResponse.message || 'Error en la respuesta del servidor')
-      }
+        if (!apiResponse.success) {
+          throw new Error(apiResponse.message || 'Error en la respuesta del servidor')
+        }
 
-      // La API retorna { success: true, data: Ticket[], meta: {...} }
-      // Asegurar que data es un array
-      const tickets = Array.isArray(apiResponse.data) ? apiResponse.data : []
-      
-      return {
-        data: tickets,
-        meta: apiResponse.meta || null
+        // La API retorna { success: true, data: Ticket[], meta: {...} }
+        // Asegurar que data es un array
+        const tickets = Array.isArray(apiResponse.data) ? apiResponse.data : []
+
+        return {
+          data: tickets,
+          meta: apiResponse.meta || null,
+        }
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
+        setError(errorMessage)
+
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: errorMessage,
+        })
+
+        return { data: [], meta: null }
+      } finally {
+        setLoading(false)
       }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
-      setError(errorMessage)
-      
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: errorMessage
-      })
-      
-      return { data: [], meta: null }
-    } finally {
-      setLoading(false)
-    }
-  }, [toast])
+    },
+    [toast]
+  )
 
   // Actualizar ticket
-  const updateTicket = useCallback(async (
-    id: string, 
-    updates: Partial<Ticket>
-  ): Promise<Ticket | null> => {
-    return handleApiCall<Ticket>(
-      () => fetch(`/api/tickets/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates)
-      }),
-      'Ticket actualizado exitosamente'
-    )
-  }, [handleApiCall])
+  const updateTicket = useCallback(
+    async (id: string, updates: Partial<Ticket>): Promise<Ticket | null> => {
+      return handleApiCall<Ticket>(
+        () =>
+          fetch(`/api/tickets/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updates),
+          }),
+        'Ticket actualizado exitosamente'
+      )
+    },
+    [handleApiCall]
+  )
 
   // Crear ticket
-  const createTicket = useCallback(async (
-    ticketData: Omit<Ticket, 'id' | 'createdAt' | 'updatedAt'>
-  ): Promise<Ticket | null> => {
-    return handleApiCall<Ticket>(
-      () => fetch('/api/tickets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(ticketData)
-      }),
-      'Ticket creado exitosamente'
-    )
-  }, [handleApiCall])
+  const createTicket = useCallback(
+    async (ticketData: Omit<Ticket, 'id' | 'createdAt' | 'updatedAt'>): Promise<Ticket | null> => {
+      return handleApiCall<Ticket>(
+        () =>
+          fetch('/api/tickets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(ticketData),
+          }),
+        'Ticket creado exitosamente'
+      )
+    },
+    [handleApiCall]
+  )
 
   // Eliminar ticket
   const deleteTicket = useCallback(async (id: string): Promise<boolean> => {
@@ -272,7 +286,7 @@ export function useTicketData() {
     getTickets,
     updateTicket,
     createTicket,
-    deleteTicket
+    deleteTicket,
   }
 }
 
@@ -281,48 +295,54 @@ export function useUserData() {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
 
-  const getUsers = useCallback(async (params: {
-    role?: User['role']
-    isActive?: boolean
-    department?: string
-  } = {}): Promise<User[]> => {
-    try {
-      setLoading(true)
-      const searchParams = new URLSearchParams()
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined) {
-          searchParams.append(key, value.toString())
+  const getUsers = useCallback(
+    async (
+      params: {
+        role?: User['role']
+        isActive?: boolean
+        department?: string
+      } = {}
+    ): Promise<User[]> => {
+      try {
+        setLoading(true)
+        const searchParams = new URLSearchParams()
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined) {
+            searchParams.append(key, value.toString())
+          }
+        })
+
+        const response = await fetch(`/api/users?${searchParams}`)
+
+        if (!response.ok) {
+          throw new Error('Error al cargar usuarios')
         }
-      })
 
-      const response = await fetch(`/api/users?${searchParams}`)
-      
-      if (!response.ok) {
-        throw new Error('Error al cargar usuarios')
+        const data = await response.json()
+        return data.success ? data.data : []
+      } catch (err) {
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'No se pudieron cargar los usuarios',
+        })
+        return []
+      } finally {
+        setLoading(false)
       }
+    },
+    [toast]
+  )
 
-      const data = await response.json()
-      return data.success ? data.data : []
-    } catch (err) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "No se pudieron cargar los usuarios"
-      })
-      return []
-    } finally {
-      setLoading(false)
-    }
-  }, [toast])
-
-  const getTechnicians = useCallback(() => 
-    getUsers({ role: 'TECHNICIAN', isActive: true })
-  , [getUsers])
+  const getTechnicians = useCallback(
+    () => getUsers({ role: 'TECHNICIAN', isActive: true }),
+    [getUsers]
+  )
 
   return {
     loading,
     getUsers,
-    getTechnicians
+    getTechnicians,
   }
 }
 
@@ -331,67 +351,113 @@ export function useCategoryData() {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
 
-  const getCategories = useCallback(async (params: {
-    isActive?: boolean
-    level?: number
-    parentId?: string
-  } = {}): Promise<Category[]> => {
-    try {
-      setLoading(true)
-      const searchParams = new URLSearchParams()
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined) {
-          searchParams.append(key, value.toString())
+  const getCategories = useCallback(
+    async (
+      params: {
+        isActive?: boolean
+        level?: number
+        parentId?: string
+      } = {}
+    ): Promise<Category[]> => {
+      try {
+        setLoading(true)
+        const searchParams = new URLSearchParams()
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined) {
+            searchParams.append(key, value.toString())
+          }
+        })
+
+        const response = await fetch(`/api/categories?${searchParams}`)
+
+        if (!response.ok) {
+          throw new Error('Error al cargar categorías')
         }
-      })
 
-      const response = await fetch(`/api/categories?${searchParams}`)
-      
-      if (!response.ok) {
-        throw new Error('Error al cargar categorías')
+        const data = await response.json()
+        return data.success ? data.data : []
+      } catch (err) {
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'No se pudieron cargar las categorías',
+        })
+        return []
+      } finally {
+        setLoading(false)
       }
-
-      const data = await response.json()
-      return data.success ? data.data : []
-    } catch (err) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "No se pudieron cargar las categorías"
-      })
-      return []
-    } finally {
-      setLoading(false)
-    }
-  }, [toast])
+    },
+    [toast]
+  )
 
   return {
     loading,
-    getCategories
+    getCategories,
   }
 }
 
 // Constantes del sistema
 export const TICKET_STATUSES: TicketStatus[] = [
-  { value: 'OPEN', label: 'Abierto', color: 'bg-blue-100 text-blue-800', icon: 'AlertCircle' },
-  { value: 'IN_PROGRESS', label: 'En Progreso', color: 'bg-yellow-100 text-yellow-800', icon: 'Clock' },
-  { value: 'RESOLVED', label: 'Resuelto', color: 'bg-green-100 text-green-800', icon: 'CheckCircle' },
-  { value: 'CLOSED', label: 'Cerrado', color: 'bg-gray-100 text-gray-800', icon: 'XCircle' },
-  { value: 'ON_HOLD', label: 'En Espera', color: 'bg-purple-100 text-purple-800', icon: 'Pause' }
+  {
+    value: 'OPEN',
+    label: 'Abierto',
+    color: 'bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300',
+    icon: 'AlertCircle',
+  },
+  {
+    value: 'IN_PROGRESS',
+    label: 'En Progreso',
+    color: 'bg-amber-100 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300',
+    icon: 'Clock',
+  },
+  {
+    value: 'RESOLVED',
+    label: 'Resuelto',
+    color: 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300',
+    icon: 'CheckCircle',
+  },
+  {
+    value: 'CLOSED',
+    label: 'Cerrado',
+    color: 'bg-gray-100 dark:bg-gray-800/50 text-gray-800 dark:text-gray-300',
+    icon: 'XCircle',
+  },
+  {
+    value: 'ON_HOLD',
+    label: 'En Espera',
+    color: 'bg-purple-100 dark:bg-purple-900/20 text-purple-800 dark:text-purple-300',
+    icon: 'Pause',
+  },
 ]
 
 export const TICKET_PRIORITIES: TicketPriority[] = [
-  { value: 'LOW', label: 'Baja', color: 'bg-gray-100 text-gray-800' },
-  { value: 'MEDIUM', label: 'Media', color: 'bg-blue-100 text-blue-800' },
-  { value: 'HIGH', label: 'Alta', color: 'bg-orange-100 text-orange-800' },
-  { value: 'URGENT', label: 'Urgente', color: 'bg-red-100 text-red-800' }
+  {
+    value: 'LOW',
+    label: 'Baja',
+    color: 'bg-gray-100 dark:bg-gray-800/50 text-gray-800 dark:text-gray-300',
+  },
+  {
+    value: 'MEDIUM',
+    label: 'Media',
+    color: 'bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300',
+  },
+  {
+    value: 'HIGH',
+    label: 'Alta',
+    color: 'bg-orange-100 dark:bg-orange-900/20 text-orange-800 dark:text-orange-300',
+  },
+  {
+    value: 'URGENT',
+    label: 'Urgente',
+    color: 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-300',
+  },
 ]
 
 // Utilidades
-export const getStatusConfig = (status: TicketStatus['value']) => 
+export const getStatusConfig = (status: TicketStatus['value']) =>
   TICKET_STATUSES.find(s => s.value === status)
 
-export const getPriorityConfig = (priority: TicketPriority['value']) => 
+export const getPriorityConfig = (priority: TicketPriority['value']) =>
   TICKET_PRIORITIES.find(p => p.value === priority)
 
 export const formatTimeAgo = (dateString: string): string => {
