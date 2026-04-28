@@ -5,17 +5,23 @@ import prisma from '@/lib/prisma'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { NotificationService } from '@/lib/services/notification-service'
 import { canManageCategory, getDepartmentFamilyId } from '@/lib/category-access'
+import { invalidateCache } from '@/lib/api-cache'
 
 /**
  * Obtiene el nombre del nivel basado en el número
  */
 function getLevelName(level: number): string {
   switch (level) {
-    case 1: return 'Principal'
-    case 2: return 'Subcategoría'
-    case 3: return 'Especialidad'
-    case 4: return 'Detalle'
-    default: return 'Máximo'
+    case 1:
+      return 'Principal'
+    case 2:
+      return 'Subcategoría'
+    case 3:
+      return 'Especialidad'
+    case 4:
+      return 'Detalle'
+    default:
+      return 'Máximo'
   }
 }
 
@@ -23,14 +29,11 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
-      return NextResponse.json(
-        { success: false, message: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
     }
 
     const { searchParams } = new URL(request.url)
-    
+
     const isActive = searchParams.get('isActive')
     const level = searchParams.get('level')
     const parentId = searchParams.get('parentId')
@@ -81,7 +84,8 @@ export async function GET(request: NextRequest) {
     // Obtener categorías con relaciones
     const categories = await prisma.categories.findMany({
       where,
-      select: {        id: true,
+      select: {
+        id: true,
         name: true,
         description: true,
         level: true,
@@ -105,20 +109,20 @@ export async function GET(request: NextRequest) {
                 name: true,
                 code: true,
                 color: true,
-              }
-            }
-          }
+              },
+            },
+          },
         },
         other_categories: {
           select: {
             id: true,
             name: true,
             color: true,
-            level: true
+            level: true,
           },
           where: {
-            isActive: true
-          }
+            isActive: true,
+          },
         },
         categories: {
           select: {
@@ -140,16 +144,16 @@ export async function GET(request: NextRequest) {
                     name: true,
                     color: true,
                     level: true,
-                    parentId: true
-                  }
-                }
-              }
-            }
-          }
+                    parentId: true,
+                  },
+                },
+              },
+            },
+          },
         },
         technician_assignments: {
           where: {
-            isActive: true
+            isActive: true,
           },
           select: {
             id: true,
@@ -161,10 +165,10 @@ export async function GET(request: NextRequest) {
               select: {
                 id: true,
                 name: true,
-                email: true
-              }
-            }
-          }
+                email: true,
+              },
+            },
+          },
         },
         _count: {
           select: {
@@ -173,14 +177,10 @@ export async function GET(request: NextRequest) {
             technician_assignments: true,
             knowledge_articles: true,
             sla_policies: true,
-          }
-        }
+          },
+        },
       },
-      orderBy: [
-        { level: 'asc' },
-        { order: 'asc' },
-        { name: 'asc' }
-      ],
+      orderBy: [{ level: 'asc' }, { order: 'asc' }, { name: 'asc' }],
       take: 2000, // cap de seguridad — árbol de categorías raramente supera esto
     })
 
@@ -204,12 +204,16 @@ export async function GET(request: NextRequest) {
       data: enrichedCategories,
       meta: {
         total: enrichedCategories.length,
-        filters: { isActive, level, parentId, familyId }
-      }
+        filters: { isActive, level, parentId, familyId },
+      },
     }
 
     // Guardar en caché
-    try { const { setCache } = await import('@/lib/redis'); await setCache(cacheKey, response, 180) } catch {}
+    const cacheKey = `categories:${isActive}:${level}:${parentId}:${familyId}:${session.user.id}`
+    try {
+      const { setCache } = await import('@/lib/redis')
+      await setCache(cacheKey, response, 180)
+    } catch {}
 
     return NextResponse.json(response)
   } catch (error) {
@@ -218,7 +222,7 @@ export async function GET(request: NextRequest) {
       {
         success: false,
         message: 'Error al cargar las categorías',
-        error: error instanceof Error ? error.message : 'Error desconocido'
+        error: error instanceof Error ? error.message : 'Error desconocido',
       },
       { status: 500 }
     )
@@ -229,10 +233,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
-      return NextResponse.json(
-        { success: false, message: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
     }
 
     // Solo ADMIN puede crear categorías
@@ -278,7 +279,7 @@ export async function POST(request: NextRequest) {
         name: name.trim(),
         level,
         parentId: parentId || null,
-      }
+      },
     })
 
     if (existing) {
@@ -300,7 +301,7 @@ export async function POST(request: NextRequest) {
         color: color || '#6B7280',
         order: order || 0,
         isActive: true,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       },
       include: {
         departments: true,
@@ -311,9 +312,9 @@ export async function POST(request: NextRequest) {
             technician_assignments: true,
             knowledge_articles: true,
             sla_policies: true,
-          }
-        }
-      }
+          },
+        },
+      },
     })
 
     // Registrar en auditoría
@@ -328,9 +329,9 @@ export async function POST(request: NextRequest) {
         level: category.level,
         parentId: category.parentId,
         departmentId: category.departmentId,
-        color: category.color
+        color: category.color,
       },
-      request
+      request,
     })
 
     // Notificación in-app a otros admins
@@ -339,17 +340,23 @@ export async function POST(request: NextRequest) {
       select: { id: true },
     })
     // Notificación in-app a otros admins
-    await Promise.all(admins.map(admin =>
-      NotificationService.push({
-        userId: admin.id,
-        type: 'INFO',
-        title: `Nueva categoría creada: ${category.name}`,
-        message: `Se creó la categoría "${category.name}" (Nivel ${category.level}) en el departamento ${category.departments?.name ?? 'sin departamento'}.`,
-      }).catch(err => console.error('[NOTIFY] Error:', err))
-    ))
+    await Promise.all(
+      admins.map(admin =>
+        NotificationService.push({
+          userId: admin.id,
+          type: 'INFO',
+          title: `Nueva categoría creada: ${category.name}`,
+          message: `Se creó la categoría "${category.name}" (Nivel ${category.level}) en el departamento ${category.departments?.name ?? 'sin departamento'}.`,
+        }).catch(err => console.error('[NOTIFY] Error:', err))
+      )
+    )
 
     // Invalidar caché de categorías
-    await invalidateCache(['categories:role=ADMIN*', 'categories:role=TECHNICIAN*', 'categories:role=CLIENT*']).catch(() => {})
+    await invalidateCache([
+      'categories:role=ADMIN*',
+      'categories:role=TECHNICIAN*',
+      'categories:role=CLIENT*',
+    ]).catch(() => {})
 
     // Enriquecer con canDelete y levelName
     const enrichedCategory = {
@@ -361,16 +368,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: enrichedCategory,
-      message: 'Categoría creada exitosamente'
+      message: 'Categoría creada exitosamente',
     })
   } catch (error) {
     console.error('Error creating category:', error)
-    
+
     return NextResponse.json(
       {
         success: false,
         message: 'Error al crear la categoría',
-        error: error instanceof Error ? error.message : 'Error desconocido'
+        error: error instanceof Error ? error.message : 'Error desconocido',
       },
       { status: 500 }
     )

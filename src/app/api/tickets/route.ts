@@ -13,14 +13,11 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
-      return NextResponse.json(
-        { success: false, message: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
     }
 
     const { searchParams } = new URL(request.url)
-    
+
     // Parámetros de consulta
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '25')
@@ -75,7 +72,7 @@ export async function GET(request: NextRequest) {
       // Técnico: solo tickets de sus familias asignadas
       const techFamilies = await prisma.technician_family_assignments.findMany({
         where: { technicianId: session.user.id, isActive: true },
-        select: { familyId: true }
+        select: { familyId: true },
       })
       const techFamilyIds = techFamilies.map(a => a.familyId)
 
@@ -84,93 +81,89 @@ export async function GET(request: NextRequest) {
         where.AND = [
           { familyId: { in: techFamilyIds } },
           {
-            OR: [
-              { assigneeId: session.user.id },
-              { assigneeId: null }
-            ]
-          }
+            OR: [{ assigneeId: session.user.id }, { assigneeId: null }],
+          },
         ]
       } else {
         // Sin asignaciones de familia: solo sus tickets asignados
-        where.OR = [
-          { assigneeId: session.user.id },
-          { assigneeId: null }
-        ]
+        where.OR = [{ assigneeId: session.user.id }, { assigneeId: null }]
       }
     }
 
     // Obtener tickets con relaciones — select explícito para evitar traer campos pesados
     const [tickets, total] = await Promise.all([
       prisma.tickets.findMany({
-          where,
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            status: true,
-            priority: true,
-            ticketCode: true,
-            codeIsManual: true,
-            familyId: true,
-            categoryId: true,
-            clientId: true,
-            assigneeId: true,
-            createdAt: true,
-            updatedAt: true,
-            resolvedAt: true,
-            closedAt: true,
-            slaDeadline: true,
-            users_tickets_clientIdTousers: {
-              select: { id: true, name: true, email: true, departmentId: true }
-            },
-            users_tickets_assigneeIdTousers: {
-              select: { id: true, name: true, email: true }
-            },
-            categories: {
-              select: { id: true, name: true, color: true, level: true }
-            },
-            family: {
-              select: { id: true, name: true, code: true, color: true }
-            },
-            _count: {
-              select: { comments: true, attachments: true }
-            }
+        where,
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          status: true,
+          priority: true,
+          ticketCode: true,
+          codeIsManual: true,
+          familyId: true,
+          categoryId: true,
+          clientId: true,
+          assigneeId: true,
+          createdAt: true,
+          updatedAt: true,
+          resolvedAt: true,
+          closedAt: true,
+          slaDeadline: true,
+          users_tickets_clientIdTousers: {
+            select: { id: true, name: true, email: true, departmentId: true },
           },
-          orderBy: { createdAt: 'desc' },
-          skip: (page - 1) * limit,
-          take: limit,
-        }),
-        prisma.tickets.count({ where })
-      ])
-
-      const mappedTickets = tickets.map(ticket => ({
-        ...ticket,
-        client: ticket.users_tickets_clientIdTousers,
-        assignee: ticket.users_tickets_assigneeIdTousers,
-        category: ticket.categories,
-        family: ticket.family,
-      }))
-
-      return NextResponse.json({
-        success: true,
-        data: mappedTickets,
-        meta: {
-          pagination: {
-            page, limit, total,
-            totalPages: Math.ceil(total / limit),
-            hasNext: (page * limit) < total,
-            hasPrev: page > 1
+          users_tickets_assigneeIdTousers: {
+            select: { id: true, name: true, email: true },
           },
-          filters: { status, priority, search, assigneeId, categoryId, familyId }
-        }
-      })
+          categories: {
+            select: { id: true, name: true, color: true, level: true },
+          },
+          family: {
+            select: { id: true, name: true, code: true, color: true },
+          },
+          _count: {
+            select: { comments: true, attachments: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.tickets.count({ where }),
+    ])
+
+    const mappedTickets = tickets.map(ticket => ({
+      ...ticket,
+      client: ticket.users_tickets_clientIdTousers,
+      assignee: ticket.users_tickets_assigneeIdTousers,
+      category: ticket.categories,
+      family: ticket.family,
+    }))
+
+    return NextResponse.json({
+      success: true,
+      data: mappedTickets,
+      meta: {
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+          hasNext: page * limit < total,
+          hasPrev: page > 1,
+        },
+        filters: { status, priority, search, assigneeId, categoryId, familyId },
+      },
+    })
   } catch (error) {
     console.error('Error in tickets API:', error)
     return NextResponse.json(
       {
         success: false,
         message: 'Error al cargar los tickets',
-        error: error instanceof Error ? error.message : 'Error desconocido'
+        error: error instanceof Error ? error.message : 'Error desconocido',
       },
       { status: 500 }
     )
@@ -181,10 +174,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
-      return NextResponse.json(
-        { success: false, message: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
     }
 
     const ticketData = await request.json()
@@ -194,7 +184,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: 'El título es requerido'
+          message: 'El título es requerido',
         },
         { status: 400 }
       )
@@ -204,7 +194,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: 'La descripción es requerida'
+          message: 'La descripción es requerida',
         },
         { status: 400 }
       )
@@ -214,7 +204,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: 'La categoría es requerida'
+          message: 'La categoría es requerida',
         },
         { status: 400 }
       )
@@ -222,14 +212,14 @@ export async function POST(request: NextRequest) {
 
     // Verificar que la categoría existe
     const category = await prisma.categories.findUnique({
-      where: { id: ticketData.categoryId }
+      where: { id: ticketData.categoryId },
     })
 
     if (!category) {
       return NextResponse.json(
         {
           success: false,
-          message: 'Categoría no encontrada'
+          message: 'Categoría no encontrada',
         },
         { status: 400 }
       )
@@ -237,29 +227,29 @@ export async function POST(request: NextRequest) {
 
     // Determinar el clientId basado en el rol del usuario
     let clientId = session.user.id // Por defecto, el usuario actual es el cliente
-    
+
     // Si es admin y especifica un clientId, usar ese
     if (session.user.role === 'ADMIN' && ticketData.clientId) {
       // Verificar que el cliente existe
       const client = await prisma.users.findUnique({
-        where: { id: ticketData.clientId }
+        where: { id: ticketData.clientId },
       })
-      
+
       if (!client) {
         return NextResponse.json(
           {
             success: false,
-            message: 'Cliente no encontrado'
+            message: 'Cliente no encontrado',
           },
           { status: 400 }
         )
       }
-      
+
       clientId = ticketData.clientId
     }
 
     // Crear nuevo ticket usando TicketService (maneja familyId, ticketCode, codeIsManual)
-    const newTicket = await TicketService.createTicket({
+    const newTicket = (await TicketService.createTicket({
       title: ticketData.title,
       description: ticketData.description,
       location: ticketData.location || undefined,
@@ -267,9 +257,10 @@ export async function POST(request: NextRequest) {
       clientId,
       categoryId: ticketData.categoryId,
       assigneeId: ticketData.assigneeId || undefined,
-      ...(ticketData.ticketCode && session.user.role === 'ADMIN' && { ticketCode: ticketData.ticketCode }),
+      ...(ticketData.ticketCode &&
+        session.user.role === 'ADMIN' && { ticketCode: ticketData.ticketCode }),
       isAdmin: session.user.role === 'ADMIN',
-    }) as any
+    })) as any
 
     // ⭐ AUDITORÍA: Registrar creación de ticket
     await AuditServiceComplete.log({
@@ -282,9 +273,9 @@ export async function POST(request: NextRequest) {
         priority: newTicket.priority,
         categoryName: newTicket.categories.name,
         clientName: newTicket.users_tickets_clientIdTousers.name,
-        assigneeName: newTicket.users_tickets_assigneeIdTousers?.name || 'Sin asignar'
+        assigneeName: newTicket.users_tickets_assigneeIdTousers?.name || 'Sin asignar',
       },
-      request: request
+      request: request,
     })
 
     // ⭐ NUEVO: Asignar SLA al ticket
@@ -301,43 +292,46 @@ export async function POST(request: NextRequest) {
       client: {
         id: newTicket.users_tickets_clientIdTousers.id,
         name: newTicket.users_tickets_clientIdTousers.name,
-        email: newTicket.users_tickets_clientIdTousers.email
+        email: newTicket.users_tickets_clientIdTousers.email,
       },
       category: {
         id: newTicket.categories.id,
-        name: newTicket.categories.name
+        name: newTicket.categories.name,
       },
-      assignee: newTicket.users_tickets_assigneeIdTousers ? {
-        id: newTicket.users_tickets_assigneeIdTousers.id,
-        name: newTicket.users_tickets_assigneeIdTousers.name,
-        email: newTicket.users_tickets_assigneeIdTousers.email
-      } : null,
-      createdAt: newTicket.createdAt
+      assignee: newTicket.users_tickets_assigneeIdTousers
+        ? {
+            id: newTicket.users_tickets_assigneeIdTousers.id,
+            name: newTicket.users_tickets_assigneeIdTousers.name,
+            email: newTicket.users_tickets_assigneeIdTousers.email,
+          }
+        : null,
+      createdAt: newTicket.createdAt,
     }).catch(err => {
       console.error('[WEBHOOK] Error disparando evento TICKET_CREATED:', err)
     })
 
     // ⭐ NUEVO: Enviar email de notificación al cliente
-    await EmailService.queueEmail({
-      to: newTicket.users_tickets_clientIdTousers.email,
-      subject: `Ticket #${(newTicket as any).ticketCode ?? newTicket.id.substring(0, 8)} creado`,
-      template: 'ticket-created',
-      templateData: {
-        ticketId: newTicket.id,
-        title: newTicket.title,
-        clientName: newTicket.users_tickets_clientIdTousers.name,
-        priority: newTicket.priority,
-        category: newTicket.categories.name
-      }
-    }, session.user.id).catch(err => {
+    await EmailService.queueEmail(
+      {
+        to: newTicket.users_tickets_clientIdTousers.email,
+        subject: `Ticket #${(newTicket as any).ticketCode ?? newTicket.id.substring(0, 8)} creado`,
+        template: 'ticket-created',
+        templateData: {
+          ticketId: newTicket.id,
+          title: newTicket.title,
+          clientName: newTicket.users_tickets_clientIdTousers.name,
+          priority: newTicket.priority,
+          category: newTicket.categories.name,
+        },
+      },
+      session.user.id
+    ).catch(err => {
       console.error('[EMAIL] Error enviando email de ticket creado:', err)
     })
 
     // ⭐ NUEVO: Enviar email al administrador para que asigne el ticket
     const { triggerTicketCreatedToAdminEmail } = await import('@/lib/email-triggers')
-    triggerTicketCreatedToAdminEmail(newTicket.id).catch(err => {
-      console.error('[EMAIL] Error enviando email de ticket creado a admin:', err)
-    })
+    void triggerTicketCreatedToAdminEmail(newTicket.id)
 
     // ⭐ NUEVO: Enviar notificaciones in-app a todos los admins
     await NotificationService.notifyTicketCreated(newTicket.id).catch(err => {
@@ -346,9 +340,11 @@ export async function POST(request: NextRequest) {
 
     // ⭐ Si el ticket fue asignado al crearse, notificar al técnico asignado
     if (newTicket.assigneeId) {
-      await NotificationService.notifyTicketAssigned(newTicket.id, newTicket.assigneeId).catch(err => {
-        console.error('[NOTIFICATION] Error enviando notificación de asignación:', err)
-      })
+      await NotificationService.notifyTicketAssigned(newTicket.id, newTicket.assigneeId).catch(
+        err => {
+          console.error('[NOTIFICATION] Error enviando notificación de asignación:', err)
+        }
+      )
     }
 
     // Mapear los datos para que coincidan con lo que espera el frontend
@@ -363,7 +359,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: mappedTicket,
-      message: 'Ticket creado exitosamente'
+      message: 'Ticket creado exitosamente',
     })
   } catch (error) {
     console.error('Error creating ticket:', error)
@@ -371,7 +367,7 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         message: 'Error al crear el ticket',
-        error: error instanceof Error ? error.message : 'Error desconocido'
+        error: error instanceof Error ? error.message : 'Error desconocido',
       },
       { status: 500 }
     )
