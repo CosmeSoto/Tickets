@@ -3,13 +3,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { 
-  BookOpen, 
-  Eye, 
-  ThumbsUp, 
-  FileText,
-  Lightbulb,
-} from 'lucide-react'
+import { BookOpen, Eye, ThumbsUp, FileText, Lightbulb } from 'lucide-react'
 
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { BackToTickets } from '@/components/tickets/back-to-tickets'
@@ -61,9 +55,14 @@ function filterArticles(articles: Article[], filters: any) {
 function sortArticles(articles: Article[], sortBy: 'recent' | 'views' | 'helpful') {
   const sorted = [...articles]
   switch (sortBy) {
-    case 'views': return sorted.sort((a, b) => b.views - a.views)
-    case 'helpful': return sorted.sort((a, b) => b.helpfulVotes - a.helpfulVotes)
-    default: return sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    case 'views':
+      return sorted.sort((a, b) => b.views - a.views)
+    case 'helpful':
+      return sorted.sort((a, b) => b.helpfulVotes - a.helpfulVotes)
+    default:
+      return sorted.sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )
   }
 }
 
@@ -77,14 +76,20 @@ export default function TechnicianKnowledgePage() {
   const { families } = useFamilies()
 
   // Cargar artículos filtrados por familia del técnico
-  const { data: allArticles, loading, error, reload } = useModuleData<Article>({
+  const {
+    data: allArticles,
+    loading,
+    error,
+    reload,
+  } = useModuleData<Article>({
     endpoint: '/api/knowledge-articles',
     initialLoad: true,
   })
 
   // Familias ya disponibles desde el contexto global
 
-  const { filters, debouncedFilters, setFilter, clearFilters, hasActiveFilters } = useKnowledgeFilters()
+  const { filters, debouncedFilters, setFilter, clearFilters, hasActiveFilters } =
+    useKnowledgeFilters()
 
   // Resetear categoría cuando cambia la familia
   const prevFamilyRef = useRef(filters.family)
@@ -99,10 +104,18 @@ export default function TechnicianKnowledgePage() {
   const categories = useMemo(() => {
     const seen = new Map<string, { id: string; name: string; color: string | null }>()
     allArticles
-      .filter(a => a.isPublished && (debouncedFilters.family === 'all' || a.familyId === debouncedFilters.family))
+      .filter(
+        a =>
+          a.isPublished &&
+          (debouncedFilters.family === 'all' || a.familyId === debouncedFilters.family)
+      )
       .forEach(a => {
         if (a.category && !seen.has(a.category.id)) {
-          seen.set(a.category.id, { id: a.category.id, name: a.category.name, color: a.category.color ?? null })
+          seen.set(a.category.id, {
+            id: a.category.id,
+            name: a.category.name,
+            color: a.category.color ?? null,
+          })
         }
       })
     return Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name))
@@ -115,19 +128,23 @@ export default function TechnicianKnowledgePage() {
 
   const pagination = usePagination(processedArticles, { pageSize: 20 })
 
-  const stats = useMemo(() => ({
-    total: processedArticles.length,
-    published: processedArticles.filter(a => a.isPublished).length,
-    totalViews: processedArticles.reduce((sum, a) => sum + a.views, 0),
-    avgHelpful: processedArticles.length > 0
-      ? Math.round(
-          processedArticles.reduce((sum, a) => {
-            const total = a.helpfulVotes + a.notHelpfulVotes
-            return sum + (total > 0 ? (a.helpfulVotes / total) * 100 : 0)
-          }, 0) / processedArticles.length
-        )
-      : 0,
-  }), [processedArticles])
+  const stats = useMemo(
+    () => ({
+      total: processedArticles.length,
+      published: processedArticles.filter(a => a.isPublished).length,
+      totalViews: processedArticles.reduce((sum, a) => sum + a.views, 0),
+      avgHelpful:
+        processedArticles.length > 0
+          ? Math.round(
+              processedArticles.reduce((sum, a) => {
+                const total = a.helpfulVotes + a.notHelpfulVotes
+                return sum + (total > 0 ? (a.helpfulVotes / total) * 100 : 0)
+              }, 0) / processedArticles.length
+            )
+          : 0,
+    }),
+    [processedArticles]
+  )
 
   const handleViewArticle = (article: Article) => router.push(`/technician/knowledge/${article.id}`)
 
@@ -144,9 +161,13 @@ export default function TechnicianKnowledgePage() {
       { key: 'author', label: 'Autor', format: v => v?.name ?? '' },
       { key: 'views', label: 'Vistas' },
       { key: 'helpfulVotes', label: 'Votos útiles' },
-      { key: 'helpfulPercentage', label: '% Útil', format: v => v != null ? `${v}%` : '' },
-      { key: 'tags', label: 'Tags', format: v => Array.isArray(v) ? v.join(', ') : '' },
-      { key: 'createdAt', label: 'Creado', format: v => v ? new Date(v).toLocaleDateString('es-ES') : '' },
+      { key: 'helpfulPercentage', label: '% Útil', format: v => (v != null ? `${v}%` : '') },
+      { key: 'tags', label: 'Tags', format: v => (Array.isArray(v) ? v.join(', ') : '') },
+      {
+        key: 'createdAt',
+        label: 'Creado',
+        format: v => (v ? new Date(v).toLocaleDateString('es-ES') : ''),
+      },
     ],
   })
 
@@ -155,13 +176,20 @@ export default function TechnicianKnowledgePage() {
     try {
       const res = await fetch(`/api/knowledge/${article.id}`, { method: 'DELETE' })
       if (res.ok) {
-        toast({ title: 'Artículo eliminado', description: 'El artículo fue eliminado correctamente' })
+        toast({
+          title: 'Artículo eliminado',
+          description: 'El artículo fue eliminado correctamente',
+        })
         reload()
       } else {
         throw new Error()
       }
     } catch {
-      toast({ title: 'Error', description: 'No se pudo eliminar el artículo', variant: 'destructive' })
+      toast({
+        title: 'Error',
+        description: 'No se pudo eliminar el artículo',
+        variant: 'destructive',
+      })
     }
   }
 
@@ -183,19 +211,21 @@ export default function TechnicianKnowledgePage() {
       error={error}
       onRetry={reload}
     >
-      <div className="space-y-6">
+      <div className='space-y-6'>
         <BackToTickets />
 
-        <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
-          <CardContent className="pt-6">
-            <div className="flex items-start gap-3">
-              <Lightbulb className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+        <Card className='border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800'>
+          <CardContent className='pt-6'>
+            <div className='flex items-start gap-3'>
+              <Lightbulb className='h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0' />
               <div>
-                <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                <p className='text-sm font-medium text-blue-900 dark:text-blue-100'>
                   ¿Cómo crear artículos?
                 </p>
-                <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
-                  Los artículos se crean desde tickets resueltos. Ve a un ticket con estado "Resuelto" y haz clic en "Crear Artículo". Solo ves artículos de las áreas que tienes asignadas.
+                <p className='text-sm text-blue-700 dark:text-blue-300 mt-1'>
+                  Los artículos se crean desde tickets resueltos. Ve a un ticket con estado
+                  &quot;Resuelto&quot; y haz clic en &quot;Crear Artículo&quot;. Solo ves artículos
+                  de las áreas que tienes asignadas.
                 </p>
               </div>
             </div>
@@ -203,33 +233,50 @@ export default function TechnicianKnowledgePage() {
         </Card>
 
         <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
-          <SymmetricStatsCard title="Total Artículos" value={stats.total} icon={BookOpen} color="blue" />
           <SymmetricStatsCard
-            title="Publicados"
+            title='Total Artículos'
+            value={stats.total}
+            icon={BookOpen}
+            color='blue'
+          />
+          <SymmetricStatsCard
+            title='Publicados'
             value={stats.published}
             icon={FileText}
-            color="green"
-            badge={stats.total > 0 ? { text: `${Math.round((stats.published / stats.total) * 100)}%`, variant: 'secondary' } : undefined}
+            color='green'
+            badge={
+              stats.total > 0
+                ? {
+                    text: `${Math.round((stats.published / stats.total) * 100)}%`,
+                    variant: 'secondary',
+                  }
+                : undefined
+            }
           />
-          <SymmetricStatsCard title="Total Vistas" value={stats.totalViews} icon={Eye} color="purple" />
           <SymmetricStatsCard
-            title="Valoración"
+            title='Total Vistas'
+            value={stats.totalViews}
+            icon={Eye}
+            color='purple'
+          />
+          <SymmetricStatsCard
+            title='Valoración'
             value={`${stats.avgHelpful}%`}
             icon={ThumbsUp}
-            color="yellow"
+            color='yellow'
             status={stats.avgHelpful >= 80 ? 'success' : 'normal'}
           />
         </div>
 
         <KnowledgeFilters
           searchTerm={filters.search}
-          setSearchTerm={(term) => setFilter('search', term)}
+          setSearchTerm={term => setFilter('search', term)}
           categoryFilter={filters.category}
-          setCategoryFilter={(category) => setFilter('category', category)}
+          setCategoryFilter={category => setFilter('category', category)}
           sortBy={filters.sortBy}
-          setSortBy={(sort) => setFilter('sortBy', sort)}
+          setSortBy={sort => setFilter('sortBy', sort)}
           familyFilter={filters.family}
-          setFamilyFilter={(family) => setFilter('family', family)}
+          setFamilyFilter={family => setFilter('family', family)}
           onRefresh={reload}
           onClearFilters={clearFilters}
           categories={categories}
@@ -238,7 +285,7 @@ export default function TechnicianKnowledgePage() {
         />
 
         <DataTable
-          title="Artículos de Conocimiento"
+          title='Artículos de Conocimiento'
           description={`Artículos de tus áreas asignadas (${processedArticles.length} artículos)`}
           data={pagination.currentItems}
           columns={createKnowledgeColumns({
@@ -264,7 +311,7 @@ export default function TechnicianKnowledgePage() {
           }
           viewMode={viewMode}
           onViewModeChange={setViewMode}
-          cardRenderer={(article) => (
+          cardRenderer={article => (
             <KnowledgeCard
               article={article}
               onView={handleViewArticle}
@@ -274,10 +321,12 @@ export default function TechnicianKnowledgePage() {
             />
           )}
           emptyState={{
-            icon: <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />,
-            title: hasActiveFilters ? "No se encontraron artículos" : "No hay artículos disponibles",
+            icon: <BookOpen className='h-12 w-12 text-muted-foreground mx-auto mb-4' />,
+            title: hasActiveFilters
+              ? 'No se encontraron artículos'
+              : 'No hay artículos disponibles',
             description: hasActiveFilters
-              ? "Intenta ajustar los filtros de búsqueda"
+              ? 'Intenta ajustar los filtros de búsqueda'
               : "Los artículos se crean desde tickets resueltos. Ve a un ticket resuelto y haz clic en 'Crear Artículo'.",
           }}
         />

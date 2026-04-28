@@ -44,7 +44,7 @@ function NewArticleContent() {
   const [isSaving, setIsSaving] = useState(false)
   const [sourceTicketId, setSourceTicketId] = useState<string | null>(null)
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
-  
+
   // Usar useRef para evitar ejecuciones duplicadas en Strict Mode
   const hasLoadedTicket = useRef(false)
 
@@ -56,7 +56,7 @@ function NewArticleContent() {
   // Cargar datos del ticket si viene desde un ticket
   useEffect(() => {
     const fromTicket = searchParams.get('fromTicket')
-    
+
     if (fromTicket && !hasLoadedTicket.current) {
       hasLoadedTicket.current = true
       setSourceTicketId(fromTicket)
@@ -66,10 +66,10 @@ function NewArticleContent() {
 
   const loadTicketSuggestions = async (ticketId: string) => {
     setLoadingSuggestions(true)
-    
+
     try {
       const data = await getTicketSuggestions(ticketId)
-      
+
       if (data) {
         // Verificar si ya existe un artículo
         if (data.existingArticle) {
@@ -79,8 +79,8 @@ function NewArticleContent() {
               duration: 5000,
               action: {
                 label: 'Ver artículo',
-                onClick: () => router.push(`/technician/knowledge/${data.existingArticle.id}`)
-              }
+                onClick: () => router.push(`/technician/knowledge/${data.existingArticle.id}`),
+              },
             }
           )
           // Redirigir automáticamente después de 3 segundos
@@ -89,17 +89,17 @@ function NewArticleContent() {
           }, 3000)
           return
         }
-        
+
         // Pre-llenar formulario con sugerencias
         setTitle(data.suggestions.title)
         setContent(data.suggestions.content)
         setCategoryId(data.ticket.category?.id || '')
         setTags(data.suggestions.tags)
-        
+
         // Generar resumen automático
         const autoSummary = data.ticket.description.substring(0, 200)
         setSummary(autoSummary)
-        
+
         toast.success('Información del ticket cargada automáticamente')
       }
     } catch (error) {
@@ -131,7 +131,7 @@ function NewArticleContent() {
   }
 
   const handleRemoveTag = (tagToRemove: string) => {
-    setTags(tags.filter((tag) => tag !== tagToRemove))
+    setTags(tags.filter(tag => tag !== tagToRemove))
   }
 
   const handleSubmit = async () => {
@@ -156,9 +156,9 @@ function NewArticleContent() {
     }
 
     setIsSaving(true)
-    
+
     let article
-    
+
     // Si viene desde un ticket, usar API específica
     if (sourceTicketId) {
       article = await createFromTicket(sourceTicketId, {
@@ -188,47 +188,47 @@ function NewArticleContent() {
   }
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div className='container mx-auto py-6 space-y-6'>
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className='flex flex-wrap items-center justify-between gap-4'>
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <BookOpen className="h-8 w-8" />
+          <h1 className='text-3xl font-bold flex items-center gap-2'>
+            <BookOpen className='h-8 w-8' />
             Nuevo Artículo
           </h1>
-          <p className="text-muted-foreground mt-2">
-            {sourceTicketId 
-              ? 'Crear artículo desde ticket resuelto' 
+          <p className='text-muted-foreground mt-2'>
+            {sourceTicketId
+              ? 'Crear artículo desde ticket resuelto'
               : 'Crea un nuevo artículo para la base de conocimiento'}
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className='flex items-center gap-2'>
           <Button
-            variant="ghost"
+            variant='ghost'
             onClick={() => router.push('/technician/knowledge')}
             disabled={isSaving || loadingSuggestions}
-            size="sm"
+            size='sm'
           >
-            <ArrowLeft className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Cancelar</span>
+            <ArrowLeft className='h-4 w-4 sm:mr-2' />
+            <span className='hidden sm:inline'>Cancelar</span>
           </Button>
 
-          <Button 
-            onClick={handleSubmit} 
-            disabled={isSaving || loading || loadingSuggestions || !sourceTicketId} 
-            size="sm"
+          <Button
+            onClick={handleSubmit}
+            disabled={isSaving || loading || loadingSuggestions || !sourceTicketId}
+            size='sm'
           >
             {isSaving ? (
               <>
-                <Loader2 className="h-4 w-4 sm:mr-2 animate-spin" />
-                <span className="hidden sm:inline">Creando...</span>
+                <Loader2 className='h-4 w-4 sm:mr-2 animate-spin' />
+                <span className='hidden sm:inline'>Creando...</span>
               </>
             ) : (
               <>
-                <Save className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Crear Artículo</span>
-                <span className="sm:hidden">Crear</span>
+                <Save className='h-4 w-4 sm:mr-2' />
+                <span className='hidden sm:inline'>Crear Artículo</span>
+                <span className='sm:hidden'>Crear</span>
               </>
             )}
           </Button>
@@ -237,11 +237,11 @@ function NewArticleContent() {
 
       {/* Alerta si no viene desde ticket */}
       {!sourceTicketId && !loadingSuggestions && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
+        <Alert variant='destructive'>
+          <AlertCircle className='h-4 w-4' />
           <AlertDescription>
-            Los artículos solo pueden crearse desde tickets resueltos. 
-            Ve a un ticket resuelto y haz clic en "Crear Artículo".
+            Los artículos solo pueden crearse desde tickets resueltos. Ve a un ticket resuelto y haz
+            clic en &quot;Crear Artículo&quot;.
           </AlertDescription>
         </Alert>
       )}
@@ -249,10 +249,8 @@ function NewArticleContent() {
       {/* Loading sugerencias */}
       {loadingSuggestions && (
         <Alert>
-          <Loader2 className="h-4 w-4 animate-spin" />
-          <AlertDescription>
-            Cargando información del ticket...
-          </AlertDescription>
+          <Loader2 className='h-4 w-4 animate-spin' />
+          <AlertDescription>Cargando información del ticket...</AlertDescription>
         </Alert>
       )}
 
@@ -261,55 +259,53 @@ function NewArticleContent() {
         <CardHeader>
           <CardTitle>Información del Artículo</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className='space-y-6'>
           {/* Título */}
-          <div className="space-y-2">
-            <Label htmlFor="title">
-              Título <span className="text-red-500">*</span>
+          <div className='space-y-2'>
+            <Label htmlFor='title'>
+              Título <span className='text-red-500'>*</span>
             </Label>
             <Input
-              id="title"
+              id='title'
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Ej: Cómo solucionar problemas de conexión"
+              onChange={e => setTitle(e.target.value)}
+              placeholder='Ej: Cómo solucionar problemas de conexión'
               maxLength={200}
             />
-            <p className="text-xs text-muted-foreground">
+            <p className='text-xs text-muted-foreground'>
               {title.length}/200 caracteres (mínimo 10)
             </p>
           </div>
 
           {/* Resumen */}
-          <div className="space-y-2">
-            <Label htmlFor="summary">Resumen</Label>
+          <div className='space-y-2'>
+            <Label htmlFor='summary'>Resumen</Label>
             <Textarea
-              id="summary"
+              id='summary'
               value={summary}
-              onChange={(e) => setSummary(e.target.value)}
-              placeholder="Breve descripción del artículo (opcional)"
+              onChange={e => setSummary(e.target.value)}
+              placeholder='Breve descripción del artículo (opcional)'
               rows={2}
               maxLength={300}
             />
-            <p className="text-xs text-muted-foreground">
-              {summary.length}/300 caracteres
-            </p>
+            <p className='text-xs text-muted-foreground'>{summary.length}/300 caracteres</p>
           </div>
 
           {/* Categoría */}
-          <div className="space-y-2">
-            <Label htmlFor="category">
-              Categoría <span className="text-red-500">*</span>
+          <div className='space-y-2'>
+            <Label htmlFor='category'>
+              Categoría <span className='text-red-500'>*</span>
             </Label>
             <Select value={categoryId} onValueChange={setCategoryId}>
               <SelectTrigger>
-                <SelectValue placeholder="Selecciona una categoría" />
+                <SelectValue placeholder='Selecciona una categoría' />
               </SelectTrigger>
               <SelectContent>
-                {categories.map((category) => (
+                {categories.map(category => (
                   <SelectItem key={category.id} value={category.id}>
-                    <div className="flex items-center gap-2">
+                    <div className='flex items-center gap-2'>
                       <div
-                        className="w-3 h-3 rounded-full"
+                        className='w-3 h-3 rounded-full'
                         style={{ backgroundColor: category.color }}
                       />
                       {category.name}
@@ -321,37 +317,35 @@ function NewArticleContent() {
           </div>
 
           {/* Contenido */}
-          <div className="space-y-2">
+          <div className='space-y-2'>
             <Label>
-              Contenido <span className="text-red-500">*</span>
+              Contenido <span className='text-red-500'>*</span>
             </Label>
             <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="edit">Editar</TabsTrigger>
-                <TabsTrigger value="preview">Vista Previa</TabsTrigger>
+              <TabsList className='grid w-full grid-cols-2'>
+                <TabsTrigger value='edit'>Editar</TabsTrigger>
+                <TabsTrigger value='preview'>Vista Previa</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="edit" className="space-y-2">
+              <TabsContent value='edit' className='space-y-2'>
                 <Textarea
                   value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  placeholder="Escribe el contenido en Markdown..."
+                  onChange={e => setContent(e.target.value)}
+                  placeholder='Escribe el contenido en Markdown...'
                   rows={16}
-                  className="font-mono text-sm"
+                  className='font-mono text-sm'
                 />
-                <p className="text-xs text-muted-foreground">
+                <p className='text-xs text-muted-foreground'>
                   {content.length} caracteres (mínimo 50). Soporta Markdown.
                 </p>
               </TabsContent>
 
-              <TabsContent value="preview">
-                <div className="border rounded-lg p-6 min-h-[400px] prose prose-slate dark:prose-invert max-w-none">
+              <TabsContent value='preview'>
+                <div className='border rounded-lg p-6 min-h-[400px] prose prose-slate dark:prose-invert max-w-none'>
                   {content ? (
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {content}
-                    </ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
                   ) : (
-                    <p className="text-muted-foreground">
+                    <p className='text-muted-foreground'>
                       Escribe contenido para ver la vista previa
                     </p>
                   )}
@@ -361,69 +355,65 @@ function NewArticleContent() {
           </div>
 
           {/* Tags */}
-          <div className="space-y-2">
-            <Label htmlFor="tags">
-              Tags <span className="text-red-500">*</span>
+          <div className='space-y-2'>
+            <Label htmlFor='tags'>
+              Tags <span className='text-red-500'>*</span>
             </Label>
-            <div className="flex gap-2">
+            <div className='flex gap-2'>
               <Input
-                id="tags"
+                id='tags'
                 value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={(e) => {
+                onChange={e => setTagInput(e.target.value)}
+                onKeyDown={e => {
                   if (e.key === 'Enter') {
                     e.preventDefault()
                     handleAddTag()
                   }
                 }}
-                placeholder="Escribe un tag y presiona Enter"
+                placeholder='Escribe un tag y presiona Enter'
                 maxLength={30}
               />
               <Button
-                type="button"
-                variant="outline"
-                size="icon"
+                type='button'
+                variant='outline'
+                size='icon'
                 onClick={handleAddTag}
                 disabled={!tagInput.trim() || tags.length >= 10}
               >
-                <Plus className="h-4 w-4" />
+                <Plus className='h-4 w-4' />
               </Button>
             </div>
 
             {tags.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {tags.map((tag) => (
-                  <Badge key={tag} variant="secondary">
+              <div className='flex flex-wrap gap-2'>
+                {tags.map(tag => (
+                  <Badge key={tag} variant='secondary'>
                     {tag}
                     <button
                       onClick={() => handleRemoveTag(tag)}
-                      className="ml-2 hover:text-destructive"
+                      className='ml-2 hover:text-destructive'
                     >
-                      <X className="h-3 w-3" />
+                      <X className='h-3 w-3' />
                     </button>
                   </Badge>
                 ))}
               </div>
             )}
 
-            <p className="text-xs text-muted-foreground">
+            <p className='text-xs text-muted-foreground'>
               {tags.length}/10 tags. Presiona Enter para agregar.
             </p>
           </div>
 
           {/* Publicar */}
-          <div className="flex items-center justify-between p-4 border rounded-lg">
-            <div className="space-y-0.5">
-              <Label htmlFor="publish">Publicar artículo</Label>
-              <p className="text-sm text-muted-foreground">
+          <div className='flex items-center justify-between p-4 border rounded-lg'>
+            <div className='space-y-0.5'>
+              <Label htmlFor='publish'>Publicar artículo</Label>
+              <p className='text-sm text-muted-foreground'>
                 El artículo será visible para todos los usuarios
               </p>
             </div>
-            <Switch
-              id="publish"
-              checked={isPublished}
-              onCheckedChange={setIsPublished}
-            />
+            <Switch id='publish' checked={isPublished} onCheckedChange={setIsPublished} />
           </div>
         </CardContent>
       </Card>
@@ -433,13 +423,15 @@ function NewArticleContent() {
 
 export default function NewArticlePage() {
   return (
-    <Suspense fallback={
-      <div className="container mx-auto py-6">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <Loader2 className="h-8 w-8 animate-spin" />
+    <Suspense
+      fallback={
+        <div className='container mx-auto py-6'>
+          <div className='flex items-center justify-center min-h-[400px]'>
+            <Loader2 className='h-8 w-8 animate-spin' />
+          </div>
         </div>
-      </div>
-    }>
+      }
+    >
       <NewArticleContent />
     </Suspense>
   )

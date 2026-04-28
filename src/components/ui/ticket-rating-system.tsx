@@ -5,12 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './car
 import { Button } from './button'
 import { Textarea } from './textarea'
 import { Badge } from './badge'
-import { 
-  Star, 
-  MessageSquare, 
-  User,
-  CheckCircle
-} from 'lucide-react'
+import { Star, MessageSquare, User, CheckCircle } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 interface Rating {
@@ -59,20 +54,20 @@ interface TicketRatingSystemProps {
   onRatingSubmitted?: () => void
 }
 
-export function TicketRatingSystem({ 
-  ticketId, 
+export function TicketRatingSystem({
+  ticketId,
   technicianId,
-  canRate = false, 
+  canRate = false,
   showTechnicianStats = false,
   mode = 'client',
-  onRatingSubmitted
+  onRatingSubmitted,
 }: TicketRatingSystemProps) {
   const { toast } = useToast()
   const [rating, setRating] = useState<Rating | null>(null)
   const [technicianStats, setTechnicianStats] = useState<TechnicianStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  
+
   // Form state para nueva calificación
   const [newRating, setNewRating] = useState({
     rating: 0,
@@ -81,8 +76,8 @@ export function TicketRatingSystem({
       responseTime: 0,
       technicalSkill: 0,
       communication: 0,
-      problemResolution: 0
-    }
+      problemResolution: 0,
+    },
   })
 
   useEffect(() => {
@@ -92,7 +87,7 @@ export function TicketRatingSystem({
   const loadRatingData = async () => {
     try {
       setLoading(true)
-      
+
       // Cargar calificación existente
       const ratingResponse = await fetch(`/api/tickets/${ticketId}/rating`)
       if (ratingResponse.ok) {
@@ -115,9 +110,9 @@ export function TicketRatingSystem({
   const handleSubmitRating = async () => {
     if (newRating.rating === 0) {
       toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Por favor selecciona una calificación general"
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Por favor selecciona una calificación general',
       })
       return
     }
@@ -127,9 +122,9 @@ export function TicketRatingSystem({
       const response = await fetch(`/api/tickets/${ticketId}/rating`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(newRating)
+        body: JSON.stringify(newRating),
       })
 
       if (!response.ok) {
@@ -137,32 +132,32 @@ export function TicketRatingSystem({
       }
 
       const data = await response.json()
-      
+
       if (data.success) {
         toast({
-          title: "Calificación enviada",
-          description: "Gracias por tu feedback. El ticket ha sido cerrado automáticamente."
+          title: 'Calificación enviada',
+          description: 'Gracias por tu feedback. El ticket ha sido cerrado automáticamente.',
         })
         loadRatingData()
         onRatingSubmitted?.()
       }
     } catch (err) {
       toast({
-        variant: "destructive",
-        title: "Error",
-        description: "No se pudo enviar la calificación"
+        variant: 'destructive',
+        title: 'Error',
+        description: 'No se pudo enviar la calificación',
       })
     } finally {
       setSubmitting(false)
     }
   }
 
-  const StarRating = ({ 
-    value, 
-    onChange, 
-    readonly = false, 
-    size = 'md' 
-  }: { 
+  const StarRating = ({
+    value,
+    onChange,
+    readonly = false,
+    size = 'md',
+  }: {
     value: number
     onChange?: (rating: number) => void
     readonly?: boolean
@@ -171,7 +166,7 @@ export function TicketRatingSystem({
     const sizeClasses = {
       sm: 'h-4 w-4',
       md: 'h-5 w-5',
-      lg: 'h-6 w-6'
+      lg: 'h-6 w-6',
     }
 
     const handleStarClick = (star: number) => {
@@ -181,13 +176,13 @@ export function TicketRatingSystem({
     }
 
     return (
-      <div className="flex items-center space-x-1">
-        {[1, 2, 3, 4, 5].map((star) => (
+      <div className='flex items-center space-x-1'>
+        {[1, 2, 3, 4, 5].map(star => (
           <button
             key={star}
-            type="button"
+            type='button'
             disabled={readonly}
-            onClick={(e) => {
+            onClick={e => {
               e.preventDefault()
               e.stopPropagation()
               handleStarClick(star)
@@ -195,47 +190,40 @@ export function TicketRatingSystem({
             className={`${sizeClasses[size]} ${
               readonly ? 'cursor-default' : 'cursor-pointer hover:scale-110 transition-transform'
             } ${
-              star <= value
-                ? 'text-yellow-400 fill-current'
-                : 'text-gray-300 hover:text-yellow-200'
+              star <= value ? 'text-yellow-400 fill-current' : 'text-gray-300 hover:text-yellow-200'
             } focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-opacity-50 rounded`}
             aria-label={`Calificar con ${star} estrella${star !== 1 ? 's' : ''}`}
           >
-            <Star className="w-full h-full" />
+            <Star className='w-full h-full' />
           </button>
         ))}
       </div>
     )
   }
 
-  const CategoryRating = ({ 
-    label, 
-    value, 
-    onChange, 
-    readonly = false 
-  }: { 
+  const CategoryRating = ({
+    label,
+    value,
+    onChange,
+    readonly = false,
+  }: {
     label: string
     value: number
     onChange?: (rating: number) => void
     readonly?: boolean
   }) => (
-    <div className="flex items-center justify-between">
-      <span className="text-sm font-medium text-foreground">{label}</span>
-      <StarRating 
-        value={value} 
-        onChange={onChange} 
-        readonly={readonly} 
-        size="sm"
-      />
+    <div className='flex items-center justify-between'>
+      <span className='text-sm font-medium text-foreground'>{label}</span>
+      <StarRating value={value} onChange={onChange} readonly={readonly} size='sm' />
     </div>
   )
 
   if (loading) {
     return (
       <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <CardContent className='pt-6'>
+          <div className='flex items-center justify-center py-8'>
+            <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary'></div>
           </div>
         </CardContent>
       </Card>
@@ -243,35 +231,40 @@ export function TicketRatingSystem({
   }
 
   return (
-    <div className="space-y-6">
+    <div className='space-y-6'>
       {/* Mensaje cuando no hay calificación aún */}
       {!rating && !canRate && (
-        <Card className={
-          mode === 'admin'
-            ? 'border-border bg-muted/30'
-            : 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950'
-        }>
-          <CardContent className="pt-6">
-            <div className="flex items-start space-x-3">
-              <Star className={`h-5 w-5 mt-0.5 flex-shrink-0 ${
-                mode === 'admin' ? 'text-muted-foreground' : 'text-blue-600 dark:text-blue-400'
-              }`} />
+        <Card
+          className={
+            mode === 'admin'
+              ? 'border-border bg-muted/30'
+              : 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950'
+          }
+        >
+          <CardContent className='pt-6'>
+            <div className='flex items-start space-x-3'>
+              <Star
+                className={`h-5 w-5 mt-0.5 flex-shrink-0 ${
+                  mode === 'admin' ? 'text-muted-foreground' : 'text-blue-600 dark:text-blue-400'
+                }`}
+              />
               <div>
                 {mode === 'admin' ? (
                   <>
-                    <h4 className="font-medium text-foreground mb-1">Sin calificación</h4>
-                    <p className="text-sm text-muted-foreground">
-                      El cliente podrá calificar este ticket cuando el técnico lo marque como resuelto.
+                    <h4 className='font-medium text-foreground mb-1'>Sin calificación</h4>
+                    <p className='text-sm text-muted-foreground'>
+                      El cliente podrá calificar este ticket cuando el técnico lo marque como
+                      resuelto.
                     </p>
                   </>
                 ) : (
                   <>
-                    <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-1">
+                    <h4 className='font-medium text-blue-900 dark:text-blue-100 mb-1'>
                       Calificación no disponible aún
                     </h4>
-                    <p className="text-sm text-blue-800 dark:text-blue-200">
-                      Podrás calificar este ticket una vez que el técnico lo marque como <strong>resuelto</strong>.
-                      Tu calificación cerrará el ticket automáticamente.
+                    <p className='text-sm text-blue-800 dark:text-blue-200'>
+                      Podrás calificar este ticket una vez que el técnico lo marque como{' '}
+                      <strong>resuelto</strong>. Tu calificación cerrará el ticket automáticamente.
                     </p>
                   </>
                 )}
@@ -285,70 +278,60 @@ export function TicketRatingSystem({
       {rating && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Star className="h-5 w-5 text-yellow-400" />
+            <CardTitle className='flex items-center space-x-2'>
+              <Star className='h-5 w-5 text-yellow-400' />
               <span>Calificación del Servicio</span>
             </CardTitle>
-            <CardDescription>
-              Evaluación del cliente sobre la resolución del ticket
-            </CardDescription>
+            <CardDescription>Evaluación del cliente sobre la resolución del ticket</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
+          <CardContent className='space-y-4'>
+            <div className='flex items-center justify-between'>
               <div>
-                <div className="flex items-center space-x-2">
-                  <StarRating value={rating.rating} readonly size="lg" />
-                  <span className="text-2xl font-bold text-foreground">
-                    {rating.rating}/5
-                  </span>
+                <div className='flex items-center space-x-2'>
+                  <StarRating value={rating.rating} readonly size='lg' />
+                  <span className='text-2xl font-bold text-foreground'>{rating.rating}/5</span>
                 </div>
-                <p className="text-sm text-muted-foreground mt-1">
+                <p className='text-sm text-muted-foreground mt-1'>
                   Calificado por {rating.client.name}
                 </p>
               </div>
-              <div className="text-right">
-                <Badge variant="outline">
-                  {new Date(rating.createdAt).toLocaleDateString()}
-                </Badge>
+              <div className='text-right'>
+                <Badge variant='outline'>{new Date(rating.createdAt).toLocaleDateString()}</Badge>
               </div>
             </div>
 
             {/* Calificaciones por categoría */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
-              <CategoryRating 
-                label="Tiempo de Respuesta" 
-                value={rating.categories.responseTime} 
-                readonly 
+            <div className='grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted rounded-lg'>
+              <CategoryRating
+                label='Tiempo de Respuesta'
+                value={rating.categories.responseTime}
+                readonly
               />
-              <CategoryRating 
-                label="Habilidad Técnica" 
-                value={rating.categories.technicalSkill} 
-                readonly 
+              <CategoryRating
+                label='Habilidad Técnica'
+                value={rating.categories.technicalSkill}
+                readonly
               />
-              <CategoryRating 
-                label="Comunicación" 
-                value={rating.categories.communication} 
-                readonly 
+              <CategoryRating
+                label='Comunicación'
+                value={rating.categories.communication}
+                readonly
               />
-              <CategoryRating 
-                label="Resolución del Problema" 
-                value={rating.categories.problemResolution} 
-                readonly 
+              <CategoryRating
+                label='Resolución del Problema'
+                value={rating.categories.problemResolution}
+                readonly
               />
             </div>
 
             {/* Feedback del cliente */}
             {rating.feedback && (
-              <div className="p-4 bg-blue-50 rounded-lg">
-                <div className="flex items-start space-x-2">
-                  <MessageSquare className="h-4 w-4 text-blue-600 mt-1" />
+              <div className='p-4 bg-blue-50 rounded-lg'>
+                <div className='flex items-start space-x-2'>
+                  <MessageSquare className='h-4 w-4 text-blue-600 mt-1' />
                   <div>
-                    <p className="text-sm font-medium text-blue-900">
-                      Comentarios del cliente:
-                    </p>
-                    <p className="text-sm text-blue-800 mt-1">
-                      "{rating.feedback}"
-                    </p>
+                    <p className='text-sm font-medium text-blue-900'>Comentarios del cliente:</p>
+                    <p className='text-sm text-blue-800 mt-1'>&quot;{rating.feedback}&quot;</p>
                   </div>
                 </div>
               </div>
@@ -366,19 +349,19 @@ export function TicketRatingSystem({
               Tu opinión nos ayuda a mejorar la calidad de nuestro soporte
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className='space-y-6'>
             {/* Calificación general */}
             <div>
-              <label className="block text-sm font-medium text-foreground mb-2">
+              <label className='block text-sm font-medium text-foreground mb-2'>
                 Calificación General
               </label>
-              <div className="flex items-center space-x-4">
-                <StarRating 
-                  value={newRating.rating} 
-                  onChange={(rating) => setNewRating(prev => ({ ...prev, rating }))}
-                  size="lg"
+              <div className='flex items-center space-x-4'>
+                <StarRating
+                  value={newRating.rating}
+                  onChange={rating => setNewRating(prev => ({ ...prev, rating }))}
+                  size='lg'
                 />
-                <span className="text-lg font-medium text-foreground">
+                <span className='text-lg font-medium text-foreground'>
                   {newRating.rating > 0 && `${newRating.rating}/5`}
                 </span>
               </div>
@@ -386,63 +369,71 @@ export function TicketRatingSystem({
 
             {/* Calificaciones detalladas */}
             <div>
-              <label className="block text-sm font-medium text-foreground mb-3">
+              <label className='block text-sm font-medium text-foreground mb-3'>
                 Calificación Detallada
               </label>
-              <div className="space-y-3 p-4 bg-muted rounded-lg">
-                <CategoryRating 
-                  label="Tiempo de Respuesta" 
+              <div className='space-y-3 p-4 bg-muted rounded-lg'>
+                <CategoryRating
+                  label='Tiempo de Respuesta'
                   value={newRating.categories.responseTime}
-                  onChange={(rating) => setNewRating(prev => ({
-                    ...prev,
-                    categories: { ...prev.categories, responseTime: rating }
-                  }))}
+                  onChange={rating =>
+                    setNewRating(prev => ({
+                      ...prev,
+                      categories: { ...prev.categories, responseTime: rating },
+                    }))
+                  }
                 />
-                <CategoryRating 
-                  label="Habilidad Técnica" 
+                <CategoryRating
+                  label='Habilidad Técnica'
                   value={newRating.categories.technicalSkill}
-                  onChange={(rating) => setNewRating(prev => ({
-                    ...prev,
-                    categories: { ...prev.categories, technicalSkill: rating }
-                  }))}
+                  onChange={rating =>
+                    setNewRating(prev => ({
+                      ...prev,
+                      categories: { ...prev.categories, technicalSkill: rating },
+                    }))
+                  }
                 />
-                <CategoryRating 
-                  label="Comunicación" 
+                <CategoryRating
+                  label='Comunicación'
                   value={newRating.categories.communication}
-                  onChange={(rating) => setNewRating(prev => ({
-                    ...prev,
-                    categories: { ...prev.categories, communication: rating }
-                  }))}
+                  onChange={rating =>
+                    setNewRating(prev => ({
+                      ...prev,
+                      categories: { ...prev.categories, communication: rating },
+                    }))
+                  }
                 />
-                <CategoryRating 
-                  label="Resolución del Problema" 
+                <CategoryRating
+                  label='Resolución del Problema'
                   value={newRating.categories.problemResolution}
-                  onChange={(rating) => setNewRating(prev => ({
-                    ...prev,
-                    categories: { ...prev.categories, problemResolution: rating }
-                  }))}
+                  onChange={rating =>
+                    setNewRating(prev => ({
+                      ...prev,
+                      categories: { ...prev.categories, problemResolution: rating },
+                    }))
+                  }
                 />
               </div>
             </div>
 
             {/* Comentarios */}
             <div>
-              <label className="block text-sm font-medium text-foreground mb-2">
+              <label className='block text-sm font-medium text-foreground mb-2'>
                 Comentarios (Opcional)
               </label>
               <Textarea
-                placeholder="Comparte tu experiencia y sugerencias para mejorar..."
+                placeholder='Comparte tu experiencia y sugerencias para mejorar...'
                 value={newRating.feedback}
-                onChange={(e) => setNewRating(prev => ({ ...prev, feedback: e.target.value }))}
+                onChange={e => setNewRating(prev => ({ ...prev, feedback: e.target.value }))}
                 rows={4}
               />
             </div>
 
             {/* Botón de envío */}
-            <Button 
-              onClick={handleSubmitRating} 
+            <Button
+              onClick={handleSubmitRating}
               disabled={submitting || newRating.rating === 0}
-              className="w-full"
+              className='w-full'
             >
               {submitting ? 'Enviando...' : 'Enviar Calificación'}
             </Button>
@@ -454,65 +445,67 @@ export function TicketRatingSystem({
       {showTechnicianStats && technicianStats && mode === 'admin' && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <User className="h-5 w-5" />
+            <CardTitle className='flex items-center space-x-2'>
+              <User className='h-5 w-5' />
               <span>Estadísticas del Técnico</span>
             </CardTitle>
-            <CardDescription>
-              Rendimiento y calificaciones históricas
-            </CardDescription>
+            <CardDescription>Rendimiento y calificaciones históricas</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className='space-y-4'>
             {/* Resumen general */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <div className="flex items-center justify-center space-x-1 mb-2">
-                  <StarRating value={Math.round(technicianStats.averageRating)} readonly size="sm" />
+            <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+              <div className='text-center p-4 bg-blue-50 rounded-lg'>
+                <div className='flex items-center justify-center space-x-1 mb-2'>
+                  <StarRating
+                    value={Math.round(technicianStats.averageRating)}
+                    readonly
+                    size='sm'
+                  />
                 </div>
-                <div className="text-2xl font-bold text-blue-900">
+                <div className='text-2xl font-bold text-blue-900'>
                   {technicianStats.averageRating.toFixed(1)}
                 </div>
-                <div className="text-sm text-blue-700">Promedio General</div>
+                <div className='text-sm text-blue-700'>Promedio General</div>
               </div>
-              
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-900">
+
+              <div className='text-center p-4 bg-green-50 rounded-lg'>
+                <div className='text-2xl font-bold text-green-900'>
                   {technicianStats.totalRatings}
                 </div>
-                <div className="text-sm text-green-700">Total Calificaciones</div>
+                <div className='text-sm text-green-700'>Total Calificaciones</div>
               </div>
-              
-              <div className="text-center p-4 bg-purple-50 rounded-lg">
-                <div className="text-2xl font-bold text-purple-900">
+
+              <div className='text-center p-4 bg-purple-50 rounded-lg'>
+                <div className='text-2xl font-bold text-purple-900'>
                   {technicianStats.recentRatings.filter(r => r.rating >= 4).length}
                 </div>
-                <div className="text-sm text-purple-700">Calificaciones 4+</div>
+                <div className='text-sm text-purple-700'>Calificaciones 4+</div>
               </div>
             </div>
 
             {/* Promedios por categoría */}
             <div>
-              <h4 className="font-medium text-foreground mb-3">Rendimiento por Categoría</h4>
-              <div className="space-y-2">
-                <CategoryRating 
-                  label="Tiempo de Respuesta" 
-                  value={Math.round(technicianStats.categoryAverages.responseTime)} 
-                  readonly 
+              <h4 className='font-medium text-foreground mb-3'>Rendimiento por Categoría</h4>
+              <div className='space-y-2'>
+                <CategoryRating
+                  label='Tiempo de Respuesta'
+                  value={Math.round(technicianStats.categoryAverages.responseTime)}
+                  readonly
                 />
-                <CategoryRating 
-                  label="Habilidad Técnica" 
-                  value={Math.round(technicianStats.categoryAverages.technicalSkill)} 
-                  readonly 
+                <CategoryRating
+                  label='Habilidad Técnica'
+                  value={Math.round(technicianStats.categoryAverages.technicalSkill)}
+                  readonly
                 />
-                <CategoryRating 
-                  label="Comunicación" 
-                  value={Math.round(technicianStats.categoryAverages.communication)} 
-                  readonly 
+                <CategoryRating
+                  label='Comunicación'
+                  value={Math.round(technicianStats.categoryAverages.communication)}
+                  readonly
                 />
-                <CategoryRating 
-                  label="Resolución del Problema" 
-                  value={Math.round(technicianStats.categoryAverages.problemResolution)} 
-                  readonly 
+                <CategoryRating
+                  label='Resolución del Problema'
+                  value={Math.round(technicianStats.categoryAverages.problemResolution)}
+                  readonly
                 />
               </div>
             </div>
@@ -520,18 +513,21 @@ export function TicketRatingSystem({
             {/* Calificaciones recientes */}
             {technicianStats.recentRatings.length > 0 && (
               <div>
-                <h4 className="font-medium text-foreground mb-3">Calificaciones Recientes</h4>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {technicianStats.recentRatings.slice(0, 5).map((recentRating) => (
-                    <div key={recentRating.id} className="flex items-center justify-between p-2 bg-muted rounded">
-                      <div className="flex items-center space-x-2">
-                        <StarRating value={recentRating.rating} readonly size="sm" />
-                        <span className="text-sm text-muted-foreground">
+                <h4 className='font-medium text-foreground mb-3'>Calificaciones Recientes</h4>
+                <div className='space-y-2 max-h-40 overflow-y-auto'>
+                  {technicianStats.recentRatings.slice(0, 5).map(recentRating => (
+                    <div
+                      key={recentRating.id}
+                      className='flex items-center justify-between p-2 bg-muted rounded'
+                    >
+                      <div className='flex items-center space-x-2'>
+                        <StarRating value={recentRating.rating} readonly size='sm' />
+                        <span className='text-sm text-muted-foreground'>
                           {new Date(recentRating.createdAt).toLocaleDateString()}
                         </span>
                       </div>
                       {recentRating.feedback && (
-                        <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                        <MessageSquare className='h-4 w-4 text-muted-foreground' />
                       )}
                     </div>
                   ))}

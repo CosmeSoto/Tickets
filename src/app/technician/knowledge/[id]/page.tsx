@@ -3,7 +3,17 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Eye, Calendar, Tag, BookOpen, Share2, Trash2, CheckCircle, XCircle } from 'lucide-react'
+import {
+  ArrowLeft,
+  Eye,
+  Calendar,
+  Tag,
+  BookOpen,
+  Share2,
+  Trash2,
+  CheckCircle,
+  XCircle,
+} from 'lucide-react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -26,12 +36,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useToast } from '@/hooks/use-toast'
 import type { Article } from '@/hooks/use-knowledge'
 
@@ -40,9 +45,9 @@ export default function TechnicianKnowledgeDetailPage() {
   const router = useRouter()
   const params = useParams()
   const { toast } = useToast()
-  
+
   const articleId = params.id as string
-  
+
   const [article, setArticle] = useState<Article | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -72,10 +77,10 @@ export default function TechnicianKnowledgeDetailPage() {
   const loadArticle = async () => {
     setLoading(true)
     setError(null)
-    
+
     try {
       const response = await fetch(`/api/knowledge/${articleId}`)
-      
+
       if (response.ok) {
         const data = await response.json()
         setArticle(data)
@@ -93,23 +98,23 @@ export default function TechnicianKnowledgeDetailPage() {
 
   const loadSimilarArticles = async () => {
     if (!article) return
-    
+
     try {
-      const payload = { 
+      const payload = {
         title: article.title || '',
         description: article.summary || article.content?.substring(0, 200) || '',
         categoryId: article.categoryId || '',
-        limit: 3 
+        limit: 3,
       }
-      
+
       console.log('[Similar Articles] Sending payload:', payload)
-      
+
       const response = await fetch(`/api/knowledge/similar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      
+
       if (response.ok) {
         const data = await response.json()
         // Filtrar el artículo actual de los resultados
@@ -120,7 +125,7 @@ export default function TechnicianKnowledgeDetailPage() {
         console.error('Error loading similar articles:', {
           status: response.status,
           statusText: response.statusText,
-          error: errorData
+          error: errorData,
         })
       }
     } catch (err) {
@@ -135,7 +140,7 @@ export default function TechnicianKnowledgeDetailPage() {
     toast({
       title: 'Enlace copiado exitosamente',
       description: `El enlace de "${articleTitle}" se copió al portapapeles`,
-      duration: 4000
+      duration: 4000,
     })
   }
 
@@ -156,10 +161,10 @@ export default function TechnicianKnowledgeDetailPage() {
         setArticle(updated)
         toast({
           title: updated.isPublished ? 'Artículo publicado exitosamente' : 'Artículo despublicado',
-          description: updated.isPublished 
+          description: updated.isPublished
             ? `"${articleTitle}" está ahora visible para todos los usuarios`
             : `"${articleTitle}" ya no es visible públicamente`,
-          duration: 4000
+          duration: 4000,
         })
       } else {
         throw new Error('Error al cambiar estado')
@@ -169,7 +174,7 @@ export default function TechnicianKnowledgeDetailPage() {
         title: 'Error al cambiar estado',
         description: `No se pudo ${article.isPublished ? 'despublicar' : 'publicar'} el artículo. Intenta nuevamente.`,
         variant: 'destructive',
-        duration: 5000
+        duration: 5000,
       })
     } finally {
       setToggling(false)
@@ -188,7 +193,7 @@ export default function TechnicianKnowledgeDetailPage() {
         toast({
           title: 'Artículo eliminado',
           description: `"${articleTitle}" ha sido eliminado permanentemente de la base de conocimientos`,
-          duration: 4000
+          duration: 4000,
         })
         router.push('/technician/knowledge')
       } else {
@@ -199,7 +204,7 @@ export default function TechnicianKnowledgeDetailPage() {
         title: 'Error al eliminar artículo',
         description: 'No se pudo eliminar el artículo. Intenta nuevamente.',
         variant: 'destructive',
-        duration: 5000
+        duration: 5000,
       })
     } finally {
       setDeleting(false)
@@ -216,12 +221,12 @@ export default function TechnicianKnowledgeDetailPage() {
   return (
     <ModuleLayout
       title={article?.title || 'Cargando...'}
-      subtitle="Artículo de la base de conocimientos"
+      subtitle='Artículo de la base de conocimientos'
       loading={loading}
       error={error}
       onRetry={loadArticle}
       headerActions={
-        <div className="flex items-center gap-2">
+        <div className='flex items-center gap-2'>
           {isAuthor && (
             <>
               <TooltipProvider>
@@ -229,18 +234,18 @@ export default function TechnicianKnowledgeDetailPage() {
                   <TooltipTrigger asChild>
                     <Button
                       variant={article?.isPublished ? 'outline' : 'default'}
-                      size="sm"
+                      size='sm'
                       onClick={handleTogglePublish}
                       disabled={toggling}
                     >
                       {article?.isPublished ? (
                         <>
-                          <XCircle className="h-4 w-4 mr-2" />
+                          <XCircle className='h-4 w-4 mr-2' />
                           Despublicar
                         </>
                       ) : (
                         <>
-                          <CheckCircle className="h-4 w-4 mr-2" />
+                          <CheckCircle className='h-4 w-4 mr-2' />
                           Publicar
                         </>
                       )}
@@ -248,8 +253,8 @@ export default function TechnicianKnowledgeDetailPage() {
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>
-                      {article?.isPublished 
-                        ? 'Oculta este artículo de la base de conocimientos pública' 
+                      {article?.isPublished
+                        ? 'Oculta este artículo de la base de conocimientos pública'
                         : 'Publica este artículo para que sea visible a todos los usuarios'}
                     </p>
                   </TooltipContent>
@@ -259,11 +264,11 @@ export default function TechnicianKnowledgeDetailPage() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
-                      variant="destructive"
-                      size="sm"
+                      variant='destructive'
+                      size='sm'
                       onClick={() => setShowDeleteDialog(true)}
                     >
-                      <Trash2 className="h-4 w-4 mr-2" />
+                      <Trash2 className='h-4 w-4 mr-2' />
                       Eliminar
                     </Button>
                   </TooltipTrigger>
@@ -277,8 +282,8 @@ export default function TechnicianKnowledgeDetailPage() {
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="sm" onClick={handleShare}>
-                  <Share2 className="h-4 w-4 mr-2" />
+                <Button variant='outline' size='sm' onClick={handleShare}>
+                  <Share2 className='h-4 w-4 mr-2' />
                   Compartir
                 </Button>
               </TooltipTrigger>
@@ -290,9 +295,9 @@ export default function TechnicianKnowledgeDetailPage() {
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Link href="/technician/knowledge">
-                  <Button variant="outline" size="sm">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
+                <Link href='/technician/knowledge'>
+                  <Button variant='outline' size='sm'>
+                    <ArrowLeft className='h-4 w-4 mr-2' />
                     Volver
                   </Button>
                 </Link>
@@ -306,16 +311,16 @@ export default function TechnicianKnowledgeDetailPage() {
       }
     >
       {article && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
           {/* Contenido principal */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className='lg:col-span-2 space-y-6'>
             {/* Estado del artículo */}
             {!article.isPublished && (
-              <Card className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950">
-                <CardContent className="p-4">
-                  <div className="flex items-center space-x-2">
-                    <Badge variant="secondary">Borrador</Badge>
-                    <span className="text-sm text-muted-foreground">
+              <Card className='border-yellow-500 bg-yellow-50 dark:bg-yellow-950'>
+                <CardContent className='p-4'>
+                  <div className='flex items-center space-x-2'>
+                    <Badge variant='secondary'>Borrador</Badge>
+                    <span className='text-sm text-muted-foreground'>
                       Este artículo no está publicado y solo es visible para ti
                     </span>
                   </div>
@@ -325,13 +330,13 @@ export default function TechnicianKnowledgeDetailPage() {
 
             {/* Metadata */}
             <Card>
-              <CardContent className="p-6">
-                <div className="space-y-4">
+              <CardContent className='p-6'>
+                <div className='space-y-4'>
                   {/* Categoría y tags */}
-                  <div className="flex flex-wrap gap-2">
+                  <div className='flex flex-wrap gap-2'>
                     {article.category && (
                       <Badge
-                        variant="outline"
+                        variant='outline'
                         style={{
                           borderColor: article.category.color || undefined,
                           color: article.category.color || undefined,
@@ -341,8 +346,8 @@ export default function TechnicianKnowledgeDetailPage() {
                       </Badge>
                     )}
                     {article.tags.map((tag, index) => (
-                      <Badge key={index} variant="secondary">
-                        <Tag className="h-3 w-3 mr-1" />
+                      <Badge key={index} variant='secondary'>
+                        <Tag className='h-3 w-3 mr-1' />
                         {tag}
                       </Badge>
                     ))}
@@ -351,29 +356,29 @@ export default function TechnicianKnowledgeDetailPage() {
                   <Separator />
 
                   {/* Información del autor y fecha */}
-                  <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <div className="flex items-center space-x-4">
+                  <div className='flex items-center justify-between text-sm text-muted-foreground'>
+                    <div className='flex items-center space-x-4'>
                       {article.author && (
-                        <div className="flex items-center space-x-2">
-                          <Avatar className="h-8 w-8">
+                        <div className='flex items-center space-x-2'>
+                          <Avatar className='h-8 w-8'>
                             <AvatarImage src={article.author.avatar || undefined} />
                             <AvatarFallback>
                               {article.author.name?.charAt(0).toUpperCase() || 'U'}
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <div className="font-medium text-foreground">
+                            <div className='font-medium text-foreground'>
                               {article.author.name || article.author.email}
                             </div>
-                            <div className="text-xs">Autor</div>
+                            <div className='text-xs'>Autor</div>
                           </div>
                         </div>
                       )}
                     </div>
 
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center space-x-1">
-                        <Calendar className="h-4 w-4" />
+                    <div className='flex items-center space-x-4'>
+                      <div className='flex items-center space-x-1'>
+                        <Calendar className='h-4 w-4' />
                         <span>
                           {formatDistanceToNow(new Date(article.createdAt), {
                             addSuffix: true,
@@ -381,8 +386,8 @@ export default function TechnicianKnowledgeDetailPage() {
                           })}
                         </span>
                       </div>
-                      <div className="flex items-center space-x-1">
-                        <Eye className="h-4 w-4" />
+                      <div className='flex items-center space-x-1'>
+                        <Eye className='h-4 w-4' />
                         <span>{article.views} vistas</span>
                       </div>
                     </div>
@@ -393,9 +398,9 @@ export default function TechnicianKnowledgeDetailPage() {
 
             {/* Contenido del artículo */}
             <Card>
-              <CardContent className="p-6">
-                <div className="prose prose-sm max-w-none dark:prose-invert">
-                  <div className="whitespace-pre-wrap">{article.content}</div>
+              <CardContent className='p-6'>
+                <div className='prose prose-sm max-w-none dark:prose-invert'>
+                  <div className='whitespace-pre-wrap'>{article.content}</div>
                 </div>
               </CardContent>
             </Card>
@@ -411,20 +416,20 @@ export default function TechnicianKnowledgeDetailPage() {
           </div>
 
           {/* Sidebar */}
-          <div className="space-y-6">
+          <div className='space-y-6'>
             {/* Ticket relacionado */}
             {article.sourceTicket && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Ticket Relacionado</CardTitle>
+                  <CardTitle className='text-base'>Ticket Relacionado</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Link href={`/technician/tickets/${article.sourceTicket.id}`}>
-                          <Button variant="outline" className="w-full justify-start">
-                            <BookOpen className="h-4 w-4 mr-2" />
+                          <Button variant='outline' className='w-full justify-start'>
+                            <BookOpen className='h-4 w-4 mr-2' />
                             {article.sourceTicket.title}
                           </Button>
                         </Link>
@@ -442,22 +447,20 @@ export default function TechnicianKnowledgeDetailPage() {
             {similarArticles.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Artículos Relacionados</CardTitle>
+                  <CardTitle className='text-base'>Artículos Relacionados</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  {similarArticles.map((similar) => (
+                <CardContent className='space-y-3'>
+                  {similarArticles.map(similar => (
                     <Link
                       key={similar.id}
                       href={`/technician/knowledge/${similar.id}`}
-                      className="block"
+                      className='block'
                     >
-                      <div className="p-3 rounded-lg border hover:bg-accent transition-colors">
-                        <div className="font-medium text-sm line-clamp-2 mb-1">
-                          {similar.title}
-                        </div>
-                        <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                          <div className="flex items-center space-x-1">
-                            <Eye className="h-3 w-3" />
+                      <div className='p-3 rounded-lg border hover:bg-accent transition-colors'>
+                        <div className='font-medium text-sm line-clamp-2 mb-1'>{similar.title}</div>
+                        <div className='flex items-center space-x-2 text-xs text-muted-foreground'>
+                          <div className='flex items-center space-x-1'>
+                            <Eye className='h-3 w-3' />
                             <span>{similar.views}</span>
                           </div>
                           <span>•</span>
@@ -483,17 +486,18 @@ export default function TechnicianKnowledgeDetailPage() {
                 {article && (
                   <>
                     Estás a punto de eliminar:{' '}
-                    <span className="font-semibold text-foreground">
-                      "{article.title}"
+                    <span className='font-semibold text-foreground'>
+                      &quot;{article.title}&quot;
                     </span>
-                    <br /><br />
+                    <br />
+                    <br />
                   </>
                 )}
-                Esta acción no se puede deshacer. El artículo será eliminado permanentemente
-                de la base de conocimientos.
+                Esta acción no se puede deshacer. El artículo será eliminado permanentemente de la
+                base de conocimientos.
                 {article?.sourceTicket && (
-                  <div className="mt-3 p-3 bg-yellow-50 dark:bg-yellow-950 rounded-md">
-                    <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                  <div className='mt-3 p-3 bg-yellow-50 dark:bg-yellow-950 rounded-md'>
+                    <p className='text-sm text-yellow-800 dark:text-yellow-200'>
                       ⚠️ Este artículo está vinculado al ticket: {article.sourceTicket.title}
                     </p>
                   </div>
@@ -506,7 +510,7 @@ export default function TechnicianKnowledgeDetailPage() {
             <AlertDialogAction
               onClick={handleDelete}
               disabled={deleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
             >
               {deleting ? 'Eliminando...' : 'Eliminar Artículo'}
             </AlertDialogAction>

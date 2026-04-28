@@ -3,20 +3,13 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Settings,
@@ -34,7 +27,6 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { OAuthSettingsTab } from '@/components/settings/oauth-settings-tab'
 import { SLAPoliciesTab } from '@/components/settings/sla-policies-tab'
-import { ModuleLayout } from '@/components/common/layout/module-layout'
 
 interface SystemSettings {
   // Configuración general
@@ -84,19 +76,16 @@ function SettingsPage() {
 
   useEffect(() => {
     if (status === 'loading') return
-
     if (!session) {
       router.push('/login')
       return
     }
-
     if (session.user.role !== 'ADMIN') {
       router.push('/login')
       return
     }
-
     loadSettings()
-  }, [session, status, router])
+  }, [session, status, router]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadSettings = async () => {
     setLoading(true)
@@ -270,21 +259,29 @@ function SettingsPage() {
       subtitle='Administra la configuración global del sistema de tickets'
       headerActions={headerActions}
     >
-      <Tabs value={activeTab} className='space-y-6' onValueChange={(tab) => {
-      const superAdminTabs = ['email', 'security', 'oauth', 'sla']
-        if (superAdminTabs.includes(tab) && !isSuperAdmin) return
-        setActiveTab(tab)
-      }}>
+      <Tabs
+        value={activeTab}
+        className='space-y-6'
+        onValueChange={tab => {
+          const superAdminTabs = ['email', 'security', 'oauth', 'sla']
+          if (superAdminTabs.includes(tab) && !isSuperAdmin) return
+          setActiveTab(tab)
+        }}
+      >
         <TabsList className='flex flex-wrap h-auto gap-1 p-1 w-full'>
-          <TabsTrigger value='general' className='flex-1 min-w-[80px]'>General</TabsTrigger>
-          <TabsTrigger value='notifications' className='flex-1 min-w-[110px]'>Notificaciones</TabsTrigger>
+          <TabsTrigger value='general' className='flex-1 min-w-[80px]'>
+            General
+          </TabsTrigger>
+          <TabsTrigger value='notifications' className='flex-1 min-w-[110px]'>
+            Notificaciones
+          </TabsTrigger>
           {/* Tabs solo para Super Admin */}
           <TabsTrigger value='sla' className='flex-1 min-w-[60px]' disabled={!isSuperAdmin}>
             <span className='flex items-center gap-1'>
               {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
-              <Timer className="h-4 w-4 hidden sm:inline" />
-              <span className="hidden sm:inline">SLA</span>
-              <span className="sm:hidden">SLA</span>
+              <Timer className='h-4 w-4 hidden sm:inline' />
+              <span className='hidden sm:inline'>SLA</span>
+              <span className='sm:hidden'>SLA</span>
             </span>
           </TabsTrigger>
           <TabsTrigger value='email' className='flex-1 min-w-[60px]' disabled={!isSuperAdmin}>
@@ -302,7 +299,7 @@ function SettingsPage() {
           <TabsTrigger value='oauth' className='flex-1 min-w-[70px]' disabled={!isSuperAdmin}>
             <span className='flex items-center gap-1'>
               {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' />}
-              <Key className="h-4 w-4 hidden sm:inline" />
+              <Key className='h-4 w-4 hidden sm:inline' />
               OAuth
             </span>
           </TabsTrigger>
@@ -323,16 +320,24 @@ function SettingsPage() {
                 <div>
                   <Label htmlFor='systemName' className='flex items-center gap-1.5'>
                     Nombre del Sistema
-                    {!isSuperAdmin && <Crown className='h-3 w-3 text-amber-500' aria-label='Solo Super Admin' />}
+                    {!isSuperAdmin && (
+                      <Crown className='h-3 w-3 text-amber-500' aria-label='Solo Super Admin' />
+                    )}
                   </Label>
                   <Input
                     id='systemName'
                     value={settings.systemName}
-                    onChange={e => isSuperAdmin && setSettings({ ...settings, systemName: e.target.value })}
+                    onChange={e =>
+                      isSuperAdmin && setSettings({ ...settings, systemName: e.target.value })
+                    }
                     placeholder='Sistema de Tickets'
                     disabled={!isSuperAdmin}
                   />
-                  {!isSuperAdmin && <p className='text-xs text-muted-foreground mt-1'>Solo el Super Admin puede cambiar el nombre del sistema</p>}
+                  {!isSuperAdmin && (
+                    <p className='text-xs text-muted-foreground mt-1'>
+                      Solo el Super Admin puede cambiar el nombre del sistema
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor='supportEmail'>Email de Soporte</Label>
@@ -356,7 +361,6 @@ function SettingsPage() {
                   rows={3}
                 />
               </div>
-
             </CardContent>
           </Card>
         </TabsContent>
@@ -367,111 +371,113 @@ function SettingsPage() {
             <div className='flex flex-col items-center justify-center py-16 text-center'>
               <Crown className='h-12 w-12 text-amber-500 mb-4' />
               <h3 className='text-lg font-semibold text-foreground mb-2'>Acceso restringido</h3>
-              <p className='text-muted-foreground max-w-sm'>Esta sección solo está disponible para Administradores Principales (Super Admin).</p>
+              <p className='text-muted-foreground max-w-sm'>
+                Esta sección solo está disponible para Administradores Principales (Super Admin).
+              </p>
             </div>
           ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle className='flex items-center'>
-                <Mail className='h-5 w-5 mr-2' />
-                Configuración de Email
-              </CardTitle>
-              <CardDescription>
-                Configuración del servidor SMTP para envío de emails
-              </CardDescription>
-            </CardHeader>
-            <CardContent className='space-y-4'>
-              <div className='flex items-center space-x-2'>
-                <Switch
-                  id='emailEnabled'
-                  checked={settings.emailEnabled}
-                  onCheckedChange={checked => setSettings({ ...settings, emailEnabled: checked })}
-                />
-                <Label htmlFor='emailEnabled'>Habilitar envío de emails</Label>
-              </div>
+            <Card>
+              <CardHeader>
+                <CardTitle className='flex items-center'>
+                  <Mail className='h-5 w-5 mr-2' />
+                  Configuración de Email
+                </CardTitle>
+                <CardDescription>
+                  Configuración del servidor SMTP para envío de emails
+                </CardDescription>
+              </CardHeader>
+              <CardContent className='space-y-4'>
+                <div className='flex items-center space-x-2'>
+                  <Switch
+                    id='emailEnabled'
+                    checked={settings.emailEnabled}
+                    onCheckedChange={checked => setSettings({ ...settings, emailEnabled: checked })}
+                  />
+                  <Label htmlFor='emailEnabled'>Habilitar envío de emails</Label>
+                </div>
 
-              {settings.emailEnabled && (
-                <>
-                  <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                    <div>
-                      <Label htmlFor='smtpHost'>Servidor SMTP</Label>
-                      <Input
-                        id='smtpHost'
-                        value={settings.smtpHost}
-                        onChange={e => setSettings({ ...settings, smtpHost: e.target.value })}
-                        placeholder='smtp.gmail.com'
-                      />
+                {settings.emailEnabled && (
+                  <>
+                    <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                      <div>
+                        <Label htmlFor='smtpHost'>Servidor SMTP</Label>
+                        <Input
+                          id='smtpHost'
+                          value={settings.smtpHost}
+                          onChange={e => setSettings({ ...settings, smtpHost: e.target.value })}
+                          placeholder='smtp.gmail.com'
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor='smtpPort'>Puerto SMTP</Label>
+                        <Input
+                          id='smtpPort'
+                          type='number'
+                          value={settings.smtpPort}
+                          onChange={e => {
+                            const value = parseInt(e.target.value)
+                            setSettings({ ...settings, smtpPort: isNaN(value) ? 587 : value })
+                          }}
+                          placeholder='587'
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <Label htmlFor='smtpPort'>Puerto SMTP</Label>
-                      <Input
-                        id='smtpPort'
-                        type='number'
-                        value={settings.smtpPort}
-                        onChange={e => {
-                          const value = parseInt(e.target.value)
-                          setSettings({ ...settings, smtpPort: isNaN(value) ? 587 : value })
-                        }}
-                        placeholder='587'
-                      />
-                    </div>
-                  </div>
 
-                  <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                    <div>
-                      <Label htmlFor='smtpUser'>Usuario SMTP</Label>
-                      <Input
-                        id='smtpUser'
-                        value={settings.smtpUser}
-                        onChange={e => setSettings({ ...settings, smtpUser: e.target.value })}
-                        placeholder='usuario@gmail.com'
-                      />
+                    <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                      <div>
+                        <Label htmlFor='smtpUser'>Usuario SMTP</Label>
+                        <Input
+                          id='smtpUser'
+                          value={settings.smtpUser}
+                          onChange={e => setSettings({ ...settings, smtpUser: e.target.value })}
+                          placeholder='usuario@gmail.com'
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor='smtpPassword'>Contraseña SMTP</Label>
+                        <Input
+                          id='smtpPassword'
+                          type='password'
+                          value={settings.smtpPassword}
+                          onChange={e => setSettings({ ...settings, smtpPassword: e.target.value })}
+                          placeholder='••••••••'
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <Label htmlFor='smtpPassword'>Contraseña SMTP</Label>
-                      <Input
-                        id='smtpPassword'
-                        type='password'
-                        value={settings.smtpPassword}
-                        onChange={e => setSettings({ ...settings, smtpPassword: e.target.value })}
-                        placeholder='••••••••'
-                      />
-                    </div>
-                  </div>
 
-                  <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                    <div>
-                      <Label htmlFor='emailFrom'>Email Remitente</Label>
-                      <Input
-                        id='emailFrom'
-                        type='email'
-                        value={settings.emailFrom}
-                        onChange={e => setSettings({ ...settings, emailFrom: e.target.value })}
-                        placeholder='noreply@empresa.com'
-                      />
+                    <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                      <div>
+                        <Label htmlFor='emailFrom'>Email Remitente</Label>
+                        <Input
+                          id='emailFrom'
+                          type='email'
+                          value={settings.emailFrom}
+                          onChange={e => setSettings({ ...settings, emailFrom: e.target.value })}
+                          placeholder='noreply@empresa.com'
+                        />
+                      </div>
+                      <div className='flex items-center space-x-2 pt-6'>
+                        <Switch
+                          id='smtpSecure'
+                          checked={settings.smtpSecure}
+                          onCheckedChange={checked =>
+                            setSettings({ ...settings, smtpSecure: checked })
+                          }
+                        />
+                        <Label htmlFor='smtpSecure'>Conexión Segura (SSL/TLS)</Label>
+                      </div>
                     </div>
-                    <div className='flex items-center space-x-2 pt-6'>
-                      <Switch
-                        id='smtpSecure'
-                        checked={settings.smtpSecure}
-                        onCheckedChange={checked =>
-                          setSettings({ ...settings, smtpSecure: checked })
-                        }
-                      />
-                      <Label htmlFor='smtpSecure'>Conexión Segura (SSL/TLS)</Label>
-                    </div>
-                  </div>
 
-                  <div className='pt-4'>
-                    <Button variant='outline' onClick={testEmailConnection}>
-                      <Mail className='h-4 w-4 mr-2' />
-                      Probar Conexión
-                    </Button>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
+                    <div className='pt-4'>
+                      <Button variant='outline' onClick={testEmailConnection}>
+                        <Mail className='h-4 w-4 mr-2' />
+                        Probar Conexión
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
 
@@ -484,21 +490,22 @@ function SettingsPage() {
                 Módulo de Notificaciones
               </CardTitle>
               <CardDescription>
-                Configuración global del sistema de notificaciones. 
-                Los usuarios pueden configurar sus preferencias personales en su perfil.
+                Configuración global del sistema de notificaciones. Los usuarios pueden configurar
+                sus preferencias personales en su perfil.
               </CardDescription>
             </CardHeader>
             <CardContent className='space-y-6'>
-              <div className='rounded-lg border border-border bg-muted p-4'>
+              <div className='rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20 p-4'>
                 <div className='flex items-start space-x-3'>
-                  <Bell className='h-5 w-5 text-muted-foreground mt-0.5' />
+                  <Bell className='h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5' />
                   <div className='space-y-1'>
-                    <h4 className='text-sm font-medium text-foreground'>
+                    <h4 className='text-sm font-medium text-blue-900 dark:text-blue-200'>
                       Configuración Global
                     </h4>
-                    <p className='text-sm text-muted-foreground'>
-                      Esta configuración habilita o deshabilita el módulo de notificaciones para todo el sistema.
-                      Cada usuario puede personalizar sus preferencias individuales en Configuración → Notificaciones.
+                    <p className='text-sm text-blue-800 dark:text-blue-300'>
+                      Esta configuración habilita o deshabilita el módulo de notificaciones para
+                      todo el sistema. Cada usuario puede personalizar sus preferencias individuales
+                      en Configuración → Notificaciones.
                     </p>
                   </div>
                 </div>
@@ -524,16 +531,16 @@ function SettingsPage() {
                 </div>
 
                 {!settings.notificationsEnabled && (
-                  <div className='rounded-lg border border-yellow-200 bg-yellow-50 p-4'>
+                  <div className='rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 p-4'>
                     <div className='flex items-start space-x-3'>
-                      <AlertTriangle className='h-5 w-5 text-yellow-600 mt-0.5' />
+                      <AlertTriangle className='h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5' />
                       <div className='space-y-1'>
-                        <h4 className='text-sm font-medium text-yellow-900'>
+                        <h4 className='text-sm font-medium text-amber-900 dark:text-amber-200'>
                           Notificaciones Deshabilitadas
                         </h4>
-                        <p className='text-sm text-yellow-700'>
-                          Los usuarios no recibirán notificaciones del sistema. 
-                          Esto puede afectar la comunicación sobre tickets y actualizaciones importantes.
+                        <p className='text-sm text-amber-700 dark:text-amber-300'>
+                          Los usuarios no recibirán notificaciones del sistema. Esto puede afectar
+                          la comunicación sobre tickets y actualizaciones importantes.
                         </p>
                       </div>
                     </div>
@@ -550,165 +557,175 @@ function SettingsPage() {
             <div className='flex flex-col items-center justify-center py-16 text-center'>
               <Crown className='h-12 w-12 text-amber-500 mb-4' />
               <h3 className='text-lg font-semibold text-foreground mb-2'>Acceso restringido</h3>
-              <p className='text-muted-foreground max-w-sm'>Esta sección solo está disponible para Administradores Principales (Super Admin).</p>
+              <p className='text-muted-foreground max-w-sm'>
+                Esta sección solo está disponible para Administradores Principales (Super Admin).
+              </p>
             </div>
           ) : (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className='flex items-center'>
-                  <Shield className='h-5 w-5 mr-2' />
-                  Configuración de Seguridad
-                </CardTitle>
-                <CardDescription>Configuración de seguridad y autenticación</CardDescription>
-              </CardHeader>
-              <CardContent className='space-y-4'>
-                <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                  <div>
-                    <Label htmlFor='sessionTimeout'>Tiempo de Sesión</Label>
-                    <div className="space-y-2">
-                      <Input
-                        id='sessionTimeout'
-                        type='number'
-                        value={settings.sessionTimeout}
-                        onChange={e => {
-                          const value = parseInt(e.target.value)
-                          setSettings({ ...settings, sessionTimeout: isNaN(value) ? 30 : value })
-                        }}
-                        min='5'
-                        max='1440'
-                      />
-                      <p className="text-sm text-muted-foreground">
-                        {settings.sessionTimeout < 60 
-                          ? `${settings.sessionTimeout} minutos`
-                          : settings.sessionTimeout === 60
-                          ? '1 hora'
-                          : settings.sessionTimeout < 1440
-                          ? `${Math.floor(settings.sessionTimeout / 60)} horas ${settings.sessionTimeout % 60 > 0 ? `y ${settings.sessionTimeout % 60} minutos` : ''}`
-                          : '24 horas (1 día)'
+            <div className='space-y-6'>
+              <Card>
+                <CardHeader>
+                  <CardTitle className='flex items-center'>
+                    <Shield className='h-5 w-5 mr-2' />
+                    Configuración de Seguridad
+                  </CardTitle>
+                  <CardDescription>Configuración de seguridad y autenticación</CardDescription>
+                </CardHeader>
+                <CardContent className='space-y-4'>
+                  <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                    <div>
+                      <Label htmlFor='sessionTimeout'>Tiempo de Sesión</Label>
+                      <div className='space-y-2'>
+                        <Input
+                          id='sessionTimeout'
+                          type='number'
+                          value={settings.sessionTimeout}
+                          onChange={e => {
+                            const value = parseInt(e.target.value)
+                            setSettings({ ...settings, sessionTimeout: isNaN(value) ? 30 : value })
+                          }}
+                          min='5'
+                          max='1440'
+                        />
+                        <p className='text-sm text-muted-foreground'>
+                          {settings.sessionTimeout < 60
+                            ? `${settings.sessionTimeout} minutos`
+                            : settings.sessionTimeout === 60
+                              ? '1 hora'
+                              : settings.sessionTimeout < 1440
+                                ? `${Math.floor(settings.sessionTimeout / 60)} horas ${settings.sessionTimeout % 60 > 0 ? `y ${settings.sessionTimeout % 60} minutos` : ''}`
+                                : '24 horas (1 día)'}
+                        </p>
+                        <p className='text-xs text-amber-600 dark:text-amber-400'>
+                          ⚠️ La sesión se cerrará automáticamente después de este tiempo de
+                          inactividad
+                        </p>
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor='maxLoginAttempts'>Máximo Intentos de Login</Label>
+                      <div className='space-y-2'>
+                        <Input
+                          id='maxLoginAttempts'
+                          type='number'
+                          value={settings.maxLoginAttempts}
+                          onChange={e => {
+                            const value = parseInt(e.target.value)
+                            setSettings({ ...settings, maxLoginAttempts: isNaN(value) ? 5 : value })
+                          }}
+                          min='3'
+                          max='10'
+                        />
+                        <p className='text-sm text-muted-foreground'>
+                          {settings.maxLoginAttempts} intentos antes de bloquear
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                    <div>
+                      <Label htmlFor='passwordMinLength'>Longitud Mínima de Contraseña</Label>
+                      <div className='space-y-2'>
+                        <Input
+                          id='passwordMinLength'
+                          type='number'
+                          value={settings.passwordMinLength}
+                          onChange={e => {
+                            const value = parseInt(e.target.value)
+                            setSettings({
+                              ...settings,
+                              passwordMinLength: isNaN(value) ? 8 : value,
+                            })
+                          }}
+                          min='6'
+                          max='20'
+                        />
+                        <p className='text-sm text-muted-foreground'>
+                          Mínimo {settings.passwordMinLength} caracteres
+                        </p>
+                      </div>
+                    </div>
+                    <div className='flex items-center space-x-2 pt-6'>
+                      <Switch
+                        id='requirePasswordChange'
+                        checked={settings.requirePasswordChange}
+                        onCheckedChange={checked =>
+                          setSettings({ ...settings, requirePasswordChange: checked })
                         }
-                      </p>
-                      <p className="text-xs text-amber-600">
-                        ⚠️ La sesión se cerrará automáticamente después de este tiempo de inactividad
-                      </p>
+                      />
+                      <Label htmlFor='requirePasswordChange'>Requerir cambio de contraseña</Label>
                     </div>
                   </div>
+
                   <div>
-                    <Label htmlFor='maxLoginAttempts'>Máximo Intentos de Login</Label>
-                    <div className="space-y-2">
+                    <Label htmlFor='maxFileSize'>Tamaño Máximo de Archivo</Label>
+                    <div className='space-y-2'>
                       <Input
-                        id='maxLoginAttempts'
+                        id='maxFileSize'
                         type='number'
-                        value={settings.maxLoginAttempts}
+                        value={settings.maxFileSize}
                         onChange={e => {
                           const value = parseInt(e.target.value)
-                          setSettings({ ...settings, maxLoginAttempts: isNaN(value) ? 5 : value })
+                          setSettings({ ...settings, maxFileSize: isNaN(value) ? 10 : value })
                         }}
-                        min='3'
-                        max='10'
+                        min='1'
+                        max='100'
                       />
-                      <p className="text-sm text-muted-foreground">
-                        {settings.maxLoginAttempts} intentos antes de bloquear
+                      <p className='text-sm text-muted-foreground'>
+                        Máximo {settings.maxFileSize} MB por archivo
                       </p>
                     </div>
                   </div>
-                </div>
 
-                <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                  <div>
-                    <Label htmlFor='passwordMinLength'>Longitud Mínima de Contraseña</Label>
-                    <div className="space-y-2">
-                      <Input
-                        id='passwordMinLength'
-                        type='number'
-                        value={settings.passwordMinLength}
-                        onChange={e => {
-                          const value = parseInt(e.target.value)
-                          setSettings({ ...settings, passwordMinLength: isNaN(value) ? 8 : value })
-                        }}
-                        min='6'
-                        max='20'
-                      />
-                      <p className="text-sm text-muted-foreground">
-                        Mínimo {settings.passwordMinLength} caracteres
+                  {/* Información adicional sobre seguridad */}
+                  <div className='mt-6 p-4 bg-muted border border-border rounded-lg'>
+                    <h4 className='font-medium text-foreground mb-2'>
+                      ℹ️ Información de Seguridad
+                    </h4>
+                    <ul className='text-sm text-muted-foreground space-y-1'>
+                      <li>
+                        • El cierre automático de sesión se activa después del tiempo configurado
+                        sin actividad
+                      </li>
+                      <li>• Se mostrará una advertencia 5 minutos antes de cerrar la sesión</li>
+                      <li>
+                        • Cualquier acción del usuario (click, tecla, scroll) reinicia el contador
+                      </li>
+                      <li>• Los cambios requieren reiniciar sesión para aplicarse</li>
+                    </ul>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Enlace al módulo de backups */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className='flex items-center'>
+                    <Database className='h-5 w-5 mr-2' />
+                    Gestión de Backups
+                  </CardTitle>
+                  <CardDescription>
+                    La configuración de backups se ha movido a un módulo dedicado
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className='flex items-center justify-between p-4 bg-muted border border-border rounded-lg'>
+                    <div>
+                      <h4 className='font-medium text-foreground'>Sistema de Backups</h4>
+                      <p className='text-sm text-muted-foreground mt-1'>
+                        Accede al módulo completo de gestión de backups con configuración avanzada,
+                        monitoreo en tiempo real y herramientas de restauración.
                       </p>
                     </div>
+                    <Button onClick={() => router.push('/admin/backups')}>
+                      <Database className='h-4 w-4 mr-2' />
+                      Ir a Backups
+                    </Button>
                   </div>
-                  <div className='flex items-center space-x-2 pt-6'>
-                    <Switch
-                      id='requirePasswordChange'
-                      checked={settings.requirePasswordChange}
-                      onCheckedChange={checked =>
-                        setSettings({ ...settings, requirePasswordChange: checked })
-                      }
-                    />
-                    <Label htmlFor='requirePasswordChange'>Requerir cambio de contraseña</Label>
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor='maxFileSize'>Tamaño Máximo de Archivo</Label>
-                  <div className="space-y-2">
-                    <Input
-                      id='maxFileSize'
-                      type='number'
-                      value={settings.maxFileSize}
-                      onChange={e => {
-                        const value = parseInt(e.target.value)
-                        setSettings({ ...settings, maxFileSize: isNaN(value) ? 10 : value })
-                      }}
-                      min='1'
-                      max='100'
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      Máximo {settings.maxFileSize} MB por archivo
-                    </p>
-                  </div>
-                </div>
-
-                {/* Información adicional sobre seguridad */}
-                <div className="mt-6 p-4 bg-muted border border-border rounded-lg">
-                  <h4 className="font-medium text-foreground mb-2">ℹ️ Información de Seguridad</h4>
-                  <ul className="text-sm text-muted-foreground space-y-1">
-                    <li>• El cierre automático de sesión se activa después del tiempo configurado sin actividad</li>
-                    <li>• Se mostrará una advertencia 5 minutos antes de cerrar la sesión</li>
-                    <li>• Cualquier acción del usuario (click, tecla, scroll) reinicia el contador</li>
-                    <li>• Los cambios requieren reiniciar sesión para aplicarse</li>
-                  </ul>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Enlace al módulo de backups */}
-            <Card>
-              <CardHeader>
-                <CardTitle className='flex items-center'>
-                  <Database className='h-5 w-5 mr-2' />
-                  Gestión de Backups
-                </CardTitle>
-                <CardDescription>
-                  La configuración de backups se ha movido a un módulo dedicado
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between p-4 bg-muted border border-border rounded-lg">
-                  <div>
-                    <h4 className="font-medium text-foreground">Sistema de Backups</h4>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Accede al módulo completo de gestión de backups con configuración avanzada, 
-                      monitoreo en tiempo real y herramientas de restauración.
-                    </p>
-                  </div>
-                  <Button 
-                    onClick={() => router.push('/admin/backups')}
-                  >
-                    <Database className="h-4 w-4 mr-2" />
-                    Ir a Backups
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                </CardContent>
+              </Card>
+            </div>
           )}
         </TabsContent>
 
@@ -718,7 +735,9 @@ function SettingsPage() {
             <div className='flex flex-col items-center justify-center py-16 text-center'>
               <Crown className='h-12 w-12 text-amber-500 mb-4' />
               <h3 className='text-lg font-semibold text-foreground mb-2'>Acceso restringido</h3>
-              <p className='text-muted-foreground max-w-sm'>Esta sección solo está disponible para Administradores Principales (Super Admin).</p>
+              <p className='text-muted-foreground max-w-sm'>
+                Esta sección solo está disponible para Administradores Principales (Super Admin).
+              </p>
             </div>
           ) : (
             <OAuthSettingsTab />
@@ -731,7 +750,9 @@ function SettingsPage() {
             <div className='flex flex-col items-center justify-center py-16 text-center'>
               <Crown className='h-12 w-12 text-amber-500 mb-4' />
               <h3 className='text-lg font-semibold text-foreground mb-2'>Acceso restringido</h3>
-              <p className='text-muted-foreground max-w-sm'>Esta sección solo está disponible para Administradores Principales (Super Admin).</p>
+              <p className='text-muted-foreground max-w-sm'>
+                Esta sección solo está disponible para Administradores Principales (Super Admin).
+              </p>
             </div>
           ) : (
             <SLAPoliciesTab isSuperAdmin={isSuperAdmin} />
@@ -745,11 +766,13 @@ function SettingsPage() {
 // Wrap in Suspense because useSearchParams requires it
 function SettingsPageWrapper() {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className='flex items-center justify-center h-64'>
+          <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary' />
+        </div>
+      }
+    >
       <SettingsPage />
     </Suspense>
   )

@@ -82,7 +82,9 @@ export function AutoAssignment({
         setResult(data)
         // NO llamar onAssignmentComplete aquí — esperar a que el usuario cierre el dialog
       } else {
-        const errorData = await response.json().catch(() => ({ error: `Error ${response.status}: ${response.statusText}` }))
+        const errorData = await response
+          .json()
+          .catch(() => ({ error: `Error ${response.status}: ${response.statusText}` }))
         const errorMessage = errorData.error || errorData.message || 'Error al asignar ticket'
         setError(errorMessage)
         toast({
@@ -133,8 +135,14 @@ export function AutoAssignment({
       }}
     >
       <DialogTrigger asChild>
-        <Button variant='outline' size='sm' className='flex items-center space-x-2'
-          onClick={() => { setIsOpen(true); onOpenChange?.(true) }}
+        <Button
+          variant='outline'
+          size='sm'
+          className='flex items-center space-x-2'
+          onClick={() => {
+            setIsOpen(true)
+            onOpenChange?.(true)
+          }}
         >
           <Bot className='h-4 w-4' />
           <span>Asignación Automática</span>
@@ -167,8 +175,12 @@ export function AutoAssignment({
                     <User className='h-5 w-5 text-green-700 dark:text-green-300' />
                   </div>
                   <div>
-                    <p className='font-semibold text-foreground text-sm'>{result.assignedTechnician.name}</p>
-                    <p className='text-xs text-muted-foreground'>{result.assignedTechnician.email}</p>
+                    <p className='font-semibold text-foreground text-sm'>
+                      {result.assignedTechnician.name}
+                    </p>
+                    <p className='text-xs text-muted-foreground'>
+                      {result.assignedTechnician.email}
+                    </p>
                   </div>
                 </div>
                 <Separator className='my-3' />
@@ -180,7 +192,7 @@ export function AutoAssignment({
                 </div>
                 <div className='mt-3'>
                   <Badge className='bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-green-300'>
-                    Estado actualizado a "En Progreso"
+                    Estado actualizado a &quot;En Progreso&quot;
                   </Badge>
                 </div>
               </div>
