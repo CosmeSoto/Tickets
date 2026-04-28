@@ -896,7 +896,7 @@ export default function CategoriesPage() {
                             <div className='flex items-center justify-between'>
                               <span>Tickets asociados:</span>
                               <span
-                                className={`font-medium ${tickets > 0 ? 'text-red-600' : 'text-green-600'}`}
+                                className={`font-medium ${tickets > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}
                               >
                                 {tickets} {tickets > 0 ? '⛔' : '✓'}
                               </span>
@@ -904,7 +904,7 @@ export default function CategoriesPage() {
                             <div className='flex items-center justify-between'>
                               <span>Subcategorías:</span>
                               <span
-                                className={`font-medium ${subcats > 0 ? 'text-red-600' : 'text-green-600'}`}
+                                className={`font-medium ${subcats > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}
                               >
                                 {subcats} {subcats > 0 ? '⛔' : '✓'}
                               </span>
