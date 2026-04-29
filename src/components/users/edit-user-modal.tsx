@@ -52,9 +52,9 @@ interface EditUserData {
   avatar?: File
 }
 
-// ── Módulos activos del usuario (informativo) ─────────────────────────────
+// ── Panel de módulos del usuario ─────────────────────────────────────────
 
-function UserModulesInfo({
+function UserModulesPanel({
   userId,
   role,
   canManageInventory,
@@ -74,78 +74,163 @@ function UserModulesInfo({
       modules: { tickets: boolean; inventory: boolean }
     }>
   } | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    setLoading(true)
     fetch(`/api/user/modules?userId=${userId}`)
       .then(r => (r.ok ? r.json() : null))
-      .then(d => {
-        if (d) setData(d)
-      })
+      .then(d => setData(d))
       .catch(() => {})
+      .finally(() => setLoading(false))
   }, [userId, canManageInventory])
 
-  const noFamilies = !data || data.families.length === 0
-  const isTechOrClient = role === 'TECHNICIAN' || role === 'CLIENT'
-
-  // Para técnicos/clientes sin familias: mostrar advertencia con guía
-  if (noFamilies && isTechOrClient) {
+  if (loading) {
     return (
-      <div className='rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-3 space-y-2'>
-        <p className='text-xs font-medium text-amber-800 dark:text-amber-300 flex items-center gap-1.5'>
-          <AlertTriangle className='h-3.5 w-3.5' />
-          Sin familias asignadas — el usuario solo verá el Dashboard
-        </p>
-        <p className='text-xs text-amber-700 dark:text-amber-400'>
-          {role === 'TECHNICIAN'
-            ? 'Para que este técnico pueda atender tickets, asígnalo a una o más familias en:'
-            : 'Para que este cliente vea tickets e inventario, asígnalo a una familia en:'}
-        </p>
-        <p className='text-xs font-mono bg-amber-100 dark:bg-amber-900/40 rounded px-2 py-1 text-amber-900 dark:text-amber-200'>
-          Admin → Familias → [Familia] → Personal →{' '}
-          {role === 'TECHNICIAN' ? 'Técnicos de Tickets' : 'Gestores de Inventario'}
-        </p>
+      <div className='rounded-lg border bg-muted/30 p-3'>
+        <p className='text-xs text-muted-foreground'>Cargando módulos...</p>
       </div>
     )
   }
 
-  if (!data || data.families.length === 0) return null
+  const isTechOrClient = role === 'TECHNICIAN' || role === 'CLIENT'
+  const hasFamilies = data && data.families.length > 0
+
+  // ── Determinar estado y guía de cada módulo ──
+  const ticketsActive = data?.tickets ?? false
+  const inventoryActive = data?.inventory ?? false
+
+  const getTicketsGuide = () => {
+    if (ticketsActive) return null
+    if (role === 'TECHNICIAN') {
+      return hasFamilies
+        ? 'La familia asignada no tiene el módulo de Tickets activo. Actívalo en: Admin → Configuración → Tickets → [Familia]'
+        : 'Asigna este técnico a una familia en: Admin → Familias → [Familia] → Personal → Técnicos de Tickets'
+    }
+    if (role === 'CLIENT') {
+      return 'El cliente verá Tickets cuando tenga tickets creados en una familia con el módulo activo.'
+    }
+    return null
+  }
+
+  const getInventoryGuide = () => {
+    if (inventoryActive) return null
+    if (role === 'TECHNICIAN') {
+      if (!canManageInventory)
+        return 'Activa "Gestor de Inventario" arriba y asígnalo en: Admin → Familias → [Familia] → Personal → Gestores de Inventario'
+      return hasFamilies
+        ? 'La familia asignada no tiene el módulo de Inventario activo. Actívalo en: Admin → Configuración → Inventario → [Familia]'
+        : 'Asigna este técnico como gestor en: Admin → Familias → [Familia] → Personal → Gestores de Inventario'
+    }
+    if (role === 'CLIENT') {
+      if (!canManageInventory)
+        return 'Activa "Gestor de Inventario" arriba, o asigna un equipo a este cliente desde el módulo de Inventario.'
+      return 'Asigna este cliente como gestor en: Admin → Familias → [Familia] → Personal → Gestores de Inventario'
+    }
+    return null
+  }
+
+  const ticketsGuide = getTicketsGuide()
+  const inventoryGuide = getInventoryGuide()
 
   return (
-    <div className='rounded-lg border bg-muted/30 p-3 space-y-2'>
-      <p className='text-xs font-medium text-muted-foreground flex items-center gap-1.5'>
-        <Activity className='h-3.5 w-3.5' />
-        Módulos activos según familias asignadas
+    <div className='rounded-lg border bg-muted/30 p-3 space-y-3'>
+      <p className='text-xs font-semibold text-foreground flex items-center gap-1.5'>
+        <Activity className='h-3.5 w-3.5 text-muted-foreground' />
+        Módulos activos
       </p>
-      <div className='flex flex-wrap gap-1.5'>
-        {data.families.map(f => (
-          <span
-            key={f.id}
-            className='inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border bg-background'
-          >
-            {f.color && (
-              <span
-                className='w-2 h-2 rounded-full flex-shrink-0'
-                style={{ backgroundColor: f.color }}
-              />
-            )}
-            <span className='font-medium'>{f.name}</span>
-            {f.modules.tickets && (
-              <span className='text-primary' title='Tickets habilitado'>
-                🎫
-              </span>
-            )}
-            {f.modules.inventory && (
-              <span className='text-primary' title='Inventario habilitado'>
-                📦
-              </span>
-            )}
-          </span>
-        ))}
+
+      {/* Módulo Tickets */}
+      <div
+        className={`flex items-start gap-2.5 p-2.5 rounded-md border ${ticketsActive ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800' : 'bg-muted/50 border-border'}`}
+      >
+        <span className='text-base mt-0.5'>🎫</span>
+        <div className='flex-1 min-w-0'>
+          <div className='flex items-center gap-2'>
+            <span className='text-xs font-medium'>Tickets</span>
+            <Badge
+              variant={ticketsActive ? 'default' : 'secondary'}
+              className='text-[10px] h-4 px-1.5'
+            >
+              {ticketsActive ? 'Activo' : 'Inactivo'}
+            </Badge>
+          </div>
+          {ticketsGuide && (
+            <p className='text-[11px] text-amber-700 dark:text-amber-400 mt-1 leading-tight'>
+              ↳ {ticketsGuide}
+            </p>
+          )}
+          {ticketsActive && hasFamilies && (
+            <div className='flex flex-wrap gap-1 mt-1'>
+              {data!.families
+                .filter(f => f.modules.tickets)
+                .map(f => (
+                  <span
+                    key={f.id}
+                    className='inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-background border'
+                  >
+                    {f.color && (
+                      <span
+                        className='w-1.5 h-1.5 rounded-full'
+                        style={{ backgroundColor: f.color }}
+                      />
+                    )}
+                    {f.name}
+                  </span>
+                ))}
+            </div>
+          )}
+        </div>
       </div>
-      {!data.tickets && !data.inventory && (
-        <p className='text-xs text-amber-600 dark:text-amber-400'>
-          ⚠️ Ningún módulo activo — el usuario no verá Tickets ni Inventario en su navegación
-        </p>
+
+      {/* Módulo Inventario */}
+      {isTechOrClient && (
+        <div
+          className={`flex items-start gap-2.5 p-2.5 rounded-md border ${inventoryActive ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800' : 'bg-muted/50 border-border'}`}
+        >
+          <span className='text-base mt-0.5'>📦</span>
+          <div className='flex-1 min-w-0'>
+            <div className='flex items-center gap-2'>
+              <span className='text-xs font-medium'>Inventario</span>
+              <Badge
+                variant={inventoryActive ? 'default' : 'secondary'}
+                className='text-[10px] h-4 px-1.5'
+              >
+                {inventoryActive ? 'Activo' : 'Inactivo'}
+              </Badge>
+              {role === 'TECHNICIAN' && !canManageInventory && (
+                <Badge variant='outline' className='text-[10px] h-4 px-1.5 text-muted-foreground'>
+                  Requiere Gestor
+                </Badge>
+              )}
+            </div>
+            {inventoryGuide && (
+              <p className='text-[11px] text-amber-700 dark:text-amber-400 mt-1 leading-tight'>
+                ↳ {inventoryGuide}
+              </p>
+            )}
+            {inventoryActive && hasFamilies && (
+              <div className='flex flex-wrap gap-1 mt-1'>
+                {data!.families
+                  .filter(f => f.modules.inventory)
+                  .map(f => (
+                    <span
+                      key={f.id}
+                      className='inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-background border'
+                    >
+                      {f.color && (
+                        <span
+                          className='w-1.5 h-1.5 rounded-full'
+                          style={{ backgroundColor: f.color }}
+                        />
+                      )}
+                      {f.name}
+                    </span>
+                  ))}
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   )
@@ -665,7 +750,7 @@ export function EditUserModal({
               )}
             </div>
             {user && formData.role !== 'ADMIN' && (
-              <UserModulesInfo
+              <UserModulesPanel
                 userId={user.id}
                 role={formData.role}
                 canManageInventory={formData.canManageInventory}
