@@ -1,13 +1,21 @@
 import { randomUUID } from 'crypto'
 import prisma from '@/lib/prisma'
 import { calculateConsumableStatus } from '@/lib/inventory/consumable-status'
-import type { Consumable, StockMovement, CreateConsumableData, UpdateConsumableData, CreateStockMovementData, ConsumableSummary } from '@/types/inventory/consumable'
-
+import type {
+  Consumable,
+  StockMovement,
+  CreateConsumableData,
+  UpdateConsumableData,
+  CreateStockMovementData,
+  ConsumableSummary,
+} from '@/types/inventory/consumable'
 
 const consumableInclude = {
   consumableType: { include: { family: true } },
   unitOfMeasure: true,
-  assignedEquipment: { select: { id: true, code: true, brand: true, model: true, serialNumber: true } },
+  assignedEquipment: {
+    select: { id: true, code: true, brand: true, model: true, serialNumber: true },
+  },
   movements: {
     include: {
       user: { select: { id: true, name: true, email: true } },
@@ -39,18 +47,25 @@ export class ConsumableService {
     })
 
     if (data.currentStock > 0) {
-      await this.createStockMovement({
-        consumableId: consumable.id,
-        type: 'ENTRY',
-        quantity: data.currentStock,
-        reason: 'Stock inicial',
-      }, userId)
+      await this.createStockMovement(
+        {
+          consumableId: consumable.id,
+          type: 'ENTRY',
+          quantity: data.currentStock,
+          reason: 'Stock inicial',
+        },
+        userId
+      )
     }
 
     return consumable as unknown as Consumable
   }
 
-  static async updateConsumable(id: string, data: UpdateConsumableData, userId: string): Promise<Consumable> {
+  static async updateConsumable(
+    id: string,
+    data: UpdateConsumableData,
+    _userId: string
+  ): Promise<Consumable> {
     const updateData: any = { ...data }
     // Permitir desasignar equipo enviando null
     if (data.assignedEquipmentId === null) {
@@ -64,13 +79,16 @@ export class ConsumableService {
     return consumable as unknown as Consumable
   }
 
-  static async deleteConsumable(id: string, userId: string): Promise<void> {
+  static async deleteConsumable(id: string, _userId: string): Promise<void> {
     await prisma.stock_movements.deleteMany({ where: { consumableId: id } })
     await prisma.consumables.delete({ where: { id } })
   }
 
-  static async createStockMovement(data: CreateStockMovementData, userId: string): Promise<StockMovement> {
-    const result = await prisma.$transaction(async (tx) => {
+  static async createStockMovement(
+    data: CreateStockMovementData,
+    _userId: string
+  ): Promise<StockMovement> {
+    const result = await prisma.$transaction(async tx => {
       const consumable = await tx.consumables.findUnique({ where: { id: data.consumableId } })
       if (!consumable) throw new Error('Consumible no encontrado')
 
@@ -81,13 +99,21 @@ export class ConsumableService {
 
       let newStock = consumable.currentStock
       switch (data.type) {
-        case 'ENTRY': newStock += data.quantity; break
-        case 'EXIT': newStock -= data.quantity; break
-        case 'ADJUSTMENT': newStock = data.quantity; break
+        case 'ENTRY':
+          newStock += data.quantity
+          break
+        case 'EXIT':
+          newStock -= data.quantity
+          break
+        case 'ADJUSTMENT':
+          newStock = data.quantity
+          break
       }
 
       if (newStock < 0) {
-        throw new Error(`Stock insuficiente: disponible ${consumable.currentStock}, solicitado ${data.quantity}`)
+        throw new Error(
+          `Stock insuficiente: disponible ${consumable.currentStock}, solicitado ${data.quantity}`
+        )
       }
 
       const movement = await tx.stock_movements.create({
@@ -147,7 +173,9 @@ export class ConsumableService {
       include: {
         consumableType: true,
         unitOfMeasure: true,
-        assignedEquipment: { select: { id: true, code: true, brand: true, model: true, serialNumber: true } },
+        assignedEquipment: {
+          select: { id: true, code: true, brand: true, model: true, serialNumber: true },
+        },
         movements: {
           include: {
             user: { select: { id: true, name: true, email: true } },
@@ -162,7 +190,9 @@ export class ConsumableService {
     return consumable as Consumable | null
   }
 
-  static async listConsumables(filters: any): Promise<{ consumables: Consumable[], total: number }> {
+  static async listConsumables(
+    filters: any
+  ): Promise<{ consumables: Consumable[]; total: number }> {
     const where: any = {}
 
     if (filters.search) {
@@ -199,23 +229,36 @@ export class ConsumableService {
   }
 
   static async getConsumableSummary(): Promise<ConsumableSummary> {
-    const [total, lowStock, outOfStock, byType, totalValueResult, recentMovements] = await Promise.all([
-      prisma.consumables.count(),
-      prisma.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) as count FROM consumables WHERE current_stock <= min_stock`,
-      prisma.consumables.count({ where: { currentStock: 0 } }),
-      prisma.consumables.groupBy({ by: ['typeId'], _count: true }),
-      prisma.$queryRaw<Array<{ total: number }>>`SELECT SUM(current_stock * COALESCE(cost_per_unit, 0)) as total FROM consumables`,
-      prisma.stock_movements.count({ where: { createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } } }),
-    ])
+    const [total, lowStock, outOfStock, byType, totalValueResult, recentMovements] =
+      await Promise.all([
+        prisma.consumables.count(),
+        prisma.$queryRaw<
+          Array<{ count: bigint }>
+        >`SELECT COUNT(*) as count FROM consumables WHERE current_stock <= min_stock`,
+        prisma.consumables.count({ where: { currentStock: 0 } }),
+        prisma.consumables.groupBy({ by: ['typeId'], _count: true }),
+        prisma.$queryRaw<
+          Array<{ total: number }>
+        >`SELECT SUM(current_stock * COALESCE(cost_per_unit, 0)) as total FROM consumables`,
+        prisma.stock_movements.count({
+          where: { createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
+        }),
+      ])
 
     const typeIds = byType.map(t => t.typeId)
-    const types = typeIds.length > 0
-      ? await prisma.consumable_types.findMany({ where: { id: { in: typeIds } }, select: { id: true, name: true } })
-      : []
+    const types =
+      typeIds.length > 0
+        ? await prisma.consumable_types.findMany({
+            where: { id: { in: typeIds } },
+            select: { id: true, name: true },
+          })
+        : []
     const typeMap = Object.fromEntries(types.map(t => [t.id, t.name]))
 
     const byTypeMap: Record<string, number> = {}
-    byType.forEach(item => { byTypeMap[typeMap[item.typeId] || item.typeId] = item._count })
+    byType.forEach(item => {
+      byTypeMap[typeMap[item.typeId] || item.typeId] = item._count
+    })
 
     return {
       total,
@@ -227,7 +270,10 @@ export class ConsumableService {
     }
   }
 
-  static async getConsumableMovements(consumableId: string, limit: number = 50): Promise<StockMovement[]> {
+  static async getConsumableMovements(
+    consumableId: string,
+    limit: number = 50
+  ): Promise<StockMovement[]> {
     const movements = await prisma.stock_movements.findMany({
       where: { consumableId },
       include: {

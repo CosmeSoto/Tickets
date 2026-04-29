@@ -6,7 +6,6 @@
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { WebhookService } from './webhook-service'
-import { EmailService } from './email/email-service'
 
 export interface SLAPolicy {
   id: string
@@ -30,8 +29,8 @@ export class SLAService {
       const ticket = await prisma.tickets.findUnique({
         where: { id: ticketId },
         include: {
-          categories: true
-        }
+          categories: true,
+        },
       })
 
       if (!ticket) {
@@ -39,10 +38,7 @@ export class SLAService {
       }
 
       // Buscar política SLA aplicable
-      const policy = await this.findApplicablePolicy(
-        ticket.categoryId,
-        ticket.priority
-      )
+      const policy = await this.findApplicablePolicy(ticket.categoryId, ticket.priority)
 
       if (!policy) {
         console.log(`[SLA] No hay política aplicable para ticket ${ticketId}`)
@@ -75,17 +71,19 @@ export class SLAService {
           ticketId,
           slaPolicyId: policy.id,
           responseDeadline,
-          resolutionDeadline
-        }
+          resolutionDeadline,
+        },
       })
 
       // Actualizar deadline en ticket
       await prisma.tickets.update({
         where: { id: ticketId },
-        data: { slaDeadline: resolutionDeadline }
+        data: { slaDeadline: resolutionDeadline },
       })
 
-      console.log(`[SLA] Asignado a ticket ${ticketId}: Respuesta ${responseDeadline}, Resolución ${resolutionDeadline}`)
+      console.log(
+        `[SLA] Asignado a ticket ${ticketId}: Respuesta ${responseDeadline}, Resolución ${resolutionDeadline}`
+      )
     } catch (error) {
       console.error('[SLA] Error asignando SLA:', error)
     }
@@ -97,24 +95,21 @@ export class SLAService {
    * Nivel 2: política de familia (resuelto desde categoryId → departments.familyId)
    * Nivel 3: política global (sin categoría ni familia)
    */
-  private static async findApplicablePolicy(
-    categoryId: string,
-    priority: string
-  ): Promise<any> {
+  private static async findApplicablePolicy(categoryId: string, priority: string): Promise<any> {
     // Nivel 1: política específica de categoría
     let policy = await prisma.sla_policies.findFirst({
       where: {
         categoryId,
         priority,
-        isActive: true
-      }
+        isActive: true,
+      },
     })
     if (policy) return policy
 
     // Nivel 2: política de familia
     const category = await prisma.categories.findUnique({
       where: { id: categoryId },
-      include: { departments: { select: { familyId: true } } }
+      include: { departments: { select: { familyId: true } } },
     })
     const familyId = category?.departments?.familyId
     if (familyId) {
@@ -123,8 +118,8 @@ export class SLAService {
           familyId,
           categoryId: null,
           priority,
-          isActive: true
-        }
+          isActive: true,
+        },
       })
       if (policy) return policy
     }
@@ -135,8 +130,8 @@ export class SLAService {
         categoryId: null,
         familyId: null,
         priority,
-        isActive: true
-      }
+        isActive: true,
+      },
     })
   }
 
@@ -166,31 +161,31 @@ export class SLAService {
 
     const [startHour, startMinute] = businessStart.split(':').map(Number)
     const [endHour, endMinute] = businessEnd.split(':').map(Number)
-    const dailyHours = (endHour - startHour) + ((endMinute - startMinute) / 60)
+    const dailyHours = endHour - startHour + (endMinute - startMinute) / 60
 
     while (remainingHours > 0) {
       const currentDay = dayNames[deadline.getDay()]
-      
+
       // Si es día laboral
       if (businessDaysArray.includes(currentDay)) {
         const currentHour = deadline.getHours()
         const currentMinute = deadline.getMinutes()
-        
+
         // Si estamos antes del horario laboral, mover al inicio
         if (currentHour < startHour || (currentHour === startHour && currentMinute < startMinute)) {
           deadline.setHours(startHour, startMinute, 0, 0)
         }
-        
+
         // Si estamos después del horario laboral, mover al siguiente día
         if (currentHour >= endHour) {
           deadline.setDate(deadline.getDate() + 1)
           deadline.setHours(startHour, startMinute, 0, 0)
           continue
         }
-        
+
         // Calcular horas disponibles hoy
-        const hoursUntilEnd = (endHour - currentHour) + ((endMinute - currentMinute) / 60)
-        
+        const hoursUntilEnd = endHour - currentHour + (endMinute - currentMinute) / 60
+
         if (remainingHours <= hoursUntilEnd) {
           // Cabe en el día actual
           deadline.setHours(deadline.getHours() + Math.floor(remainingHours))
@@ -218,7 +213,7 @@ export class SLAService {
   static async recordFirstResponse(ticketId: string): Promise<void> {
     try {
       const metrics = await prisma.ticket_sla_metrics.findUnique({
-        where: { ticketId }
+        where: { ticketId },
       })
 
       if (!metrics || metrics.firstResponseAt) {
@@ -230,7 +225,7 @@ export class SLAService {
         (now.getTime() - new Date(metrics.createdAt).getTime()) / (1000 * 60)
       )
 
-      const responseSLAMet = metrics.responseDeadline 
+      const responseSLAMet = metrics.responseDeadline
         ? now <= new Date(metrics.responseDeadline)
         : null
 
@@ -240,16 +235,16 @@ export class SLAService {
         data: {
           firstResponseAt: now,
           responseTimeMinutes: responseTimeMins,
-          responseSLAMet
-        }
+          responseSLAMet,
+        },
       })
 
       // También actualizar el campo en la tabla tickets
       await prisma.tickets.update({
         where: { id: ticketId },
         data: {
-          firstResponseAt: now
-        }
+          firstResponseAt: now,
+        },
       })
 
       // Si se violó el SLA de respuesta, registrar violación
@@ -269,7 +264,7 @@ export class SLAService {
   static async recordResolution(ticketId: string): Promise<void> {
     try {
       const metrics = await prisma.ticket_sla_metrics.findUnique({
-        where: { ticketId }
+        where: { ticketId },
       })
 
       if (!metrics) {
@@ -290,8 +285,8 @@ export class SLAService {
         data: {
           resolvedAt: now,
           resolutionTimeMinutes: resolutionTimeMins,
-          resolutionSLAMet
-        }
+          resolutionSLAMet,
+        },
       })
 
       // Si se violó el SLA de resolución, registrar violación
@@ -320,27 +315,25 @@ export class SLAService {
             include: {
               users_tickets_clientIdTousers: true,
               users_tickets_assigneeIdTousers: true,
-              categories: true
-            }
-          }
-        }
+              categories: true,
+            },
+          },
+        },
       })
 
       if (!metrics) return
 
-      const expectedAt = violationType === 'RESPONSE'
-        ? metrics.responseDeadline
-        : metrics.resolutionDeadline
+      const expectedAt =
+        violationType === 'RESPONSE' ? metrics.responseDeadline : metrics.resolutionDeadline
 
-      const actualAt = violationType === 'RESPONSE'
-        ? metrics.firstResponseAt
-        : metrics.resolvedAt
+      const actualAt = violationType === 'RESPONSE' ? metrics.firstResponseAt : metrics.resolvedAt
 
       if (!expectedAt) return
 
       // Calcular severidad basada en el retraso
       const delayHours = Math.floor(
-        (new Date(actualAt || new Date()).getTime() - new Date(expectedAt).getTime()) / (1000 * 60 * 60)
+        (new Date(actualAt || new Date()).getTime() - new Date(expectedAt).getTime()) /
+          (1000 * 60 * 60)
       )
 
       let severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' = 'MEDIUM'
@@ -359,11 +352,13 @@ export class SLAService {
           expectedAt: new Date(expectedAt),
           actualAt: actualAt ? new Date(actualAt) : null,
           severity,
-          isResolved: !!actualAt
-        }
+          isResolved: !!actualAt,
+        },
       })
 
-      console.log(`[SLA] ⚠️ Violación registrada: Ticket ${ticketId}, Tipo ${violationType}, Severidad ${severity}`)
+      console.log(
+        `[SLA] ⚠️ Violación registrada: Ticket ${ticketId}, Tipo ${violationType}, Severidad ${severity}`
+      )
 
       // Disparar webhook
       await WebhookService.trigger(WebhookService.EVENTS.SLA_VIOLATED, {
@@ -379,8 +374,8 @@ export class SLAService {
           priority: metrics.ticket.priority,
           client: metrics.ticket.users_tickets_clientIdTousers?.name,
           assignee: metrics.ticket.users_tickets_assigneeIdTousers?.name,
-          category: metrics.ticket.categories?.name
-        }
+          category: metrics.ticket.categories?.name,
+        },
       })
 
       // Enviar email de alerta (solo para violaciones críticas)
@@ -408,26 +403,26 @@ export class SLAService {
             {
               responseDeadline: {
                 gte: now,
-                lte: oneHourFromNow
+                lte: oneHourFromNow,
               },
-              firstResponseAt: null
+              firstResponseAt: null,
             },
             {
               resolutionDeadline: {
                 gte: now,
-                lte: oneHourFromNow
+                lte: oneHourFromNow,
               },
-              resolvedAt: null
-            }
-          ]
+              resolvedAt: null,
+            },
+          ],
         },
         include: {
           ticket: {
             include: {
-              users_tickets_assigneeIdTousers: true
-            }
-          }
-        }
+              users_tickets_assigneeIdTousers: true,
+            },
+          },
+        },
       })
 
       console.log(`[SLA] ${upcomingDeadlines.length} tickets próximos a vencer SLA`)
@@ -444,14 +439,16 @@ export class SLAService {
           ticket: {
             id: metrics.ticket.id,
             title: metrics.ticket.title,
-            assignee: metrics.ticket.users_tickets_assigneeIdTousers?.name
-          }
+            assignee: metrics.ticket.users_tickets_assigneeIdTousers?.name,
+          },
         })
 
         // Enviar email al técnico asignado
         if (metrics.ticket.users_tickets_assigneeIdTousers) {
           // TODO: Implementar template de email para advertencia SLA
-          console.log(`[SLA] Email de advertencia enviado a ${metrics.ticket.users_tickets_assigneeIdTousers.name}`)
+          console.log(
+            `[SLA] Email de advertencia enviado a ${metrics.ticket.users_tickets_assigneeIdTousers.name}`
+          )
         }
       }
     } catch (error) {
@@ -496,10 +493,10 @@ export class SLAService {
         ticket: {
           select: {
             categoryId: true,
-            priority: true
-          }
-        }
-      }
+            priority: true,
+          },
+        },
+      },
     })
 
     // Filtrar por categoría y prioridad si se especifica
@@ -512,14 +509,17 @@ export class SLAService {
     const totalTickets = filteredMetrics.length
     const responseMet = filteredMetrics.filter(m => m.responseSLAMet === true).length
     const resolutionMet = filteredMetrics.filter(m => m.resolutionSLAMet === true).length
-    
-    const avgResponseTime = filteredMetrics.reduce((sum, m) => sum + (m.responseTimeMinutes || 0), 0) / totalTickets || 0
-    const avgResolutionTime = filteredMetrics.reduce((sum, m) => sum + (m.resolutionTimeMinutes || 0), 0) / totalTickets || 0
+
+    const avgResponseTime =
+      filteredMetrics.reduce((sum, m) => sum + (m.responseTimeMinutes || 0), 0) / totalTickets || 0
+    const avgResolutionTime =
+      filteredMetrics.reduce((sum, m) => sum + (m.resolutionTimeMinutes || 0), 0) / totalTickets ||
+      0
 
     const violations = await prisma.sla_violations.count({
       where: {
-        ticketId: { in: filteredMetrics.map(m => m.ticketId) }
-      }
+        ticketId: { in: filteredMetrics.map(m => m.ticketId) },
+      },
     })
 
     return {
@@ -530,7 +530,7 @@ export class SLAService {
       violations,
       avgResponseTime: Math.round(avgResponseTime),
       avgResolutionTime: Math.round(avgResolutionTime),
-      complianceRate: totalTickets > 0 ? Math.round((resolutionMet / totalTickets) * 100) : 0
+      complianceRate: totalTickets > 0 ? Math.round((resolutionMet / totalTickets) * 100) : 0,
     }
   }
 }

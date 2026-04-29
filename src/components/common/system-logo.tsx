@@ -16,8 +16,14 @@ function useIsDark() {
   useEffect(() => {
     const check = () => {
       const theme = localStorage.getItem('theme') || 'system'
-      if (theme === 'dark') { setIsDark(true); return }
-      if (theme === 'light') { setIsDark(false); return }
+      if (theme === 'dark') {
+        setIsDark(true)
+        return
+      }
+      if (theme === 'light') {
+        setIsDark(false)
+        return
+      }
       // system
       setIsDark(window.matchMedia('(prefers-color-scheme: dark)').matches)
     }
@@ -29,7 +35,9 @@ function useIsDark() {
     mq.addEventListener('change', check)
 
     // Escuchar cambios manuales de tema (el hook useTheme guarda en localStorage)
-    const onStorage = (e: StorageEvent) => { if (e.key === 'theme') check() }
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'theme') check()
+    }
     window.addEventListener('storage', onStorage)
 
     // También escuchar el evento custom que dispara el cambio de tema en la misma pestaña
@@ -52,12 +60,17 @@ export function SystemLogo({ className = '', showText = true, size = 'md' }: Sys
 
   // En modo oscuro usar logo oscuro (versión blanca/clara), con fallback al claro
   // En modo claro usar logo claro (versión oscura/color), con fallback al oscuro
-  const logoUrl = isDark ? (darkUrl || lightUrl) : (lightUrl || darkUrl)
+  const logoUrl = isDark ? darkUrl || lightUrl : lightUrl || darkUrl
 
   const sizeClasses = { sm: 'h-8', md: 'h-10', lg: 'h-12', xl: 'h-16' }
-  const textSizes  = { sm: 'text-base', md: 'text-lg', lg: 'text-xl', xl: 'text-2xl' }
+  const textSizes = { sm: 'text-base', md: 'text-lg', lg: 'text-xl', xl: 'text-2xl' }
   // max-w proporcional: permite logos anchos sin que se desborden
-  const maxWClasses = { sm: 'max-w-[160px]', md: 'max-w-[200px]', lg: 'max-w-[240px]', xl: 'max-w-[280px]' }
+  const maxWClasses = {
+    sm: 'max-w-[160px]',
+    md: 'max-w-[200px]',
+    lg: 'max-w-[240px]',
+    xl: 'max-w-[280px]',
+  }
 
   if (loading) {
     return (
@@ -69,6 +82,7 @@ export function SystemLogo({ className = '', showText = true, size = 'md' }: Sys
 
   return (
     <div className={`flex items-center space-x-2 ${className}`}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       {logoUrl ? (
         <img
           src={logoUrl}

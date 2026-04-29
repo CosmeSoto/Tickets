@@ -1,14 +1,14 @@
-import { EquipmentStatus, Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import { QRCodeService } from './qr-code.service'
-import type { 
-  Equipment, 
-  EquipmentFormData, 
-  EquipmentFilters, 
+import type {
+  Equipment,
+  EquipmentFormData,
+  EquipmentFilters,
   EquipmentListResponse,
   EquipmentDetailResponse,
   EquipmentHistoryEvent,
-  EquipmentSummary
+  EquipmentSummary,
 } from '@/types/inventory/equipment'
 import { db as prisma } from '@/lib/server'
 
@@ -19,14 +19,11 @@ export class EquipmentService {
   /**
    * Crea un nuevo equipo
    */
-  static async createEquipment(
-    data: EquipmentFormData,
-    userId: string
-  ): Promise<Equipment> {
+  static async createEquipment(data: EquipmentFormData, userId: string): Promise<Equipment> {
     try {
       // Verificar que el código sea único
       const existingEquipment = await prisma.equipment.findUnique({
-        where: { code: data.code }
+        where: { code: data.code },
       })
 
       if (existingEquipment) {
@@ -47,16 +44,22 @@ export class EquipmentService {
           status: (data.status || 'AVAILABLE') as any,
           condition: data.condition as any,
           ownershipType: data.ownershipType as any,
-          purchaseDate: data.purchaseDate ? new Date(data.purchaseDate as string | number) : undefined,
+          purchaseDate: data.purchaseDate
+            ? new Date(data.purchaseDate as string | number)
+            : undefined,
           purchasePrice: data.purchasePrice,
-          warrantyExpiration: data.warrantyExpiration ? new Date(data.warrantyExpiration as string | number) : undefined,
+          warrantyExpiration: data.warrantyExpiration
+            ? new Date(data.warrantyExpiration as string | number)
+            : undefined,
           specifications: data.specifications || {},
           accessories: data.accessories || [],
           location: data.location,
           notes: data.notes,
           qrCode: qrCodeId,
-          ...((data as any).departmentId !== undefined && { departmentId: (data as any).departmentId }),
-        } as any
+          ...((data as any).departmentId !== undefined && {
+            departmentId: (data as any).departmentId,
+          }),
+        } as any,
       })
 
       // Registrar en auditoría
@@ -71,9 +74,9 @@ export class EquipmentService {
             code: equipment.code,
             typeId: equipment.typeId,
             brand: equipment.brand,
-            model: equipment.model
-          }
-        }
+            model: equipment.model,
+          },
+        },
       })
 
       return equipment as Equipment
@@ -90,7 +93,7 @@ export class EquipmentService {
     try {
       const equipment = await prisma.equipment.findUnique({
         where: { id },
-        include: { type: true }
+        include: { type: true },
       })
 
       return equipment as Equipment | null
@@ -114,21 +117,21 @@ export class EquipmentService {
           assignments: {
             include: {
               receiver: { select: { id: true, name: true, email: true } },
-              deliverer: { select: { id: true, name: true, email: true } }
+              deliverer: { select: { id: true, name: true, email: true } },
             },
-            orderBy: { createdAt: 'desc' }
+            orderBy: { createdAt: 'desc' },
           },
           maintenanceRecords: {
             include: {
               technician: { select: { id: true, name: true, email: true } },
-              ticket: { select: { id: true, title: true } }
+              ticket: { select: { id: true, title: true } },
             },
-            orderBy: { date: 'desc' }
+            orderBy: { date: 'desc' },
           },
           licenses: {
-            orderBy: { createdAt: 'desc' }
-          }
-        }
+            orderBy: { createdAt: 'desc' },
+          },
+        },
       })
 
       if (!equipment) {
@@ -145,7 +148,7 @@ export class EquipmentService {
         equipment: equipment as any,
         currentAssignment,
         history,
-        maintenanceRecords: (equipment as any).maintenanceRecords
+        maintenanceRecords: (equipment as any).maintenanceRecords,
       }
     } catch (error) {
       console.error('Error obteniendo detalle de equipo:', error)
@@ -175,7 +178,7 @@ export class EquipmentService {
           { code: { contains: filters.search, mode: 'insensitive' } },
           { serialNumber: { contains: filters.search, mode: 'insensitive' } },
           { brand: { contains: filters.search, mode: 'insensitive' } },
-          { model: { contains: filters.search, mode: 'insensitive' } }
+          { model: { contains: filters.search, mode: 'insensitive' } },
         ]
       }
 
@@ -209,8 +212,8 @@ export class EquipmentService {
         where.assignments = {
           some: {
             receiverId: filters.assignedTo,
-            isActive: true
-          }
+            isActive: true,
+          },
         }
       }
 
@@ -219,8 +222,8 @@ export class EquipmentService {
         where.assignments = {
           some: {
             receiverId: userId,
-            isActive: true
-          }
+            isActive: true,
+          },
         }
       }
 
@@ -234,15 +237,15 @@ export class EquipmentService {
           include: {
             type: { include: { family: true } }, // Incluir familia en la respuesta
           },
-          orderBy: { createdAt: 'desc' }
-        })
+          orderBy: { createdAt: 'desc' },
+        }),
       ])
 
       return {
         equipment: equipment as Equipment[],
         total,
         page,
-        limit
+        limit,
       }
     } catch (error) {
       console.error('Error listando equipos:', error)
@@ -260,14 +263,14 @@ export class EquipmentService {
   ): Promise<Equipment> {
     try {
       const equipment = await prisma.equipment.findUnique({ where: { id } })
-      
+
       if (!equipment) {
         throw new Error('Equipo no encontrado')
       }
 
       // Si hay asignación activa, no permitir cambiar ciertos campos
       const hasActiveAssignment = await prisma.equipment_assignments.findFirst({
-        where: { equipmentId: id, isActive: true }
+        where: { equipmentId: id, isActive: true },
       })
 
       if (hasActiveAssignment && data.status && data.status !== equipment.status) {
@@ -284,18 +287,18 @@ export class EquipmentService {
           ...(data.status && { status: data.status as any }),
           ...(data.condition && { condition: data.condition as any }),
           ...(data.ownershipType && { ownershipType: data.ownershipType as any }),
-          ...(data.purchaseDate !== undefined && { 
-            purchaseDate: data.purchaseDate ? new Date(data.purchaseDate) : null 
+          ...(data.purchaseDate !== undefined && {
+            purchaseDate: data.purchaseDate ? new Date(data.purchaseDate) : null,
           }),
           ...(data.purchasePrice !== undefined && { purchasePrice: data.purchasePrice }),
-          ...(data.warrantyExpiration !== undefined && { 
-            warrantyExpiration: data.warrantyExpiration ? new Date(data.warrantyExpiration) : null 
+          ...(data.warrantyExpiration !== undefined && {
+            warrantyExpiration: data.warrantyExpiration ? new Date(data.warrantyExpiration) : null,
           }),
           ...(data.specifications !== undefined && { specifications: data.specifications }),
           ...(data.accessories !== undefined && { accessories: data.accessories }),
           ...(data.location !== undefined && { location: data.location }),
           ...(data.notes !== undefined && { notes: data.notes }),
-        }
+        },
       })
 
       // Registrar en auditoría con cambios legibles
@@ -335,8 +338,8 @@ export class EquipmentService {
           details: {
             code: updated.code,
             changes: changedFields,
-          }
-        }
+          },
+        },
       })
 
       return updated as Equipment
@@ -352,14 +355,14 @@ export class EquipmentService {
   static async deleteEquipment(id: string, userId: string): Promise<void> {
     try {
       const equipment = await prisma.equipment.findUnique({ where: { id } })
-      
+
       if (!equipment) {
         throw new Error('Equipo no encontrado')
       }
 
       // Verificar que no tenga asignación activa
       const hasActiveAssignment = await prisma.equipment_assignments.findFirst({
-        where: { equipmentId: id, isActive: true }
+        where: { equipmentId: id, isActive: true },
       })
 
       if (hasActiveAssignment) {
@@ -369,7 +372,7 @@ export class EquipmentService {
       // Soft delete: cambiar estado a RETIRED
       await prisma.equipment.update({
         where: { id },
-        data: { status: 'RETIRED' }
+        data: { status: 'RETIRED' },
       })
 
       // Registrar en auditoría
@@ -382,9 +385,9 @@ export class EquipmentService {
           userId: userId,
           details: {
             code: equipment.code,
-            reason: 'Equipo retirado'
-          }
-        }
+            reason: 'Equipo retirado',
+          },
+        },
       })
     } catch (error) {
       console.error('Error eliminando equipo:', error)
@@ -409,7 +412,7 @@ export class EquipmentService {
       }
 
       const hasActiveAssignment = await prisma.equipment_assignments.findFirst({
-        where: { equipmentId: id, isActive: true }
+        where: { equipmentId: id, isActive: true },
       })
 
       if (hasActiveAssignment) {
@@ -424,10 +427,10 @@ export class EquipmentService {
         typeId: equipment.typeId,
       }
 
-      await prisma.$transaction(async (tx) => {
+      await prisma.$transaction(async tx => {
         const assignments = await tx.equipment_assignments.findMany({
           where: { equipmentId: id },
-          select: { id: true }
+          select: { id: true },
         })
         const assignmentIds = assignments.map(a => a.id)
 
@@ -448,7 +451,7 @@ export class EquipmentService {
             entityId: id,
             userId,
             details: equipmentData,
-          }
+          },
         })
       })
     } catch (error) {
@@ -456,7 +459,6 @@ export class EquipmentService {
       throw error
     }
   }
-
 
   /**
    * Obtiene el resumen de equipos para el dashboard
@@ -467,19 +469,19 @@ export class EquipmentService {
         prisma.equipment.count(),
         prisma.equipment.groupBy({
           by: ['status'],
-          _count: true
+          _count: true,
         }),
         prisma.equipment.groupBy({
           by: ['typeId'],
-          _count: true
+          _count: true,
         }),
         prisma.equipment.groupBy({
           by: ['condition'],
-          _count: true
+          _count: true,
         }),
         prisma.equipment.aggregate({
-          _sum: { purchasePrice: true }
-        })
+          _sum: { purchasePrice: true },
+        }),
       ])
 
       // Helper para extraer conteo de forma segura
@@ -494,19 +496,25 @@ export class EquipmentService {
         maintenance: getCount(byStatus, 'status', 'MAINTENANCE'),
         damaged: getCount(byStatus, 'status', 'DAMAGED'),
         retired: getCount(byStatus, 'status', 'RETIRED'),
-        byType: byType.reduce((acc, item) => ({ ...acc, [item.typeId]: item._count }), {} as Record<string, number>),
-        byCondition: byCondition.reduce((acc, item) => ({ ...acc, [item.condition]: item._count }), {} as Record<string, number>),
-        totalValue: totalValue._sum.purchasePrice ?? 0
+        byType: byType.reduce(
+          (acc, item) => ({ ...acc, [item.typeId]: item._count }),
+          {} as Record<string, number>
+        ),
+        byCondition: byCondition.reduce(
+          (acc, item) => ({ ...acc, [item.condition]: item._count }),
+          {} as Record<string, number>
+        ),
+        totalValue: totalValue._sum.purchasePrice ?? 0,
       }
     } catch (error) {
       console.error('Error obteniendo resumen de equipos:', error)
-      
+
       // Log detallado para debugging
       if (error instanceof Error) {
         console.error('Error message:', error.message)
         console.error('Error stack:', error.stack)
       }
-      
+
       // Retornar estructura válida con valores en cero en caso de error
       return {
         total: 0,
@@ -517,7 +525,7 @@ export class EquipmentService {
         retired: 0,
         byType: {},
         byCondition: {} as any,
-        totalValue: 0
+        totalValue: 0,
       }
     }
   }
@@ -525,25 +533,30 @@ export class EquipmentService {
   /**
    * Construye el historial de eventos de un equipo
    */
-  private static async buildEquipmentHistory(equipmentId: string): Promise<EquipmentHistoryEvent[]> {
+  private static async buildEquipmentHistory(
+    equipmentId: string
+  ): Promise<EquipmentHistoryEvent[]> {
     const history: EquipmentHistoryEvent[] = []
 
     // Acciones duplicadas del AuditServiceComplete que ya se registran desde el servicio
     const duplicateActions = new Set([
-      'equipment_created', 'equipment_updated', 'equipment_deleted',
-      'equipment_status_changed', 'assignment_created',
+      'equipment_created',
+      'equipment_updated',
+      'equipment_deleted',
+      'equipment_status_changed',
+      'assignment_created',
     ])
 
     // Obtener eventos de auditoría
     const auditLogs = await prisma.audit_logs.findMany({
       where: {
         entityType: 'equipment',
-        entityId: equipmentId
+        entityId: equipmentId,
       },
       include: {
-        users: { select: { name: true } }
+        users: { select: { name: true } },
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     })
 
     // Deduplicar: agrupar por timestamp (mismo segundo) y quedarse con el más descriptivo
@@ -572,11 +585,18 @@ export class EquipmentService {
       } else if (log.action === 'ASSIGNED') {
         if (details?.receiverName) metadata['Asignado a'] = details.receiverName
         if (details?.assignmentType) {
-          const typeLabels: Record<string, string> = { PERMANENT: 'Permanente', TEMPORARY: 'Temporal', LOAN: 'Préstamo' }
+          const typeLabels: Record<string, string> = {
+            PERMANENT: 'Permanente',
+            TEMPORARY: 'Temporal',
+            LOAN: 'Préstamo',
+          }
           metadata['Tipo'] = typeLabels[details.assignmentType] || details.assignmentType
         }
       } else if (log.action === 'RETURNED') {
-        if (details?.actualEndDate) metadata['Fecha de devolución'] = new Date(details.actualEndDate).toLocaleDateString('es-ES')
+        if (details?.actualEndDate)
+          metadata['Fecha de devolución'] = new Date(details.actualEndDate).toLocaleDateString(
+            'es-ES'
+          )
       }
 
       history.push({
@@ -586,7 +606,7 @@ export class EquipmentService {
         userId: log.userId || undefined,
         userName: log.users?.name,
         timestamp: log.createdAt,
-        metadata: Object.keys(metadata).length > 0 ? metadata : undefined
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
       })
     }
 
@@ -630,10 +650,19 @@ export class EquipmentService {
     }
     // Traducir valores de enums comunes
     const labels: Record<string, string> = {
-      AVAILABLE: 'Disponible', ASSIGNED: 'Asignado', MAINTENANCE: 'Mantenimiento',
-      DAMAGED: 'Dañado', RETIRED: 'Retirado',
-      NEW: 'Nuevo', LIKE_NEW: 'Como Nuevo', GOOD: 'Bueno', FAIR: 'Regular', POOR: 'Malo',
-      FIXED_ASSET: 'Activo Fijo', RENTAL: 'Alquiler', LOAN: 'Préstamo',
+      AVAILABLE: 'Disponible',
+      ASSIGNED: 'Asignado',
+      MAINTENANCE: 'Mantenimiento',
+      DAMAGED: 'Dañado',
+      RETIRED: 'Retirado',
+      NEW: 'Nuevo',
+      LIKE_NEW: 'Como Nuevo',
+      GOOD: 'Bueno',
+      FAIR: 'Regular',
+      POOR: 'Malo',
+      FIXED_ASSET: 'Activo Fijo',
+      RENTAL: 'Alquiler',
+      LOAN: 'Préstamo',
     }
     return labels[String(value)] || String(value)
   }

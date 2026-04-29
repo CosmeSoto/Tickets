@@ -326,7 +326,7 @@ export async function generateDeliveryActPDF(
   let dy = card(col2X, y, colW, delH, 'ENTREGADO POR')
   dy = row(col2X, dy, colW, 'Nombre', act.delivererInfo.name)
   dy = row(col2X, dy, colW, 'Email', act.delivererInfo.email)
-  dy = row(col2X, dy, colW, 'Departamento', act.delivererInfo.department || '—')
+  void row(col2X, dy, colW, 'Departamento', act.delivererInfo.department || '—')
 
   // Tarjeta: Recibido por
   const recY = y + delH + 8
@@ -334,7 +334,7 @@ export async function generateDeliveryActPDF(
   let ry = card(col2X, recY, colW, recH, 'RECIBIDO POR')
   ry = row(col2X, ry, colW, 'Nombre', act.receiverInfo.name)
   ry = row(col2X, ry, colW, 'Email', act.receiverInfo.email)
-  ry = row(col2X, ry, colW, 'Departamento', act.receiverInfo.department || '—')
+  void row(col2X, ry, colW, 'Departamento', act.receiverInfo.department || '—')
 
   // Tarjeta: Fechas
   const fechasY = recY + recH + 8

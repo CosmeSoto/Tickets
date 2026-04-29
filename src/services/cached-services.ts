@@ -5,7 +5,7 @@
 
 import prisma from '@/lib/prisma'
 import { cacheService, Cache, InvalidateCache, CachePatterns } from '@/lib/cache'
-import type { tickets, categories, users, TicketPriority, TicketStatus } from '@prisma/client'
+import type { TicketPriority, TicketStatus } from '@prisma/client'
 
 /**
  * Cached Category Service
@@ -14,25 +14,22 @@ export class CachedCategoryService {
   private static readonly CACHE_TTL = 3600 // 1 hour
   private static readonly CACHE_PREFIX = 'categories'
 
-  @Cache({ 
-    ttl: CachedCategoryService.CACHE_TTL, 
+  @Cache({
+    ttl: CachedCategoryService.CACHE_TTL,
     prefix: CachedCategoryService.CACHE_PREFIX,
-    tags: ['categories']
+    tags: ['categories'],
   })
-  async getCategories(filters?: {
-    isActive?: boolean
-    search?: string
-  }) {
+  async getCategories(filters?: { isActive?: boolean; search?: string }) {
     const where: any = {}
-    
+
     if (filters?.isActive !== undefined) {
       where.isActive = filters.isActive
     }
-    
+
     if (filters?.search) {
       where.OR = [
         { name: { contains: filters.search, mode: 'insensitive' } },
-        { description: { contains: filters.search, mode: 'insensitive' } }
+        { description: { contains: filters.search, mode: 'insensitive' } },
       ]
     }
 
@@ -41,25 +38,25 @@ export class CachedCategoryService {
       orderBy: { name: 'asc' },
       include: {
         _count: {
-          select: { tickets: true }
-        }
-      }
+          select: { tickets: true },
+        },
+      },
     })
   }
 
-  @Cache({ 
-    ttl: CachedCategoryService.CACHE_TTL, 
+  @Cache({
+    ttl: CachedCategoryService.CACHE_TTL,
     prefix: CachedCategoryService.CACHE_PREFIX,
-    tags: ['categories']
+    tags: ['categories'],
   })
   async getCategoryById(id: string) {
     return prisma.categories.findUnique({
       where: { id },
       include: {
         _count: {
-          select: { tickets: true }
-        }
-      }
+          select: { tickets: true },
+        },
+      },
     })
   }
 
@@ -82,37 +79,40 @@ export class CachedCategoryService {
       },
       include: {
         _count: {
-          select: { tickets: true }
-        }
-      }
+          select: { tickets: true },
+        },
+      },
     })
   }
 
   @InvalidateCache(['categories'])
-  async updateCategory(id: string, data: {
-    name?: string
-    description?: string
-    level?: number
-    parentId?: string
-    order?: number
-    color?: string
-    isActive?: boolean
-  }) {
+  async updateCategory(
+    id: string,
+    data: {
+      name?: string
+      description?: string
+      level?: number
+      parentId?: string
+      order?: number
+      color?: string
+      isActive?: boolean
+    }
+  ) {
     return prisma.categories.update({
       where: { id },
       data,
       include: {
         _count: {
-          select: { tickets: true }
-        }
-      }
+          select: { tickets: true },
+        },
+      },
     })
   }
 
   @InvalidateCache(['categories'])
   async deleteCategory(id: string) {
     return prisma.categories.delete({
-      where: { id }
+      where: { id },
     })
   }
 
@@ -131,24 +131,24 @@ export class CachedCategoryService {
               select: {
                 tickets: {
                   where: {
-                    status: { not: 'CLOSED' }
-                  }
-                }
-              }
-            }
-          }
+                    status: { not: 'CLOSED' },
+                  },
+                },
+              },
+            },
+          },
         })
 
         return stats.map(category => ({
           id: category.id,
           name: category.name,
-          activeTickets: category._count.tickets
+          activeTickets: category._count.tickets,
         }))
       },
-      { 
+      {
         ttl: 300, // 5 minutes
         prefix: CachedCategoryService.CACHE_PREFIX,
-        refreshThreshold: 60 // Refresh when 1 minute left
+        refreshThreshold: 60, // Refresh when 1 minute left
       }
     )
   }
@@ -171,7 +171,7 @@ export class CachedTicketService {
     limit?: number
   }) {
     const cacheKey = `tickets-list:${JSON.stringify(filters || {})}`
-    
+
     return cacheService.getOrSet(
       cacheKey,
       async () => {
@@ -180,27 +180,27 @@ export class CachedTicketService {
         const skip = (page - 1) * limit
 
         const where: any = {}
-        
+
         if (filters?.status) {
           where.status = filters.status
         }
-        
+
         if (filters?.priority) {
           where.priority = filters.priority
         }
-        
+
         if (filters?.categoryId) {
           where.categoryId = filters.categoryId
         }
-        
+
         if (filters?.clientId) {
           where.clientId = filters.clientId
         }
-        
+
         if (filters?.search) {
           where.OR = [
             { title: { contains: filters.search, mode: 'insensitive' } },
-            { description: { contains: filters.search, mode: 'insensitive' } }
+            { description: { contains: filters.search, mode: 'insensitive' } },
           ]
         }
 
@@ -212,20 +212,20 @@ export class CachedTicketService {
             orderBy: { createdAt: 'desc' },
             include: {
               users_tickets_clientIdTousers: {
-                select: { id: true, name: true, email: true }
+                select: { id: true, name: true, email: true },
               },
               categories: {
-                select: { id: true, name: true, color: true }
+                select: { id: true, name: true, color: true },
               },
               users_tickets_assigneeIdTousers: {
-                select: { id: true, name: true, email: true }
+                select: { id: true, name: true, email: true },
               },
               _count: {
-                select: { comments: true, attachments: true }
-              }
-            }
+                select: { comments: true, attachments: true },
+              },
+            },
           }),
-          prisma.tickets.count({ where })
+          prisma.tickets.count({ where }),
         ])
 
         return {
@@ -234,46 +234,46 @@ export class CachedTicketService {
             page,
             limit,
             total,
-            pages: Math.ceil(total / limit)
-          }
+            pages: Math.ceil(total / limit),
+          },
         }
       },
-      { 
+      {
         ttl: CachedTicketService.CACHE_TTL,
         prefix: CachedTicketService.CACHE_PREFIX,
-        tags: ['tickets', 'tickets-list']
+        tags: ['tickets', 'tickets-list'],
       }
     )
   }
 
-  @Cache({ 
-    ttl: CachedTicketService.CACHE_TTL, 
+  @Cache({
+    ttl: CachedTicketService.CACHE_TTL,
     prefix: CachedTicketService.CACHE_PREFIX,
-    tags: ['tickets']
+    tags: ['tickets'],
   })
   async getTicketById(id: string) {
     return prisma.tickets.findUnique({
       where: { id },
       include: {
         users_tickets_clientIdTousers: {
-          select: { id: true, name: true, email: true }
+          select: { id: true, name: true, email: true },
         },
         categories: {
-          select: { id: true, name: true, color: true }
+          select: { id: true, name: true, color: true },
         },
         users_tickets_assigneeIdTousers: {
-          select: { id: true, name: true, email: true }
+          select: { id: true, name: true, email: true },
         },
         comments: {
           include: {
             users: {
-              select: { id: true, name: true, email: true }
-            }
+              select: { id: true, name: true, email: true },
+            },
           },
-          orderBy: { createdAt: 'asc' }
+          orderBy: { createdAt: 'asc' },
         },
-        attachments: true
-      }
+        attachments: true,
+      },
     })
   }
 
@@ -296,41 +296,44 @@ export class CachedTicketService {
       },
       include: {
         users_tickets_clientIdTousers: {
-          select: { id: true, name: true, email: true }
+          select: { id: true, name: true, email: true },
         },
         categories: {
-          select: { id: true, name: true, color: true }
+          select: { id: true, name: true, color: true },
         },
         users_tickets_assigneeIdTousers: {
-          select: { id: true, name: true, email: true }
-        }
-      }
+          select: { id: true, name: true, email: true },
+        },
+      },
     })
   }
 
   @InvalidateCache(['tickets', 'tickets-list', 'dashboard-stats'])
-  async updateTicket(id: string, data: {
-    title?: string
-    description?: string
-    status?: TicketStatus
-    priority?: TicketPriority
-    categoryId?: string
-    assigneeId?: string
-  }) {
+  async updateTicket(
+    id: string,
+    data: {
+      title?: string
+      description?: string
+      status?: TicketStatus
+      priority?: TicketPriority
+      categoryId?: string
+      assigneeId?: string
+    }
+  ) {
     return prisma.tickets.update({
       where: { id },
       data,
       include: {
         users_tickets_clientIdTousers: {
-          select: { id: true, name: true, email: true }
+          select: { id: true, name: true, email: true },
         },
         categories: {
-          select: { id: true, name: true, color: true }
+          select: { id: true, name: true, color: true },
         },
         users_tickets_assigneeIdTousers: {
-          select: { id: true, name: true, email: true }
-        }
-      }
+          select: { id: true, name: true, email: true },
+        },
+      },
     })
   }
 
@@ -347,7 +350,7 @@ export class CachedTicketService {
           inProgressTickets,
           closedTickets,
           highPriorityTickets,
-          recentTickets
+          recentTickets,
         ] = await Promise.all([
           prisma.tickets.count(),
           prisma.tickets.count({ where: { status: 'OPEN' } }),
@@ -359,9 +362,9 @@ export class CachedTicketService {
             orderBy: { createdAt: 'desc' },
             include: {
               users_tickets_clientIdTousers: { select: { name: true } },
-              categories: { select: { name: true, color: true } }
-            }
-          })
+              categories: { select: { name: true, color: true } },
+            },
+          }),
         ])
 
         return {
@@ -370,14 +373,14 @@ export class CachedTicketService {
           inProgressTickets,
           closedTickets,
           highPriorityTickets,
-          recentTickets
+          recentTickets,
         }
       },
-      { 
+      {
         ttl: 300, // 5 minutes in Redis
         memoryTtl: 60, // 1 minute in memory
         prefix: CachedTicketService.CACHE_PREFIX,
-        tags: ['dashboard-stats']
+        tags: ['dashboard-stats'],
       }
     )
   }
@@ -390,30 +393,26 @@ export class CachedUserService {
   private static readonly CACHE_TTL = 3600 // 1 hour
   private static readonly CACHE_PREFIX = 'users'
 
-  @Cache({ 
-    ttl: CachedUserService.CACHE_TTL, 
+  @Cache({
+    ttl: CachedUserService.CACHE_TTL,
     prefix: CachedUserService.CACHE_PREFIX,
-    tags: ['users']
+    tags: ['users'],
   })
-  async getUsers(filters?: {
-    role?: string
-    active?: boolean
-    search?: string
-  }) {
+  async getUsers(filters?: { role?: string; active?: boolean; search?: string }) {
     const where: any = {}
-    
+
     if (filters?.role) {
       where.role = filters.role
     }
-    
+
     if (filters?.active !== undefined) {
       where.active = filters.active
     }
-    
+
     if (filters?.search) {
       where.OR = [
         { name: { contains: filters.search, mode: 'insensitive' } },
-        { email: { contains: filters.search, mode: 'insensitive' } }
+        { email: { contains: filters.search, mode: 'insensitive' } },
       ]
     }
 
@@ -429,18 +428,18 @@ export class CachedUserService {
         _count: {
           select: {
             tickets_tickets_createdByIdTousers: true,
-            tickets_tickets_assigneeIdTousers: true
-          }
-        }
+            tickets_tickets_assigneeIdTousers: true,
+          },
+        },
       },
-      orderBy: { name: 'asc' }
+      orderBy: { name: 'asc' },
     })
   }
 
-  @Cache({ 
-    ttl: CachedUserService.CACHE_TTL, 
+  @Cache({
+    ttl: CachedUserService.CACHE_TTL,
     prefix: CachedUserService.CACHE_PREFIX,
-    tags: ['users']
+    tags: ['users'],
   })
   async getUserById(id: string) {
     return prisma.users.findUnique({
@@ -455,10 +454,10 @@ export class CachedUserService {
         _count: {
           select: {
             tickets_tickets_createdByIdTousers: true,
-            tickets_tickets_assigneeIdTousers: true
-          }
-        }
-      }
+            tickets_tickets_assigneeIdTousers: true,
+          },
+        },
+      },
     })
   }
 
@@ -469,30 +468,29 @@ export class CachedUserService {
     return CachePatterns.cacheWithRefresh(
       `user-stats:${userId}`,
       async () => {
-        const [
-          totalTickets,
-          openTickets,
-          tickets_tickets_assigneeIdTousers,
-          resolvedTickets
-        ] = await Promise.all([
-          prisma.tickets.count({ where: { clientId: userId } }),
-          prisma.tickets.count({ where: { clientId: userId, status: 'OPEN' } }),
-          prisma.tickets.count({ where: { assigneeId: userId } }),
-          prisma.tickets.count({ where: { assigneeId: userId, status: 'CLOSED' } })
-        ])
+        const [totalTickets, openTickets, tickets_tickets_assigneeIdTousers, resolvedTickets] =
+          await Promise.all([
+            prisma.tickets.count({ where: { clientId: userId } }),
+            prisma.tickets.count({ where: { clientId: userId, status: 'OPEN' } }),
+            prisma.tickets.count({ where: { assigneeId: userId } }),
+            prisma.tickets.count({ where: { assigneeId: userId, status: 'CLOSED' } }),
+          ])
 
         return {
           totalTickets,
           openTickets,
           tickets_tickets_assigneeIdTousers,
           resolvedTickets,
-          resolutionRate: tickets_tickets_assigneeIdTousers > 0 ? (resolvedTickets / tickets_tickets_assigneeIdTousers) * 100 : 0
+          resolutionRate:
+            tickets_tickets_assigneeIdTousers > 0
+              ? (resolvedTickets / tickets_tickets_assigneeIdTousers) * 100
+              : 0,
         }
       },
-      { 
+      {
         ttl: 600, // 10 minutes
         prefix: CachedUserService.CACHE_PREFIX,
-        refreshThreshold: 120 // Refresh when 2 minutes left
+        refreshThreshold: 120, // Refresh when 2 minutes left
       }
     )
   }
@@ -508,14 +506,14 @@ export class CacheManagementService {
   async warmUpCaches() {
     const categoryService = new CachedCategoryService()
     const ticketService = new CachedTicketService()
-    
+
     try {
       // Warm up most accessed data
       await Promise.all([
         categoryService.getCategories({ isActive: true }),
         categoryService.getCategoryStats(),
         ticketService.getDashboardStats(),
-        ticketService.getTickets({ page: 1, limit: 10 })
+        ticketService.getTickets({ page: 1, limit: 10 }),
       ])
     } catch (error) {
       // Error silencioso - el cache se calentará en el próximo request
@@ -528,12 +526,12 @@ export class CacheManagementService {
   async clearAllCaches() {
     const patterns = ['categories:*', 'tickets:*', 'users:*']
     let totalCleared = 0
-    
+
     for (const pattern of patterns) {
       const cleared = await cacheService.clear(pattern)
       totalCleared += cleared
     }
-    
+
     return totalCleared
   }
 
@@ -543,11 +541,11 @@ export class CacheManagementService {
   async getCacheHealth() {
     const stats = cacheService.getStats()
     const hitRatio = cacheService.getHitRatio()
-    
+
     return {
       ...stats,
       hitRatio: Math.round(hitRatio * 100),
-      status: hitRatio > 0.7 ? 'healthy' : hitRatio > 0.5 ? 'warning' : 'poor'
+      status: hitRatio > 0.7 ? 'healthy' : hitRatio > 0.5 ? 'warning' : 'poor',
     }
   }
 

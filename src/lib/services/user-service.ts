@@ -2,20 +2,21 @@ import prisma from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { randomUUID } from 'crypto'
-import { 
-  AuditServiceComplete, 
-  AuditActionsComplete, 
-  logUserActionComplete 
-} from './audit-service-complete'
+import { AuditServiceComplete, AuditActionsComplete } from './audit-service-complete'
 
 // Función helper para obtener el nombre del nivel
 function getLevelName(level: number): string {
   switch (level) {
-    case 1: return 'Principal'
-    case 2: return 'Subcategoría'
-    case 3: return 'Especialidad'
-    case 4: return 'Detalle'
-    default: return `Nivel ${level}`
+    case 1:
+      return 'Principal'
+    case 2:
+      return 'Subcategoría'
+    case 3:
+      return 'Especialidad'
+    case 4:
+      return 'Detalle'
+    default:
+      return `Nivel ${level}`
   }
 }
 
@@ -97,8 +98,8 @@ export class UserService {
             id: true,
             name: true,
             color: true,
-            description: true
-          }
+            description: true,
+          },
         },
         phone: true,
         isActive: true,
@@ -125,12 +126,12 @@ export class UserService {
                   name: true,
                   color: true,
                   level: true,
-                }
-              }
+                },
+              },
             },
-            orderBy: { priority: 'asc' as const }
-          }
-        })
+            orderBy: { priority: 'asc' as const },
+          },
+        }),
       },
       orderBy: { createdAt: 'desc' } as const,
     }
@@ -155,9 +156,9 @@ export class UserService {
               ...assignment,
               category: {
                 ...assignment.category,
-                levelName: getLevelName(assignment.categories.level)
-              }
-            }))
+                levelName: getLevelName(assignment.categories.level),
+              },
+            })),
           }
         }
         return user
@@ -167,7 +168,7 @@ export class UserService {
     } else {
       // Sin paginación (compatibilidad hacia atrás)
       const users = await prisma.users.findMany(baseQuery)
-      
+
       // Enriquecer datos para técnicos
       const enrichedUsers = users.map(user => {
         if (user.role === 'TECHNICIAN' && user.technician_assignments) {
@@ -177,14 +178,14 @@ export class UserService {
               ...assignment,
               category: {
                 ...assignment.category,
-                levelName: getLevelName(assignment.categories.level)
-              }
-            }))
+                levelName: getLevelName(assignment.categories.level),
+              },
+            })),
           }
         }
         return user
       })
-      
+
       return enrichedUsers
     }
   }
@@ -203,8 +204,8 @@ export class UserService {
             id: true,
             name: true,
             color: true,
-            description: true
-          }
+            description: true,
+          },
         },
         phone: true,
         avatar: true,
@@ -237,7 +238,7 @@ export class UserService {
     const passwordHash = await bcrypt.hash(data.password, 12)
 
     // Crear el usuario en una transacción para manejar las asignaciones de categorías
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async tx => {
       const user = await tx.users.create({
         data: {
           id: randomUUID(),
@@ -259,14 +260,18 @@ export class UserService {
               id: true,
               name: true,
               color: true,
-              description: true
-            }
-          }
-        }
+              description: true,
+            },
+          },
+        },
       })
 
       // Si es técnico y tiene categorías asignadas, crear las asignaciones
-      if (data.role === 'TECHNICIAN' && data.assignedCategories && data.assignedCategories.length > 0) {
+      if (
+        data.role === 'TECHNICIAN' &&
+        data.assignedCategories &&
+        data.assignedCategories.length > 0
+      ) {
         await tx.technician_assignments.createMany({
           data: data.assignedCategories.map(assignment => ({
             id: randomUUID(),
@@ -295,7 +300,7 @@ export class UserService {
           newComments: true,
           ticketUpdated: true,
           updatedAt: new Date(),
-        }
+        },
       })
 
       // Registrar auditoría
@@ -310,15 +315,15 @@ export class UserService {
             userName: user.name,
             userRole: user.role,
             departmentId: user.departmentId,
-            assignedCategories: data.assignedCategories?.length || 0
+            assignedCategories: data.assignedCategories?.length || 0,
           },
           newValues: {
             email: user.email,
             name: user.name,
             role: user.role,
             departmentId: user.departmentId,
-            isActive: user.isActive
-          }
+            isActive: user.isActive,
+          },
         })
       }
 
@@ -362,9 +367,10 @@ export class UserService {
     if (data.phone !== undefined) updateData.phone = data.phone
     if (data.avatar !== undefined) updateData.avatar = data.avatar
     if (data.isActive !== undefined) updateData.isActive = data.isActive
-    if ((data as any).canManageInventory !== undefined) updateData.canManageInventory = (data as any).canManageInventory
+    if ((data as any).canManageInventory !== undefined)
+      updateData.canManageInventory = (data as any).canManageInventory
     if (data.isSuperAdmin !== undefined) updateData.isSuperAdmin = data.isSuperAdmin
-    
+
     // Manejar departmentId explícitamente
     if (data.departmentId !== undefined) {
       updateData.departmentId = data.departmentId || null
@@ -376,7 +382,7 @@ export class UserService {
     console.log('🔧 [UserService] Datos que se enviarán a Prisma:', updateData)
 
     // Actualizar usuario en una transacción para manejar las asignaciones de categorías
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async tx => {
       const updatedUser = await tx.users.update({
         where: { id },
         data: updateData,
@@ -386,10 +392,10 @@ export class UserService {
               id: true,
               name: true,
               color: true,
-              description: true
-            }
-          }
-        }
+              description: true,
+            },
+          },
+        },
       })
 
       // Si es técnico y se proporcionaron asignaciones de categorías, actualizarlas
@@ -423,7 +429,7 @@ export class UserService {
     console.log('✅ [UserService] Usuario actualizado en BD:', {
       id: result.id,
       departmentId: result.departmentId,
-      department: result.departments?.name
+      department: result.departments?.name,
     })
 
     return {
@@ -446,10 +452,12 @@ export class UserService {
     })
 
     if (activeTickets > 0) {
-      throw new Error('No se puede eliminar un usuario con tickets activos asignados. Reasigna o cierra los tickets primero.')
+      throw new Error(
+        'No se puede eliminar un usuario con tickets activos asignados. Reasigna o cierra los tickets primero.'
+      )
     }
 
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async tx => {
       // --- Campos no-nullable: hay que ELIMINAR los registros ---
 
       // Asignaciones de técnico
@@ -465,7 +473,9 @@ export class UserService {
       await tx.attachments.deleteMany({ where: { uploadedBy: id } })
 
       // Calificaciones de tickets (clientId NOT NULL, technicianId nullable)
-      await tx.ticket_ratings.deleteMany({ where: { OR: [{ clientId: id }, { technicianId: id }] } })
+      await tx.ticket_ratings.deleteMany({
+        where: { OR: [{ clientId: id }, { technicianId: id }] },
+      })
 
       // Artículos de conocimiento (authorId NOT NULL) — eliminar votos primero
       const articles = await tx.knowledge_articles.findMany({
@@ -491,20 +501,32 @@ export class UserService {
       // --- Campos nullable: NULLIFICAR en lugar de eliminar ---
 
       // Tickets: desasignar assignee, nullificar createdById
-      await tx.tickets.updateMany({ where: { assigneeId: id }, data: { assigneeId: null, status: 'OPEN' } })
+      await tx.tickets.updateMany({
+        where: { assigneeId: id },
+        data: { assigneeId: null, status: 'OPEN' },
+      })
       await tx.tickets.updateMany({ where: { createdById: id }, data: { createdById: null } })
 
       // Tareas de resolución: nullificar assignedTo (nullable)
-      await tx.resolution_tasks.updateMany({ where: { assignedTo: id }, data: { assignedTo: null } })
+      await tx.resolution_tasks.updateMany({
+        where: { assignedTo: id },
+        data: { assignedTo: null },
+      })
 
       // Webhooks: nullificar createdBy (nullable)
       await tx.webhooks.updateMany({ where: { createdBy: id }, data: { createdBy: null } })
 
       // Movimientos de stock: nullificar assignedToUserId (nullable)
-      await tx.stock_movements.updateMany({ where: { assignedToUserId: id }, data: { assignedToUserId: null } })
+      await tx.stock_movements.updateMany({
+        where: { assignedToUserId: id },
+        data: { assignedToUserId: null },
+      })
 
       // Licencias de software: nullificar assignedToUser (nullable)
-      await tx.software_licenses.updateMany({ where: { assignedToUser: id }, data: { assignedToUser: null } })
+      await tx.software_licenses.updateMany({
+        where: { assignedToUser: id },
+        data: { assignedToUser: null },
+      })
 
       // Eliminar el usuario (Prisma cascade elimina: accounts, sessions,
       // notification_preferences, notifications, user_settings,
@@ -557,8 +579,8 @@ export class UserService {
             id: true,
             name: true,
             color: true,
-            description: true
-          }
+            description: true,
+          },
         },
         _count: {
           select: {
@@ -575,8 +597,8 @@ export class UserService {
   }
 
   static async getTechnicianWorkload(technicianId: string) {
-    const [openTickets, inProgressTickets, resolvedThisWeek, avgResolutionTime, activeAssignments] = await Promise.all(
-      [
+    const [openTickets, inProgressTickets, resolvedThisWeek, avgResolutionTime, activeAssignments] =
+      await Promise.all([
         prisma.tickets.count({
           where: { assigneeId: technicianId, status: 'OPEN' },
         }),
@@ -594,13 +616,12 @@ export class UserService {
         }),
         this.calculateAvgResolutionTime(technicianId),
         prisma.technician_assignments.count({
-          where: { 
+          where: {
             technicianId: technicianId,
             isActive: true,
           },
         }),
-      ]
-    )
+      ])
 
     return {
       openTickets,

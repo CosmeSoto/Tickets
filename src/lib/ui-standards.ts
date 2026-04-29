@@ -1,12 +1,9 @@
 /**
  * UI Component Standards and Templates
- * 
+ *
  * This module provides standardized templates and utilities for creating
  * consistent UI components across the application.
  */
-
-import { type VariantProps } from 'class-variance-authority'
-import { type ComponentPropsWithoutRef, type ElementRef } from 'react'
 
 // Standard Component Props Interface
 export interface StandardComponentProps {
@@ -22,7 +19,7 @@ export interface StandardComponentProps {
 // Size Variant Type
 export type SizeVariant = 'xs' | 'sm' | 'md' | 'lg' | 'xl'
 
-// Color Variant Type  
+// Color Variant Type
 export type ColorVariant = 'primary' | 'secondary' | 'success' | 'warning' | 'error' | 'gray'
 
 // Standard Variant Props
@@ -50,9 +47,12 @@ export class ComponentTemplate {
       hasVariants ? "import { cva, type VariantProps } from 'class-variance-authority'" : null,
       "import { cn } from '@/lib/utils'",
       isInteractive ? "import { type StandardComponentProps } from '@/lib/ui-standards'" : null,
-    ].filter(Boolean).join('\n')
+    ]
+      .filter(Boolean)
+      .join('\n')
 
-    const variantsCode = hasVariants ? `
+    const variantsCode = hasVariants
+      ? `
 const ${name.toLowerCase()}Variants = cva(
   // Base styles
   'inline-flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
@@ -79,7 +79,8 @@ const ${name.toLowerCase()}Variants = cva(
       size: 'md',
     },
   }
-)` : ''
+)`
+      : ''
 
     const propsInterface = `
 export interface ${name}Props
@@ -103,17 +104,13 @@ const ${name} = React.forwardRef<HTML${element.charAt(0).toUpperCase() + element
 )
 ${name}.displayName = '${name}'`
 
-    const exports = hasVariants 
+    const exports = hasVariants
       ? `export { ${name}, ${name.toLowerCase()}Variants }`
       : `export { ${name} }`
 
-    return [
-      imports,
-      variantsCode,
-      propsInterface,
-      componentCode,
-      exports,
-    ].filter(Boolean).join('\n\n')
+    return [imports, variantsCode, propsInterface, componentCode, exports]
+      .filter(Boolean)
+      .join('\n\n')
   }
 
   /**
@@ -225,38 +222,39 @@ export const Sizes: Story = {
 // Standard CSS Classes
 export const StandardClasses = {
   // Focus styles
-  focus: 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2',
-  
+  focus:
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2',
+
   // Disabled styles
   disabled: 'disabled:pointer-events-none disabled:opacity-50',
-  
+
   // Transition styles
   transition: 'transition-colors duration-200',
-  
+
   // Interactive styles
   interactive: 'cursor-pointer hover:opacity-80',
-  
+
   // Layout utilities
   flexCenter: 'flex items-center justify-center',
   flexBetween: 'flex items-center justify-between',
-  
+
   // Spacing utilities
   padding: {
     xs: 'p-1',
-    sm: 'p-2', 
+    sm: 'p-2',
     md: 'p-4',
     lg: 'p-6',
     xl: 'p-8',
   },
-  
+
   margin: {
     xs: 'm-1',
     sm: 'm-2',
-    md: 'm-4', 
+    md: 'm-4',
     lg: 'm-6',
     xl: 'm-8',
   },
-  
+
   // Border radius utilities
   rounded: {
     none: 'rounded-none',
@@ -266,7 +264,7 @@ export const StandardClasses = {
     xl: 'rounded-xl',
     full: 'rounded-full',
   },
-  
+
   // Shadow utilities
   shadow: {
     sm: 'shadow-sm',

@@ -17,10 +17,7 @@ export async function PATCH(
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
-      return NextResponse.json(
-        { success: false, message: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
     }
 
     const { id: ticketId, taskId } = await params
@@ -32,17 +29,14 @@ export async function PATCH(
       include: {
         plan: {
           include: {
-            ticket: true
-          }
-        }
-      }
+            ticket: true,
+          },
+        },
+      },
     })
 
     if (!task) {
-      return NextResponse.json(
-        { success: false, message: 'Tarea no encontrada' },
-        { status: 404 }
-      )
+      return NextResponse.json({ success: false, message: 'Tarea no encontrada' }, { status: 404 })
     }
 
     // Verificar que la tarea pertenece al ticket correcto
@@ -55,9 +49,8 @@ export async function PATCH(
 
     // Verificar permisos
     const isAdmin = session.user.role === 'ADMIN'
-    const isAssignedTechnician = 
-      session.user.role === 'TECHNICIAN' && 
-      task.plan.ticket.assigneeId === session.user.id
+    const isAssignedTechnician =
+      session.user.role === 'TECHNICIAN' && task.plan.ticket.assigneeId === session.user.id
 
     if (!isAdmin && !isAssignedTechnician) {
       return NextResponse.json(
@@ -68,7 +61,7 @@ export async function PATCH(
 
     // Preparar datos de actualización
     const updateData: any = {
-      updatedAt: new Date()
+      updatedAt: new Date(),
     }
 
     const changes: Record<string, any> = {}
@@ -112,7 +105,7 @@ export async function PATCH(
     if (body.startTime !== undefined || body.endTime !== undefined) {
       const newStartTime = body.startTime !== undefined ? body.startTime : task.startTime
       const newEndTime = body.endTime !== undefined ? body.endTime : task.endTime
-      
+
       // Validar si ambos horarios están presentes
       if (newStartTime && newEndTime) {
         if (!validateTimeRange(newStartTime, newEndTime)) {
@@ -121,23 +114,23 @@ export async function PATCH(
             { status: 400 }
           )
         }
-        
+
         // Calcular duración automáticamente
         const calculatedDuration = calculateDuration(newStartTime, newEndTime)
         updateData.estimatedHours = calculatedDuration
         changes.estimatedHours = { old: task.estimatedHours, new: calculatedDuration }
       }
-      
+
       if (body.startTime !== undefined) {
         updateData.startTime = body.startTime
         changes.startTime = { old: task.startTime, new: body.startTime }
       }
-      
+
       if (body.endTime !== undefined) {
         updateData.endTime = body.endTime
         changes.endTime = { old: task.endTime, new: body.endTime }
       }
-      
+
       // Si hay fecha y hora de inicio, combinarlas en dueDate
       if (body.dueDate && newStartTime) {
         updateData.dueDate = combineDateAndTime(body.dueDate, newStartTime)
@@ -176,26 +169,26 @@ export async function PATCH(
           select: {
             id: true,
             name: true,
-            email: true
-          }
-        }
-      }
+            email: true,
+          },
+        },
+      },
     })
 
     // Si cambió el estado de completitud, actualizar contador en el plan
     if (body.status !== undefined && body.status !== oldStatus) {
       const allTasks = await prisma.resolution_tasks.findMany({
-        where: { planId: task.planId }
+        where: { planId: task.planId },
       })
 
-      const completedCount = allTasks.filter(t => 
+      const completedCount = allTasks.filter(t =>
         t.id === taskId ? body.status === 'completed' : t.status === 'completed'
       ).length
 
       const totalTasks = allTasks.length
       const planUpdateData: any = {
         completedTasks: completedCount,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       }
 
       // Si todas las tareas están completadas y el plan está activo, marcarlo como completado
@@ -206,7 +199,7 @@ export async function PATCH(
         // Registrar en el historial del ticket
         await prisma.ticket_history.create({
           data: {
-            id: require('crypto').randomUUID(),
+            id: crypto.randomUUID(),
             ticketId: task.plan.ticketId,
             userId: session.user.id,
             action: 'resolution_plan_completed',
@@ -214,8 +207,8 @@ export async function PATCH(
             oldValue: 'active',
             newValue: 'completed',
             comment: `Plan de resolución completado: "${task.plan.title}". Todas las tareas (${totalTasks}) han sido finalizadas exitosamente.`,
-            createdAt: new Date()
-          }
+            createdAt: new Date(),
+          },
         })
 
         // Crear notificación para el cliente
@@ -237,19 +230,13 @@ export async function PATCH(
 
       await prisma.resolution_plans.update({
         where: { id: task.planId },
-        data: planUpdateData
+        data: planUpdateData,
       })
     }
 
     // Auditoría
     if (Object.keys(changes).length > 0) {
-      await auditTaskChange(
-        taskId,
-        task.planId,
-        session.user.id,
-        'updated',
-        changes
-      )
+      await auditTaskChange(taskId, task.planId, session.user.id, 'updated', changes)
     }
 
     return NextResponse.json({
@@ -269,9 +256,9 @@ export async function PATCH(
         completedAt: updatedTask.completedAt?.toISOString() || null,
         notes: updatedTask.notes,
         createdAt: updatedTask.createdAt.toISOString(),
-        updatedAt: updatedTask.updatedAt.toISOString()
+        updatedAt: updatedTask.updatedAt.toISOString(),
       },
-      message: 'Tarea actualizada exitosamente'
+      message: 'Tarea actualizada exitosamente',
     })
   } catch (error) {
     console.error('[API] Error in resolution task PATCH:', error)
@@ -279,7 +266,7 @@ export async function PATCH(
       {
         success: false,
         message: 'Error al actualizar la tarea',
-        error: error instanceof Error ? error.message : 'Error desconocido'
+        error: error instanceof Error ? error.message : 'Error desconocido',
       },
       { status: 500 }
     )
@@ -297,10 +284,7 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
-      return NextResponse.json(
-        { success: false, message: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
     }
 
     const { id: ticketId, taskId } = await params
@@ -311,17 +295,14 @@ export async function DELETE(
       include: {
         plan: {
           include: {
-            ticket: true
-          }
-        }
-      }
+            ticket: true,
+          },
+        },
+      },
     })
 
     if (!task) {
-      return NextResponse.json(
-        { success: false, message: 'Tarea no encontrada' },
-        { status: 404 }
-      )
+      return NextResponse.json({ success: false, message: 'Tarea no encontrada' }, { status: 404 })
     }
 
     // Verificar que la tarea pertenece al ticket correcto
@@ -334,9 +315,8 @@ export async function DELETE(
 
     // Verificar permisos
     const isAdmin = session.user.role === 'ADMIN'
-    const isAssignedTechnician = 
-      session.user.role === 'TECHNICIAN' && 
-      task.plan.ticket.assigneeId === session.user.id
+    const isAssignedTechnician =
+      session.user.role === 'TECHNICIAN' && task.plan.ticket.assigneeId === session.user.id
 
     if (!isAdmin && !isAssignedTechnician) {
       return NextResponse.json(
@@ -349,7 +329,7 @@ export async function DELETE(
 
     // Eliminar tarea
     await prisma.resolution_tasks.delete({
-      where: { id: taskId }
+      where: { id: taskId },
     })
 
     // Actualizar contadores en el plan
@@ -358,25 +338,19 @@ export async function DELETE(
       data: {
         totalTasks: { decrement: 1 },
         completedTasks: wasCompleted ? { decrement: 1 } : undefined,
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     })
 
     // Auditoría
-    await auditTaskChange(
-      taskId,
-      task.planId,
-      session.user.id,
-      'deleted',
-      {
-        title: task.title,
-        status: task.status
-      }
-    )
+    await auditTaskChange(taskId, task.planId, session.user.id, 'deleted', {
+      title: task.title,
+      status: task.status,
+    })
 
     return NextResponse.json({
       success: true,
-      message: 'Tarea eliminada exitosamente'
+      message: 'Tarea eliminada exitosamente',
     })
   } catch (error) {
     console.error('[API] Error in resolution task DELETE:', error)
@@ -384,7 +358,7 @@ export async function DELETE(
       {
         success: false,
         message: 'Error al eliminar la tarea',
-        error: error instanceof Error ? error.message : 'Error desconocido'
+        error: error instanceof Error ? error.message : 'Error desconocido',
       },
       { status: 500 }
     )

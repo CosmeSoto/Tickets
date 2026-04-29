@@ -36,12 +36,12 @@ import { getUploadDir } from '@/lib/upload-path'
 
 // ─── Constantes ────────────────────────────────────────────────────────────────
 
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024   // 10 MB por archivo
-const MAX_FILES_PER_TICKET = 10                 // máx archivos por ticket
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // 10 MB por archivo
+const MAX_FILES_PER_TICKET = 10 // máx archivos por ticket
 const MAX_STORAGE_PER_TICKET = 50 * 1024 * 1024 // 50 MB total por ticket
-const IMAGE_MAX_WIDTH = 1920                    // px — ancho máximo tras compresión
-const IMAGE_JPEG_QUALITY = 82                   // calidad JPEG (0-100)
-const IMAGE_WEBP_QUALITY = 85                   // calidad WebP (0-100)
+const IMAGE_MAX_WIDTH = 1920 // px — ancho máximo tras compresión
+const IMAGE_JPEG_QUALITY = 82 // calidad JPEG (0-100)
+const IMAGE_WEBP_QUALITY = 85 // calidad WebP (0-100)
 
 const ALLOWED_TYPES = [
   'image/jpeg',
@@ -93,7 +93,7 @@ async function compressImage(
   originalName: string
 ): Promise<{ buffer: Buffer; ext: string; compressed: boolean }> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
     const sharp = require('sharp') as typeof import('sharp')
 
     let pipeline = sharp(buffer).resize({
@@ -140,7 +140,8 @@ export class FileService {
     if (!ALLOWED_TYPES.includes(file.type)) {
       return {
         isValid: false,
-        error: 'Tipo de archivo no permitido. Se aceptan: imágenes, PDF, documentos Office y texto plano',
+        error:
+          'Tipo de archivo no permitido. Se aceptan: imágenes, PDF, documentos Office y texto plano',
       }
     }
 
@@ -242,9 +243,10 @@ export class FileService {
         ? Math.round((1 - finalBuffer.length / originalSize) * 100)
         : 0
 
-      const comment = compressed && savedPercent > 5
-        ? `Archivo subido: ${file.name} (comprimido ${savedPercent}%, ${FileService.formatFileSize(originalSize)} → ${FileService.formatFileSize(finalBuffer.length)})`
-        : `Archivo subido: ${file.name}`
+      const comment =
+        compressed && savedPercent > 5
+          ? `Archivo subido: ${file.name} (comprimido ${savedPercent}%, ${FileService.formatFileSize(originalSize)} → ${FileService.formatFileSize(finalBuffer.length)})`
+          : `Archivo subido: ${file.name}`
 
       await prisma.ticket_history.create({
         data: {
@@ -280,9 +282,7 @@ export class FileService {
     for (let i = 0; i < files.length; i += CONCURRENCY) {
       const batch = files.slice(i, i + CONCURRENCY)
       const batchResults = await Promise.allSettled(
-        batch.map((file) =>
-          this.uploadFile({ file, ticketId, uploadedBy, skipHistory: false })
-        )
+        batch.map(file => this.uploadFile({ file, ticketId, uploadedBy, skipHistory: false }))
       )
 
       for (let j = 0; j < batch.length; j++) {
@@ -322,7 +322,7 @@ export class FileService {
       orderBy: { createdAt: 'desc' },
     })
 
-    return attachments.map((a) => ({
+    return attachments.map(a => ({
       id: a.id,
       filename: a.filename,
       originalName: a.originalName,
@@ -395,7 +395,11 @@ export class FileService {
   static async downloadFile(fileId: string) {
     const attachment = await prisma.attachments.findUnique({ where: { id: fileId } })
     if (!attachment) throw new Error('Archivo no encontrado')
-    return { path: attachment.path, filename: attachment.originalName, mimeType: attachment.mimeType }
+    return {
+      path: attachment.path,
+      filename: attachment.originalName,
+      mimeType: attachment.mimeType,
+    }
   }
 
   static async getFile(fileId: string) {
@@ -403,7 +407,12 @@ export class FileService {
     if (!attachment) throw new Error('Archivo no encontrado')
 
     const buffer = await readFile(attachment.path)
-    return { buffer, filename: attachment.originalName, mimeType: attachment.mimeType, size: attachment.size }
+    return {
+      buffer,
+      filename: attachment.originalName,
+      mimeType: attachment.mimeType,
+      size: attachment.size,
+    }
   }
 
   // ── Utilidades ───────────────────────────────────────────────────────────────

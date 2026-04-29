@@ -13,7 +13,7 @@ export type SoftwareLicense = Prisma.software_licensesGetPayload<{
   }
 }>
 
-export type LicenseType = Prisma.license_typesGetPayload<{}>
+export type LicenseType = Prisma.license_typesGetPayload<Record<string, never>>
 
 export interface CreateLicenseData {
   name: string

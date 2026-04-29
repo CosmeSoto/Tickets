@@ -25,6 +25,7 @@ export function EquipmentQRCard({ qrCode, equipmentCode, onDownload }: Equipment
       <CardContent className='flex flex-col items-center gap-4'>
         {qrCode ? (
           <>
+            {/* eslint-disable-next-line @next/next/no-img-element -- QR code is a data URL, not a static asset */}
             <img src={qrCode} alt='QR Code' className='w-48 h-48' />
             <Button onClick={onDownload} variant='outline' size='sm'>
               <Download className='mr-2 h-4 w-4' />
