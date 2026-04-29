@@ -56,6 +56,7 @@ interface EditUserData {
 
 function UserModulesInfo({
   userId,
+  role,
   canManageInventory,
 }: {
   userId: string
@@ -82,6 +83,30 @@ function UserModulesInfo({
       })
       .catch(() => {})
   }, [userId, canManageInventory])
+
+  const noFamilies = !data || data.families.length === 0
+  const isTechOrClient = role === 'TECHNICIAN' || role === 'CLIENT'
+
+  // Para técnicos/clientes sin familias: mostrar advertencia con guía
+  if (noFamilies && isTechOrClient) {
+    return (
+      <div className='rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-3 space-y-2'>
+        <p className='text-xs font-medium text-amber-800 dark:text-amber-300 flex items-center gap-1.5'>
+          <AlertTriangle className='h-3.5 w-3.5' />
+          Sin familias asignadas — el usuario solo verá el Dashboard
+        </p>
+        <p className='text-xs text-amber-700 dark:text-amber-400'>
+          {role === 'TECHNICIAN'
+            ? 'Para que este técnico pueda atender tickets, asígnalo a una o más familias en:'
+            : 'Para que este cliente vea tickets e inventario, asígnalo a una familia en:'}
+        </p>
+        <p className='text-xs font-mono bg-amber-100 dark:bg-amber-900/40 rounded px-2 py-1 text-amber-900 dark:text-amber-200'>
+          Admin → Familias → [Familia] → Personal →{' '}
+          {role === 'TECHNICIAN' ? 'Técnicos de Tickets' : 'Gestores de Inventario'}
+        </p>
+      </div>
+    )
+  }
 
   if (!data || data.families.length === 0) return null
 
