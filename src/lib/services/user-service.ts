@@ -59,6 +59,9 @@ export interface UpdateUserData {
   phone?: string | null
   avatar?: string | null
   isActive?: boolean
+  canManageInventory?: boolean
+  ticketsEnabled?: boolean
+  inventoryEnabled?: boolean
   isSuperAdmin?: boolean
   assignedCategories?: {
     categoryId: string
@@ -367,8 +370,10 @@ export class UserService {
     if (data.phone !== undefined) updateData.phone = data.phone
     if (data.avatar !== undefined) updateData.avatar = data.avatar
     if (data.isActive !== undefined) updateData.isActive = data.isActive
-    if ((data as any).canManageInventory !== undefined)
-      updateData.canManageInventory = (data as any).canManageInventory
+    if (data.canManageInventory !== undefined)
+      updateData.canManageInventory = data.canManageInventory
+    if (data.ticketsEnabled !== undefined) updateData.ticketsEnabled = data.ticketsEnabled
+    if (data.inventoryEnabled !== undefined) updateData.inventoryEnabled = data.inventoryEnabled
     if (data.isSuperAdmin !== undefined) updateData.isSuperAdmin = data.isSuperAdmin
 
     // Manejar departmentId explícitamente

@@ -231,6 +231,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         })
       }
 
+      // Si cambian ticketsEnabled o inventoryEnabled, notificar para refrescar navegación
+      if (
+        validatedData.ticketsEnabled !== undefined ||
+        validatedData.inventoryEnabled !== undefined
+      ) {
+        NotificationEvents.emit(targetId, {
+          type: 'session_refresh',
+          reason: 'modules_changed',
+        })
+      }
+
       // Si cambia isSuperAdmin, registrar acción específica y notificar
       if (
         validatedData.isSuperAdmin !== undefined &&
