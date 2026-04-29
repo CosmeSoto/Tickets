@@ -18,6 +18,8 @@ const updateUserSchema = z.object({
   avatar: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
   canManageInventory: z.boolean().optional(),
+  ticketsEnabled: z.boolean().optional(),
+  inventoryEnabled: z.boolean().optional(),
   isSuperAdmin: z.boolean().optional(),
   assignedCategories: z
     .array(

@@ -35,17 +35,39 @@ export async function GET(request: Request) {
   let role = session.user.role
   let isSuperAdmin = (session.user as any).isSuperAdmin === true
   let canManageInventory = (session.user as any).canManageInventory === true
+  let ticketsEnabled = true
+  let inventoryEnabled = false
 
   if (targetUserId && targetUserId !== session.user.id) {
     const targetUser = await prisma.users.findUnique({
       where: { id: targetUserId },
-      select: { id: true, role: true, isSuperAdmin: true, canManageInventory: true },
+      select: {
+        id: true,
+        role: true,
+        isSuperAdmin: true,
+        canManageInventory: true,
+        ticketsEnabled: true,
+        inventoryEnabled: true,
+      },
     })
     if (!targetUser) return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
     userId = targetUser.id
     role = targetUser.role
     isSuperAdmin = targetUser.isSuperAdmin ?? false
     canManageInventory = targetUser.canManageInventory ?? false
+    ticketsEnabled = targetUser.ticketsEnabled ?? true
+    inventoryEnabled = targetUser.inventoryEnabled ?? false
+  } else {
+    // Cargar flags del usuario actual desde DB (la sesión puede estar desactualizada)
+    const currentUser = await prisma.users.findUnique({
+      where: { id: userId },
+      select: { ticketsEnabled: true, inventoryEnabled: true, canManageInventory: true },
+    })
+    if (currentUser) {
+      ticketsEnabled = currentUser.ticketsEnabled ?? true
+      inventoryEnabled = currentUser.inventoryEnabled ?? false
+      canManageInventory = currentUser.canManageInventory ?? false
+    }
   }
 
   const cacheKey = `user:modules:${userId}`
@@ -113,6 +135,15 @@ export async function GET(request: Request) {
     }
 
     if (familyIds.length === 0) {
+      // Para clientes con módulos explícitamente habilitados pero sin familias aún,
+      // devolver el estado correcto sin familias
+      if (role === 'CLIENT') {
+        return {
+          tickets: ticketsEnabled,
+          inventory: inventoryEnabled || canManageInventory,
+          families: [],
+        }
+      }
       return { tickets: false, inventory: false, families: [] }
     }
 
@@ -139,39 +170,42 @@ export async function GET(request: Request) {
       ...f,
       modules: {
         tickets: ticketMap.get(f.id) ?? false,
-        // Para técnicos sin canManageInventory: nunca mostrar inventario
-        // aunque la familia lo tenga activo
-        inventory: canManageInventory ? (invMap.get(f.id) ?? false) : false,
+        inventory: canManageInventory || inventoryEnabled ? (invMap.get(f.id) ?? false) : false,
       },
     }))
 
-    const hasTickets = enrichedFamilies.some(f => f.modules.tickets)
-
-    // Inventario visible según rol:
-    // - ADMIN: siempre (gestión global)
-    // - TECHNICIAN: solo si canManageInventory=true Y alguna familia lo tiene activo
-    // - CLIENT: si canManageInventory=true O tiene equipos asignados directamente
-    let hasInventory = false
+    // Módulo Tickets:
+    // - ADMIN: siempre
+    // - TECHNICIAN: si alguna familia asignada tiene ticketsEnabled=true
+    // - CLIENT: flag explícito ticketsEnabled (default true) O tiene familias con tickets
+    const familyHasTickets = enrichedFamilies.some(f => f.modules.tickets)
+    let resolvedTickets: boolean
     if (role === 'ADMIN') {
-      hasInventory = true
+      resolvedTickets = true
     } else if (role === 'TECHNICIAN') {
-      hasInventory = canManageInventory && enrichedFamilies.some(f => f.modules.inventory)
-    } else if (role === 'CLIENT') {
-      if (canManageInventory) {
-        hasInventory = enrichedFamilies.some(f => f.modules.inventory)
-      } else {
-        // Cliente sin gestor: ver "Mis Equipos" solo si tiene equipos asignados
-        const assignedCount = await prisma.equipment_assignments.count({
-          where: { receiverId: userId, isActive: true },
-        })
-        hasInventory = assignedCount > 0
-      }
+      resolvedTickets = familyHasTickets
+    } else {
+      // CLIENT: el flag explícito manda; si está desactivado, no ve tickets
+      resolvedTickets = ticketsEnabled && (familyHasTickets || ticketsEnabled)
     }
 
-    // ADMIN siempre ve tickets e inventario (gestión global)
+    // Módulo Inventario:
+    // - ADMIN: siempre
+    // - TECHNICIAN: solo si canManageInventory=true Y alguna familia lo tiene activo
+    // - CLIENT: flag explícito inventoryEnabled=true O canManageInventory=true
+    let resolvedInventory: boolean
+    if (role === 'ADMIN') {
+      resolvedInventory = true
+    } else if (role === 'TECHNICIAN') {
+      resolvedInventory = canManageInventory && enrichedFamilies.some(f => f.modules.inventory)
+    } else {
+      // CLIENT: inventoryEnabled o canManageInventory activan el módulo
+      resolvedInventory = inventoryEnabled || canManageInventory
+    }
+
     return {
-      tickets: role === 'ADMIN' ? true : hasTickets,
-      inventory: role === 'ADMIN' ? true : hasInventory,
+      tickets: resolvedTickets,
+      inventory: resolvedInventory,
       families: enrichedFamilies,
     }
   })

@@ -409,6 +409,8 @@ model users {
   isActive                                          Boolean                         @default(true)
   isEmailVerified                                   Boolean                         @default(false)
   canManageInventory                                Boolean                         @default(false)
+  ticketsEnabled                                    Boolean                         @default(true)
+  inventoryEnabled                                  Boolean                         @default(false)
   lastLogin                                         DateTime?
   oauthProvider                                     String?
   oauthId                                           String?
