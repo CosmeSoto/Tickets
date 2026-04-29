@@ -15,6 +15,8 @@ interface UseRoleProtectionOptions {
   allowedRoles: Role[]
   redirectTo?: string
   onUnauthorized?: () => void
+  /** Si es false, el hook no redirige (útil cuando se llaman múltiples hooks en paralelo) */
+  enabled?: boolean
 }
 
 interface UseRoleProtectionReturn {
@@ -27,17 +29,17 @@ interface UseRoleProtectionReturn {
 
 /**
  * Hook para proteger rutas según el rol del usuario
- * 
+ *
  * @example
  * ```tsx
  * function AdminPage() {
- *   const { isAuthorized, isLoading } = useRoleProtection({ 
- *     allowedRoles: ['ADMIN'] 
+ *   const { isAuthorized, isLoading } = useRoleProtection({
+ *     allowedRoles: ['ADMIN']
  *   })
- *   
+ *
  *   if (isLoading) return <Loading />
  *   if (!isAuthorized) return null // Ya redirigió
- *   
+ *
  *   return <div>Admin Content</div>
  * }
  * ```
@@ -46,6 +48,7 @@ export function useRoleProtection({
   allowedRoles,
   redirectTo = '/unauthorized',
   onUnauthorized,
+  enabled = true,
 }: UseRoleProtectionOptions): UseRoleProtectionReturn {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -55,6 +58,9 @@ export function useRoleProtection({
   const isLoading = status === 'loading'
 
   useEffect(() => {
+    // No redirigir si el hook está deshabilitado (llamado en paralelo con otros hooks)
+    if (!enabled) return
+
     // No hacer nada mientras está cargando
     if (status === 'loading') return
 
@@ -72,7 +78,7 @@ export function useRoleProtection({
       router.push(redirectTo)
       return
     }
-  }, [session, status, isAuthorized, router, redirectTo, onUnauthorized])
+  }, [enabled, session, status, isAuthorized, router, redirectTo, onUnauthorized])
 
   return {
     session,
@@ -86,22 +92,22 @@ export function useRoleProtection({
 /**
  * Hook simplificado para proteger rutas de admin
  */
-export function useAdminProtection() {
-  return useRoleProtection({ allowedRoles: ['ADMIN'] })
+export function useAdminProtection(enabled = true) {
+  return useRoleProtection({ allowedRoles: ['ADMIN'], enabled })
 }
 
 /**
  * Hook simplificado para proteger rutas de técnico
  */
-export function useTechnicianProtection() {
-  return useRoleProtection({ allowedRoles: ['TECHNICIAN', 'ADMIN'] })
+export function useTechnicianProtection(enabled = true) {
+  return useRoleProtection({ allowedRoles: ['TECHNICIAN', 'ADMIN'], enabled })
 }
 
 /**
  * Hook simplificado para proteger rutas de cliente
  */
-export function useClientProtection() {
-  return useRoleProtection({ allowedRoles: ['CLIENT'] })
+export function useClientProtection(enabled = true) {
+  return useRoleProtection({ allowedRoles: ['CLIENT'], enabled })
 }
 
 /**

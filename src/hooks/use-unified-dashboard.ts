@@ -39,9 +39,10 @@ export function useUnifiedDashboard({
   role,
 }: UseUnifiedDashboardOptions): UseUnifiedDashboardReturn {
   // Llamar todos los hooks incondicionalmente (regla de React Hooks)
-  const adminProtection = useAdminProtection()
-  const technicianProtection = useTechnicianProtection()
-  const clientProtection = useClientProtection()
+  // Solo el hook del rol activo tiene enabled=true para evitar redirects cruzados
+  const adminProtection = useAdminProtection(role === 'ADMIN')
+  const technicianProtection = useTechnicianProtection(role === 'TECHNICIAN')
+  const clientProtection = useClientProtection(role === 'CLIENT')
 
   // Seleccionar el resultado según el rol
   const protectionHook =

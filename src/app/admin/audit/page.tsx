@@ -60,7 +60,7 @@ export default function AuditPage() {
     return (
       <div className='flex items-center justify-center h-64'>
         <div className='text-center'>
-          <Loader2 className='animate-spin h-8 w-8 border-b-2 border-purple-600 mx-auto' />
+          <Loader2 className='animate-spin h-8 w-8 text-primary mx-auto' />
           <p className='mt-2 text-muted-foreground'>Cargando...</p>
         </div>
       </div>
