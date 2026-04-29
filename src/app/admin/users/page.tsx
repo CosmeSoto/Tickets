@@ -193,7 +193,7 @@ export default function AdminUsersPage() {
           : `"${userName}" ahora puede iniciar sesión en el sistema`,
         duration: 4000,
       })
-      refresh()
+      // No llamar refresh() — toggleUserStatus ya actualiza el estado local optimísticamente
     } else {
       toast({
         title: 'Error al cambiar estado',

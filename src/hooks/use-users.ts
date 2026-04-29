@@ -17,12 +17,14 @@ export interface UserData {
   email: string
   name: string
   role: UserRole
-  department?: string | {
-    id: string
-    name: string
-    color: string
-    description?: string
-  }
+  department?:
+    | string
+    | {
+        id: string
+        name: string
+        color: string
+        description?: string
+      }
   phone?: string
   avatar?: string
   isActive: boolean
@@ -94,58 +96,58 @@ interface UseUsersReturn {
 
 // Función para filtrar usuarios en memoria (como filterTechnicians)
 function filterUsers(users: UserData[], filters: UserFilters, currentUserId?: string) {
-  return users.map(user => ({
-    ...user,
-    canDelete: user.id !== currentUserId && 
-              (user._count?.tickets_tickets_assigneeIdTousers || 0) === 0
-  })).filter(user => {
-    // Búsqueda
-    if (filters.search) {
-      const searchLower = filters.search.toLowerCase()
-      const matchesSearch = 
-        user.name.toLowerCase().includes(searchLower) ||
-        user.email.toLowerCase().includes(searchLower) ||
-        (user.phone && user.phone.toLowerCase().includes(searchLower))
-      
-      if (!matchesSearch) return false
-    }
+  return users
+    .map(user => ({
+      ...user,
+      canDelete:
+        user.id !== currentUserId && (user._count?.tickets_tickets_assigneeIdTousers || 0) === 0,
+    }))
+    .filter(user => {
+      // Búsqueda
+      if (filters.search) {
+        const searchLower = filters.search.toLowerCase()
+        const matchesSearch =
+          user.name.toLowerCase().includes(searchLower) ||
+          user.email.toLowerCase().includes(searchLower) ||
+          (user.phone && user.phone.toLowerCase().includes(searchLower))
 
-    // Rol - solo filtrar si hay un rol específico seleccionado
-    if (filters.role && filters.role !== 'all') {
-      if (filters.role === 'SUPER_ADMIN') {
-        // Super Admin = ADMIN con isSuperAdmin=true
-        if (user.role !== 'ADMIN' || !user.isSuperAdmin) return false
-      } else if (filters.role === 'ADMIN') {
-        // Admin normal = ADMIN con isSuperAdmin=false (excluye super admins)
-        if (user.role !== 'ADMIN' || user.isSuperAdmin) return false
-      } else {
-        if (user.role !== filters.role) return false
+        if (!matchesSearch) return false
       }
-    }
 
-    // Estado - solo filtrar si hay un estado específico seleccionado
-    if (filters.isActive && filters.isActive !== 'all') {
-      const isActive = filters.isActive === 'true'
-      if (user.isActive !== isActive) return false
-    }
+      // Rol - solo filtrar si hay un rol específico seleccionado
+      if (filters.role && filters.role !== 'all') {
+        if (filters.role === 'SUPER_ADMIN') {
+          // Super Admin = ADMIN con isSuperAdmin=true
+          if (user.role !== 'ADMIN' || !user.isSuperAdmin) return false
+        } else if (filters.role === 'ADMIN') {
+          // Admin normal = ADMIN con isSuperAdmin=false (excluye super admins)
+          if (user.role !== 'ADMIN' || user.isSuperAdmin) return false
+        } else {
+          if (user.role !== filters.role) return false
+        }
+      }
 
-    // Departamento - solo filtrar si hay un departamento específico seleccionado
-    const departmentId = filters.departmentId || filters.department
-    if (departmentId && departmentId !== 'all') {
-      const userDeptId = typeof user.department === 'object' ? user.department?.id : user.department
-      // Si el usuario no tiene departamento, no coincide con ningún filtro de departamento
-      if (!userDeptId || userDeptId !== departmentId) return false
-    }
+      // Estado - solo filtrar si hay un estado específico seleccionado
+      if (filters.isActive && filters.isActive !== 'all') {
+        const isActive = filters.isActive === 'true'
+        if (user.isActive !== isActive) return false
+      }
 
-    return true
-  })
+      // Departamento - solo filtrar si hay un departamento específico seleccionado
+      const departmentId = filters.departmentId || filters.department
+      if (departmentId && departmentId !== 'all') {
+        const userDeptId =
+          typeof user.department === 'object' ? user.department?.id : user.department
+        // Si el usuario no tiene departamento, no coincide con ningún filtro de departamento
+        if (!userDeptId || userDeptId !== departmentId) return false
+      }
+
+      return true
+    })
 }
 
 export function useUsers(options: UseUsersOptions = {}): UseUsersReturn {
-  const {
-    initialFilters = {},
-    pageSize = 20
-  } = options
+  const { initialFilters = {}, pageSize = 20 } = options
 
   const { data: session } = useSession()
   const { toast } = useToast()
@@ -159,10 +161,10 @@ export function useUsers(options: UseUsersOptions = {}): UseUsersReturn {
     loading,
     error: moduleError,
     reload,
-    setData
+    setData,
   } = useModuleData<UserData>({
     endpoint: '/api/users',
-    initialLoad: true
+    initialLoad: true,
   })
 
   // Filtrar en MEMORIA (como técnicos)
@@ -172,7 +174,7 @@ export function useUsers(options: UseUsersOptions = {}): UseUsersReturn {
 
   // Paginación
   const pagination = usePagination(filteredUsers, {
-    pageSize
+    pageSize,
   })
 
   // Estadísticas
@@ -192,7 +194,7 @@ export function useUsers(options: UseUsersOptions = {}): UseUsersReturn {
     if (!moduleError) return null
     return {
       type: 'unknown',
-      message: moduleError
+      message: moduleError,
     }
   }, [moduleError])
 
@@ -212,7 +214,7 @@ export function useUsers(options: UseUsersOptions = {}): UseUsersReturn {
       if (response.ok && result.success) {
         toast({
           title: 'Éxito',
-          description: 'Usuario creado correctamente'
+          description: 'Usuario creado correctamente',
         })
         await reload()
         return true
@@ -220,7 +222,7 @@ export function useUsers(options: UseUsersOptions = {}): UseUsersReturn {
         toast({
           title: 'Error',
           description: result.error || 'No se pudo crear el usuario',
-          variant: 'destructive'
+          variant: 'destructive',
         })
         return false
       }
@@ -228,7 +230,7 @@ export function useUsers(options: UseUsersOptions = {}): UseUsersReturn {
       toast({
         title: 'Error',
         description: 'No se pudo conectar con el servidor',
-        variant: 'destructive'
+        variant: 'destructive',
       })
       return false
     }
@@ -250,7 +252,7 @@ export function useUsers(options: UseUsersOptions = {}): UseUsersReturn {
       if (response.ok && result.success) {
         toast({
           title: 'Éxito',
-          description: 'Usuario actualizado correctamente'
+          description: 'Usuario actualizado correctamente',
         })
         await reload()
         return true
@@ -258,7 +260,7 @@ export function useUsers(options: UseUsersOptions = {}): UseUsersReturn {
         toast({
           title: 'Error',
           description: result.error || 'No se pudo actualizar el usuario',
-          variant: 'destructive'
+          variant: 'destructive',
         })
         return false
       }
@@ -266,7 +268,7 @@ export function useUsers(options: UseUsersOptions = {}): UseUsersReturn {
       toast({
         title: 'Error',
         description: 'No se pudo conectar con el servidor',
-        variant: 'destructive'
+        variant: 'destructive',
       })
       return false
     }
@@ -284,7 +286,7 @@ export function useUsers(options: UseUsersOptions = {}): UseUsersReturn {
       if (response.ok && result.success) {
         toast({
           title: 'Éxito',
-          description: 'Usuario eliminado correctamente'
+          description: 'Usuario eliminado correctamente',
         })
         await reload()
         return true
@@ -292,7 +294,7 @@ export function useUsers(options: UseUsersOptions = {}): UseUsersReturn {
         toast({
           title: 'Error',
           description: result.error || 'No se pudo eliminar el usuario',
-          variant: 'destructive'
+          variant: 'destructive',
         })
         return false
       }
@@ -300,41 +302,46 @@ export function useUsers(options: UseUsersOptions = {}): UseUsersReturn {
       toast({
         title: 'Error',
         description: 'No se pudo conectar con el servidor',
-        variant: 'destructive'
+        variant: 'destructive',
       })
       return false
     }
   }
 
-  // Función para cambiar estado de usuario
+  // Función para cambiar estado de usuario — actualización optimista
   const toggleUserStatus = async (userId: string, currentStatus: boolean): Promise<boolean> => {
+    // 1. Actualizar estado local INMEDIATAMENTE (optimistic update)
+    setData(prev => prev.map(u => (u.id === userId ? { ...u, isActive: !currentStatus } : u)))
+
     try {
       const response = await fetch(`/api/users/${userId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isActive: !currentStatus }),
       })
 
       const result = await response.json()
 
       if (response.ok && result.success) {
-        await reload()
+        // Éxito — el estado local ya está actualizado, no hace falta reload
         return true
       } else {
+        // Revertir el cambio optimista si falló
+        setData(prev => prev.map(u => (u.id === userId ? { ...u, isActive: currentStatus } : u)))
         toast({
           title: 'Error',
           description: result.error || 'No se pudo cambiar el estado del usuario',
-          variant: 'destructive'
+          variant: 'destructive',
         })
         return false
       }
-    } catch (error) {
+    } catch {
+      // Revertir el cambio optimista si hubo error de red
+      setData(prev => prev.map(u => (u.id === userId ? { ...u, isActive: currentStatus } : u)))
       toast({
         title: 'Error',
         description: 'No se pudo conectar con el servidor',
-        variant: 'destructive'
+        variant: 'destructive',
       })
       return false
     }
@@ -343,9 +350,10 @@ export function useUsers(options: UseUsersOptions = {}): UseUsersReturn {
   // Funciones de utilidad
   const setFilters = useCallback((newFilters: Partial<UserFilters>) => {
     // Si newFilters está vacío o solo tiene valores 'all', limpiar todos los filtros
-    const hasOnlyDefaults = Object.keys(newFilters).length === 0 || 
+    const hasOnlyDefaults =
+      Object.keys(newFilters).length === 0 ||
       Object.values(newFilters).every(v => !v || v === 'all' || v === '')
-    
+
     if (hasOnlyDefaults) {
       setFiltersState({})
     } else {
@@ -366,9 +374,12 @@ export function useUsers(options: UseUsersOptions = {}): UseUsersReturn {
 
   const refresh = reload
 
-  const removeUserLocally = useCallback((userId: string) => {
-    setData(prev => prev.filter(u => u.id !== userId))
-  }, [setData])
+  const removeUserLocally = useCallback(
+    (userId: string) => {
+      setData(prev => prev.filter(u => u.id !== userId))
+    },
+    [setData]
+  )
 
   const goToPage = (page: number) => {
     if (page !== pagination.currentPage && page >= 1 && page <= pagination.totalPages) {
@@ -378,9 +389,7 @@ export function useUsers(options: UseUsersOptions = {}): UseUsersReturn {
 
   // Computed values
   const hasActiveFilters = useMemo(() => {
-    return Object.values(filters).some(value => 
-      value && value.toString().trim() && value !== 'all'
-    )
+    return Object.values(filters).some(value => value && value.toString().trim() && value !== 'all')
   }, [filters])
 
   // Paginación info
@@ -388,7 +397,7 @@ export function useUsers(options: UseUsersOptions = {}): UseUsersReturn {
     page: pagination.currentPage,
     limit: pagination.pageSize,
     total: filteredUsers.length,
-    totalPages: pagination.totalPages
+    totalPages: pagination.totalPages,
   }
 
   return {
@@ -407,7 +416,7 @@ export function useUsers(options: UseUsersOptions = {}): UseUsersReturn {
     updateUser,
     deleteUser,
     toggleUserStatus,
-    removeUserLocally
+    removeUserLocally,
   }
 }
 
