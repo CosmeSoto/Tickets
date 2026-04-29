@@ -130,6 +130,8 @@ export async function GET(request: NextRequest) {
         avatar: true,
         isActive: true,
         canManageInventory: true,
+        ticketsEnabled: true,
+        inventoryEnabled: true,
         isSuperAdmin: true,
         createdAt: true,
         lastLogin: true,

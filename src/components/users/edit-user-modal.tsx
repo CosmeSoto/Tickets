@@ -31,6 +31,11 @@ import { USER_ROLE_FORM_OPTIONS, type UserRole } from '@/lib/constants/user-cons
 import { DepartmentSelector } from '@/components/ui/department-selector'
 import { Switch } from '@/components/ui/switch'
 import { extractApiError, extractCatchError } from '@/lib/utils/api-error'
+import {
+  useSystemModules,
+  getModuleRoleDescription,
+  getModuleEmoji,
+} from '@/hooks/use-system-modules'
 
 interface EditUserModalProps {
   isOpen: boolean
@@ -60,10 +65,14 @@ function UserModulesPanel({
   userId,
   role,
   canManageInventory,
+  ticketsEnabled,
+  inventoryEnabled,
 }: {
   userId: string
   role: string
   canManageInventory: boolean
+  ticketsEnabled?: boolean
+  inventoryEnabled?: boolean
 }) {
   const [data, setData] = useState<{
     tickets: boolean
@@ -85,7 +94,7 @@ function UserModulesPanel({
       .then(d => setData(d))
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [userId, canManageInventory])
+  }, [userId, canManageInventory, ticketsEnabled, inventoryEnabled])
 
   if (loading) {
     return (
@@ -465,6 +474,7 @@ export function EditUserModal({
   }
 
   const isCurrentUser = user?.id === session?.user?.id
+  const { modules: systemModules } = useSystemModules()
   const formatDate = (dateString?: string) =>
     dateString
       ? new Date(dateString).toLocaleDateString('es-ES', {
@@ -746,8 +756,8 @@ export function EditUserModal({
               )}
             </div>
 
-            {/* ── Módulos visibles — solo para no-ADMIN ── */}
-            {formData.role !== 'ADMIN' && (
+            {/* ── Módulos visibles — generado dinámicamente desde system_modules ── */}
+            {formData.role !== 'ADMIN' && systemModules.length > 0 && (
               <div className='space-y-2'>
                 <p className='text-xs font-semibold text-muted-foreground uppercase tracking-wide pt-1'>
                   Módulos visibles
@@ -756,70 +766,68 @@ export function EditUserModal({
                   Controla qué secciones aparecen en la navegación de este usuario.
                 </p>
 
-                {/* Módulo Tickets */}
-                <div className='flex items-center justify-between rounded-lg border px-3 py-2.5'>
-                  <div className='flex items-center gap-2.5'>
-                    <span className='text-base'>🎫</span>
-                    <div>
-                      <p className='text-sm font-medium'>Módulo de Tickets</p>
-                      <p className='text-xs text-muted-foreground'>
-                        {formData.role === 'TECHNICIAN'
-                          ? 'Ver y atender tickets asignados a sus familias'
-                          : 'Crear y seguir sus propios tickets de soporte'}
-                      </p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={formData.ticketsEnabled}
-                    onCheckedChange={v => setFormData(p => ({ ...p, ticketsEnabled: v }))}
-                  />
-                </div>
+                {systemModules.map(mod => {
+                  // Determinar si el módulo está activo para este usuario
+                  const isEnabled = (() => {
+                    if (mod.key === 'tickets') return formData.ticketsEnabled
+                    if (mod.key === 'inventory')
+                      return formData.inventoryEnabled || formData.canManageInventory
+                    // Módulos futuros: leer de formData.moduleFlags[mod.key] cuando exista
+                    return false
+                  })()
 
-                {/* Módulo Inventario */}
-                <div className='flex items-center justify-between rounded-lg border px-3 py-2.5'>
-                  <div className='flex items-center gap-2.5'>
-                    <span className='text-base'>📦</span>
-                    <div>
-                      <p className='text-sm font-medium'>Módulo de Inventario</p>
-                      <p className='text-xs text-muted-foreground'>
-                        {formData.role === 'TECHNICIAN'
-                          ? 'Ver y gestionar activos de sus familias asignadas'
-                          : 'Ver sus equipos asignados y solicitar mantenimientos'}
-                      </p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={formData.inventoryEnabled || formData.canManageInventory}
-                    onCheckedChange={v =>
+                  const handleToggle = (v: boolean) => {
+                    if (mod.key === 'tickets') {
+                      setFormData(p => ({ ...p, ticketsEnabled: v }))
+                    } else if (mod.key === 'inventory') {
                       setFormData(p => ({
                         ...p,
                         inventoryEnabled: v,
-                        // Si se activa inventario para técnico, también activar canManageInventory
+                        // Para técnicos: activar inventario implica activar canManageInventory
                         canManageInventory:
                           formData.role === 'TECHNICIAN' ? v : p.canManageInventory,
                       }))
                     }
-                  />
-                </div>
+                    // Módulos futuros: setFormData(p => ({ ...p, moduleFlags: { ...p.moduleFlags, [mod.key]: v } }))
+                  }
 
-                {/* Gestor de Inventario — sub-opción cuando inventario está activo */}
-                {(formData.inventoryEnabled || formData.canManageInventory) &&
-                  formData.role !== 'CLIENT' && (
-                    <div className='flex items-center justify-between rounded-lg border border-dashed px-3 py-2.5 ml-4'>
-                      <div>
-                        <p className='text-sm font-medium text-muted-foreground'>
-                          Gestión completa de inventario
-                        </p>
-                        <p className='text-xs text-muted-foreground'>
-                          Puede crear, editar y configurar activos (no solo verlos)
-                        </p>
+                  return (
+                    <div key={mod.key}>
+                      <div className='flex items-center justify-between rounded-lg border px-3 py-2.5'>
+                        <div className='flex items-center gap-2.5'>
+                          <span className='text-base'>{getModuleEmoji(mod.key)}</span>
+                          <div>
+                            <p className='text-sm font-medium'>{mod.name}</p>
+                            <p className='text-xs text-muted-foreground'>
+                              {getModuleRoleDescription(mod.key, formData.role)}
+                            </p>
+                          </div>
+                        </div>
+                        <Switch checked={isEnabled} onCheckedChange={handleToggle} />
                       </div>
-                      <Switch
-                        checked={formData.canManageInventory}
-                        onCheckedChange={v => setFormData(p => ({ ...p, canManageInventory: v }))}
-                      />
+
+                      {/* Sub-opción: gestión completa (solo para módulos con requiresManager) */}
+                      {mod.requiresManager && isEnabled && formData.role !== 'CLIENT' && (
+                        <div className='flex items-center justify-between rounded-lg border border-dashed px-3 py-2.5 ml-4 mt-1'>
+                          <div>
+                            <p className='text-sm font-medium text-muted-foreground'>
+                              Gestión completa
+                            </p>
+                            <p className='text-xs text-muted-foreground'>
+                              Puede crear, editar y configurar activos (no solo verlos)
+                            </p>
+                          </div>
+                          <Switch
+                            checked={formData.canManageInventory}
+                            onCheckedChange={v =>
+                              setFormData(p => ({ ...p, canManageInventory: v }))
+                            }
+                          />
+                        </div>
+                      )}
                     </div>
-                  )}
+                  )
+                })}
               </div>
             )}
 
@@ -829,6 +837,8 @@ export function EditUserModal({
                 userId={user.id}
                 role={formData.role}
                 canManageInventory={formData.canManageInventory}
+                ticketsEnabled={formData.ticketsEnabled}
+                inventoryEnabled={formData.inventoryEnabled}
               />
             )}
           </div>

@@ -397,6 +397,25 @@ model email_queue {
   @@index([toEmail])
 }
 
+/// Catálogo de módulos del sistema — define qué módulos existen y sus defaults por rol
+model system_modules {
+  key              String   @id                    // 'tickets' | 'inventory' | 'contracts' | ...
+  name             String                          // 'Tickets de Soporte'
+  description      String?                         // Descripción para el admin
+  icon             String?                         // Nombre del icono lucide
+  isActive         Boolean  @default(true)         // El módulo está disponible en el sistema
+  order            Int      @default(0)            // Orden de aparición en la UI
+  defaultForAdmin  Boolean  @default(true)         // ADMINs lo tienen por defecto
+  defaultForTech   Boolean  @default(false)        // TECHNICIANs lo tienen por defecto
+  defaultForClient Boolean  @default(false)        // CLIENTs lo tienen por defecto
+  requiresManager  Boolean  @default(false)        // Requiere canManageInventory para gestión completa
+  familyScoped     Boolean  @default(true)         // Se activa/desactiva por familia también
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([isActive, order])
+}
+
 model users {
   id                                                String                          @id
   email                                             String                          @unique
