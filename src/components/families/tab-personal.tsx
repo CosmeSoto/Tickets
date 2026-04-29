@@ -44,57 +44,15 @@ export function TabPersonal({
   onPersonnelChanged,
 }: TabPersonalProps) {
   return (
-    <div className="space-y-8">
-
-      {/* ── Sección 1: Técnicos de esta familia ── */}
-      <div className="space-y-3">
+    <div className='space-y-8'>
+      {/* ── Sección 1: Administradores asignados a esta familia ── */}
+      <div className='space-y-3'>
         <div>
-          <h3 className="text-sm font-semibold">Técnicos de Tickets</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Técnicos del sistema que atienden tickets de <strong>esta familia</strong>.
-            Solo los técnicos asignados aquí reciben tickets de esta familia.
-          </p>
-        </div>
-        <TechnicianFamilyAssignment
-          mode="by-family"
-          familyId={familyId}
-          assignedTechnicians={technicians}
-          onChanged={onPersonnelChanged}
-        />
-        <div className="flex items-center gap-2 pt-1">
-          <span className="text-xs text-muted-foreground">¿Necesitas crear o editar un técnico?</span>
-          <TechnicianManagementPanel onChanged={onPersonnelChanged} />
-        </div>
-      </div>
-
-      {/* ── Sección 2: Gestores de inventario de esta familia ── */}
-      <div className="space-y-3">
-        <div>
-          <h3 className="text-sm font-semibold">Gestores de Inventario</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Usuarios que pueden gestionar los activos de inventario de <strong>esta familia</strong>.
-          </p>
-        </div>
-        <ManagerFamilyAssignment
-          mode="by-family"
-          familyId={familyId}
-          assignedManagers={managers}
-          onChanged={onPersonnelChanged}
-        />
-        <div className="flex items-center gap-2 pt-1">
-          <span className="text-xs text-muted-foreground">¿Necesitas ver todos los gestores del sistema?</span>
-          <InventoryManagerPanel onChanged={onPersonnelChanged} />
-        </div>
-      </div>
-
-      {/* ── Sección 3: Administradores asignados a esta familia ── */}
-      <div className="space-y-3">
-        <div>
-          <h3 className="text-sm font-semibold">Administradores de Familia</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Administradores con acceso <strong>restringido a esta familia</strong>.
-            Pueden gestionar sus técnicos y colaboradores dentro de esta familia,
-            pero no tienen acceso a otras familias ni a la configuración global del sistema.
+          <h3 className='text-sm font-semibold'>Administradores de Familia</h3>
+          <p className='text-xs text-muted-foreground mt-0.5'>
+            Administradores con acceso <strong>restringido a esta familia</strong>. Pueden gestionar
+            sus técnicos y colaboradores dentro de esta familia, pero no tienen acceso a otras
+            familias ni a la configuración global del sistema.
           </p>
         </div>
         <AdminFamilyAssignment
@@ -105,6 +63,51 @@ export function TabPersonal({
         />
       </div>
 
+      {/* ── Sección 2: Técnicos de esta familia ── */}
+      <div className='space-y-3'>
+        <div>
+          <h3 className='text-sm font-semibold'>Técnicos de Tickets</h3>
+          <p className='text-xs text-muted-foreground mt-0.5'>
+            Técnicos del sistema que atienden tickets de <strong>esta familia</strong>. Solo los
+            técnicos asignados aquí reciben tickets de esta familia.
+          </p>
+        </div>
+        <TechnicianFamilyAssignment
+          mode='by-family'
+          familyId={familyId}
+          assignedTechnicians={technicians}
+          onChanged={onPersonnelChanged}
+        />
+        <div className='flex items-center gap-2 pt-1'>
+          <span className='text-xs text-muted-foreground'>
+            ¿Necesitas crear o editar un técnico?
+          </span>
+          <TechnicianManagementPanel onChanged={onPersonnelChanged} />
+        </div>
+      </div>
+
+      {/* ── Sección 3: Gestores de inventario de esta familia ── */}
+      <div className='space-y-3'>
+        <div>
+          <h3 className='text-sm font-semibold'>Gestores de Inventario</h3>
+          <p className='text-xs text-muted-foreground mt-0.5'>
+            Usuarios que pueden gestionar los activos de inventario de <strong>esta familia</strong>
+            . Solo aplica si el módulo de inventario está habilitado para esta familia.
+          </p>
+        </div>
+        <ManagerFamilyAssignment
+          mode='by-family'
+          familyId={familyId}
+          assignedManagers={managers}
+          onChanged={onPersonnelChanged}
+        />
+        <div className='flex items-center gap-2 pt-1'>
+          <span className='text-xs text-muted-foreground'>
+            ¿Necesitas ver todos los gestores del sistema?
+          </span>
+          <InventoryManagerPanel onChanged={onPersonnelChanged} />
+        </div>
+      </div>
     </div>
   )
 }
