@@ -61,6 +61,109 @@ interface EditUserData {
 
 // ── Panel de módulos del usuario ─────────────────────────────────────────
 
+function ModuleStatusCard({
+  emoji,
+  name,
+  active,
+  families,
+  guide,
+  badge,
+}: {
+  emoji: string
+  name: string
+  active: boolean
+  families?: Array<{ id: string; name: string; color?: string | null }>
+  guide?: { steps: string[]; type: 'warning' | 'info' } | null
+  badge?: string
+}) {
+  return (
+    <div
+      className={`rounded-lg border p-2.5 space-y-1.5 ${
+        active
+          ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800'
+          : 'bg-muted/30 border-border'
+      }`}
+    >
+      {/* Header */}
+      <div className='flex items-center justify-between'>
+        <div className='flex items-center gap-1.5'>
+          <span className='text-sm'>{emoji}</span>
+          <span className='text-xs font-semibold text-foreground'>{name}</span>
+          {badge && (
+            <span className='text-[9px] px-1.5 py-0.5 rounded-full bg-muted border text-muted-foreground font-medium'>
+              {badge}
+            </span>
+          )}
+        </div>
+        <span
+          className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+            active
+              ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+              : 'bg-muted text-muted-foreground'
+          }`}
+        >
+          {active ? '● Activo' : '○ Inactivo'}
+        </span>
+      </div>
+
+      {/* Familias activas — chips compactos */}
+      {active && families && families.length > 0 && (
+        <div className='flex flex-wrap gap-1'>
+          {families.map(f => (
+            <span
+              key={f.id}
+              className='inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-background border font-medium'
+            >
+              {f.color && (
+                <span
+                  className='w-1.5 h-1.5 rounded-full flex-shrink-0'
+                  style={{ backgroundColor: f.color }}
+                />
+              )}
+              {f.name}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Guía numerada — solo cuando inactivo */}
+      {!active && guide && (
+        <div
+          className={`rounded-md px-2 py-1.5 space-y-1 ${
+            guide.type === 'warning'
+              ? 'bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800'
+              : 'bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800'
+          }`}
+        >
+          <p
+            className={`text-[9px] font-bold uppercase tracking-wider ${
+              guide.type === 'warning'
+                ? 'text-amber-600 dark:text-amber-400'
+                : 'text-blue-600 dark:text-blue-400'
+            }`}
+          >
+            Cómo activar
+          </p>
+          <ol className='space-y-0.5'>
+            {guide.steps.map((step, i) => (
+              <li key={i} className='flex items-start gap-1'>
+                <span
+                  className={`text-[10px] font-bold flex-shrink-0 ${
+                    guide.type === 'warning' ? 'text-amber-500' : 'text-blue-500'
+                  }`}
+                >
+                  {i + 1}.
+                </span>
+                <span className='text-[11px] text-foreground leading-tight'>{step}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function UserModulesPanel({
   userId,
   role,
@@ -86,166 +189,152 @@ function UserModulesPanel({
     }>
   } | null>(null)
   const [loading, setLoading] = useState(true)
+  const [expanded, setExpanded] = useState(false)
 
   useEffect(() => {
     setLoading(true)
     fetch(`/api/user/modules?userId=${userId}`)
       .then(r => (r.ok ? r.json() : null))
-      .then(d => setData(d))
+      .then(d => {
+        setData(d)
+        // Auto-expandir si hay módulos inactivos (hay algo que mostrar)
+        if (d && (!d.tickets || !d.inventory)) setExpanded(true)
+      })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [userId, canManageInventory, ticketsEnabled, inventoryEnabled])
 
-  if (loading) {
-    return (
-      <div className='rounded-lg border bg-muted/30 p-3'>
-        <p className='text-xs text-muted-foreground'>Cargando módulos...</p>
-      </div>
-    )
-  }
-
-  const isTechOrClient = role === 'TECHNICIAN' || role === 'CLIENT'
   const isAdminRole = role === 'ADMIN'
   const hasFamilies = data && data.families.length > 0
-
-  // ── Determinar estado y guía de cada módulo ──
   const ticketsActive = data?.tickets ?? false
   const inventoryActive = data?.inventory ?? false
+  const allActive =
+    ticketsActive && (role === 'CLIENT' ? inventoryActive || true : inventoryActive || !isAdminRole)
 
   const getTicketsGuide = () => {
     if (ticketsActive) return null
     if (isAdminRole)
-      return 'Asigna este admin a una familia con tickets activos en: Admin → Familias → [Familia] → Personal → Administradores'
-    if (role === 'TECHNICIAN') {
+      return {
+        type: 'info' as const,
+        steps: ['Admin → Familias → [Familia]', 'Personal → Administradores → Agregar'],
+      }
+    if (role === 'TECHNICIAN')
       return hasFamilies
-        ? 'La familia asignada no tiene el módulo de Tickets activo. Actívalo en: Admin → Configuración → Tickets → [Familia]'
-        : 'Asigna este técnico a una familia en: Admin → Familias → [Familia] → Personal → Técnicos de Tickets'
-    }
-    if (role === 'CLIENT') {
-      return 'El cliente verá Tickets cuando tenga tickets creados en una familia con el módulo activo.'
-    }
-    return null
+        ? {
+            type: 'warning' as const,
+            steps: ['Admin → Configuración → Tickets', 'Seleccionar familia → Activar módulo'],
+          }
+        : {
+            type: 'warning' as const,
+            steps: ['Admin → Familias → [Familia]', 'Personal → Técnicos de Tickets → Agregar'],
+          }
+    return { type: 'info' as const, steps: ['Activar el toggle "Tickets" en la sección anterior'] }
   }
 
   const getInventoryGuide = () => {
     if (inventoryActive) return null
     if (isAdminRole)
-      return 'Asigna este admin a una familia con inventario activo en: Admin → Familias → [Familia] → Personal → Administradores'
+      return {
+        type: 'info' as const,
+        steps: ['Admin → Familias → [Familia]', 'Personal → Administradores → Agregar'],
+      }
     if (role === 'TECHNICIAN') {
       if (!canManageInventory)
-        return 'Activa "Gestor de Inventario" arriba y asígnalo en: Admin → Familias → [Familia] → Personal → Gestores de Inventario'
+        return {
+          type: 'warning' as const,
+          steps: [
+            'Activar "Inventario" en la sección anterior',
+            'Admin → Familias → [Familia]',
+            'Personal → Gestores de Inventario → Agregar',
+          ],
+        }
       return hasFamilies
-        ? 'La familia asignada no tiene el módulo de Inventario activo. Actívalo en: Admin → Configuración → Inventario → [Familia]'
-        : 'Asigna este técnico como gestor en: Admin → Familias → [Familia] → Personal → Gestores de Inventario'
+        ? {
+            type: 'warning' as const,
+            steps: ['Admin → Configuración → Inventario', 'Seleccionar familia → Activar módulo'],
+          }
+        : {
+            type: 'warning' as const,
+            steps: ['Admin → Familias → [Familia]', 'Personal → Gestores de Inventario → Agregar'],
+          }
     }
-    if (role === 'CLIENT') {
-      if (!canManageInventory)
-        return 'Activa "Gestor de Inventario" arriba, o asigna un equipo a este cliente desde el módulo de Inventario.'
-      return 'Asigna este cliente como gestor en: Admin → Familias → [Familia] → Personal → Gestores de Inventario'
+    return {
+      type: 'info' as const,
+      steps: ['Activar el toggle "Inventario" en la sección anterior'],
     }
-    return null
   }
 
-  const ticketsGuide = getTicketsGuide()
-  const inventoryGuide = getInventoryGuide()
+  if (loading) {
+    return (
+      <div className='flex items-center gap-2 py-1'>
+        <div className='w-2 h-2 rounded-full bg-muted-foreground/30 animate-pulse' />
+        <p className='text-[11px] text-muted-foreground'>Verificando acceso...</p>
+      </div>
+    )
+  }
 
   return (
-    <div className='rounded-lg border bg-muted/30 p-3 space-y-3'>
-      <p className='text-xs font-semibold text-foreground flex items-center gap-1.5'>
-        <Activity className='h-3.5 w-3.5 text-muted-foreground' />
-        Módulos activos
-      </p>
-
-      {/* Módulo Tickets */}
-      <div
-        className={`flex items-start gap-2.5 p-2.5 rounded-md border ${ticketsActive ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800' : 'bg-muted/50 border-border'}`}
+    <div className='rounded-lg border overflow-hidden'>
+      {/* Header colapsable */}
+      <button
+        type='button'
+        onClick={() => setExpanded(v => !v)}
+        className='w-full flex items-center justify-between px-3 py-2 bg-muted/30 hover:bg-muted/50 transition-colors'
       >
-        <span className='text-base mt-0.5'>🎫</span>
-        <div className='flex-1 min-w-0'>
-          <div className='flex items-center gap-2'>
-            <span className='text-xs font-medium'>Tickets</span>
-            <Badge
-              variant={ticketsActive ? 'default' : 'secondary'}
-              className='text-[10px] h-4 px-1.5'
+        <div className='flex items-center gap-2'>
+          <Activity className='h-3.5 w-3.5 text-muted-foreground' />
+          <span className='text-xs font-semibold text-foreground'>Estado de acceso</span>
+          {/* Resumen compacto de módulos */}
+          <div className='flex items-center gap-1'>
+            <span
+              className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                ticketsActive
+                  ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+                  : 'bg-muted text-muted-foreground'
+              }`}
             >
-              {ticketsActive ? 'Activo' : 'Inactivo'}
-            </Badge>
+              🎫 {ticketsActive ? 'ON' : 'OFF'}
+            </span>
+            <span
+              className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                inventoryActive
+                  ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+                  : 'bg-muted text-muted-foreground'
+              }`}
+            >
+              📦 {inventoryActive ? 'ON' : 'OFF'}
+            </span>
           </div>
-          {ticketsGuide && (
-            <p className='text-[11px] text-amber-700 dark:text-amber-400 mt-1 leading-tight'>
-              ↳ {ticketsGuide}
-            </p>
-          )}
-          {ticketsActive && hasFamilies && (
-            <div className='flex flex-wrap gap-1 mt-1'>
-              {data!.families
-                .filter(f => f.modules.tickets)
-                .map(f => (
-                  <span
-                    key={f.id}
-                    className='inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-background border'
-                  >
-                    {f.color && (
-                      <span
-                        className='w-1.5 h-1.5 rounded-full'
-                        style={{ backgroundColor: f.color }}
-                      />
-                    )}
-                    {f.name}
-                  </span>
-                ))}
-            </div>
-          )}
         </div>
-      </div>
-
-      {/* Módulo Inventario */}
-      {(isTechOrClient || isAdminRole) && (
-        <div
-          className={`flex items-start gap-2.5 p-2.5 rounded-md border ${inventoryActive ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800' : 'bg-muted/50 border-border'}`}
+        <svg
+          className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`}
+          viewBox='0 0 24 24'
+          fill='none'
+          stroke='currentColor'
+          strokeWidth='2'
         >
-          <span className='text-base mt-0.5'>📦</span>
-          <div className='flex-1 min-w-0'>
-            <div className='flex items-center gap-2'>
-              <span className='text-xs font-medium'>Inventario</span>
-              <Badge
-                variant={inventoryActive ? 'default' : 'secondary'}
-                className='text-[10px] h-4 px-1.5'
-              >
-                {inventoryActive ? 'Activo' : 'Inactivo'}
-              </Badge>
-              {role === 'TECHNICIAN' && !canManageInventory && (
-                <Badge variant='outline' className='text-[10px] h-4 px-1.5 text-muted-foreground'>
-                  Requiere Gestor
-                </Badge>
-              )}
-            </div>
-            {inventoryGuide && (
-              <p className='text-[11px] text-amber-700 dark:text-amber-400 mt-1 leading-tight'>
-                ↳ {inventoryGuide}
-              </p>
-            )}
-            {inventoryActive && hasFamilies && (
-              <div className='flex flex-wrap gap-1 mt-1'>
-                {data!.families
-                  .filter(f => f.modules.inventory)
-                  .map(f => (
-                    <span
-                      key={f.id}
-                      className='inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-background border'
-                    >
-                      {f.color && (
-                        <span
-                          className='w-1.5 h-1.5 rounded-full'
-                          style={{ backgroundColor: f.color }}
-                        />
-                      )}
-                      {f.name}
-                    </span>
-                  ))}
-              </div>
-            )}
-          </div>
+          <path d='M6 9l6 6 6-6' strokeLinecap='round' strokeLinejoin='round' />
+        </svg>
+      </button>
+
+      {/* Contenido expandible */}
+      {expanded && (
+        <div className='p-2.5 space-y-2 border-t'>
+          <ModuleStatusCard
+            emoji='🎫'
+            name='Tickets'
+            active={ticketsActive}
+            families={data?.families.filter(f => f.modules.tickets)}
+            guide={getTicketsGuide()}
+          />
+          <ModuleStatusCard
+            emoji='📦'
+            name='Inventario'
+            active={inventoryActive}
+            families={data?.families.filter(f => f.modules.inventory)}
+            guide={getInventoryGuide()}
+            badge={role === 'TECHNICIAN' && !canManageInventory ? 'Requiere Gestor' : undefined}
+          />
         </div>
       )}
     </div>
@@ -778,82 +867,122 @@ export function EditUserModal({
               )}
             </div>
 
-            {/* ── Módulos visibles — generado dinámicamente desde system_modules ── */}
+            {/* ── Módulos — grid escalable, funciona con 2 o 10 módulos ── */}
             {formData.role !== 'ADMIN' && systemModules.length > 0 && (
-              <div className='space-y-2'>
-                <p className='text-xs font-semibold text-muted-foreground uppercase tracking-wide pt-1'>
-                  Módulos visibles
-                </p>
-                <p className='text-xs text-muted-foreground -mt-1'>
-                  Controla qué secciones aparecen en la navegación de este usuario.
+              <div className='space-y-2 pt-1'>
+                <p className='text-xs font-semibold text-muted-foreground uppercase tracking-wide'>
+                  Acceso a módulos
                 </p>
 
-                {systemModules.map(mod => {
-                  // Determinar si el módulo está activo para este usuario
-                  const isEnabled = (() => {
-                    if (mod.key === 'tickets') return formData.ticketsEnabled
-                    if (mod.key === 'inventory')
-                      return formData.inventoryEnabled || formData.canManageInventory
-                    // Módulos futuros: leer de formData.moduleFlags[mod.key] cuando exista
-                    return false
-                  })()
+                {/* Grid 2 columnas — escala bien con más módulos */}
+                <div className='grid grid-cols-2 gap-2'>
+                  {systemModules.map(mod => {
+                    const isEnabled = (() => {
+                      if (mod.key === 'tickets') return formData.ticketsEnabled
+                      if (mod.key === 'inventory')
+                        return formData.inventoryEnabled || formData.canManageInventory
+                      return false
+                    })()
 
-                  const handleToggle = (v: boolean) => {
-                    if (mod.key === 'tickets') {
-                      setFormData(p => ({ ...p, ticketsEnabled: v }))
-                    } else if (mod.key === 'inventory') {
-                      setFormData(p => ({
-                        ...p,
-                        inventoryEnabled: v,
-                        // Para técnicos: activar inventario implica activar canManageInventory
-                        canManageInventory:
-                          formData.role === 'TECHNICIAN' ? v : p.canManageInventory,
-                      }))
+                    const handleToggle = (v: boolean) => {
+                      if (mod.key === 'tickets') {
+                        setFormData(p => ({ ...p, ticketsEnabled: v }))
+                      } else if (mod.key === 'inventory') {
+                        setFormData(p => ({
+                          ...p,
+                          inventoryEnabled: v,
+                          canManageInventory:
+                            formData.role === 'TECHNICIAN' ? v : p.canManageInventory,
+                        }))
+                      }
                     }
-                    // Módulos futuros: setFormData(p => ({ ...p, moduleFlags: { ...p.moduleFlags, [mod.key]: v } }))
-                  }
 
-                  return (
-                    <div key={mod.key}>
-                      <div className='flex items-center justify-between rounded-lg border px-3 py-2.5'>
-                        <div className='flex items-center gap-2.5'>
-                          <span className='text-base'>{getModuleEmoji(mod.key)}</span>
-                          <div>
-                            <p className='text-sm font-medium'>{mod.name}</p>
-                            <p className='text-xs text-muted-foreground'>
-                              {getModuleRoleDescription(mod.key, formData.role)}
-                            </p>
+                    return (
+                      <div key={mod.key} className='space-y-1.5'>
+                        {/* Tarjeta del módulo */}
+                        <button
+                          type='button'
+                          onClick={() => handleToggle(!isEnabled)}
+                          className={`w-full text-left rounded-xl border-2 p-3 transition-all duration-150 ${
+                            isEnabled
+                              ? 'border-primary/40 bg-primary/5 shadow-sm'
+                              : 'border-border bg-background hover:border-border/80 hover:bg-muted/30'
+                          }`}
+                        >
+                          <div className='flex items-start justify-between gap-2'>
+                            <div className='flex items-center gap-2 min-w-0'>
+                              <span className='text-xl leading-none'>
+                                {getModuleEmoji(mod.key)}
+                              </span>
+                              <div className='min-w-0'>
+                                <p
+                                  className={`text-xs font-semibold leading-tight ${isEnabled ? 'text-primary' : 'text-foreground'}`}
+                                >
+                                  {mod.name}
+                                </p>
+                                <p className='text-[10px] text-muted-foreground leading-tight mt-0.5 line-clamp-2'>
+                                  {getModuleRoleDescription(mod.key, formData.role)}
+                                </p>
+                              </div>
+                            </div>
+                            {/* Indicador visual de estado */}
+                            <div
+                              className={`flex-shrink-0 w-4 h-4 rounded-full border-2 mt-0.5 transition-colors ${
+                                isEnabled
+                                  ? 'bg-primary border-primary'
+                                  : 'bg-background border-muted-foreground/30'
+                              }`}
+                            >
+                              {isEnabled && (
+                                <svg
+                                  className='w-full h-full text-primary-foreground p-0.5'
+                                  viewBox='0 0 12 12'
+                                  fill='none'
+                                >
+                                  <path
+                                    d='M2 6l3 3 5-5'
+                                    stroke='currentColor'
+                                    strokeWidth='2'
+                                    strokeLinecap='round'
+                                    strokeLinejoin='round'
+                                  />
+                                </svg>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                        <Switch checked={isEnabled} onCheckedChange={handleToggle} />
+                        </button>
+
+                        {/* Sub-opción gestión completa — solo cuando está activo y aplica */}
+                        {mod.requiresManager && isEnabled && formData.role !== 'CLIENT' && (
+                          <div
+                            className={`flex items-center justify-between rounded-lg border px-2.5 py-1.5 transition-colors ${
+                              formData.canManageInventory
+                                ? 'border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20'
+                                : 'border-dashed border-border bg-muted/20'
+                            }`}
+                          >
+                            <div className='flex items-center gap-1.5 min-w-0'>
+                              <span className='text-xs'>🔧</span>
+                              <p className='text-[11px] font-medium text-foreground leading-tight'>
+                                Gestión completa
+                              </p>
+                            </div>
+                            <Switch
+                              checked={formData.canManageInventory}
+                              onCheckedChange={v =>
+                                setFormData(p => ({ ...p, canManageInventory: v }))
+                              }
+                            />
+                          </div>
+                        )}
                       </div>
-
-                      {/* Sub-opción: gestión completa (solo para módulos con requiresManager) */}
-                      {mod.requiresManager && isEnabled && formData.role !== 'CLIENT' && (
-                        <div className='flex items-center justify-between rounded-lg border border-dashed px-3 py-2.5 ml-4 mt-1'>
-                          <div>
-                            <p className='text-sm font-medium text-muted-foreground'>
-                              Gestión completa
-                            </p>
-                            <p className='text-xs text-muted-foreground'>
-                              Puede crear, editar y configurar activos (no solo verlos)
-                            </p>
-                          </div>
-                          <Switch
-                            checked={formData.canManageInventory}
-                            onCheckedChange={v =>
-                              setFormData(p => ({ ...p, canManageInventory: v }))
-                            }
-                          />
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
+                    )
+                  })}
+                </div>
               </div>
             )}
 
-            {/* Panel de estado actual de módulos */}
+            {/* Panel de estado actual — separado de los controles, colapsado por defecto */}
             {user && formData.role !== 'ADMIN' && (
               <UserModulesPanel
                 userId={user.id}
@@ -863,7 +992,7 @@ export function EditUserModal({
                 inventoryEnabled={formData.inventoryEnabled}
               />
             )}
-            {/* Para ADMIN normal: mostrar panel informativo de sus familias */}
+            {/* Para ADMIN normal: panel informativo de sus familias */}
             {user && formData.role === 'ADMIN' && !formData.isSuperAdmin && (
               <UserModulesPanel
                 userId={user.id}
