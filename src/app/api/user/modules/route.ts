@@ -85,7 +85,7 @@ export async function GET(request: Request) {
       })
       familyIds = assignments.map(a => a.familyId)
 
-      // Si es gestor, agregar familias de inventario
+      // Solo agregar familias de inventario si es gestor explícito
       if (canManageInventory) {
         const invAssignments = await prisma.inventory_manager_families.findMany({
           where: { managerId: userId },
@@ -139,13 +139,34 @@ export async function GET(request: Request) {
       ...f,
       modules: {
         tickets: ticketMap.get(f.id) ?? false,
-        inventory: invMap.get(f.id) ?? false,
+        // Para técnicos sin canManageInventory: nunca mostrar inventario
+        // aunque la familia lo tenga activo
+        inventory: canManageInventory ? (invMap.get(f.id) ?? false) : false,
       },
     }))
 
-    // Módulo activo si AL MENOS UNA familia lo tiene habilitado
     const hasTickets = enrichedFamilies.some(f => f.modules.tickets)
-    const hasInventory = enrichedFamilies.some(f => f.modules.inventory)
+
+    // Inventario visible según rol:
+    // - ADMIN: siempre (gestión global)
+    // - TECHNICIAN: solo si canManageInventory=true Y alguna familia lo tiene activo
+    // - CLIENT: si canManageInventory=true O tiene equipos asignados directamente
+    let hasInventory = false
+    if (role === 'ADMIN') {
+      hasInventory = true
+    } else if (role === 'TECHNICIAN') {
+      hasInventory = canManageInventory && enrichedFamilies.some(f => f.modules.inventory)
+    } else if (role === 'CLIENT') {
+      if (canManageInventory) {
+        hasInventory = enrichedFamilies.some(f => f.modules.inventory)
+      } else {
+        // Cliente sin gestor: ver "Mis Equipos" solo si tiene equipos asignados
+        const assignedCount = await prisma.equipment_assignments.count({
+          where: { receiverId: userId, isActive: true },
+        })
+        hasInventory = assignedCount > 0
+      }
+    }
 
     // ADMIN siempre ve tickets e inventario (gestión global)
     return {

@@ -15,7 +15,7 @@ interface UserModules {
   }>
 }
 
-const DEFAULT: UserModules = { tickets: true, inventory: true, families: [] }
+const DEFAULT: UserModules = { tickets: false, inventory: false, families: [] }
 
 export function useUserModules() {
   const { data: session, status } = useSession()
