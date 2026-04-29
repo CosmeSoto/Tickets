@@ -105,6 +105,7 @@ function UserModulesPanel({
   }
 
   const isTechOrClient = role === 'TECHNICIAN' || role === 'CLIENT'
+  const isAdminRole = role === 'ADMIN'
   const hasFamilies = data && data.families.length > 0
 
   // ── Determinar estado y guía de cada módulo ──
@@ -113,6 +114,8 @@ function UserModulesPanel({
 
   const getTicketsGuide = () => {
     if (ticketsActive) return null
+    if (isAdminRole)
+      return 'Asigna este admin a una familia con tickets activos en: Admin → Familias → [Familia] → Personal → Administradores'
     if (role === 'TECHNICIAN') {
       return hasFamilies
         ? 'La familia asignada no tiene el módulo de Tickets activo. Actívalo en: Admin → Configuración → Tickets → [Familia]'
@@ -126,6 +129,8 @@ function UserModulesPanel({
 
   const getInventoryGuide = () => {
     if (inventoryActive) return null
+    if (isAdminRole)
+      return 'Asigna este admin a una familia con inventario activo en: Admin → Familias → [Familia] → Personal → Administradores'
     if (role === 'TECHNICIAN') {
       if (!canManageInventory)
         return 'Activa "Gestor de Inventario" arriba y asígnalo en: Admin → Familias → [Familia] → Personal → Gestores de Inventario'
@@ -195,7 +200,7 @@ function UserModulesPanel({
       </div>
 
       {/* Módulo Inventario */}
-      {isTechOrClient && (
+      {(isTechOrClient || isAdminRole) && (
         <div
           className={`flex items-start gap-2.5 p-2.5 rounded-md border ${inventoryActive ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800' : 'bg-muted/50 border-border'}`}
         >
@@ -754,6 +759,23 @@ export function EditUserModal({
                   />
                 </div>
               )}
+
+              {/* Info de acceso para ADMIN normal (no super admin) */}
+              {formData.role === 'ADMIN' && !formData.isSuperAdmin && (
+                <div className='rounded-lg border bg-muted/30 px-3 py-2.5 space-y-1'>
+                  <p className='text-xs font-medium text-muted-foreground flex items-center gap-1.5'>
+                    <Activity className='h-3.5 w-3.5' />
+                    Acceso como Administrador de Familia
+                  </p>
+                  <p className='text-xs text-muted-foreground'>
+                    Este admin ve los módulos de las familias que tiene asignadas en{' '}
+                    <span className='font-mono text-[11px]'>
+                      Admin → Familias → [Familia] → Personal → Administradores
+                    </span>
+                    . Si no tiene familias asignadas, tiene acceso completo al sistema.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* ── Módulos visibles — generado dinámicamente desde system_modules ── */}
@@ -839,6 +861,16 @@ export function EditUserModal({
                 canManageInventory={formData.canManageInventory}
                 ticketsEnabled={formData.ticketsEnabled}
                 inventoryEnabled={formData.inventoryEnabled}
+              />
+            )}
+            {/* Para ADMIN normal: mostrar panel informativo de sus familias */}
+            {user && formData.role === 'ADMIN' && !formData.isSuperAdmin && (
+              <UserModulesPanel
+                userId={user.id}
+                role={formData.role}
+                canManageInventory={true}
+                ticketsEnabled={true}
+                inventoryEnabled={true}
               />
             )}
           </div>

@@ -324,12 +324,17 @@ export function RoleDashboardLayout({
         ? 'CLIENT_MANAGER'
         : userRole
 
-  // Para ADMIN, construir navegación dinámicamente según isSuperAdmin
+  // Para ADMIN, construir navegación dinámicamente según isSuperAdmin y módulos activos
   let navigation: NavItem[] = []
   if (userRole === 'ADMIN') {
     const adminNav = navigationByRole['ADMIN'].filter(item => {
       // Auditoría solo para Super Admin
       if (item.href === '/admin/audit') return isSuperAdmin
+      // Para Super Admin: siempre mostrar todo
+      if (isSuperAdmin) return true
+      // Para Admin normal: filtrar según módulos activos de sus familias asignadas
+      if (item.href === '/admin/tickets' || item.name === 'Tickets') return hasTickets
+      if (item.href === '/inventory' || item.name === 'Inventario') return hasInventory
       return true
     })
     navigation = adminNav
