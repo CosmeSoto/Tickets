@@ -89,15 +89,15 @@ interface UseDashboardDataReturn {
 
 /**
  * Hook para cargar datos del dashboard con cache y optimizaciones
- * 
+ *
  * @example
  * ```tsx
  * function Dashboard() {
  *   const { stats, tickets, isLoading, error, refetch } = useDashboardData('ADMIN')
- *   
+ *
  *   if (isLoading) return <Loading />
  *   if (error) return <Error message={error} onRetry={refetch} />
- *   
+ *
  *   return (
  *     <div>
  *       <StatsCard value={stats.totalTickets} />
@@ -124,17 +124,17 @@ export function useDashboardData(role: Role): UseDashboardDataReturn {
       const timeoutId = setTimeout(() => controller.abort(), 10000) // 10s timeout
 
       const [statsResponse, ticketsResponse] = await Promise.all([
-        fetch(`/api/dashboard/stats?role=${role}`, { 
+        fetch(`/api/dashboard/stats?role=${role}`, {
           signal: controller.signal,
           headers: {
-            'Cache-Control': 'max-age=60' // Cache por 1 minuto
-          }
+            'Cache-Control': 'max-age=60', // Cache por 1 minuto
+          },
         }),
-        fetch(`/api/dashboard/tickets?role=${role}&limit=5`, { 
+        fetch(`/api/dashboard/tickets?role=${role}&limit=5`, {
           signal: controller.signal,
           headers: {
-            'Cache-Control': 'max-age=30' // Cache por 30 segundos
-          }
+            'Cache-Control': 'max-age=30', // Cache por 30 segundos
+          },
         }),
       ])
 
@@ -144,7 +144,7 @@ export function useDashboardData(role: Role): UseDashboardDataReturn {
       if (statsResponse.ok) {
         const statsData = await statsResponse.json()
         setStats(statsData)
-        
+
         // Si hay actividad reciente en la respuesta
         if (statsData.recentActivity) {
           setRecentActivity(statsData.recentActivity)
@@ -156,19 +156,19 @@ export function useDashboardData(role: Role): UseDashboardDataReturn {
       // Procesar tickets
       if (ticketsResponse.ok) {
         const ticketsData = await ticketsResponse.json()
-        const ticketsList = Array.isArray(ticketsData.tickets) 
-          ? ticketsData.tickets 
-          : Array.isArray(ticketsData) 
-          ? ticketsData 
-          : []
+        const ticketsList = Array.isArray(ticketsData.tickets)
+          ? ticketsData.tickets
+          : Array.isArray(ticketsData)
+            ? ticketsData
+            : []
         setTickets(ticketsList)
-        
+
         // Agregar estadísticas adicionales de tickets si existen
         if (ticketsData.pendingAssignment !== undefined) {
-          setStats(prev => ({ 
-            ...prev, 
+          setStats(prev => ({
+            ...prev,
             pendingAssignment: ticketsData.pendingAssignment,
-            overdueTickets: ticketsData.overdueTickets 
+            overdueTickets: ticketsData.overdueTickets,
           }))
         }
       } else {
@@ -190,11 +190,29 @@ export function useDashboardData(role: Role): UseDashboardDataReturn {
 
   useEffect(() => {
     loadData()
-    
-    // Auto-refresh cada 5 minutos para mantener datos actualizados
-    const interval = setInterval(loadData, 5 * 60 * 1000)
-    
-    return () => clearInterval(interval)
+
+    // Auto-refresh cada 5 minutos — pero solo si la pestaña está visible
+    const interval = setInterval(
+      () => {
+        if (!document.hidden) loadData()
+      },
+      5 * 60 * 1000
+    )
+
+    // Recargar cuando la pestaña vuelve a ser visible (si pasaron > 2 min)
+    let lastLoad = Date.now()
+    const handleVisibilityChange = () => {
+      if (!document.hidden && Date.now() - lastLoad > 2 * 60 * 1000) {
+        lastLoad = Date.now()
+        loadData()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [loadData])
 
   return {
@@ -226,12 +244,12 @@ export function useDashboardStats(role: Role) {
       const response = await fetch(`/api/dashboard/stats?role=${role}`, {
         signal: controller.signal,
         headers: {
-          'Cache-Control': 'max-age=60'
-        }
+          'Cache-Control': 'max-age=60',
+        },
       })
-      
+
       clearTimeout(timeoutId)
-      
+
       if (response.ok) {
         const data = await response.json()
         setStats(data)
@@ -252,11 +270,28 @@ export function useDashboardStats(role: Role) {
 
   useEffect(() => {
     loadStats()
-    
-    // Auto-refresh cada 2 minutos para stats
-    const interval = setInterval(loadStats, 2 * 60 * 1000)
-    
-    return () => clearInterval(interval)
+
+    // Auto-refresh cada 2 minutos — solo si la pestaña está visible
+    const interval = setInterval(
+      () => {
+        if (!document.hidden) loadStats()
+      },
+      2 * 60 * 1000
+    )
+
+    let lastLoad = Date.now()
+    const handleVisibilityChange = () => {
+      if (!document.hidden && Date.now() - lastLoad > 60 * 1000) {
+        lastLoad = Date.now()
+        loadStats()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [loadStats])
 
   return { stats, isLoading, error, refetch: loadStats }
@@ -282,19 +317,19 @@ export function useDashboardTickets(role: Role, limit: number = 5) {
       const response = await fetch(`/api/dashboard/tickets?role=${role}&limit=${limit}`, {
         signal: controller.signal,
         headers: {
-          'Cache-Control': 'max-age=30'
-        }
+          'Cache-Control': 'max-age=30',
+        },
       })
-      
+
       clearTimeout(timeoutId)
-      
+
       if (response.ok) {
         const data = await response.json()
-        const ticketsList = Array.isArray(data.tickets) 
-          ? data.tickets 
-          : Array.isArray(data) 
-          ? data 
-          : []
+        const ticketsList = Array.isArray(data.tickets)
+          ? data.tickets
+          : Array.isArray(data)
+            ? data
+            : []
         setTickets(ticketsList)
         setTotal(data.total || ticketsList.length)
       } else {
@@ -315,10 +350,28 @@ export function useDashboardTickets(role: Role, limit: number = 5) {
 
   useEffect(() => {
     loadTickets()
-    
-    // Auto-refresh cada 3 minutos — el SSE notifica cambios en tiempo real
-    const interval = setInterval(loadTickets, 3 * 60 * 1000)    
-    return () => clearInterval(interval)
+
+    // Auto-refresh cada 3 minutos — solo si la pestaña está visible
+    const interval = setInterval(
+      () => {
+        if (!document.hidden) loadTickets()
+      },
+      3 * 60 * 1000
+    )
+
+    let lastLoad = Date.now()
+    const handleVisibilityChange = () => {
+      if (!document.hidden && Date.now() - lastLoad > 90 * 1000) {
+        lastLoad = Date.now()
+        loadTickets()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [loadTickets])
 
   return { tickets, total, isLoading, error, refetch: loadTickets }

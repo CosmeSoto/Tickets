@@ -1014,6 +1014,7 @@ model maintenance_records {
   @@index([technicianId])
   @@index([ticketId])
   @@index([status])
+  @@index([equipmentId, status])
   @@map("maintenance_records")
 }
 

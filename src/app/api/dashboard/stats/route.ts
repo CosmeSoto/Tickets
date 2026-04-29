@@ -110,7 +110,9 @@ function formatTimeAgo(date: Date): string {
   return 'ahora'
 }
 
-// Función para obtener métricas por familia — incluye estado de módulos activos
+// Función para obtener métricas por familia — usa groupBy para evitar N+1
+// Antes: hasta 7 queries por familia (N*7 total)
+// Ahora: 4 queries totales independientemente del número de familias
 async function getFamilyMetrics() {
   try {
     const families = await prisma.families.findMany({
@@ -133,67 +135,110 @@ async function getFamilyMetrics() {
       },
     })
 
-    const metrics = await Promise.all(
-      families.map(async family => {
-        const ticketsEnabled = family.ticketFamilyConfig?.ticketsEnabled ?? false
-        // Inventario habilitado: campo real inventoryEnabled (default true si tiene config)
-        const inventoryEnabled =
-          family.inventory_family_config !== null &&
-          (family.inventory_family_config.inventoryEnabled ?? true)
+    if (families.length === 0) return []
 
-        // Solo consultar métricas de tickets si el módulo está habilitado
-        const ticketMetrics = ticketsEnabled
-          ? await Promise.all([
-              prisma.tickets.count({ where: { familyId: family.id, status: 'OPEN' } }),
-              prisma.tickets.count({ where: { familyId: family.id, status: 'IN_PROGRESS' } }),
-              prisma.technician_family_assignments.count({
-                where: { familyId: family.id, isActive: true },
-              }),
-            ]).then(([open, inProgress, techs]) => ({
-              openTickets: open,
-              inProgressTickets: inProgress,
-              technicianCount: techs,
-            }))
-          : { openTickets: 0, inProgressTickets: 0, technicianCount: 0 }
+    const familyIds = families.map(f => f.id)
 
-        // Solo consultar métricas de inventario si el módulo está habilitado
-        const inventoryMetrics = inventoryEnabled
-          ? await Promise.all([
-              prisma.equipment.count({
-                where: { type: { familyId: family.id }, status: 'AVAILABLE' },
-              }),
-              prisma.equipment.count({
-                where: { type: { familyId: family.id }, status: 'ASSIGNED' },
-              }),
-              prisma.equipment.count({
-                where: { type: { familyId: family.id }, status: 'MAINTENANCE' },
-              }),
-            ]).then(([available, assigned, maintenance]) => ({
-              availableAssets: available,
-              assignedAssets: assigned,
-              maintenanceAssets: maintenance,
-              totalAssets: available + assigned + maintenance,
-            }))
-          : null
+    // ── 1 query: contar tickets por familia+status (groupBy) ──
+    const ticketCounts = await prisma.tickets.groupBy({
+      by: ['familyId', 'status'],
+      where: {
+        familyId: { in: familyIds },
+        status: { in: ['OPEN', 'IN_PROGRESS'] },
+      },
+      _count: { id: true },
+    })
 
-        return {
-          familyId: family.id,
-          familyName: family.name,
-          familyColor: family.color,
-          familyCode: family.code,
-          // Módulos activos
-          modules: {
-            tickets: ticketsEnabled,
-            inventory: inventoryEnabled,
-          },
-          // Métricas de tickets (solo si habilitado)
-          ...(ticketsEnabled ? ticketMetrics : {}),
-          // Métricas de inventario (solo si habilitado)
-          ...(inventoryEnabled && inventoryMetrics ? { inventory: inventoryMetrics } : {}),
-        }
-      })
-    )
-    return metrics
+    // ── 1 query: contar técnicos activos por familia (groupBy) ──
+    const techCounts = await prisma.technician_family_assignments.groupBy({
+      by: ['familyId'],
+      where: { familyId: { in: familyIds }, isActive: true },
+      _count: { id: true },
+    })
+
+    // ── 1 query: contar equipos por familia+status (groupBy via equipmentType) ──
+    const equipmentCounts = await prisma.equipment.groupBy({
+      by: ['typeId', 'status'],
+      where: {
+        status: { in: ['AVAILABLE', 'ASSIGNED', 'MAINTENANCE'] },
+        type: { familyId: { in: familyIds } },
+      },
+      _count: { id: true },
+    })
+
+    // ── 1 query: obtener typeId → familyId mapping ──
+    const equipmentTypes = await prisma.equipment_types.findMany({
+      where: { familyId: { in: familyIds } },
+      select: { id: true, familyId: true },
+    })
+
+    // Construir mapas para lookup O(1)
+    const ticketMap = new Map<string, { open: number; inProgress: number }>()
+    for (const row of ticketCounts) {
+      if (!row.familyId) continue
+      const entry = ticketMap.get(row.familyId) ?? { open: 0, inProgress: 0 }
+      if (row.status === 'OPEN') entry.open = row._count.id
+      if (row.status === 'IN_PROGRESS') entry.inProgress = row._count.id
+      ticketMap.set(row.familyId, entry)
+    }
+
+    const techMap = new Map<string, number>()
+    for (const row of techCounts) {
+      techMap.set(row.familyId, row._count.id)
+    }
+
+    // typeId → familyId
+    const typeToFamily = new Map<string, string>()
+    for (const t of equipmentTypes) {
+      if (t.familyId) typeToFamily.set(t.id, t.familyId)
+    }
+
+    // Agregar equipment counts por familia
+    const equipMap = new Map<string, { available: number; assigned: number; maintenance: number }>()
+    for (const row of equipmentCounts) {
+      const familyId = typeToFamily.get(row.typeId)
+      if (!familyId) continue
+      const entry = equipMap.get(familyId) ?? { available: 0, assigned: 0, maintenance: 0 }
+      if (row.status === 'AVAILABLE') entry.available = row._count.id
+      if (row.status === 'ASSIGNED') entry.assigned = row._count.id
+      if (row.status === 'MAINTENANCE') entry.maintenance = row._count.id
+      equipMap.set(familyId, entry)
+    }
+
+    return families.map(family => {
+      const ticketsEnabled = family.ticketFamilyConfig?.ticketsEnabled ?? false
+      const inventoryEnabled =
+        family.inventory_family_config !== null &&
+        (family.inventory_family_config.inventoryEnabled ?? true)
+
+      const tickets = ticketMap.get(family.id) ?? { open: 0, inProgress: 0 }
+      const equip = equipMap.get(family.id) ?? { available: 0, assigned: 0, maintenance: 0 }
+
+      return {
+        familyId: family.id,
+        familyName: family.name,
+        familyColor: family.color,
+        familyCode: family.code,
+        modules: { tickets: ticketsEnabled, inventory: inventoryEnabled },
+        ...(ticketsEnabled
+          ? {
+              openTickets: tickets.open,
+              inProgressTickets: tickets.inProgress,
+              technicianCount: techMap.get(family.id) ?? 0,
+            }
+          : {}),
+        ...(inventoryEnabled
+          ? {
+              inventory: {
+                availableAssets: equip.available,
+                assignedAssets: equip.assigned,
+                maintenanceAssets: equip.maintenance,
+                totalAssets: equip.available + equip.assigned + equip.maintenance,
+              },
+            }
+          : {}),
+      }
+    })
   } catch {
     return []
   }
@@ -464,20 +509,27 @@ export async function GET(request: NextRequest) {
 
       // Métricas globales de inventario (agregado de todas las familias con inventario activo)
       try {
-        const [totalAssets, availableAssets, assignedAssets, maintenanceAssets,
-               totalConsumables, lowStockConsumables, totalLicenses, expiredLicenses] =
-          await Promise.all([
-            prisma.equipment.count({ where: { status: { not: 'RETIRED' } } }),
-            prisma.equipment.count({ where: { status: 'AVAILABLE' } }),
-            prisma.equipment.count({ where: { status: 'ASSIGNED' } }),
-            prisma.equipment.count({ where: { status: 'MAINTENANCE' } }),
-            prisma.consumables.count(),
-            prisma.$queryRaw<Array<{ count: bigint }>>`
+        const [
+          totalAssets,
+          availableAssets,
+          assignedAssets,
+          maintenanceAssets,
+          totalConsumables,
+          lowStockConsumables,
+          totalLicenses,
+          expiredLicenses,
+        ] = await Promise.all([
+          prisma.equipment.count({ where: { status: { not: 'RETIRED' } } }),
+          prisma.equipment.count({ where: { status: 'AVAILABLE' } }),
+          prisma.equipment.count({ where: { status: 'ASSIGNED' } }),
+          prisma.equipment.count({ where: { status: 'MAINTENANCE' } }),
+          prisma.consumables.count(),
+          prisma.$queryRaw<Array<{ count: bigint }>>`
               SELECT COUNT(*) as count FROM consumables WHERE current_stock <= min_stock
             `.then(r => Number(r[0]?.count ?? 0)),
-            prisma.software_licenses.count(),
-            prisma.software_licenses.count({ where: { expirationDate: { lt: new Date() } } }),
-          ])
+          prisma.software_licenses.count(),
+          prisma.software_licenses.count({ where: { expirationDate: { lt: new Date() } } }),
+        ])
         stats.inventoryStats = {
           totalAssets,
           availableAssets,

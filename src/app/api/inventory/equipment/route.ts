@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { EquipmentService } from '@/lib/services/equipment.service'
-import { createEquipmentSchema, equipmentFiltersSchema } from '@/lib/validations/inventory/equipment'
+import {
+  createEquipmentSchema,
+  equipmentFiltersSchema,
+} from '@/lib/validations/inventory/equipment'
 import { ZodError } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { withCache, invalidateCache, buildCacheKey } from '@/lib/api-cache'
@@ -15,12 +18,9 @@ import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
-      return NextResponse.json(
-        { error: 'No autenticado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
     // Parsear query params
@@ -29,7 +29,8 @@ export async function GET(request: NextRequest) {
       search: searchParams.get('search') || undefined,
       typeId: searchParams.getAll('typeId').length > 0 ? searchParams.getAll('typeId') : undefined,
       status: searchParams.getAll('status').length > 0 ? searchParams.getAll('status') : undefined,
-      condition: searchParams.getAll('condition').length > 0 ? searchParams.getAll('condition') : undefined,
+      condition:
+        searchParams.getAll('condition').length > 0 ? searchParams.getAll('condition') : undefined,
       assignedTo: searchParams.get('assignedTo') || undefined,
       departmentId: searchParams.get('departmentId') || undefined,
       familyId: searchParams.get('familyId') || undefined,
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
       ...validatedFilters,
     })
 
-    const result = await withCache(cacheKey, 10, () =>
+    const result = await withCache(cacheKey, 60, () =>
       EquipmentService.listEquipment(
         validatedFilters,
         validatedFilters.page,
@@ -60,18 +61,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(result)
   } catch (error) {
     console.error('Error en GET /api/inventory/equipment:', error)
-    
+
     if (error instanceof ZodError) {
-      return NextResponse.json(
-        { error: 'Datos inválidos', details: error.errors },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Datos inválidos', details: error.errors }, { status: 400 })
     }
 
-    return NextResponse.json(
-      { error: 'Error al obtener equipos' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al obtener equipos' }, { status: 500 })
   }
 }
 
@@ -82,13 +77,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
     // Verificar permiso de gestión de inventario
-    if (!await canManageInventory(session.user.id, session.user.role)) {
+    if (!(await canManageInventory(session.user.id, session.user.role))) {
       return inventoryForbidden()
     }
 
@@ -99,14 +94,11 @@ export async function POST(request: NextRequest) {
 
     // Validar que el departamento exista y esté activo
     const department = await prisma.departments.findUnique({
-      where: { id: validatedData.departmentId }
+      where: { id: validatedData.departmentId },
     })
 
     if (!department) {
-      return NextResponse.json(
-        { error: 'El departamento especificado no existe' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'El departamento especificado no existe' }, { status: 400 })
     }
 
     if (!department.isActive) {
@@ -117,10 +109,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Crear equipo
-    const equipment = await EquipmentService.createEquipment(
-      validatedData,
-      session.user.id
-    )
+    const equipment = await EquipmentService.createEquipment(validatedData, session.user.id)
 
     // Invalidar caché de equipos
     await invalidateCache('inventory:equipment:*').catch(() => {})
@@ -128,24 +117,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(equipment, { status: 201 })
   } catch (error) {
     console.error('Error en POST /api/inventory/equipment:', error)
-    
+
     if (error instanceof ZodError) {
-      return NextResponse.json(
-        { error: 'Datos inválidos', details: error.errors },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Datos inválidos', details: error.errors }, { status: 400 })
     }
 
     if (error instanceof Error && error.message.includes('Ya existe')) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 409 }
-      )
+      return NextResponse.json({ error: error.message }, { status: 409 })
     }
 
-    return NextResponse.json(
-      { error: 'Error al crear equipo' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al crear equipo' }, { status: 500 })
   }
 }

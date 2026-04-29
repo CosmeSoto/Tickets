@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { UserService } from '@/lib/services/user-service'
 import { z } from 'zod'
+import { withCache, buildCacheKey } from '@/lib/api-cache'
 const createUserSchema = z.object({
   email: z.string().email('Email inválido'),
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
@@ -19,14 +20,11 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
-      return NextResponse.json(
-        { success: false, message: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
     }
 
     const { searchParams } = new URL(request.url)
-    
+
     const role = searchParams.get('role')
     const isActive = searchParams.get('isActive')
     const departmentId = searchParams.get('departmentId')
@@ -61,14 +59,14 @@ export async function GET(request: NextRequest) {
     } else if (department) {
       // Compatibilidad con filtro antiguo por nombre
       where.departments = {
-        name: department
+        name: department,
       }
     }
 
     // Filtrar técnicos por familia: solo los que tienen asignación activa a esa familia
     if (familyId) {
       where.technicianFamilyAssignments = {
-        some: { familyId, isActive: true }
+        some: { familyId, isActive: true },
       }
     }
 
@@ -76,8 +74,28 @@ export async function GET(request: NextRequest) {
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } }
+        { email: { contains: search, mode: 'insensitive' } },
       ]
+    }
+
+    // Intentar servir desde caché (solo para listas sin búsqueda de texto)
+    if (!search) {
+      const cacheKey = buildCacheKey('users:list', {
+        role: role ?? 'all',
+        isActive: isActive ?? 'all',
+        departmentId: departmentId ?? '',
+        familyId: familyId ?? '',
+        canManageInventory: canManageInventory ?? '',
+        isSuperAdmin: isSuperAdmin ?? '',
+        limit: limit ?? '500',
+      })
+      try {
+        const { getCached } = await import('@/lib/redis')
+        const cached = await getCached<any>(cacheKey)
+        if (cached) return NextResponse.json(cached)
+      } catch {
+        // Redis no disponible — continuar sin caché
+      }
     }
 
     // Obtener usuarios con conteo de tickets y relación con departamento
@@ -96,15 +114,18 @@ export async function GET(request: NextRequest) {
             color: true,
             description: true,
             familyId: true,
-          }
+          },
         },
-        technicianFamilyAssignments: role === 'TECHNICIAN' ? {
-          where: { isActive: true },
-          select: {
-            familyId: true,
-            family: { select: { id: true, name: true, code: true, color: true } }
-          }
-        } : false,
+        technicianFamilyAssignments:
+          role === 'TECHNICIAN'
+            ? {
+                where: { isActive: true },
+                select: {
+                  familyId: true,
+                  family: { select: { id: true, name: true, code: true, color: true } },
+                },
+              }
+            : false,
         phone: true,
         avatar: true,
         isActive: true,
@@ -116,34 +137,37 @@ export async function GET(request: NextRequest) {
           select: {
             tickets_tickets_createdByIdTousers: true,
             tickets_tickets_assigneeIdTousers: true,
-            technician_assignments: true
-          }
-        },
-        technician_assignments: role === 'TECHNICIAN' ? {
-          select: {
-            id: true,
-            priority: true,
-            maxTickets: true,
-            autoAssign: true,
-            categories: {
-              select: {
-                id: true,
-                name: true,
-                color: true,
-                level: true
-              }
-            }
+            technician_assignments: true,
           },
-          where: {
-            isActive: true
-          }
-        } : false
+        },
+        technician_assignments:
+          role === 'TECHNICIAN'
+            ? {
+                select: {
+                  id: true,
+                  priority: true,
+                  maxTickets: true,
+                  autoAssign: true,
+                  categories: {
+                    select: {
+                      id: true,
+                      name: true,
+                      color: true,
+                      level: true,
+                    },
+                  },
+                },
+                where: {
+                  isActive: true,
+                },
+              }
+            : false,
       },
       orderBy: {
-        name: 'asc'
+        name: 'asc',
       },
       // Aplicar límite si se especifica
-      take: limit ? Math.min(parseInt(limit), 500) : undefined
+      take: limit ? Math.min(parseInt(limit), 500) : undefined,
     })
 
     // Agregar levelName a las categorías de técnicos
@@ -155,11 +179,16 @@ export async function GET(request: NextRequest) {
             ...assignment,
             categories: {
               ...assignment.categories,
-              levelName: assignment.categories.level === 1 ? 'Principal' : 
-                        assignment.categories.level === 2 ? 'Subcategoría' :
-                        assignment.categories.level === 3 ? 'Especialidad' : 'Detalle'
-            }
-          }))
+              levelName:
+                assignment.categories.level === 1
+                  ? 'Principal'
+                  : assignment.categories.level === 2
+                    ? 'Subcategoría'
+                    : assignment.categories.level === 3
+                      ? 'Especialidad'
+                      : 'Detalle',
+            },
+          })),
         }
       }
       return user
@@ -173,16 +202,16 @@ export async function GET(request: NextRequest) {
         department: user.departments, // Cambiar departments a department
         technicianAssignments: user.technician_assignments?.map((assignment: any) => ({
           ...assignment,
-          category: assignment.categories // Cambiar categories a category (singular)
-        }))
+          category: assignment.categories, // Cambiar categories a category (singular)
+        })),
       }
       delete normalizedUser.departments // Eliminar departments
       delete normalizedUser.technician_assignments // Eliminar snake_case
-      
+
       if (user.role === 'TECHNICIAN') {
-        const canDelete = 
-          (user._count.tickets_tickets_assigneeIdTousers === 0) && 
-          (user._count.technician_assignments === 0)
+        const canDelete =
+          user._count.tickets_tickets_assigneeIdTousers === 0 &&
+          user._count.technician_assignments === 0
         return { ...normalizedUser, canDelete }
       }
       return normalizedUser
@@ -193,7 +222,26 @@ export async function GET(request: NextRequest) {
       data: usersWithCanDelete,
       meta: {
         total: users.length,
-        filters: { role, isActive, departmentId, department }
+        filters: { role, isActive, departmentId, department },
+      },
+    }
+
+    // Cache 30s para listas sin búsqueda de texto (se invalida en POST/PUT/DELETE)
+    if (!search) {
+      const cacheKey = buildCacheKey('users:list', {
+        role: role ?? 'all',
+        isActive: isActive ?? 'all',
+        departmentId: departmentId ?? '',
+        familyId: familyId ?? '',
+        canManageInventory: canManageInventory ?? '',
+        isSuperAdmin: isSuperAdmin ?? '',
+        limit: limit ?? '500',
+      })
+      try {
+        const { setCache } = await import('@/lib/redis')
+        await setCache(cacheKey, responseData, 30)
+      } catch {
+        // Redis no disponible — continuar sin caché
       }
     }
 
@@ -204,7 +252,7 @@ export async function GET(request: NextRequest) {
       {
         success: false,
         message: 'Error al cargar los usuarios',
-        error: error instanceof Error ? error.message : 'Error desconocido'
+        error: error instanceof Error ? error.message : 'Error desconocido',
       },
       { status: 500 }
     )
@@ -214,16 +262,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { success: false, message: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
     }
 
     const body = await request.json()
-    
+
     // Validar datos de entrada
     const validatedData = createUserSchema.parse(body)
 
@@ -235,9 +280,9 @@ export async function POST(request: NextRequest) {
     // Verificar si el departamento existe (si se proporciona departmentId)
     if (validatedData.departmentId) {
       const department = await prisma.departments.findUnique({
-        where: { id: validatedData.departmentId }
+        where: { id: validatedData.departmentId },
       })
-      
+
       if (!department) {
         return NextResponse.json(
           { success: false, error: 'Departamento no encontrado' },
@@ -249,10 +294,13 @@ export async function POST(request: NextRequest) {
     // Crear el usuario usando el servicio
     const user = await UserService.createUser(validatedData, session.user.id)
 
+    // Invalidar cache de lista de usuarios
+    void import('@/lib/api-cache').then(({ invalidateCache }) => invalidateCache('users:list:*'))
+
     return NextResponse.json({
       success: true,
       data: user,
-      message: 'Usuario creado exitosamente'
+      message: 'Usuario creado exitosamente',
     })
   } catch (error) {
     console.error('Error creating user:', error)
@@ -272,22 +320,28 @@ export async function POST(request: NextRequest) {
       const fieldLabel = fieldLabels[field] || field
       const message = fieldLabel ? `${fieldLabel}: ${firstIssue.message}` : firstIssue.message
 
-      return NextResponse.json({
-        success: false,
-        error: message,
-        details: error.issues.map(i => ({
-          path: i.path,
-          message: i.message,
-        })),
-      }, { status: 400 })
+      return NextResponse.json(
+        {
+          success: false,
+          error: message,
+          details: error.issues.map(i => ({
+            path: i.path,
+            message: i.message,
+          })),
+        },
+        { status: 400 }
+      )
     }
 
     if (error instanceof Error) {
       if (error.message.includes('Ya existe un usuario')) {
-        return NextResponse.json({
-          success: false,
-          error: error.message,
-        }, { status: 409 })
+        return NextResponse.json(
+          {
+            success: false,
+            error: error.message,
+          },
+          { status: 409 }
+        )
       }
     }
 
