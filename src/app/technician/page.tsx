@@ -119,7 +119,10 @@ export default function TechnicianDashboard() {
                             {ticket.title}
                           </h3>
                           <div className='flex flex-wrap gap-1'>
-                            <Badge className={getPriorityColor(ticket.priority)} variant='secondary'>
+                            <Badge
+                              className={getPriorityColor(ticket.priority)}
+                              variant='secondary'
+                            >
                               {ticket.priority}
                             </Badge>
                             <Badge className={getStatusColor(ticket.status)} variant='secondary'>
@@ -237,6 +240,12 @@ export default function TechnicianDashboard() {
                   <Link href='/technician/tickets?status=unassigned'>
                     <Ticket className='h-4 w-4 mr-2' />
                     Tomar Ticket Disponible
+                  </Link>
+                </Button>
+                <Button className='w-full justify-start' variant='outline' asChild>
+                  <Link href='/technician/tickets/create'>
+                    <FileText className='h-4 w-4 mr-2' />
+                    Reportar un Problema
                   </Link>
                 </Button>
                 <Button className='w-full justify-start' variant='outline' asChild>

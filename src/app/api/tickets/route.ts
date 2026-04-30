@@ -248,6 +248,85 @@ export async function POST(request: NextRequest) {
       clientId = ticketData.clientId
     }
 
+    // ── Lógica de escalamiento para técnicos ──────────────────────────────
+    // Un técnico puede crear tickets, pero NO puede auto-asignárselos.
+    // Si crea un ticket en una categoría donde él está asignado, el sistema
+    // busca otro técnico disponible o escala al nivel de categoría superior.
+    let resolvedAssigneeId: string | undefined = ticketData.assigneeId
+
+    if (session.user.role === 'TECHNICIAN') {
+      const technicianId = session.user.id
+
+      // Verificar si el técnico está asignado a esta categoría
+      const selfAssignment = await prisma.technician_assignments.findFirst({
+        where: {
+          technicianId,
+          categoryId: ticketData.categoryId,
+          isActive: true,
+        },
+      })
+
+      if (selfAssignment) {
+        // El técnico está asignado a esta categoría — buscar otro técnico disponible
+        // Primero intentar en la misma categoría (excluyendo al creador)
+        const otherTechInCategory = await prisma.technician_assignments.findFirst({
+          where: {
+            categoryId: ticketData.categoryId,
+            isActive: true,
+            autoAssign: true,
+            technicianId: { not: technicianId },
+            users: { isActive: true, role: 'TECHNICIAN' },
+          },
+          include: {
+            users: {
+              select: {
+                id: true,
+                _count: {
+                  select: {
+                    tickets_tickets_assigneeIdTousers: {
+                      where: { status: { in: ['OPEN', 'IN_PROGRESS'] } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          orderBy: { priority: 'asc' },
+        })
+
+        if (otherTechInCategory) {
+          // Hay otro técnico en la misma categoría — asignar a él
+          resolvedAssigneeId = otherTechInCategory.technicianId
+        } else {
+          // No hay otro técnico en esta categoría — escalar al nivel padre
+          const currentCategory = await prisma.categories.findUnique({
+            where: { id: ticketData.categoryId },
+            select: { level: true, parentId: true },
+          })
+
+          if (currentCategory?.parentId) {
+            // Buscar técnico en la categoría padre
+            const techInParent = await prisma.technician_assignments.findFirst({
+              where: {
+                categoryId: currentCategory.parentId,
+                isActive: true,
+                autoAssign: true,
+                technicianId: { not: technicianId },
+                users: { isActive: true, role: 'TECHNICIAN' },
+              },
+            })
+            resolvedAssigneeId = techInParent?.technicianId ?? undefined
+          }
+          // Si no hay nadie en el padre tampoco → queda sin asignar (admin lo tomará)
+        }
+      }
+
+      // Bloquear explícitamente la auto-asignación aunque se envíe en el body
+      if (resolvedAssigneeId === technicianId) {
+        resolvedAssigneeId = undefined
+      }
+    }
+
     // Crear nuevo ticket usando TicketService (maneja familyId, ticketCode, codeIsManual)
     const newTicket = (await TicketService.createTicket({
       title: ticketData.title,
