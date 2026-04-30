@@ -24,6 +24,7 @@ import {
   Unlock,
   Calendar,
   Ticket,
+  Layers,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { UserData } from '@/hooks/use-users'
@@ -36,6 +37,7 @@ import {
   getModuleRoleDescription,
   getModuleEmoji,
 } from '@/hooks/use-system-modules'
+import { TechnicianFamilyAssignment } from '@/components/families/technician-family-assignment'
 
 interface EditUserModalProps {
   isOpen: boolean
@@ -1008,6 +1010,37 @@ export function EditUserModal({
               />
             )}
           </div>
+
+          {/* ── Familias asignadas — solo para TECHNICIAN ── */}
+          {user && formData.role === 'TECHNICIAN' && (
+            <>
+              <Separator />
+              <div className='space-y-3'>
+                <div>
+                  <h3 className='text-sm font-semibold text-foreground flex items-center gap-1.5'>
+                    <Layers className='h-4 w-4 text-muted-foreground' />
+                    Familias asignadas
+                  </h3>
+                  <p className='text-xs text-muted-foreground mt-0.5'>
+                    Familias donde este técnico puede atender tickets. Puedes asignar o quitar
+                    familias directamente aquí.
+                  </p>
+                </div>
+                <TechnicianFamilyAssignment
+                  mode='by-technician'
+                  technicianId={user.id}
+                  technicianName={user.name}
+                  onChanged={() => {
+                    // Invalidar cache de módulos del técnico para que su navegación se actualice
+                    void fetch(`/api/user/modules?userId=${user.id}&_t=${Date.now()}`, {
+                      headers: { 'Cache-Control': 'no-cache' },
+                    })
+                    window.dispatchEvent(new CustomEvent('modules-updated'))
+                  }}
+                />
+              </div>
+            </>
+          )}
 
           <Separator />
 
