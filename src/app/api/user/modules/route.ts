@@ -25,6 +25,8 @@ export async function GET(request: Request) {
   // Admin puede consultar módulos de otro usuario (para el modal de edición)
   const targetUserId = searchParams.get('userId')
   const isAdmin = session.user.role === 'ADMIN'
+  // Si viene con ?_t= es un bypass de cache — invalidar antes de responder
+  const bypassCache = searchParams.has('_t')
 
   if (targetUserId && targetUserId !== session.user.id && !isAdmin) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
@@ -72,7 +74,17 @@ export async function GET(request: Request) {
 
   const cacheKey = `user:modules:${userId}`
 
-  const result = await withCache(cacheKey, 120, async () => {
+  // Si es bypass, invalidar cache primero para obtener datos frescos
+  if (bypassCache) {
+    try {
+      const { invalidateCache } = await import('@/lib/api-cache')
+      await invalidateCache(cacheKey)
+    } catch {
+      // Redis no disponible — continuar sin cache
+    }
+  }
+
+  const result = await withCache(cacheKey, 30, async () => {
     // Obtener familias del usuario según su rol
     let familyIds: string[] = []
 

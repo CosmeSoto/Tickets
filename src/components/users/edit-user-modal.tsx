@@ -551,6 +551,11 @@ export function EditUserModal({
           title: 'Usuario actualizado',
           description: `${formData.name} actualizado correctamente`,
         })
+        // Invalidar cache del usuario afectado en el servidor
+        // Esto garantiza que cuando el usuario recargue, verá los módulos actualizados
+        void fetch(`/api/user/modules?userId=${user.id}&_t=${Date.now()}`, {
+          headers: { 'Cache-Control': 'no-cache' },
+        })
         window.dispatchEvent(new CustomEvent('modules-updated'))
         handleClose()
         onUserUpdated()

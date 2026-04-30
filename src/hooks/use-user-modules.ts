@@ -22,37 +22,45 @@ export function useUserModules() {
   const [modules, setModules] = useState<UserModules>(DEFAULT)
   const [loading, setLoading] = useState(true)
 
-  const load = useCallback(async () => {
-    if (status !== 'authenticated' || !session?.user) return
-    try {
-      const res = await fetch('/api/user/modules')
-      if (res.ok) {
-        const data = await res.json()
-        setModules(data)
+  const load = useCallback(
+    async (bypassCache = false) => {
+      if (status !== 'authenticated' || !session?.user) return
+      try {
+        // bypassCache=true añade timestamp para evitar cache del browser y fuerza
+        // que el servidor invalide su propio cache Redis antes de responder
+        const url = bypassCache ? `/api/user/modules?_t=${Date.now()}` : '/api/user/modules'
+        const res = await fetch(url, {
+          headers: bypassCache ? { 'Cache-Control': 'no-cache' } : {},
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setModules(data)
+        }
+      } catch {
+        setModules(DEFAULT)
+      } finally {
+        setLoading(false)
       }
-    } catch {
-      // Fail-open: si falla, mostrar todo para no bloquear al usuario
-      setModules(DEFAULT)
-    } finally {
-      setLoading(false)
-    }
-  }, [status, session?.user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+    },
+    [status, session?.user?.id]
+  ) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     load()
   }, [load])
 
-  // Recargar cuando el admin cambia configuración de módulos o asignaciones de familias
+  // Recargar con bypass de cache cuando cambian permisos/módulos
   useEffect(() => {
-    const reload = () => load()
-    window.addEventListener('settings-updated', reload)
-    window.addEventListener('modules-updated', reload)
-    // El SSE emite session_refresh cuando cambian permisos/asignaciones
-    window.addEventListener('session_refresh', reload)
+    const reloadFresh = () => load(true) // bypass cache
+    const reloadNormal = () => load(false)
+
+    window.addEventListener('settings-updated', reloadNormal)
+    window.addEventListener('modules-updated', reloadFresh) // bypass — cambio explícito de módulos
+    window.addEventListener('session_refresh', reloadFresh) // bypass — cambio de permisos
     return () => {
-      window.removeEventListener('settings-updated', reload)
-      window.removeEventListener('modules-updated', reload)
-      window.removeEventListener('session_refresh', reload)
+      window.removeEventListener('settings-updated', reloadNormal)
+      window.removeEventListener('modules-updated', reloadFresh)
+      window.removeEventListener('session_refresh', reloadFresh)
     }
   }, [load])
 
