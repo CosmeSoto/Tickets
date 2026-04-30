@@ -195,12 +195,15 @@ export async function GET(request: Request) {
     /**
      * Tabla de reglas de visibilidad de módulos:
      *
-     * | Rol            | Tickets                              | Inventario                                    |
-     * |----------------|--------------------------------------|-----------------------------------------------|
-     * | Super Admin    | Siempre true                         | Siempre true                                  |
-     * | Admin normal   | Si alguna familia tiene tickets ON   | Si alguna familia tiene inventario ON         |
-     * | Technician     | Si alguna familia tiene tickets ON   | Solo si canManageInventory=true Y familia ON  |
-     * | Client         | Flag ticketsEnabled del usuario      | Flag inventoryEnabled O canManageInventory    |
+     * | Rol            | Tickets                              | Inventario                                              |
+     * |----------------|--------------------------------------|---------------------------------------------------------|
+     * | Super Admin    | Siempre true                         | Siempre true                                            |
+     * | Admin normal   | Si alguna familia tiene tickets ON   | Si alguna familia tiene inventario ON                   |
+     * | Technician     | Si alguna familia tiene tickets ON   | inventoryEnabled=true O canManageInventory=true         |
+     * | Client         | Flag ticketsEnabled del usuario      | inventoryEnabled=true O canManageInventory=true         |
+     *
+     * inventoryEnabled = puede VER el módulo (sus equipos asignados)
+     * canManageInventory = puede GESTIONAR activos (crear, editar, configurar)
      */
     let resolvedTickets: boolean
     let resolvedInventory: boolean
@@ -210,7 +213,8 @@ export async function GET(request: Request) {
       resolvedInventory = isSuperAdmin ? true : familyHasInventory
     } else if (role === 'TECHNICIAN') {
       resolvedTickets = familyHasTickets
-      resolvedInventory = canManageInventory && enrichedFamilies.some(f => f.modules.inventory)
+      // inventoryEnabled permite ver el módulo; canManageInventory permite gestionarlo
+      resolvedInventory = inventoryEnabled || canManageInventory
     } else {
       // CLIENT
       resolvedTickets = ticketsEnabled
