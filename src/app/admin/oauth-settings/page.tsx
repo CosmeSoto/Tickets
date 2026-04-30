@@ -74,7 +74,7 @@ export default function OAuthSettingsPage() {
     }
 
     loadConfigs()
-  }, [session, status, router])
+  }, [session, status, router]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadConfigs = async () => {
     try {

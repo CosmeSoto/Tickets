@@ -210,9 +210,6 @@ function UserModulesPanel({
   const hasFamilies = data && data.families.length > 0
   const ticketsActive = data?.tickets ?? false
   const inventoryActive = data?.inventory ?? false
-  const allActive =
-    ticketsActive && (role === 'CLIENT' ? inventoryActive || true : inventoryActive || !isAdminRole)
-
   const getTicketsGuide = () => {
     if (ticketsActive) return null
     if (isAdminRole)

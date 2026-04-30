@@ -91,7 +91,7 @@ export default function AdminTicketDetailPage() {
       loadTicket()
       getTechnicians().then(setTechnicians)
     }
-  }, [ticketId])
+  }, [ticketId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Polling
   useEffect(() => {

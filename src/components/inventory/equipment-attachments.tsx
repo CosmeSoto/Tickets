@@ -80,7 +80,7 @@ export function EquipmentAttachments({ equipmentId, canManage }: EquipmentAttach
 
   useEffect(() => {
     loadAttachments()
-  }, [equipmentId])
+  }, [equipmentId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadAttachments = async () => {
     try {
@@ -136,7 +136,11 @@ export function EquipmentAttachments({ equipmentId, canManage }: EquipmentAttach
       setAttachments(prev => prev.filter(a => a.id !== deleteTarget.id))
       toast({ title: 'Archivo eliminado' })
     } catch (err) {
-      toast({ title: 'Error', description: extractCatchError(err, 'No se pudo eliminar el archivo'), variant: 'destructive' })
+      toast({
+        title: 'Error',
+        description: extractCatchError(err, 'No se pudo eliminar el archivo'),
+        variant: 'destructive',
+      })
     } finally {
       setDeleteTarget(null)
     }

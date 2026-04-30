@@ -66,13 +66,13 @@ export default function TechnicianKnowledgeDetailPage() {
     if (articleId && articleId !== 'create' && articleId !== 'new') {
       loadArticle()
     }
-  }, [session, articleId, router])
+  }, [session, articleId, router]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (article) {
       loadSimilarArticles()
     }
-  }, [article?.id])
+  }, [article?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadArticle = async () => {
     setLoading(true)

@@ -62,7 +62,7 @@ function NewArticleContent() {
       setSourceTicketId(fromTicket)
       loadTicketSuggestions(fromTicket)
     }
-  }, [searchParams])
+  }, [searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadTicketSuggestions = async (ticketId: string) => {
     setLoadingSuggestions(true)

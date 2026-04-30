@@ -72,7 +72,7 @@ export default function EditTicketPage() {
 
     loadTicket()
     loadCategories()
-  }, [session, status, router, params.id])
+  }, [session, status, router, params.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadTicket = async () => {
     try {

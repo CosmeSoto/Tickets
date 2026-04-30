@@ -335,7 +335,12 @@ export async function POST(request: NextRequest) {
       priority: ticketData.priority || 'MEDIUM',
       clientId,
       categoryId: ticketData.categoryId,
-      assigneeId: ticketData.assigneeId || undefined,
+      // Para técnicos: usar resolvedAssigneeId (resultado del escalamiento)
+      // Para admin/cliente: usar el assigneeId del body si se especificó
+      assigneeId:
+        session.user.role === 'TECHNICIAN'
+          ? resolvedAssigneeId
+          : ticketData.assigneeId || undefined,
       ...(ticketData.ticketCode &&
         session.user.role === 'ADMIN' && { ticketCode: ticketData.ticketCode }),
       isAdmin: session.user.role === 'ADMIN',

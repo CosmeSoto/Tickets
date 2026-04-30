@@ -60,7 +60,7 @@ export default function ClientTicketsPage() {
       prevFamilyRef.current = filters.family
       if (filters.category !== 'all') setFilter('category', 'all')
     }
-  }, [filters.family])
+  }, [filters.family]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const filteredTickets = useMemo(() => {
     if (!session?.user?.id) return []

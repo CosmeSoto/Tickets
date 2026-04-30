@@ -66,38 +66,35 @@ export function useTechnicians() {
   const loadTechnicians = async () => {
     setLoading(true)
     setError(null)
-    
+
     try {
       const response = await fetch('/api/users?role=TECHNICIAN', {
         credentials: 'include',
       })
-      
+
       if (!response.ok) {
         if (response.status === 401) {
-          window.location.href = '/login?callbackUrl=' + encodeURIComponent(window.location.pathname)
+          window.location.href =
+            '/login?callbackUrl=' + encodeURIComponent(window.location.pathname)
           return
         }
         throw new Error(`HTTP ${response.status}`)
       }
-      
+
       const data = await response.json()
-      
+
       if (data.success && Array.isArray(data.data)) {
         setTechnicians(data.data)
       } else {
         throw new Error('Formato de respuesta inválido')
       }
-      
     } catch (error) {
       console.error('Error cargando técnicos:', error)
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido'
       setError(errorMessage)
       setTechnicians([])
-      
-      showError(
-        'Error al cargar técnicos',
-        `No se pudieron cargar los técnicos: ${errorMessage}`
-      )
+
+      showError('Error al cargar técnicos', `No se pudieron cargar los técnicos: ${errorMessage}`)
     } finally {
       setLoading(false)
     }
@@ -106,10 +103,10 @@ export function useTechnicians() {
   const loadAvailableCategories = async () => {
     try {
       const response = await fetch('/api/categories?isActive=true')
-      
+
       if (response.ok) {
         const data = await response.json()
-        
+
         if (data.success && Array.isArray(data.data)) {
           setAvailableCategories(data.data)
         }
@@ -122,17 +119,19 @@ export function useTechnicians() {
   useEffect(() => {
     loadTechnicians()
     loadAvailableCategories()
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const departments = useMemo(() => {
-    const depts = technicians
-      .map(t => t.department)
-      .filter(Boolean) as Array<{ id: string; name: string; color: string }>
-    
-    const uniqueDepts = depts.filter((dept, index, self) =>
-      index === self.findIndex(d => d.id === dept.id)
+    const depts = technicians.map(t => t.department).filter(Boolean) as Array<{
+      id: string
+      name: string
+      color: string
+    }>
+
+    const uniqueDepts = depts.filter(
+      (dept, index, self) => index === self.findIndex(d => d.id === dept.id)
     )
-    
+
     return uniqueDepts.sort((a, b) => a.name.localeCompare(b.name))
   }, [technicians])
 
@@ -142,9 +141,9 @@ export function useTechnicians() {
         method: 'DELETE',
         credentials: 'include',
       })
-      
+
       const result = await response.json()
-      
+
       if (response.ok && result.success) {
         await loadTechnicians()
         return { success: true }
@@ -163,9 +162,9 @@ export function useTechnicians() {
         method: 'POST',
         credentials: 'include',
       })
-      
+
       const result = await response.json()
-      
+
       if (response.ok && result.success) {
         await loadTechnicians()
         return { success: true }
@@ -186,7 +185,7 @@ export function useTechnicians() {
     try {
       let url: string
       let method: string
-      
+
       if (editingTechnician) {
         url = `/api/users/${editingTechnician.id}`
         method = 'PUT'
@@ -196,21 +195,21 @@ export function useTechnicians() {
       } else {
         throw new Error('Operación no válida')
       }
-      
+
       const payload = {
         ...formData,
         role: 'TECHNICIAN',
       }
-      
+
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
         credentials: 'include',
       })
-      
+
       const result = await response.json()
-      
+
       if (response.ok && result.success) {
         await loadTechnicians()
         return { success: true }

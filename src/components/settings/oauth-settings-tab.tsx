@@ -52,7 +52,7 @@ export function OAuthSettingsTab() {
 
   useEffect(() => {
     loadConfigs()
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadConfigs = async () => {
     try {

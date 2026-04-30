@@ -39,8 +39,8 @@ function formatSize(bytes: number): string {
 }
 
 function FileIcon({ mimeType }: { mimeType: string }) {
-  if (mimeType === 'application/pdf') return <FileText className="h-4 w-4 text-red-500" />
-  return <File className="h-4 w-4 text-muted-foreground" />
+  if (mimeType === 'application/pdf') return <FileText className='h-4 w-4 text-red-500' />
+  return <File className='h-4 w-4 text-muted-foreground' />
 }
 
 const ACCEPTED = [
@@ -63,7 +63,9 @@ export function LicenseAttachments({ licenseId, canManage }: LicenseAttachmentsP
 
   const baseUrl = `/api/inventory/licenses/${licenseId}/attachments`
 
-  useEffect(() => { loadAttachments() }, [licenseId])
+  useEffect(() => {
+    loadAttachments()
+  }, [licenseId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadAttachments = async () => {
     try {
@@ -80,7 +82,11 @@ export function LicenseAttachments({ licenseId, canManage }: LicenseAttachmentsP
     if (!file) return
 
     if (file.size > 20 * 1024 * 1024) {
-      toast({ title: 'Archivo muy grande', description: 'El límite es 20 MB', variant: 'destructive' })
+      toast({
+        title: 'Archivo muy grande',
+        description: 'El límite es 20 MB',
+        variant: 'destructive',
+      })
       return
     }
 
@@ -97,7 +103,11 @@ export function LicenseAttachments({ licenseId, canManage }: LicenseAttachmentsP
       setAttachments(prev => [newAttachment, ...prev])
       toast({ title: 'Archivo subido', description: file.name })
     } catch (err) {
-      toast({ title: 'Error', description: err instanceof Error ? err.message : 'No se pudo subir el archivo', variant: 'destructive' })
+      toast({
+        title: 'Error',
+        description: err instanceof Error ? err.message : 'No se pudo subir el archivo',
+        variant: 'destructive',
+      })
     } finally {
       setUploading(false)
     }
@@ -111,7 +121,11 @@ export function LicenseAttachments({ licenseId, canManage }: LicenseAttachmentsP
       setAttachments(prev => prev.filter(a => a.id !== deleteTarget.id))
       toast({ title: 'Archivo eliminado' })
     } catch (err) {
-      toast({ title: 'Error', description: extractCatchError(err, 'No se pudo eliminar el archivo'), variant: 'destructive' })
+      toast({
+        title: 'Error',
+        description: extractCatchError(err, 'No se pudo eliminar el archivo'),
+        variant: 'destructive',
+      })
     } finally {
       setDeleteTarget(null)
     }
@@ -124,10 +138,10 @@ export function LicenseAttachments({ licenseId, canManage }: LicenseAttachmentsP
   return (
     <>
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+        <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-3'>
           <div>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Paperclip className="h-4 w-4" />
+            <CardTitle className='flex items-center gap-2 text-base'>
+              <Paperclip className='h-4 w-4' />
               Documentos y Contratos
             </CardTitle>
             <CardDescription>
@@ -135,19 +149,30 @@ export function LicenseAttachments({ licenseId, canManage }: LicenseAttachmentsP
             </CardDescription>
           </div>
           {canManage && (
-            <FileInputWithCamera
-              accept={ACCEPTED}
-              onChange={handleUpload}
-            >
+            <FileInputWithCamera accept={ACCEPTED} onChange={handleUpload}>
               {({ openFile, openCamera, showCamera }) => (
-                <div className="flex items-center gap-1.5">
+                <div className='flex items-center gap-1.5'>
                   {showCamera && (
-                    <Button size="sm" variant="outline" onClick={openCamera} disabled={uploading} title="Tomar foto">
-                      {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                    <Button
+                      size='sm'
+                      variant='outline'
+                      onClick={openCamera}
+                      disabled={uploading}
+                      title='Tomar foto'
+                    >
+                      {uploading ? (
+                        <Loader2 className='h-4 w-4 animate-spin' />
+                      ) : (
+                        <Camera className='h-4 w-4' />
+                      )}
                     </Button>
                   )}
-                  <Button size="sm" variant="outline" onClick={openFile} disabled={uploading}>
-                    {uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+                  <Button size='sm' variant='outline' onClick={openFile} disabled={uploading}>
+                    {uploading ? (
+                      <Loader2 className='h-4 w-4 mr-2 animate-spin' />
+                    ) : (
+                      <Upload className='h-4 w-4 mr-2' />
+                    )}
                     {uploading ? 'Subiendo...' : showCamera ? 'Archivo' : 'Subir archivo'}
                   </Button>
                 </div>
@@ -157,37 +182,50 @@ export function LicenseAttachments({ licenseId, canManage }: LicenseAttachmentsP
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <div className='flex items-center justify-center py-8'>
+              <Loader2 className='h-6 w-6 animate-spin text-muted-foreground' />
             </div>
           ) : attachments.length === 0 ? (
-            <div className="text-center py-8 border-2 border-dashed rounded-lg">
-              <Paperclip className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-40" />
-              <p className="text-sm text-muted-foreground">Sin documentos adjuntos</p>
+            <div className='text-center py-8 border-2 border-dashed rounded-lg'>
+              <Paperclip className='h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-40' />
+              <p className='text-sm text-muted-foreground'>Sin documentos adjuntos</p>
               {canManage && (
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className='text-xs text-muted-foreground mt-1'>
                   Sube contratos, pólizas o documentos de la licencia
                 </p>
               )}
             </div>
           ) : (
-            <div className="divide-y">
+            <div className='divide-y'>
               {attachments.map(att => (
-                <div key={att.id} className="flex items-center gap-3 py-2.5">
+                <div key={att.id} className='flex items-center gap-3 py-2.5'>
                   <FileIcon mimeType={att.mimeType} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{att.originalName}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatSize(att.size)} · {att.uploader.name} · {new Date(att.createdAt).toLocaleDateString('es-EC')}
+                  <div className='flex-1 min-w-0'>
+                    <p className='text-sm font-medium truncate'>{att.originalName}</p>
+                    <p className='text-xs text-muted-foreground'>
+                      {formatSize(att.size)} · {att.uploader.name} ·{' '}
+                      {new Date(att.createdAt).toLocaleDateString('es-EC')}
                     </p>
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => downloadFile(att)} title="Descargar">
-                      <Download className="h-3.5 w-3.5" />
+                  <div className='flex items-center gap-1 shrink-0'>
+                    <Button
+                      size='icon'
+                      variant='ghost'
+                      className='h-7 w-7'
+                      onClick={() => downloadFile(att)}
+                      title='Descargar'
+                    >
+                      <Download className='h-3.5 w-3.5' />
                     </Button>
                     {canManage && (
-                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(att)} title="Eliminar">
-                        <Trash2 className="h-3.5 w-3.5" />
+                      <Button
+                        size='icon'
+                        variant='ghost'
+                        className='h-7 w-7 text-destructive hover:text-destructive'
+                        onClick={() => setDeleteTarget(att)}
+                        title='Eliminar'
+                      >
+                        <Trash2 className='h-3.5 w-3.5' />
                       </Button>
                     )}
                   </div>
@@ -203,12 +241,17 @@ export function LicenseAttachments({ licenseId, canManage }: LicenseAttachmentsP
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar archivo?</AlertDialogTitle>
             <AlertDialogDescription>
-              Se eliminará permanentemente <span className="font-medium">&quot;{deleteTarget?.originalName}&quot;</span>. Esta acción no se puede deshacer.
+              Se eliminará permanentemente{' '}
+              <span className='font-medium'>&quot;{deleteTarget?.originalName}&quot;</span>. Esta
+              acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={handleDelete}
+              className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
+            >
               Eliminar
             </AlertDialogAction>
           </AlertDialogFooter>

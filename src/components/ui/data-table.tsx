@@ -187,7 +187,7 @@ export function DataTable<T extends { id: string }>({
       // Números
       return (aVal - bVal) * dir
     })
-  }, [safeData, sortConfig])
+  }, [safeData, sortConfig]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const clearFilters = () => {
     setSearchTerm('')

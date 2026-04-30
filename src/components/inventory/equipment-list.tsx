@@ -11,7 +11,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/hooks/use-toast'
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
-import type { Equipment, EquipmentFilters as EquipmentFiltersType } from '@/types/inventory/equipment'
+import type {
+  Equipment,
+  EquipmentFilters as EquipmentFiltersType,
+} from '@/types/inventory/equipment'
 
 interface EquipmentListProps {
   onCreateNew?: () => void
@@ -20,32 +23,27 @@ interface EquipmentListProps {
   onViewQR?: (equipment: Equipment) => void
 }
 
-export function EquipmentList({
-  onCreateNew,
-  onEdit,
-  onDelete,
-  onViewQR,
-}: EquipmentListProps) {
+export function EquipmentList({ onCreateNew, onEdit, onDelete, onViewQR }: EquipmentListProps) {
   const { data: session } = useSession()
   const { toast } = useToast()
-  
+
   const [equipment, setEquipment] = useState<Equipment[]>([])
   const [loading, setLoading] = useState(true)
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [limit] = useState(10)
-  
+
   const [filters, setFilters] = useState<EquipmentFiltersType>({})
 
   // Cargar equipos
   useEffect(() => {
     loadEquipment()
-  }, [filters, page])
+  }, [filters, page]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadEquipment = async () => {
     try {
       setLoading(true)
-      
+
       // Construir query params
       const params = new URLSearchParams()
       if (filters.search) params.append('search', filters.search)
@@ -60,7 +58,7 @@ export function EquipmentList({
       const response = await fetch(`/api/inventory/equipment?${params}`, {
         cache: 'no-store',
       })
-      
+
       if (!response.ok) {
         throw new Error('Error al cargar equipos')
       }
@@ -90,7 +88,10 @@ export function EquipmentList({
     setPage(1)
   }
 
-  const canCreate = session?.user?.role === 'ADMIN' || session?.user?.role === 'TECHNICIAN' || (session?.user as any)?.canManageInventory === true
+  const canCreate =
+    session?.user?.role === 'ADMIN' ||
+    session?.user?.role === 'TECHNICIAN' ||
+    (session?.user as any)?.canManageInventory === true
 
   // Exportación — equipos visibles con filtros activos
   const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
@@ -104,27 +105,59 @@ export function EquipmentList({
       { key: 'model', label: 'Modelo' },
       { key: 'serialNumber', label: 'N° Serie' },
       { key: 'type', label: 'Tipo', format: v => (v as any)?.name ?? '' },
-      { key: 'status', label: 'Estado', format: (v: string) => ({ AVAILABLE: 'Disponible', ASSIGNED: 'Asignado', MAINTENANCE: 'Mantenimiento', DAMAGED: 'Dañado', RETIRED: 'Retirado' } as Record<string, string>)[v] ?? v },
-      { key: 'condition', label: 'Condición', format: (v: string) => ({ NEW: 'Nuevo', LIKE_NEW: 'Como Nuevo', GOOD: 'Bueno', FAIR: 'Regular', POOR: 'Malo' } as Record<string, string>)[v] ?? v },
+      {
+        key: 'status',
+        label: 'Estado',
+        format: (v: string) =>
+          (
+            ({
+              AVAILABLE: 'Disponible',
+              ASSIGNED: 'Asignado',
+              MAINTENANCE: 'Mantenimiento',
+              DAMAGED: 'Dañado',
+              RETIRED: 'Retirado',
+            }) as Record<string, string>
+          )[v] ?? v,
+      },
+      {
+        key: 'condition',
+        label: 'Condición',
+        format: (v: string) =>
+          (
+            ({
+              NEW: 'Nuevo',
+              LIKE_NEW: 'Como Nuevo',
+              GOOD: 'Bueno',
+              FAIR: 'Regular',
+              POOR: 'Malo',
+            }) as Record<string, string>
+          )[v] ?? v,
+      },
       { key: 'department', label: 'Departamento', format: v => (v as any)?.name ?? '' },
       { key: 'location', label: 'Ubicación', format: v => v ?? '' },
-      { key: 'purchaseDate', label: 'Fecha compra', format: v => v ? new Date(v).toLocaleDateString('es-ES') : '' },
-      { key: 'purchasePrice', label: 'Precio compra', format: v => v != null ? String(v) : '' },
-      { key: 'warrantyExpiration', label: 'Garantía hasta', format: v => v ? new Date(v).toLocaleDateString('es-ES') : '' },
+      {
+        key: 'purchaseDate',
+        label: 'Fecha compra',
+        format: v => (v ? new Date(v).toLocaleDateString('es-ES') : ''),
+      },
+      { key: 'purchasePrice', label: 'Precio compra', format: v => (v != null ? String(v) : '') },
+      {
+        key: 'warrantyExpiration',
+        label: 'Garantía hasta',
+        format: v => (v ? new Date(v).toLocaleDateString('es-ES') : ''),
+      },
     ],
   })
 
   return (
-    <div className="space-y-4">
+    <div className='space-y-4'>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className='flex items-center justify-between'>
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Equipos</h2>
-          <p className="text-muted-foreground">
-            Gestiona el inventario de equipos tecnológicos
-          </p>
+          <h2 className='text-2xl font-bold tracking-tight'>Equipos</h2>
+          <p className='text-muted-foreground'>Gestiona el inventario de equipos tecnológicos</p>
         </div>
-        <div className="flex gap-2">
+        <div className='flex gap-2'>
           <ExportButton
             onExportCSV={exportCSV}
             onExportExcel={exportExcel}
@@ -133,8 +166,8 @@ export function EquipmentList({
             disabled={equipment.length === 0}
           />
           {canCreate && onCreateNew && (
-            <Button onClick={onCreateNew} size="sm">
-              <Plus className="mr-2 h-4 w-4" />
+            <Button onClick={onCreateNew} size='sm'>
+              <Plus className='mr-2 h-4 w-4' />
               Nuevo Equipo
             </Button>
           )}
@@ -145,9 +178,7 @@ export function EquipmentList({
       <Card>
         <CardHeader>
           <CardTitle>Filtros</CardTitle>
-          <CardDescription>
-            Busca y filtra equipos por diferentes criterios
-          </CardDescription>
+          <CardDescription>Busca y filtra equipos por diferentes criterios</CardDescription>
         </CardHeader>
         <CardContent>
           <EquipmentFilters
@@ -161,24 +192,22 @@ export function EquipmentList({
       {/* Resultados */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className='flex items-center justify-between'>
             <div>
               <CardTitle>Resultados</CardTitle>
               <CardDescription>
-                {loading ? (
-                  'Cargando...'
-                ) : (
-                  `${total} equipo${total !== 1 ? 's' : ''} encontrado${total !== 1 ? 's' : ''}`
-                )}
+                {loading
+                  ? 'Cargando...'
+                  : `${total} equipo${total !== 1 ? 's' : ''} encontrado${total !== 1 ? 's' : ''}`}
               </CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="space-y-3">
+            <div className='space-y-3'>
               {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-16 w-full" />
+                <Skeleton key={i} className='h-16 w-full' />
               ))}
             </div>
           ) : (
@@ -191,25 +220,25 @@ export function EquipmentList({
                 onDelete={onDelete}
                 onViewQR={onViewQR}
               />
-              
+
               {/* Paginación */}
               {total > limit && (
-                <div className="mt-4 flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">
+                <div className='mt-4 flex items-center justify-between'>
+                  <p className='text-sm text-muted-foreground'>
                     Mostrando {(page - 1) * limit + 1} a {Math.min(page * limit, total)} de {total}
                   </p>
-                  <div className="flex gap-2">
+                  <div className='flex gap-2'>
                     <Button
-                      variant="outline"
-                      size="sm"
+                      variant='outline'
+                      size='sm'
                       onClick={() => setPage(p => Math.max(1, p - 1))}
                       disabled={page === 1}
                     >
                       Anterior
                     </Button>
                     <Button
-                      variant="outline"
-                      size="sm"
+                      variant='outline'
+                      size='sm'
                       onClick={() => setPage(p => p + 1)}
                       disabled={page * limit >= total}
                     >

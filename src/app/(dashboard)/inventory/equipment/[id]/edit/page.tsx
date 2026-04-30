@@ -31,7 +31,7 @@ export default function EditEquipmentPage({ params }: EditEquipmentPageProps) {
   useEffect(() => {
     if (!id) return
     loadEquipment()
-  }, [id])
+  }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadEquipment = async () => {
     try {
@@ -54,9 +54,9 @@ export default function EditEquipmentPage({ params }: EditEquipmentPageProps) {
 
   if (status === 'loading' || loading) {
     return (
-      <RoleDashboardLayout title="Cargando..." subtitle="Obteniendo información del equipo">
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <RoleDashboardLayout title='Cargando...' subtitle='Obteniendo información del equipo'>
+        <div className='flex items-center justify-center h-64'>
+          <Loader2 className='h-8 w-8 animate-spin text-primary' />
         </div>
       </RoleDashboardLayout>
     )
@@ -66,9 +66,9 @@ export default function EditEquipmentPage({ params }: EditEquipmentPageProps) {
 
   if (!equipment) {
     return (
-      <RoleDashboardLayout title="Error" subtitle="Equipo no encontrado">
-        <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">No se encontró el equipo solicitado</p>
+      <RoleDashboardLayout title='Error' subtitle='Equipo no encontrado'>
+        <div className='flex items-center justify-center h-64'>
+          <p className='text-muted-foreground'>No se encontró el equipo solicitado</p>
         </div>
       </RoleDashboardLayout>
     )
@@ -77,15 +77,13 @@ export default function EditEquipmentPage({ params }: EditEquipmentPageProps) {
   return (
     <RoleDashboardLayout
       title={`Editar Equipo: ${equipment.code}`}
-      subtitle="Modifica la información del equipo"
+      subtitle='Modifica la información del equipo'
     >
-      <div className="max-w-4xl mx-auto">
+      <div className='max-w-4xl mx-auto'>
         <Card>
           <CardHeader>
             <CardTitle>Editar Equipo</CardTitle>
-            <CardDescription>
-              Actualiza los datos del equipo {equipment.code}
-            </CardDescription>
+            <CardDescription>Actualiza los datos del equipo {equipment.code}</CardDescription>
           </CardHeader>
           <CardContent>
             <EquipmentForm

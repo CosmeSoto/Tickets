@@ -49,7 +49,7 @@ export function LandingPageCMSTab({ isSuperAdmin = false }: { isSuperAdmin?: boo
 
   useEffect(() => {
     loadContent()
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Detectar cambios no guardados
   useEffect(() => {
@@ -141,10 +141,10 @@ export function LandingPageCMSTab({ isSuperAdmin = false }: { isSuperAdmin?: boo
   if (loading) {
     return (
       <Card>
-        <CardContent className="py-8">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Cargando contenido...</p>
+        <CardContent className='py-8'>
+          <div className='text-center'>
+            <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4'></div>
+            <p className='text-muted-foreground'>Cargando contenido...</p>
           </div>
         </CardContent>
       </Card>
@@ -154,35 +154,31 @@ export function LandingPageCMSTab({ isSuperAdmin = false }: { isSuperAdmin?: boo
   if (!content) return null
 
   return (
-    <div className="space-y-6">
+    <div className='space-y-6'>
       {/* Header con acciones */}
-      <div className="flex items-center justify-between">
+      <div className='flex items-center justify-between'>
         <div>
-          <h3 className="text-lg font-medium">Gestión de Página Pública</h3>
-          <p className="text-sm text-muted-foreground">
+          <h3 className='text-lg font-medium'>Gestión de Página Pública</h3>
+          <p className='text-sm text-muted-foreground'>
             Personaliza el contenido de la página de inicio
           </p>
         </div>
-        <div className="flex items-center space-x-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={(e) => {
+        <div className='flex items-center space-x-2'>
+          <Button
+            variant='outline'
+            size='sm'
+            onClick={e => {
               e.preventDefault()
               e.stopPropagation()
               const previewUrl = `${window.location.origin}/?preview=true`
               window.open(previewUrl, '_blank', 'noopener,noreferrer')
             }}
           >
-            <Eye className="h-4 w-4 mr-2" />
+            <Eye className='h-4 w-4 mr-2' />
             Vista Previa
           </Button>
-          <Button 
-            size="sm" 
-            onClick={saveContent} 
-            disabled={saving}
-          >
-            <Save className="h-4 w-4 mr-2" />
+          <Button size='sm' onClick={saveContent} disabled={saving}>
+            <Save className='h-4 w-4 mr-2' />
             {saving ? 'Guardando...' : hasUnsavedChanges ? 'Guardar Cambios *' : 'Guardar Cambios'}
           </Button>
         </div>
@@ -191,107 +187,105 @@ export function LandingPageCMSTab({ isSuperAdmin = false }: { isSuperAdmin?: boo
       {/* Sección Hero */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center">
-            <Globe className="h-5 w-5 mr-2" />
+          <CardTitle className='flex items-center'>
+            <Globe className='h-5 w-5 mr-2' />
             Sección Hero
           </CardTitle>
-          <CardDescription>
-            Contenido principal de la página de inicio
-          </CardDescription>
+          <CardDescription>Contenido principal de la página de inicio</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="heroTitle">Título Principal</Label>
+        <CardContent className='space-y-4'>
+          <div className='space-y-2'>
+            <Label htmlFor='heroTitle'>Título Principal</Label>
             <Input
-              id="heroTitle"
+              id='heroTitle'
               value={content.heroTitle}
-              onChange={(e) => setContent({ ...content, heroTitle: e.target.value })}
-              placeholder="Soporte Técnico Profesional"
+              onChange={e => setContent({ ...content, heroTitle: e.target.value })}
+              placeholder='Soporte Técnico Profesional'
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="heroSubtitle">Subtítulo</Label>
+          <div className='space-y-2'>
+            <Label htmlFor='heroSubtitle'>Subtítulo</Label>
             <Textarea
-              id="heroSubtitle"
+              id='heroSubtitle'
               value={content.heroSubtitle}
-              onChange={(e) => setContent({ ...content, heroSubtitle: e.target.value })}
-              placeholder="Descripción breve de tus servicios"
+              onChange={e => setContent({ ...content, heroSubtitle: e.target.value })}
+              placeholder='Descripción breve de tus servicios'
               rows={3}
             />
           </div>
 
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="heroCtaPrimary">Texto Botón Principal</Label>
+          <div className='space-y-4'>
+            <div className='grid grid-cols-2 gap-4'>
+              <div className='space-y-2'>
+                <Label htmlFor='heroCtaPrimary'>Texto Botón Principal</Label>
                 <Input
-                  id="heroCtaPrimary"
+                  id='heroCtaPrimary'
                   value={content.heroCtaPrimary}
-                  onChange={(e) => setContent({ ...content, heroCtaPrimary: e.target.value })}
-                  placeholder="Crear Ticket de Soporte"
+                  onChange={e => setContent({ ...content, heroCtaPrimary: e.target.value })}
+                  placeholder='Crear Ticket de Soporte'
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="heroCtaPrimaryUrl">Acción Botón Principal</Label>
+              <div className='space-y-2'>
+                <Label htmlFor='heroCtaPrimaryUrl'>Acción Botón Principal</Label>
                 <Select
                   value={content.heroCtaPrimaryUrl}
-                  onValueChange={(value) => setContent({ ...content, heroCtaPrimaryUrl: value })}
+                  onValueChange={value => setContent({ ...content, heroCtaPrimaryUrl: value })}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="/login">Iniciar Sesión</SelectItem>
-                    <SelectItem value="/register">Registrarse</SelectItem>
-                    <SelectItem value="/client/tickets/create">Crear Ticket</SelectItem>
-                    <SelectItem value="#servicios">Ver Servicios</SelectItem>
+                    <SelectItem value='/login'>Iniciar Sesión</SelectItem>
+                    <SelectItem value='/register'>Registrarse</SelectItem>
+                    <SelectItem value='/client/tickets/create'>Crear Ticket</SelectItem>
+                    <SelectItem value='#servicios'>Ver Servicios</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="heroCtaSecondary">Texto Botón Secundario</Label>
+            <div className='grid grid-cols-2 gap-4'>
+              <div className='space-y-2'>
+                <Label htmlFor='heroCtaSecondary'>Texto Botón Secundario</Label>
                 <Input
-                  id="heroCtaSecondary"
+                  id='heroCtaSecondary'
                   value={content.heroCtaSecondary}
-                  onChange={(e) => setContent({ ...content, heroCtaSecondary: e.target.value })}
-                  placeholder="Ver Servicios"
+                  onChange={e => setContent({ ...content, heroCtaSecondary: e.target.value })}
+                  placeholder='Ver Servicios'
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="heroCtaSecondaryUrl">Acción Botón Secundario</Label>
+              <div className='space-y-2'>
+                <Label htmlFor='heroCtaSecondaryUrl'>Acción Botón Secundario</Label>
                 <Select
                   value={content.heroCtaSecondaryUrl}
-                  onValueChange={(value) => setContent({ ...content, heroCtaSecondaryUrl: value })}
+                  onValueChange={value => setContent({ ...content, heroCtaSecondaryUrl: value })}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="#servicios">Ver Servicios</SelectItem>
-                    <SelectItem value="/login">Iniciar Sesión</SelectItem>
-                    <SelectItem value="/register">Registrarse</SelectItem>
-                    <SelectItem value="/client/tickets/create">Crear Ticket</SelectItem>
+                    <SelectItem value='#servicios'>Ver Servicios</SelectItem>
+                    <SelectItem value='/login'>Iniciar Sesión</SelectItem>
+                    <SelectItem value='/register'>Registrarse</SelectItem>
+                    <SelectItem value='/client/tickets/create'>Crear Ticket</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className='space-y-2'>
             <ImageUploader
-              label="Imagen de Fondo (Opcional)"
+              label='Imagen de Fondo (Opcional)'
               currentUrl={content.heroImageUrl}
-              onUpload={(url) => {
+              onUpload={url => {
                 console.log('🖼️ Hero image uploaded, updating state:', url)
                 setContent({ ...content, heroImageUrl: url })
               }}
-              type="hero-bg"
+              type='hero-bg'
             />
           </div>
         </CardContent>
@@ -301,35 +295,33 @@ export function LandingPageCMSTab({ isSuperAdmin = false }: { isSuperAdmin?: boo
       <Card>
         <CardHeader>
           <CardTitle>Sección de Servicios</CardTitle>
-          <CardDescription>
-            Configura la sección de servicios
-          </CardDescription>
+          <CardDescription>Configura la sección de servicios</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center space-x-2">
+        <CardContent className='space-y-4'>
+          <div className='flex items-center space-x-2'>
             <Switch
-              id="servicesEnabled"
+              id='servicesEnabled'
               checked={content.servicesEnabled}
-              onCheckedChange={(checked) => setContent({ ...content, servicesEnabled: checked })}
+              onCheckedChange={checked => setContent({ ...content, servicesEnabled: checked })}
             />
-            <Label htmlFor="servicesEnabled">Mostrar sección de servicios</Label>
+            <Label htmlFor='servicesEnabled'>Mostrar sección de servicios</Label>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="servicesTitle">Título de Servicios</Label>
+          <div className='space-y-2'>
+            <Label htmlFor='servicesTitle'>Título de Servicios</Label>
             <Input
-              id="servicesTitle"
+              id='servicesTitle'
               value={content.servicesTitle}
-              onChange={(e) => setContent({ ...content, servicesTitle: e.target.value })}
+              onChange={e => setContent({ ...content, servicesTitle: e.target.value })}
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="servicesSubtitle">Subtítulo de Servicios</Label>
+          <div className='space-y-2'>
+            <Label htmlFor='servicesSubtitle'>Subtítulo de Servicios</Label>
             <Input
-              id="servicesSubtitle"
+              id='servicesSubtitle'
               value={content.servicesSubtitle}
-              onChange={(e) => setContent({ ...content, servicesSubtitle: e.target.value })}
+              onChange={e => setContent({ ...content, servicesSubtitle: e.target.value })}
             />
           </div>
         </CardContent>
@@ -341,11 +333,11 @@ export function LandingPageCMSTab({ isSuperAdmin = false }: { isSuperAdmin?: boo
       {/* Información de la Empresa */}
       <Card className={!isSuperAdmin ? 'opacity-60' : ''}>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className='flex items-center gap-2'>
             Información de la Empresa
             {!isSuperAdmin && (
-              <Badge className="bg-amber-100 text-amber-700 border-amber-200 flex items-center gap-1 text-xs">
-                <Crown className="h-3 w-3" />
+              <Badge className='bg-amber-100 text-amber-700 border-amber-200 flex items-center gap-1 text-xs'>
+                <Crown className='h-3 w-3' />
                 Solo Super Admin
               </Badge>
             )}
@@ -356,55 +348,59 @@ export function LandingPageCMSTab({ isSuperAdmin = false }: { isSuperAdmin?: boo
               : 'Solo el Administrador Principal puede modificar la identidad de la empresa'}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="companyName">Nombre de la Empresa</Label>
+        <CardContent className='space-y-4'>
+          <div className='space-y-2'>
+            <Label htmlFor='companyName'>Nombre de la Empresa</Label>
             <Input
-              id="companyName"
+              id='companyName'
               value={content.companyName}
-              onChange={(e) => isSuperAdmin && setContent({ ...content, companyName: e.target.value })}
+              onChange={e =>
+                isSuperAdmin && setContent({ ...content, companyName: e.target.value })
+              }
               disabled={!isSuperAdmin}
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="companyTagline">Eslogan</Label>
+          <div className='space-y-2'>
+            <Label htmlFor='companyTagline'>Eslogan</Label>
             <Input
-              id="companyTagline"
+              id='companyTagline'
               value={content.companyTagline}
-              onChange={(e) => isSuperAdmin && setContent({ ...content, companyTagline: e.target.value })}
+              onChange={e =>
+                isSuperAdmin && setContent({ ...content, companyTagline: e.target.value })
+              }
               disabled={!isSuperAdmin}
             />
           </div>
 
-          <div className="space-y-4">
+          <div className='space-y-4'>
             <ImageUploader
-              label="Logo Tema Claro"
+              label='Logo Tema Claro'
               currentUrl={content.companyLogoLightUrl}
-              onUpload={(url) => {
+              onUpload={url => {
                 if (!isSuperAdmin) return
                 setContent({ ...content, companyLogoLightUrl: url })
               }}
-              type="logo-light"
+              type='logo-light'
             />
-            
+
             <ImageUploader
-              label="Logo Tema Oscuro"
+              label='Logo Tema Oscuro'
               currentUrl={content.companyLogoDarkUrl}
-              onUpload={(url) => {
+              onUpload={url => {
                 if (!isSuperAdmin) return
                 setContent({ ...content, companyLogoDarkUrl: url })
               }}
-              type="logo-dark"
+              type='logo-dark'
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="footerText">Texto del Footer</Label>
+          <div className='space-y-2'>
+            <Label htmlFor='footerText'>Texto del Footer</Label>
             <Input
-              id="footerText"
+              id='footerText'
               value={content.footerText}
-              onChange={(e) => isSuperAdmin && setContent({ ...content, footerText: e.target.value })}
+              onChange={e => isSuperAdmin && setContent({ ...content, footerText: e.target.value })}
               disabled={!isSuperAdmin}
             />
           </div>
@@ -414,11 +410,11 @@ export function LandingPageCMSTab({ isSuperAdmin = false }: { isSuperAdmin?: boo
       {/* SEO */}
       <Card className={!isSuperAdmin ? 'opacity-60' : ''}>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className='flex items-center gap-2'>
             SEO y Metadatos
             {!isSuperAdmin && (
-              <Badge className="bg-amber-100 text-amber-700 border-amber-200 flex items-center gap-1 text-xs">
-                <Crown className="h-3 w-3" />
+              <Badge className='bg-amber-100 text-amber-700 border-amber-200 flex items-center gap-1 text-xs'>
+                <Crown className='h-3 w-3' />
                 Solo Super Admin
               </Badge>
             )}
@@ -429,26 +425,28 @@ export function LandingPageCMSTab({ isSuperAdmin = false }: { isSuperAdmin?: boo
               : 'Solo el Administrador Principal puede modificar el SEO'}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="metaTitle">Título SEO</Label>
+        <CardContent className='space-y-4'>
+          <div className='space-y-2'>
+            <Label htmlFor='metaTitle'>Título SEO</Label>
             <Input
-              id="metaTitle"
+              id='metaTitle'
               value={content.metaTitle}
-              onChange={(e) => isSuperAdmin && setContent({ ...content, metaTitle: e.target.value })}
+              onChange={e => isSuperAdmin && setContent({ ...content, metaTitle: e.target.value })}
               disabled={!isSuperAdmin}
-              placeholder="Sistema de Tickets - Soporte Técnico"
+              placeholder='Sistema de Tickets - Soporte Técnico'
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="metaDescription">Descripción SEO</Label>
+          <div className='space-y-2'>
+            <Label htmlFor='metaDescription'>Descripción SEO</Label>
             <Textarea
-              id="metaDescription"
+              id='metaDescription'
               value={content.metaDescription}
-              onChange={(e) => isSuperAdmin && setContent({ ...content, metaDescription: e.target.value })}
+              onChange={e =>
+                isSuperAdmin && setContent({ ...content, metaDescription: e.target.value })
+              }
               disabled={!isSuperAdmin}
-              placeholder="Descripción para motores de búsqueda"
+              placeholder='Descripción para motores de búsqueda'
               rows={3}
             />
           </div>
@@ -456,13 +454,14 @@ export function LandingPageCMSTab({ isSuperAdmin = false }: { isSuperAdmin?: boo
       </Card>
 
       {/* Botón de guardar al final */}
-      <div className="flex justify-end">
-        <Button 
-          onClick={saveContent} 
-          disabled={saving}
-        >
-          <Save className="h-4 w-4 mr-2" />
-          {saving ? 'Guardando...' : hasUnsavedChanges ? 'Guardar Todos los Cambios *' : 'Guardar Todos los Cambios'}
+      <div className='flex justify-end'>
+        <Button onClick={saveContent} disabled={saving}>
+          <Save className='h-4 w-4 mr-2' />
+          {saving
+            ? 'Guardando...'
+            : hasUnsavedChanges
+              ? 'Guardar Todos los Cambios *'
+              : 'Guardar Todos los Cambios'}
         </Button>
       </div>
     </div>

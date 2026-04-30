@@ -3,12 +3,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { 
-  BookOpen, 
-  Eye, 
-  ThumbsUp, 
-  FileText,
-} from 'lucide-react'
+import { BookOpen, Eye, ThumbsUp, FileText } from 'lucide-react'
 
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { BackToTickets } from '@/components/tickets/back-to-tickets'
@@ -58,9 +53,14 @@ function filterArticles(articles: Article[], filters: any) {
 function sortArticles(articles: Article[], sortBy: 'recent' | 'views' | 'helpful') {
   const sorted = [...articles]
   switch (sortBy) {
-    case 'views': return sorted.sort((a, b) => b.views - a.views)
-    case 'helpful': return sorted.sort((a, b) => b.helpfulVotes - a.helpfulVotes)
-    default: return sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    case 'views':
+      return sorted.sort((a, b) => b.views - a.views)
+    case 'helpful':
+      return sorted.sort((a, b) => b.helpfulVotes - a.helpfulVotes)
+    default:
+      return sorted.sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )
   }
 }
 
@@ -73,14 +73,20 @@ export default function KnowledgePage() {
   const { families } = useFamilies()
 
   // Usa el endpoint con filtrado por rol (cliente ve solo familias de sus tickets)
-  const { data: allArticles, loading, error, reload } = useModuleData<Article>({
+  const {
+    data: allArticles,
+    loading,
+    error,
+    reload,
+  } = useModuleData<Article>({
     endpoint: '/api/knowledge-articles',
     initialLoad: true,
   })
 
   // Familias ya disponibles desde el contexto global
 
-  const { filters, debouncedFilters, setFilter, clearFilters, hasActiveFilters } = useKnowledgeFilters()
+  const { filters, debouncedFilters, setFilter, clearFilters, hasActiveFilters } =
+    useKnowledgeFilters()
 
   // Resetear categoría cuando cambia la familia
   const prevFamilyRef = useRef(filters.family)
@@ -89,16 +95,24 @@ export default function KnowledgePage() {
       prevFamilyRef.current = filters.family
       if (filters.category !== 'all') setFilter('category', 'all')
     }
-  }, [filters.family])
+  }, [filters.family]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Categorías derivadas de los artículos de la familia seleccionada
   const categories = useMemo(() => {
     const seen = new Map<string, { id: string; name: string; color: string | null }>()
     allArticles
-      .filter(a => a.isPublished && (debouncedFilters.family === 'all' || a.familyId === debouncedFilters.family))
+      .filter(
+        a =>
+          a.isPublished &&
+          (debouncedFilters.family === 'all' || a.familyId === debouncedFilters.family)
+      )
       .forEach(a => {
         if (a.category && !seen.has(a.category.id)) {
-          seen.set(a.category.id, { id: a.category.id, name: a.category.name, color: a.category.color ?? null })
+          seen.set(a.category.id, {
+            id: a.category.id,
+            name: a.category.name,
+            color: a.category.color ?? null,
+          })
         }
       })
     return Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name))
@@ -117,14 +131,15 @@ export default function KnowledgePage() {
       total: published.length,
       totalViews: published.reduce((sum, a) => sum + a.views, 0),
       totalHelpful: published.reduce((sum, a) => sum + a.helpfulVotes, 0),
-      avgHelpful: published.length > 0
-        ? Math.round(
-            published.reduce((sum, a) => {
-              const total = a.helpfulVotes + a.notHelpfulVotes
-              return sum + (total > 0 ? (a.helpfulVotes / total) * 100 : 0)
-            }, 0) / published.length
-          )
-        : 0,
+      avgHelpful:
+        published.length > 0
+          ? Math.round(
+              published.reduce((sum, a) => {
+                const total = a.helpfulVotes + a.notHelpfulVotes
+                return sum + (total > 0 ? (a.helpfulVotes / total) * 100 : 0)
+              }, 0) / published.length
+            )
+          : 0,
     }
   }, [allArticles])
 
@@ -149,9 +164,13 @@ export default function KnowledgePage() {
       { key: 'family', label: 'Área', format: v => v?.name ?? '' },
       { key: 'views', label: 'Vistas' },
       { key: 'helpfulVotes', label: 'Votos útiles' },
-      { key: 'helpfulPercentage', label: '% Útil', format: v => v != null ? `${v}%` : '' },
-      { key: 'tags', label: 'Tags', format: v => Array.isArray(v) ? v.join(', ') : '' },
-      { key: 'createdAt', label: 'Creado', format: v => v ? new Date(v).toLocaleDateString('es-ES') : '' },
+      { key: 'helpfulPercentage', label: '% Útil', format: v => (v != null ? `${v}%` : '') },
+      { key: 'tags', label: 'Tags', format: v => (Array.isArray(v) ? v.join(', ') : '') },
+      {
+        key: 'createdAt',
+        label: 'Creado',
+        format: v => (v ? new Date(v).toLocaleDateString('es-ES') : ''),
+      },
     ],
   })
 
@@ -173,51 +192,51 @@ export default function KnowledgePage() {
       error={error}
       onRetry={reload}
     >
-      <div className="space-y-6">
+      <div className='space-y-6'>
         <BackToTickets />
 
         <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
           <SymmetricStatsCard
-            title="Artículos Disponibles"
+            title='Artículos Disponibles'
             value={stats.total}
             icon={BookOpen}
-            color="blue"
-            role="CLIENT"
+            color='blue'
+            role='CLIENT'
           />
           <SymmetricStatsCard
-            title="Artículos Útiles"
+            title='Artículos Útiles'
             value={stats.totalHelpful}
             icon={ThumbsUp}
-            color="green"
-            role="CLIENT"
-            status="success"
+            color='green'
+            role='CLIENT'
+            status='success'
           />
           <SymmetricStatsCard
-            title="Total Vistas"
+            title='Total Vistas'
             value={stats.totalViews}
             icon={Eye}
-            color="purple"
-            role="CLIENT"
+            color='purple'
+            role='CLIENT'
           />
           <SymmetricStatsCard
-            title="Valoración"
+            title='Valoración'
             value={`${stats.avgHelpful}%`}
             icon={FileText}
-            color="yellow"
-            role="CLIENT"
+            color='yellow'
+            role='CLIENT'
             status={stats.avgHelpful >= 80 ? 'success' : 'normal'}
           />
         </div>
 
         <KnowledgeFilters
           searchTerm={filters.search}
-          setSearchTerm={(term) => setFilter('search', term)}
+          setSearchTerm={term => setFilter('search', term)}
           categoryFilter={filters.category}
-          setCategoryFilter={(category) => setFilter('category', category)}
+          setCategoryFilter={category => setFilter('category', category)}
           sortBy={filters.sortBy}
-          setSortBy={(sort) => setFilter('sortBy', sort)}
+          setSortBy={sort => setFilter('sortBy', sort)}
           familyFilter={filters.family}
-          setFamilyFilter={(family) => setFilter('family', family)}
+          setFamilyFilter={family => setFilter('family', family)}
           onRefresh={reload}
           onClearFilters={clearFilters}
           categories={categories}
@@ -226,7 +245,7 @@ export default function KnowledgePage() {
         />
 
         <DataTable
-          title="Artículos de Conocimiento"
+          title='Artículos de Conocimiento'
           description={`Busca soluciones antes de crear un ticket (${processedArticles.length} artículos)`}
           data={pagination.currentItems}
           columns={createKnowledgeColumns({
@@ -250,7 +269,7 @@ export default function KnowledgePage() {
           }
           viewMode={viewMode}
           onViewModeChange={setViewMode}
-          cardRenderer={(article) => (
+          cardRenderer={article => (
             <KnowledgeCard
               article={article}
               onView={handleViewArticle}
@@ -259,11 +278,13 @@ export default function KnowledgePage() {
             />
           )}
           emptyState={{
-            icon: <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />,
-            title: hasActiveFilters ? "No se encontraron artículos" : "No hay artículos disponibles",
+            icon: <BookOpen className='h-12 w-12 text-muted-foreground mx-auto mb-4' />,
+            title: hasActiveFilters
+              ? 'No se encontraron artículos'
+              : 'No hay artículos disponibles',
             description: hasActiveFilters
-              ? "Intenta ajustar los filtros de búsqueda"
-              : "Aún no hay artículos publicados en la base de conocimientos",
+              ? 'Intenta ajustar los filtros de búsqueda'
+              : 'Aún no hay artículos publicados en la base de conocimientos',
           }}
         />
       </div>

@@ -41,25 +41,29 @@ export function DemoteTechnicianDialog({ open, onOpenChange, technician, onSucce
       setValidation(null)
       setValidating(true)
     }
-  }, [open, technician.id])
+  }, [open, technician.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const validateDemotion = async () => {
     setValidating(true)
     try {
       const response = await fetch(`/api/users/${technician.id}/demote/validate`)
       const result = await response.json()
-      
+
       if (response.ok) {
         setValidation(result)
       } else {
         setValidation({
           canDemote: false,
           assignedTickets: 0,
-          message: result.error || 'Error al validar'
+          message: result.error || 'Error al validar',
         })
       }
     } catch (err) {
-      setValidation({ canDemote: false, assignedTickets: 0, message: extractCatchError(err, 'Error de conexión al validar') })
+      setValidation({
+        canDemote: false,
+        assignedTickets: 0,
+        message: extractCatchError(err, 'Error de conexión al validar'),
+      })
     } finally {
       setValidating(false)
     }
@@ -71,7 +75,7 @@ export function DemoteTechnicianDialog({ open, onOpenChange, technician, onSucce
     setLoading(true)
     try {
       const response = await fetch(`/api/users/${technician.id}/demote`, {
-        method: 'POST'
+        method: 'POST',
       })
 
       const result = await response.json()
@@ -81,10 +85,18 @@ export function DemoteTechnicianDialog({ open, onOpenChange, technician, onSucce
         onSuccess()
         onOpenChange(false)
       } else {
-        toast({ title: 'Error al despromover', description: extractApiError(result), variant: 'destructive' })
+        toast({
+          title: 'Error al despromover',
+          description: extractApiError(result),
+          variant: 'destructive',
+        })
       }
     } catch (err) {
-      toast({ title: 'Error de conexión', description: extractCatchError(err), variant: 'destructive' })
+      toast({
+        title: 'Error de conexión',
+        description: extractCatchError(err),
+        variant: 'destructive',
+      })
     } finally {
       setLoading(false)
     }
@@ -94,27 +106,28 @@ export function DemoteTechnicianDialog({ open, onOpenChange, technician, onSucce
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <div className="flex items-center space-x-2">
-            <UserMinus className="h-5 w-5 text-orange-600" />
+          <div className='flex items-center space-x-2'>
+            <UserMinus className='h-5 w-5 text-orange-600' />
             <AlertDialogTitle>¿Despromover a Cliente?</AlertDialogTitle>
           </div>
           <AlertDialogDescription asChild>
             <div>
               {validating ? (
-                <div className="flex items-center justify-center py-6">
-                  <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-                  <span className="ml-2 text-muted-foreground">Validando...</span>
+                <div className='flex items-center justify-center py-6'>
+                  <Loader2 className='h-6 w-6 animate-spin text-blue-600' />
+                  <span className='ml-2 text-muted-foreground'>Validando...</span>
                 </div>
               ) : validation === null ? (
-                <span className="text-muted-foreground">Error al cargar validación</span>
+                <span className='text-muted-foreground'>Error al cargar validación</span>
               ) : validation.canDemote ? (
-                <div className="space-y-3">
+                <div className='space-y-3'>
                   <p>
-                    ¿Estás seguro de que deseas despromover a <strong>{technician.name}</strong> ({technician.email}) a cliente?
+                    ¿Estás seguro de que deseas despromover a <strong>{technician.name}</strong> (
+                    {technician.email}) a cliente?
                   </p>
-                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
-                    <p className="text-sm text-orange-900 font-medium mb-2">El usuario perderá:</p>
-                    <ul className="list-disc list-inside text-sm text-orange-800 space-y-1">
+                  <div className='bg-orange-50 border border-orange-200 rounded-lg p-3'>
+                    <p className='text-sm text-orange-900 font-medium mb-2'>El usuario perderá:</p>
+                    <ul className='list-disc list-inside text-sm text-orange-800 space-y-1'>
                       <li>Acceso al panel de técnico</li>
                       <li>Capacidad de gestionar tickets</li>
                       <li>Asignaciones de categorías</li>
@@ -123,17 +136,17 @@ export function DemoteTechnicianDialog({ open, onOpenChange, technician, onSucce
                   </div>
                 </div>
               ) : (
-                <div className="flex items-start space-x-3 p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1">
-                    <h4 className="font-medium text-red-900">No se puede despromover</h4>
-                    <p className="text-sm text-red-700 mt-1">{validation.message}</p>
+                <div className='flex items-start space-x-3 p-4 bg-red-50 border border-red-200 rounded-lg'>
+                  <AlertTriangle className='h-5 w-5 text-red-600 mt-0.5 flex-shrink-0' />
+                  <div className='flex-1'>
+                    <h4 className='font-medium text-red-900'>No se puede despromover</h4>
+                    <p className='text-sm text-red-700 mt-1'>{validation.message}</p>
                     {validation.assignedTickets > 0 && (
-                      <div className="mt-3 p-2 bg-red-100 rounded">
-                        <p className="text-sm text-red-800">
+                      <div className='mt-3 p-2 bg-red-100 rounded'>
+                        <p className='text-sm text-red-800'>
                           <strong>Tickets asignados:</strong> {validation.assignedTickets}
                         </p>
-                        <p className="text-xs text-red-700 mt-1">
+                        <p className='text-xs text-red-700 mt-1'>
                           Reasigna o cierra estos tickets antes de despromover
                         </p>
                       </div>
@@ -149,10 +162,10 @@ export function DemoteTechnicianDialog({ open, onOpenChange, technician, onSucce
             {validation?.canDemote ? 'Cancelar' : 'Cerrar'}
           </AlertDialogCancel>
           {validation?.canDemote && (
-            <AlertDialogAction 
-              onClick={handleDemote} 
+            <AlertDialogAction
+              onClick={handleDemote}
               disabled={loading}
-              className="bg-orange-600 hover:bg-orange-700"
+              className='bg-orange-600 hover:bg-orange-700'
             >
               {loading ? 'Despromoviendo...' : 'Despromover a Cliente'}
             </AlertDialogAction>

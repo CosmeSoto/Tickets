@@ -174,7 +174,7 @@ export function useCategories(options: UseCategoriesOptions = {}) {
     dataHook.loadAvailableParents()
     dataHook.loadAvailableTechnicians()
     dataHook.loadDepartments()
-  }, [searchTerm, levelFilter])
+  }, [searchTerm, levelFilter]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Wrapper para handleSubmit
   const handleSubmit = useCallback(

@@ -21,13 +21,12 @@ export function useUserModules() {
   const { data: session, status } = useSession()
   const [modules, setModules] = useState<UserModules>(DEFAULT)
   const [loading, setLoading] = useState(true)
+  const userId = session?.user?.id
 
   const load = useCallback(
     async (bypassCache = false) => {
-      if (status !== 'authenticated' || !session?.user) return
+      if (status !== 'authenticated' || !userId) return
       try {
-        // bypassCache=true añade timestamp para evitar cache del browser y fuerza
-        // que el servidor invalide su propio cache Redis antes de responder
         const url = bypassCache ? `/api/user/modules?_t=${Date.now()}` : '/api/user/modules'
         const res = await fetch(url, {
           headers: bypassCache ? { 'Cache-Control': 'no-cache' } : {},
@@ -42,8 +41,8 @@ export function useUserModules() {
         setLoading(false)
       }
     },
-    [status, session?.user?.id]
-  ) // eslint-disable-line react-hooks/exhaustive-deps
+    [status, userId]
+  )
 
   useEffect(() => {
     load()

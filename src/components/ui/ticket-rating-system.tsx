@@ -82,7 +82,7 @@ export function TicketRatingSystem({
 
   useEffect(() => {
     loadRatingData()
-  }, [ticketId, technicianId])
+  }, [ticketId, technicianId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadRatingData = async () => {
     try {

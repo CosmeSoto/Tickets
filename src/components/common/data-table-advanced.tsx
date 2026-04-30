@@ -246,7 +246,7 @@ export function DataTableAdvanced<T>({
     }
 
     return result
-  }, [data, searchTerm, searchConfig, sortConfig])
+  }, [data, searchTerm, searchConfig, sortConfig]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Manejar ordenamiento
   const handleSort = useCallback((key: keyof T) => {

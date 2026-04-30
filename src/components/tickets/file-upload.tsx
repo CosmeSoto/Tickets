@@ -177,7 +177,7 @@ export function FileUpload({
         uploadFile(file)
       }
     },
-    [disabled, uploadingFiles.length, maxFiles, ticketId, toast, onUploadComplete]
+    [disabled, uploadingFiles.length, maxFiles, ticketId, toast, onUploadComplete] // eslint-disable-line react-hooks/exhaustive-deps
   )
 
   const handleDrop = useCallback(

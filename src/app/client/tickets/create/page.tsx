@@ -5,14 +5,12 @@ import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import {
   Select,
   SelectContent,
@@ -20,16 +18,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Separator } from '@/components/ui/separator'
 import { createTicketSchema, CreateTicketData } from '@/lib/schemas/ticket-schemas'
 import { TicketPriority } from '@prisma/client'
-import { 
-  Ticket, 
-  AlertCircle, 
-  CheckCircle, 
-  Loader2, 
-  ArrowLeft, 
+import {
+  Ticket,
+  CheckCircle,
+  Loader2,
+  ArrowLeft,
   Tag,
   Zap,
   Upload,
@@ -44,7 +40,6 @@ import { CategorySelectorWrapper } from '@/features/category-selection'
 import { FilePreviewList } from '@/components/tickets/file-preview-list'
 import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { FileInputWithCamera } from '@/components/common/file-input-with-camera'
-import { useFamilies } from '@/contexts/families-context'
 
 interface FamilyOption {
   id: string
@@ -77,11 +72,13 @@ const priorityDescriptions = {
 
 export default function CreateClientTicketPage() {
   return (
-    <Suspense fallback={
-      <ModuleLayout title='Crear Ticket' subtitle='Nueva solicitud de soporte' loading={true}>
-        <div />
-      </ModuleLayout>
-    }>
+    <Suspense
+      fallback={
+        <ModuleLayout title='Crear Ticket' subtitle='Nueva solicitud de soporte' loading={true}>
+          <div />
+        </ModuleLayout>
+      }
+    >
       <CreateClientTicketContent />
     </Suspense>
   )
@@ -92,10 +89,8 @@ function CreateClientTicketContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
-  const [isLoading, setIsLoading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
-  const [createdTicketId, setCreatedTicketId] = useState<string | null>(null)
   const [equipmentId, setEquipmentId] = useState<string | null>(null)
   const [availableFamilies, setAvailableFamilies] = useState<FamilyOption[]>([])
   const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(null)
@@ -105,9 +100,7 @@ function CreateClientTicketContent() {
   // Estados para archivos
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
 
-  // Familias desde el contexto global (cache Redis, sin peticion extra)
-  const { families } = useFamilies()
-
+  // Familias disponibles para este cliente (cargadas localmente)
   const {
     register,
     handleSubmit,
@@ -186,7 +179,7 @@ function CreateClientTicketContent() {
       // Solo resetear si ya había una categoría seleccionada
       if (selectedCategoryId) setValue('categoryId', '')
     }
-  }, [selectedFamilyId])
+  }, [selectedFamilyId, selectedCategoryId, setValue])
 
   // Manejar selección de archivos
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -197,7 +190,7 @@ function CreateClientTicketContent() {
       toast({
         title: 'Límite excedido',
         description: 'Máximo 5 archivos permitidos',
-        variant: 'destructive'
+        variant: 'destructive',
       })
       return
     }
@@ -207,7 +200,7 @@ function CreateClientTicketContent() {
       toast({
         title: 'Archivo muy grande',
         description: 'Los archivos no deben superar 10MB',
-        variant: 'destructive'
+        variant: 'destructive',
       })
       return
     }
@@ -229,7 +222,7 @@ function CreateClientTicketContent() {
       try {
         await fetch(`/api/tickets/${ticketId}/attachments`, {
           method: 'POST',
-          body: formData
+          body: formData,
         })
       } catch (error) {
         console.error('Error uploading file:', error)
@@ -256,9 +249,9 @@ function CreateClientTicketContent() {
         const result = await response.json()
         const ticketId = result.data.id
         setCreatedTicketId(ticketId)
-        
+
         await uploadFiles(ticketId)
-        
+
         // Si viene de un reporte de equipo, vincular el ticket con el equipo
         if (equipmentId) {
           try {
@@ -274,7 +267,7 @@ function CreateClientTicketContent() {
             // No fallar si el vínculo falla, el ticket ya fue creado
           }
         }
-        
+
         setSubmitSuccess(true)
 
         // Disparar evento para actualizar notificaciones inmediatamente
@@ -282,7 +275,7 @@ function CreateClientTicketContent() {
 
         toast({
           title: 'Éxito',
-          description: 'Tu ticket ha sido creado exitosamente'
+          description: 'Tu ticket ha sido creado exitosamente',
         })
 
         setTimeout(() => {
@@ -293,7 +286,7 @@ function CreateClientTicketContent() {
         toast({
           title: 'Error',
           description: error.message || 'Error al crear el ticket',
-          variant: 'destructive'
+          variant: 'destructive',
         })
       }
     } catch (error) {
@@ -301,7 +294,7 @@ function CreateClientTicketContent() {
       toast({
         title: 'Error',
         description: 'Error de conexión al crear el ticket',
-        variant: 'destructive'
+        variant: 'destructive',
       })
     } finally {
       setIsSubmitting(false)
@@ -405,7 +398,8 @@ function CreateClientTicketContent() {
               <div className='space-y-1.5'>
                 <Label htmlFor='location' className='flex items-center gap-1.5'>
                   <MapPin className='h-3.5 w-3.5' />
-                  Ubicación / Área <span className='text-muted-foreground font-normal text-xs'>(opcional)</span>
+                  Ubicación / Área{' '}
+                  <span className='text-muted-foreground font-normal text-xs'>(opcional)</span>
                 </Label>
                 <Input
                   id='location'
@@ -452,8 +446,12 @@ function CreateClientTicketContent() {
                   </SelectContent>
                 </Select>
                 {selectedPriority && (
-                  <p className={`px-2 py-1.5 rounded text-xs ${priorityColors[selectedPriority as keyof typeof priorityColors]}`}>
-                    <strong>{priorityLabels[selectedPriority as keyof typeof priorityLabels]}:</strong>{' '}
+                  <p
+                    className={`px-2 py-1.5 rounded text-xs ${priorityColors[selectedPriority as keyof typeof priorityColors]}`}
+                  >
+                    <strong>
+                      {priorityLabels[selectedPriority as keyof typeof priorityLabels]}:
+                    </strong>{' '}
                     {priorityDescriptions[selectedPriority as keyof typeof priorityDescriptions]}
                   </p>
                 )}
@@ -475,22 +473,26 @@ function CreateClientTicketContent() {
                   <FamilyCombobox
                     families={availableFamilies}
                     value={selectedFamilyId ?? ''}
-                    onValueChange={(v) => setSelectedFamilyId(v || null)}
+                    onValueChange={v => setSelectedFamilyId(v || null)}
                     allowNull
                     nullLabel='Sin preferencia'
                     nullDescription='El sistema asignará automáticamente'
                     allowClear
                     popoverWidth='360px'
                   />
-                  {selectedFamilyId && (() => {
-                    const f = availableFamilies.find(x => x.id === selectedFamilyId)
-                    return f ? (
-                      <p className='text-xs text-muted-foreground flex items-center gap-1.5'>
-                        <span className='w-2 h-2 rounded-full' style={{ backgroundColor: f.color ?? '#6366f1' }} />
-                        Tu solicitud irá al equipo de <strong>{f.name}</strong>
-                      </p>
-                    ) : null
-                  })()}
+                  {selectedFamilyId &&
+                    (() => {
+                      const f = availableFamilies.find(x => x.id === selectedFamilyId)
+                      return f ? (
+                        <p className='text-xs text-muted-foreground flex items-center gap-1.5'>
+                          <span
+                            className='w-2 h-2 rounded-full'
+                            style={{ backgroundColor: f.color ?? '#6366f1' }}
+                          />
+                          Tu solicitud irá al equipo de <strong>{f.name}</strong>
+                        </p>
+                      ) : null
+                    })()}
                 </div>
               )}
 
@@ -501,12 +503,13 @@ function CreateClientTicketContent() {
                   Categoría *
                 </Label>
                 <p className='text-xs text-muted-foreground'>
-                  Selecciona la categoría que mejor describa tu problema. Usa la búsqueda (Ctrl+K) para encontrarla rápidamente.
+                  Selecciona la categoría que mejor describa tu problema. Usa la búsqueda (Ctrl+K)
+                  para encontrarla rápidamente.
                 </p>
                 <div className='border rounded-lg p-3 bg-muted/30'>
                   <CategorySelectorWrapper
                     value={selectedCategoryId}
-                    onChange={(categoryId) => setValue('categoryId', categoryId)}
+                    onChange={categoryId => setValue('categoryId', categoryId)}
                     ticketTitle={ticketTitle || ''}
                     ticketDescription={ticketDescription || ''}
                     clientId={session?.user?.id || ''}
@@ -531,26 +534,18 @@ function CreateClientTicketContent() {
                       <div className='flex items-center justify-between gap-4 flex-wrap'>
                         <div className='flex items-center gap-3'>
                           <Upload className='h-5 w-5 text-muted-foreground flex-shrink-0' />
-                          <p className='text-xs text-muted-foreground'>Máximo 5 archivos, 10MB cada uno</p>
+                          <p className='text-xs text-muted-foreground'>
+                            Máximo 5 archivos, 10MB cada uno
+                          </p>
                         </div>
                         <div className='flex items-center gap-2'>
                           {showCamera && (
-                            <Button
-                              type='button'
-                              variant='outline'
-                              size='sm'
-                              onClick={openCamera}
-                            >
+                            <Button type='button' variant='outline' size='sm' onClick={openCamera}>
                               <Camera className='h-3.5 w-3.5 mr-1.5' />
                               Cámara
                             </Button>
                           )}
-                          <Button
-                            type='button'
-                            variant='outline'
-                            size='sm'
-                            onClick={openFile}
-                          >
+                          <Button type='button' variant='outline' size='sm' onClick={openFile}>
                             <Paperclip className='h-3.5 w-3.5 mr-1.5' />
                             {showCamera ? 'Galería / Archivo' : 'Seleccionar'}
                           </Button>
@@ -567,10 +562,21 @@ function CreateClientTicketContent() {
 
               {/* Botones */}
               <div className='flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 pt-2'>
-                <Button type='button' variant='outline' size='sm' asChild className='w-full sm:w-auto'>
+                <Button
+                  type='button'
+                  variant='outline'
+                  size='sm'
+                  asChild
+                  className='w-full sm:w-auto'
+                >
                   <Link href='/client/tickets'>Cancelar</Link>
                 </Button>
-                <Button type='submit' size='sm' disabled={isSubmitting} className='w-full sm:w-auto'>
+                <Button
+                  type='submit'
+                  size='sm'
+                  disabled={isSubmitting}
+                  className='w-full sm:w-auto'
+                >
                   {isSubmitting ? (
                     <>
                       <Loader2 className='h-3.5 w-3.5 mr-1.5 animate-spin' />

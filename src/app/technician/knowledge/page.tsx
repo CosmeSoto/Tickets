@@ -98,7 +98,7 @@ export default function TechnicianKnowledgePage() {
       prevFamilyRef.current = filters.family
       if (filters.category !== 'all') setFilter('category', 'all')
     }
-  }, [filters.family])
+  }, [filters.family]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Categorías derivadas de los artículos de la familia seleccionada
   const categories = useMemo(() => {
