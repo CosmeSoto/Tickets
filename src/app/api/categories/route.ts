@@ -60,24 +60,57 @@ export async function GET(request: NextRequest) {
     }
 
     // Para ADMIN no-superadmin: restringir a familias asignadas
-    // Para TECHNICIAN/CLIENT: solo categorías activas de sus familias
+    // Para TECHNICIAN: solo categorías de sus familias asignadas
+    // Para CLIENT: solo categorías de su familia nativa + client_family_assignments
     const role = session.user.role
     const isSuperAdmin = (session.user as any).isSuperAdmin === true
 
-    if (role === 'ADMIN' && !isSuperAdmin && !familyId) {
-      try {
-        const assignments = await prisma.admin_family_assignments.findMany({
-          where: { adminId: session.user.id, isActive: true },
+    if (!familyId) {
+      // familyId explícito tiene prioridad — no sobreescribir
+      if (role === 'ADMIN' && !isSuperAdmin) {
+        try {
+          const assignments = await prisma.admin_family_assignments.findMany({
+            where: { adminId: session.user.id, isActive: true },
+            select: { familyId: true },
+          })
+          if (assignments.length > 0) {
+            where.departments = { familyId: { in: assignments.map(a => a.familyId) } }
+          }
+          // Sin asignaciones → ve todas (compatibilidad con admins existentes)
+        } catch {
+          /* tabla no existe → no restringir */
+        }
+      } else if (role === 'TECHNICIAN') {
+        const techAssignments = await prisma.technician_family_assignments.findMany({
+          where: { technicianId: session.user.id, isActive: true },
           select: { familyId: true },
         })
-        if (assignments.length > 0) {
-          const allowedFamilyIds = assignments.map(a => a.familyId)
-          // Solo aplicar restricción si tiene asignaciones explícitas
-          where.departments = { familyId: { in: allowedFamilyIds } }
+        if (techAssignments.length > 0) {
+          where.departments = { familyId: { in: techAssignments.map(a => a.familyId) } }
+        } else {
+          // Técnico sin familias asignadas → no mostrar categorías
+          where.departments = { familyId: { in: [] } }
         }
-        // Si no tiene asignaciones, ve todas (compatibilidad con admins existentes)
-      } catch {
-        // Si la tabla no existe, no restringir
+      } else if (role === 'CLIENT') {
+        const [userDept, clientAssignments] = await Promise.all([
+          prisma.users.findUnique({
+            where: { id: session.user.id },
+            select: { departments: { select: { familyId: true } } },
+          }),
+          prisma.client_family_assignments.findMany({
+            where: { clientId: session.user.id, isActive: true },
+            select: { familyId: true },
+          }),
+        ])
+        const allowedFamilyIds = new Set<string>(clientAssignments.map(a => a.familyId))
+        if (userDept?.departments?.familyId) allowedFamilyIds.add(userDept.departments.familyId)
+
+        if (allowedFamilyIds.size > 0) {
+          where.departments = { familyId: { in: Array.from(allowedFamilyIds) } }
+        } else {
+          // Cliente sin familias → no mostrar categorías
+          where.departments = { familyId: { in: [] } }
+        }
       }
     }
 
@@ -208,8 +241,8 @@ export async function GET(request: NextRequest) {
       },
     }
 
-    // Guardar en caché
-    const cacheKey = `categories:${isActive}:${level}:${parentId}:${familyId}:${session.user.id}`
+    // Clave de caché incluye userId para que cada usuario tenga su propio resultado filtrado
+    const cacheKey = `categories:${session.user.id}:${isActive}:${level}:${parentId}:${familyId}`
     try {
       const { setCache } = await import('@/lib/redis')
       await setCache(cacheKey, response, 180)
