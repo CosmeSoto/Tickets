@@ -79,32 +79,32 @@ const STATUS_CONFIG: Record<ContractStatus, { label: string; icon: any; cls: str
   DRAFT: {
     label: 'Borrador',
     icon: Clock,
-    cls: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
+    cls: 'bg-muted text-muted-foreground border border-border',
   },
   ACTIVE: {
     label: 'Vigente',
     icon: CheckCircle,
-    cls: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+    cls: 'bg-green-100 text-green-700 border border-green-200 dark:bg-green-500/20 dark:text-green-300 dark:border-green-500/40',
   },
   EXPIRING: {
     label: 'Por vencer',
     icon: AlertTriangle,
-    cls: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+    cls: 'bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/40',
   },
   EXPIRED: {
     label: 'Vencido',
     icon: XCircle,
-    cls: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+    cls: 'bg-red-100 text-red-700 border border-red-200 dark:bg-red-500/20 dark:text-red-300 dark:border-red-500/40',
   },
   TERMINATED: {
     label: 'Terminado',
     icon: XCircle,
-    cls: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+    cls: 'bg-muted text-muted-foreground border border-border',
   },
   RENEWED: {
     label: 'Renovado',
     icon: CheckCircle,
-    cls: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+    cls: 'bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-500/40',
   },
 }
 

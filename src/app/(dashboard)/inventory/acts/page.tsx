@@ -32,15 +32,22 @@ import { cn } from '@/lib/utils'
 const STATUS_CONFIG = {
   PENDING: {
     label: 'Pendiente',
-    color: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+    color:
+      'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-500/20 dark:text-yellow-300 dark:border-yellow-500/40',
     icon: Clock,
   },
   ACCEPTED: {
     label: 'Aceptada',
-    color: 'bg-green-100 text-green-800 border-green-300',
+    color:
+      'bg-green-100 text-green-800 border-green-300 dark:bg-green-500/20 dark:text-green-300 dark:border-green-500/40',
     icon: CheckCircle,
   },
-  REJECTED: { label: 'Rechazada', color: 'bg-red-100 text-red-800 border-red-300', icon: XCircle },
+  REJECTED: {
+    label: 'Rechazada',
+    color:
+      'bg-red-100 text-red-800 border-red-300 dark:bg-red-500/20 dark:text-red-300 dark:border-red-500/40',
+    icon: XCircle,
+  },
   EXPIRED: {
     label: 'Expirada',
     color: 'bg-muted text-muted-foreground border-border',
@@ -107,7 +114,7 @@ function DeliveryActsTab() {
   return (
     <div className='space-y-4'>
       {pendingCount > 0 && (
-        <div className='rounded-lg bg-yellow-50 border border-yellow-200 px-4 py-3 flex items-center gap-2 text-sm text-yellow-800'>
+        <div className='rounded-lg bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/40 px-4 py-3 flex items-center gap-2 text-sm text-yellow-800 dark:text-yellow-300'>
           <Clock className='h-4 w-4 shrink-0' />
           {pendingCount} acta{pendingCount > 1 ? 's' : ''} pendiente{pendingCount > 1 ? 's' : ''} de
           firma
@@ -195,7 +202,7 @@ function ReturnActsTab() {
   return (
     <div className='space-y-4'>
       {pendingCount > 0 && (
-        <div className='rounded-lg bg-purple-50 border border-purple-200 px-4 py-3 flex items-center gap-2 text-sm text-purple-800'>
+        <div className='rounded-lg bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/40 px-4 py-3 flex items-center gap-2 text-sm text-purple-800 dark:text-purple-300'>
           <ArrowLeftRight className='h-4 w-4 shrink-0' />
           {pendingCount} devolución{pendingCount > 1 ? 'es' : ''} pendiente
           {pendingCount > 1 ? 's' : ''} de firma
@@ -311,7 +318,7 @@ function DecommissionActsTab() {
   return (
     <div className='space-y-4'>
       {pendingCount > 0 && (
-        <div className='rounded-lg bg-red-50 border border-red-200 px-4 py-3 flex items-center gap-2 text-sm text-red-800'>
+        <div className='rounded-lg bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/40 px-4 py-3 flex items-center gap-2 text-sm text-red-800 dark:text-red-300'>
           <Trash2 className='h-4 w-4 shrink-0' />
           {pendingCount} solicitud{pendingCount > 1 ? 'es' : ''} de baja pendiente
           {pendingCount > 1 ? 's' : ''} de aprobación
@@ -549,8 +556,8 @@ function ActCard({
   const StatusIcon = cfg.icon
   const borderColor = highlight
     ? accentColor === 'purple'
-      ? 'border-l-purple-400 bg-purple-50/10'
-      : 'border-l-yellow-400 bg-yellow-50/20'
+      ? 'border-l-purple-400 bg-purple-500/5 dark:bg-purple-500/10'
+      : 'border-l-yellow-400 bg-yellow-500/5 dark:bg-yellow-500/10'
     : 'border-l-transparent'
   const badgeColor =
     accentColor === 'purple'

@@ -274,32 +274,32 @@ export default function TechnicianDashboard() {
             </CardHeader>
             <CardContent>
               <div className='space-y-4'>
-                <div className='flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-950/50 rounded-lg'>
+                <div className='flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-100 dark:border-blue-900/50'>
                   <div>
                     <p className='text-sm font-medium'>Tiempo Respuesta</p>
                     <p className='text-xs text-muted-foreground'>Promedio actual</p>
                   </div>
-                  <Badge className='bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'>
+                  <Badge className='bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-500/40'>
                     {stats.avgFirstResponseTime || '45min'}
                   </Badge>
                 </div>
-                <div className='flex items-center justify-between p-3 bg-green-50 dark:bg-green-950/50 rounded-lg'>
+                <div className='flex items-center justify-between p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-100 dark:border-green-900/50'>
                   <div>
                     <p className='text-sm font-medium'>Resolución</p>
                     <p className='text-xs text-muted-foreground'>Tiempo promedio</p>
                   </div>
-                  <Badge className='bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'>
+                  <Badge className='bg-green-100 text-green-700 border border-green-200 dark:bg-green-500/20 dark:text-green-300 dark:border-green-500/40'>
                     {stats.avgResolutionTime || '2h'}
                   </Badge>
                 </div>
-                <div className='flex items-center justify-between p-3 bg-purple-50 dark:bg-purple-950/50 rounded-lg'>
+                <div className='flex items-center justify-between p-3 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-100 dark:border-purple-900/50'>
                   <div>
                     <p className='text-sm font-medium'>Calificación</p>
                     <p className='text-xs text-muted-foreground'>Satisfacción cliente</p>
                   </div>
                   <div className='flex items-center space-x-1'>
                     <Star className='h-4 w-4 text-yellow-500 fill-current' />
-                    <Badge className='bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'>
+                    <Badge className='bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-500/20 dark:text-purple-300 dark:border-purple-500/40'>
                       {stats.satisfactionScore || 0}/5
                     </Badge>
                   </div>

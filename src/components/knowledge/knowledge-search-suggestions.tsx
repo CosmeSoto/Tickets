@@ -59,11 +59,9 @@ export function KnowledgeSearchSuggestions({
   if (loading) {
     return (
       <Alert>
-        <Loader2 className="h-4 w-4 animate-spin" />
+        <Loader2 className='h-4 w-4 animate-spin' />
         <AlertTitle>Buscando soluciones similares...</AlertTitle>
-        <AlertDescription>
-          Estamos revisando nuestra base de conocimientos
-        </AlertDescription>
+        <AlertDescription>Estamos revisando nuestra base de conocimientos</AlertDescription>
       </Alert>
     )
   }
@@ -72,7 +70,7 @@ export function KnowledgeSearchSuggestions({
   if (hasSearched && articles.length === 0) {
     return (
       <Alert>
-        <Search className="h-4 w-4" />
+        <Search className='h-4 w-4' />
         <AlertTitle>No encontramos soluciones similares</AlertTitle>
         <AlertDescription>
           Parece ser un problema nuevo. Continúa creando el ticket.
@@ -84,33 +82,29 @@ export function KnowledgeSearchSuggestions({
   // Mostrar sugerencias
   if (articles.length > 0) {
     return (
-      <Card className="border-yellow-200 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950">
+      <Card className='border-yellow-200 bg-yellow-50/60 dark:border-yellow-800/60 dark:bg-yellow-500/10'>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Lightbulb className="h-5 w-5 text-yellow-600" />
+          <CardTitle className='flex items-center gap-2 text-lg'>
+            <Lightbulb className='h-5 w-5 text-yellow-600' />
             ¿Es alguno de estos tu problema?
           </CardTitle>
-          <CardDescription>
-            Encontramos soluciones similares que podrían ayudarte
-          </CardDescription>
+          <CardDescription>Encontramos soluciones similares que podrían ayudarte</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className='space-y-3'>
           {articles.map((article, index) => (
             <div
               key={article.id}
-              className="p-3 bg-white dark:bg-gray-900 border rounded-lg hover:shadow-md transition-shadow cursor-pointer"
+              className='p-3 bg-card border rounded-lg hover:shadow-md hover:border-muted-foreground/30 transition-shadow cursor-pointer'
               onClick={() => onArticleClick(article)}
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      #{index + 1}
-                    </span>
+              <div className='flex items-start justify-between gap-2'>
+                <div className='flex-1 min-w-0'>
+                  <div className='flex items-center gap-2 mb-1'>
+                    <span className='text-xs font-medium text-muted-foreground'>#{index + 1}</span>
                     {article.category && (
                       <Badge
-                        variant="outline"
-                        className="text-xs"
+                        variant='outline'
+                        className='text-xs'
                         style={{
                           borderColor: article.category.color,
                           color: article.category.color,
@@ -120,44 +114,34 @@ export function KnowledgeSearchSuggestions({
                       </Badge>
                     )}
                     {article.helpfulPercentage && article.helpfulPercentage >= 80 && (
-                      <Badge variant="default" className="text-xs bg-green-500">
+                      <Badge variant='default' className='text-xs bg-green-500'>
                         Muy útil
                       </Badge>
                     )}
                   </div>
-                  
-                  <h4 className="text-sm font-medium line-clamp-2 mb-1">
-                    {article.title}
-                  </h4>
-                  
-                  <p className="text-xs text-muted-foreground line-clamp-2">
-                    {article.summary}
-                  </p>
 
-                  <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                  <h4 className='text-sm font-medium line-clamp-2 mb-1'>{article.title}</h4>
+
+                  <p className='text-xs text-muted-foreground line-clamp-2'>{article.summary}</p>
+
+                  <div className='flex items-center gap-3 mt-2 text-xs text-muted-foreground'>
                     <span>{article.views} vistas</span>
                     {article.helpfulPercentage && article.helpfulPercentage > 0 && (
-                      <span className="text-green-600 font-medium">
+                      <span className='text-green-600 font-medium'>
                         {article.helpfulPercentage}% útil
                       </span>
                     )}
                   </div>
                 </div>
 
-                <ExternalLink className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <ExternalLink className='h-4 w-4 text-muted-foreground flex-shrink-0' />
               </div>
             </div>
           ))}
 
-          <div className="flex items-center justify-between pt-2 border-t">
-            <p className="text-xs text-muted-foreground">
-              ¿Alguno de estos resuelve tu problema?
-            </p>
-            <Button
-              variant="link"
-              size="sm"
-              onClick={() => window.open('/knowledge', '_blank')}
-            >
+          <div className='flex items-center justify-between pt-2 border-t'>
+            <p className='text-xs text-muted-foreground'>¿Alguno de estos resuelve tu problema?</p>
+            <Button variant='link' size='sm' onClick={() => window.open('/knowledge', '_blank')}>
               Ver más artículos
             </Button>
           </div>

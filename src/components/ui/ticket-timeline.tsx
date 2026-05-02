@@ -464,10 +464,10 @@ export function TicketTimeline({
                   variant={metadata.status === 'completed' ? 'default' : 'outline'}
                   className={`text-xs ${
                     metadata.status === 'completed'
-                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                      ? 'bg-green-100 text-green-700 border border-green-200 dark:bg-green-500/20 dark:text-green-300 dark:border-green-500/40'
                       : metadata.status === 'active'
-                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                        : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+                        ? 'bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-500/40'
+                        : 'bg-muted text-muted-foreground border border-border'
                   }`}
                 >
                   {metadata.status === 'draft' && '📝 Borrador'}
