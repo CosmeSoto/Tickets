@@ -122,7 +122,7 @@ export class ConsumableService {
           type: data.type,
           quantity: data.quantity,
           reason: data.reason,
-          userId,
+          userId: _userId,
           assignedToUserId: data.assignedToUserId || null,
           assignedToEquipmentId: data.assignedToEquipmentId || null,
         },
@@ -151,7 +151,7 @@ export class ConsumableService {
           action: 'STOCK_MOVEMENT',
           entityType: 'asset',
           entityId: data.consumableId,
-          userId,
+          userId: _userId,
           details: {
             type: data.type,
             quantity: data.quantity,

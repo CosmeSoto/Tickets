@@ -17,7 +17,60 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const includeInactive = searchParams.get('includeInactive') === 'true'
 
-    // ── Clientes y técnicos: todas las familias habilitadas para tickets ────
+    // ── Clientes: solo las familias explícitamente asignadas ────────────────
+    if (session.user.role === 'CLIENT') {
+      const [user, clientAssignments] = await Promise.all([
+        prisma.users.findUnique({
+          where: { id: session.user.id },
+          select: { departments: { select: { familyId: true } } },
+        }),
+        prisma.client_family_assignments.findMany({
+          where: { clientId: session.user.id, isActive: true },
+          select: { familyId: true },
+        }),
+      ])
+
+      const userFamilyId = user?.departments?.familyId ?? null
+
+      // Construir el conjunto de familias permitidas:
+      // la familia nativa del departamento + las asignaciones explícitas
+      const allowedFamilyIds = new Set<string>(clientAssignments.map(a => a.familyId))
+      if (userFamilyId) allowedFamilyIds.add(userFamilyId)
+
+      if (allowedFamilyIds.size === 0) {
+        return NextResponse.json({ success: true, data: [] })
+      }
+
+      const families = (await (prisma.families.findMany as any)({
+        where: {
+          id: { in: Array.from(allowedFamilyIds) },
+          isActive: true,
+          ticketFamilyConfig: { ticketsEnabled: true },
+        },
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          color: true,
+          icon: true,
+          description: true,
+          isActive: true,
+          ticketFamilyConfig: { select: { ticketsEnabled: true, allowedFromFamilies: true } },
+        },
+        orderBy: { order: 'asc' },
+      })) as any[]
+
+      return NextResponse.json({
+        success: true,
+        data: families.map((f: any) => ({
+          ...f,
+          isOwnFamily: f.id === userFamilyId,
+          isRestricted: (f.ticketFamilyConfig?.allowedFromFamilies ?? []).length > 0,
+        })),
+      })
+    }
+
+    // ── Técnicos: todas las familias habilitadas para tickets ────────────────
     if (session.user.role !== 'ADMIN') {
       const user = await prisma.users.findUnique({
         where: { id: session.user.id },
@@ -28,14 +81,19 @@ export async function GET(request: NextRequest) {
       const families = (await (prisma.families.findMany as any)({
         where: { isActive: true, ticketFamilyConfig: { ticketsEnabled: true } },
         select: {
-          id: true, name: true, code: true, color: true, icon: true,
-          description: true, isActive: true,
+          id: true,
+          name: true,
+          code: true,
+          color: true,
+          icon: true,
+          description: true,
+          isActive: true,
           ticketFamilyConfig: { select: { ticketsEnabled: true, allowedFromFamilies: true } },
         },
         orderBy: { order: 'asc' },
       })) as any[]
 
-      const accessible = families.filter(f => {
+      const accessible = families.filter((f: any) => {
         const allowed = f.ticketFamilyConfig?.allowedFromFamilies ?? []
         if (allowed.length === 0) return true
         if (!userFamilyId) return true
@@ -44,7 +102,7 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        data: accessible.map(f => ({
+        data: accessible.map((f: any) => ({
           ...f,
           isOwnFamily: f.id === userFamilyId,
           isRestricted: (f.ticketFamilyConfig?.allowedFromFamilies ?? []).length > 0,
@@ -70,13 +128,18 @@ export async function GET(request: NextRequest) {
           const allowedIds = new Set(assignments.map(a => a.familyId))
           families = families.filter(f => allowedIds.has(f.id))
         }
-      } catch { /* fallback seguro */ }
+      } catch {
+        /* fallback seguro */
+      }
     }
 
     return NextResponse.json({ success: true, data: families })
   } catch (error) {
     console.error('[GET /api/families]', error)
-    return NextResponse.json({ success: false, message: 'Error al obtener familias' }, { status: 500 })
+    return NextResponse.json(
+      { success: false, message: 'Error al obtener familias' },
+      { status: 500 }
+    )
   }
 }
 

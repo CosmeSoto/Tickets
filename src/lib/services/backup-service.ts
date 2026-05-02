@@ -5,6 +5,7 @@ import { join } from 'path'
 import { createHash, randomUUID } from 'crypto'
 import prisma from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
+import { BackupCloudService, type CloudProvider } from './backup-cloud-service'
 
 const execAsync = promisify(exec)
 
@@ -108,12 +109,12 @@ export class BackupService {
         command += ` > "${filepath}"`
 
         console.log('Ejecutando backup con pg_dump (contraseña oculta)')
-        
-        const { stdout, stderr } = await execAsync(command, { 
+
+        const { stdout, stderr } = await execAsync(command, {
           timeout: 300000, // 5 minutos timeout
-          maxBuffer: 1024 * 1024 * 100 // 100MB buffer
+          maxBuffer: 1024 * 1024 * 100, // 100MB buffer
         })
-        
+
         if (stderr && !stderr.includes('NOTICE')) {
           console.warn('Advertencias durante el backup:', stderr)
         }
@@ -144,7 +145,7 @@ export class BackupService {
       let finalFilepath = filepath
       let compressed = false
       let encrypted = false
-      
+
       // Aplicar compresión si está habilitada
       if (config.compression) {
         try {
@@ -172,29 +173,28 @@ export class BackupService {
 
       // Actualizar registro con información final
       const finalStats = await stat(finalFilepath)
-      
-      const updateData: any = {
-        filepath: finalFilepath,
-        size: finalStats.size,
-        status: 'completed'
-      }
-
-      // Por ahora, no guardar checksum hasta actualizar el schema
-      // if (checksum) {
-      //   try {
-      //     updateData.checksum = checksum
-      //   } catch (error) {
-      //     console.warn('No se pudo guardar checksum:', error)
-      //   }
-      // }
 
       await prisma.backups.update({
         where: { id: backupRecord.id },
-        data: updateData
+        data: {
+          filepath: finalFilepath,
+          size: finalStats.size,
+          status: 'completed',
+          checksum: checksum ?? null,
+          compressed,
+          encrypted,
+        },
       })
 
       // Limpiar backups antiguos
       await this.cleanOldBackups()
+
+      // Subir a cloud storage si está habilitado (fire and forget)
+      if (config.cloudStorage && config.cloudProvider) {
+        this.uploadToCloud(backupRecord.id, finalFilepath, config.cloudProvider as any).catch(err =>
+          console.error('[CLOUD] Error subiendo backup a la nube:', err)
+        )
+      }
 
       // Enviar notificaciones si están habilitadas (simplificado)
       try {
@@ -202,7 +202,7 @@ export class BackupService {
           await this.sendBackupNotification('success', {
             filename,
             size: finalStats.size,
-            type
+            type,
           })
         }
       } catch (error) {
@@ -222,7 +222,7 @@ export class BackupService {
               filename,
               size: finalStats.size,
               type,
-              checksum: checksum || null
+              checksum: checksum || null,
             },
           },
         })
@@ -239,7 +239,7 @@ export class BackupService {
         status: 'completed',
         checksum,
         compressed,
-        encrypted
+        encrypted,
       }
     } catch (error) {
       console.error('Error al crear backup:', error)
@@ -249,8 +249,8 @@ export class BackupService {
         where: { id: backupRecord.id },
         data: {
           status: 'failed',
-          error: error instanceof Error ? error.message : 'Error desconocido'
-        }
+          error: error instanceof Error ? error.message : 'Error desconocido',
+        },
       })
 
       // Enviar notificación de error (simplificado)
@@ -260,7 +260,7 @@ export class BackupService {
           await this.sendBackupNotification('error', {
             filename,
             error: error instanceof Error ? error.message : 'Error desconocido',
-            type
+            type,
           })
         }
       } catch (notificationError) {
@@ -297,7 +297,6 @@ export class BackupService {
       // Verificar que el archivo no está corrupto intentando leerlo
       const stats = await stat(backup.filepath)
       return stats.size > 0
-
     } catch (error) {
       console.error('Error al verificar integridad del backup:', error)
       return false
@@ -317,7 +316,7 @@ export class BackupService {
 
       const totalBackups = await prisma.backups.count()
       const completedBackups = await prisma.backups.count({
-        where: { status: 'completed' }
+        where: { status: 'completed' },
       })
 
       const successRate = totalBackups > 0 ? (completedBackups / totalBackups) * 100 : 0
@@ -328,7 +327,7 @@ export class BackupService {
         lastBackup: stats._max.createdAt || undefined,
         oldestBackup: stats._min.createdAt || undefined,
         successRate,
-        avgSize: stats._avg.size || 0
+        avgSize: stats._avg.size || 0,
       }
     } catch (error) {
       console.error('Error al obtener estadísticas de backup:', error)
@@ -336,7 +335,7 @@ export class BackupService {
         totalBackups: 0,
         totalSize: 0,
         successRate: 0,
-        avgSize: 0
+        avgSize: 0,
       }
     }
   }
@@ -345,13 +344,14 @@ export class BackupService {
     try {
       const { readFile } = await import('fs/promises')
       const { createHash } = await import('crypto')
-      
+
       // Para archivos grandes, usar streaming
       const stats = await stat(filepath)
-      if (stats.size > 50 * 1024 * 1024) { // 50MB
+      if (stats.size > 50 * 1024 * 1024) {
+        // 50MB
         return this.calculateChecksumStream(filepath)
       }
-      
+
       const data = await readFile(filepath)
       return createHash('sha256').update(data).digest('hex')
     } catch (error) {
@@ -363,12 +363,12 @@ export class BackupService {
   private static async calculateChecksumStream(filepath: string): Promise<string> {
     const { createReadStream } = await import('fs')
     const { createHash } = await import('crypto')
-    
+
     return new Promise((resolve, reject) => {
       const hash = createHash('sha256')
       const stream = createReadStream(filepath)
-      
-      stream.on('data', (data) => hash.update(data))
+
+      stream.on('data', data => hash.update(data))
       stream.on('end', () => resolve(hash.digest('hex')))
       stream.on('error', reject)
     })
@@ -378,30 +378,122 @@ export class BackupService {
     const { createGzip } = await import('zlib')
     const { createReadStream, createWriteStream } = await import('fs')
     const { pipeline } = await import('stream/promises')
-    
+
     const compressedPath = filepath + '.gz'
-    
+
     await pipeline(
       createReadStream(filepath),
       createGzip({ level: this.COMPRESSION_LEVEL }),
       createWriteStream(compressedPath)
     )
-    
+
     // Eliminar archivo original
     await unlink(filepath)
-    
+
     return compressedPath
   }
 
+  /**
+   * Encripta un archivo de backup usando AES-256-GCM.
+   *
+   * Formato del archivo .enc:
+   *   [4 bytes: longitud del IV] [16 bytes: IV] [16 bytes: auth tag] [N bytes: datos cifrados]
+   *
+   * Requiere la variable de entorno BACKUP_ENCRYPTION_KEY (mínimo 32 caracteres).
+   * Genera un IV aleatorio por cada backup para garantizar que dos backups del mismo
+   * contenido produzcan archivos cifrados distintos.
+   */
   private static async encryptFile(filepath: string): Promise<string> {
-    // TODO: Implementar encriptación real con AES-256
-    // Por ahora, solo simular el proceso para evitar errores
-    console.warn('Encriptación no implementada completamente - usando placeholder')
-    
-    // En una implementación real, usar crypto.createCipher con AES-256
-    // const cipher = crypto.createCipher('aes-256-cbc', process.env.BACKUP_ENCRYPTION_KEY)
-    
-    return filepath // Retornar el mismo archivo por ahora
+    const key = process.env.BACKUP_ENCRYPTION_KEY
+    if (!key || key.length < 32) {
+      throw new Error(
+        'BACKUP_ENCRYPTION_KEY no configurada o demasiado corta (mínimo 32 caracteres). ' +
+          'Genera una con: openssl rand -hex 32'
+      )
+    }
+
+    const { createCipheriv, randomBytes, createHash: nodeCreateHash } = await import('crypto')
+    const { createReadStream, createWriteStream } = await import('fs')
+    const { pipeline } = await import('stream/promises')
+
+    // Derivar clave de 32 bytes desde la variable de entorno (SHA-256)
+    const keyBuffer = nodeCreateHash('sha256').update(key).digest()
+
+    // IV aleatorio de 16 bytes (recomendado para GCM: 12 bytes, pero 16 también funciona)
+    const iv = randomBytes(16)
+
+    const encryptedPath = filepath + '.enc'
+
+    // Cifrar con AES-256-GCM (autenticado — detecta tampering)
+    const cipher = createCipheriv('aes-256-gcm', keyBuffer, iv)
+
+    await pipeline(createReadStream(filepath), cipher, createWriteStream(encryptedPath))
+
+    // El auth tag se obtiene DESPUÉS de que el pipeline termina
+    const authTag = cipher.getAuthTag() // 16 bytes
+
+    // Prepend: [4 bytes ivLen][iv][16 bytes authTag] al inicio del archivo cifrado
+    // Leemos el archivo cifrado, anteponemos el header y reescribimos
+    const { readFile: fsReadFile, writeFile: fsWriteFile } = await import('fs/promises')
+    const encryptedData = await fsReadFile(encryptedPath)
+
+    const ivLenBuf = Buffer.alloc(4)
+    ivLenBuf.writeUInt32BE(iv.length, 0)
+
+    const finalBuffer = Buffer.concat([ivLenBuf, iv, authTag, encryptedData])
+    await fsWriteFile(encryptedPath, finalBuffer)
+
+    // Eliminar archivo original sin cifrar
+    await unlink(filepath)
+
+    console.log(`Backup cifrado con AES-256-GCM: ${encryptedPath} (${finalBuffer.length} bytes)`)
+    return encryptedPath
+  }
+
+  /**
+   * Descifra un archivo .enc generado por encryptFile().
+   * Devuelve la ruta del archivo descifrado (sin extensión .enc).
+   */
+  private static async decryptFile(encryptedPath: string): Promise<string> {
+    const key = process.env.BACKUP_ENCRYPTION_KEY
+    if (!key || key.length < 32) {
+      throw new Error(
+        'BACKUP_ENCRYPTION_KEY no configurada. No se puede descifrar el backup. ' +
+          'Asegúrate de que la variable de entorno esté definida con la misma clave usada al cifrar.'
+      )
+    }
+
+    const { createDecipheriv, createHash: nodeCreateHash } = await import('crypto')
+    const { createWriteStream } = await import('fs')
+    const { pipeline } = await import('stream/promises')
+    const { readFile: fsReadFile } = await import('fs/promises')
+
+    const keyBuffer = nodeCreateHash('sha256').update(key).digest()
+
+    // Leer el archivo completo para extraer el header
+    const fileData = await fsReadFile(encryptedPath)
+
+    // Parsear header: [4 bytes ivLen][iv][16 bytes authTag][datos cifrados]
+    const ivLen = fileData.readUInt32BE(0)
+    const iv = fileData.subarray(4, 4 + ivLen)
+    const authTag = fileData.subarray(4 + ivLen, 4 + ivLen + 16)
+    const encryptedData = fileData.subarray(4 + ivLen + 16)
+
+    // Descifrar
+    const decipher = createDecipheriv('aes-256-gcm', keyBuffer, iv)
+    decipher.setAuthTag(authTag)
+
+    const decryptedPath = encryptedPath.replace(/\.enc$/, '')
+    const decryptedData = Buffer.concat([
+      decipher.update(encryptedData),
+      decipher.final(), // lanza error si el auth tag no coincide (archivo alterado)
+    ])
+
+    const { writeFile: fsWriteFile } = await import('fs/promises')
+    await fsWriteFile(decryptedPath, decryptedData)
+
+    console.log(`Backup descifrado: ${decryptedPath}`)
+    return decryptedPath
   }
 
   private static async getBackupConfig() {
@@ -410,34 +502,71 @@ export class BackupService {
         where: {
           key: {
             in: [
+              'backupEnabled',
+              'backupFrequency',
+              'backupRetention',
+              'backupMaxCount',
               'backupCompression',
               'backupEncryption',
+              'backupCloudStorage',
+              'backupCloudProvider',
+              'backupNotifications',
+              'backupEmailNotifications',
               'backupVerifyIntegrity',
-              'backupNotifications'
-            ]
-          }
-        }
+              'backupScheduleTime',
+            ],
+          },
+        },
       })
 
-      const config = settings.reduce((acc, setting) => {
-        acc[setting.key.replace('backup', '').toLowerCase()] = setting.value === 'true'
-        return acc
-      }, {} as Record<string, boolean>)
+      const raw = settings.reduce(
+        (acc, s) => {
+          acc[s.key] = s.value
+          return acc
+        },
+        {} as Record<string, string>
+      )
 
       return {
-        compression: config.compression ?? true,
-        encryption: config.encryption ?? false,
-        verifyIntegrity: config.verifyintegrity ?? true,
-        notifications: config.notifications ?? true
+        enabled: raw.backupEnabled !== undefined ? raw.backupEnabled === 'true' : true,
+        frequency: (raw.backupFrequency as 'daily' | 'weekly' | 'monthly') ?? 'daily',
+        retentionDays: raw.backupRetention !== undefined ? parseInt(raw.backupRetention) : 30,
+        maxBackups: raw.backupMaxCount !== undefined ? parseInt(raw.backupMaxCount) : 100,
+        compression: raw.backupCompression !== undefined ? raw.backupCompression === 'true' : true,
+        encryption: raw.backupEncryption !== undefined ? raw.backupEncryption === 'true' : false,
+        cloudStorage:
+          raw.backupCloudStorage !== undefined ? raw.backupCloudStorage === 'true' : false,
+        cloudProvider: raw.backupCloudProvider ?? null,
+        notifications:
+          raw.backupNotifications !== undefined ? raw.backupNotifications === 'true' : true,
+        emailNotifications: raw.backupEmailNotifications
+          ? (() => {
+              try {
+                return JSON.parse(raw.backupEmailNotifications)
+              } catch {
+                return []
+              }
+            })()
+          : [],
+        verifyIntegrity:
+          raw.backupVerifyIntegrity !== undefined ? raw.backupVerifyIntegrity === 'true' : true,
+        scheduleTime: raw.backupScheduleTime ?? '02:00',
       }
     } catch (error) {
       console.error('Error loading backup config:', error)
-      // Valores por defecto en caso de error
       return {
+        enabled: true,
+        frequency: 'daily' as const,
+        retentionDays: 30,
+        maxBackups: 100,
         compression: true,
         encryption: false,
+        cloudStorage: false,
+        cloudProvider: null,
+        notifications: true,
+        emailNotifications: [],
         verifyIntegrity: true,
-        notifications: true
+        scheduleTime: '02:00',
       }
     }
   }
@@ -446,7 +575,7 @@ export class BackupService {
     try {
       // Obtener emails de notificación
       const emailSetting = await prisma.system_settings.findUnique({
-        where: { key: 'backupEmailNotifications' }
+        where: { key: 'backupEmailNotifications' },
       })
 
       if (!emailSetting?.value) {
@@ -462,7 +591,6 @@ export class BackupService {
 
       // TODO: Implementar envío de emails real
       console.log(`Notificación de backup ${type}:`, data, 'a emails:', emails)
-      
     } catch (error) {
       console.error('Error al enviar notificación de backup:', error)
       // No lanzar error para no interrumpir el proceso de backup
@@ -473,17 +601,17 @@ export class BackupService {
   static async verifyAndFixBackupStates(): Promise<void> {
     try {
       console.log('Verificando estados de backups...')
-      
+
       const backups = await prisma.backups.findMany({
         where: {
-          status: 'in_progress'
-        }
+          status: 'in_progress',
+        },
       })
-      
+
       for (const backup of backups) {
         try {
           const stats = await stat(backup.filepath)
-          
+
           if (stats.size > 0) {
             // El archivo existe y tiene contenido, corregir estado
             await prisma.backups.update({
@@ -491,8 +619,8 @@ export class BackupService {
               data: {
                 status: 'completed',
                 size: stats.size,
-                error: null
-              }
+                error: null,
+              },
             })
             console.log(`Estado corregido para backup: ${backup.filename}`)
           } else {
@@ -501,8 +629,8 @@ export class BackupService {
               where: { id: backup.id },
               data: {
                 status: 'failed',
-                error: 'Archivo de backup vacío'
-              }
+                error: 'Archivo de backup vacío',
+              },
             })
           }
         } catch (error) {
@@ -511,8 +639,8 @@ export class BackupService {
             where: { id: backup.id },
             data: {
               status: 'failed',
-              error: 'Archivo de backup no encontrado'
-            }
+              error: 'Archivo de backup no encontrado',
+            },
           })
         }
       }
@@ -525,7 +653,7 @@ export class BackupService {
     try {
       // Verificar y corregir estados inconsistentes automáticamente
       await this.verifyAndFixBackupStates()
-      
+
       const backups = await prisma.backups.findMany({
         orderBy: { createdAt: 'desc' },
         take: 50,
@@ -538,9 +666,9 @@ export class BackupService {
         createdAt: backup.createdAt,
         type: backup.type as 'manual' | 'automatic',
         status: backup.status as 'completed' | 'failed' | 'in_progress',
-        checksum: undefined, // Por ahora no disponible
-        compressed: false,   // Por ahora no disponible
-        encrypted: false     // Por ahora no disponible
+        checksum: backup.checksum ?? undefined,
+        compressed: backup.compressed,
+        encrypted: backup.encrypted,
       }))
     } catch (error) {
       console.error('Error al listar backups:', error)
@@ -556,7 +684,9 @@ export class BackupService {
 
       if (!backup) {
         // Si el backup no existe en la BD, considerarlo como ya eliminado
-        console.log(`Backup ${backupId} no encontrado en la base de datos, posiblemente ya eliminado`)
+        console.log(
+          `Backup ${backupId} no encontrado en la base de datos, posiblemente ya eliminado`
+        )
         return // No lanzar error, simplemente retornar
       }
 
@@ -566,7 +696,10 @@ export class BackupService {
         await unlink(backup.filepath)
         console.log(`Archivo de backup eliminado: ${backup.filepath}`)
       } catch (error) {
-        console.warn(`No se pudo eliminar el archivo de backup (puede que no exista): ${backup.filepath}`, error)
+        console.warn(
+          `No se pudo eliminar el archivo de backup (puede que no exista): ${backup.filepath}`,
+          error
+        )
         // No lanzar error aquí, continuar con la eliminación del registro
       }
 
@@ -578,7 +711,10 @@ export class BackupService {
         console.log(`Registro de backup eliminado: ${backupId}`)
       } catch (dbError) {
         // Si el registro ya no existe, no es un error
-        if (dbError instanceof Error && dbError.message.includes('Record to delete does not exist')) {
+        if (
+          dbError instanceof Error &&
+          dbError.message.includes('Record to delete does not exist')
+        ) {
           console.log(`Registro de backup ${backupId} ya no existe en la base de datos`)
           return
         }
@@ -604,7 +740,6 @@ export class BackupService {
         console.warn('No se pudo registrar eliminación en auditoría:', auditError)
         // No fallar por esto
       }
-
     } catch (error) {
       console.error('Error al eliminar backup:', error)
       throw error
@@ -632,176 +767,51 @@ export class BackupService {
       try {
         const isValid = await this.verifyBackupIntegrity(backupId)
         if (!isValid) {
-          console.warn('Advertencia: El backup puede estar corrupto, pero continuando con la restauración')
+          console.warn(
+            'Advertencia: El backup puede estar corrupto, pero continuando con la restauración'
+          )
         }
       } catch (error) {
         console.warn('No se pudo verificar la integridad del backup:', error)
       }
 
-      // Leer el contenido del backup
-      const backupContent = await readFile(backup.filepath, 'utf-8')
-      
-      let backupData: any
+      // ── Descifrar si el archivo está encriptado (.enc) ──────────────────────
+      let workingFilepath = backup.filepath
+      let decryptedTempPath: string | null = null
+
+      if (backup.filepath.endsWith('.enc')) {
+        console.log('Backup encriptado detectado, descifrando...')
+        try {
+          workingFilepath = await this.decryptFile(backup.filepath)
+          decryptedTempPath = workingFilepath
+          console.log(`Backup descifrado temporalmente en: ${workingFilepath}`)
+        } catch (decryptError) {
+          throw new Error(
+            `No se pudo descifrar el backup: ${decryptError instanceof Error ? decryptError.message : 'Error desconocido'}. ` +
+              'Verifica que BACKUP_ENCRYPTION_KEY sea la misma que se usó al crear el backup.'
+          )
+        }
+      }
+
+      // Detectar formato del archivo de trabajo (ya descifrado si aplica)
+      const isSqlBackup = workingFilepath.endsWith('.sql') || workingFilepath.endsWith('.sql.gz')
+
       try {
-        backupData = JSON.parse(backupContent)
-      } catch (error) {
-        throw new Error('El archivo de backup no tiene un formato JSON válido')
-      }
-
-      // Detectar y normalizar el formato del backup
-      let normalizedData: any
-      
-      if (backupData.metadata && backupData.data) {
-        // Formato nuevo
-        console.log('Detectado formato de backup nuevo')
-        normalizedData = backupData.data
-      } else if (backupData.tables) {
-        // Formato anterior
-        console.log('Detectado formato de backup anterior')
-        normalizedData = backupData.tables
-      } else {
-        console.error('Estructura del backup:', Object.keys(backupData))
-        throw new Error('El archivo de backup no tiene una estructura reconocida')
-      }
-
-      console.log('Iniciando restauración de backup:', backup.filename)
-      console.log('Tablas disponibles:', Object.keys(normalizedData))
-
-      // Mapear nombres de tablas del formato anterior al nuevo
-      const tableMapping: { [key: string]: string } = {
-        // Mapeo básico
-        'users': 'user',
-        'categories': 'category',
-        'tickets': 'ticket',
-        'ticketComments': 'comment',
-        'comments': 'comment',
-        'notifications': 'notification',
-        'auditLogs': 'auditLog',
-        
-        // Mapeo adicional para todas las tablas
-        'technician_assignments': 'technicianAssignment',
-        'ticketRatings': 'ticketRating',
-        'ticket_ratings': 'ticketRating',
-        'ticketHistory': 'ticketHistory',
-        'ticket_history': 'ticketHistory',
-        'attachments': 'attachment',
-        'notificationPreferences': 'notificationPreference',
-        'notification_preferences': 'notificationPreference',
-        'oauthAccounts': 'oAuthAccount',
-        'oauth_accounts': 'oAuthAccount',
-        'accounts': 'account',
-        'sessions': 'session',
-        'pages': 'page',
-        'siteConfig': 'siteConfig',
-        'site_config': 'siteConfig',
-        'systemSettings': 'systemSetting',
-        'system_settings': 'systemSetting',
-        'backups': 'backup',
-        'verificationTokens': 'verificationToken',
-        'verification_tokens': 'verificationToken'
-      }
-
-      // Normalizar nombres de tablas
-      const mappedData: { [key: string]: any[] } = {}
-      for (const [oldName, data] of Object.entries(normalizedData)) {
-        const newName = tableMapping[oldName] || oldName
-        mappedData[newName] = Array.isArray(data) ? data : []
-      }
-
-      console.log('Tablas a restaurar:', Object.keys(mappedData))
-
-      // Crear una transacción para la restauración
-      await prisma.$transaction(async (tx) => {
-        // Limpiar datos existentes usando SQL directo para manejar foreign keys
-        console.log('Limpiando base de datos...')
-        
-        // Deshabilitar temporalmente las foreign key constraints
-        await tx.$executeRaw(Prisma.sql`SET session_replication_role = replica;`)
-        
-        // Limpiar tablas en cualquier orden ya que las constraints están deshabilitadas
-        const allTables = [
-          'verification_tokens', 'site_config', 'pages', 'system_settings', 'backups',
-          'audit_logs', 'sessions', 'accounts', 'oauth_accounts', 'notification_preferences',
-          'notifications', 'attachments', 'ticket_history', 'ticket_ratings', 'comments',
-          'tickets', 'technician_assignments', 'categories', 'users'
-        ]
-        
-        for (const tableName of allTables) {
+        if (isSqlBackup) {
+          await this.restoreFromSQL({ ...backup, filepath: workingFilepath })
+        } else {
+          await this.restoreFromJSON({ ...backup, filepath: workingFilepath })
+        }
+      } finally {
+        // Limpiar archivo descifrado temporal (nunca dejar datos sin cifrar en disco)
+        if (decryptedTempPath) {
           try {
-            await tx.$executeRaw(Prisma.sql`DELETE FROM ${Prisma.raw(tableName)};`)
-            console.log(`✓ Limpiada tabla: ${tableName}`)
-          } catch (error) {
-            console.warn(`⚠ Error limpiando tabla ${tableName}:`, error)
+            await unlink(decryptedTempPath)
+          } catch {
+            /* ignorar */
           }
         }
-        
-        // Rehabilitar foreign key constraints
-        await tx.$executeRaw(Prisma.sql`SET session_replication_role = DEFAULT;`)
-
-        // Restaurar datos (en orden correcto por dependencias)
-        const tablesToRestore = [
-          // Tablas base
-          'user',               // Base
-          'category',           // Puede tener parent
-          
-          // Tablas de asignaciones
-          'technicianAssignment', // Depende de user y category ✅ AGREGADO
-          
-          // Tablas relacionadas con tickets
-          'ticket',             // Depende de category y user
-          'comment',            // Depende de ticket y user
-          'ticketRating',       // Depende de ticket y user
-          'ticketHistory',      // Depende de ticket y user
-          'attachment',         // Depende de ticket y user
-          
-          // Tablas de configuración y notificaciones
-          'notification',       // Depende de user y ticket
-          'notificationPreference', // Depende de user
-          'oAuthAccount',       // Depende de user
-          'account',            // Depende de user
-          'session',            // Depende de user
-          'auditLog',           // Depende de user (opcional)
-          
-          // Tablas independientes
-          'backup',
-          'systemSetting',
-          'page',
-          'siteConfig',
-          'verificationToken'
-        ]
-
-        for (const tableName of tablesToRestore) {
-          const tableData = mappedData[tableName]
-          if (tableData && Array.isArray(tableData) && tableData.length > 0) {
-            console.log(`Restaurando ${tableData.length} registros en tabla: ${tableName}`)
-            
-            try {
-              // Restaurar registros uno por uno para manejar mejor los errores
-              for (let i = 0; i < tableData.length; i++) {
-                const record = tableData[i]
-                try {
-                  // Convertir fechas de string a Date objects
-                  const processedRecord = this.processRecordForRestore(record)
-                  await (tx as any)[tableName].create({
-                    data: processedRecord
-                  })
-                } catch (recordError) {
-                  console.error(`Error restaurando registro ${i + 1} de tabla ${tableName}:`, recordError)
-                  console.error('Datos del registro:', JSON.stringify(record, null, 2))
-                  throw recordError
-                }
-              }
-            } catch (error) {
-              console.error(`Error restaurando tabla ${tableName}:`, error)
-              throw new Error(`Error al restaurar tabla ${tableName}: ${error instanceof Error ? error.message : 'Error desconocido'}`)
-            }
-          }
-        }
-      }, {
-        timeout: 300000 // 5 minutos de timeout
-      })
-
-      console.log('Restauración completada exitosamente')
+      }
 
       // Registrar restauración en auditoría
       await prisma.audit_logs.create({
@@ -814,8 +824,9 @@ export class BackupService {
           details: {
             backupId: backup.id,
             filename: backup.filename,
+            method: isSqlBackup ? 'psql' : 'prisma-json',
+            wasEncrypted: backup.filepath.endsWith('.enc'),
             restoredAt: new Date(),
-            tablesRestored: Object.keys(mappedData),
           },
         },
       })
@@ -825,30 +836,315 @@ export class BackupService {
     }
   }
 
+  /**
+   * Restaura un backup SQL usando psql (el método correcto para backups pg_dump).
+   */
+  private static async restoreFromSQL(backup: {
+    id: string
+    filename: string
+    filepath: string
+  }): Promise<void> {
+    const databaseUrl = process.env.DATABASE_URL
+    if (!databaseUrl) throw new Error('DATABASE_URL no configurada')
+
+    // Verificar que psql esté disponible
+    try {
+      await execAsync('which psql')
+    } catch {
+      throw new Error(
+        'psql no está disponible en el sistema. No se puede restaurar un backup SQL sin psql. ' +
+          'Instala postgresql-client o usa un backup en formato JSON.'
+      )
+    }
+
+    const url = new URL(databaseUrl)
+    const dbConfig = {
+      host: url.hostname,
+      port: url.port || '5432',
+      database: url.pathname.slice(1),
+      username: url.username,
+      password: url.password,
+    }
+
+    let sourceFile = backup.filepath
+
+    // Descomprimir si es necesario
+    if (backup.filepath.endsWith('.gz')) {
+      const decompressedPath = backup.filepath.replace('.gz', '')
+      console.log('Descomprimiendo backup...')
+      await execAsync(`gunzip -c "${backup.filepath}" > "${decompressedPath}"`)
+      sourceFile = decompressedPath
+    }
+
+    console.log(`Restaurando backup SQL: ${backup.filename}`)
+
+    try {
+      const command = `PGPASSWORD="${dbConfig.password}" psql -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database} -f "${sourceFile}" --single-transaction`
+
+      const { stderr } = await execAsync(command, {
+        timeout: 600000, // 10 minutos
+        maxBuffer: 1024 * 1024 * 100,
+      })
+
+      if (stderr && !stderr.includes('NOTICE') && !stderr.includes('WARNING')) {
+        console.warn('Advertencias durante la restauración SQL:', stderr)
+      }
+
+      console.log('Restauración SQL completada exitosamente')
+    } finally {
+      // Limpiar archivo descomprimido temporal
+      if (sourceFile !== backup.filepath) {
+        try {
+          await unlink(sourceFile)
+        } catch {
+          /* ignorar */
+        }
+      }
+    }
+  }
+
+  /**
+   * Restaura un backup JSON generado por el método Prisma.
+   */
+  private static async restoreFromJSON(backup: {
+    id: string
+    filename: string
+    filepath: string
+  }): Promise<void> {
+    // Leer el contenido del backup
+    const backupContent = await readFile(backup.filepath, 'utf-8')
+
+    let backupData: any
+    try {
+      backupData = JSON.parse(backupContent)
+    } catch (error) {
+      throw new Error(
+        'El archivo de backup no tiene un formato JSON válido. Si es un backup SQL (.sql), asegúrate de que psql esté instalado.'
+      )
+    }
+
+    // Detectar y normalizar el formato del backup
+    let normalizedData: any
+
+    if (backupData.metadata && backupData.data) {
+      // Formato v2 (nuevo — tabla directa por nombre real)
+      console.log('Detectado formato de backup v2 (Prisma completo)')
+      normalizedData = backupData.data
+    } else if (backupData.tables) {
+      // Formato v1 (anterior — nombres de tabla en camelCase)
+      console.log('Detectado formato de backup v1 (Prisma básico)')
+      normalizedData = backupData.tables
+    } else {
+      throw new Error(
+        'El archivo de backup no tiene una estructura reconocida. Claves encontradas: ' +
+          Object.keys(backupData).join(', ')
+      )
+    }
+
+    console.log('Iniciando restauración JSON:', backup.filename)
+    console.log('Tablas disponibles:', Object.keys(normalizedData))
+
+    // Mapear nombres de tablas del formato v1 al nombre real de Prisma
+    const tableMapping: Record<string, string> = {
+      users: 'users',
+      categories: 'categories',
+      tickets: 'tickets',
+      ticketComments: 'comments',
+      comments: 'comments',
+      notifications: 'notifications',
+      auditLogs: 'audit_logs',
+      technician_assignments: 'technician_assignments',
+      ticketRatings: 'ticket_ratings',
+      ticket_ratings: 'ticket_ratings',
+      ticketHistory: 'ticket_history',
+      ticket_history: 'ticket_history',
+      attachments: 'attachments',
+      notificationPreferences: 'notification_preferences',
+      notification_preferences: 'notification_preferences',
+      oauthAccounts: 'oauth_accounts',
+      oauth_accounts: 'oauth_accounts',
+      accounts: 'accounts',
+      sessions: 'sessions',
+      pages: 'pages',
+      siteConfig: 'site_config',
+      site_config: 'site_config',
+      systemSettings: 'system_settings',
+      system_settings: 'system_settings',
+      backups: 'backups',
+      verificationTokens: 'verification_tokens',
+      verification_tokens: 'verification_tokens',
+    }
+
+    // Normalizar nombres de tablas (v1 → nombre real)
+    const mappedData: Record<string, any[]> = {}
+    for (const [oldName, data] of Object.entries(normalizedData)) {
+      const realName = tableMapping[oldName] ?? oldName
+      mappedData[realName] = Array.isArray(data) ? data : []
+    }
+
+    console.log('Tablas a restaurar:', Object.keys(mappedData))
+
+    // Orden de restauración respetando dependencias de FK
+    const restoreOrder = [
+      // Tablas base
+      'users',
+      'departments',
+      'families',
+      'categories',
+      'system_settings',
+      'system_modules',
+      'site_config',
+      'pages',
+      'oauth_configs',
+      'equipment_types',
+      'suppliers',
+      'warehouses',
+      // Asignaciones de familia
+      'admin_family_assignments',
+      'technician_family_assignments',
+      'client_family_assignments',
+      'inventory_manager_families',
+      // Usuarios relacionados
+      'user_settings',
+      'notification_preferences',
+      'technician_assignments',
+      'oauth_accounts',
+      'sessions',
+      'accounts',
+      'password_reset_tokens',
+      // Tickets
+      'tickets',
+      'comments',
+      'attachments',
+      'ticket_history',
+      'ticket_ratings',
+      'ticket_collaborators',
+      'notifications',
+      'audit_logs',
+      // SLA
+      'sla_policies',
+      'sla_violations',
+      'ticket_sla_metrics',
+      // Conocimiento
+      'knowledge_articles',
+      'article_votes',
+      'ticket_knowledge_articles',
+      // Inventario
+      'equipment',
+      'equipment_assignments',
+      'equipment_attachments',
+      'maintenance_records',
+      'software_licenses',
+      'license_attachments',
+      'consumables',
+      'stock_movements',
+      'delivery_acts',
+      'return_acts',
+      'decommission_requests',
+      'decommission_acts',
+      'decommission_attachments',
+      // Contratos
+      'contracts',
+      'contract_lines',
+      'contract_attachments',
+      // Planes
+      'resolution_plans',
+      'resolution_tasks',
+      // Webhooks
+      'webhooks',
+      'webhook_logs',
+      // Landing
+      'landing_page_content',
+      'landing_page_services',
+      'landing_page_banners',
+      // Otros
+      'email_queue',
+      'category_analytics',
+      'backups',
+      'verification_tokens',
+    ]
+
+    await prisma.$transaction(
+      async tx => {
+        // Deshabilitar FK constraints para limpiar en cualquier orden
+        await tx.$executeRaw(Prisma.sql`SET session_replication_role = replica;`)
+
+        // Limpiar todas las tablas que vamos a restaurar
+        for (const tableName of [...restoreOrder].reverse()) {
+          if (mappedData[tableName]?.length > 0) {
+            try {
+              await tx.$executeRaw(Prisma.sql`DELETE FROM ${Prisma.raw(`"${tableName}"`)};`)
+            } catch (err) {
+              console.warn(`⚠ No se pudo limpiar tabla ${tableName}:`, (err as Error).message)
+            }
+          }
+        }
+
+        // Rehabilitar FK constraints
+        await tx.$executeRaw(Prisma.sql`SET session_replication_role = DEFAULT;`)
+
+        // Restaurar en orden correcto
+        for (const tableName of restoreOrder) {
+          const tableData = mappedData[tableName]
+          if (!tableData?.length) continue
+
+          console.log(`Restaurando ${tableData.length} registros → ${tableName}`)
+
+          // Usar createMany cuando sea posible (mucho más rápido)
+          try {
+            const processed = tableData.map(r => this.processRecordForRestore(r))
+            await (tx as any)[tableName].createMany({ data: processed, skipDuplicates: true })
+          } catch (bulkErr) {
+            // Fallback: insertar uno a uno para identificar el registro problemático
+            console.warn(`createMany falló para ${tableName}, intentando inserción individual...`)
+            for (let i = 0; i < tableData.length; i++) {
+              try {
+                const processed = this.processRecordForRestore(tableData[i])
+                await (tx as any)[tableName].create({ data: processed })
+              } catch (recordErr) {
+                console.error(
+                  `Error en registro ${i + 1} de ${tableName}:`,
+                  (recordErr as Error).message
+                )
+                throw new Error(
+                  `Error al restaurar tabla ${tableName} (registro ${i + 1}): ${(recordErr as Error).message}`
+                )
+              }
+            }
+          }
+        }
+      },
+      { timeout: 600000 }
+    ) // 10 minutos
+
+    console.log('Restauración JSON completada exitosamente')
+  }
+
   private static processRecordForRestore(record: any): any {
     const processed = { ...record }
-    
+
     // Convertir campos de fecha de string a Date
     const dateFields = ['createdAt', 'updatedAt', 'lastLogin', 'dueDate', 'resolvedAt']
-    
+
     for (const field of dateFields) {
       if (processed[field] && typeof processed[field] === 'string') {
         processed[field] = new Date(processed[field])
       }
     }
-    
+
     return processed
   }
 
   static async cleanOldBackups(): Promise<void> {
     try {
       // Obtener configuración de retención
+      // La clave en system_settings es 'backupRetention' (sin 'Days')
       const retentionSetting = await prisma.system_settings.findUnique({
-        where: { key: 'backupRetentionDays' },
+        where: { key: 'backupRetention' },
       })
 
       const retentionDays = retentionSetting ? parseInt(retentionSetting.value) : 30
-      
+
       // Validar valor de retención
       if (isNaN(retentionDays) || retentionDays < 1) {
         console.warn('Valor de retención inválido, usando 30 días por defecto')
@@ -865,7 +1161,7 @@ export class BackupService {
         where: {
           createdAt: { lt: cutoffDate },
           type: 'automatic', // Solo eliminar backups automáticos
-          status: 'completed' // Solo eliminar backups completados
+          status: 'completed', // Solo eliminar backups completados
         },
       })
 
@@ -900,43 +1196,148 @@ export class BackupService {
         }
       }
 
-      console.log(`Limpieza completada: ${deletedCount} backups eliminados, ${failedCount} fallidos`)
+      console.log(
+        `Limpieza completada: ${deletedCount} backups eliminados, ${failedCount} fallidos`
+      )
     } catch (error) {
       console.error('Error al limpiar backups antiguos:', error)
-      throw new Error(`Error en limpieza de backups: ${error instanceof Error ? error.message : 'Error desconocido'}`)
+      throw new Error(
+        `Error en limpieza de backups: ${error instanceof Error ? error.message : 'Error desconocido'}`
+      )
     }
   }
 
   private static async createBackupWithPrisma(filepath: string): Promise<void> {
     try {
       console.log('Creando backup usando método alternativo con Prisma')
-      
-      // Obtener todas las tablas y sus datos
-      const backupData = {
-        timestamp: new Date().toISOString(),
-        version: '1.0',
-        tables: {} as Record<string, any[]>
+
+      const backupData: Record<string, any[]> = {}
+
+      // ── Tablas base (sin dependencias) ────────────────────────────────────
+      const fetchTable = async (name: string, fetcher: () => Promise<any[]>) => {
+        try {
+          backupData[name] = await fetcher()
+          console.log(`  ✓ ${name}: ${backupData[name].length} registros`)
+        } catch (err) {
+          console.warn(`  ⚠ ${name}: no se pudo exportar —`, (err as Error).message)
+          backupData[name] = []
+        }
       }
 
-      // Exportar datos de las tablas principales
-      try {
-        backupData.tables.users = await prisma.users.findMany()
-        backupData.tables.categories = await prisma.categories.findMany()
-        backupData.tables.tickets = await prisma.tickets.findMany()
-        backupData.tables.comments = await prisma.comments.findMany()
-        backupData.tables.attachments = await prisma.attachments.findMany()
-        backupData.tables.auditLogs = await prisma.audit_logs.findMany()
-        backupData.tables.backups = await prisma.backups.findMany()
-        backupData.tables.systemSettings = await prisma.system_settings.findMany()
-      } catch (error) {
-        console.warn('Error exportando algunas tablas:', error)
-      }
+      await fetchTable('users', () => prisma.users.findMany())
+      await fetchTable('departments', () => prisma.departments.findMany())
+      await fetchTable('families', () => prisma.families.findMany())
+      await fetchTable('categories', () => prisma.categories.findMany())
+      await fetchTable('system_settings', () => prisma.system_settings.findMany())
+      await fetchTable('system_modules', () => prisma.system_modules.findMany())
+      await fetchTable('site_config', () => prisma.site_config.findMany())
+      await fetchTable('pages', () => prisma.pages.findMany())
+      await fetchTable('oauth_configs', () => prisma.oauth_configs.findMany())
+      await fetchTable('equipment_types', () => prisma.equipment_types.findMany())
+      await fetchTable('suppliers', () => prisma.suppliers.findMany())
+      await fetchTable('warehouses', () => prisma.warehouses.findMany())
 
-      // Escribir datos al archivo
-      const backupContent = JSON.stringify(backupData, null, 2)
-      await writeFile(filepath, backupContent, 'utf-8')
-      
-      console.log('Backup alternativo creado exitosamente')
+      // ── Tablas de asignaciones de familia ─────────────────────────────────
+      await fetchTable('admin_family_assignments', () => prisma.admin_family_assignments.findMany())
+      await fetchTable('technician_family_assignments', () =>
+        prisma.technician_family_assignments.findMany()
+      )
+      await fetchTable('client_family_assignments', () =>
+        prisma.client_family_assignments.findMany()
+      )
+      await fetchTable('inventory_manager_families', () =>
+        prisma.inventory_manager_families.findMany()
+      )
+
+      // ── Tablas de usuarios ────────────────────────────────────────────────
+      await fetchTable('user_settings', () => prisma.user_settings.findMany())
+      await fetchTable('notification_preferences', () => prisma.notification_preferences.findMany())
+      await fetchTable('technician_assignments', () => prisma.technician_assignments.findMany())
+      await fetchTable('oauth_accounts', () => prisma.oauth_accounts.findMany())
+      await fetchTable('sessions', () => prisma.sessions.findMany())
+      await fetchTable('accounts', () => prisma.accounts.findMany())
+      await fetchTable('password_reset_tokens', () => prisma.password_reset_tokens.findMany())
+
+      // ── Tickets y relacionados ────────────────────────────────────────────
+      await fetchTable('tickets', () => prisma.tickets.findMany())
+      await fetchTable('comments', () => prisma.comments.findMany())
+      await fetchTable('attachments', () => prisma.attachments.findMany())
+      await fetchTable('ticket_history', () => prisma.ticket_history.findMany())
+      await fetchTable('ticket_ratings', () => prisma.ticket_ratings.findMany())
+      await fetchTable('ticket_collaborators', () => prisma.ticket_collaborators.findMany())
+      await fetchTable('notifications', () => prisma.notifications.findMany())
+      await fetchTable('audit_logs', () => prisma.audit_logs.findMany())
+
+      // ── SLA ───────────────────────────────────────────────────────────────
+      await fetchTable('sla_policies', () => prisma.sla_policies.findMany())
+      await fetchTable('sla_violations', () => prisma.sla_violations.findMany())
+      await fetchTable('ticket_sla_metrics', () => prisma.ticket_sla_metrics.findMany())
+
+      // ── Conocimiento ──────────────────────────────────────────────────────
+      await fetchTable('knowledge_articles', () => prisma.knowledge_articles.findMany())
+      await fetchTable('article_votes', () => prisma.article_votes.findMany())
+      await fetchTable('ticket_knowledge_articles', () =>
+        prisma.ticket_knowledge_articles.findMany()
+      )
+
+      // ── Inventario ────────────────────────────────────────────────────────
+      await fetchTable('equipment', () => prisma.equipment.findMany())
+      await fetchTable('equipment_assignments', () => prisma.equipment_assignments.findMany())
+      await fetchTable('equipment_attachments', () => prisma.equipment_attachments.findMany())
+      await fetchTable('maintenance_records', () => prisma.maintenance_records.findMany())
+      await fetchTable('software_licenses', () => prisma.software_licenses.findMany())
+      await fetchTable('license_attachments', () => prisma.license_attachments.findMany())
+      await fetchTable('consumables', () => prisma.consumables.findMany())
+      await fetchTable('stock_movements', () => prisma.stock_movements.findMany())
+      await fetchTable('delivery_acts', () => prisma.delivery_acts.findMany())
+      await fetchTable('return_acts', () => prisma.return_acts.findMany())
+      await fetchTable('decommission_requests', () => prisma.decommission_requests.findMany())
+      await fetchTable('decommission_acts', () => prisma.decommission_acts.findMany())
+      await fetchTable('decommission_attachments', () => prisma.decommission_attachments.findMany())
+
+      // ── Contratos ─────────────────────────────────────────────────────────
+      await fetchTable('contracts', () => prisma.contracts.findMany())
+      await fetchTable('contract_lines', () => prisma.contract_lines.findMany())
+      await fetchTable('contract_attachments', () => prisma.contract_attachments.findMany())
+
+      // ── Resolución y planes ───────────────────────────────────────────────
+      await fetchTable('resolution_plans', () => prisma.resolution_plans.findMany())
+      await fetchTable('resolution_tasks', () => prisma.resolution_tasks.findMany())
+
+      // ── Webhooks ──────────────────────────────────────────────────────────
+      await fetchTable('webhooks', () => prisma.webhooks.findMany())
+      await fetchTable('webhook_logs', () => prisma.webhook_logs.findMany())
+
+      // ── Landing page ──────────────────────────────────────────────────────
+      await fetchTable('landing_page_content', () => prisma.landing_page_content.findMany())
+      await fetchTable('landing_page_services', () => prisma.landing_page_services.findMany())
+      await fetchTable('landing_page_banners', () => prisma.landing_page_banners.findMany())
+
+      // ── Otros ─────────────────────────────────────────────────────────────
+      await fetchTable('email_queue', () => prisma.email_queue.findMany())
+      await fetchTable('category_analytics', () => prisma.category_analytics.findMany())
+      await fetchTable('backups', () => prisma.backups.findMany())
+      await fetchTable('verification_tokens', () => prisma.verification_tokens.findMany())
+
+      const output = JSON.stringify(
+        {
+          metadata: {
+            version: '2.0',
+            timestamp: new Date().toISOString(),
+            method: 'prisma',
+            tables: Object.keys(backupData),
+            totalRecords: Object.values(backupData).reduce((s, t) => s + t.length, 0),
+          },
+          data: backupData,
+        },
+        null,
+        2
+      )
+
+      await writeFile(filepath, output, 'utf-8')
+      console.log(
+        `Backup Prisma creado: ${Object.keys(backupData).length} tablas, ${output.length} bytes`
+      )
     } catch (error) {
       console.error('Error en backup alternativo:', error)
       throw error
@@ -1008,6 +1409,46 @@ export class BackupService {
       }
     } catch (error) {
       console.error('Error en backup automático:', error)
+    }
+  }
+
+  /**
+   * Sube un backup al proveedor cloud configurado.
+   * Se llama de forma fire-and-forget desde createBackup.
+   */
+  private static async uploadToCloud(
+    backupId: string,
+    filepath: string,
+    provider: CloudProvider
+  ): Promise<void> {
+    try {
+      console.log(`[CLOUD] Iniciando subida a ${provider}: ${filepath}`)
+      const result = await BackupCloudService.uploadBackup(backupId, filepath, provider)
+
+      // Registrar en auditoría
+      await prisma.audit_logs
+        .create({
+          data: {
+            id: randomUUID(),
+            action: 'backup_uploaded_cloud',
+            entityType: 'System',
+            entityId: backupId,
+            createdAt: new Date(),
+            details: {
+              provider: result.provider,
+              fileId: result.fileId,
+              fileName: result.fileName,
+              webViewLink: result.webViewLink ?? null,
+              size: result.size,
+            },
+          },
+        })
+        .catch(() => {})
+
+      console.log(`[CLOUD] Backup subido exitosamente a ${provider}: ${result.fileId}`)
+    } catch (error) {
+      console.error(`[CLOUD] Error subiendo backup a ${provider}:`, error)
+      // No lanzar — el backup local ya está guardado correctamente
     }
   }
 }

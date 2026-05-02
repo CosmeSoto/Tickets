@@ -10,7 +10,20 @@ import { NextRequest } from 'next/server'
 
 export interface AuditLogData {
   action: string
-  entityType: 'ticket' | 'user' | 'category' | 'department' | 'comment' | 'attachment' | 'system' | 'report' | 'settings' | 'technician' | 'assignment' | 'equipment' | 'inventory'
+  entityType:
+    | 'ticket'
+    | 'user'
+    | 'category'
+    | 'department'
+    | 'comment'
+    | 'attachment'
+    | 'system'
+    | 'report'
+    | 'settings'
+    | 'technician'
+    | 'assignment'
+    | 'equipment'
+    | 'inventory'
   entityId?: string
   userId: string
   details?: Record<string, any>
@@ -48,27 +61,26 @@ export interface AuditExportOptions {
 }
 
 export class AuditServiceComplete {
-  
   /**
    * Registrar una acción de auditoría con contexto enriquecido
    */
   static async log(data: AuditLogData): Promise<void> {
     try {
       // Enriquecer contexto automáticamente
-      const enrichedContext = data.request 
+      const enrichedContext = data.request
         ? AuditContextEnricher.enrichContext(data.request, {
             sessionId: data.sessionId,
             startTime: data.startTime,
             result: data.result,
             errorCode: data.errorCode,
-            errorMessage: data.errorMessage
+            errorMessage: data.errorMessage,
           })
         : AuditContextEnricher.createSystemContext({
             result: data.result,
             errorCode: data.errorCode,
-            errorMessage: data.errorMessage
+            errorMessage: data.errorMessage,
           })
-      
+
       await prisma.audit_logs.create({
         data: {
           id: randomUUID(),
@@ -82,41 +94,41 @@ export class AuditServiceComplete {
             oldValues: data.oldValues,
             newValues: data.newValues,
             metadata: data.metadata,
-            
+
             // NUEVO: Contexto enriquecido
             context: {
               // Trazabilidad
               sessionId: enrichedContext.sessionId,
               requestId: enrichedContext.requestId,
               correlationId: enrichedContext.correlationId,
-              
+
               // Resultado
               result: enrichedContext.result,
               errorCode: enrichedContext.errorCode,
               errorMessage: enrichedContext.errorMessage,
               duration: enrichedContext.duration,
-              
+
               // Contexto técnico
               source: enrichedContext.source,
               endpoint: enrichedContext.endpoint,
               method: enrichedContext.method,
               statusCode: enrichedContext.statusCode,
-              
+
               // Dispositivo
               deviceType: enrichedContext.deviceType,
               browser: enrichedContext.browser,
               browserVersion: enrichedContext.browserVersion,
               os: enrichedContext.os,
               osVersion: enrichedContext.osVersion,
-              
+
               // Timestamp
-              timestamp: enrichedContext.timestamp
-            }
+              timestamp: enrichedContext.timestamp,
+            },
           },
           ipAddress: data.ipAddress || null,
           userAgent: data.userAgent || null,
-          createdAt: new Date()
-        }
+          createdAt: new Date(),
+        },
       })
     } catch (error) {
       console.error('[AUDIT] Error logging audit entry:', error)
@@ -139,7 +151,7 @@ export class AuditServiceComplete {
         endDate,
         limit = 50,
         offset = 0,
-        search
+        search,
       } = filter
 
       const where: any = {}
@@ -153,10 +165,10 @@ export class AuditServiceComplete {
           { action: { contains: search, mode: 'insensitive' } },
           { entityType: { contains: search, mode: 'insensitive' } },
           { users: { name: { contains: search, mode: 'insensitive' } } },
-          { users: { email: { contains: search, mode: 'insensitive' } } }
+          { users: { email: { contains: search, mode: 'insensitive' } } },
         ]
       }
-      
+
       if (startDate || endDate) {
         where.createdAt = {}
         if (startDate) where.createdAt.gte = startDate
@@ -171,13 +183,13 @@ export class AuditServiceComplete {
               id: true,
               name: true,
               email: true,
-              role: true
-            }
-          }
+              role: true,
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
         take: limit,
-        skip: offset
+        skip: offset,
       })
 
       const total = await prisma.audit_logs.count({ where })
@@ -188,7 +200,7 @@ export class AuditServiceComplete {
       return {
         logs: enrichedLogs,
         total,
-        hasMore: offset + limit < total
+        hasMore: offset + limit < total,
       }
     } catch (error) {
       console.error('[AUDIT SERVICE] Error in getLogs:', error)
@@ -227,16 +239,28 @@ export class AuditServiceComplete {
     // Resolver todos en paralelo con queries batch
     const [users, tickets, categories, departments] = await Promise.all([
       userIds.size > 0
-        ? prisma.users.findMany({ where: { id: { in: [...userIds] } }, select: { id: true, name: true, email: true } })
+        ? prisma.users.findMany({
+            where: { id: { in: [...userIds] } },
+            select: { id: true, name: true, email: true },
+          })
         : [],
       ticketIds.size > 0
-        ? prisma.tickets.findMany({ where: { id: { in: [...ticketIds] } }, select: { id: true, title: true } })
+        ? prisma.tickets.findMany({
+            where: { id: { in: [...ticketIds] } },
+            select: { id: true, title: true },
+          })
         : [],
       categoryIds.size > 0
-        ? prisma.categories.findMany({ where: { id: { in: [...categoryIds] } }, select: { id: true, name: true } })
+        ? prisma.categories.findMany({
+            where: { id: { in: [...categoryIds] } },
+            select: { id: true, name: true },
+          })
         : [],
       departmentIds.size > 0
-        ? prisma.departments.findMany({ where: { id: { in: [...departmentIds] } }, select: { id: true, name: true } })
+        ? prisma.departments.findMany({
+            where: { id: { in: [...departmentIds] } },
+            select: { id: true, name: true },
+          })
         : [],
     ])
 
@@ -254,16 +278,22 @@ export class AuditServiceComplete {
         const t = log.entityType?.toLowerCase()
         if (t === 'user') enriched.entityName = userMap.get(log.entityId) ?? log.entityId
         else if (t === 'ticket') enriched.entityName = ticketMap.get(log.entityId) ?? log.entityId
-        else if (t === 'category') enriched.entityName = categoryMap.get(log.entityId) ?? log.entityId
-        else if (t === 'department') enriched.entityName = departmentMap.get(log.entityId) ?? log.entityId
+        else if (t === 'category')
+          enriched.entityName = categoryMap.get(log.entityId) ?? log.entityId
+        else if (t === 'department')
+          enriched.entityName = departmentMap.get(log.entityId) ?? log.entityId
       }
 
       // Resolver IDs en details
       if (details.userId) enriched.userName = userMap.get(details.userId) ?? details.userId
-      if (details.assigneeId) enriched.assigneeName = userMap.get(details.assigneeId) ?? details.assigneeId
-      if (details.categoryId) enriched.categoryName = categoryMap.get(details.categoryId) ?? details.categoryId
-      if (details.departmentId) enriched.departmentName = departmentMap.get(details.departmentId) ?? details.departmentId
-      if (details.ticketId) enriched.ticketTitle = ticketMap.get(details.ticketId) ?? details.ticketId
+      if (details.assigneeId)
+        enriched.assigneeName = userMap.get(details.assigneeId) ?? details.assigneeId
+      if (details.categoryId)
+        enriched.categoryName = categoryMap.get(details.categoryId) ?? details.categoryId
+      if (details.departmentId)
+        enriched.departmentName = departmentMap.get(details.departmentId) ?? details.departmentId
+      if (details.ticketId)
+        enriched.ticketTitle = ticketMap.get(details.ticketId) ?? details.ticketId
 
       return { ...log, details: enriched }
     })
@@ -336,18 +366,21 @@ export class AuditServiceComplete {
   /**
    * Resuelve cambios (oldValues -> newValues) a nombres legibles
    */
-  private static async resolveChanges(oldValues: any, newValues: any): Promise<Record<string, { old: string; new: string; field: string }>> {
+  private static async resolveChanges(
+    oldValues: any,
+    newValues: any
+  ): Promise<Record<string, { old: string; new: string; field: string }>> {
     const changes: Record<string, { old: string; new: string; field: string }> = {}
 
     for (const key of Object.keys(newValues)) {
       if (oldValues[key] !== newValues[key]) {
         const oldResolved = await this.resolveFieldValue(key, oldValues[key])
         const newResolved = await this.resolveFieldValue(key, newValues[key])
-        
+
         changes[key] = {
           field: this.getFieldDisplayName(key),
           old: oldResolved,
-          new: newResolved
+          new: newResolved,
         }
       }
     }
@@ -361,7 +394,7 @@ export class AuditServiceComplete {
   private static async resolveFieldValue(fieldName: string, value: any): Promise<string> {
     if (value === null || value === undefined) return 'vacío'
     if (typeof value !== 'string') return String(value)
-    
+
     // Si no parece un UUID, retornar como está
     if (!value.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
       // Traducir valores especiales
@@ -379,11 +412,15 @@ export class AuditServiceComplete {
       }
       return value
     }
-    
+
     // Resolver UUID según el tipo de campo
     const fieldLower = fieldName.toLowerCase()
-    
-    if (fieldLower.includes('user') || fieldLower.includes('createdby') || fieldLower.includes('assignee')) {
+
+    if (
+      fieldLower.includes('user') ||
+      fieldLower.includes('createdby') ||
+      fieldLower.includes('assignee')
+    ) {
       return await this.resolveUserId(value)
     }
     if (fieldLower.includes('department')) {
@@ -395,7 +432,7 @@ export class AuditServiceComplete {
     if (fieldLower.includes('ticket')) {
       return await this.resolveTicketId(value)
     }
-    
+
     return value
   }
 
@@ -406,7 +443,7 @@ export class AuditServiceComplete {
     try {
       const user = await prisma.users.findUnique({
         where: { id: userId },
-        select: { name: true, email: true }
+        select: { name: true, email: true },
       })
       return user ? `${user.name} (${user.email})` : userId
     } catch {
@@ -421,7 +458,7 @@ export class AuditServiceComplete {
     try {
       const ticket = await prisma.tickets.findUnique({
         where: { id: ticketId },
-        select: { title: true }
+        select: { title: true },
       })
       return ticket ? ticket.title : ticketId
     } catch {
@@ -436,7 +473,7 @@ export class AuditServiceComplete {
     try {
       const category = await prisma.categories.findUnique({
         where: { id: categoryId },
-        select: { name: true }
+        select: { name: true },
       })
       return category ? category.name : categoryId
     } catch {
@@ -451,7 +488,7 @@ export class AuditServiceComplete {
     try {
       const department = await prisma.departments.findUnique({
         where: { id: departmentId },
-        select: { name: true }
+        select: { name: true },
       })
       return department ? department.name : departmentId
     } catch {
@@ -464,31 +501,31 @@ export class AuditServiceComplete {
    */
   private static getFieldDisplayName(fieldName: string): string {
     const fieldNames: Record<string, string> = {
-      'name': 'Nombre',
-      'email': 'Correo Electrónico',
-      'role': 'Rol',
-      'departmentId': 'Departamento',
-      'phone': 'Teléfono',
-      'isActive': 'Estado',
-      'avatar': 'Avatar',
-      'password': 'Contraseña',
-      'createdById': 'Creado por',
-      'assigneeId': 'Asignado a',
-      'ticketId': 'Ticket',
-      'title': 'Título',
-      'description': 'Descripción',
-      'status': 'Estado',
-      'priority': 'Prioridad',
-      'categoryId': 'Categoría',
-      'ticketNumber': 'Número de Ticket',
-      'color': 'Color',
-      'parentId': 'Categoría Padre',
-      'level': 'Nivel',
-      'order': 'Orden',
-      'createdAt': 'Fecha de Creación',
-      'updatedAt': 'Última Actualización',
-      'isEmailVerified': 'Email Verificado',
-      'lastLogin': 'Último Acceso'
+      name: 'Nombre',
+      email: 'Correo Electrónico',
+      role: 'Rol',
+      departmentId: 'Departamento',
+      phone: 'Teléfono',
+      isActive: 'Estado',
+      avatar: 'Avatar',
+      password: 'Contraseña',
+      createdById: 'Creado por',
+      assigneeId: 'Asignado a',
+      ticketId: 'Ticket',
+      title: 'Título',
+      description: 'Descripción',
+      status: 'Estado',
+      priority: 'Prioridad',
+      categoryId: 'Categoría',
+      ticketNumber: 'Número de Ticket',
+      color: 'Color',
+      parentId: 'Categoría Padre',
+      level: 'Nivel',
+      order: 'Orden',
+      createdAt: 'Fecha de Creación',
+      updatedAt: 'Última Actualización',
+      isEmailVerified: 'Email Verificado',
+      lastLogin: 'Último Acceso',
     }
     return fieldNames[fieldName] || fieldName
   }
@@ -498,9 +535,9 @@ export class AuditServiceComplete {
    */
   private static getRoleDisplayName(role: string): string {
     const roleNames: Record<string, string> = {
-      'ADMIN': 'Administrador',
-      'TECHNICIAN': 'Técnico',
-      'CLIENT': 'Cliente'
+      ADMIN: 'Administrador',
+      TECHNICIAN: 'Técnico',
+      CLIENT: 'Cliente',
     }
     return roleNames[role] || role
   }
@@ -510,12 +547,12 @@ export class AuditServiceComplete {
    */
   private static getStatusDisplayName(status: string): string {
     const statusNames: Record<string, string> = {
-      'OPEN': 'Abierto',
-      'IN_PROGRESS': 'En Progreso',
-      'PENDING': 'Pendiente',
-      'RESOLVED': 'Resuelto',
-      'CLOSED': 'Cerrado',
-      'CANCELLED': 'Cancelado'
+      OPEN: 'Abierto',
+      IN_PROGRESS: 'En Progreso',
+      PENDING: 'Pendiente',
+      RESOLVED: 'Resuelto',
+      CLOSED: 'Cerrado',
+      CANCELLED: 'Cancelado',
     }
     return statusNames[status] || status
   }
@@ -525,10 +562,10 @@ export class AuditServiceComplete {
    */
   private static getPriorityDisplayName(priority: string): string {
     const priorityNames: Record<string, string> = {
-      'LOW': 'Baja',
-      'MEDIUM': 'Media',
-      'HIGH': 'Alta',
-      'URGENT': 'Urgente'
+      LOW: 'Baja',
+      MEDIUM: 'Media',
+      HIGH: 'Alta',
+      URGENT: 'Urgente',
     }
     return priorityNames[priority] || priority
   }
@@ -545,26 +582,26 @@ export class AuditServiceComplete {
       by: ['action', 'entityType'],
       where: {
         createdAt: {
-          gte: startDate
-        }
+          gte: startDate,
+        },
       },
       _count: {
-        id: true
+        id: true,
       },
       orderBy: {
         _count: {
-          id: 'desc'
-        }
-      }
+          id: 'desc',
+        },
+      },
     })
 
     // Total de logs
     const totalLogs = await prisma.audit_logs.count({
       where: {
         createdAt: {
-          gte: startDate
-        }
-      }
+          gte: startDate,
+        },
+      },
     })
 
     // Actividad por usuario
@@ -572,18 +609,18 @@ export class AuditServiceComplete {
       by: ['userId'],
       where: {
         createdAt: {
-          gte: startDate
-        }
+          gte: startDate,
+        },
       },
       _count: {
-        id: true
+        id: true,
       },
       orderBy: {
         _count: {
-          id: 'desc'
-        }
+          id: 'desc',
+        },
       },
-      take: 10
+      take: 10,
     })
 
     // Estadísticas por módulo
@@ -591,17 +628,17 @@ export class AuditServiceComplete {
       by: ['entityType'],
       where: {
         createdAt: {
-          gte: startDate
-        }
+          gte: startDate,
+        },
       },
       _count: {
-        id: true
+        id: true,
       },
       orderBy: {
         _count: {
-          id: 'desc'
-        }
-      }
+          id: 'desc',
+        },
+      },
     })
 
     return {
@@ -609,7 +646,7 @@ export class AuditServiceComplete {
       actionStats,
       topUsers: userActivity,
       moduleActivity: moduleStats,
-      period: `${days} días`
+      period: `${days} días`,
     }
   }
 
@@ -618,13 +655,13 @@ export class AuditServiceComplete {
    */
   static async exportLogs(options: AuditExportOptions) {
     const { filters, includeDetails, maxRecords } = options
-    
+
     // Limitar registros para evitar problemas de memoria
     const safeLimit = Math.min(maxRecords, 100000) // Máximo 100k registros
-    
+
     const result = await this.getLogs({
       ...filters,
-      limit: safeLimit
+      limit: safeLimit,
     })
 
     return {
@@ -632,7 +669,7 @@ export class AuditServiceComplete {
       total: result.total,
       exported: result.logs.length,
       truncated: result.total > safeLimit,
-      includeDetails
+      includeDetails,
     }
   }
 
@@ -645,20 +682,24 @@ export class AuditServiceComplete {
 
     // Mantener logs críticos por más tiempo
     const criticalActions = [
-      'user_deleted', 'user_role_changed', 'system_config_changed',
-      'backup_created', 'backup_restored', 'security_breach'
+      'user_deleted',
+      'user_role_changed',
+      'system_config_changed',
+      'backup_created',
+      'backup_restored',
+      'security_breach',
     ]
 
     // Eliminar logs no críticos
     const result = await prisma.audit_logs.deleteMany({
       where: {
         createdAt: {
-          lt: cutoffDate
+          lt: cutoffDate,
         },
         action: {
-          notIn: criticalActions
-        }
-      }
+          notIn: criticalActions,
+        },
+      },
     })
 
     // Log de limpieza
@@ -670,8 +711,8 @@ export class AuditServiceComplete {
         deletedCount: result.count,
         cutoffDate: cutoffDate.toISOString(),
         daysToKeep,
-        criticalActionsPreserved: criticalActions
-      }
+        criticalActionsPreserved: criticalActions,
+      },
     })
 
     return result.count
@@ -689,12 +730,12 @@ export class AuditServiceComplete {
       by: ['userId', 'ipAddress'],
       where: {
         action: 'login_failed',
-        createdAt: { gte: startDate }
+        createdAt: { gte: startDate },
       },
       _count: { id: true },
       having: {
-        id: { _count: { gt: 5 } }
-      }
+        id: { _count: { gt: 5 } },
+      },
     })
 
     // Eliminaciones masivas
@@ -702,18 +743,18 @@ export class AuditServiceComplete {
       by: ['userId'],
       where: {
         action: { endsWith: '_deleted' },
-        createdAt: { gte: startDate }
+        createdAt: { gte: startDate },
       },
       _count: { id: true },
       having: {
-        id: { _count: { gt: 10 } }
-      }
+        id: { _count: { gt: 10 } },
+      },
     })
 
     return {
       failedLogins,
       massDeletes,
-      period: `${hours} horas`
+      period: `${hours} horas`,
     }
   }
 
@@ -876,6 +917,14 @@ export const AuditActionsComplete = {
   ADMIN_FAMILY_ASSIGNED: 'admin_family_assigned',
   ADMIN_FAMILY_UNASSIGNED: 'admin_family_unassigned',
 
+  // Familias — asignaciones de técnicos, clientes y gestores
+  TECHNICIAN_FAMILY_ASSIGNED: 'technician_family_assigned',
+  TECHNICIAN_FAMILY_UNASSIGNED: 'technician_family_unassigned',
+  CLIENT_FAMILY_ASSIGNED: 'client_family_assigned',
+  CLIENT_FAMILY_UNASSIGNED: 'client_family_unassigned',
+  MANAGER_FAMILY_ASSIGNED: 'manager_family_assigned',
+  MANAGER_FAMILY_UNASSIGNED: 'manager_family_unassigned',
+
   // Super admin
   SUPER_ADMIN_GRANTED: 'super_admin_granted',
   SUPER_ADMIN_REVOKED: 'super_admin_revoked',
@@ -899,10 +948,9 @@ export const logTicketActionComplete = async (
     details,
     oldValues,
     newValues,
-    ipAddress: request?.headers.get('x-forwarded-for') || 
-               request?.headers.get('x-real-ip') || 
-               'unknown',
-    userAgent: request?.headers.get('user-agent') || 'unknown'
+    ipAddress:
+      request?.headers.get('x-forwarded-for') || request?.headers.get('x-real-ip') || 'unknown',
+    userAgent: request?.headers.get('user-agent') || 'unknown',
   })
 }
 
@@ -923,10 +971,9 @@ export const logUserActionComplete = async (
     details,
     oldValues,
     newValues,
-    ipAddress: request?.headers.get('x-forwarded-for') || 
-               request?.headers.get('x-real-ip') || 
-               'unknown',
-    userAgent: request?.headers.get('user-agent') || 'unknown'
+    ipAddress:
+      request?.headers.get('x-forwarded-for') || request?.headers.get('x-real-ip') || 'unknown',
+    userAgent: request?.headers.get('user-agent') || 'unknown',
   })
 }
 
@@ -947,10 +994,9 @@ export const logCategoryActionComplete = async (
     details,
     oldValues,
     newValues,
-    ipAddress: request?.headers.get('x-forwarded-for') || 
-               request?.headers.get('x-real-ip') || 
-               'unknown',
-    userAgent: request?.headers.get('user-agent') || 'unknown'
+    ipAddress:
+      request?.headers.get('x-forwarded-for') || request?.headers.get('x-real-ip') || 'unknown',
+    userAgent: request?.headers.get('user-agent') || 'unknown',
   })
 }
 
@@ -971,10 +1017,9 @@ export const logDepartmentActionComplete = async (
     details,
     oldValues,
     newValues,
-    ipAddress: request?.headers.get('x-forwarded-for') || 
-               request?.headers.get('x-real-ip') || 
-               'unknown',
-    userAgent: request?.headers.get('user-agent') || 'unknown'
+    ipAddress:
+      request?.headers.get('x-forwarded-for') || request?.headers.get('x-real-ip') || 'unknown',
+    userAgent: request?.headers.get('user-agent') || 'unknown',
   })
 }
 
@@ -989,9 +1034,8 @@ export const logSystemActionComplete = async (
     entityType: 'system',
     userId,
     details,
-    ipAddress: request?.headers.get('x-forwarded-for') || 
-               request?.headers.get('x-real-ip') || 
-               'unknown',
-    userAgent: request?.headers.get('user-agent') || 'unknown'
+    ipAddress:
+      request?.headers.get('x-forwarded-for') || request?.headers.get('x-real-ip') || 'unknown',
+    userAgent: request?.headers.get('user-agent') || 'unknown',
   })
 }

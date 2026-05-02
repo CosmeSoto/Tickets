@@ -2,7 +2,7 @@
 // SOLO constantes y funciones puras — sin dependencias de servidor
 // Importable tanto en cliente como en servidor
 
-import type { FamilyConfig } from './family-config-types'
+import type { FamilyConfig, AssetSubtype, FormSection } from './family-config-types'
 
 export const DEFAULT_FAMILY_CONFIG: Omit<FamilyConfig, 'familyId'> = {
   allowedSubtypes: ['EQUIPMENT', 'MRO', 'LICENSE'],
@@ -19,7 +19,7 @@ export function validateSubtypeForFamily(
   subtype: string,
   config: FamilyConfig
 ): { valid: boolean; error?: string } {
-  if (!config.allowedSubtypes.includes(subtype)) {
+  if (!(config.allowedSubtypes as string[]).includes(subtype)) {
     return {
       valid: false,
       error: `El tipo de activo "${subtype}" no está permitido para esta área`,
@@ -45,9 +45,9 @@ export async function getFamilyConfig(familyId: string): Promise<FamilyConfig> {
 
   return {
     familyId: config.familyId,
-    allowedSubtypes: config.allowedSubtypes as string[],
-    visibleSections: config.visibleSections as string[],
-    requiredSections: config.requiredSections as string[],
+    allowedSubtypes: config.allowedSubtypes as AssetSubtype[],
+    visibleSections: config.visibleSections as FormSection[],
+    requiredSections: config.requiredSections as FormSection[],
     requireFinancialForNew: config.requireFinancialForNew,
     sectionsByMode: config.sectionsByMode as any,
     defaultDepreciationMethod: config.defaultDepreciationMethod,

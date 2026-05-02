@@ -20,12 +20,14 @@ import {
   RotateCcw,
   BarChart3,
   Shield,
+  ArrowLeft,
 } from 'lucide-react'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useRouter } from 'next/navigation'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,6 +50,7 @@ import {
 } from '@/hooks/use-backups'
 
 export default function BackupsPage() {
+  const router = useRouter()
   const {
     session,
     status,
@@ -114,7 +117,15 @@ export default function BackupsPage() {
   return (
     <RoleDashboardLayout
       title='Sistema de Backups'
-      subtitle='Gestión avanzada de respaldos y recuperación de datos'
+      subtitle={
+        <button
+          onClick={() => router.push('/admin/settings')}
+          className='flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors'
+        >
+          <ArrowLeft className='h-3 w-3' />
+          Configuración del sistema
+        </button>
+      }
       headerActions={headerActions}
     >
       <div className='space-y-6'>
@@ -185,13 +196,13 @@ export default function BackupsPage() {
                         <div className='flex items-center space-x-4'>
                           <div className='flex items-center space-x-2'>
                             {backup.status === 'completed' && (
-                              <CheckCircle className='h-4 w-4 text-emerald-600 dark:text-emerald-400' />
+                              <CheckCircle className='h-4 w-4 text-primary' />
                             )}
                             {backup.status === 'failed' && (
-                              <AlertTriangle className='h-4 w-4 text-red-600 dark:text-red-400' />
+                              <AlertTriangle className='h-4 w-4 text-destructive' />
                             )}
                             {backup.status === 'in_progress' && (
-                              <Clock className='h-4 w-4 text-amber-600 dark:text-amber-400' />
+                              <Clock className='h-4 w-4 text-muted-foreground' />
                             )}
                             <Database className='h-5 w-5 text-muted-foreground' />
                           </div>
@@ -212,10 +223,8 @@ export default function BackupsPage() {
                               {backup.encrypted && (
                                 <>
                                   <span>•</span>
-                                  <Badge
-                                    variant='outline'
-                                    className='text-xs bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-                                  >
+                                  <Badge variant='outline' className='text-xs'>
+                                    <Shield className='h-3 w-3 mr-1' />
                                     Encriptado
                                   </Badge>
                                 </>
@@ -271,23 +280,19 @@ export default function BackupsPage() {
               <Card>
                 <CardHeader>
                   <CardTitle className='flex items-center space-x-2'>
-                    <Shield className='h-5 w-5 text-emerald-600 dark:text-emerald-400' />
+                    <Shield className='h-5 w-5 text-primary' />
                     <span>Estado del Sistema</span>
                   </CardTitle>
                   <CardDescription>Monitoreo en tiempo real del sistema de backups</CardDescription>
                 </CardHeader>
                 <CardContent className='space-y-4'>
                   <div className='grid grid-cols-2 gap-4'>
-                    <div className='p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 dark:border-emerald-800'>
+                    <div className='p-3 bg-primary/5 rounded-lg border border-primary/20'>
                       <div className='flex items-center space-x-2 mb-1'>
-                        <CheckCircle className='h-4 w-4 text-emerald-600 dark:text-emerald-400' />
-                        <span className='text-sm font-medium text-emerald-800 dark:text-emerald-300'>
-                          Sistema Activo
-                        </span>
+                        <CheckCircle className='h-4 w-4 text-primary' />
+                        <span className='text-sm font-medium text-foreground'>Sistema Activo</span>
                       </div>
-                      <p className='text-xs text-emerald-700 dark:text-emerald-400'>
-                        Funcionando correctamente
-                      </p>
+                      <p className='text-xs text-muted-foreground'>Funcionando correctamente</p>
                     </div>
                     <div className='p-3 bg-muted rounded-lg border border-border'>
                       <div className='flex items-center space-x-2 mb-1'>
@@ -305,12 +310,7 @@ export default function BackupsPage() {
                     ].map(item => (
                       <div key={item.label} className='flex justify-between items-center text-sm'>
                         <span className='text-muted-foreground'>{item.label}</span>
-                        <Badge
-                          variant='outline'
-                          className='bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                        >
-                          {item.value}
-                        </Badge>
+                        <Badge variant='outline'>{item.value}</Badge>
                       </div>
                     ))}
                   </div>
@@ -336,13 +336,11 @@ export default function BackupsPage() {
                           </div>
                           <div className='text-xs text-muted-foreground'>Tasa de Éxito</div>
                         </div>
-                        <div className='text-center p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg'>
-                          <div className='text-lg font-bold text-amber-700 dark:text-amber-300'>
+                        <div className='text-center p-3 bg-muted rounded-lg'>
+                          <div className='text-lg font-bold text-foreground'>
                             {formatFileSize(stats.avgSize || 0)}
                           </div>
-                          <div className='text-xs text-amber-600 dark:text-amber-400'>
-                            Tamaño Promedio
-                          </div>
+                          <div className='text-xs text-muted-foreground'>Tamaño Promedio</div>
                         </div>
                       </div>
                       <div className='space-y-2'>
@@ -421,19 +419,11 @@ export default function BackupsPage() {
             <AlertDialogDescription asChild>
               <div>
                 <p>¿Estás seguro de que quieres eliminar todos los backups fallidos?</p>
-                <div className='mt-3 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded text-sm'>
-                  <div className='font-medium mb-2 text-amber-800 dark:text-amber-300'>
-                    Se eliminarán:
-                  </div>
-                  <div className='text-amber-700 dark:text-amber-400'>
-                    • {failedCount} backup(s) fallido(s)
-                  </div>
-                  <div className='text-amber-700 dark:text-amber-400'>
-                    • Archivos físicos (si existen)
-                  </div>
-                  <div className='text-amber-700 dark:text-amber-400'>
-                    • Registros de base de datos
-                  </div>
+                <div className='mt-3 p-3 bg-muted border border-border rounded text-sm'>
+                  <div className='font-medium mb-2 text-foreground'>Se eliminarán:</div>
+                  <div className='text-muted-foreground'>• {failedCount} backup(s) fallido(s)</div>
+                  <div className='text-muted-foreground'>• Archivos físicos (si existen)</div>
+                  <div className='text-muted-foreground'>• Registros de base de datos</div>
                 </div>
                 <p className='mt-2 text-destructive font-medium'>
                   Esta acción no se puede deshacer.

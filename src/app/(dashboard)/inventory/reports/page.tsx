@@ -4,15 +4,21 @@ import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import {
-  Package, Users, Clock, ShoppingCart, Trash2,
-  Wrench, BarChart3, MapPin, Crown, Lock,
+  Package,
+  Users,
+  Clock,
+  ShoppingCart,
+  Trash2,
+  Wrench,
+  BarChart3,
+  MapPin,
+  Crown,
+  Lock,
 } from 'lucide-react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { FamilyCombobox } from '@/components/ui/family-combobox'
-import { useFetch } from '@/hooks/common/use-fetch'
-import { useInventoryFamilies } from '@/contexts/families-context'
 import { useFamilyOptions } from '@/hooks/use-family-options'
 
 // ── Definición completa de reportes ──────────────────────────────────────────
@@ -98,7 +104,8 @@ const ALL_REPORTS: ReportDef[] = [
   {
     slug: 'financial-summary',
     name: 'Resumen Financiero Global',
-    description: 'Valor total del inventario, costos de renta y mantenimiento de todas las familias',
+    description:
+      'Valor total del inventario, costos de renta y mantenimiento de todas las familias',
     icon: BarChart3,
     color: 'text-amber-600',
     bg: 'bg-amber-50 dark:bg-amber-950/30',
@@ -136,7 +143,11 @@ export default function InventoryReportsPage() {
   }, [status, router])
 
   if (status === 'loading') {
-    return <ModuleLayout title="Reportes de Inventario" loading><div /></ModuleLayout>
+    return (
+      <ModuleLayout title='Reportes de Inventario' loading>
+        <div />
+      </ModuleLayout>
+    )
   }
   if (!session?.user) return null
 
@@ -149,7 +160,7 @@ export default function InventoryReportsPage() {
         ? 'MANAGER'
         : 'MANAGER' // fallback — la API filtra por familias de todas formas
 
-  const visibleReports = ALL_REPORTS.filter((r) => r.roles.includes(userReportRole))
+  const visibleReports = ALL_REPORTS.filter(r => r.roles.includes(userReportRole))
 
   const handleCardClick = (slug: string) => {
     const params = new URLSearchParams()
@@ -162,13 +173,12 @@ export default function InventoryReportsPage() {
   const subtitle = getSubtitle(role, isSuperAdmin, canManageInventory)
 
   return (
-    <ModuleLayout title="Reportes de Inventario" subtitle={subtitle}>
-      <div className="space-y-6">
-
+    <ModuleLayout title='Reportes de Inventario' subtitle={subtitle}>
+      <div className='space-y-6'>
         {/* Selector de familia — solo si hay más de una y el usuario puede ver varias */}
         {families.length > 1 && (
-          <div className="flex flex-wrap items-center gap-3">
-            <p className="text-sm text-muted-foreground shrink-0">Filtrar por área:</p>
+          <div className='flex flex-wrap items-center gap-3'>
+            <p className='text-sm text-muted-foreground shrink-0'>Filtrar por área:</p>
             <FamilyCombobox
               families={families.map(f => ({
                 id: f.id,
@@ -177,20 +187,20 @@ export default function InventoryReportsPage() {
                 color: f.color,
               }))}
               value={selectedFamilyId ?? 'all'}
-              onValueChange={(v) => setSelectedFamilyId(v === 'all' ? null : v)}
+              onValueChange={v => setSelectedFamilyId(v === 'all' ? null : v)}
               allowAll
               allowClear
-              popoverWidth="260px"
-              className="w-full sm:w-56"
+              popoverWidth='260px'
+              className='w-full sm:w-56'
             />
             {isSuperAdmin && (
-              <Badge className="bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 flex items-center gap-1 shrink-0">
-                <Crown className="h-3 w-3" />
+              <Badge className='bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 flex items-center gap-1 shrink-0'>
+                <Crown className='h-3 w-3' />
                 Vista global
               </Badge>
             )}
             {!isAdmin && !isSuperAdmin && canManageInventory && (
-              <span className="text-xs text-muted-foreground">
+              <span className='text-xs text-muted-foreground'>
                 Solo verás datos de tus familias asignadas
               </span>
             )}
@@ -198,8 +208,8 @@ export default function InventoryReportsPage() {
         )}
 
         {/* Tarjetas de reportes */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {visibleReports.map((report) => {
+        <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
+          {visibleReports.map(report => {
             const Icon = report.icon
             const isSuperAdminOnly = report.roles.length === 1 && report.roles[0] === 'SUPER_ADMIN'
 
@@ -211,24 +221,26 @@ export default function InventoryReportsPage() {
                 }`}
                 onClick={() => handleCardClick(report.slug)}
               >
-                <CardHeader className="pb-3">
-                  <div className="flex items-start gap-3">
-                    <div className={`p-2 rounded-lg shrink-0 ${report.bg} group-hover:scale-105 transition-transform`}>
+                <CardHeader className='pb-3'>
+                  <div className='flex items-start gap-3'>
+                    <div
+                      className={`p-2 rounded-lg shrink-0 ${report.bg} group-hover:scale-105 transition-transform`}
+                    >
                       <Icon className={`h-5 w-5 ${report.color}`} />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <CardTitle className="text-base leading-tight">{report.name}</CardTitle>
+                    <div className='flex-1 min-w-0'>
+                      <CardTitle className='text-base leading-tight'>{report.name}</CardTitle>
                       {isSuperAdminOnly && (
-                        <Badge className="bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 text-xs mt-1 flex items-center gap-1 w-fit">
-                          <Crown className="h-2.5 w-2.5" />
+                        <Badge className='bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 text-xs mt-1 flex items-center gap-1 w-fit'>
+                          <Crown className='h-2.5 w-2.5' />
                           Solo Super Admin
                         </Badge>
                       )}
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="pt-0">
-                  <CardDescription className="text-sm leading-relaxed">
+                <CardContent className='pt-0'>
+                  <CardDescription className='text-sm leading-relaxed'>
                     {report.description}
                   </CardDescription>
                 </CardContent>
@@ -238,16 +250,16 @@ export default function InventoryReportsPage() {
         </div>
 
         {/* Nota informativa contextual */}
-        <div className="flex items-start gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg p-4">
-          <BarChart3 className="h-4 w-4 mt-0.5 shrink-0" />
-          <div className="space-y-1">
+        <div className='flex items-start gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg p-4'>
+          <BarChart3 className='h-4 w-4 mt-0.5 shrink-0' />
+          <div className='space-y-1'>
             <p>
               Haz clic en cualquier reporte para ver los datos detallados con filtros por fecha.
               Puedes exportar en CSV o PDF desde la vista individual.
             </p>
             {!isAdmin && !isSuperAdmin && (
-              <p className="flex items-center gap-1">
-                <Lock className="h-3 w-3" />
+              <p className='flex items-center gap-1'>
+                <Lock className='h-3 w-3' />
                 Los datos están limitados a las familias que tienes asignadas.
               </p>
             )}

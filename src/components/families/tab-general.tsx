@@ -98,6 +98,17 @@ export function TabGeneral({
   })
   const [saving, setSaving] = useState(false)
   const [codeError, setCodeError] = useState<string | null>(null)
+  const [codeManuallyEdited, setCodeManuallyEdited] = useState(false)
+
+  /** Genera un código limpio a partir del nombre: mayúsculas, sin tildes, guión bajo */
+  const generateCode = (name: string) =>
+    name
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // quitar tildes
+      .toUpperCase()
+      .replace(/[^A-Z0-9\s]/g, '') // solo letras, números y espacios
+      .trim()
+      .replace(/\s+/g, '_') // espacios → guión bajo
 
   const handleSave = async () => {
     if (!form.name.trim()) {
@@ -273,34 +284,64 @@ export function TabGeneral({
           {/* Código + Nombre en la misma fila */}
           <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
             <div className='space-y-1'>
-              <Label htmlFor='family-code' className='text-xs'>
-                Código *
-              </Label>
-              <Input
-                id='family-code'
-                value={form.code}
-                onChange={e => {
-                  setForm(f => ({ ...f, code: e.target.value }))
-                  setCodeError(null)
-                }}
-                placeholder='Ej: IT'
-                disabled={saving}
-                className='h-8 text-sm'
-              />
-              {codeError && <p className='text-xs text-destructive'>{codeError}</p>}
-            </div>
-            <div className='space-y-1'>
               <Label htmlFor='family-name' className='text-xs'>
                 Nombre *
               </Label>
               <Input
                 id='family-name'
                 value={form.name}
-                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                onChange={e => {
+                  const name = e.target.value
+                  setForm(f => ({
+                    ...f,
+                    name,
+                    // Auto-generar código solo si el usuario no lo ha editado manualmente
+                    code: codeManuallyEdited ? f.code : generateCode(name),
+                  }))
+                }}
                 placeholder='Ej: Tecnología'
                 disabled={saving}
                 className='h-8 text-sm'
               />
+            </div>
+            <div className='space-y-1'>
+              <div className='flex items-center justify-between'>
+                <Label htmlFor='family-code' className='text-xs'>
+                  Código *
+                </Label>
+                {codeManuallyEdited && (
+                  <button
+                    type='button'
+                    onClick={() => {
+                      setCodeManuallyEdited(false)
+                      setCodeError(null)
+                      setForm(f => ({ ...f, code: generateCode(f.name) }))
+                    }}
+                    className='text-[10px] text-muted-foreground hover:text-primary transition-colors'
+                  >
+                    ↺ Auto-generar
+                  </button>
+                )}
+              </div>
+              <Input
+                id='family-code'
+                value={form.code}
+                onChange={e => {
+                  setCodeManuallyEdited(true)
+                  setForm(f => ({
+                    ...f,
+                    code: e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ''),
+                  }))
+                  setCodeError(null)
+                }}
+                placeholder='AUTO'
+                disabled={saving}
+                className={`h-8 text-sm font-mono ${!codeManuallyEdited ? 'text-muted-foreground' : ''}`}
+              />
+              {codeError && <p className='text-xs text-destructive'>{codeError}</p>}
+              {!codeManuallyEdited && form.code && (
+                <p className='text-[10px] text-muted-foreground'>Generado automáticamente</p>
+              )}
             </div>
           </div>
 

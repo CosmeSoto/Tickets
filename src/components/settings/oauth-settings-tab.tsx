@@ -332,14 +332,25 @@ export function OAuthSettingsTab() {
 
           {/* Client Secret */}
           <div className='space-y-2'>
-            <Label htmlFor='google-client-secret'>Client Secret *</Label>
+            <Label htmlFor='google-client-secret'>
+              Client Secret{' '}
+              {googleConfig.hasExistingSecret ? '(dejar vacío para mantener el actual)' : '*'}
+            </Label>
+            {googleConfig.hasExistingSecret && !googleConfig.clientSecret && (
+              <div className='flex items-center gap-2 px-3 py-2 rounded-md bg-muted/50 border border-border text-xs text-muted-foreground'>
+                <Key className='h-3.5 w-3.5 flex-shrink-0' />
+                Secret guardado — deja vacío para mantenerlo o escribe uno nuevo para reemplazarlo
+              </div>
+            )}
             <div className='relative'>
               <Input
                 id='google-client-secret'
                 type={googleConfig.showSecret ? 'text' : 'password'}
                 value={googleConfig.clientSecret}
                 onChange={e => setGoogleConfig({ ...googleConfig, clientSecret: e.target.value })}
-                placeholder='GOCSPX-...'
+                placeholder={
+                  googleConfig.hasExistingSecret ? '••••••••  (sin cambios)' : 'GOCSPX-...'
+                }
                 className='font-mono text-sm pr-10'
               />
               <Button
@@ -472,7 +483,16 @@ export function OAuthSettingsTab() {
 
           {/* Client Secret */}
           <div className='space-y-2'>
-            <Label htmlFor='microsoft-client-secret'>Client Secret *</Label>
+            <Label htmlFor='microsoft-client-secret'>
+              Client Secret{' '}
+              {microsoftConfig.hasExistingSecret ? '(dejar vacío para mantener el actual)' : '*'}
+            </Label>
+            {microsoftConfig.hasExistingSecret && !microsoftConfig.clientSecret && (
+              <div className='flex items-center gap-2 px-3 py-2 rounded-md bg-muted/50 border border-border text-xs text-muted-foreground'>
+                <Key className='h-3.5 w-3.5 flex-shrink-0' />
+                Secret guardado — deja vacío para mantenerlo o escribe uno nuevo para reemplazarlo
+              </div>
+            )}
             <div className='relative'>
               <Input
                 id='microsoft-client-secret'
@@ -481,7 +501,7 @@ export function OAuthSettingsTab() {
                 onChange={e =>
                   setMicrosoftConfig({ ...microsoftConfig, clientSecret: e.target.value })
                 }
-                placeholder='...'
+                placeholder={microsoftConfig.hasExistingSecret ? '••••••••  (sin cambios)' : '...'}
                 className='font-mono text-sm pr-10'
               />
               <Button

@@ -3,8 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { PDFGeneratorService } from '@/lib/services/pdf-generator.service'
 import { DeliveryActService } from '@/lib/services/delivery-act.service'
+import { getUploadDir } from '@/lib/upload-path'
 import fs from 'fs'
-import path from 'path'
 import { promisify } from 'util'
 
 const readFile = promisify(fs.readFile)
@@ -14,36 +14,27 @@ const readFile = promisify(fs.readFile)
  * Descarga el PDF de un acta de entrega
  * Requiere autenticación y permisos (deliverer, receiver o ADMIN)
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
-      return NextResponse.json(
-        { error: 'No autenticado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
     const { id } = await params
 
     // Obtener acta
     const act = await DeliveryActService.getActById(id)
-    
+
     if (!act) {
-      return NextResponse.json(
-        { error: 'Acta no encontrada' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Acta no encontrada' }, { status: 404 })
     }
 
     // Verificar permisos: solo deliverer, receiver o ADMIN pueden descargar
     const userId = session.user.id
     const userRole = session.user.role
-    
+
     const isDeliverer = act.delivererInfo.id === userId
     const isReceiver = act.receiverInfo.id === userId
     const isAdmin = userRole === 'ADMIN'
@@ -65,7 +56,7 @@ export async function GET(
 
     // Obtener o generar PDF
     let pdfPath = await PDFGeneratorService.getDeliveryActPDFPath(id)
-    
+
     // Si no existe el PDF o el archivo no existe, generarlo
     if (!pdfPath || !(await PDFGeneratorService.pdfExists(pdfPath))) {
       console.log('PDF no encontrado, generando nuevo PDF...')
@@ -73,7 +64,9 @@ export async function GET(
     }
 
     // Leer archivo PDF
-    const fullPath = path.join(process.cwd(), 'public', pdfPath)
+    // pdfPath es /uploads/delivery-acts/... → extraer segmento relativo a uploads/
+    const relative = pdfPath.replace(/^\/uploads\//, '')
+    const fullPath = getUploadDir(relative)
     const pdfBuffer = await readFile(fullPath)
 
     // Nombre del archivo para descarga
@@ -90,17 +83,11 @@ export async function GET(
     })
   } catch (error) {
     console.error('Error en GET /api/inventory/acts/[id]/pdf:', error)
-    
+
     if (error instanceof Error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json(
-      { error: 'Error al descargar PDF' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al descargar PDF' }, { status: 500 })
   }
 }

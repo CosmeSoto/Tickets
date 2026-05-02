@@ -19,7 +19,7 @@ interface EquipmentStatusBannersProps {
 }
 
 export function EquipmentStatusBanners({
-  equipment,
+  equipment: _equipment,
   currentAssignment,
   maintenanceRecords,
   userRole,

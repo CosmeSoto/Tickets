@@ -4,7 +4,6 @@ import { authOptions } from '@/lib/auth'
 import { UserService } from '@/lib/services/user-service'
 import { z } from 'zod'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
-import prisma from '@/lib/prisma'
 import { IdResolverService } from '@/lib/services/id-resolver-service'
 import { NotificationEvents } from '@/lib/notification-events'
 

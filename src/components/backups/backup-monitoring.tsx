@@ -34,13 +34,20 @@ interface SystemHealth {
   }
   backupService: {
     status: 'running' | 'stopped' | 'error'
+    backupEnabled?: boolean
+    frequency?: string
+    scheduleTime?: string
     lastBackup: string | null
     nextScheduled: string | null
+    pgDumpAvailable?: boolean
   }
   performance: {
-    avgBackupTime: number
+    avgBackupTime: number | null
     successRate: number
-    compressionRatio: number
+    compressionRatio: number | null
+    totalBackups: number
+    completedBackups: number
+    failedBackups: number
   }
 }
 
@@ -99,28 +106,31 @@ export function BackupMonitoring() {
         variant: 'warning',
       })
 
-      // Datos de ejemplo para desarrollo
+      // Si la API falla, mostrar estado de error sin datos inventados
       setHealth({
         database: {
-          status: 'connected',
-          responseTime: 45,
+          status: 'error',
+          responseTime: 0,
           lastCheck: new Date().toISOString(),
         },
         storage: {
-          available: 85 * 1024 * 1024 * 1024, // 85GB
-          used: 15 * 1024 * 1024 * 1024, // 15GB
-          total: 100 * 1024 * 1024 * 1024, // 100GB
+          available: 0,
+          used: 0,
+          total: 0,
           status: 'healthy',
         },
         backupService: {
-          status: 'running',
-          lastBackup: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 horas atrás
-          nextScheduled: new Date(Date.now() + 22 * 60 * 60 * 1000).toISOString(), // en 22 horas
+          status: 'error',
+          lastBackup: null,
+          nextScheduled: null,
         },
         performance: {
-          avgBackupTime: 3.5, // minutos
-          successRate: 98.5,
-          compressionRatio: 65,
+          avgBackupTime: null,
+          successRate: 0,
+          compressionRatio: null,
+          totalBackups: 0,
+          completedBackups: 0,
+          failedBackups: 0,
         },
       })
     } finally {
@@ -157,25 +167,8 @@ export function BackupMonitoring() {
         variant: 'warning',
       })
 
-      // Alertas de ejemplo
-      setAlerts([
-        {
-          id: '1',
-          type: 'info',
-          title: 'Backup completado',
-          message: 'Backup automático completado exitosamente',
-          timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-          resolved: true,
-        },
-        {
-          id: '2',
-          type: 'warning',
-          title: 'Espacio en disco',
-          message: 'El espacio disponible está por debajo del 20%',
-          timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-          resolved: false,
-        },
-      ])
+      // Si la API de alertas falla, mostrar lista vacía — no inventar datos
+      setAlerts([])
     }
   }
 
@@ -187,7 +180,8 @@ export function BackupMonitoring() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
   }
 
-  const formatTime = (minutes: number) => {
+  const formatTime = (minutes: number | null) => {
+    if (minutes === null || minutes === 0) return 'Sin datos'
     if (minutes < 60) return `${minutes.toFixed(1)} min`
     const hours = Math.floor(minutes / 60)
     const mins = Math.round(minutes % 60)
@@ -199,14 +193,14 @@ export function BackupMonitoring() {
       case 'connected':
       case 'running':
       case 'healthy':
-        return 'text-green-600 bg-green-50 border-green-200'
+        return 'text-primary bg-primary/5 border-primary/20'
       case 'warning':
-        return 'text-yellow-600 bg-yellow-50 border-yellow-200'
+        return 'text-destructive bg-destructive/10 border-destructive/20'
       case 'disconnected':
       case 'stopped':
       case 'error':
       case 'critical':
-        return 'text-red-600 bg-red-50 border-red-200'
+        return 'text-destructive bg-destructive/20 border-destructive/40'
       default:
         return 'text-muted-foreground bg-muted border-border'
     }
@@ -217,14 +211,14 @@ export function BackupMonitoring() {
       case 'connected':
       case 'running':
       case 'healthy':
-        return <CheckCircle className='h-4 w-4 text-green-600' />
+        return <CheckCircle className='h-4 w-4 text-primary' />
       case 'warning':
-        return <AlertTriangle className='h-4 w-4 text-yellow-600' />
+        return <AlertTriangle className='h-4 w-4 text-destructive' />
       case 'disconnected':
       case 'stopped':
       case 'error':
       case 'critical':
-        return <AlertTriangle className='h-4 w-4 text-red-600' />
+        return <AlertTriangle className='h-4 w-4 text-destructive' />
       default:
         return <Clock className='h-4 w-4 text-muted-foreground' />
     }
@@ -233,11 +227,11 @@ export function BackupMonitoring() {
   const getAlertIcon = (type: string) => {
     switch (type) {
       case 'info':
-        return <CheckCircle className='h-4 w-4 text-blue-600' />
+        return <CheckCircle className='h-4 w-4 text-primary' />
       case 'warning':
-        return <AlertTriangle className='h-4 w-4 text-yellow-600' />
+        return <AlertTriangle className='h-4 w-4 text-destructive' />
       case 'error':
-        return <AlertTriangle className='h-4 w-4 text-red-600' />
+        return <AlertTriangle className='h-4 w-4 text-destructive' />
       default:
         return <Bell className='h-4 w-4 text-muted-foreground' />
     }
@@ -247,7 +241,7 @@ export function BackupMonitoring() {
     return (
       <div className='flex items-center justify-center h-64'>
         <div className='text-center'>
-          <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto'></div>
+          <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto'></div>
           <p className='mt-2 text-muted-foreground'>Cargando estado del sistema...</p>
         </div>
       </div>
@@ -256,9 +250,9 @@ export function BackupMonitoring() {
 
   if (!health) {
     return (
-      <Alert className='border-red-200 bg-red-50'>
-        <AlertTriangle className='h-4 w-4 text-red-600' />
-        <AlertDescription className='text-red-800'>
+      <Alert className='border-destructive/40 bg-destructive/10'>
+        <AlertTriangle className='h-4 w-4 text-destructive' />
+        <AlertDescription className='text-destructive'>
           No se pudo cargar el estado del sistema. Verifique la conectividad.
         </AlertDescription>
       </Alert>
@@ -300,12 +294,11 @@ export function BackupMonitoring() {
         <Card>
           <CardContent className='p-6'>
             <div className='flex items-center justify-between mb-4'>
-              <div className='p-3 rounded-lg bg-blue-50 border border-blue-200'>
-                <Database className='h-6 w-6 text-blue-600' />
+              <div className='p-3 rounded-lg bg-muted border border-border'>
+                <Database className='h-6 w-6 text-muted-foreground' />
               </div>
               {getStatusIcon(health.database.status)}
             </div>
-
             <div className='space-y-2'>
               <div className='text-lg font-bold text-foreground'>Base de Datos</div>
               <div
@@ -323,12 +316,11 @@ export function BackupMonitoring() {
         <Card>
           <CardContent className='p-6'>
             <div className='flex items-center justify-between mb-4'>
-              <div className='p-3 rounded-lg bg-green-50 border border-green-200'>
-                <HardDrive className='h-6 w-6 text-green-600' />
+              <div className='p-3 rounded-lg bg-muted border border-border'>
+                <HardDrive className='h-6 w-6 text-muted-foreground' />
               </div>
               {getStatusIcon(health.storage.status)}
             </div>
-
             <div className='space-y-2'>
               <div className='text-lg font-bold text-foreground'>Almacenamiento</div>
               <div
@@ -350,12 +342,11 @@ export function BackupMonitoring() {
         <Card>
           <CardContent className='p-6'>
             <div className='flex items-center justify-between mb-4'>
-              <div className='p-3 rounded-lg bg-purple-50 border border-purple-200'>
-                <Server className='h-6 w-6 text-purple-600' />
+              <div className='p-3 rounded-lg bg-muted border border-border'>
+                <Server className='h-6 w-6 text-muted-foreground' />
               </div>
               {getStatusIcon(health.backupService.status)}
             </div>
-
             <div className='space-y-2'>
               <div className='text-lg font-bold text-foreground'>Servicio Backup</div>
               <div
@@ -380,15 +371,14 @@ export function BackupMonitoring() {
         <Card>
           <CardContent className='p-6'>
             <div className='flex items-center justify-between mb-4'>
-              <div className='p-3 rounded-lg bg-orange-50 border border-orange-200'>
-                <TrendingUp className='h-6 w-6 text-orange-600' />
+              <div className='p-3 rounded-lg bg-muted border border-border'>
+                <TrendingUp className='h-6 w-6 text-muted-foreground' />
               </div>
-              <CheckCircle className='h-4 w-4 text-green-600' />
+              <CheckCircle className='h-4 w-4 text-primary' />
             </div>
-
             <div className='space-y-2'>
               <div className='text-lg font-bold text-foreground'>Rendimiento</div>
-              <div className='text-sm text-green-600 bg-green-50 px-2 py-1 rounded border border-green-200'>
+              <div className='text-sm text-primary bg-primary/5 px-2 py-1 rounded border border-primary/20'>
                 {health.performance.successRate}% éxito
               </div>
               <div className='text-xs text-muted-foreground'>
@@ -404,25 +394,26 @@ export function BackupMonitoring() {
         <Card>
           <CardHeader>
             <CardTitle className='flex items-center space-x-2'>
-              <Zap className='h-5 w-5 text-yellow-600' />
+              <Zap className='h-5 w-5 text-primary' />
               <span>Métricas de Rendimiento</span>
             </CardTitle>
             <CardDescription>Estadísticas de eficiencia y optimización</CardDescription>
           </CardHeader>
           <CardContent className='space-y-6'>
             <div className='grid grid-cols-2 gap-4'>
-              <div className='text-center p-4 bg-blue-50 rounded-lg'>
-                <div className='text-2xl font-bold text-blue-700'>
-                  {health.performance.successRate}%
+              <div className='text-center p-4 bg-muted/50 rounded-lg border border-border'>
+                <div className='text-2xl font-bold text-foreground'>
+                  {health.performance.successRate.toFixed(1)}%
                 </div>
-                <div className='text-sm text-blue-600'>Tasa de Éxito</div>
+                <div className='text-sm text-muted-foreground'>Tasa de Éxito</div>
               </div>
-
-              <div className='text-center p-4 bg-green-50 rounded-lg'>
-                <div className='text-2xl font-bold text-green-700'>
-                  {health.performance.compressionRatio}%
+              <div className='text-center p-4 bg-muted/50 rounded-lg border border-border'>
+                <div className='text-2xl font-bold text-foreground'>
+                  {health.performance.compressionRatio !== null
+                    ? `${health.performance.compressionRatio}%`
+                    : 'N/A'}
                 </div>
-                <div className='text-sm text-green-600'>Compresión</div>
+                <div className='text-sm text-muted-foreground'>Compresión</div>
               </div>
             </div>
 
@@ -431,6 +422,18 @@ export function BackupMonitoring() {
                 <span className='text-sm font-medium text-foreground'>Tiempo Promedio</span>
                 <span className='text-sm font-bold text-foreground'>
                   {formatTime(health.performance.avgBackupTime)}
+                </span>
+              </div>
+
+              <div className='flex justify-between items-center'>
+                <span className='text-sm font-medium text-foreground'>Backups (30 días)</span>
+                <span className='text-sm font-bold text-foreground'>
+                  {health.performance.completedBackups} completados
+                  {health.performance.failedBackups > 0 && (
+                    <span className='text-destructive ml-1'>
+                      · {health.performance.failedBackups} fallidos
+                    </span>
+                  )}
                 </span>
               </div>
 
@@ -444,7 +447,9 @@ export function BackupMonitoring() {
                         hour: '2-digit',
                         minute: '2-digit',
                       })
-                    : 'No programado'}
+                    : health.backupService.backupEnabled === false
+                      ? 'Deshabilitado'
+                      : 'No programado'}
                 </span>
               </div>
             </div>
@@ -454,7 +459,7 @@ export function BackupMonitoring() {
         <Card>
           <CardHeader>
             <CardTitle className='flex items-center space-x-2'>
-              <Bell className='h-5 w-5 text-red-600' />
+              <Bell className='h-5 w-5 text-primary' />
               <span>Alertas del Sistema</span>
             </CardTitle>
             <CardDescription>Notificaciones y eventos recientes</CardDescription>
@@ -462,7 +467,7 @@ export function BackupMonitoring() {
           <CardContent>
             {alerts.length === 0 ? (
               <div className='text-center py-8 text-muted-foreground'>
-                <CheckCircle className='h-8 w-8 mx-auto mb-2 text-green-400' />
+                <CheckCircle className='h-8 w-8 mx-auto mb-2 text-primary' />
                 <p className='text-sm'>No hay alertas activas</p>
                 <p className='text-xs'>El sistema está funcionando correctamente</p>
               </div>
@@ -473,10 +478,10 @@ export function BackupMonitoring() {
                     key={alert.id}
                     className={`p-3 rounded-lg border ${
                       alert.type === 'error'
-                        ? 'bg-red-50 border-red-200'
+                        ? 'bg-destructive/10 border-destructive/30'
                         : alert.type === 'warning'
-                          ? 'bg-yellow-50 border-yellow-200'
-                          : 'bg-blue-50 border-blue-200'
+                          ? 'bg-destructive/5 border-destructive/20'
+                          : 'bg-muted/50 border-border'
                     }`}
                   >
                     <div className='flex items-start space-x-3'>
@@ -485,7 +490,7 @@ export function BackupMonitoring() {
                         <div className='flex items-center justify-between'>
                           <p className='text-sm font-medium text-foreground'>{alert.title}</p>
                           {alert.resolved && (
-                            <Badge variant='outline' className='text-xs bg-green-50 text-green-700'>
+                            <Badge variant='outline' className='text-xs'>
                               Resuelto
                             </Badge>
                           )}

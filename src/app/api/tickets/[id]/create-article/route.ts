@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { 
-  translateTicketStatus, 
-  translatePriority, 
-  translateTaskStatus 
+import {
+  translateTicketStatus,
+  translatePriority,
+  translateTaskStatus,
 } from '@/lib/translations/es'
 import { UserRole } from '@prisma/client'
 import { z } from 'zod'
@@ -14,25 +14,22 @@ import { NotificationService } from '@/lib/services/notification-service'
 
 // Schema de validación para crear artículo desde ticket
 const createArticleFromTicketSchema = z.object({
-  title: z.string().min(10, 'El título debe tener al menos 10 caracteres').max(200, 'El título no puede exceder 200 caracteres'),
+  title: z
+    .string()
+    .min(10, 'El título debe tener al menos 10 caracteres')
+    .max(200, 'El título no puede exceder 200 caracteres'),
   content: z.string().min(50, 'El contenido debe tener al menos 50 caracteres'),
   summary: z.string().optional(),
   tags: z.array(z.string().min(2).max(30)).max(10, 'Máximo 10 tags permitidos'),
 })
 
 // POST /api/tickets/[id]/create-article - Crear artículo desde ticket resuelto
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
     // Verificar que el usuario sea TECHNICIAN o ADMIN
@@ -82,10 +79,7 @@ export async function POST(
     })
 
     if (!ticket) {
-      return NextResponse.json(
-        { error: 'Ticket no encontrado' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Ticket no encontrado' }, { status: 404 })
     }
 
     // Verificar que el ticket esté resuelto o cerrado
@@ -102,7 +96,10 @@ export async function POST(
 
     if (!isAssignedTechnician && !isAdmin) {
       return NextResponse.json(
-        { error: 'Solo el técnico asignado o un administrador pueden crear artículos desde este ticket' },
+        {
+          error:
+            'Solo el técnico asignado o un administrador pueden crear artículos desde este ticket',
+        },
         { status: 403 }
       )
     }
@@ -114,7 +111,7 @@ export async function POST(
 
     if (existingArticle) {
       return NextResponse.json(
-        { 
+        {
           error: 'Ya existe un artículo creado desde este ticket',
           articleId: existingArticle.id,
         },
@@ -123,7 +120,7 @@ export async function POST(
     }
 
     const body = await request.json()
-    
+
     // Validar datos
     const validationResult = createArticleFromTicketSchema.safeParse(body)
     if (!validationResult.success) {
@@ -138,13 +135,24 @@ export async function POST(
     // Generar resumen automático si no se proporciona
     const summary = data.summary || data.content.substring(0, 200) + '...'
 
-    // Crear artículo
+    // Derivar familyId: ticket.familyId tiene prioridad, luego categoría → departamento → familia
+    let familyId: string | null = (ticket as any).familyId ?? null
+    if (!familyId && ticket.categoryId) {
+      const cat = await prisma.categories.findUnique({
+        where: { id: ticket.categoryId },
+        select: { departments: { select: { familyId: true } } },
+      })
+      familyId = cat?.departments?.familyId ?? null
+    }
+
+    // Crear artículo con familyId derivado del ticket
     const article = await prisma.knowledge_articles.create({
       data: {
         title: data.title,
         content: data.content,
         summary,
         categoryId: ticket.categoryId,
+        familyId,
         tags: data.tags,
         sourceTicketId: ticketId,
         authorId: session.user.id,
@@ -219,32 +227,26 @@ export async function POST(
       }).catch(() => {})
     }
 
-    return NextResponse.json({
-      article,
-      message: 'Artículo creado exitosamente desde el ticket',
-    }, { status: 201 })
+    return NextResponse.json(
+      {
+        article,
+        message: 'Artículo creado exitosamente desde el ticket',
+      },
+      { status: 201 }
+    )
   } catch (error) {
     console.error('Error al crear artículo desde ticket:', error)
-    return NextResponse.json(
-      { error: 'Error al crear artículo desde ticket' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al crear artículo desde ticket' }, { status: 500 })
   }
 }
 
 // GET /api/tickets/[id]/create-article - Obtener información del ticket para crear artículo
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
     const { id: ticketId } = await params
@@ -322,10 +324,7 @@ export async function GET(
     })
 
     if (!ticket) {
-      return NextResponse.json(
-        { error: 'Ticket no encontrado' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Ticket no encontrado' }, { status: 404 })
     }
 
     // Verificar que el ticket esté resuelto o cerrado
@@ -347,10 +346,10 @@ export async function GET(
 
     // Generar sugerencias para el artículo
     const suggestedTitle = `Solución: ${ticket.title}`
-    
+
     // Generar contenido sugerido completo en Markdown
     let suggestedContent = `# ${ticket.title}\n\n`
-    
+
     // 1. Información del Ticket
     suggestedContent += `## 📋 Información del Ticket\n\n`
     if (ticket.categories?.departments) {
@@ -360,27 +359,28 @@ export async function GET(
     suggestedContent += `- **Prioridad:** ${translatePriority(ticket.priority)}\n`
     suggestedContent += `- **Estado:** ${translateTicketStatus(ticket.status)}\n`
     suggestedContent += `- **Técnico asignado:** ${ticket.users_tickets_assigneeIdTousers?.name || 'N/A'}\n\n`
-    
+
     // 2. Descripción del Problema
     suggestedContent += `## 🔍 Problema Reportado\n\n`
     suggestedContent += `${ticket.description}\n\n`
-    
+
     // Calcular métricas reales del ticket
     const createdAt = new Date(ticket.createdAt)
     const resolvedAt = ticket.resolvedAt ? new Date(ticket.resolvedAt) : new Date()
     const resolutionTimeMs = resolvedAt.getTime() - createdAt.getTime()
-    const resolutionTimeHours = Math.round(resolutionTimeMs / (1000 * 60 * 60) * 10) / 10
+    const resolutionTimeHours = Math.round((resolutionTimeMs / (1000 * 60 * 60)) * 10) / 10
     const resolutionTimeDays = Math.floor(resolutionTimeHours / 24)
     const remainingHours = Math.round((resolutionTimeHours % 24) * 10) / 10
-    
+
     // Tiempo de primera respuesta (primer comentario público del técnico)
-    const firstTechnicianComment = ticket.comments.find((c: any) => 
-      (c.users.role === 'TECHNICIAN' || c.users.role === 'ADMIN') && !c.isInternal
+    const firstTechnicianComment = ticket.comments.find(
+      (c: any) => (c.users.role === 'TECHNICIAN' || c.users.role === 'ADMIN') && !c.isInternal
     )
     let firstResponseTime = 'N/A'
     if (firstTechnicianComment) {
-      const firstResponseMs = new Date(firstTechnicianComment.createdAt).getTime() - createdAt.getTime()
-      const firstResponseHours = Math.round(firstResponseMs / (1000 * 60 * 60) * 10) / 10
+      const firstResponseMs =
+        new Date(firstTechnicianComment.createdAt).getTime() - createdAt.getTime()
+      const firstResponseHours = Math.round((firstResponseMs / (1000 * 60 * 60)) * 10) / 10
       if (firstResponseHours < 1) {
         const minutes = Math.round(firstResponseMs / (1000 * 60))
         firstResponseTime = `${minutes} minutos`
@@ -392,17 +392,17 @@ export async function GET(
         firstResponseTime = `${days} ${days === 1 ? 'día' : 'días'}${hours > 0 ? ` ${hours} horas` : ''}`
       }
     }
-    
+
     // 3. Plan de Resolución (si existe)
     if (ticket.resolution_plans && ticket.resolution_plans.length > 0) {
       const plan = ticket.resolution_plans[0]
       suggestedContent += `## 📝 Plan de Resolución\n\n`
       suggestedContent += `**Título:** ${plan.title}\n\n`
-      
+
       if (plan.description) {
         suggestedContent += `**Descripción:**\n${plan.description}\n\n`
       }
-      
+
       if (plan.tasks && plan.tasks.length > 0) {
         suggestedContent += `### Tareas Realizadas\n\n`
         plan.tasks.forEach((task: any, index: number) => {
@@ -411,7 +411,7 @@ export async function GET(
             suggestedContent += `   - ${task.description}\n`
           }
           suggestedContent += `   - Estado: ${translateTaskStatus(task.status)}\n`
-          
+
           // Incluir información de horario si está disponible
           if (task.startTime && task.endTime && task.estimatedHours) {
             const hours = Math.floor(task.estimatedHours)
@@ -428,7 +428,7 @@ export async function GET(
           } else if (task.estimatedHours) {
             suggestedContent += `   - Tiempo estimado: ${task.estimatedHours} horas\n`
           }
-          
+
           if (task.notes) {
             suggestedContent += `   - Notas: ${task.notes}\n`
           }
@@ -437,10 +437,10 @@ export async function GET(
       }
       suggestedContent += `\n`
     }
-    
+
     // 4. Métricas del Ticket (información real y útil)
     suggestedContent += `## 📊 Métricas de Resolución\n\n`
-    
+
     // Tiempo total de resolución
     if (resolutionTimeDays > 0) {
       suggestedContent += `- **Tiempo de resolución:** ${resolutionTimeDays} ${resolutionTimeDays === 1 ? 'día' : 'días'}`
@@ -451,33 +451,35 @@ export async function GET(
     } else {
       suggestedContent += `- **Tiempo de resolución:** ${resolutionTimeHours} horas\n`
     }
-    
+
     // Tiempo de primera respuesta
     suggestedContent += `- **Tiempo de primera respuesta:** ${firstResponseTime}\n`
-    
+
     // Función para formatear horas a formato legible
     const formatHours = (hours: number): string => {
       if (hours < 1) {
         const minutes = Math.round(hours * 60)
         return `${minutes} minuto${minutes !== 1 ? 's' : ''}`
       }
-      
+
       const wholeHours = Math.floor(hours)
       const remainingMinutes = Math.round((hours - wholeHours) * 60)
-      
+
       if (remainingMinutes === 0) {
         return `${wholeHours} hora${wholeHours !== 1 ? 's' : ''}`
       }
-      
+
       return `${wholeHours} hora${wholeHours !== 1 ? 's' : ''} ${remainingMinutes} minuto${remainingMinutes !== 1 ? 's' : ''}`
     }
-    
+
     // Número de interacciones (solo comentarios públicos)
     const publicComments = ticket.comments.filter((c: any) => !c.isInternal)
     const clientComments = publicComments.filter((c: any) => c.users.role === 'CLIENT').length
-    const technicianComments = publicComments.filter((c: any) => c.users.role === 'TECHNICIAN' || c.users.role === 'ADMIN').length
+    const technicianComments = publicComments.filter(
+      (c: any) => c.users.role === 'TECHNICIAN' || c.users.role === 'ADMIN'
+    ).length
     suggestedContent += `- **Interacciones totales:** ${publicComments.length} (${clientComments} del cliente, ${technicianComments} del equipo técnico)\n`
-    
+
     // Información del plan si existe
     if (ticket.resolution_plans && ticket.resolution_plans.length > 0) {
       const plan = ticket.resolution_plans[0]
@@ -490,10 +492,12 @@ export async function GET(
       }
     }
     suggestedContent += `\n`
-    
+
     // 5. Solución Aplicada (solo comentarios públicos de técnicos)
-    const techComments = ticket.comments.filter((comment: any) => 
-      (comment.users.role === 'TECHNICIAN' || comment.users.role === 'ADMIN') && !comment.isInternal
+    const techComments = ticket.comments.filter(
+      (comment: any) =>
+        (comment.users.role === 'TECHNICIAN' || comment.users.role === 'ADMIN') &&
+        !comment.isInternal
     )
     if (techComments.length > 0) {
       suggestedContent += `## ✅ Solución Aplicada\n\n`
@@ -501,7 +505,7 @@ export async function GET(
         suggestedContent += `${comment.content}\n\n`
       })
     }
-    
+
     // 6. Calificación del Cliente (si existe)
     // 6. Calificación del Cliente (si existe)
     if (ticket.ticket_ratings) {
@@ -517,20 +521,26 @@ export async function GET(
       }
       suggestedContent += `\n`
     }
-    
+
     // 7. Conclusión
     // 7. Conclusión
     suggestedContent += `## 💡 Conclusión\n\n`
     suggestedContent += `Este artículo documenta la solución aplicada al ticket #${ticket.id.substring(0, 8)}. `
     suggestedContent += `La información aquí presentada puede ser útil para resolver casos similares en el futuro.\n\n`
-    
+
     // Extraer tags sugeridos del título, descripción, categoría y departamento
     const suggestedTags = [
       ticket.categories?.departments?.name.toLowerCase() || '',
       ticket.categories?.name.toLowerCase() || '',
       translatePriority(ticket.priority).toLowerCase(),
-      ...ticket.title.toLowerCase().split(' ').filter(word => word.length > 4).slice(0, 3),
-    ].filter(Boolean).slice(0, 10) // Máximo 10 tags
+      ...ticket.title
+        .toLowerCase()
+        .split(' ')
+        .filter(word => word.length > 4)
+        .slice(0, 3),
+    ]
+      .filter(Boolean)
+      .slice(0, 10) // Máximo 10 tags
 
     return NextResponse.json({
       ticket: {
@@ -555,9 +565,6 @@ export async function GET(
     })
   } catch (error) {
     console.error('Error al obtener información del ticket:', error)
-    return NextResponse.json(
-      { error: 'Error al obtener información del ticket' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al obtener información del ticket' }, { status: 500 })
   }
 }

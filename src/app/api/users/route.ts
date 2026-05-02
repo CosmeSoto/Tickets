@@ -4,7 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { UserService } from '@/lib/services/user-service'
 import { z } from 'zod'
-import { withCache, buildCacheKey } from '@/lib/api-cache'
+import { buildCacheKey } from '@/lib/api-cache'
 const createUserSchema = z.object({
   email: z.string().email('Email inválido'),
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
@@ -21,6 +21,11 @@ export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions)
     if (!session) {
       return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
+    }
+
+    // SECURITY: clientes no pueden listar usuarios
+    if (session.user.role === 'CLIENT') {
+      return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 403 })
     }
 
     const { searchParams } = new URL(request.url)

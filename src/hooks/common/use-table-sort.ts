@@ -58,12 +58,13 @@ export function useTableSort<T>(
 }
 
 /** Renderiza el ícono de sort para una columna */
-export function SortIcon<T>(
-  col: keyof T,
-  sortKey: keyof T | null,
+export function SortIcon(
+  col: PropertyKey,
+  sortKey: PropertyKey | null,
   sortDir: Direction
 ): React.ReactElement {
-  if (sortKey !== col)
+  const isActive = sortKey != null && String(sortKey) === String(col)
+  if (!isActive)
     return React.createElement(ArrowUpDown, {
       className: 'h-3.5 w-3.5 ml-1 text-muted-foreground/50 inline',
     })

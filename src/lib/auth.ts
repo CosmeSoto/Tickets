@@ -19,7 +19,7 @@ export const authOptions: NextAuthOptions = {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Contraseña', type: 'password' },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) {
           throw new Error('Email y contraseña son requeridos')
         }
@@ -27,7 +27,12 @@ export const authOptions: NextAuthOptions = {
         try {
           // NUEVO: Verificar si la cuenta está bloqueada por intentos fallidos
           const { SecurityConfigService } = await import('./services/security-config-service')
-          const ipAddress = 'unknown' // En producción, obtener IP real del request
+
+          // Extraer IP real del request (soporta proxies y load balancers)
+          const ipAddress =
+            (req?.headers?.['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+            (req?.headers?.['x-real-ip'] as string) ||
+            'unknown'
 
           const lockStatus = await SecurityConfigService.isAccountLocked(
             credentials.email,

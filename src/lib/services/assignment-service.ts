@@ -24,10 +24,10 @@ export class AssignmentService {
                 select: {
                   id: true,
                   name: true,
-                  color: true
-                }
-              }
-            }
+                  color: true,
+                },
+              },
+            },
           },
         },
       })
@@ -85,14 +85,14 @@ export class AssignmentService {
           title: true,
           status: true,
           priority: true,
-          users_tickets_assigneeIdTousers: { 
-            select: { id: true, name: true, email: true } 
+          users_tickets_assigneeIdTousers: {
+            select: { id: true, name: true, email: true },
           },
-          users_tickets_clientIdTousers: { 
-            select: { id: true, name: true, email: true } 
+          users_tickets_clientIdTousers: {
+            select: { id: true, name: true, email: true },
           },
-          categories: { 
-            select: { id: true, name: true, color: true, departmentId: true } 
+          categories: {
+            select: { id: true, name: true, color: true, departmentId: true },
           },
         },
       })
@@ -107,7 +107,7 @@ export class AssignmentService {
             : `Ticket asignado automáticamente a ${bestTechnician.name}`,
           ticketId,
           userId: bestTechnician.id,
-          createdAt: new Date()
+          createdAt: new Date(),
         },
       })
 
@@ -117,8 +117,8 @@ export class AssignmentService {
           technicianId_categoryId: {
             technicianId: bestTechnician.id,
             categoryId: ticket.categoryId,
-          }
-        }
+          },
+        },
       })
 
       // Solo crear si no existe (evitar duplicados por el constraint unique)
@@ -145,14 +145,12 @@ export class AssignmentService {
       })
 
       // ⭐ Enviar emails de asignación
-      const { 
-        triggerTicketAssignedToTechnicianEmail,
-        triggerTicketAssignedToClientEmail 
-      } = await import('@/lib/email-triggers')
-      triggerTicketAssignedToTechnicianEmail(ticketId).catch((err: Error) => {
+      const { triggerTicketAssignedToTechnicianEmail, triggerTicketAssignedToClientEmail } =
+        await import('@/lib/email-triggers')
+      void Promise.resolve(triggerTicketAssignedToTechnicianEmail(ticketId)).catch((err: Error) => {
         console.error('[EMAIL] Error enviando email de asignación a técnico:', err)
       })
-      triggerTicketAssignedToClientEmail(ticketId).catch((err: Error) => {
+      void Promise.resolve(triggerTicketAssignedToClientEmail(ticketId)).catch((err: Error) => {
         console.error('[EMAIL] Error enviando email de asignación a cliente:', err)
       })
 
@@ -187,8 +185,8 @@ export class AssignmentService {
           select: {
             id: true,
             name: true,
-            color: true
-          }
+            color: true,
+          },
         },
         _count: {
           select: {
@@ -249,16 +247,23 @@ export class AssignmentService {
         }
 
         // Factor 2: Departamento coincidente (40% del peso si aplica)
-        if (ticket.categories.departmentId && technician.departmentId === ticket.categories.departmentId) {
+        if (
+          ticket.categories.departmentId &&
+          technician.departmentId === ticket.categories.departmentId
+        ) {
           score += 0.4
           reasons.push(`Departamento: ${technician.departments?.name}`)
         }
 
         // Factor 2: Carga de trabajo (30% del peso)
         if (criteria.workloadBalance !== false) {
-          const workloadScore = this.calculateWorkloadScore(technician._count.tickets_tickets_assigneeIdTousers)
+          const workloadScore = this.calculateWorkloadScore(
+            technician._count.tickets_tickets_assigneeIdTousers
+          )
           score += workloadScore * 0.3
-          reasons.push(`Carga: ${technician._count.tickets_tickets_assigneeIdTousers} tickets activos`)
+          reasons.push(
+            `Carga: ${technician._count.tickets_tickets_assigneeIdTousers} tickets activos`
+          )
         }
 
         // Factor 3: Especialización en categoría (15% del peso)
@@ -287,7 +292,7 @@ export class AssignmentService {
 
     // Ordenar por puntuación y devolver el mejor
     scoredTechnicians.sort((a, b) => b.score - a.score)
-    
+
     return scoredTechnicians[0]
   }
 
@@ -507,14 +512,14 @@ export class AssignmentService {
         title: true,
         status: true,
         priority: true,
-        users_tickets_assigneeIdTousers: { 
-          select: { id: true, name: true, email: true } 
+        users_tickets_assigneeIdTousers: {
+          select: { id: true, name: true, email: true },
         },
-        users_tickets_clientIdTousers: { 
-          select: { id: true, name: true, email: true } 
+        users_tickets_clientIdTousers: {
+          select: { id: true, name: true, email: true },
         },
-        categories: { 
-          select: { id: true, name: true, color: true } 
+        categories: {
+          select: { id: true, name: true, color: true },
         },
       },
     })
@@ -527,7 +532,7 @@ export class AssignmentService {
         comment: `Ticket reasignado a ${newTechnician.name}`,
         ticketId,
         userId,
-        createdAt: new Date()
+        createdAt: new Date(),
       },
     })
 

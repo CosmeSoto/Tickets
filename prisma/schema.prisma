@@ -438,6 +438,7 @@ model users {
   isSuperAdmin                                      Boolean                         @default(false) @map("is_super_admin")
   accounts                                          accounts[]
   adminFamilyAssignments                            admin_family_assignments[]
+  clientFamilyAssignments                           client_family_assignments[]
   article_votes                                     article_votes[]
   attachments                                       attachments[]
   audit_logs                                        audit_logs[]
@@ -1328,6 +1329,7 @@ model families {
   createdAt                   DateTime                        @default(now()) @map("created_at")
   updatedAt                   DateTime                        @updatedAt @map("updated_at")
   adminFamilyAssignments      admin_family_assignments[]
+  clientFamilyAssignments     client_family_assignments[]
   consumableTypes             consumable_types[]
   departments                 departments[]
   equipmentTypes              equipment_types[]
@@ -1476,6 +1478,22 @@ model admin_family_assignments {
   @@index([adminId, isActive])
   @@index([familyId, isActive])
   @@map("admin_family_assignments")
+}
+
+model client_family_assignments {
+  id        String   @id @default(uuid())
+  clientId  String   @map("client_id")
+  familyId  String   @map("family_id")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  client    users    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  family    families @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, familyId])
+  @@index([clientId, isActive])
+  @@index([familyId, isActive])
+  @@map("client_family_assignments")
 }
 
 model ticket_collaborators {

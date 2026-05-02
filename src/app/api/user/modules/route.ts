@@ -129,20 +129,30 @@ export async function GET(request: Request) {
         familyIds = [...new Set([...familyIds, ...invIds])]
       }
     } else if (role === 'CLIENT') {
+      // Familias explícitamente asignadas al cliente
+      const explicitAssignments = await prisma.client_family_assignments.findMany({
+        where: { clientId: userId, isActive: true },
+        select: { familyId: true },
+      })
+      const explicitIds = explicitAssignments.map(a => a.familyId)
+
       if (canManageInventory) {
+        // Gestor de inventario: sus familias de inventario + las explícitas de tickets
         const invAssignments = await prisma.inventory_manager_families.findMany({
           where: { managerId: userId },
           select: { familyId: true },
         })
-        familyIds = invAssignments.map(a => a.familyId)
+        const invIds = invAssignments.map(a => a.familyId)
+        familyIds = [...new Set([...invIds, ...explicitIds])]
       } else {
-        // Familias de los tickets del cliente
+        // Familias explícitas + familias derivadas de tickets existentes
         const ticketFamilies = await prisma.tickets.findMany({
           where: { clientId: userId, familyId: { not: null } },
           select: { familyId: true },
           distinct: ['familyId'],
         })
-        familyIds = ticketFamilies.map(t => t.familyId!).filter(Boolean)
+        const ticketIds = ticketFamilies.map(t => t.familyId!).filter(Boolean)
+        familyIds = [...new Set([...explicitIds, ...ticketIds])]
       }
     }
 

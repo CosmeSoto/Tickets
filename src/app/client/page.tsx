@@ -56,7 +56,7 @@ export default function ClientDashboard() {
     error,
     stats,
     tickets: recentTickets,
-    refetch
+    refetch,
   } = useUnifiedDashboard({ role: 'CLIENT' })
 
   const [systemMetrics, setSystemMetrics] = useState<SystemMetrics | null>(null)
@@ -89,29 +89,38 @@ export default function ClientDashboard() {
   return (
     <UnifiedDashboardBase
       userName={userName}
-      userRole="CLIENT"
+      userRole='CLIENT'
       isLoading={isLoading}
       isAuthorized={isAuthorized}
       error={error}
-      title="Mi Panel"
-      subtitle={hasOpenTickets ? `Tienes ${stats.openTickets} ticket${stats.openTickets > 1 ? 's' : ''} abierto${stats.openTickets > 1 ? 's' : ''}` : 'Todo al día'}
-      loadingMessage="Cargando tus tickets..."
+      title='Mi Panel'
+      subtitle={
+        hasOpenTickets
+          ? `Tienes ${stats.openTickets} ticket${stats.openTickets > 1 ? 's' : ''} abierto${stats.openTickets > 1 ? 's' : ''}`
+          : 'Todo al día'
+      }
+      loadingMessage='Cargando tus tickets...'
       onRefresh={refetch}
       notificationsMaxVisible={2}
       statusBadge={{
-        text: `Soporte: ${supportQuality === 'excellent' ? 'Excelente' : 
-                         supportQuality === 'good' ? 'Bueno' : 'Regular'}`,
+        text: `Soporte: ${
+          supportQuality === 'excellent'
+            ? 'Excelente'
+            : supportQuality === 'good'
+              ? 'Bueno'
+              : 'Regular'
+        }`,
         variant: supportQuality === 'excellent' ? 'default' : 'secondary',
-        className: supportQuality === 'excellent' ? 'bg-green-100 text-green-800' : ''
+        className: supportQuality === 'excellent' ? 'bg-green-100 text-green-800' : '',
       }}
     >
       {/* Alerta de mensajes sin leer */}
       {hasUnreadMessages && (
-        <Alert className="mb-6 border-blue-200 bg-blue-50">
-          <Bell className="h-4 w-4 text-blue-600" />
+        <Alert className='mb-6 border-blue-200 bg-blue-50'>
+          <Bell className='h-4 w-4 text-blue-600' />
           <AlertDescription>
-            <strong>Nuevas respuestas:</strong> Tienes mensajes sin leer en tus tickets. 
-            <Link href="/client/tickets" className="ml-2 underline font-medium">
+            <strong>Nuevas respuestas:</strong> Tienes mensajes sin leer en tus tickets.
+            <Link href='/client/tickets' className='ml-2 underline font-medium'>
               Ver tickets
             </Link>
           </AlertDescription>
@@ -146,17 +155,20 @@ export default function ClientDashboard() {
                   <Ticket className='h-8 w-8 text-primary-foreground' />
                 </div>
                 <div>
-                  <h3 className='text-xl sm:text-2xl font-bold text-foreground'>¿Necesitas ayuda?</h3>
+                  <h3 className='text-xl sm:text-2xl font-bold text-foreground'>
+                    ¿Necesitas ayuda?
+                  </h3>
                   <p className='text-muted-foreground mt-1 max-w-md text-sm'>
-                    Crea un nuevo ticket y nuestro equipo técnico especializado te ayudará lo antes posible
+                    Crea un nuevo ticket y nuestro equipo técnico especializado te ayudará lo antes
+                    posible
                   </p>
-                  <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground">
-                    <div className="flex items-center">
-                      <Clock className="h-4 w-4 mr-1" />
+                  <div className='flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground'>
+                    <div className='flex items-center'>
+                      <Clock className='h-4 w-4 mr-1' />
                       Respuesta: {stats.responseTime || '2h'}
                     </div>
-                    <div className="flex items-center">
-                      <Star className="h-4 w-4 mr-1 text-yellow-500" />
+                    <div className='flex items-center'>
+                      <Star className='h-4 w-4 mr-1 text-yellow-500' />
                       {stats.satisfactionRating || 4.5}/5
                     </div>
                   </div>
@@ -164,13 +176,16 @@ export default function ClientDashboard() {
               </div>
               <div className='flex flex-col sm:flex-row gap-2 sm:gap-3'>
                 <Link href='/client/tickets'>
-                  <Button variant='outline' size='lg' className="shadow-sm w-full sm:w-auto">
+                  <Button variant='outline' size='lg' className='shadow-sm w-full sm:w-auto'>
                     <Eye className='h-5 w-5 mr-2' />
                     Ver Mis Tickets
                   </Button>
                 </Link>
                 <Link href='/client/tickets/create'>
-                  <Button size='lg' className='bg-primary hover:bg-primary/90 shadow-lg w-full sm:w-auto'>
+                  <Button
+                    size='lg'
+                    className='bg-primary hover:bg-primary/90 shadow-lg w-full sm:w-auto'
+                  >
                     <Plus className='h-5 w-5 mr-2' />
                     Crear Ticket
                   </Button>
@@ -191,15 +206,17 @@ export default function ClientDashboard() {
                   <Zap className='h-5 w-5 mr-2 text-primary' />
                   Acceso Rápido
                 </div>
-                <Badge variant="outline" className="text-xs">
+                <Badge variant='outline' className='text-xs'>
                   Servicios Disponibles
                 </Badge>
               </CardTitle>
-              <CardDescription>Accede a las funciones principales y servicios de soporte</CardDescription>
+              <CardDescription>
+                Accede a las funciones principales y servicios de soporte
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <ActionGrid
-                role="CLIENT"
+                role='CLIENT'
                 columns={2}
                 actions={[
                   {
@@ -207,7 +224,7 @@ export default function ClientDashboard() {
                     icon: User,
                     title: 'Mi Perfil',
                     description: 'Gestionar información personal y preferencias',
-                    color: 'primary'
+                    color: 'primary',
                   },
                   {
                     href: '/client/notifications',
@@ -215,22 +232,22 @@ export default function ClientDashboard() {
                     title: 'Notificaciones',
                     description: 'Ver actualizaciones y alertas importantes',
                     color: 'green',
-                    badge: hasUnreadMessages ? 'Nuevas' : undefined
+                    badge: hasUnreadMessages ? 'Nuevas' : undefined,
                   },
                   {
                     href: '/settings',
                     icon: Settings,
                     title: 'Configuración',
                     description: 'Preferencias de cuenta y privacidad',
-                    color: 'purple'
+                    color: 'purple',
                   },
                   {
                     href: '/client/help',
                     icon: HelpCircle,
                     title: 'Centro de Ayuda',
                     description: 'FAQ, guías y soporte adicional',
-                    color: 'orange'
-                  }
+                    color: 'orange',
+                  },
                 ]}
               />
             </CardContent>
@@ -247,7 +264,7 @@ export default function ClientDashboard() {
                   Tickets Recientes
                 </div>
                 <Button variant='ghost' size='sm' asChild>
-                  <Link href="/client/tickets">
+                  <Link href='/client/tickets'>
                     <Eye className='h-4 w-4' />
                   </Link>
                 </Button>
@@ -262,9 +279,9 @@ export default function ClientDashboard() {
                   <div className='text-center py-8'>
                     <Ticket className='h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50' />
                     <p className='text-sm text-muted-foreground mb-3'>No tienes tickets aún</p>
-                    <Button size="sm" asChild>
-                      <Link href="/client/tickets/create">
-                        <Plus className="h-4 w-4 mr-2" />
+                    <Button size='sm' asChild>
+                      <Link href='/client/tickets/create'>
+                        <Plus className='h-4 w-4 mr-2' />
                         Crear tu primer ticket
                       </Link>
                     </Button>
@@ -273,8 +290,10 @@ export default function ClientDashboard() {
                   recentTickets.map(ticket => (
                     <div
                       key={ticket.id}
-                      className={`p-4 border rounded-lg hover:shadow-sm transition-all cursor-pointer ${
-                        ticket.hasUnreadMessages ? 'border-blue-200 bg-blue-50/50' : 'border-border'
+                      className={`p-4 border rounded-lg hover:shadow-md transition-all cursor-pointer bg-card ${
+                        ticket.hasUnreadMessages
+                          ? 'border-blue-400 dark:border-blue-500 ring-1 ring-blue-400/30 dark:ring-blue-500/30'
+                          : 'border-border hover:border-muted-foreground/30'
                       }`}
                     >
                       <div className='flex items-start justify-between mb-2'>
@@ -285,13 +304,13 @@ export default function ClientDashboard() {
                           <div className='w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 ml-2 mt-1'></div>
                         )}
                       </div>
-                      
+
                       {ticket.description && (
-                        <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
+                        <p className='text-xs text-muted-foreground line-clamp-2 mb-3'>
                           {ticket.description}
                         </p>
                       )}
-                      
+
                       <div className='flex items-center space-x-2 mb-3'>
                         <Badge className={getPriorityColor(ticket.priority)} variant='secondary'>
                           {ticket.priority}
@@ -300,14 +319,14 @@ export default function ClientDashboard() {
                           {ticket.status}
                         </Badge>
                         {ticket.isOverdue && (
-                          <Badge variant="destructive" className="text-xs">
+                          <Badge variant='destructive' className='text-xs'>
                             Atención
                           </Badge>
                         )}
                       </div>
-                      
+
                       <div className='flex items-center justify-between text-xs text-muted-foreground'>
-                        <div className="flex items-center space-x-3">
+                        <div className='flex items-center space-x-3'>
                           <span className='flex items-center'>
                             <Calendar className='h-3 w-3 mr-1' />
                             {new Date(ticket.createdAt).toLocaleDateString('es-ES', {
@@ -322,10 +341,10 @@ export default function ClientDashboard() {
                             </span>
                           )}
                         </div>
-                        
-                        <div className="flex items-center space-x-2">
+
+                        <div className='flex items-center space-x-2'>
                           {ticket.hasUnreadMessages && (
-                            <MessageSquare className="h-3 w-3 text-blue-500" />
+                            <MessageSquare className='h-3 w-3 text-blue-500' />
                           )}
                           <span>{ticket.commentCount || 0} comentarios</span>
                         </div>
@@ -348,110 +367,139 @@ export default function ClientDashboard() {
                 <Activity className='h-5 w-5 mr-2 text-green-600 dark:text-green-400' />
                 Estado del Soporte Técnico
               </div>
-              <div className="flex items-center space-x-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">
-                  Actualizado: {systemMetrics ? new Date(systemMetrics.lastUpdated).toLocaleTimeString('es-ES', { 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                  }) : new Date().toLocaleTimeString('es-ES', { 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                  })}
+              <div className='flex items-center space-x-2'>
+                <Calendar className='h-4 w-4 text-muted-foreground' />
+                <span className='text-sm text-muted-foreground'>
+                  Actualizado:{' '}
+                  {systemMetrics
+                    ? new Date(systemMetrics.lastUpdated).toLocaleTimeString('es-ES', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
+                    : new Date().toLocaleTimeString('es-ES', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
                 </span>
               </div>
             </CardTitle>
           </CardHeader>
           <CardContent>
             {!systemMetrics ? (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className='text-center py-8 text-muted-foreground'>
                 Cargando métricas del sistema...
               </div>
             ) : (
               <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                 <div className='flex flex-col space-y-3 p-4 bg-green-50 dark:bg-green-950/50 rounded-lg border border-green-200 dark:border-green-800'>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Clock className="h-4 w-4 text-green-600" />
+                  <div className='flex items-center justify-between'>
+                    <div className='flex items-center space-x-2'>
+                      <Clock className='h-4 w-4 text-green-600' />
                       <p className='text-sm font-semibold text-foreground'>Tiempo de Respuesta</p>
                     </div>
-                    <Badge variant='default' className={`text-xs ${
-                      systemMetrics.responseStatus === 'excellent' 
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                    <Badge
+                      variant='default'
+                      className={`text-xs ${
+                        systemMetrics.responseStatus === 'excellent'
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                          : systemMetrics.responseStatus === 'good'
+                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                      }`}
+                    >
+                      {systemMetrics.responseStatus === 'excellent'
+                        ? '✓ Excelente'
                         : systemMetrics.responseStatus === 'good'
-                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                        : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                    }`}>
-                      {systemMetrics.responseStatus === 'excellent' ? '✓ Excelente' : 
-                       systemMetrics.responseStatus === 'good' ? '✓ Bueno' : '⚠ Mejorable'}
+                          ? '✓ Bueno'
+                          : '⚠ Mejorable'}
                     </Badge>
                   </div>
-                  <div className="space-y-1">
-                    <p className='text-lg font-bold text-green-700 dark:text-green-300'>{systemMetrics.responseTime}</p>
+                  <div className='space-y-1'>
+                    <p className='text-lg font-bold text-green-700 dark:text-green-300'>
+                      {systemMetrics.responseTime}
+                    </p>
                     <p className='text-xs text-muted-foreground'>Promedio de respuesta inicial</p>
                   </div>
                 </div>
-                
+
                 <div className='flex flex-col space-y-3 p-4 bg-blue-50 dark:bg-blue-950/50 rounded-lg border border-blue-200 dark:border-blue-800'>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Activity className="h-4 w-4 text-blue-600" />
-                      <p className='text-sm font-semibold text-foreground'>Disponibilidad del Sistema</p>
+                  <div className='flex items-center justify-between'>
+                    <div className='flex items-center space-x-2'>
+                      <Activity className='h-4 w-4 text-blue-600' />
+                      <p className='text-sm font-semibold text-foreground'>
+                        Disponibilidad del Sistema
+                      </p>
                     </div>
-                    <Badge variant='default' className={`text-xs ${
-                      systemMetrics.uptimeStatus === 'excellent'
-                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                        : systemMetrics.uptimeStatus === 'good'
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                        : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                    }`}>
+                    <Badge
+                      variant='default'
+                      className={`text-xs ${
+                        systemMetrics.uptimeStatus === 'excellent'
+                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                          : systemMetrics.uptimeStatus === 'good'
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                      }`}
+                    >
                       ✓ {systemMetrics.uptime}%
                     </Badge>
                   </div>
-                  <div className="space-y-1">
+                  <div className='space-y-1'>
                     <p className='text-lg font-bold text-blue-700 dark:text-blue-300'>24/7</p>
                     <p className='text-xs text-muted-foreground'>Sistema operativo continuamente</p>
                   </div>
                 </div>
-                
+
                 <div className='flex flex-col space-y-3 p-4 bg-purple-50 dark:bg-purple-950/50 rounded-lg border border-purple-200 dark:border-purple-800'>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <User className="h-4 w-4 text-purple-600" />
+                  <div className='flex items-center justify-between'>
+                    <div className='flex items-center space-x-2'>
+                      <User className='h-4 w-4 text-purple-600' />
                       <p className='text-sm font-semibold text-foreground'>Horario de Soporte</p>
                     </div>
-                    <Badge variant='default' className='bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 text-xs'>
+                    <Badge
+                      variant='default'
+                      className='bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 text-xs'
+                    >
                       {systemMetrics.schedule.days}
                     </Badge>
                   </div>
-                  <div className="space-y-1">
-                    <p className='text-lg font-bold text-purple-700 dark:text-purple-300'>{systemMetrics.schedule.hours}</p>
+                  <div className='space-y-1'>
+                    <p className='text-lg font-bold text-purple-700 dark:text-purple-300'>
+                      {systemMetrics.schedule.hours}
+                    </p>
                     <p className='text-xs text-muted-foreground'>Atención personalizada</p>
                   </div>
                 </div>
-                
+
                 <div className='flex flex-col space-y-3 p-4 bg-yellow-50 dark:bg-yellow-950/50 rounded-lg border border-yellow-200 dark:border-yellow-800'>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Star className="h-4 w-4 text-yellow-600 fill-current" />
-                      <p className='text-sm font-semibold text-foreground'>Satisfacción del Cliente</p>
+                  <div className='flex items-center justify-between'>
+                    <div className='flex items-center space-x-2'>
+                      <Star className='h-4 w-4 text-yellow-600 fill-current' />
+                      <p className='text-sm font-semibold text-foreground'>
+                        Satisfacción del Cliente
+                      </p>
                     </div>
-                    <Badge variant='default' className={`text-xs ${
-                      systemMetrics.satisfaction.status === 'excellent'
-                        ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                        : systemMetrics.satisfaction.status === 'good'
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                        : 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
-                    }`}>
+                    <Badge
+                      variant='default'
+                      className={`text-xs ${
+                        systemMetrics.satisfaction.status === 'excellent'
+                          ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                          : systemMetrics.satisfaction.status === 'good'
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                            : 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
+                      }`}
+                    >
                       {systemMetrics.satisfaction.percentage}%
                     </Badge>
                   </div>
-                  <div className="space-y-1">
+                  <div className='space-y-1'>
                     <p className='text-lg font-bold text-yellow-700 dark:text-yellow-300'>
-                      {systemMetrics.satisfaction.rating > 0 ? systemMetrics.satisfaction.rating.toFixed(1) : 'N/A'}/5
+                      {systemMetrics.satisfaction.rating > 0
+                        ? systemMetrics.satisfaction.rating.toFixed(1)
+                        : 'N/A'}
+                      /5
                     </p>
                     <p className='text-xs text-muted-foreground'>
-                      {systemMetrics.satisfaction.totalRatings > 0 
+                      {systemMetrics.satisfaction.totalRatings > 0
                         ? `Basado en ${systemMetrics.satisfaction.totalRatings} calificaciones`
                         : 'Sin calificaciones aún'}
                     </p>

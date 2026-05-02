@@ -91,6 +91,7 @@ function CreateClientTicketContent() {
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
+  const [createdTicketId, setCreatedTicketId] = useState<string | null>(null)
   const [equipmentId, setEquipmentId] = useState<string | null>(null)
   const [availableFamilies, setAvailableFamilies] = useState<FamilyOption[]>([])
   const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(null)

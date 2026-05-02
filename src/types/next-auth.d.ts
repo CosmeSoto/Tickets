@@ -13,6 +13,8 @@ declare module 'next-auth' {
       phone?: string
       avatar?: string
       isOAuth?: boolean
+      isSuperAdmin?: boolean
+      canManageInventory?: boolean
     }
   }
 

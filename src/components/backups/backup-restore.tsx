@@ -46,10 +46,8 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
 
   const completedBackups = backups.filter(b => b.status === 'completed')
 
-  // Limpiar estado si el backup seleccionado ya no existe
   useEffect(() => {
     if (selectedBackup && !completedBackups.find(b => b.id === selectedBackup.id)) {
-      console.log('Backup seleccionado ya no existe, limpiando estado')
       setSelectedBackup(null)
       setRestorePreview(null)
       setShowConfirmation(false)
@@ -58,14 +56,12 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
 
   const loadRestorePreview = async (backup: BackupInfo) => {
     setPreviewLoading(true)
-    setRestorePreview(null) // Limpiar estado anterior
+    setRestorePreview(null)
 
     try {
       const response = await fetch(`/api/admin/backups/${backup.id}/preview`)
       if (response.ok) {
         const result = await response.json()
-
-        // Validar y normalizar los datos recibidos con verificaciones más estrictas
         const preview: RestorePreview = {
           tables: Array.isArray(result.data?.tables)
             ? result.data.tables.map((table: any) => ({
@@ -80,29 +76,16 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
           databaseVersion: result.data?.databaseVersion || 'Desconocida',
           createdAt: result.data?.createdAt || backup.createdAt,
         }
-
         setRestorePreview(preview)
       } else {
-        const errorData = await response.json().catch(() => ({}))
-        console.error('Error response:', response.status, errorData)
-
-        // Crear preview básico con información disponible
         const fallbackPreview: RestorePreview = {
-          tables: [
-            {
-              name: 'backup_completo',
-              recordCount: 1,
-              size: formatFileSize(backup.size),
-            },
-          ],
+          tables: [{ name: 'backup_completo', recordCount: 1, size: formatFileSize(backup.size) }],
           totalRecords: 1,
           totalSize: formatFileSize(backup.size),
           databaseVersion: 'Información no disponible',
           createdAt: backup.createdAt,
         }
-
         setRestorePreview(fallbackPreview)
-
         toast({
           title: 'Vista previa limitada',
           description: 'No se pudo obtener información detallada, mostrando información básica',
@@ -110,25 +93,14 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
         })
       }
     } catch (error) {
-      console.error('Error loading restore preview:', error)
-
-      // Crear preview básico en caso de error
       const fallbackPreview: RestorePreview = {
-        tables: [
-          {
-            name: 'backup_completo',
-            recordCount: 1,
-            size: formatFileSize(backup.size),
-          },
-        ],
+        tables: [{ name: 'backup_completo', recordCount: 1, size: formatFileSize(backup.size) }],
         totalRecords: 1,
         totalSize: formatFileSize(backup.size),
         databaseVersion: 'Error al obtener información',
         createdAt: backup.createdAt,
       }
-
       setRestorePreview(fallbackPreview)
-
       toast({
         title: 'Error al cargar vista previa',
         description: 'Mostrando información básica del backup',
@@ -145,19 +117,15 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
     loadRestorePreview(backup)
   }
 
-  const initiateRestore = () => {
-    setShowConfirmation(true)
-  }
+  const initiateRestore = () => setShowConfirmation(true)
 
   const confirmRestore = async () => {
     if (!selectedBackup) return
-
     setRestoring(true)
     setRestoreProgress(0)
     setShowConfirmation(false)
 
     try {
-      // Simular progreso de restauración
       const progressInterval = setInterval(() => {
         setRestoreProgress(prev => {
           if (prev >= 90) {
@@ -180,8 +148,6 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
           title: 'Restauración Exitosa',
           description: 'La base de datos ha sido restaurada correctamente',
         })
-
-        // Esperar un momento para mostrar el progreso completo
         setTimeout(() => {
           setRestoring(false)
           setRestoreProgress(0)
@@ -194,7 +160,6 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
         throw new Error(error.error || 'Error en la restauración')
       }
     } catch (error) {
-      console.error('Error during restore:', error)
       toast({
         title: 'Error en la Restauración',
         description: error instanceof Error ? error.message : 'Error desconocido',
@@ -213,15 +178,14 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('es-ES', {
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleString('es-ES', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
     })
-  }
 
   return (
     <div className='space-y-6'>
@@ -232,9 +196,9 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
       </div>
 
       {/* Advertencia de Seguridad */}
-      <Alert className='border-red-200 bg-red-50'>
-        <AlertTriangle className='h-4 w-4 text-red-600' />
-        <AlertDescription className='text-red-800'>
+      <Alert className='border-destructive/40 bg-destructive/10'>
+        <AlertTriangle className='h-4 w-4 text-destructive' />
+        <AlertDescription className='text-destructive'>
           <strong>¡Advertencia!</strong> La restauración de un backup reemplazará completamente
           todos los datos actuales de la base de datos. Esta acción no se puede deshacer. Se
           recomienda crear un backup actual antes de proceder.
@@ -246,7 +210,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
         <Card>
           <CardHeader>
             <CardTitle className='flex items-center space-x-2'>
-              <Database className='h-5 w-5 text-blue-600' />
+              <Database className='h-5 w-5 text-primary' />
               <span>Backups Disponibles</span>
             </CardTitle>
             <CardDescription>Selecciona un backup para restaurar</CardDescription>
@@ -264,7 +228,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
                     key={backup.id}
                     className={`p-4 border rounded-lg cursor-pointer transition-all ${
                       selectedBackup?.id === backup.id
-                        ? 'border-blue-500 bg-blue-50'
+                        ? 'border-primary bg-primary/5'
                         : 'border-border hover:border-border hover:bg-muted'
                     }`}
                     onClick={() => handleBackupSelect(backup)}
@@ -281,7 +245,6 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
                         {backup.type === 'manual' ? 'Manual' : 'Automático'}
                       </Badge>
                     </div>
-
                     <div className='flex items-center justify-between text-xs text-muted-foreground'>
                       <span>{formatFileSize(backup.size)}</span>
                       <span>{formatDate(backup.createdAt)}</span>
@@ -297,7 +260,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
         <Card>
           <CardHeader>
             <CardTitle className='flex items-center space-x-2'>
-              <Eye className='h-5 w-5 text-green-600' />
+              <Eye className='h-5 w-5 text-primary' />
               <span>Vista Previa de Restauración</span>
             </CardTitle>
             <CardDescription>Información del backup seleccionado</CardDescription>
@@ -310,24 +273,24 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
               </div>
             ) : previewLoading ? (
               <div className='text-center py-8'>
-                <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2'></div>
+                <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2'></div>
                 <p className='text-sm text-muted-foreground'>Cargando vista previa...</p>
               </div>
-            ) : restorePreview && !previewLoading ? (
+            ) : restorePreview ? (
               <div className='space-y-6'>
                 {/* Información General */}
                 <div className='grid grid-cols-2 gap-4'>
-                  <div className='p-3 bg-blue-50 rounded-lg'>
-                    <div className='text-sm font-medium text-blue-800'>Total de Registros</div>
-                    <div className='text-lg font-bold text-blue-900'>
+                  <div className='p-3 bg-muted/50 rounded-lg border border-border'>
+                    <div className='text-sm font-medium text-foreground'>Total de Registros</div>
+                    <div className='text-lg font-bold text-foreground'>
                       {typeof restorePreview.totalRecords === 'number'
                         ? restorePreview.totalRecords.toLocaleString()
                         : '0'}
                     </div>
                   </div>
-                  <div className='p-3 bg-green-50 rounded-lg'>
-                    <div className='text-sm font-medium text-green-800'>Tamaño Total</div>
-                    <div className='text-lg font-bold text-green-900'>
+                  <div className='p-3 bg-muted/50 rounded-lg border border-border'>
+                    <div className='text-sm font-medium text-foreground'>Tamaño Total</div>
+                    <div className='text-lg font-bold text-foreground'>
                       {restorePreview.totalSize || 'N/A'}
                     </div>
                   </div>
@@ -396,11 +359,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
                     Descargar
                   </Button>
 
-                  <Button
-                    onClick={initiateRestore}
-                    disabled={restoring}
-                    className='bg-red-600 hover:bg-red-700 text-white'
-                  >
+                  <Button onClick={initiateRestore} disabled={restoring} variant='destructive'>
                     <RotateCcw className='h-4 w-4 mr-2' />
                     Restaurar
                   </Button>
@@ -408,7 +367,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
               </div>
             ) : (
               <div className='text-center py-8 text-muted-foreground'>
-                <AlertTriangle className='h-8 w-8 mx-auto mb-2 text-red-400' />
+                <AlertTriangle className='h-8 w-8 mx-auto mb-2 text-destructive' />
                 <p className='text-sm'>Error al cargar la vista previa del backup</p>
               </div>
             )}
@@ -418,20 +377,20 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
 
       {/* Modal de Confirmación */}
       {showConfirmation && selectedBackup && (
-        <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'>
+        <div className='fixed inset-0 bg-black/50 flex items-center justify-center z-50'>
           <Card className='w-full max-w-md mx-4'>
             <CardHeader>
-              <CardTitle className='flex items-center space-x-2 text-red-700'>
+              <CardTitle className='flex items-center space-x-2 text-destructive'>
                 <AlertTriangle className='h-5 w-5' />
                 <span>Confirmar Restauración</span>
               </CardTitle>
             </CardHeader>
             <CardContent className='space-y-4'>
-              <div className='p-4 bg-red-50 border border-red-200 rounded-lg'>
-                <p className='text-sm text-red-800'>
-                  <strong>¡Esta acción no se puede deshacer!</strong>
+              <div className='p-4 bg-destructive/10 border border-destructive/30 rounded-lg'>
+                <p className='text-sm text-destructive font-medium'>
+                  ¡Esta acción no se puede deshacer!
                 </p>
-                <p className='text-sm text-red-700 mt-2'>
+                <p className='text-sm text-muted-foreground mt-2'>
                   Se restaurará el backup &quot;{selectedBackup.filename}&quot; y se perderán todos
                   los datos actuales de la base de datos.
                 </p>
@@ -446,7 +405,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
                 <Button variant='outline' onClick={() => setShowConfirmation(false)}>
                   Cancelar
                 </Button>
-                <Button onClick={confirmRestore} className='bg-red-600 hover:bg-red-700 text-white'>
+                <Button variant='destructive' onClick={confirmRestore}>
                   Confirmar Restauración
                 </Button>
               </div>
@@ -457,11 +416,11 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
 
       {/* Modal de Progreso de Restauración */}
       {restoring && (
-        <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'>
+        <div className='fixed inset-0 bg-black/50 flex items-center justify-center z-50'>
           <Card className='w-full max-w-md mx-4'>
             <CardHeader>
               <CardTitle className='flex items-center space-x-2'>
-                <Activity className='h-5 w-5 text-blue-600 animate-spin' />
+                <Activity className='h-5 w-5 text-primary animate-spin' />
                 <span>Restaurando Base de Datos</span>
               </CardTitle>
             </CardHeader>
@@ -473,7 +432,6 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
                 </div>
                 <Progress value={restoreProgress} className='h-3' />
               </div>
-
               <div className='text-center text-sm text-muted-foreground'>
                 <p>Por favor, no cierres esta ventana...</p>
                 <p className='text-xs mt-1'>La restauración puede tomar varios minutos</p>

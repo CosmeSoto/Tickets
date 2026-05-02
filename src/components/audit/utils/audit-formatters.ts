@@ -162,6 +162,13 @@ export function getActionLabel(action: string): string {
     // Familias — admin
     admin_family_assigned: 'Admin Asignado a Familia',
     admin_family_unassigned: 'Admin Desasignado de Familia',
+    // Familias — técnicos, clientes y gestores
+    technician_family_assigned: 'Técnico Asignado a Familia',
+    technician_family_unassigned: 'Técnico Desasignado de Familia',
+    client_family_assigned: 'Cliente Asignado a Familia Adicional',
+    client_family_unassigned: 'Cliente Desasignado de Familia Adicional',
+    manager_family_assigned: 'Gestor de Inventario Asignado a Familia',
+    manager_family_unassigned: 'Gestor de Inventario Desasignado de Familia',
     // Super admin
     super_admin_granted: 'Super Admin Otorgado',
     super_admin_revoked: 'Super Admin Revocado',

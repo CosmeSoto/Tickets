@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { withCache, buildCacheKey, invalidateCache } from '@/lib/api-cache'
+import { withCache, buildCacheKey } from '@/lib/api-cache'
 
 /**
  * GET /api/admin/families/[id]
- * Retorna datos unificados de la familia (sin configs de tickets/inventario)
- * Las configuraciones se gestionan desde /admin/settings/tickets y /admin/settings/inventory
+ * Retorna datos unificados de la familia (configuración + departamentos).
+ * Los arrays de personal (técnicos, gestores, admins, clientes) fueron eliminados —
+ * las asignaciones se gestionan desde el módulo de Usuarios.
+ * Se conservan los _count para el InformationalNotice.
  */
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -18,7 +20,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const { id } = await params
 
-    // Caché 30 segundos — datos de familia con personal, se invalida en mutaciones
+    // Caché 30 segundos — datos de familia, se invalida en mutaciones
     const cacheKey = buildCacheKey('admin:family', { id })
     const data = await withCache(cacheKey, 30, async () => {
       const currentUser = await prisma.users.findUnique({
@@ -26,7 +28,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         select: { isSuperAdmin: true },
       })
 
-      const [family, departments, technicians, managers, admins] = await Promise.all([
+      const [family, departments] = await Promise.all([
         prisma.families.findUnique({
           where: { id },
           include: {
@@ -36,6 +38,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                 tickets: true,
                 technicianFamilyAssignments: true,
                 managerFamilies: true,
+                clientFamilyAssignments: true,
               },
             },
           },
@@ -44,45 +47,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           where: { familyId: id },
           orderBy: [{ order: 'asc' }, { name: 'asc' }],
         }),
-        prisma.technician_family_assignments.findMany({
-          where: { familyId: id },
-          include: {
-            technician: {
-              select: { id: true, name: true, email: true, role: true, isActive: true },
-            },
-          },
-        }),
-        prisma.inventory_manager_families.findMany({
-          where: { familyId: id },
-          include: {
-            manager: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                role: true,
-                canManageInventory: true,
-                isActive: true,
-              },
-            },
-          },
-        }),
-        prisma.admin_family_assignments.findMany({
-          where: { familyId: id, isActive: true },
-          include: {
-            admin: {
-              select: { id: true, name: true, email: true, isSuperAdmin: true },
-            },
-          },
-        }),
       ])
 
       return {
         family,
         departments,
-        technicians,
-        managers,
-        admins,
         currentUserIsSuperAdmin: currentUser?.isSuperAdmin ?? false,
       }
     })

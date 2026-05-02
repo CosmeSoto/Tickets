@@ -105,12 +105,12 @@ export default function TechnicianDashboard() {
                   recentTickets.map(ticket => (
                     <div
                       key={ticket.id}
-                      className={`flex flex-col p-4 border rounded-lg hover:shadow-sm transition-all ${
+                      className={`flex flex-col p-4 border rounded-lg hover:shadow-md transition-all bg-card ${
                         ticket.urgencyLevel === 'critical'
-                          ? 'border-red-200 bg-red-50/50'
+                          ? 'border-red-400 dark:border-red-500 ring-1 ring-red-400/30 dark:ring-red-500/30'
                           : ticket.urgencyLevel === 'high'
-                            ? 'border-orange-200 bg-orange-50/50'
-                            : 'border-border hover:border-primary/20'
+                            ? 'border-orange-400 dark:border-orange-500 ring-1 ring-orange-400/30 dark:ring-orange-500/30'
+                            : 'border-border hover:border-muted-foreground/30'
                       }`}
                     >
                       <div className='flex-1'>

@@ -8,7 +8,10 @@ import { randomUUID } from 'crypto'
 
 // Schema de validación para crear artículo
 const createArticleSchema = z.object({
-  title: z.string().min(10, 'El título debe tener al menos 10 caracteres').max(200, 'El título no puede exceder 200 caracteres'),
+  title: z
+    .string()
+    .min(10, 'El título debe tener al menos 10 caracteres')
+    .max(200, 'El título no puede exceder 200 caracteres'),
   content: z.string().min(50, 'El contenido debe tener al menos 50 caracteres'),
   summary: z.string().optional(),
   categoryId: z.string().uuid('ID de categoría inválido'),
@@ -20,12 +23,9 @@ const createArticleSchema = z.object({
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
     const { searchParams } = new URL(request.url)
@@ -118,9 +118,12 @@ export async function GET(request: NextRequest) {
     // Calcular porcentaje de votos útiles
     const articlesWithStats = articles.map(article => ({
       ...article,
-      helpfulPercentage: article.helpfulVotes + article.notHelpfulVotes > 0
-        ? Math.round((article.helpfulVotes / (article.helpfulVotes + article.notHelpfulVotes)) * 100)
-        : 0,
+      helpfulPercentage:
+        article.helpfulVotes + article.notHelpfulVotes > 0
+          ? Math.round(
+              (article.helpfulVotes / (article.helpfulVotes + article.notHelpfulVotes)) * 100
+            )
+          : 0,
     }))
 
     return NextResponse.json({
@@ -135,10 +138,7 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('Error al obtener artículos:', error)
-    return NextResponse.json(
-      { error: 'Error al obtener artículos' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al obtener artículos' }, { status: 500 })
   }
 }
 
@@ -146,12 +146,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
     // Verificar que el usuario sea TECHNICIAN o ADMIN
@@ -163,7 +160,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    
+
     // Validar datos
     const validationResult = createArticleSchema.safeParse(body)
     if (!validationResult.success) {
@@ -175,17 +172,18 @@ export async function POST(request: NextRequest) {
 
     const data = validationResult.data
 
-    // Verificar que la categoría existe
+    // Verificar que la categoría existe y obtener su familia
     const category = await prisma.categories.findUnique({
       where: { id: data.categoryId },
+      include: { departments: { select: { familyId: true } } },
     })
 
     if (!category) {
-      return NextResponse.json(
-        { error: 'Categoría no encontrada' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Categoría no encontrada' }, { status: 404 })
     }
+
+    // Derivar familyId: categoría → departamento → familia
+    const familyId = category.departments?.familyId ?? null
 
     // Si hay sourceTicketId, verificar que el ticket existe y está resuelto
     if (data.sourceTicketId) {
@@ -194,10 +192,7 @@ export async function POST(request: NextRequest) {
       })
 
       if (!ticket) {
-        return NextResponse.json(
-          { error: 'Ticket no encontrado' },
-          { status: 404 }
-        )
+        return NextResponse.json({ error: 'Ticket no encontrado' }, { status: 404 })
       }
 
       if (ticket.status !== 'RESOLVED') {
@@ -208,13 +203,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Crear artículo
+    // Crear artículo con familyId derivado de la categoría
     const article = await prisma.knowledge_articles.create({
       data: {
         title: data.title,
         content: data.content,
         summary: data.summary || data.content.substring(0, 200) + '...',
         categoryId: data.categoryId,
+        familyId,
         tags: data.tags,
         sourceTicketId: data.sourceTicketId,
         authorId: session.user.id,
@@ -266,9 +262,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(article, { status: 201 })
   } catch (error) {
     console.error('Error al crear artículo:', error)
-    return NextResponse.json(
-      { error: 'Error al crear artículo' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al crear artículo' }, { status: 500 })
   }
 }

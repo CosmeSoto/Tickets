@@ -23,6 +23,14 @@ export interface FamilyConfig {
   requireFinancialForNew: boolean
   /** Config por modalidad para EQUIPMENT. Si está presente, tiene prioridad sobre visibleSections/requiredSections */
   sectionsByMode?: SectionsByMode
+  // Campos opcionales de la BD
+  defaultDepreciationMethod?: string | null
+  defaultUsefulLifeYears?: number | null
+  defaultResidualValuePct?: number | null
+  codePrefix?: string | null
+  autoApproveDecommission?: boolean
+  requireDeliveryAct?: boolean
+  inventoryEnabled?: boolean
 }
 
 export const DEFAULT_MODE_CONFIG: ModeSectionConfig = {

@@ -118,8 +118,6 @@ export async function PUT(request: NextRequest) {
       },
     })
 
-    return NextResponse.json({ success: true, content })
-
     // Invalidar caché de landing page
     try {
       const { invalidateCache } = await import('@/lib/api-cache')

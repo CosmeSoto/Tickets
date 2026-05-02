@@ -11,21 +11,18 @@ export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions)
 
     if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { success: false, error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
     }
 
     const configs = await prisma.oauth_configs.findMany({
-      orderBy: { provider: 'asc' }
+      orderBy: { provider: 'asc' },
     })
 
     // Si no hay configuraciones, retornar array vacío
     if (!configs || configs.length === 0) {
       return NextResponse.json({
         success: true,
-        data: []
+        data: [],
       })
     }
 
@@ -44,14 +41,14 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: configsWithMaskedSecrets
+      data: configsWithMaskedSecrets,
     })
   } catch (error) {
     console.error('Error fetching OAuth configs:', error)
     console.error('Error details:', {
       message: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,
-      encryptionKeySet: !!process.env.ENCRYPTION_KEY
+      encryptionKeySet: !!process.env.ENCRYPTION_KEY,
     })
     return NextResponse.json(
       { success: false, error: 'Error al obtener configuraciones' },
@@ -66,10 +63,7 @@ export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions)
 
     if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { success: false, error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
     }
 
     const body = await request.json()
@@ -92,7 +86,7 @@ export async function POST(request: NextRequest) {
 
     // Buscar configuración existente
     const existingConfig = await prisma.oauth_configs.findUnique({
-      where: { provider }
+      where: { provider },
     })
 
     // Si es una nueva configuración, clientSecret es obligatorio
@@ -133,8 +127,31 @@ export async function POST(request: NextRequest) {
         createdAt: new Date(),
         updatedAt: new Date(),
       },
-      update: updateData
+      update: updateData,
     })
+
+    // Auditoría
+    try {
+      const { AuditServiceComplete, AuditActionsComplete } =
+        await import('@/lib/services/audit-service-complete')
+      await AuditServiceComplete.log({
+        action: existingConfig
+          ? AuditActionsComplete.OAUTH_CONFIG_UPDATED
+          : AuditActionsComplete.OAUTH_CONFIG_UPDATED,
+        entityType: 'settings',
+        entityId: config.id,
+        userId: session.user.id,
+        details: {
+          provider,
+          isEnabled: isEnabled ?? false,
+          action: existingConfig ? 'updated' : 'created',
+          clientIdChanged: existingConfig ? existingConfig.clientId !== clientId : true,
+          secretChanged: !!clientSecret,
+        },
+      })
+    } catch {
+      /* no interrumpir */
+    }
 
     return NextResponse.json({
       success: true,
@@ -143,7 +160,7 @@ export async function POST(request: NextRequest) {
         id: config.id,
         provider: config.provider,
         isEnabled: config.isEnabled,
-      }
+      },
     })
   } catch (error) {
     console.error('Error saving OAuth config:', error)
@@ -160,10 +177,7 @@ export async function PUT(request: NextRequest) {
     const session = await getServerSession(authOptions)
 
     if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { success: false, error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
     }
 
     const body = await request.json()
@@ -178,8 +192,23 @@ export async function PUT(request: NextRequest) {
 
     const config = await prisma.oauth_configs.update({
       where: { provider },
-      data: { isEnabled }
+      data: { isEnabled },
     })
+
+    // Auditoría
+    try {
+      const { AuditServiceComplete, AuditActionsComplete } =
+        await import('@/lib/services/audit-service-complete')
+      await AuditServiceComplete.log({
+        action: AuditActionsComplete.OAUTH_CONFIG_UPDATED,
+        entityType: 'settings',
+        entityId: config.id,
+        userId: session.user.id,
+        details: { provider, isEnabled, action: 'toggle' },
+      })
+    } catch {
+      /* no interrumpir */
+    }
 
     return NextResponse.json({
       success: true,
@@ -187,7 +216,7 @@ export async function PUT(request: NextRequest) {
       data: {
         provider: config.provider,
         isEnabled: config.isEnabled,
-      }
+      },
     })
   } catch (error) {
     console.error('Error updating OAuth config:', error)
@@ -204,29 +233,38 @@ export async function DELETE(request: NextRequest) {
     const session = await getServerSession(authOptions)
 
     if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { success: false, error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
     }
 
     const { searchParams } = new URL(request.url)
     const provider = searchParams.get('provider')
 
     if (!provider) {
-      return NextResponse.json(
-        { success: false, error: 'Provider es requerido' },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, error: 'Provider es requerido' }, { status: 400 })
     }
 
     await prisma.oauth_configs.delete({
-      where: { provider }
+      where: { provider },
     })
+
+    // Auditoría
+    try {
+      const { AuditServiceComplete, AuditActionsComplete } =
+        await import('@/lib/services/audit-service-complete')
+      await AuditServiceComplete.log({
+        action: AuditActionsComplete.OAUTH_CONFIG_UPDATED,
+        entityType: 'settings',
+        entityId: provider,
+        userId: session.user.id,
+        details: { provider, action: 'deleted' },
+      })
+    } catch {
+      /* no interrumpir */
+    }
 
     return NextResponse.json({
       success: true,
-      message: `Configuración de ${provider} eliminada`
+      message: `Configuración de ${provider} eliminada`,
     })
   } catch (error) {
     console.error('Error deleting OAuth config:', error)

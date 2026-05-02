@@ -12,7 +12,11 @@ interface EquipmentQRCardProps {
   onDownload: () => void
 }
 
-export function EquipmentQRCard({ qrCode, equipmentCode, onDownload }: EquipmentQRCardProps) {
+export function EquipmentQRCard({
+  qrCode,
+  equipmentCode: _equipmentCode,
+  onDownload,
+}: EquipmentQRCardProps) {
   return (
     <Card>
       <CardHeader>

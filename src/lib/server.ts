@@ -50,6 +50,8 @@ function createPrisma(): PrismaClient {
 /**
  * Instancia singleton de Prisma.
  * Lazy: se crea la primera vez que se accede a cualquier propiedad.
+ * Si el cliente cacheado no tiene el modelo solicitado (puede ocurrir tras
+ * una migración con hot-reload activo), lo recrea automáticamente.
  */
 export const db: PrismaClient = new Proxy({} as PrismaClient, {
   get(_target, prop) {
@@ -61,7 +63,19 @@ export const db: PrismaClient = new Proxy({} as PrismaClient, {
       }
       g.__db__ = createPrisma()
     }
-    return (g.__db__ as any)[prop]
+    const value = (g.__db__ as any)[prop]
+    // Si el modelo no existe en el cliente cacheado (puede pasar tras una migración
+    // con hot-reload activo), forzar recreación del singleton
+    if (
+      value === undefined &&
+      typeof prop === 'string' &&
+      !prop.startsWith('$') &&
+      !prop.startsWith('_')
+    ) {
+      g.__db__ = createPrisma()
+      return (g.__db__ as any)[prop]
+    }
+    return value
   },
 })
 
@@ -99,7 +113,9 @@ export function getRedis(): Redis | null {
 
   try {
     const client = createIoRedis(process.env.REDIS_URL)
-    client.on('error', () => { /* degradación silenciosa */ })
+    client.on('error', () => {
+      /* degradación silenciosa */
+    })
     g.__redis__ = client
   } catch {
     g.__redis__ = null
@@ -122,7 +138,9 @@ export function getRedisPub(): Redis | null {
 
   try {
     const client = createIoRedis(process.env.REDIS_URL)
-    client.on('error', () => { /* degradación silenciosa */ })
+    client.on('error', () => {
+      /* degradación silenciosa */
+    })
     g.__redisPub__ = client
   } catch {
     g.__redisPub__ = null
@@ -145,7 +163,9 @@ export function getRedisSub(): Redis | null {
 
   try {
     const client = createIoRedis(process.env.REDIS_URL)
-    client.on('error', () => { /* degradación silenciosa */ })
+    client.on('error', () => {
+      /* degradación silenciosa */
+    })
     g.__redisSub__ = client
   } catch {
     g.__redisSub__ = null

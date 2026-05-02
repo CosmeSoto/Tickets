@@ -136,7 +136,7 @@ export default function AuditPage() {
         {/* Filtros de Auditoría */}
         <AuditFiltersComponent
           filters={filters}
-          families={families}
+          families={families.map(f => ({ ...f, color: f.color ?? null }))}
           hasActiveFilters={hasActiveFilters}
           loading={loading}
           onFilterChange={updateFilter}

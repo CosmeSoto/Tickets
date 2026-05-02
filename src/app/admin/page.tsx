@@ -59,12 +59,33 @@ export default function AdminDashboard() {
   } = useUnifiedDashboard({ role: 'ADMIN' })
 
   // Sort para la tabla de métricas por familia
+  type FamilyMetric = {
+    familyId: string
+    familyName: string
+    familyColor?: string | null
+    familyCode?: string
+    modules?: { tickets: boolean; inventory: boolean }
+    openTickets?: number
+    inProgressTickets?: number
+    technicianCount?: number
+    inventory?: {
+      availableAssets: number
+      assignedAssets: number
+      maintenanceAssets: number
+      totalAssets: number
+    }
+  }
+
   const {
     sorted: sortedFamilyMetrics,
     sortKey: familySortKey,
     sortDir: familySortDir,
     toggleSort: toggleFamilySort,
-  } = useTableSort(stats?.familyMetrics ?? [], 'openTickets', 'desc')
+  } = useTableSort<FamilyMetric>(
+    (stats?.familyMetrics ?? []) as FamilyMetric[],
+    'openTickets',
+    'desc'
+  )
 
   const {
     systemStatus,

@@ -231,7 +231,18 @@ function NavItemComponent({
     return false
   }
 
-  const isDirectActive = pathname === item.href || pathname?.startsWith(item.href + '/')
+  // Para items hoja (sin hijos): activar con match exacto o startsWith.
+  // Excepción: si el href es la raíz de un grupo (ej: /inventory), usar solo match exacto
+  // para evitar que "Activos" aparezca activo cuando estás en /inventory/maintenance.
+  // Un href es "raíz de grupo" si tiene exactamente un segmento de ruta (ej: /inventory, /admin).
+  const hrefSegments = item.href.split('/').filter(Boolean).length
+  const isRootGroupHref = !hasChildren && hrefSegments <= 1
+
+  const isDirectActive = hasChildren
+    ? pathname === item.href || pathname?.startsWith(item.href + '/')
+    : isRootGroupHref
+      ? pathname === item.href
+      : pathname === item.href || pathname?.startsWith(item.href + '/')
   const isActive = isDirectActive || (hasChildren ? item.children!.some(isDescendantActive) : false)
 
   const [isOpen, setIsOpen] = useState(isActive)

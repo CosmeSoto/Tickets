@@ -27,13 +27,14 @@ export async function GET(request: NextRequest) {
 
     const where: any = { isPublished: true }
 
-    if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { content: { contains: search, mode: 'insensitive' } },
-        { summary: { contains: search, mode: 'insensitive' } },
-      ]
-    }
+    // Búsqueda de texto — se guarda aparte para combinar con AND si hay filtro de familia
+    const textSearchCondition = search
+      ? [
+          { title: { contains: search, mode: 'insensitive' } },
+          { content: { contains: search, mode: 'insensitive' } },
+          { summary: { contains: search, mode: 'insensitive' } },
+        ]
+      : null
 
     if (categoryId) {
       where.categoryId = categoryId
@@ -42,30 +43,60 @@ export async function GET(request: NextRequest) {
     // Filtro de familia según rol
     const role = session.user.role
 
-    if (familyId) {
-      // Filtro explícito por familia (solo ADMIN puede usarlo sin restricción)
-      if (role === 'ADMIN') {
-        where.familyId = familyId
-      }
-    }
-
     if (role === 'TECHNICIAN') {
       // Solo artículos de familias asignadas al técnico
       const assignments = await prisma.technician_family_assignments.findMany({
         where: { technicianId: session.user.id, isActive: true },
         select: { familyId: true },
       })
-      const assignedFamilyIds = assignments.map((a) => a.familyId)
-      where.familyId = assignedFamilyIds.length > 0 ? { in: assignedFamilyIds } : undefined
+      const assignedFamilyIds = assignments.map(a => a.familyId)
+
+      if (assignedFamilyIds.length > 0) {
+        const effectiveIds = familyId
+          ? assignedFamilyIds.filter(id => id === familyId)
+          : assignedFamilyIds
+        // Artículos de sus familias O sin familia (legado), combinado con búsqueda si existe
+        const familyCondition = [{ familyId: { in: effectiveIds } }, { familyId: null }]
+        where.AND = [
+          { OR: familyCondition },
+          ...(textSearchCondition ? [{ OR: textSearchCondition }] : []),
+        ]
+      } else if (textSearchCondition) {
+        where.OR = textSearchCondition
+      }
     } else if (role === 'CLIENT') {
-      // Solo artículos de familias de los departamentos de sus tickets
-      const clientTickets = await prisma.tickets.findMany({
-        where: { clientId: session.user.id, familyId: { not: null } },
-        select: { familyId: true },
-        distinct: ['familyId'],
-      })
-      const clientFamilyIds = clientTickets.map((t) => t.familyId).filter(Boolean) as string[]
-      where.familyId = clientFamilyIds.length > 0 ? { in: clientFamilyIds } : undefined
+      // SECURITY: usar client_family_assignments, no inferir desde tickets
+      const [userDept, clientAssignments] = await Promise.all([
+        prisma.users.findUnique({
+          where: { id: session.user.id },
+          select: { departments: { select: { familyId: true } } },
+        }),
+        prisma.client_family_assignments.findMany({
+          where: { clientId: session.user.id, isActive: true },
+          select: { familyId: true },
+        }),
+      ])
+      const allowedIds = new Set<string>(clientAssignments.map(a => a.familyId))
+      if (userDept?.departments?.familyId) allowedIds.add(userDept.departments.familyId)
+
+      if (allowedIds.size > 0) {
+        const effectiveIds = familyId
+          ? Array.from(allowedIds).filter(id => id === familyId)
+          : Array.from(allowedIds)
+        const familyCondition = [{ familyId: { in: effectiveIds } }, { familyId: null }]
+        where.AND = [
+          { OR: familyCondition },
+          ...(textSearchCondition ? [{ OR: textSearchCondition }] : []),
+        ]
+      } else {
+        // Sin asignaciones: no ve ningún artículo
+        where.familyId = { in: [] }
+      }
+    } else if (role === 'ADMIN') {
+      if (familyId) where.familyId = familyId
+      if (textSearchCondition) where.OR = textSearchCondition
+    } else {
+      if (textSearchCondition) where.OR = textSearchCondition
     }
 
     const [articles, total] = await Promise.all([
@@ -90,11 +121,13 @@ export async function GET(request: NextRequest) {
       prisma.knowledge_articles.count({ where }),
     ])
 
-    const articlesWithStats = articles.map((article) => ({
+    const articlesWithStats = articles.map(article => ({
       ...article,
       helpfulPercentage:
         article.helpfulVotes + article.notHelpfulVotes > 0
-          ? Math.round((article.helpfulVotes / (article.helpfulVotes + article.notHelpfulVotes)) * 100)
+          ? Math.round(
+              (article.helpfulVotes / (article.helpfulVotes + article.notHelpfulVotes)) * 100
+            )
           : 0,
     }))
 
@@ -110,9 +143,6 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('Error al obtener artículos de conocimiento:', error)
-    return NextResponse.json(
-      { error: 'Error al obtener artículos' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al obtener artículos' }, { status: 500 })
   }
 }

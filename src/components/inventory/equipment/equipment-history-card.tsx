@@ -5,10 +5,10 @@
 import { FileText } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { EquipmentHistory } from '../equipment-history'
-import type { HistoryEvent } from './utils/equipment-types'
+import type { EquipmentHistoryEvent } from '@/types/inventory/equipment'
 
 interface EquipmentHistoryCardProps {
-  history: HistoryEvent[]
+  history: EquipmentHistoryEvent[]
 }
 
 export function EquipmentHistoryCard({ history }: EquipmentHistoryCardProps) {

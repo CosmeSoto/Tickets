@@ -130,14 +130,14 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
           </div>
         </div>
         <EquipmentActionButtons
-          canReportProblem={canReportProblem}
-          canRequestMaintenance={canRequestMaintenance}
-          canEdit={canEdit}
-          canAssign={canAssign}
-          canReturn={canReturn}
-          canMaintenance={canMaintenance}
-          canRetire={canRetire}
-          canPermanentDelete={canPermanentDelete}
+          canReportProblem={canReportProblem ?? false}
+          canRequestMaintenance={canRequestMaintenance ?? false}
+          canEdit={canEdit ?? false}
+          canAssign={canAssign ?? false}
+          canReturn={canReturn ?? false}
+          canMaintenance={canMaintenance ?? false}
+          canRetire={canRetire ?? false}
+          canPermanentDelete={canPermanentDelete ?? false}
           isInMaintenance={isInMaintenance}
           onReportProblem={handleReportProblem}
           onRequestMaintenance={() => setShowMaintenanceDialog(true)}
@@ -199,7 +199,7 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
       </div>
 
       {/* History */}
-      <EquipmentHistoryCard history={history} />
+      <EquipmentHistoryCard history={history as any} />
 
       {/* Maintenance Records */}
       {maintenanceRecords.length > 0 && (

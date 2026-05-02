@@ -23,21 +23,21 @@ export function computeContractStatus(endDate?: Date | null): {
   if (!endDate) return { status: 'ACTIVE' }
   const now = new Date()
   const diff = Math.floor((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-  if (diff < 0)              return { status: 'EXPIRED',  daysUntilExpiry: 0 }
+  if (diff < 0) return { status: 'EXPIRED', daysUntilExpiry: 0 }
   if (diff <= EXPIRING_DAYS) return { status: 'EXPIRING', daysUntilExpiry: diff }
-  return                            { status: 'ACTIVE',   daysUntilExpiry: diff }
+  return { status: 'ACTIVE', daysUntilExpiry: diff }
 }
 
 // Selector reutilizable para incluir relaciones en queries
 const CONTRACT_INCLUDE = {
   supplier: { select: { id: true, name: true } },
-  family:   { select: { id: true, name: true, color: true, code: true } },
-  creator:  { select: { id: true, name: true, email: true } },
+  family: { select: { id: true, name: true, color: true, code: true } },
+  creator: { select: { id: true, name: true, email: true } },
   lines: {
     orderBy: { order: 'asc' as const },
     include: {
       equipment: { select: { id: true, code: true, brand: true, model: true } },
-      license:   { select: { id: true, name: true } },
+      license: { select: { id: true, name: true } },
     },
   },
   attachments: { orderBy: { createdAt: 'asc' as const } },
@@ -46,7 +46,6 @@ const CONTRACT_INCLUDE = {
 // ── Servicio ──────────────────────────────────────────────────────────────────
 
 export class ContractService {
-
   // ── Listar ──────────────────────────────────────────────────────────────────
 
   static async list(params: {
@@ -61,7 +60,18 @@ export class ContractService {
     userRole?: string
     isSuperAdmin?: boolean
   }) {
-    const { page = 1, pageSize = 20, search, status, category, familyId, supplierId, userId, userRole, isSuperAdmin } = params
+    const {
+      page = 1,
+      pageSize = 20,
+      search,
+      status,
+      category,
+      familyId,
+      supplierId,
+      userId,
+      userRole,
+      isSuperAdmin,
+    } = params
 
     const where: any = {}
 
@@ -93,14 +103,14 @@ export class ContractService {
 
     if (search?.trim()) {
       where.OR = [
-        { name:           { contains: search, mode: 'insensitive' } },
+        { name: { contains: search, mode: 'insensitive' } },
         { contractNumber: { contains: search, mode: 'insensitive' } },
         { supplier: { name: { contains: search, mode: 'insensitive' } } },
       ]
     }
-    if (status   && status   !== 'ALL') where.status   = status
+    if (status && status !== 'ALL') where.status = status
     if (category && category !== 'ALL') where.category = category
-    if (familyId)   where.familyId   = familyId   // override explícito
+    if (familyId) where.familyId = familyId // override explícito
     if (supplierId) where.supplierId = supplierId
 
     const [rawContracts, total] = await Promise.all([
@@ -108,8 +118,8 @@ export class ContractService {
         where,
         include: CONTRACT_INCLUDE,
         orderBy: { createdAt: 'desc' },
-        skip:  (page - 1) * pageSize,
-        take:  pageSize,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
       }),
       prisma.contracts.count({ where }),
     ])
@@ -120,9 +130,12 @@ export class ContractService {
       return { ...c, status: computedStatus, daysUntilExpiry }
     })
 
-    // Stats globales (sin paginación)
+    // Stats globales (sin paginación) — respetan el mismo scope de familias del usuario
+    const statsWhere: any = {}
+    if (where.familyId) statsWhere.familyId = where.familyId
+    else if (familyId) statsWhere.familyId = familyId
     const allForStats = await prisma.contracts.findMany({
-      where: familyId ? { familyId } : {},
+      where: statsWhere,
       select: { endDate: true, monthlyCost: true },
     })
 
@@ -130,10 +143,10 @@ export class ContractService {
       (acc, c) => {
         const { status } = computeContractStatus(c.endDate)
         acc.total++
-        if (status === 'ACTIVE')    acc.active++
-        if (status === 'EXPIRING')  acc.expiring++
-        if (status === 'EXPIRED')   acc.expired++
-        if (c.monthlyCost)          acc.monthlyCostTotal += c.monthlyCost
+        if (status === 'ACTIVE') acc.active++
+        if (status === 'EXPIRING') acc.expiring++
+        if (status === 'EXPIRED') acc.expired++
+        if (c.monthlyCost) acc.monthlyCostTotal += c.monthlyCost
         return acc
       },
       { total: 0, active: 0, expiring: 0, expired: 0, draft: 0, monthlyCostTotal: 0 }
@@ -199,42 +212,45 @@ export class ContractService {
 
     const contract = await prisma.contracts.create({
       data: {
-        id:                randomUUID(),
-        contractNumber:    contractData.contractNumber || null,
-        name:              contractData.name,
-        description:       contractData.description || null,
-        category:          contractData.category as any,
-        status:            'DRAFT',
-        supplierId:        contractData.supplierId || null,
-        familyId:          contractData.familyId || null,
-        startDate:         contractData.startDate ? new Date(contractData.startDate) : null,
-        endDate:           contractData.endDate   ? new Date(contractData.endDate)   : null,
-        autoRenew:         contractData.autoRenew         ?? false,
+        id: randomUUID(),
+        contractNumber: contractData.contractNumber || null,
+        name: contractData.name,
+        description: contractData.description || null,
+        category: contractData.category as any,
+        status: 'DRAFT',
+        supplierId: contractData.supplierId || null,
+        familyId: contractData.familyId || null,
+        startDate: contractData.startDate ? new Date(contractData.startDate) : null,
+        endDate: contractData.endDate ? new Date(contractData.endDate) : null,
+        autoRenew: contractData.autoRenew ?? false,
         renewalNoticeDays: contractData.renewalNoticeDays ?? 30,
-        billingCycle:      (contractData.billingCycle as any) ?? 'MONTHLY',
-        totalValue:        contractData.totalValue  ?? null,
-        monthlyCost:       contractData.monthlyCost ?? null,
-        currency:          contractData.currency    ?? 'USD',
-        contactName:       contractData.contactName  || null,
-        contactEmail:      contractData.contactEmail || null,
-        contactPhone:      contractData.contactPhone || null,
-        notes:             contractData.notes    || null,
-        termsUrl:          contractData.termsUrl || null,
+        billingCycle: (contractData.billingCycle as any) ?? 'MONTHLY',
+        totalValue: contractData.totalValue ?? null,
+        monthlyCost: contractData.monthlyCost ?? null,
+        currency: contractData.currency ?? 'USD',
+        contactName: contractData.contactName || null,
+        contactEmail: contractData.contactEmail || null,
+        contactPhone: contractData.contactPhone || null,
+        notes: contractData.notes || null,
+        termsUrl: contractData.termsUrl || null,
         createdBy,
-        lines: lines.length > 0 ? {
-          create: lines.map((l, i) => ({
-            id:          randomUUID(),
-            type:        l.type as any,
-            description: l.description,
-            quantity:    l.quantity    ?? 1,
-            unitPrice:   l.unitPrice   ?? null,
-            totalPrice:  l.unitPrice && l.quantity ? l.unitPrice * l.quantity : null,
-            equipmentId: l.equipmentId || null,
-            licenseId:   l.licenseId   || null,
-            notes:       l.notes       || null,
-            order:       l.order       ?? i,
-          })),
-        } : undefined,
+        lines:
+          lines.length > 0
+            ? {
+                create: lines.map((l, i) => ({
+                  id: randomUUID(),
+                  type: l.type as any,
+                  description: l.description,
+                  quantity: l.quantity ?? 1,
+                  unitPrice: l.unitPrice ?? null,
+                  totalPrice: l.unitPrice && l.quantity ? l.unitPrice * l.quantity : null,
+                  equipmentId: l.equipmentId || null,
+                  licenseId: l.licenseId || null,
+                  notes: l.notes || null,
+                  order: l.order ?? i,
+                })),
+              }
+            : undefined,
       },
       include: CONTRACT_INCLUDE,
     })
@@ -242,13 +258,13 @@ export class ContractService {
     // Auditoría
     await createAuditLog({
       entityType: 'contract',
-      entityId:   contract.id,
-      action:     'contract_created',
-      userId:     createdBy,
+      entityId: contract.id,
+      action: 'contract_created',
+      userId: createdBy,
       changes: {
-        name:     contract.name,
+        name: contract.name,
         category: contract.category,
-        status:   contract.status,
+        status: contract.status,
       },
     })
 
@@ -257,66 +273,77 @@ export class ContractService {
 
   // ── Actualizar ──────────────────────────────────────────────────────────────
 
-  static async update(id: string, data: Partial<{
-    contractNumber: string
-    name: string
-    description: string
-    category: string
-    supplierId: string
-    familyId: string
-    startDate: string
-    endDate: string
-    autoRenew: boolean
-    renewalNoticeDays: number
-    billingCycle: string
-    totalValue: number
-    monthlyCost: number
-    currency: string
-    contactName: string
-    contactEmail: string
-    contactPhone: string
-    notes: string
-    termsUrl: string
-    status: string
-  }>, updatedBy: string) {
-    const before = await prisma.contracts.findUnique({ where: { id }, select: { name: true, status: true, endDate: true } })
+  static async update(
+    id: string,
+    data: Partial<{
+      contractNumber: string
+      name: string
+      description: string
+      category: string
+      supplierId: string
+      familyId: string
+      startDate: string
+      endDate: string
+      autoRenew: boolean
+      renewalNoticeDays: number
+      billingCycle: string
+      totalValue: number
+      monthlyCost: number
+      currency: string
+      contactName: string
+      contactEmail: string
+      contactPhone: string
+      notes: string
+      termsUrl: string
+      status: string
+    }>,
+    updatedBy: string
+  ) {
+    const before = await prisma.contracts.findUnique({
+      where: { id },
+      select: { name: true, status: true, endDate: true },
+    })
     if (!before) throw new Error('Contrato no encontrado')
 
     const contract = await prisma.contracts.update({
       where: { id },
       data: {
         ...(data.contractNumber !== undefined && { contractNumber: data.contractNumber || null }),
-        ...(data.name           !== undefined && { name: data.name }),
-        ...(data.description    !== undefined && { description: data.description || null }),
-        ...(data.category       !== undefined && { category: data.category as any }),
-        ...(data.supplierId     !== undefined && { supplierId: data.supplierId || null }),
-        ...(data.familyId       !== undefined && { familyId: data.familyId || null }),
-        ...(data.startDate      !== undefined && { startDate: data.startDate ? new Date(data.startDate) : null }),
-        ...(data.endDate        !== undefined && { endDate:   data.endDate   ? new Date(data.endDate)   : null }),
-        ...(data.autoRenew      !== undefined && { autoRenew: data.autoRenew }),
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.description !== undefined && { description: data.description || null }),
+        ...(data.category !== undefined && { category: data.category as any }),
+        ...(data.supplierId !== undefined && { supplierId: data.supplierId || null }),
+        ...(data.familyId !== undefined && { familyId: data.familyId || null }),
+        ...(data.startDate !== undefined && {
+          startDate: data.startDate ? new Date(data.startDate) : null,
+        }),
+        ...(data.endDate !== undefined && {
+          endDate: data.endDate ? new Date(data.endDate) : null,
+        }),
+        ...(data.autoRenew !== undefined && { autoRenew: data.autoRenew }),
         ...(data.renewalNoticeDays !== undefined && { renewalNoticeDays: data.renewalNoticeDays }),
-        ...(data.billingCycle   !== undefined && { billingCycle: data.billingCycle as any }),
-        ...(data.totalValue     !== undefined && { totalValue: data.totalValue }),
-        ...(data.monthlyCost    !== undefined && { monthlyCost: data.monthlyCost }),
-        ...(data.currency       !== undefined && { currency: data.currency }),
-        ...(data.contactName    !== undefined && { contactName: data.contactName || null }),
-        ...(data.contactEmail   !== undefined && { contactEmail: data.contactEmail || null }),
-        ...(data.contactPhone   !== undefined && { contactPhone: data.contactPhone || null }),
-        ...(data.notes          !== undefined && { notes: data.notes || null }),
-        ...(data.termsUrl       !== undefined && { termsUrl: data.termsUrl || null }),
-        ...(data.status         !== undefined && { status: data.status as any }),
+        ...(data.billingCycle !== undefined && { billingCycle: data.billingCycle as any }),
+        ...(data.totalValue !== undefined && { totalValue: data.totalValue }),
+        ...(data.monthlyCost !== undefined && { monthlyCost: data.monthlyCost }),
+        ...(data.currency !== undefined && { currency: data.currency }),
+        ...(data.contactName !== undefined && { contactName: data.contactName || null }),
+        ...(data.contactEmail !== undefined && { contactEmail: data.contactEmail || null }),
+        ...(data.contactPhone !== undefined && { contactPhone: data.contactPhone || null }),
+        ...(data.notes !== undefined && { notes: data.notes || null }),
+        ...(data.termsUrl !== undefined && { termsUrl: data.termsUrl || null }),
+        ...(data.status !== undefined && { status: data.status as any }),
       },
       include: CONTRACT_INCLUDE,
     })
 
     await createAuditLog({
       entityType: 'contract',
-      entityId:   id,
-      action:     'contract_updated',
-      userId:     updatedBy,
+      entityId: id,
+      action: 'contract_updated',
+      userId: updatedBy,
       changes: {
         before: { name: before.name, status: before.status },
-        after:  { name: contract.name, status: contract.status },
+        after: { name: contract.name, status: contract.status },
       },
     })
 
@@ -336,53 +363,57 @@ export class ContractService {
 
     await createAuditLog({
       entityType: 'contract',
-      entityId:   id,
-      action:     'contract_deleted',
-      userId:     deletedBy,
-      changes:    { name: contract.name, status: contract.status },
+      entityId: id,
+      action: 'contract_deleted',
+      userId: deletedBy,
+      changes: { name: contract.name, status: contract.status },
     })
   }
 
   // ── Líneas ──────────────────────────────────────────────────────────────────
 
-  static async upsertLines(contractId: string, lines: Array<{
-    id?: string
-    type: string
-    description: string
-    quantity?: number
-    unitPrice?: number
-    equipmentId?: string
-    licenseId?: string
-    notes?: string
-    order?: number
-  }>, updatedBy: string) {
+  static async upsertLines(
+    contractId: string,
+    lines: Array<{
+      id?: string
+      type: string
+      description: string
+      quantity?: number
+      unitPrice?: number
+      equipmentId?: string
+      licenseId?: string
+      notes?: string
+      order?: number
+    }>,
+    updatedBy: string
+  ) {
     // Eliminar líneas existentes y recrear (más simple que diff)
     await prisma.contract_lines.deleteMany({ where: { contractId } })
 
     if (lines.length > 0) {
       await prisma.contract_lines.createMany({
         data: lines.map((l, i) => ({
-          id:          randomUUID(),
+          id: randomUUID(),
           contractId,
-          type:        l.type as any,
+          type: l.type as any,
           description: l.description,
-          quantity:    l.quantity    ?? 1,
-          unitPrice:   l.unitPrice   ?? null,
-          totalPrice:  l.unitPrice && l.quantity ? l.unitPrice * l.quantity : null,
+          quantity: l.quantity ?? 1,
+          unitPrice: l.unitPrice ?? null,
+          totalPrice: l.unitPrice && l.quantity ? l.unitPrice * l.quantity : null,
           equipmentId: l.equipmentId || null,
-          licenseId:   l.licenseId   || null,
-          notes:       l.notes       || null,
-          order:       l.order       ?? i,
+          licenseId: l.licenseId || null,
+          notes: l.notes || null,
+          order: l.order ?? i,
         })),
       })
     }
 
     await createAuditLog({
       entityType: 'contract',
-      entityId:   contractId,
-      action:     'contract_lines_updated',
-      userId:     updatedBy,
-      changes:    { linesCount: lines.length },
+      entityId: contractId,
+      action: 'contract_lines_updated',
+      userId: updatedBy,
+      changes: { linesCount: lines.length },
     })
   }
 
@@ -397,55 +428,55 @@ export class ContractService {
     // Contratos que vencen en los próximos EXPIRING_DAYS días y no han sido alertados
     const expiring = await prisma.contracts.findMany({
       where: {
-        status:           { in: ['ACTIVE', 'EXPIRING'] },
-        endDate:          { lte: alertThreshold, gte: now },
+        status: { in: ['ACTIVE', 'EXPIRING'] },
+        endDate: { lte: alertThreshold, gte: now },
         expiryAlertSentAt: null,
       },
       include: {
         supplier: { select: { name: true } },
-        family:   { select: { name: true } },
-        creator:  { select: { id: true, name: true } },
+        family: { select: { name: true } },
+        creator: { select: { id: true, name: true } },
       },
     })
 
     for (const contract of expiring) {
       const { daysUntilExpiry } = computeContractStatus(contract.endDate)
       const supplierName = contract.supplier?.name ?? 'Sin proveedor'
-      const familyName   = contract.family?.name   ?? ''
+      const familyName = contract.family?.name ?? ''
 
       // Notificar al creador del contrato
       await NotificationService.push({
-        userId:  contract.createdBy,
-        type:    'WARNING',
-        title:   `Contrato por vencer: ${contract.name}`,
+        userId: contract.createdBy,
+        type: 'WARNING',
+        title: `Contrato por vencer: ${contract.name}`,
         message: `El contrato "${contract.name}" con ${supplierName}${familyName ? ` (${familyName})` : ''} vence en ${daysUntilExpiry} día(s).`,
         metadata: {
-          contractId:      contract.id,
-          contractName:    contract.name,
+          contractId: contract.id,
+          contractName: contract.name,
           daysUntilExpiry,
-          endDate:         contract.endDate?.toISOString(),
+          endDate: contract.endDate?.toISOString(),
         },
       })
 
       // Marcar como alertado
       await prisma.contracts.update({
         where: { id: contract.id },
-        data:  { expiryAlertSentAt: now, status: 'EXPIRING' },
+        data: { expiryAlertSentAt: now, status: 'EXPIRING' },
       })
 
       await createAuditLog({
         entityType: 'contract',
-        entityId:   contract.id,
-        action:     'contract_expiry_alert_sent',
-        userId:     contract.createdBy,
-        changes:    { daysUntilExpiry, endDate: contract.endDate?.toISOString() },
+        entityId: contract.id,
+        action: 'contract_expiry_alert_sent',
+        userId: contract.createdBy,
+        changes: { daysUntilExpiry, endDate: contract.endDate?.toISOString() },
       })
     }
 
     // Marcar como EXPIRED los que ya vencieron
     const expired = await prisma.contracts.updateMany({
       where: {
-        status:  { in: ['ACTIVE', 'EXPIRING'] },
+        status: { in: ['ACTIVE', 'EXPIRING'] },
         endDate: { lt: now },
       },
       data: { status: 'EXPIRED' },

@@ -16,10 +16,11 @@ export class QRCodeService {
     baseUrl?: string
   ): Promise<string> {
     try {
-      const resolvedBase = baseUrl
-        || process.env.NEXT_PUBLIC_APP_URL
-        || process.env.NEXTAUTH_URL
-        || 'http://localhost:3000'
+      const resolvedBase =
+        baseUrl ||
+        process.env.NEXT_PUBLIC_APP_URL ||
+        process.env.NEXTAUTH_URL ||
+        'http://localhost:3000'
 
       const verificationUrl = `${resolvedBase}/inventory/equipment/${equipmentId}/verify`
 
@@ -51,32 +52,21 @@ export class QRCodeService {
     verificationHash: string
   ): Promise<string> {
     try {
-      // Generar URL de verificación del acta
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-      const verificationUrl = `${baseUrl}/inventory/acts/${actId}/verify?hash=${verificationHash}`
-      
-      // Datos del QR: URL + folio + hash
-      const qrData = JSON.stringify({
-        type: 'act_verification',
-        id: actId,
-        folio: actFolio,
-        hash: verificationHash,
-        url: verificationUrl,
-        timestamp: new Date().toISOString()
-      })
-      
-      // Generar QR code como base64
-      const qrCodeBase64 = await QRCode.toDataURL(qrData, {
+      const baseUrl =
+        process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000'
+
+      // Usar solo la URL — más corta, compatible con todos los lectores QR
+      // El hash se incluye como query param para verificación directa
+      const verificationUrl = `${baseUrl}/api/inventory/acts/${actId}/verify?hash=${verificationHash.substring(0, 16)}`
+
+      const qrCodeBase64 = await QRCode.toDataURL(verificationUrl, {
         errorCorrectionLevel: 'H',
         type: 'image/png',
         width: 200,
         margin: 1,
-        color: {
-          dark: '#000000',
-          light: '#FFFFFF'
-        }
+        color: { dark: '#000000', light: '#FFFFFF' },
       })
-      
+
       return qrCodeBase64
     } catch (error) {
       console.error('Error generando QR de acta:', error)

@@ -11,12 +11,14 @@ export type Status = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED'
  */
 export const getPriorityColor = (priority: Priority | string): string => {
   const colors: Record<string, string> = {
-    URGENT: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-    HIGH: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
-    MEDIUM: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-    LOW: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+    URGENT:
+      'bg-red-100 text-red-700 border border-red-200 dark:bg-red-500/20 dark:text-red-300 dark:border-red-500/40',
+    HIGH: 'bg-orange-100 text-orange-700 border border-orange-200 dark:bg-orange-500/20 dark:text-orange-300 dark:border-orange-500/40',
+    MEDIUM:
+      'bg-yellow-100 text-yellow-700 border border-yellow-200 dark:bg-yellow-500/20 dark:text-yellow-300 dark:border-yellow-500/40',
+    LOW: 'bg-green-100 text-green-700 border border-green-200 dark:bg-green-500/20 dark:text-green-300 dark:border-green-500/40',
   }
-  return colors[priority] || 'bg-muted text-muted-foreground'
+  return colors[priority] || 'bg-muted text-muted-foreground border border-border'
 }
 
 /**
@@ -24,12 +26,15 @@ export const getPriorityColor = (priority: Priority | string): string => {
  */
 export const getStatusColor = (status: Status | string): string => {
   const colors: Record<string, string> = {
-    OPEN: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-    IN_PROGRESS: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-    RESOLVED: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-    CLOSED: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
+    OPEN: 'bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-500/40',
+    IN_PROGRESS:
+      'bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-500/20 dark:text-purple-300 dark:border-purple-500/40',
+    RESOLVED:
+      'bg-green-100 text-green-700 border border-green-200 dark:bg-green-500/20 dark:text-green-300 dark:border-green-500/40',
+    CLOSED:
+      'bg-muted text-muted-foreground border border-border dark:bg-muted/60 dark:text-muted-foreground',
   }
-  return colors[status] || 'bg-muted text-muted-foreground'
+  return colors[status] || 'bg-muted text-muted-foreground border border-border'
 }
 
 /**
@@ -97,7 +102,7 @@ export const getStatusIconColor = (status: Status | string): string => {
     OPEN: 'text-blue-600 dark:text-blue-400',
     IN_PROGRESS: 'text-purple-600 dark:text-purple-400',
     RESOLVED: 'text-green-600 dark:text-green-400',
-    CLOSED: 'text-gray-600 dark:text-gray-400',
+    CLOSED: 'text-muted-foreground',
   }
   return colors[status] || 'text-muted-foreground'
 }

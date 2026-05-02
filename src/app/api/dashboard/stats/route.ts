@@ -126,7 +126,7 @@ async function getFamilyMetrics() {
         ticketFamilyConfig: {
           select: { ticketsEnabled: true },
         },
-        inventory_family_config: {
+        formConfig: {
           select: {
             inventoryEnabled: true,
             allowedSubtypes: true,
@@ -208,8 +208,7 @@ async function getFamilyMetrics() {
     return families.map(family => {
       const ticketsEnabled = family.ticketFamilyConfig?.ticketsEnabled ?? false
       const inventoryEnabled =
-        family.inventory_family_config !== null &&
-        (family.inventory_family_config.inventoryEnabled ?? true)
+        family.formConfig !== null && (family.formConfig?.inventoryEnabled ?? true)
 
       const tickets = ticketMap.get(family.id) ?? { open: 0, inProgress: 0 }
       const equip = equipMap.get(family.id) ?? { available: 0, assigned: 0, maintenance: 0 }
@@ -357,9 +356,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const { searchParams } = new URL(request.url)
-    const role = searchParams.get('role') || session.user.role
     const userId = session.user.id
+    // SECURITY: siempre usar el rol de la sesión, nunca del query param
+    const role = session.user.role
 
     // Caché por rol + userId: 2 minutos para admin/técnico, 3 para cliente
     const ttl = role === 'CLIENT' ? 180 : 120
@@ -810,6 +809,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Familias del cliente — con módulos activos
+      // SECURITY: usar client_family_assignments, no inferir desde tickets
       const canManageInv = (session.user as any).canManageInventory === true
       stats.isInventoryManager = canManageInv
       if (canManageInv) {
@@ -823,16 +823,35 @@ export async function GET(request: NextRequest) {
         stats.inventoryFamilies = enriched
         stats.assignedFamilies = enriched
       } else {
-        const clientTicketFamilies = await prisma.tickets.findMany({
-          where: { clientId: userId, familyId: { not: null } },
-          select: {
-            familyId: true,
-            family: { select: { id: true, name: true, code: true, color: true, icon: true } },
-          },
-          distinct: ['familyId'],
-        })
-        const raw = clientTicketFamilies.filter(t => t.family).map(t => t.family!)
-        stats.assignedFamilies = await enrichFamiliesWithModules(raw)
+        // Familia nativa del departamento + asignaciones explícitas
+        const [userDept, clientAssignments] = await Promise.all([
+          prisma.users.findUnique({
+            where: { id: userId },
+            select: {
+              departments: {
+                select: {
+                  familyId: true,
+                  family: { select: { id: true, name: true, code: true, color: true, icon: true } },
+                },
+              },
+            },
+          }),
+          prisma.client_family_assignments.findMany({
+            where: { clientId: userId, isActive: true },
+            select: {
+              family: { select: { id: true, name: true, code: true, color: true, icon: true } },
+            },
+          }),
+        ])
+        const familyMap = new Map<string, any>()
+        if (userDept?.departments?.family) {
+          const f = userDept.departments.family
+          familyMap.set(f.id, f)
+        }
+        for (const a of clientAssignments) {
+          if (a.family) familyMap.set(a.family.id, a.family)
+        }
+        stats.assignedFamilies = await enrichFamiliesWithModules(Array.from(familyMap.values()))
       }
     }
 

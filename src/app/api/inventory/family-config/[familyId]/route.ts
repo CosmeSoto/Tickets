@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 import { canManageInventory } from '@/lib/inventory-access'
 import { z } from 'zod'
 import { DEFAULT_FAMILY_CONFIG } from '@/lib/inventory/family-config'
@@ -109,7 +110,18 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ fami
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { inventoryEnabled: _inv, ...configData } = validated
+    const { inventoryEnabled: _inv, sectionsByMode, ...restConfigData } = validated
+
+    // Prisma requiere Prisma.DbNull para campos JSON nullable — no acepta null directamente
+    const configData = {
+      ...restConfigData,
+      sectionsByMode:
+        sectionsByMode === null
+          ? Prisma.DbNull
+          : sectionsByMode !== undefined
+            ? (sectionsByMode as Prisma.InputJsonValue)
+            : undefined,
+    } as any // cast necesario porque Zod infiere string en lugar del enum DepreciationMethod
 
     // inventoryEnabled ahora es un campo real en la BD
     const config = await prisma.inventory_family_config.upsert({

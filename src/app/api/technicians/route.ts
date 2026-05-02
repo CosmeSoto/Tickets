@@ -8,10 +8,12 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
-      return NextResponse.json(
-        { success: false, message: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
+    }
+
+    // SECURITY: clientes no pueden listar técnicos
+    if (session.user.role === 'CLIENT') {
+      return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 403 })
     }
 
     const { searchParams } = new URL(request.url)
@@ -35,7 +37,7 @@ export async function GET(request: NextRequest) {
     } else {
       // Por defecto, solo técnicos y admins
       where.role = {
-        in: ['TECHNICIAN', 'ADMIN']
+        in: ['TECHNICIAN', 'ADMIN'],
       }
     }
 
@@ -56,12 +58,12 @@ export async function GET(request: NextRequest) {
             id: true,
             name: true,
             color: true,
-            description: true
-          }
+            description: true,
+          },
         },
         technician_assignments: {
           where: {
-            isActive: true
+            isActive: true,
           },
           select: {
             id: true,
@@ -74,10 +76,10 @@ export async function GET(request: NextRequest) {
                 id: true,
                 name: true,
                 color: true,
-                level: true
-              }
-            }
-          }
+                level: true,
+              },
+            },
+          },
         },
         technicianFamilyAssignments: {
           include: {
@@ -87,20 +89,18 @@ export async function GET(request: NextRequest) {
                 name: true,
                 code: true,
                 color: true,
-              }
-            }
-          }
+              },
+            },
+          },
         },
         _count: {
           select: {
             tickets_tickets_assigneeIdTousers: true,
-            technician_assignments: true
-          }
-        }
+            technician_assignments: true,
+          },
+        },
       },
-      orderBy: [
-        { name: 'asc' }
-      ],
+      orderBy: [{ name: 'asc' }],
       take: 500,
     })
 
@@ -112,9 +112,9 @@ export async function GET(request: NextRequest) {
         filters: {
           departmentId,
           isActive,
-          role
-        }
-      }
+          role,
+        },
+      },
     })
   } catch (error) {
     console.error('Error in technicians API:', error)
@@ -122,7 +122,7 @@ export async function GET(request: NextRequest) {
       {
         success: false,
         message: 'Error al cargar los técnicos',
-        error: error instanceof Error ? error.message : 'Error desconocido'
+        error: error instanceof Error ? error.message : 'Error desconocido',
       },
       { status: 500 }
     )
@@ -133,10 +133,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { success: false, message: 'No autorizado' },
-        { status: 403 }
-      )
+      return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 403 })
     }
 
     const body = await request.json()
@@ -152,7 +149,7 @@ export async function POST(request: NextRequest) {
 
     // Verificar si el email ya existe
     const existingUser = await prisma.users.findUnique({
-      where: { email }
+      where: { email },
     })
 
     if (existingUser) {
@@ -177,7 +174,7 @@ export async function POST(request: NextRequest) {
         isActive: true,
         isEmailVerified: true,
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       },
       select: {
         id: true,
@@ -192,16 +189,16 @@ export async function POST(request: NextRequest) {
           select: {
             id: true,
             name: true,
-            color: true
-          }
-        }
-      }
+            color: true,
+          },
+        },
+      },
     })
 
     return NextResponse.json({
       success: true,
       data: technician,
-      message: 'Técnico creado exitosamente'
+      message: 'Técnico creado exitosamente',
     })
   } catch (error) {
     console.error('Error creating technician:', error)
@@ -209,7 +206,7 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         message: 'Error al crear el técnico',
-        error: error instanceof Error ? error.message : 'Error desconocido'
+        error: error instanceof Error ? error.message : 'Error desconocido',
       },
       { status: 500 }
     )
