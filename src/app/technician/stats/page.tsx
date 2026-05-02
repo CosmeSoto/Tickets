@@ -98,11 +98,11 @@ export default function TechnicianStatsPage() {
     if (showRefresh) setIsRefreshing(true)
 
     try {
-      const response = await fetch('/api/dashboard/stats?role=TECHNICIAN')
+      // Usar el endpoint correcto del dashboard para técnico (sin query param de rol)
+      const response = await fetch('/api/dashboard/stats')
       if (response.ok) {
         const data = await response.json()
 
-        // Mapear datos reales del API al formato esperado
         const mappedStats: TechnicianStats = {
           today: {
             resolved: data.completedToday || 0,
@@ -131,10 +131,8 @@ export default function TechnicianStatsPage() {
 
         setStats(mappedStats)
 
-        // Cargar estadísticas por categoría
+        // Cargar estadísticas por categoría desde el endpoint correcto
         loadCategoryStats()
-      } else {
-        console.error('API request failed with status:', response.status)
       }
     } catch (error) {
       console.error('Error loading stats:', error)
@@ -146,65 +144,26 @@ export default function TechnicianStatsPage() {
 
   const loadCategoryStats = async () => {
     try {
-      const response = await fetch('/api/dashboard/tickets?role=TECHNICIAN&limit=100')
+      // Usar el endpoint específico de categorías del técnico
+      const response = await fetch('/api/technician/categories')
       if (response.ok) {
         const data = await response.json()
-        const tickets = Array.isArray(data.tickets) ? data.tickets : []
+        const cats = data.categories ?? []
 
-        // Agrupar por categoría
-        const categoryMap = new Map<
-          string,
-          { resolved: number; pending: number; times: number[]; color: string }
-        >()
+        const mapped: CategoryStats[] = cats
+          .map((cat: any) => ({
+            name: cat.name,
+            resolved: cat.stats?.resolved || 0,
+            pending: (cat.stats?.open || 0) + (cat.stats?.inProgress || 0),
+            avgTime: '—',
+            color: cat.color || '#3b82f6',
+          }))
+          .sort(
+            (a: CategoryStats, b: CategoryStats) =>
+              b.resolved + b.pending - (a.resolved + a.pending)
+          )
 
-        tickets.forEach((ticket: any) => {
-          const category = ticket.category || 'Sin categoría'
-          if (!categoryMap.has(category)) {
-            categoryMap.set(category, {
-              resolved: 0,
-              pending: 0,
-              times: [],
-              color: ticket.categoryColor || '#3b82f6',
-            })
-          }
-
-          const catData = categoryMap.get(category)!
-          if (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') {
-            catData.resolved++
-            if (ticket.resolvedAt && ticket.createdAt) {
-              const diff =
-                new Date(ticket.resolvedAt).getTime() - new Date(ticket.createdAt).getTime()
-              catData.times.push(diff / (1000 * 60 * 60)) // horas
-            }
-          } else {
-            catData.pending++
-          }
-        })
-
-        // Convertir a array y calcular promedios
-        const categoryStats: CategoryStats[] = Array.from(categoryMap.entries())
-          .map(([name, data]) => {
-            const avgHours =
-              data.times.length > 0 ? data.times.reduce((a, b) => a + b, 0) / data.times.length : 0
-
-            const avgTime =
-              avgHours < 1
-                ? `${Math.round(avgHours * 60)}min`
-                : avgHours < 24
-                  ? `${Math.round(avgHours * 10) / 10}h`
-                  : `${Math.round((avgHours / 24) * 10) / 10}d`
-
-            return {
-              name,
-              resolved: data.resolved,
-              pending: data.pending,
-              avgTime,
-              color: data.color,
-            }
-          })
-          .sort((a, b) => b.resolved + b.pending - (a.resolved + a.pending))
-
-        setCategoryStats(categoryStats.slice(0, 5)) // Top 5 categorías
+        setCategoryStats(mapped.slice(0, 5))
       }
     } catch (error) {
       console.error('Error loading category stats:', error)
@@ -401,10 +360,16 @@ export default function TechnicianStatsPage() {
                         </div>
                       </div>
                       <div className='flex items-center gap-2 flex-wrap'>
-                        <Badge variant='secondary' className='bg-green-100 text-green-800'>
+                        <Badge
+                          variant='secondary'
+                          className='bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300'
+                        >
                           {category.resolved} resueltos
                         </Badge>
-                        <Badge variant='secondary' className='bg-orange-100 text-orange-800'>
+                        <Badge
+                          variant='secondary'
+                          className='bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300'
+                        >
                           {category.pending} pendientes
                         </Badge>
                       </div>
@@ -434,9 +399,9 @@ export default function TechnicianStatsPage() {
                   </span>
                   <span className='text-sm text-muted-foreground'>{stats.month.resolved}/100</span>
                 </div>
-                <div className='w-full bg-gray-200 rounded-full h-2'>
+                <div className='w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2'>
                   <div
-                    className='bg-green-600 h-2 rounded-full transition-all'
+                    className='bg-green-600 dark:bg-green-500 h-2 rounded-full transition-all'
                     style={{ width: `${Math.min((stats.month.resolved / 100) * 100, 100)}%` }}
                   />
                 </div>
@@ -451,9 +416,9 @@ export default function TechnicianStatsPage() {
                     {stats.week.avgSatisfaction}/5
                   </span>
                 </div>
-                <div className='w-full bg-gray-200 rounded-full h-2'>
+                <div className='w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2'>
                   <div
-                    className='bg-yellow-600 h-2 rounded-full transition-all'
+                    className='bg-yellow-500 h-2 rounded-full transition-all'
                     style={{ width: `${(stats.week.avgSatisfaction / 5) * 100}%` }}
                   />
                 </div>
@@ -466,9 +431,9 @@ export default function TechnicianStatsPage() {
                   </span>
                   <span className='text-sm text-muted-foreground'>{stats.month.efficiency}%</span>
                 </div>
-                <div className='w-full bg-gray-200 rounded-full h-2'>
+                <div className='w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2'>
                   <div
-                    className='bg-blue-600 h-2 rounded-full transition-all'
+                    className='bg-blue-600 dark:bg-blue-500 h-2 rounded-full transition-all'
                     style={{ width: `${stats.month.efficiency}%` }}
                   />
                 </div>

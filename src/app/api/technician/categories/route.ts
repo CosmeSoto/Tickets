@@ -8,20 +8,14 @@ export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
     }
 
     const technicianId = session.user.id
 
     // Obtener categorías asignadas al técnico con estadísticas
     const assignments = await prisma.technician_assignments.findMany({
-      where: {
-        technicianId,
-        isActive: true
-      },
+      where: { technicianId, isActive: true },
       include: {
         categories: {
           select: {
@@ -30,75 +24,63 @@ export async function GET(request: Request) {
             description: true,
             level: true,
             parentId: true,
-            color: true
-          }
+            color: true,
+          },
         },
-        users: {
-          select: {
-            _count: {
-              select: {
-                tickets_tickets_assigneeIdTousers: {
-                  where: {
-                    status: { in: ['OPEN', 'IN_PROGRESS'] }
-                  }
-                }
-              }
-            }
-          }
-        }
       },
-      orderBy: {
-        priority: 'asc'
-      }
+      orderBy: { priority: 'asc' },
     })
 
-    // Obtener estadísticas de tickets por categoría
+    // Obtener estadísticas de tickets por categoría — una sola query con groupBy
     const categoryIds = assignments.map(a => a.categoryId)
-    
-    const ticketStats = await Promise.all(
-      categoryIds.map(async (categoryId) => {
-        const [open, inProgress, resolved] = await Promise.all([
-          prisma.tickets.count({
-            where: {
-              categoryId,
-              assigneeId: technicianId,
-              status: 'OPEN'
-            }
-          }),
-          prisma.tickets.count({
-            where: {
-              categoryId,
-              assigneeId: technicianId,
-              status: 'IN_PROGRESS'
-            }
-          }),
-          prisma.tickets.count({
-            where: {
-              categoryId,
-              assigneeId: technicianId,
-              status: 'RESOLVED'
-            }
-          })
-        ])
 
-        return {
-          categoryId,
-          open,
-          inProgress,
-          resolved,
-          total: open + inProgress + resolved
-        }
-      })
-    )
+    const [ticketGroups, currentTicketGroups] = await Promise.all([
+      // Todos los tickets del técnico en estas categorías, agrupados por categoría+status
+      prisma.tickets.groupBy({
+        by: ['categoryId', 'status'],
+        where: {
+          categoryId: { in: categoryIds },
+          assigneeId: technicianId,
+          status: { in: ['OPEN', 'IN_PROGRESS', 'RESOLVED'] },
+        },
+        _count: { id: true },
+      }),
+      // Tickets activos (OPEN + IN_PROGRESS) por categoría para currentTickets
+      prisma.tickets.groupBy({
+        by: ['categoryId'],
+        where: {
+          categoryId: { in: categoryIds },
+          assigneeId: technicianId,
+          status: { in: ['OPEN', 'IN_PROGRESS'] },
+        },
+        _count: { id: true },
+      }),
+    ])
 
-    // Combinar datos
+    // Construir mapas para lookup O(1)
+    const statsMap = new Map<string, { open: number; inProgress: number; resolved: number }>()
+    for (const row of ticketGroups) {
+      if (!row.categoryId) continue
+      const entry = statsMap.get(row.categoryId) ?? { open: 0, inProgress: 0, resolved: 0 }
+      if (row.status === 'OPEN') entry.open = row._count.id
+      if (row.status === 'IN_PROGRESS') entry.inProgress = row._count.id
+      if (row.status === 'RESOLVED') entry.resolved = row._count.id
+      statsMap.set(row.categoryId, entry)
+    }
+
+    const currentMap = new Map<string, number>()
+    for (const row of currentTicketGroups) {
+      if (row.categoryId) currentMap.set(row.categoryId, row._count.id)
+    }
+
+    // Combinar datos usando los mapas
     const categories = assignments.map(assignment => {
-      const stats = ticketStats.find(s => s.categoryId === assignment.categoryId)
-      const currentTickets = assignment.users._count.tickets_tickets_assigneeIdTousers
+      const s = statsMap.get(assignment.categoryId) ?? { open: 0, inProgress: 0, resolved: 0 }
+      const currentTickets = currentMap.get(assignment.categoryId) ?? 0
 
-      // Determinar el nombre del nivel
       const levelNames = ['', 'Nivel 1', 'Nivel 2', 'Nivel 3']
-      const levelName = levelNames[assignment.categories.level] || `Nivel ${assignment.categories.level}`
+      const levelName =
+        levelNames[assignment.categories.level] || `Nivel ${assignment.categories.level}`
 
       return {
         id: assignment.id,
@@ -113,15 +95,15 @@ export async function GET(request: Request) {
         maxTickets: assignment.maxTickets,
         autoAssign: assignment.autoAssign,
         currentTickets,
-        utilization: assignment.maxTickets 
-          ? Math.round((currentTickets / assignment.maxTickets) * 100) 
+        utilization: assignment.maxTickets
+          ? Math.round((currentTickets / assignment.maxTickets) * 100)
           : 0,
         stats: {
-          open: stats?.open || 0,
-          inProgress: stats?.inProgress || 0,
-          resolved: stats?.resolved || 0,
-          total: stats?.total || 0
-        }
+          open: s.open,
+          inProgress: s.inProgress,
+          resolved: s.resolved,
+          total: s.open + s.inProgress + s.resolved,
+        },
       }
     })
 
@@ -133,15 +115,15 @@ export async function GET(request: Request) {
       entityId: technicianId,
       details: {
         categoriesCount: categories.length,
-        totalCurrentTickets: categories.reduce((sum, c) => sum + c.currentTickets, 0)
+        totalCurrentTickets: categories.reduce((sum, c) => sum + c.currentTickets, 0),
       },
       ipAddress: request.headers.get('x-forwarded-for') || undefined,
-      userAgent: request.headers.get('user-agent') || undefined
+      userAgent: request.headers.get('user-agent') || undefined,
     })
 
     return NextResponse.json({
       success: true,
-      categories
+      categories,
     })
   } catch (error) {
     console.error('[API-TECHNICIAN-CATEGORIES] Error:', error)

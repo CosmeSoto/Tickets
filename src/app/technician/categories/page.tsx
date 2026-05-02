@@ -104,8 +104,8 @@ export default function TechnicianCategoriesPage() {
                   <p className='text-sm text-muted-foreground'>Total Tickets</p>
                   <p className='text-2xl font-bold text-foreground'>{totalTickets}</p>
                 </div>
-                <div className='p-3 bg-blue-100 rounded-lg'>
-                  <Ticket className='h-6 w-6 text-blue-600' />
+                <div className='p-3 bg-blue-100 dark:bg-blue-500/20 rounded-lg'>
+                  <Ticket className='h-6 w-6 text-blue-600 dark:text-blue-400' />
                 </div>
               </div>
             </CardContent>
@@ -118,8 +118,8 @@ export default function TechnicianCategoriesPage() {
                   <p className='text-sm text-muted-foreground'>Abiertos</p>
                   <p className='text-2xl font-bold text-foreground'>{totalOpen}</p>
                 </div>
-                <div className='p-3 bg-orange-100 rounded-lg'>
-                  <AlertCircle className='h-6 w-6 text-orange-600' />
+                <div className='p-3 bg-orange-100 dark:bg-orange-500/20 rounded-lg'>
+                  <AlertCircle className='h-6 w-6 text-orange-600 dark:text-orange-400' />
                 </div>
               </div>
             </CardContent>
@@ -132,8 +132,8 @@ export default function TechnicianCategoriesPage() {
                   <p className='text-sm text-muted-foreground'>Resueltos</p>
                   <p className='text-2xl font-bold text-foreground'>{totalResolved}</p>
                 </div>
-                <div className='p-3 bg-green-100 rounded-lg'>
-                  <CheckCircle className='h-6 w-6 text-green-600' />
+                <div className='p-3 bg-green-100 dark:bg-green-500/20 rounded-lg'>
+                  <CheckCircle className='h-6 w-6 text-green-600 dark:text-green-400' />
                 </div>
               </div>
             </CardContent>
@@ -207,15 +207,15 @@ export default function TechnicianCategoriesPage() {
                           {category.stats?.total || 0}
                         </p>
                       </div>
-                      <div className='text-center p-2 bg-orange-50 rounded-lg'>
-                        <p className='text-xs text-orange-600'>Abiertos</p>
-                        <p className='text-lg font-bold text-orange-700'>
+                      <div className='text-center p-2 bg-orange-50 dark:bg-orange-500/10 rounded-lg'>
+                        <p className='text-xs text-orange-600 dark:text-orange-400'>Abiertos</p>
+                        <p className='text-lg font-bold text-orange-700 dark:text-orange-300'>
                           {category.stats?.open || 0}
                         </p>
                       </div>
-                      <div className='text-center p-2 bg-green-50 rounded-lg'>
-                        <p className='text-xs text-green-600'>Resueltos</p>
-                        <p className='text-lg font-bold text-green-700'>
+                      <div className='text-center p-2 bg-green-50 dark:bg-green-500/10 rounded-lg'>
+                        <p className='text-xs text-green-600 dark:text-green-400'>Resueltos</p>
+                        <p className='text-lg font-bold text-green-700 dark:text-green-300'>
                           {category.stats?.resolved || 0}
                         </p>
                       </div>
@@ -248,7 +248,7 @@ export default function TechnicianCategoriesPage() {
                           %
                         </span>
                       </div>
-                      <div className='w-full bg-gray-200 rounded-full h-2'>
+                      <div className='w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2'>
                         <div
                           className='bg-green-600 h-2 rounded-full transition-all'
                           style={{
