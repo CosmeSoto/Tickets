@@ -1,74 +1,14 @@
 'use client'
 
-import { useState, useEffect, useRef, Suspense } from 'react'
+import { Suspense } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
+import { useEffect } from 'react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Separator } from '@/components/ui/separator'
-import { createTicketSchema, CreateTicketData } from '@/lib/schemas/ticket-schemas'
-import { TicketPriority } from '@prisma/client'
-import {
-  Ticket,
-  CheckCircle,
-  Loader2,
-  ArrowLeft,
-  Tag,
-  Zap,
-  Upload,
-  Paperclip,
-  MapPin,
-  Users,
-  Camera,
-} from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
-import { useToast } from '@/hooks/use-toast'
-import { CategorySelectorWrapper } from '@/features/category-selection'
-import { FilePreviewList } from '@/components/tickets/file-preview-list'
-import { FamilyCombobox } from '@/components/ui/family-combobox'
-import { FileInputWithCamera } from '@/components/common/file-input-with-camera'
-
-interface FamilyOption {
-  id: string
-  name: string
-  code: string
-  color?: string | null
-  isUserFamily?: boolean
-}
-
-const priorityLabels = {
-  LOW: 'Baja',
-  MEDIUM: 'Media',
-  HIGH: 'Alta',
-  URGENT: 'Urgente',
-}
-
-const priorityColors = {
-  LOW: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-green-200',
-  MEDIUM: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 border-yellow-200',
-  HIGH: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 border-orange-200',
-  URGENT: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 border-red-200',
-}
-
-const priorityDescriptions = {
-  LOW: 'Para consultas generales o mejoras no urgentes',
-  MEDIUM: 'Para problemas que afectan el trabajo pero tienen soluciones alternativas',
-  HIGH: 'Para problemas que impactan significativamente el trabajo',
-  URGENT: 'Para problemas críticos que bloquean completamente el trabajo',
-}
+import { CreateTicketForm } from '@/components/tickets/create-ticket-form'
 
 export default function CreateClientTicketPage() {
   return (
@@ -88,221 +28,20 @@ function CreateClientTicketContent() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { toast } = useToast()
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitSuccess, setSubmitSuccess] = useState(false)
-  const [createdTicketId, setCreatedTicketId] = useState<string | null>(null)
-  const [equipmentId, setEquipmentId] = useState<string | null>(null)
-  const [availableFamilies, setAvailableFamilies] = useState<FamilyOption[]>([])
-  const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(null)
-  const [loadingFamilies, setLoadingFamilies] = useState(false)
-  const prevFamilyIdRef = useRef<string | null>(null)
-
-  // Estados para archivos
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
-
-  // Familias disponibles para este cliente (cargadas localmente)
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    formState: { errors },
-  } = useForm<CreateTicketData>({
-    resolver: zodResolver(createTicketSchema),
-    defaultValues: {
-      priority: TicketPriority.MEDIUM,
-      clientId: session?.user?.id,
-    },
-  })
-
-  const selectedPriority = watch('priority')
-  const selectedCategoryId = watch('categoryId')
-  const ticketTitle = watch('title')
-  const ticketDescription = watch('description')
-
-  // Pre-llenar formulario desde query params (para reportar problemas de equipos)
-  useEffect(() => {
-    const title = searchParams.get('title')
-    const description = searchParams.get('description')
-    const equipId = searchParams.get('equipmentId')
-    const location = searchParams.get('location')
-
-    if (title) setValue('title', title)
-    if (description) setValue('description', description)
-    if (location) setValue('location', location)
-    if (equipId) setEquipmentId(equipId)
-  }, [searchParams, setValue])
 
   useEffect(() => {
     if (status === 'loading') return
-
     if (!session) {
       router.push('/login')
       return
     }
-
     if (session.user.role !== 'CLIENT') {
       router.push('/unauthorized')
       return
     }
+  }, [session, status, router])
 
-    // Auto-asignar el clientId
-    setValue('clientId', session.user.id)
-
-    // Cargar familias disponibles para este cliente
-    setLoadingFamilies(true)
-    fetch('/api/families')
-      .then(r => r.json())
-      .then(d => {
-        if (d.success && Array.isArray(d.data)) {
-          const families: FamilyOption[] = d.data.map((f: any) => ({
-            id: f.id,
-            name: f.name,
-            code: f.code,
-            color: f.color,
-            isUserFamily: f.isOwnFamily ?? false,
-          }))
-          setAvailableFamilies(families)
-          // Pre-seleccionar la familia del usuario si existe
-          const userFamily = families.find(f => f.isUserFamily)
-          if (userFamily) setSelectedFamilyId(userFamily.id)
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoadingFamilies(false))
-  }, [session, status, router, setValue])
-
-  // Resetear categoría cuando cambia la familia
-  useEffect(() => {
-    if (prevFamilyIdRef.current !== selectedFamilyId) {
-      prevFamilyIdRef.current = selectedFamilyId
-      // Solo resetear si ya había una categoría seleccionada
-      if (selectedCategoryId) setValue('categoryId', '')
-    }
-  }, [selectedFamilyId, selectedCategoryId, setValue])
-
-  // Manejar selección de archivos
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || [])
-    if (files.length === 0) return
-
-    if (selectedFiles.length + files.length > 5) {
-      toast({
-        title: 'Límite excedido',
-        description: 'Máximo 5 archivos permitidos',
-        variant: 'destructive',
-      })
-      return
-    }
-
-    const oversizedFiles = files.filter(file => file.size > 10 * 1024 * 1024)
-    if (oversizedFiles.length > 0) {
-      toast({
-        title: 'Archivo muy grande',
-        description: 'Los archivos no deben superar 10MB',
-        variant: 'destructive',
-      })
-      return
-    }
-
-    setSelectedFiles(prev => [...prev, ...files])
-  }
-
-  const removeFile = (index: number) => {
-    setSelectedFiles(prev => prev.filter((_, i) => i !== index))
-  }
-
-  const uploadFiles = async (ticketId: string) => {
-    if (selectedFiles.length === 0) return
-
-    for (const file of selectedFiles) {
-      const formData = new FormData()
-      formData.append('file', file)
-
-      try {
-        await fetch(`/api/tickets/${ticketId}/attachments`, {
-          method: 'POST',
-          body: formData,
-        })
-      } catch (error) {
-        console.error('Error uploading file:', error)
-      }
-    }
-  }
-
-  const onSubmit = async (data: CreateTicketData) => {
-    setIsSubmitting(true)
-
-    try {
-      const response = await fetch('/api/tickets', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...data,
-          ...(selectedFamilyId ? { familyId: selectedFamilyId } : {}),
-        }),
-      })
-
-      if (response.ok) {
-        const result = await response.json()
-        const ticketId = result.data.id
-        setCreatedTicketId(ticketId)
-
-        await uploadFiles(ticketId)
-
-        // Si viene de un reporte de equipo, vincular el ticket con el equipo
-        if (equipmentId) {
-          try {
-            await fetch(`/api/inventory/equipment/${equipmentId}/link-ticket`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ ticketId }),
-            })
-          } catch (error) {
-            console.error('Error vinculando ticket con equipo:', error)
-            // No fallar si el vínculo falla, el ticket ya fue creado
-          }
-        }
-
-        setSubmitSuccess(true)
-
-        // Disparar evento para actualizar notificaciones inmediatamente
-        window.dispatchEvent(new CustomEvent('ticket-created'))
-
-        toast({
-          title: 'Éxito',
-          description: 'Tu ticket ha sido creado exitosamente',
-        })
-
-        setTimeout(() => {
-          router.push(`/client/tickets/${ticketId}`)
-        }, 2000)
-      } else {
-        const error = await response.json()
-        toast({
-          title: 'Error',
-          description: error.message || 'Error al crear el ticket',
-          variant: 'destructive',
-        })
-      }
-    } catch (error) {
-      console.error('Error submitting ticket:', error)
-      toast({
-        title: 'Error',
-        description: 'Error de conexión al crear el ticket',
-        variant: 'destructive',
-      })
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  if (status === 'loading') {
+  if (status === 'loading' || !session) {
     return (
       <ModuleLayout title='Crear Ticket' subtitle='Nueva solicitud de soporte' loading={true}>
         <div />
@@ -310,291 +49,38 @@ function CreateClientTicketContent() {
     )
   }
 
-  if (submitSuccess) {
-    return (
-      <ModuleLayout title='Ticket Creado' subtitle='Solicitud enviada exitosamente'>
-        <Card className='max-w-2xl mx-auto'>
-          <CardContent className='pt-6'>
-            <div className='text-center'>
-              <CheckCircle className='h-16 w-16 text-green-600 mx-auto mb-4' />
-              <h2 className='text-2xl font-semibold text-foreground mb-2'>
-                ¡Ticket creado exitosamente!
-              </h2>
-              <p className='text-muted-foreground mb-6'>
-                Tu solicitud ha sido recibida y será atendida por nuestro equipo de soporte.
-                Recibirás notificaciones sobre el progreso.
-              </p>
-              <div className='flex flex-col sm:flex-row items-center justify-center gap-3'>
-                <Button asChild className='w-full sm:w-auto'>
-                  <Link href='/client/tickets'>Ver Mis Tickets</Link>
-                </Button>
-                <Button variant='outline' asChild className='w-full sm:w-auto'>
-                  <Link href='/client'>Ir al Dashboard</Link>
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </ModuleLayout>
-    )
-  }
-
-  const headerActions = (
-    <Button variant='outline' size='sm' asChild>
-      <Link href='/client/tickets'>
-        <ArrowLeft className='h-4 w-4 mr-2' />
-        <span className='hidden sm:inline'>Volver a Mis Tickets</span>
-        <span className='sm:hidden'>Volver</span>
-      </Link>
-    </Button>
-  )
+  // Parámetros opcionales desde query string (ej: reporte de equipo)
+  const preTitle = searchParams.get('title') || undefined
+  const preDescription = searchParams.get('description') || undefined
+  const preLocation = searchParams.get('location') || undefined
+  const equipmentId = searchParams.get('equipmentId') || undefined
 
   return (
     <ModuleLayout
-      title='Crear Nuevo Ticket'
+      title='Crear Ticket'
       subtitle='Describe tu problema o solicitud'
-      headerActions={headerActions}
+      headerActions={
+        <Button variant='outline' size='sm' asChild>
+          <Link href='/client/tickets'>
+            <ArrowLeft className='h-4 w-4 mr-2' />
+            <span className='hidden sm:inline'>Volver a Mis Tickets</span>
+            <span className='sm:hidden'>Volver</span>
+          </Link>
+        </Button>
+      }
     >
-      <div className='max-w-4xl mx-auto'>
-        <Card>
-          <CardHeader>
-            <CardTitle className='flex items-center'>
-              <Ticket className='h-5 w-5 mr-2 text-primary' />
-              Nueva Solicitud de Soporte
-            </CardTitle>
-            <CardDescription>
-              Completa el formulario con los detalles de tu problema o solicitud
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit(onSubmit)} className='space-y-4'>
-              {/* Título */}
-              <div className='space-y-1.5'>
-                <Label htmlFor='title'>Título *</Label>
-                <Input
-                  id='title'
-                  placeholder='Describe brevemente tu problema'
-                  {...register('title')}
-                  className={errors.title ? 'border-red-500' : ''}
-                />
-                {errors.title && <p className='text-xs text-red-600'>{errors.title.message}</p>}
-              </div>
-
-              {/* Descripción */}
-              <div className='space-y-1.5'>
-                <Label htmlFor='description'>Descripción Detallada *</Label>
-                <Textarea
-                  id='description'
-                  placeholder='Proporciona todos los detalles relevantes sobre tu problema. Incluye pasos para reproducirlo, mensajes de error, etc.'
-                  rows={4}
-                  {...register('description')}
-                  className={errors.description ? 'border-red-500' : ''}
-                />
-                {errors.description && (
-                  <p className='text-xs text-red-600'>{errors.description.message}</p>
-                )}
-              </div>
-
-              {/* Ubicación */}
-              <div className='space-y-1.5'>
-                <Label htmlFor='location' className='flex items-center gap-1.5'>
-                  <MapPin className='h-3.5 w-3.5' />
-                  Ubicación / Área{' '}
-                  <span className='text-muted-foreground font-normal text-xs'>(opcional)</span>
-                </Label>
-                <Input
-                  id='location'
-                  placeholder='Ej: Oficina 201, Piso 3, Sala de Reuniones A...'
-                  {...register('location')}
-                />
-                <p className='text-xs text-muted-foreground'>
-                  Indica dónde debe acercarse el técnico para atender el problema.
-                </p>
-              </div>
-
-              {/* Prioridad */}
-              <div className='space-y-1.5'>
-                <Label htmlFor='priority' className='flex items-center gap-1.5'>
-                  <Zap className='h-3.5 w-3.5' />
-                  Prioridad *
-                </Label>
-                <Select
-                  value={selectedPriority}
-                  onValueChange={value => setValue('priority', value as TicketPriority)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(priorityLabels).map(([value, label]) => (
-                      <SelectItem key={value} value={value}>
-                        <div className='flex items-center space-x-2'>
-                          <div
-                            className={`w-2.5 h-2.5 rounded-full ${
-                              value === 'LOW'
-                                ? 'bg-green-500'
-                                : value === 'MEDIUM'
-                                  ? 'bg-yellow-500'
-                                  : value === 'HIGH'
-                                    ? 'bg-orange-500'
-                                    : 'bg-red-500'
-                            }`}
-                          />
-                          <span>{label}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {selectedPriority && (
-                  <p
-                    className={`px-2 py-1.5 rounded text-xs ${priorityColors[selectedPriority as keyof typeof priorityColors]}`}
-                  >
-                    <strong>
-                      {priorityLabels[selectedPriority as keyof typeof priorityLabels]}:
-                    </strong>{' '}
-                    {priorityDescriptions[selectedPriority as keyof typeof priorityDescriptions]}
-                  </p>
-                )}
-              </div>
-
-              <Separator />
-
-              {/* Área / Familia de soporte */}
-              {availableFamilies.length > 0 && (
-                <div className='space-y-2'>
-                  <Label className='flex items-center gap-1.5 text-sm font-semibold'>
-                    <Users className='h-4 w-4' />
-                    Área de soporte
-                    <span className='text-muted-foreground font-normal text-xs'>(opcional)</span>
-                  </Label>
-                  <p className='text-xs text-muted-foreground'>
-                    Selecciona el equipo que debe atender tu solicitud.
-                  </p>
-                  <FamilyCombobox
-                    families={availableFamilies}
-                    value={selectedFamilyId ?? ''}
-                    onValueChange={v => setSelectedFamilyId(v || null)}
-                    allowNull
-                    nullLabel='Sin preferencia'
-                    nullDescription='El sistema asignará automáticamente'
-                    allowClear
-                    popoverWidth='360px'
-                  />
-                  {selectedFamilyId &&
-                    (() => {
-                      const f = availableFamilies.find(x => x.id === selectedFamilyId)
-                      return f ? (
-                        <p className='text-xs text-muted-foreground flex items-center gap-1.5'>
-                          <span
-                            className='w-2 h-2 rounded-full'
-                            style={{ backgroundColor: f.color ?? '#6366f1' }}
-                          />
-                          Tu solicitud irá al equipo de <strong>{f.name}</strong>
-                        </p>
-                      ) : null
-                    })()}
-                </div>
-              )}
-
-              {/* Selector de Categorías */}
-              <div className='space-y-1.5'>
-                <Label className='flex items-center gap-1.5 text-sm font-semibold'>
-                  <Tag className='h-4 w-4' />
-                  Categoría *
-                </Label>
-                <p className='text-xs text-muted-foreground'>
-                  Selecciona la categoría que mejor describa tu problema. Usa la búsqueda (Ctrl+K)
-                  para encontrarla rápidamente.
-                </p>
-                <div className='border rounded-lg p-3 bg-muted/30'>
-                  <CategorySelectorWrapper
-                    value={selectedCategoryId}
-                    onChange={categoryId => setValue('categoryId', categoryId)}
-                    ticketTitle={ticketTitle || ''}
-                    ticketDescription={ticketDescription || ''}
-                    clientId={session?.user?.id || ''}
-                    familyId={selectedFamilyId ?? undefined}
-                    error={errors.categoryId?.message}
-                  />
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Archivos Adjuntos */}
-              <div className='space-y-1.5'>
-                <Label>Archivos Adjuntos (Opcional)</Label>
-                <FileInputWithCamera
-                  accept='image/*,.pdf,.doc,.docx,.txt'
-                  multiple
-                  onChange={handleFileSelect}
-                >
-                  {({ openFile, openCamera, showCamera }) => (
-                    <div className='border-2 border-dashed border-border rounded-lg px-4 py-3'>
-                      <div className='flex items-center justify-between gap-4 flex-wrap'>
-                        <div className='flex items-center gap-3'>
-                          <Upload className='h-5 w-5 text-muted-foreground flex-shrink-0' />
-                          <p className='text-xs text-muted-foreground'>
-                            Máximo 5 archivos, 10MB cada uno
-                          </p>
-                        </div>
-                        <div className='flex items-center gap-2'>
-                          {showCamera && (
-                            <Button type='button' variant='outline' size='sm' onClick={openCamera}>
-                              <Camera className='h-3.5 w-3.5 mr-1.5' />
-                              Cámara
-                            </Button>
-                          )}
-                          <Button type='button' variant='outline' size='sm' onClick={openFile}>
-                            <Paperclip className='h-3.5 w-3.5 mr-1.5' />
-                            {showCamera ? 'Galería / Archivo' : 'Seleccionar'}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </FileInputWithCamera>
-
-                {selectedFiles.length > 0 && (
-                  <FilePreviewList files={selectedFiles} onRemove={removeFile} />
-                )}
-              </div>
-
-              {/* Botones */}
-              <div className='flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 pt-2'>
-                <Button
-                  type='button'
-                  variant='outline'
-                  size='sm'
-                  asChild
-                  className='w-full sm:w-auto'
-                >
-                  <Link href='/client/tickets'>Cancelar</Link>
-                </Button>
-                <Button
-                  type='submit'
-                  size='sm'
-                  disabled={isSubmitting}
-                  className='w-full sm:w-auto'
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className='h-3.5 w-3.5 mr-1.5 animate-spin' />
-                      Creando...
-                    </>
-                  ) : (
-                    <>
-                      <Ticket className='h-3.5 w-3.5 mr-1.5' />
-                      Crear Ticket
-                    </>
-                  )}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
+      <CreateTicketForm
+        familiesEndpoint='/api/families'
+        clientId={session.user.id}
+        afterSuccessHref='/client/tickets'
+        cancelHref='/client/tickets'
+        submitLabel='Crear Ticket'
+        cardTitle='Nueva Solicitud de Soporte'
+        cardDescription='Completa el formulario con los detalles de tu problema o solicitud'
+        extraData={{
+          ...(equipmentId ? { equipmentId } : {}),
+        }}
+      />
     </ModuleLayout>
   )
 }

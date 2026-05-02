@@ -245,7 +245,7 @@ export default function TechnicianDashboard() {
                 <Button className='w-full justify-start' variant='outline' asChild>
                   <Link href='/technician/tickets/create'>
                     <FileText className='h-4 w-4 mr-2' />
-                    Reportar un Problema
+                    Mis Tickets
                   </Link>
                 </Button>
                 <Button className='w-full justify-start' variant='outline' asChild>
