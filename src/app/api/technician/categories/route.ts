@@ -31,21 +31,22 @@ export async function GET(request: Request) {
       orderBy: { priority: 'asc' },
     })
 
-    // Obtener estadísticas de tickets por categoría — una sola query con groupBy
+    // Obtener estadísticas de tickets por categoría
+    // Mostramos TODOS los tickets de la categoría (no solo los del técnico)
+    // para que el técnico vea el volumen real de trabajo de su área
     const categoryIds = assignments.map(a => a.categoryId)
 
     const [ticketGroups, currentTicketGroups] = await Promise.all([
-      // Todos los tickets del técnico en estas categorías, agrupados por categoría+status
+      // Todos los tickets de estas categorías, agrupados por categoría+status
       prisma.tickets.groupBy({
         by: ['categoryId', 'status'],
         where: {
           categoryId: { in: categoryIds },
-          assigneeId: technicianId,
           status: { in: ['OPEN', 'IN_PROGRESS', 'RESOLVED'] },
         },
         _count: { id: true },
       }),
-      // Tickets activos (OPEN + IN_PROGRESS) por categoría para currentTickets
+      // Tickets activos (OPEN + IN_PROGRESS) por categoría para currentTickets del técnico
       prisma.tickets.groupBy({
         by: ['categoryId'],
         where: {

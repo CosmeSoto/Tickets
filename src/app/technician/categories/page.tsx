@@ -176,7 +176,7 @@ export default function TechnicianCategoriesPage() {
               <Card
                 key={category.id}
                 className='hover:shadow-lg transition-shadow cursor-pointer'
-                onClick={() => router.push(`/technician/tickets?category=${category.id}`)}
+                onClick={() => router.push(`/technician/tickets?category=${category.categoryId}`)}
               >
                 <CardHeader className='pb-3'>
                   <div className='flex items-start justify-between'>
@@ -199,10 +199,10 @@ export default function TechnicianCategoriesPage() {
                 </CardHeader>
                 <CardContent>
                   <div className='space-y-3'>
-                    {/* Stats */}
+                    {/* Stats de la categoría completa */}
                     <div className='grid grid-cols-3 gap-2'>
                       <div className='text-center p-2 bg-muted rounded-lg'>
-                        <p className='text-xs text-muted-foreground'>Total</p>
+                        <p className='text-xs text-muted-foreground'>Total área</p>
                         <p className='text-lg font-bold text-foreground'>
                           {category.stats?.total || 0}
                         </p>
@@ -221,11 +221,11 @@ export default function TechnicianCategoriesPage() {
                       </div>
                     </div>
 
-                    {/* Metrics */}
+                    {/* Métricas del técnico en esta categoría */}
                     <div className='flex items-center justify-between text-sm'>
                       <div className='flex items-center space-x-2 text-muted-foreground'>
                         <Ticket className='h-4 w-4' />
-                        <span>Tickets actuales: {category.currentTickets || 0}</span>
+                        <span>Mis tickets activos: {category.currentTickets || 0}</span>
                       </div>
                       {category.maxTickets && (
                         <span className='text-xs text-muted-foreground'>
@@ -271,7 +271,7 @@ export default function TechnicianCategoriesPage() {
                         className='flex-1'
                         onClick={e => {
                           e.stopPropagation()
-                          router.push(`/technician/tickets?category=${category.id}`)
+                          router.push(`/technician/tickets?category=${category.categoryId}`)
                         }}
                       >
                         <Eye className='h-4 w-4 mr-2' />
@@ -283,7 +283,7 @@ export default function TechnicianCategoriesPage() {
                         className='flex-1'
                         onClick={e => {
                           e.stopPropagation()
-                          router.push(`/technician/stats?category=${category.id}`)
+                          router.push(`/technician/stats?category=${category.categoryId}`)
                         }}
                       >
                         <BarChart3 className='h-4 w-4 mr-2' />
