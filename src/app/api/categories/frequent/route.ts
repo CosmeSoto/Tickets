@@ -11,14 +11,15 @@ import type { Category } from '@/features/category-selection/types'
 /**
  * GET /api/categories/frequent
  *
- * Retorna las categorías más frecuentemente usadas por el cliente,
- * basado EXCLUSIVAMENTE en su propio historial de tickets.
- * Si el cliente no tiene tickets propios, retorna array vacío.
- * No se usan datos de otros usuarios como fallback.
+ * Retorna las categorías más frecuentemente usadas por el usuario,
+ * basado EXCLUSIVAMENTE en su propio historial de tickets como cliente.
+ * Solo muestra categorías usadas al menos `minUsage` veces (default: 2).
+ * Sin historial suficiente, retorna array vacío — nunca datos de otros usuarios.
  *
  * Query params:
- * - clientId: string (requerido) - ID del cliente
+ * - clientId: string (requerido) - ID del usuario
  * - limit: number (opcional) - Máximo de categorías a retornar (default: 5)
+ * - minUsage: number (opcional) - Mínimo de usos para considerar "frecuente" (default: 2)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -30,7 +31,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const clientId = searchParams.get('clientId')
     const limitParam = searchParams.get('limit')
+    const minUsageParam = searchParams.get('minUsage')
     const limit = limitParam ? parseInt(limitParam, 10) : 5
+    // Una categoría debe haberse usado al menos 2 veces para ser "frecuente"
+    const minUsage = minUsageParam ? parseInt(minUsageParam, 10) : 2
 
     if (!clientId) {
       return NextResponse.json(
@@ -39,7 +43,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Solo el propio cliente, admins y técnicos pueden consultar
+    // Solo el propio usuario, admins y técnicos pueden consultar
     if (session.user.role === 'CLIENT' && session.user.id !== clientId) {
       return NextResponse.json(
         { success: false, message: 'No autorizado para ver estas categorías' },
@@ -47,12 +51,12 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Obtener los últimos 30 tickets del cliente (solo los suyos)
+    // Obtener los últimos 50 tickets donde el usuario es el cliente (creador)
     const recentTickets = await prisma.tickets.findMany({
       where: { clientId },
       select: { categoryId: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
-      take: 30,
+      take: 50,
     })
 
     // Sin historial propio → no hay frecuentes que mostrar
@@ -60,7 +64,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, data: { categories: [] } })
     }
 
-    // Contar frecuencia de cada categoría en el historial del cliente
+    // Contar frecuencia de cada categoría en el historial del usuario
     const categoryFrequency = new Map<string, { count: number; lastUsed: Date }>()
     for (const ticket of recentTickets) {
       const existing = categoryFrequency.get(ticket.categoryId)
@@ -72,14 +76,17 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Solo incluir categorías que superen el umbral mínimo de uso
     // Ordenar: primero por frecuencia desc, luego por más reciente
     const frequentCategoryIds = Array.from(categoryFrequency.entries())
+      .filter(([, data]) => data.count >= minUsage)
       .map(([categoryId, data]) => ({ categoryId, count: data.count, lastUsed: data.lastUsed }))
       .sort((a, b) =>
         b.count !== a.count ? b.count - a.count : b.lastUsed.getTime() - a.lastUsed.getTime()
       )
       .slice(0, limit)
 
+    // No hay categorías que superen el umbral → sección no se muestra
     if (frequentCategoryIds.length === 0) {
       return NextResponse.json({ success: true, data: { categories: [] } })
     }
