@@ -177,7 +177,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       success: true,
-      categories,
+      data: categories,
     })
   } catch (error) {
     console.error('[API-TECHNICIAN-CATEGORIES] Error:', error)

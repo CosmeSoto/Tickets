@@ -1,152 +1,114 @@
 'use client'
 
+import { useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { BackToTickets } from '@/components/tickets/back-to-tickets'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { useToast } from '@/hooks/use-toast'
+import { SymmetricStatsCard } from '@/components/shared/stats-card'
+import { useModuleData } from '@/hooks/common/use-module-data'
 import { FolderTree, Search, Ticket, AlertCircle, CheckCircle, BarChart3, Eye } from 'lucide-react'
 
-interface Category {
+interface CategoryStats {
+  open: number
+  inProgress: number
+  resolved: number
+  total: number
+}
+
+interface TechnicianCategory {
   id: string
   categoryId: string
   name: string
   description: string
   color: string
   levelName: string
+  categoryLevel: number
+  parentId: string | null
   priority: number
   maxTickets: number | null
   autoAssign: boolean
   currentTickets: number
   utilization: number
-  stats: {
-    open: number
-    inProgress: number
-    resolved: number
-    total: number
-  }
+  stats: CategoryStats
 }
 
 export default function TechnicianCategoriesPage() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const router = useRouter()
-  const { toast } = useToast()
-  const [categories, setCategories] = useState<Category[]>([])
   const [searchQuery, setSearchQuery] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => {
-    if (status === 'loading') return // esperar a que la sesión cargue
+  const {
+    data: categories,
+    loading,
+    error,
+    reload,
+  } = useModuleData<TechnicianCategory>({
+    endpoint: '/api/technician/categories',
+    initialLoad: true,
+  })
 
-    if (!session) {
-      router.push('/login')
-      return
-    }
-
-    if (session.user.role !== 'TECHNICIAN') {
-      router.push('/unauthorized')
-      return
-    }
-
-    loadCategories()
-  }, [session, status, router]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const loadCategories = async () => {
-    try {
-      const response = await fetch('/api/technician/categories', { cache: 'no-store' })
-      if (response.ok) {
-        const data = await response.json()
-        setCategories(data.categories || [])
-      }
-    } catch (error) {
-      console.error('Error loading categories:', error)
-      toast({
-        title: 'Error al cargar categorías',
-        description: 'No se pudieron cargar las categorías asignadas',
-        variant: 'destructive',
-      })
-    } finally {
-      setIsLoading(false)
-    }
+  // Protección de ruta — sin redirect manual, ModuleLayout maneja el loading
+  if (status === 'loading') return null
+  if (!session || session.user.role !== 'TECHNICIAN') {
+    if (typeof window !== 'undefined') router.push('/login')
+    return null
   }
 
   const filteredCategories = categories.filter(
-    category =>
-      (category.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-      (category.description?.toLowerCase() || '').includes(searchQuery.toLowerCase())
+    cat =>
+      (cat.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+      (cat.description?.toLowerCase() || '').includes(searchQuery.toLowerCase())
   )
 
   const totalTickets = categories.reduce((sum, cat) => sum + (cat.stats?.total || 0), 0)
   const totalOpen = categories.reduce((sum, cat) => sum + (cat.stats?.open || 0), 0)
   const totalResolved = categories.reduce((sum, cat) => sum + (cat.stats?.resolved || 0), 0)
 
-  if (isLoading) {
-    return (
-      <ModuleLayout title='Mis Categorías' subtitle='Categorías asignadas' loading={true}>
-        <div />
-      </ModuleLayout>
-    )
-  }
-
   return (
-    <ModuleLayout title='Mis Categorías' subtitle={`${categories.length} categorías asignadas`}>
+    <ModuleLayout
+      title='Mis Categorías'
+      subtitle={`${categories.length} categoría${categories.length !== 1 ? 's' : ''} asignada${categories.length !== 1 ? 's' : ''}`}
+      loading={loading && categories.length === 0}
+      error={error}
+      onRetry={reload}
+    >
       <div className='space-y-6'>
         <BackToTickets />
+
         {/* Summary Cards */}
         <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-          <Card>
-            <CardContent className='p-6'>
-              <div className='flex items-center justify-between'>
-                <div>
-                  <p className='text-sm text-muted-foreground'>Total Tickets</p>
-                  <p className='text-2xl font-bold text-foreground'>{totalTickets}</p>
-                </div>
-                <div className='p-3 bg-blue-100 dark:bg-blue-500/20 rounded-lg'>
-                  <Ticket className='h-6 w-6 text-blue-600 dark:text-blue-400' />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className='p-6'>
-              <div className='flex items-center justify-between'>
-                <div>
-                  <p className='text-sm text-muted-foreground'>Abiertos</p>
-                  <p className='text-2xl font-bold text-foreground'>{totalOpen}</p>
-                </div>
-                <div className='p-3 bg-orange-100 dark:bg-orange-500/20 rounded-lg'>
-                  <AlertCircle className='h-6 w-6 text-orange-600 dark:text-orange-400' />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className='p-6'>
-              <div className='flex items-center justify-between'>
-                <div>
-                  <p className='text-sm text-muted-foreground'>Resueltos</p>
-                  <p className='text-2xl font-bold text-foreground'>{totalResolved}</p>
-                </div>
-                <div className='p-3 bg-green-100 dark:bg-green-500/20 rounded-lg'>
-                  <CheckCircle className='h-6 w-6 text-green-600 dark:text-green-400' />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <SymmetricStatsCard
+            title='Total Tickets'
+            value={totalTickets}
+            icon={Ticket}
+            color='blue'
+          />
+          <SymmetricStatsCard
+            title='Abiertos'
+            value={totalOpen}
+            icon={AlertCircle}
+            color='orange'
+            status={totalOpen > 10 ? 'warning' : 'normal'}
+          />
+          <SymmetricStatsCard
+            title='Resueltos'
+            value={totalResolved}
+            icon={CheckCircle}
+            color='green'
+            status='success'
+          />
         </div>
 
-        {/* Search Bar */}
+        {/* Search */}
         <Card>
           <CardContent className='p-4'>
             <div className='relative'>
-              <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground' />
+              <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground' />
               <Input
                 placeholder='Buscar categorías...'
                 value={searchQuery}
@@ -157,7 +119,7 @@ export default function TechnicianCategoriesPage() {
           </CardContent>
         </Card>
 
-        {/* Categories List */}
+        {/* Categories Grid */}
         {filteredCategories.length === 0 ? (
           <Card>
             <CardContent className='p-12 text-center'>
@@ -177,7 +139,7 @@ export default function TechnicianCategoriesPage() {
             {filteredCategories.map(category => (
               <Card
                 key={category.id}
-                className='hover:shadow-lg transition-shadow cursor-pointer'
+                className='hover:shadow-lg transition-shadow cursor-pointer bg-card'
                 onClick={() => router.push(`/technician/tickets?category=${category.categoryId}`)}
               >
                 <CardHeader className='pb-3'>
@@ -189,19 +151,22 @@ export default function TechnicianCategoriesPage() {
                       />
                       <div>
                         <CardTitle className='text-base'>{category.name}</CardTitle>
-                        <CardDescription className='text-xs mt-1'>
-                          {category.description}
-                        </CardDescription>
+                        {category.description && (
+                          <CardDescription className='text-xs mt-1'>
+                            {category.description}
+                          </CardDescription>
+                        )}
                       </div>
                     </div>
-                    <Badge variant='outline' className='text-xs'>
+                    <Badge variant='outline' className='text-xs shrink-0'>
                       {category.levelName}
                     </Badge>
                   </div>
                 </CardHeader>
+
                 <CardContent>
                   <div className='space-y-3'>
-                    {/* Stats de la categoría completa */}
+                    {/* Stats del área completa */}
                     <div className='grid grid-cols-3 gap-2'>
                       <div className='text-center p-2 bg-muted rounded-lg'>
                         <p className='text-xs text-muted-foreground'>Total área</p>
@@ -223,7 +188,7 @@ export default function TechnicianCategoriesPage() {
                       </div>
                     </div>
 
-                    {/* Métricas del técnico en esta categoría */}
+                    {/* Mis tickets activos en esta categoría */}
                     <div className='flex items-center justify-between text-sm'>
                       <div className='flex items-center space-x-2 text-muted-foreground'>
                         <Ticket className='h-4 w-4' />
@@ -236,7 +201,7 @@ export default function TechnicianCategoriesPage() {
                       )}
                     </div>
 
-                    {/* Progress Bar */}
+                    {/* Tasa de resolución */}
                     <div>
                       <div className='flex items-center justify-between text-xs text-muted-foreground mb-1'>
                         <span>Tasa de resolución</span>
@@ -252,7 +217,7 @@ export default function TechnicianCategoriesPage() {
                       </div>
                       <div className='w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2'>
                         <div
-                          className='bg-green-600 h-2 rounded-full transition-all'
+                          className='bg-green-600 dark:bg-green-500 h-2 rounded-full transition-all'
                           style={{
                             width: `${
                               (category.stats?.total || 0) > 0
@@ -265,7 +230,7 @@ export default function TechnicianCategoriesPage() {
                       </div>
                     </div>
 
-                    {/* Actions */}
+                    {/* Acciones */}
                     <div className='flex items-center space-x-2 pt-2'>
                       <Button
                         variant='outline'
