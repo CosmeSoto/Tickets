@@ -41,6 +41,7 @@ import {
   Paperclip,
   MapPin,
   Camera,
+  Layers,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/hooks/use-toast'
@@ -95,6 +96,12 @@ export default function CreateTicketPage() {
 
   // ✅ Clientes desde contexto global — sin petición extra
   const { clients } = useClients()
+
+  // Familias disponibles para el cliente seleccionado
+  const [clientFamilies, setClientFamilies] = useState<
+    Array<{ id: string; name: string; code: string; color?: string | null }>
+  >([])
+  const [selectedFamilyId, setSelectedFamilyId] = useState<string>('')
 
   // Estados para archivos
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
@@ -237,10 +244,29 @@ export default function CreateTicketPage() {
     }
   }
 
-  const handleClientSelect = (clientId: string) => {
+  const handleClientSelect = async (clientId: string) => {
     const client = clients.find(c => c.id === clientId) as unknown as User | undefined
     setSelectedClient(client || null)
     setValue('clientId', clientId)
+    // Limpiar familia y categoría al cambiar cliente
+    setSelectedFamilyId('')
+    setValue('categoryId', '')
+    setClientFamilies([])
+
+    // Cargar familias del cliente seleccionado
+    if (clientId) {
+      try {
+        const res = await fetch(`/api/families?asClient=true&forClientId=${clientId}`)
+        if (res.ok) {
+          const json = await res.json()
+          const families = json.data ?? []
+          setClientFamilies(families)
+          if (families.length === 1) setSelectedFamilyId(families[0].id)
+        }
+      } catch {
+        /* silencioso */
+      }
+    }
   }
 
   if (status === 'loading' || isLoading) {
@@ -360,6 +386,64 @@ export default function CreateTicketPage() {
                           </p>
                         )}
                       </div>
+
+                      {/* Área de soporte — visible solo cuando hay cliente seleccionado */}
+                      {clientId && (
+                        <div className='space-y-2'>
+                          <Label className='flex items-center gap-1.5'>
+                            <Layers className='h-4 w-4' />
+                            Área de soporte *
+                          </Label>
+                          {clientFamilies.length === 0 ? (
+                            <p className='text-xs text-muted-foreground italic'>
+                              Cargando áreas disponibles para este cliente...
+                            </p>
+                          ) : clientFamilies.length === 1 ? (
+                            <div className='flex items-center gap-2 p-3 rounded-lg border bg-muted/30'>
+                              {clientFamilies[0].color && (
+                                <span
+                                  className='w-3 h-3 rounded-full flex-shrink-0'
+                                  style={{ backgroundColor: clientFamilies[0].color }}
+                                />
+                              )}
+                              <span className='text-sm font-medium'>{clientFamilies[0].name}</span>
+                              <Badge variant='outline' className='text-xs font-mono ml-auto'>
+                                {clientFamilies[0].code}
+                              </Badge>
+                            </div>
+                          ) : (
+                            <Select
+                              value={selectedFamilyId}
+                              onValueChange={v => {
+                                setSelectedFamilyId(v)
+                                setValue('categoryId', '')
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder='Selecciona el área de soporte...' />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {clientFamilies.map(f => (
+                                  <SelectItem key={f.id} value={f.id}>
+                                    <div className='flex items-center gap-2'>
+                                      {f.color && (
+                                        <span
+                                          className='w-2.5 h-2.5 rounded-full flex-shrink-0'
+                                          style={{ backgroundColor: f.color }}
+                                        />
+                                      )}
+                                      <span>{f.name}</span>
+                                      <span className='text-xs text-muted-foreground font-mono ml-1'>
+                                        {f.code}
+                                      </span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </div>
+                      )}
 
                       <Separator />
 
@@ -486,6 +570,7 @@ export default function CreateTicketPage() {
                             ticketTitle={ticketTitle || ''}
                             ticketDescription={ticketDescription || ''}
                             clientId={clientId || ''}
+                            familyId={selectedFamilyId || undefined}
                             error={errors.categoryId?.message}
                           />
                         </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
 import {
   Select,
   SelectContent,
@@ -32,10 +33,18 @@ import {
   FileText,
   MapPin,
   Info,
+  Layers,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/hooks/use-toast'
 import { CategorySelectorWrapper } from '@/features/category-selection'
+
+interface FamilyOption {
+  id: string
+  name: string
+  code: string
+  color?: string | null
+}
 
 const PRIORITY_LABELS: Record<string, string> = {
   LOW: 'Baja',
@@ -57,7 +66,11 @@ export default function TechnicianCreateTicketPage() {
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
-  const selectedFiles: File[] = []
+
+  // Familias donde el técnico actúa como CLIENTE (para crear solicitudes)
+  const [clientFamilies, setClientFamilies] = useState<FamilyOption[]>([])
+  const [selectedFamilyId, setSelectedFamilyId] = useState<string>('')
+  const [loadingFamilies, setLoadingFamilies] = useState(true)
 
   const {
     register,
@@ -67,16 +80,45 @@ export default function TechnicianCreateTicketPage() {
     formState: { errors },
   } = useForm<CreateTicketData>({
     resolver: zodResolver(createTicketSchema),
-    defaultValues: {
-      priority: TicketPriority.MEDIUM,
-      // El técnico es el cliente — se establece en el servidor
-    },
+    defaultValues: { priority: TicketPriority.MEDIUM },
   })
 
   const selectedPriority = watch('priority')
   const selectedCategoryId = watch('categoryId')
   const ticketTitle = watch('title')
   const ticketDescription = watch('description')
+
+  // Cargar familias donde el técnico puede crear tickets como cliente
+  // Usa el endpoint /api/families que ya filtra por rol, pero necesitamos
+  // las familias de cliente: familia nativa del depto + client_family_assignments
+  useEffect(() => {
+    const fetchClientFamilies = async () => {
+      try {
+        // asClient=true indica que queremos las familias donde actuamos como cliente
+        const res = await fetch('/api/families?asClient=true')
+        if (res.ok) {
+          const json = await res.json()
+          const families: FamilyOption[] = json.data ?? []
+          setClientFamilies(families)
+          // Pre-seleccionar la primera familia si solo hay una
+          if (families.length === 1) {
+            setSelectedFamilyId(families[0].id)
+          }
+        }
+      } catch {
+        // silencioso
+      } finally {
+        setLoadingFamilies(false)
+      }
+    }
+    fetchClientFamilies()
+  }, [])
+
+  // Limpiar categoría al cambiar de familia
+  const handleFamilyChange = (familyId: string) => {
+    setSelectedFamilyId(familyId)
+    setValue('categoryId', '')
+  }
 
   const onSubmit = async (data: CreateTicketData) => {
     setIsSubmitting(true)
@@ -86,7 +128,8 @@ export default function TechnicianCreateTicketPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...data,
-          // No enviar clientId — el servidor usará session.user.id para TECHNICIAN
+          familyId: selectedFamilyId || undefined,
+          // No enviar clientId — el servidor usa session.user.id para TECHNICIAN
           // No enviar assigneeId — no puede auto-asignarse
           clientId: undefined,
           assigneeId: undefined,
@@ -95,24 +138,10 @@ export default function TechnicianCreateTicketPage() {
 
       if (response.ok) {
         const result = await response.json()
-        const ticketId = result.data.id
-
-        // Subir archivos si hay
-        for (const file of selectedFiles) {
-          const fd = new FormData()
-          fd.append('file', file)
-          await fetch(`/api/tickets/${ticketId}/attachments`, { method: 'POST', body: fd }).catch(
-            () => {}
-          )
-        }
-
         setSubmitSuccess(true)
         window.dispatchEvent(new CustomEvent('ticket-created'))
-        toast({ title: 'Ticket creado', description: 'Tu solicitud fue enviada correctamente' })
-
-        setTimeout(() => {
-          router.push(`/technician/tickets/${ticketId}`)
-        }, 1500)
+        toast({ title: 'Solicitud enviada', description: 'Tu ticket fue registrado correctamente' })
+        setTimeout(() => router.push(`/technician/tickets/${result.data.id}`), 1500)
       } else {
         const error = await response.json()
         toast({
@@ -130,16 +159,16 @@ export default function TechnicianCreateTicketPage() {
 
   if (submitSuccess) {
     return (
-      <ModuleLayout title='Ticket Creado' subtitle='Solicitud enviada'>
+      <ModuleLayout title='Solicitud Enviada' subtitle='Ticket registrado'>
         <Card className='max-w-lg mx-auto'>
           <CardContent className='pt-8 pb-8 text-center space-y-4'>
             <CheckCircle className='h-14 w-14 text-emerald-500 mx-auto' />
-            <h2 className='text-xl font-semibold'>¡Ticket enviado!</h2>
+            <h2 className='text-xl font-semibold'>¡Solicitud enviada!</h2>
             <p className='text-muted-foreground text-sm'>
               Tu solicitud fue registrada. Un técnico o administrador la revisará y asignará pronto.
             </p>
             <Button asChild className='w-full'>
-              <Link href='/technician/tickets'>Ver mis tickets</Link>
+              <Link href='/technician/tickets'>Ver tickets asignados</Link>
             </Button>
           </CardContent>
         </Card>
@@ -149,8 +178,8 @@ export default function TechnicianCreateTicketPage() {
 
   return (
     <ModuleLayout
-      title='Reportar un Problema'
-      subtitle='Crea un ticket para solicitar soporte o reportar un incidente'
+      title='Nueva Solicitud'
+      subtitle='Crea un ticket de soporte para ti mismo — será atendido por otro técnico o administrador'
       headerActions={
         <Button variant='outline' asChild>
           <Link href='/technician/tickets'>
@@ -165,8 +194,8 @@ export default function TechnicianCreateTicketPage() {
         <Alert className='border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800'>
           <Info className='h-4 w-4 text-blue-600 dark:text-blue-400' />
           <AlertDescription className='text-blue-800 dark:text-blue-300 text-sm'>
-            Estás reportando un problema como <strong>{session?.user?.name}</strong>. El ticket será
-            asignado a otro técnico o administrador — no puedes atender tus propios tickets.
+            Estás creando una solicitud como <strong>{session?.user?.name}</strong>. El ticket será
+            asignado a otro técnico o administrador — no puedes atender tus propias solicitudes.
           </AlertDescription>
         </Alert>
 
@@ -174,7 +203,7 @@ export default function TechnicianCreateTicketPage() {
           <CardHeader>
             <CardTitle className='flex items-center gap-2'>
               <Ticket className='h-5 w-5 text-primary' />
-              Detalles del Problema
+              Detalles de la Solicitud
             </CardTitle>
             <CardDescription>
               Describe el problema con el mayor detalle posible para agilizar la resolución.
@@ -182,7 +211,71 @@ export default function TechnicianCreateTicketPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className='space-y-6'>
-              {/* Título */}
+              {/* ── Área de soporte ─────────────────────────────────────── */}
+              <div className='space-y-1.5'>
+                <Label className='flex items-center gap-1.5 text-sm font-semibold'>
+                  <Layers className='h-4 w-4' />
+                  Área de soporte <span className='text-destructive'>*</span>
+                </Label>
+                <p className='text-xs text-muted-foreground'>
+                  Selecciona el área a la que diriges tu solicitud.
+                </p>
+                {loadingFamilies ? (
+                  <div className='flex items-center gap-2 text-sm text-muted-foreground py-2'>
+                    <Loader2 className='h-4 w-4 animate-spin' />
+                    Cargando áreas disponibles...
+                  </div>
+                ) : clientFamilies.length === 0 ? (
+                  <Alert variant='destructive'>
+                    <AlertCircle className='h-4 w-4' />
+                    <AlertDescription>
+                      No tienes áreas de soporte asignadas. Contacta al administrador.
+                    </AlertDescription>
+                  </Alert>
+                ) : clientFamilies.length === 1 ? (
+                  // Una sola familia: mostrar como badge informativo, no como selector
+                  <div className='flex items-center gap-2 p-3 rounded-lg border bg-muted/30'>
+                    {clientFamilies[0].color && (
+                      <span
+                        className='w-3 h-3 rounded-full flex-shrink-0'
+                        style={{ backgroundColor: clientFamilies[0].color }}
+                      />
+                    )}
+                    <span className='text-sm font-medium'>{clientFamilies[0].name}</span>
+                    <Badge variant='outline' className='text-xs font-mono ml-auto'>
+                      {clientFamilies[0].code}
+                    </Badge>
+                  </div>
+                ) : (
+                  <Select value={selectedFamilyId} onValueChange={handleFamilyChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder='Selecciona el área de soporte...' />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clientFamilies.map(f => (
+                        <SelectItem key={f.id} value={f.id}>
+                          <div className='flex items-center gap-2'>
+                            {f.color && (
+                              <span
+                                className='w-2.5 h-2.5 rounded-full flex-shrink-0'
+                                style={{ backgroundColor: f.color }}
+                              />
+                            )}
+                            <span>{f.name}</span>
+                            <span className='text-xs text-muted-foreground font-mono ml-1'>
+                              {f.code}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* ── Título ──────────────────────────────────────────────── */}
               <div className='space-y-1.5'>
                 <Label htmlFor='title'>
                   Título <span className='text-destructive'>*</span>
@@ -201,7 +294,7 @@ export default function TechnicianCreateTicketPage() {
                 )}
               </div>
 
-              {/* Descripción */}
+              {/* ── Descripción ─────────────────────────────────────────── */}
               <div className='space-y-1.5'>
                 <Label htmlFor='description'>
                   Descripción <span className='text-destructive'>*</span>
@@ -221,7 +314,7 @@ export default function TechnicianCreateTicketPage() {
                 )}
               </div>
 
-              {/* Ubicación */}
+              {/* ── Ubicación ───────────────────────────────────────────── */}
               <div className='space-y-1.5'>
                 <Label htmlFor='location' className='flex items-center gap-1.5'>
                   <MapPin className='h-3.5 w-3.5' />
@@ -235,7 +328,7 @@ export default function TechnicianCreateTicketPage() {
                 />
               </div>
 
-              {/* Prioridad */}
+              {/* ── Prioridad ───────────────────────────────────────────── */}
               <div className='space-y-1.5'>
                 <Label>
                   Prioridad <span className='text-destructive'>*</span>
@@ -283,7 +376,7 @@ export default function TechnicianCreateTicketPage() {
 
               <Separator />
 
-              {/* Categoría */}
+              {/* ── Categoría ───────────────────────────────────────────── */}
               <div className='space-y-1.5'>
                 <Label className='flex items-center gap-1.5 text-sm font-semibold'>
                   <Tag className='h-4 w-4' />
@@ -291,6 +384,11 @@ export default function TechnicianCreateTicketPage() {
                 </Label>
                 <p className='text-xs text-muted-foreground'>
                   Selecciona la categoría más específica que describa el problema.
+                  {!selectedFamilyId && clientFamilies.length > 1 && (
+                    <span className='text-amber-600 dark:text-amber-400 ml-1'>
+                      Selecciona primero el área de soporte.
+                    </span>
+                  )}
                 </p>
                 <div className='border rounded-lg p-3 bg-muted/20'>
                   <CategorySelectorWrapper
@@ -299,17 +397,21 @@ export default function TechnicianCreateTicketPage() {
                     ticketTitle={ticketTitle || ''}
                     ticketDescription={ticketDescription || ''}
                     clientId={session?.user?.id || ''}
+                    familyId={selectedFamilyId || undefined}
                     error={errors.categoryId?.message}
                   />
                 </div>
               </div>
 
-              {/* Botones */}
+              {/* ── Botones ─────────────────────────────────────────────── */}
               <div className='flex items-center justify-end gap-3 pt-2'>
                 <Button type='button' variant='outline' asChild>
                   <Link href='/technician/tickets'>Cancelar</Link>
                 </Button>
-                <Button type='submit' disabled={isSubmitting}>
+                <Button
+                  type='submit'
+                  disabled={isSubmitting || loadingFamilies || clientFamilies.length === 0}
+                >
                   {isSubmitting ? (
                     <>
                       <Loader2 className='h-4 w-4 mr-2 animate-spin' />
@@ -318,7 +420,7 @@ export default function TechnicianCreateTicketPage() {
                   ) : (
                     <>
                       <FileText className='h-4 w-4 mr-2' />
-                      Enviar Ticket
+                      Enviar Solicitud
                     </>
                   )}
                 </Button>

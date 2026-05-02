@@ -16,6 +16,65 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const includeInactive = searchParams.get('includeInactive') === 'true'
+    // asClient=true: devolver familias donde el usuario actúa como CLIENTE
+    // (familia nativa del depto + client_family_assignments)
+    // Útil para TECHNICIAN y ADMIN cuando crean tickets propios
+    const asClient = searchParams.get('asClient') === 'true'
+    // forClientId: permite a ADMIN obtener las familias de un cliente específico
+    const forClientId = searchParams.get('forClientId') || null
+
+    // ── asClient: cualquier rol actuando como cliente ───────────────────────
+    if (asClient && session.user.role !== 'CLIENT') {
+      // Si es ADMIN y especifica forClientId, obtener familias de ese cliente
+      const targetId = session.user.role === 'ADMIN' && forClientId ? forClientId : session.user.id
+
+      const [user, clientAssignments] = await Promise.all([
+        prisma.users.findUnique({
+          where: { id: targetId },
+          select: { departments: { select: { familyId: true } } },
+        }),
+        prisma.client_family_assignments.findMany({
+          where: { clientId: targetId, isActive: true },
+          select: { familyId: true },
+        }),
+      ])
+
+      const userFamilyId = user?.departments?.familyId ?? null
+      const allowedFamilyIds = new Set<string>(clientAssignments.map(a => a.familyId))
+      if (userFamilyId) allowedFamilyIds.add(userFamilyId)
+
+      if (allowedFamilyIds.size === 0) {
+        return NextResponse.json({ success: true, data: [] })
+      }
+
+      const families = (await (prisma.families.findMany as any)({
+        where: {
+          id: { in: Array.from(allowedFamilyIds) },
+          isActive: true,
+          ticketFamilyConfig: { ticketsEnabled: true },
+        },
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          color: true,
+          icon: true,
+          description: true,
+          isActive: true,
+          ticketFamilyConfig: { select: { ticketsEnabled: true, allowedFromFamilies: true } },
+        },
+        orderBy: { order: 'asc' },
+      })) as any[]
+
+      return NextResponse.json({
+        success: true,
+        data: families.map((f: any) => ({
+          ...f,
+          isOwnFamily: f.id === userFamilyId,
+          isRestricted: (f.ticketFamilyConfig?.allowedFromFamilies ?? []).length > 0,
+        })),
+      })
+    }
 
     // ── Clientes: solo las familias explícitamente asignadas ────────────────
     if (session.user.role === 'CLIENT') {

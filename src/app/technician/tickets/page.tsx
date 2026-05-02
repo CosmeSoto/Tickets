@@ -151,8 +151,8 @@ export default function TechnicianTicketsPage() {
 
   return (
     <ModuleLayout
-      title='Mis Tickets Asignados'
-      subtitle='Gestiona los tickets que tienes asignados'
+      title='Tickets Asignados'
+      subtitle='Tickets que tienes asignados para resolver'
       loading={loading && allTickets.length === 0}
       error={error}
       onRetry={reload}

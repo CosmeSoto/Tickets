@@ -112,8 +112,8 @@ const navigationByRole: Record<string, NavItem[]> = {
       href: '/technician/tickets',
       icon: Ticket,
       children: [
-        { name: 'Mis Tickets', href: '/technician/tickets', icon: Ticket },
-        { name: 'Reportar Problema', href: '/technician/tickets/create', icon: FileText },
+        { name: 'Tickets Asignados', href: '/technician/tickets', icon: Ticket },
+        { name: 'Mis Solicitudes', href: '/technician/tickets/create', icon: FileText },
         { name: 'Estadísticas', href: '/technician/stats', icon: BarChart3 },
         { name: 'Categorías', href: '/technician/categories', icon: FolderTree },
         { name: 'Base de Conocimientos', href: '/technician/knowledge', icon: BookOpen },
@@ -139,8 +139,8 @@ const navigationByRole: Record<string, NavItem[]> = {
       href: '/technician/tickets',
       icon: Ticket,
       children: [
-        { name: 'Mis Tickets', href: '/technician/tickets', icon: Ticket },
-        { name: 'Reportar Problema', href: '/technician/tickets/create', icon: FileText },
+        { name: 'Tickets Asignados', href: '/technician/tickets', icon: Ticket },
+        { name: 'Mis Solicitudes', href: '/technician/tickets/create', icon: FileText },
         { name: 'Estadísticas', href: '/technician/stats', icon: BarChart3 },
         { name: 'Categorías', href: '/technician/categories', icon: FolderTree },
         { name: 'Base de Conocimientos', href: '/technician/knowledge', icon: BookOpen },
