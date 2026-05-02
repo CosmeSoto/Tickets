@@ -28,19 +28,41 @@ export async function GET(request: NextRequest) {
       // Si es ADMIN y especifica forClientId, obtener familias de ese cliente
       const targetId = session.user.role === 'ADMIN' && forClientId ? forClientId : session.user.id
 
-      const [user, clientAssignments] = await Promise.all([
+      // Consultas en paralelo según el rol del solicitante
+      const [user, clientAssignments, roleAssignments] = await Promise.all([
         prisma.users.findUnique({
           where: { id: targetId },
           select: { departments: { select: { familyId: true } } },
         }),
+        // Familias explícitas de cliente (client_family_assignments)
         prisma.client_family_assignments.findMany({
           where: { clientId: targetId, isActive: true },
           select: { familyId: true },
         }),
+        // Familias del rol de trabajo:
+        // TECHNICIAN → technician_family_assignments (puede crear tickets en las que atiende)
+        // ADMIN      → admin_family_assignments (puede crear tickets en las que gestiona)
+        // forClientId (cliente real) → no tiene rol de trabajo, array vacío
+        forClientId
+          ? Promise.resolve([])
+          : session.user.role === 'TECHNICIAN'
+            ? prisma.technician_family_assignments.findMany({
+                where: { technicianId: targetId, isActive: true },
+                select: { familyId: true },
+              })
+            : session.user.role === 'ADMIN'
+              ? prisma.admin_family_assignments.findMany({
+                  where: { adminId: targetId, isActive: true },
+                  select: { familyId: true },
+                })
+              : Promise.resolve([]),
       ])
 
       const userFamilyId = user?.departments?.familyId ?? null
-      const allowedFamilyIds = new Set<string>(clientAssignments.map(a => a.familyId))
+      const allowedFamilyIds = new Set<string>([
+        ...clientAssignments.map(a => a.familyId),
+        ...roleAssignments.map(a => a.familyId),
+      ])
       if (userFamilyId) allowedFamilyIds.add(userFamilyId)
 
       if (allowedFamilyIds.size === 0) {
