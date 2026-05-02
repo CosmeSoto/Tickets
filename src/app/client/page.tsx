@@ -111,14 +111,17 @@ export default function ClientDashboard() {
               : 'Regular'
         }`,
         variant: supportQuality === 'excellent' ? 'default' : 'secondary',
-        className: supportQuality === 'excellent' ? 'bg-green-100 text-green-800' : '',
+        className:
+          supportQuality === 'excellent'
+            ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300'
+            : '',
       }}
     >
       {/* Alerta de mensajes sin leer */}
       {hasUnreadMessages && (
-        <Alert className='mb-6 border-blue-200 bg-blue-50'>
-          <Bell className='h-4 w-4 text-blue-600' />
-          <AlertDescription>
+        <Alert className='mb-6 border-blue-300 dark:border-blue-500/40 bg-blue-50 dark:bg-blue-500/10'>
+          <Bell className='h-4 w-4 text-blue-600 dark:text-blue-400' />
+          <AlertDescription className='text-blue-800 dark:text-blue-300'>
             <strong>Nuevas respuestas:</strong> Tienes mensajes sin leer en tus tickets.
             <Link href='/client/tickets' className='ml-2 underline font-medium'>
               Ver tickets
@@ -391,20 +394,20 @@ export default function ClientDashboard() {
               </div>
             ) : (
               <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                <div className='flex flex-col space-y-3 p-4 bg-green-50 dark:bg-green-950/50 rounded-lg border border-green-200 dark:border-green-800'>
+                <div className='flex flex-col space-y-3 p-4 bg-green-50 dark:bg-green-500/10 rounded-lg border border-green-200 dark:border-green-500/30'>
                   <div className='flex items-center justify-between'>
                     <div className='flex items-center space-x-2'>
-                      <Clock className='h-4 w-4 text-green-600' />
+                      <Clock className='h-4 w-4 text-green-600 dark:text-green-400' />
                       <p className='text-sm font-semibold text-foreground'>Tiempo de Respuesta</p>
                     </div>
                     <Badge
                       variant='default'
                       className={`text-xs ${
                         systemMetrics.responseStatus === 'excellent'
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                          ? 'bg-green-100 text-green-700 border border-green-200 dark:bg-green-500/20 dark:text-green-300 dark:border-green-500/40'
                           : systemMetrics.responseStatus === 'good'
-                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                            ? 'bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-500/40'
+                            : 'bg-yellow-100 text-yellow-700 border border-yellow-200 dark:bg-yellow-500/20 dark:text-yellow-300 dark:border-yellow-500/40'
                       }`}
                     >
                       {systemMetrics.responseStatus === 'excellent'
@@ -422,10 +425,10 @@ export default function ClientDashboard() {
                   </div>
                 </div>
 
-                <div className='flex flex-col space-y-3 p-4 bg-blue-50 dark:bg-blue-950/50 rounded-lg border border-blue-200 dark:border-blue-800'>
+                <div className='flex flex-col space-y-3 p-4 bg-blue-50 dark:bg-blue-500/10 rounded-lg border border-blue-200 dark:border-blue-500/30'>
                   <div className='flex items-center justify-between'>
                     <div className='flex items-center space-x-2'>
-                      <Activity className='h-4 w-4 text-blue-600' />
+                      <Activity className='h-4 w-4 text-blue-600 dark:text-blue-400' />
                       <p className='text-sm font-semibold text-foreground'>
                         Disponibilidad del Sistema
                       </p>
@@ -434,10 +437,10 @@ export default function ClientDashboard() {
                       variant='default'
                       className={`text-xs ${
                         systemMetrics.uptimeStatus === 'excellent'
-                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                          ? 'bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-500/40'
                           : systemMetrics.uptimeStatus === 'good'
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                            ? 'bg-green-100 text-green-700 border border-green-200 dark:bg-green-500/20 dark:text-green-300 dark:border-green-500/40'
+                            : 'bg-yellow-100 text-yellow-700 border border-yellow-200 dark:bg-yellow-500/20 dark:text-yellow-300 dark:border-yellow-500/40'
                       }`}
                     >
                       ✓ {systemMetrics.uptime}%
@@ -449,15 +452,15 @@ export default function ClientDashboard() {
                   </div>
                 </div>
 
-                <div className='flex flex-col space-y-3 p-4 bg-purple-50 dark:bg-purple-950/50 rounded-lg border border-purple-200 dark:border-purple-800'>
+                <div className='flex flex-col space-y-3 p-4 bg-purple-50 dark:bg-purple-500/10 rounded-lg border border-purple-200 dark:border-purple-500/30'>
                   <div className='flex items-center justify-between'>
                     <div className='flex items-center space-x-2'>
-                      <User className='h-4 w-4 text-purple-600' />
+                      <User className='h-4 w-4 text-purple-600 dark:text-purple-400' />
                       <p className='text-sm font-semibold text-foreground'>Horario de Soporte</p>
                     </div>
                     <Badge
                       variant='default'
-                      className='bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 text-xs'
+                      className='bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-500/20 dark:text-purple-300 dark:border-purple-500/40 text-xs'
                     >
                       {systemMetrics.schedule.days}
                     </Badge>
@@ -470,10 +473,10 @@ export default function ClientDashboard() {
                   </div>
                 </div>
 
-                <div className='flex flex-col space-y-3 p-4 bg-yellow-50 dark:bg-yellow-950/50 rounded-lg border border-yellow-200 dark:border-yellow-800'>
+                <div className='flex flex-col space-y-3 p-4 bg-yellow-50 dark:bg-yellow-500/10 rounded-lg border border-yellow-200 dark:border-yellow-500/30'>
                   <div className='flex items-center justify-between'>
                     <div className='flex items-center space-x-2'>
-                      <Star className='h-4 w-4 text-yellow-600 fill-current' />
+                      <Star className='h-4 w-4 text-yellow-600 dark:text-yellow-400 fill-current' />
                       <p className='text-sm font-semibold text-foreground'>
                         Satisfacción del Cliente
                       </p>
@@ -482,10 +485,10 @@ export default function ClientDashboard() {
                       variant='default'
                       className={`text-xs ${
                         systemMetrics.satisfaction.status === 'excellent'
-                          ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                          ? 'bg-yellow-100 text-yellow-700 border border-yellow-200 dark:bg-yellow-500/20 dark:text-yellow-300 dark:border-yellow-500/40'
                           : systemMetrics.satisfaction.status === 'good'
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                            : 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
+                            ? 'bg-green-100 text-green-700 border border-green-200 dark:bg-green-500/20 dark:text-green-300 dark:border-green-500/40'
+                            : 'bg-orange-100 text-orange-700 border border-orange-200 dark:bg-orange-500/20 dark:text-orange-300 dark:border-orange-500/40'
                       }`}
                     >
                       {systemMetrics.satisfaction.percentage}%

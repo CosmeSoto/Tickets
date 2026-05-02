@@ -80,7 +80,7 @@ export function AssignedFamiliesPanel({
           />
           {config.title}
           {isSuperAdmin && (
-            <Badge className='bg-amber-100 text-amber-700 border-amber-200 text-xs'>
+            <Badge className='bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/40 text-xs'>
               Super Admin
             </Badge>
           )}
