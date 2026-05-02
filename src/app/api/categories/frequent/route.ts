@@ -13,8 +13,14 @@ import type { Category } from '@/features/category-selection/types'
  *
  * Retorna las categorías más frecuentemente usadas por el usuario,
  * basado EXCLUSIVAMENTE en su propio historial de tickets como cliente.
- * Solo muestra categorías usadas al menos `minUsage` veces (default: 2).
- * Sin historial suficiente, retorna array vacío — nunca datos de otros usuarios.
+ *
+ * Reglas:
+ * - Solo categorías usadas >= minUsage veces (default: 2)
+ * - Solo categorías que pertenecen a familias a las que el usuario tiene acceso HOY
+ *   (CLIENT: familia nativa + client_family_assignments activos)
+ *   (TECHNICIAN: technician_family_assignments activos)
+ *   (ADMIN: admin_family_assignments activos, o todas si es superAdmin)
+ * - Sin historial suficiente → array vacío, nunca datos de otros usuarios
  *
  * Query params:
  * - clientId: string (requerido) - ID del usuario
@@ -33,7 +39,6 @@ export async function GET(request: NextRequest) {
     const limitParam = searchParams.get('limit')
     const minUsageParam = searchParams.get('minUsage')
     const limit = limitParam ? parseInt(limitParam, 10) : 5
-    // Una categoría debe haberse usado al menos 2 veces para ser "frecuente"
     const minUsage = minUsageParam ? parseInt(minUsageParam, 10) : 2
 
     if (!clientId) {
@@ -51,7 +56,59 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Obtener los últimos 50 tickets donde el usuario es el cliente (creador)
+    // ── 1. Determinar familias accesibles HOY según el rol ────────────────────
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    let allowedFamilyIds: Set<string> | null = null // null = sin restricción (superAdmin)
+
+    if (session.user.role === 'CLIENT') {
+      const [userDept, clientAssignments] = await Promise.all([
+        prisma.users.findUnique({
+          where: { id: clientId },
+          select: { departments: { select: { familyId: true } } },
+        }),
+        prisma.client_family_assignments.findMany({
+          where: { clientId, isActive: true },
+          select: { familyId: true },
+        }),
+      ])
+      allowedFamilyIds = new Set(clientAssignments.map(a => a.familyId))
+      if (userDept?.departments?.familyId) allowedFamilyIds.add(userDept.departments.familyId)
+    } else if (session.user.role === 'TECHNICIAN') {
+      const techAssignments = await prisma.technician_family_assignments.findMany({
+        where: { technicianId: clientId, isActive: true },
+        select: { familyId: true },
+      })
+      allowedFamilyIds = new Set(techAssignments.map(a => a.familyId))
+    } else if (session.user.role === 'ADMIN' && !isSuperAdmin) {
+      const adminAssignments = await prisma.admin_family_assignments.findMany({
+        where: { adminId: clientId, isActive: true },
+        select: { familyId: true },
+      })
+      // Admin sin asignaciones explícitas → acceso total (igual que superAdmin)
+      if (adminAssignments.length > 0) {
+        allowedFamilyIds = new Set(adminAssignments.map(a => a.familyId))
+      }
+      // Si no tiene asignaciones → allowedFamilyIds queda null (sin restricción)
+    }
+    // ADMIN superAdmin → allowedFamilyIds = null (sin restricción)
+
+    // Sin familias asignadas para CLIENT/TECHNICIAN → no hay frecuentes posibles
+    if (allowedFamilyIds !== null && allowedFamilyIds.size === 0) {
+      return NextResponse.json({ success: true, data: { categories: [] } })
+    }
+
+    // ── 2. Obtener departamentos permitidos ───────────────────────────────────
+    // Solo necesario si hay restricción de familias
+    let allowedDeptIds: Set<string> | null = null
+    if (allowedFamilyIds !== null) {
+      const allowedDepts = await prisma.departments.findMany({
+        where: { familyId: { in: Array.from(allowedFamilyIds) }, isActive: true },
+        select: { id: true },
+      })
+      allowedDeptIds = new Set(allowedDepts.map(d => d.id))
+    }
+
+    // ── 3. Historial de tickets del usuario como cliente ──────────────────────
     const recentTickets = await prisma.tickets.findMany({
       where: { clientId },
       select: { categoryId: true, createdAt: true },
@@ -59,14 +116,28 @@ export async function GET(request: NextRequest) {
       take: 50,
     })
 
-    // Sin historial propio → no hay frecuentes que mostrar
     if (recentTickets.length === 0) {
       return NextResponse.json({ success: true, data: { categories: [] } })
     }
 
-    // Contar frecuencia de cada categoría en el historial del usuario
+    // ── 4. Contar frecuencia, filtrar por familias actuales y umbral ──────────
+    // Necesitamos saber a qué departamento pertenece cada categoría del historial
+    const historyCategoryIds = [...new Set(recentTickets.map(t => t.categoryId))]
+    const historyCategories = await prisma.categories.findMany({
+      where: { id: { in: historyCategoryIds }, isActive: true },
+      select: { id: true, departmentId: true },
+    })
+    const categoryDeptMap = new Map(historyCategories.map(c => [c.id, c.departmentId]))
+
     const categoryFrequency = new Map<string, { count: number; lastUsed: Date }>()
     for (const ticket of recentTickets) {
+      const deptId = categoryDeptMap.get(ticket.categoryId)
+
+      // Filtrar: si hay restricción de familias, solo incluir categorías de depts permitidos
+      if (allowedDeptIds !== null && (!deptId || !allowedDeptIds.has(deptId))) {
+        continue
+      }
+
       const existing = categoryFrequency.get(ticket.categoryId)
       if (existing) {
         existing.count++
@@ -76,8 +147,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Solo incluir categorías que superen el umbral mínimo de uso
-    // Ordenar: primero por frecuencia desc, luego por más reciente
+    // Solo categorías que superen el umbral mínimo de uso
     const frequentCategoryIds = Array.from(categoryFrequency.entries())
       .filter(([, data]) => data.count >= minUsage)
       .map(([categoryId, data]) => ({ categoryId, count: data.count, lastUsed: data.lastUsed }))
@@ -86,12 +156,11 @@ export async function GET(request: NextRequest) {
       )
       .slice(0, limit)
 
-    // No hay categorías que superen el umbral → sección no se muestra
     if (frequentCategoryIds.length === 0) {
       return NextResponse.json({ success: true, data: { categories: [] } })
     }
 
-    // Obtener todas las categorías activas para construir los paths
+    // ── 5. Construir respuesta con paths completos ────────────────────────────
     const allCategories = await prisma.categories.findMany({
       where: { isActive: true },
       select: {
