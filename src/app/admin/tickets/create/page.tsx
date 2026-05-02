@@ -199,7 +199,10 @@ export default function CreateTicketPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          ...(selectedFamilyId ? { familyId: selectedFamilyId } : {}),
+        }),
       })
 
       if (response.ok) {

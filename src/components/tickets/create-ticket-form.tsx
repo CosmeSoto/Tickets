@@ -44,6 +44,7 @@ import {
   Users,
   Info,
   Camera,
+  AlertCircle,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/hooks/use-toast'
@@ -382,7 +383,20 @@ export function CreateTicketForm({
             <Separator />
 
             {/* ── Área de soporte ─────────────────────────────────────── */}
-            {!loadingFamilies && availableFamilies.length > 0 && (
+            {loadingFamilies ? (
+              <div className='flex items-center gap-2 text-sm text-muted-foreground py-2'>
+                <Loader2 className='h-4 w-4 animate-spin' />
+                Cargando áreas disponibles...
+              </div>
+            ) : availableFamilies.length === 0 ? (
+              <Alert className='border-amber-200 bg-amber-50 dark:bg-amber-500/10 dark:border-amber-500/40'>
+                <AlertCircle className='h-4 w-4 text-amber-600 dark:text-amber-400' />
+                <AlertDescription className='text-amber-800 dark:text-amber-300 text-sm'>
+                  No tienes áreas de soporte disponibles. Contacta al administrador para que te
+                  asigne una familia.
+                </AlertDescription>
+              </Alert>
+            ) : (
               <div className='space-y-2'>
                 <Label className='flex items-center gap-1.5 text-sm font-semibold'>
                   <Users className='h-4 w-4' />
@@ -495,7 +509,12 @@ export function CreateTicketForm({
               >
                 <Link href={cancelHref}>Cancelar</Link>
               </Button>
-              <Button type='submit' size='sm' disabled={isSubmitting} className='w-full sm:w-auto'>
+              <Button
+                type='submit'
+                size='sm'
+                disabled={isSubmitting || (!loadingFamilies && availableFamilies.length === 0)}
+                className='w-full sm:w-auto'
+              >
                 {isSubmitting ? (
                   <>
                     <Loader2 className='h-3.5 w-3.5 mr-1.5 animate-spin' />

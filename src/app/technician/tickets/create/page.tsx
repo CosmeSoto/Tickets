@@ -27,7 +27,7 @@ export default function TechnicianCreateTicketPage() {
 
   if (status === 'loading' || !session) {
     return (
-      <ModuleLayout title='Mis Tickets' subtitle='Nueva solicitud' loading={true}>
+      <ModuleLayout title='Nueva Solicitud' subtitle='Cargando...' loading={true}>
         <div />
       </ModuleLayout>
     )
@@ -35,7 +35,7 @@ export default function TechnicianCreateTicketPage() {
 
   return (
     <ModuleLayout
-      title='Mis Tickets'
+      title='Nueva Solicitud'
       subtitle='Crea una solicitud de soporte — será atendida por otro técnico o administrador'
       headerActions={
         <Button variant='outline' size='sm' asChild>
@@ -60,11 +60,7 @@ export default function TechnicianCreateTicketPage() {
             asignado a otro técnico o administrador — no puedes atender tus propias solicitudes.
           </>
         }
-        extraData={{
-          // El servidor infiere clientId = session.user.id para TECHNICIAN
-          clientId: undefined,
-          assigneeId: undefined,
-        }}
+        // No se envía clientId ni assigneeId — el servidor los infiere para TECHNICIAN
       />
     </ModuleLayout>
   )
