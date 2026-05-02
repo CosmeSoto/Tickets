@@ -29,7 +29,7 @@ import { useToast } from '@/hooks/use-toast'
 import type { Article } from '@/hooks/use-knowledge'
 
 export default function KnowledgeDetailPage() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const router = useRouter()
   const params = useParams()
   const { toast } = useToast()
@@ -40,13 +40,15 @@ export default function KnowledgeDetailPage() {
   const [similarArticles, setSimilarArticles] = useState<Article[]>([])
 
   useEffect(() => {
+    if (status === 'loading') return
+
     if (!session) {
       router.push('/login')
       return
     }
 
     loadArticle()
-  }, [session, params.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session, status, params.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadArticle = async () => {
     try {

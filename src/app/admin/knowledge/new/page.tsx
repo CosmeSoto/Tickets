@@ -29,7 +29,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 function NewArticleContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const { createFromTicket, getTicketSuggestions, loading } = useKnowledge()
   const { categories, loadCategories } = useCategoriesData()
 
@@ -111,6 +111,8 @@ function NewArticleContent() {
   }
 
   useEffect(() => {
+    if (status === 'loading') return
+
     if (!session) {
       router.push('/login')
       return
@@ -120,7 +122,7 @@ function NewArticleContent() {
       toast.error('No tienes permisos para crear artículos')
       router.push('/knowledge')
     }
-  }, [session, router])
+  }, [session, status, router])
 
   const handleAddTag = () => {
     const trimmedTag = tagInput.trim().toLowerCase()
