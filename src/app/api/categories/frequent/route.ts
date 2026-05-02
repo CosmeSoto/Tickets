@@ -74,11 +74,26 @@ export async function GET(request: NextRequest) {
       allowedFamilyIds = new Set(clientAssignments.map(a => a.familyId))
       if (userDept?.departments?.familyId) allowedFamilyIds.add(userDept.departments.familyId)
     } else if (session.user.role === 'TECHNICIAN') {
-      const techAssignments = await prisma.technician_family_assignments.findMany({
-        where: { technicianId: clientId, isActive: true },
-        select: { familyId: true },
-      })
-      allowedFamilyIds = new Set(techAssignments.map(a => a.familyId))
+      // Misma lógica que asClient=true: unión de todas las fuentes
+      const [userDept, clientAssignments, techAssignments] = await Promise.all([
+        prisma.users.findUnique({
+          where: { id: clientId },
+          select: { departments: { select: { familyId: true } } },
+        }),
+        prisma.client_family_assignments.findMany({
+          where: { clientId, isActive: true },
+          select: { familyId: true },
+        }),
+        prisma.technician_family_assignments.findMany({
+          where: { technicianId: clientId, isActive: true },
+          select: { familyId: true },
+        }),
+      ])
+      allowedFamilyIds = new Set([
+        ...clientAssignments.map(a => a.familyId),
+        ...techAssignments.map(a => a.familyId),
+      ])
+      if (userDept?.departments?.familyId) allowedFamilyIds.add(userDept.departments.familyId)
     } else if (session.user.role === 'ADMIN' && !isSuperAdmin) {
       const adminAssignments = await prisma.admin_family_assignments.findMany({
         where: { adminId: clientId, isActive: true },
