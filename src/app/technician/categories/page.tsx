@@ -41,6 +41,8 @@ export default function TechnicianCategoriesPage() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    if (status === 'loading') return // esperar a que la sesión cargue
+
     if (!session) {
       router.push('/login')
       return
@@ -52,7 +54,7 @@ export default function TechnicianCategoriesPage() {
     }
 
     loadCategories()
-  }, [session, router]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session, status, router]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadCategories = async () => {
     try {

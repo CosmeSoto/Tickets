@@ -41,9 +41,7 @@ import { useToast } from '@/hooks/use-toast'
 import type { Article } from '@/hooks/use-knowledge'
 
 export default function TechnicianKnowledgeDetailPage() {
-  const { data: session } = useSession()
-  const router = useRouter()
-  const params = useParams()
+  const { data: session, status } = useSession()
   const { toast } = useToast()
 
   const articleId = params.id as string
@@ -57,16 +55,17 @@ export default function TechnicianKnowledgeDetailPage() {
   const [toggling, setToggling] = useState(false)
 
   useEffect(() => {
+    if (status === 'loading') return
+
     if (!session || session.user.role !== 'TECHNICIAN') {
       router.push('/login')
       return
     }
 
-    // Evitar cargar si el ID es "create" o "new"
     if (articleId && articleId !== 'create' && articleId !== 'new') {
       loadArticle()
     }
-  }, [session, articleId, router]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session, status, articleId, router]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (article) {

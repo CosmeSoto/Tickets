@@ -54,7 +54,7 @@ interface CategoryStats {
 }
 
 export default function TechnicianStatsPage() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const router = useRouter()
   const [stats, setStats] = useState<TechnicianStats>({
     today: {
@@ -81,6 +81,8 @@ export default function TechnicianStatsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false)
 
   useEffect(() => {
+    if (status === 'loading') return
+
     if (!session) {
       router.push('/login')
       return
@@ -92,7 +94,7 @@ export default function TechnicianStatsPage() {
     }
 
     loadStats()
-  }, [session, router]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session, status, router]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadStats = async (showRefresh = false) => {
     if (showRefresh) setIsRefreshing(true)
