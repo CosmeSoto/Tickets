@@ -423,6 +423,14 @@ export default function AdminDashboard() {
                 />
 
                 <ActionCard
+                  href='/admin/tickets/create'
+                  icon={TicketPlus}
+                  title='Crear Ticket'
+                  description='Abrir un ticket en nombre de un cliente'
+                  color='green'
+                />
+
+                <ActionCard
                   href='/admin/reports'
                   icon={BarChart3}
                   title='Reportes y Análisis'
