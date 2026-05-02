@@ -32,25 +32,60 @@ export async function GET(request: Request) {
     })
 
     // Obtener estadísticas de tickets por categoría
-    // Mostramos TODOS los tickets de la categoría (no solo los del técnico)
-    // para que el técnico vea el volumen real de trabajo de su área
+    // Incluimos tickets de la categoría Y de todas sus subcategorías hijas
     const categoryIds = assignments.map(a => a.categoryId)
 
+    // Obtener todas las subcategorías hijas (recursivo hasta nivel 4)
+    const allChildCategories = await prisma.categories.findMany({
+      where: {
+        OR: [
+          { id: { in: categoryIds } },
+          { parentId: { in: categoryIds } },
+          // Nietos
+          {
+            categories: {
+              parentId: { in: categoryIds },
+            },
+          },
+        ],
+        isActive: true,
+      },
+      select: { id: true, parentId: true },
+    })
+
+    // Construir mapa: categoryId raíz → todos sus descendientes (incluyéndose a sí mismo)
+    const rootToAllIds = new Map<string, string[]>()
+    for (const rootId of categoryIds) {
+      const descendants = allChildCategories
+        .filter(c => {
+          if (c.id === rootId) return true
+          if (c.parentId === rootId) return true
+          // Nieto: su padre es hijo del root
+          const parent = allChildCategories.find(p => p.id === c.parentId)
+          return parent?.parentId === rootId
+        })
+        .map(c => c.id)
+      rootToAllIds.set(rootId, descendants.length > 0 ? descendants : [rootId])
+    }
+
+    // Todos los IDs de categorías a consultar (raíces + descendientes)
+    const allCategoryIds = Array.from(new Set(allChildCategories.map(c => c.id)))
+
     const [ticketGroups, currentTicketGroups] = await Promise.all([
-      // Todos los tickets de estas categorías, agrupados por categoría+status
+      // Todos los tickets de estas categorías y sus hijas, agrupados por categoría+status
       prisma.tickets.groupBy({
         by: ['categoryId', 'status'],
         where: {
-          categoryId: { in: categoryIds },
+          categoryId: { in: allCategoryIds },
           status: { in: ['OPEN', 'IN_PROGRESS', 'RESOLVED'] },
         },
         _count: { id: true },
       }),
-      // Tickets activos (OPEN + IN_PROGRESS) por categoría para currentTickets del técnico
+      // Tickets activos del técnico en estas categorías y sus hijas
       prisma.tickets.groupBy({
         by: ['categoryId'],
         where: {
-          categoryId: { in: categoryIds },
+          categoryId: { in: allCategoryIds },
           assigneeId: technicianId,
           status: { in: ['OPEN', 'IN_PROGRESS'] },
         },
@@ -58,20 +93,40 @@ export async function GET(request: Request) {
       }),
     ])
 
-    // Construir mapas para lookup O(1)
-    const statsMap = new Map<string, { open: number; inProgress: number; resolved: number }>()
+    // Construir mapas por categoryId individual
+    const rawStatsMap = new Map<string, { open: number; inProgress: number; resolved: number }>()
     for (const row of ticketGroups) {
       if (!row.categoryId) continue
-      const entry = statsMap.get(row.categoryId) ?? { open: 0, inProgress: 0, resolved: 0 }
+      const entry = rawStatsMap.get(row.categoryId) ?? { open: 0, inProgress: 0, resolved: 0 }
       if (row.status === 'OPEN') entry.open = row._count.id
       if (row.status === 'IN_PROGRESS') entry.inProgress = row._count.id
       if (row.status === 'RESOLVED') entry.resolved = row._count.id
-      statsMap.set(row.categoryId, entry)
+      rawStatsMap.set(row.categoryId, entry)
     }
 
-    const currentMap = new Map<string, number>()
+    const rawCurrentMap = new Map<string, number>()
     for (const row of currentTicketGroups) {
-      if (row.categoryId) currentMap.set(row.categoryId, row._count.id)
+      if (row.categoryId) rawCurrentMap.set(row.categoryId, row._count.id)
+    }
+
+    // Agregar stats de todos los descendientes al root
+    const statsMap = new Map<string, { open: number; inProgress: number; resolved: number }>()
+    const currentMap = new Map<string, number>()
+
+    for (const [rootId, descendantIds] of rootToAllIds.entries()) {
+      const agg = { open: 0, inProgress: 0, resolved: 0 }
+      let current = 0
+      for (const descId of descendantIds) {
+        const s = rawStatsMap.get(descId)
+        if (s) {
+          agg.open += s.open
+          agg.inProgress += s.inProgress
+          agg.resolved += s.resolved
+        }
+        current += rawCurrentMap.get(descId) ?? 0
+      }
+      statsMap.set(rootId, agg)
+      currentMap.set(rootId, current)
     }
 
     // Combinar datos usando los mapas
