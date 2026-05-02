@@ -35,41 +35,39 @@ export async function GET(request: Request) {
     // Incluimos tickets de la categoría Y de todas sus subcategorías hijas
     const categoryIds = assignments.map(a => a.categoryId)
 
-    // Obtener todas las subcategorías hijas (recursivo hasta nivel 4)
-    const allChildCategories = await prisma.categories.findMany({
-      where: {
-        OR: [
-          { id: { in: categoryIds } },
-          { parentId: { in: categoryIds } },
-          // Nietos
-          {
-            categories: {
-              parentId: { in: categoryIds },
-            },
-          },
-        ],
-        isActive: true,
-      },
-      select: { id: true, parentId: true },
-    })
-
-    // Construir mapa: categoryId raíz → todos sus descendientes (incluyéndose a sí mismo)
-    const rootToAllIds = new Map<string, string[]>()
-    for (const rootId of categoryIds) {
-      const descendants = allChildCategories
-        .filter(c => {
-          if (c.id === rootId) return true
-          if (c.parentId === rootId) return true
-          // Nieto: su padre es hijo del root
-          const parent = allChildCategories.find(p => p.id === c.parentId)
-          return parent?.parentId === rootId
-        })
-        .map(c => c.id)
-      rootToAllIds.set(rootId, descendants.length > 0 ? descendants : [rootId])
+    if (categoryIds.length === 0) {
+      return NextResponse.json({ success: true, categories: [] })
     }
 
-    // Todos los IDs de categorías a consultar (raíces + descendientes)
-    const allCategoryIds = Array.from(new Set(allChildCategories.map(c => c.id)))
+    // Paso 1: hijos directos
+    const children = await prisma.categories.findMany({
+      where: { parentId: { in: categoryIds }, isActive: true },
+      select: { id: true, parentId: true },
+    })
+    const childIds = children.map(c => c.id)
+
+    // Paso 2: nietos (hijos de los hijos)
+    const grandchildren =
+      childIds.length > 0
+        ? await prisma.categories.findMany({
+            where: { parentId: { in: childIds }, isActive: true },
+            select: { id: true, parentId: true },
+          })
+        : []
+    const grandchildIds = grandchildren.map(c => c.id)
+
+    // Todos los IDs: raíces + hijos + nietos
+    const allCategoryIds = Array.from(new Set([...categoryIds, ...childIds, ...grandchildIds]))
+
+    // Construir mapa: rootId → todos sus descendientes
+    const rootToAllIds = new Map<string, string[]>()
+    for (const rootId of categoryIds) {
+      const myChildren = children.filter(c => c.parentId === rootId).map(c => c.id)
+      const myGrandchildren = grandchildren
+        .filter(c => myChildren.includes(c.parentId!))
+        .map(c => c.id)
+      rootToAllIds.set(rootId, [rootId, ...myChildren, ...myGrandchildren])
+    }
 
     const [ticketGroups, currentTicketGroups] = await Promise.all([
       // Todos los tickets de estas categorías y sus hijas, agrupados por categoría+status
