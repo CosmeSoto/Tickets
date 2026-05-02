@@ -56,7 +56,7 @@ export default function TechnicianCategoriesPage() {
 
   const loadCategories = async () => {
     try {
-      const response = await fetch('/api/technician/categories')
+      const response = await fetch('/api/technician/categories', { cache: 'no-store' })
       if (response.ok) {
         const data = await response.json()
         setCategories(data.categories || [])

@@ -84,15 +84,20 @@ export function SessionTimeoutMonitor() {
     // Limpiar timers existentes
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current)
+      timeoutRef.current = undefined
     }
     if (warningTimeoutRef.current) {
       clearTimeout(warningTimeoutRef.current)
+      warningTimeoutRef.current = undefined
     }
 
     // Solo configurar timers si hay sesión activa
     if (status !== 'authenticated') return
 
     const timeoutMs = sessionTimeoutMinutes.current * 60 * 1000
+    // Nunca programar un timeout menor a 1 minuto para evitar logouts accidentales
+    if (timeoutMs < 60 * 1000) return
+
     const warningMs = timeoutMs - 5 * 60 * 1000 // 5 minutos antes
 
     // Programar advertencia (5 minutos antes del timeout)
