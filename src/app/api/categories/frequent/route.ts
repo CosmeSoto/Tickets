@@ -11,9 +11,10 @@ import type { Category } from '@/features/category-selection/types'
 /**
  * GET /api/categories/frequent
  *
- * Retorna las categorías más frecuentemente usadas por el cliente
- * Basado en los últimos 20 tickets del cliente
- * Si el cliente no tiene suficiente historial, retorna las categorías más populares del sistema
+ * Retorna las categorías más frecuentemente usadas por el cliente,
+ * basado EXCLUSIVAMENTE en su propio historial de tickets.
+ * Si el cliente no tiene tickets propios, retorna array vacío.
+ * No se usan datos de otros usuarios como fallback.
  *
  * Query params:
  * - clientId: string (requerido) - ID del cliente
@@ -31,19 +32,14 @@ export async function GET(request: NextRequest) {
     const limitParam = searchParams.get('limit')
     const limit = limitParam ? parseInt(limitParam, 10) : 5
 
-    // Validar clientId
     if (!clientId) {
       return NextResponse.json(
-        {
-          success: false,
-          message: 'El parámetro clientId es requerido',
-        },
+        { success: false, message: 'El parámetro clientId es requerido' },
         { status: 400 }
       )
     }
 
-    // Validar que el usuario solo pueda ver sus propias categorías frecuentes
-    // (a menos que sea admin o técnico)
+    // Solo el propio cliente, admins y técnicos pueden consultar
     if (session.user.role === 'CLIENT' && session.user.id !== clientId) {
       return NextResponse.json(
         { success: false, message: 'No autorizado para ver estas categorías' },
@@ -51,134 +47,46 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Obtener los últimos 20 tickets del cliente
+    // Obtener los últimos 30 tickets del cliente (solo los suyos)
     const recentTickets = await prisma.tickets.findMany({
-      where: {
-        clientId,
-      },
-      select: {
-        categoryId: true,
-        createdAt: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: 20,
+      where: { clientId },
+      select: { categoryId: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
     })
 
-    let frequentCategoryIds: Array<{ categoryId: string; count: number; lastUsed: Date }> = []
-
-    // Si el cliente tiene al menos 3 tickets, calcular categorías frecuentes
-    if (recentTickets.length >= 3) {
-      // Contar frecuencia de cada categoría
-      const categoryFrequency = new Map<string, { count: number; lastUsed: Date }>()
-
-      for (const ticket of recentTickets) {
-        const existing = categoryFrequency.get(ticket.categoryId)
-        if (existing) {
-          existing.count++
-          // Mantener la fecha más reciente
-          if (ticket.createdAt > existing.lastUsed) {
-            existing.lastUsed = ticket.createdAt
-          }
-        } else {
-          categoryFrequency.set(ticket.categoryId, {
-            count: 1,
-            lastUsed: ticket.createdAt,
-          })
-        }
-      }
-
-      // Convertir a array y ordenar por frecuencia (descendente) y luego por fecha (más reciente primero)
-      frequentCategoryIds = Array.from(categoryFrequency.entries())
-        .map(([categoryId, data]) => ({
-          categoryId,
-          count: data.count,
-          lastUsed: data.lastUsed,
-        }))
-        .sort((a, b) => {
-          // Primero por frecuencia (descendente)
-          if (b.count !== a.count) {
-            return b.count - a.count
-          }
-          // Si tienen la misma frecuencia, ordenar por fecha más reciente
-          return b.lastUsed.getTime() - a.lastUsed.getTime()
-        })
-        .slice(0, limit)
-    } else {
-      // Fallback: categorías populares dentro de las familias asignadas al cliente
-      // Primero obtenemos las familias del cliente (nativa + asignaciones explícitas)
-      const [userDept, clientAssignments] = await Promise.all([
-        prisma.users.findUnique({
-          where: { id: clientId },
-          select: { departments: { select: { familyId: true } } },
-        }),
-        prisma.client_family_assignments.findMany({
-          where: { clientId, isActive: true },
-          select: { familyId: true },
-        }),
-      ])
-
-      const allowedFamilyIds = new Set<string>(clientAssignments.map(a => a.familyId))
-      if (userDept?.departments?.familyId) allowedFamilyIds.add(userDept.departments.familyId)
-
-      // Si el cliente no tiene familias asignadas, no mostrar nada
-      if (allowedFamilyIds.size === 0) {
-        return NextResponse.json({ success: true, data: { categories: [] } })
-      }
-
-      // Obtener departamentos que pertenecen a las familias del cliente
-      const allowedDepartments = await prisma.departments.findMany({
-        where: { familyId: { in: Array.from(allowedFamilyIds) }, isActive: true },
-        select: { id: true },
-      })
-      const allowedDeptIds = allowedDepartments.map(d => d.id)
-
-      // Categorías más usadas dentro de esas familias (tickets de cualquier cliente)
-      const popularCategories = await prisma.tickets.groupBy({
-        by: ['categoryId'],
-        where: {
-          categories: { departmentId: { in: allowedDeptIds } },
-        },
-        _count: { categoryId: true },
-        orderBy: { _count: { categoryId: 'desc' } },
-        take: limit,
-      })
-
-      // Obtener la fecha del último ticket para cada categoría popular
-      const categoryLastUsed = await Promise.all(
-        popularCategories.map(async cat => {
-          const lastTicket = await prisma.tickets.findFirst({
-            where: { categoryId: cat.categoryId },
-            select: { createdAt: true },
-            orderBy: { createdAt: 'desc' },
-          })
-          return {
-            categoryId: cat.categoryId,
-            count: cat._count.categoryId,
-            lastUsed: lastTicket?.createdAt || new Date(),
-          }
-        })
-      )
-
-      frequentCategoryIds = categoryLastUsed
+    // Sin historial propio → no hay frecuentes que mostrar
+    if (recentTickets.length === 0) {
+      return NextResponse.json({ success: true, data: { categories: [] } })
     }
 
-    // Si no hay categorías frecuentes, retornar array vacío
+    // Contar frecuencia de cada categoría en el historial del cliente
+    const categoryFrequency = new Map<string, { count: number; lastUsed: Date }>()
+    for (const ticket of recentTickets) {
+      const existing = categoryFrequency.get(ticket.categoryId)
+      if (existing) {
+        existing.count++
+        if (ticket.createdAt > existing.lastUsed) existing.lastUsed = ticket.createdAt
+      } else {
+        categoryFrequency.set(ticket.categoryId, { count: 1, lastUsed: ticket.createdAt })
+      }
+    }
+
+    // Ordenar: primero por frecuencia desc, luego por más reciente
+    const frequentCategoryIds = Array.from(categoryFrequency.entries())
+      .map(([categoryId, data]) => ({ categoryId, count: data.count, lastUsed: data.lastUsed }))
+      .sort((a, b) =>
+        b.count !== a.count ? b.count - a.count : b.lastUsed.getTime() - a.lastUsed.getTime()
+      )
+      .slice(0, limit)
+
     if (frequentCategoryIds.length === 0) {
-      return NextResponse.json({
-        success: true,
-        data: {
-          categories: [],
-        },
-      })
+      return NextResponse.json({ success: true, data: { categories: [] } })
     }
 
     // Obtener todas las categorías activas para construir los paths
     const allCategories = await prisma.categories.findMany({
-      where: {
-        isActive: true,
-      },
+      where: { isActive: true },
       select: {
         id: true,
         name: true,
@@ -197,36 +105,20 @@ export async function GET(request: NextRequest) {
     const activeCategories = filterActiveCategories(allCategories as Category[])
     const categoriesMap = new Map<string, Category>(activeCategories.map(cat => [cat.id, cat]))
 
-    // Construir respuesta con paths completos
-    const frequentCategories: Array<{
-      category: Category
-      path: Category[]
-      usageCount: number
-      lastUsed: string
-    }> = frequentCategoryIds
+    const frequentCategories = frequentCategoryIds
       .map(({ categoryId, count, lastUsed }) => {
         const category = categoriesMap.get(categoryId)
-        if (!category) {
-          return null
-        }
-
-        const path = buildCategoryPath(category, categoriesMap)
-
+        if (!category) return null
         return {
           category,
-          path,
+          path: buildCategoryPath(category, categoriesMap),
           usageCount: count,
           lastUsed: lastUsed.toISOString(),
         }
       })
       .filter((item): item is NonNullable<typeof item> => item !== null)
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        categories: frequentCategories,
-      },
-    })
+    return NextResponse.json({ success: true, data: { categories: frequentCategories } })
   } catch (error) {
     console.error('Error in categories frequent API:', error)
     return NextResponse.json(
