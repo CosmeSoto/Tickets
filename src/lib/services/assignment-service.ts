@@ -166,11 +166,12 @@ export class AssignmentService {
   }
 
   /**
-   * Obtiene técnicos disponibles según criterios
+   * Obtiene técnicos y admins disponibles para resolver tickets
    */
   private static async getAvailableTechnicians(criteria: AssignmentCriteria) {
+    // Incluir técnicos Y admins activos como posibles resolutores
     const where: any = {
-      role: 'TECHNICIAN',
+      role: { in: ['TECHNICIAN', 'ADMIN'] },
       isActive: true,
     }
 
@@ -500,8 +501,8 @@ export class AssignmentService {
       select: { name: true, role: true },
     })
 
-    if (!newTechnician || newTechnician.role !== 'TECHNICIAN') {
-      throw new Error('Técnico no válido')
+    if (!newTechnician || !['TECHNICIAN', 'ADMIN'].includes(newTechnician.role)) {
+      throw new Error('El usuario seleccionado no puede resolver tickets')
     }
 
     const updatedTicket = await prisma.tickets.update({

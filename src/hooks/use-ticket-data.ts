@@ -339,10 +339,34 @@ export function useUserData() {
     [getUsers]
   )
 
+  // Obtiene todos los usuarios que pueden resolver tickets: técnicos + admins activos
+  const getResolvers = useCallback(
+    async (): Promise<User[]> => {
+      try {
+        setLoading(true)
+        // Pedir técnicos y admins en paralelo
+        const [techRes, adminRes] = await Promise.all([
+          fetch('/api/users?role=TECHNICIAN&isActive=true'),
+          fetch('/api/users?role=ADMIN&isActive=true'),
+        ])
+        const [techData, adminData] = await Promise.all([techRes.json(), adminRes.json()])
+        const techs: User[] = techData.success ? techData.data : []
+        const admins: User[] = adminData.success ? adminData.data : []
+        return [...techs, ...admins]
+      } catch {
+        return []
+      } finally {
+        setLoading(false)
+      }
+    },
+    [] // eslint-disable-line react-hooks/exhaustive-deps
+  )
+
   return {
     loading,
     getUsers,
     getTechnicians,
+    getResolvers,
   }
 }
 

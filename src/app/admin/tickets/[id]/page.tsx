@@ -16,6 +16,7 @@ import {
   Loader2,
   UserX,
   MapPin,
+  CheckCircle,
 } from 'lucide-react'
 import { TicketDetailLayout } from '@/components/tickets/ticket-detail-layout'
 import { AutoAssignment } from '@/components/tickets/auto-assignment'
@@ -66,11 +67,11 @@ export default function AdminTicketDetailPage() {
   const params = useParams()
   const router = useRouter()
   const { data: session } = useSession()
-  const { getTechnicians } = useUserData()
+  const { getTechnicians, getResolvers } = useUserData()
 
   const [ticket, setTicket] = useState<Ticket | null>(null)
   const [loading, setLoading] = useState(true)
-  const [technicians, setTechnicians] = useState<any[]>([])
+  const [resolvers, setResolvers] = useState<any[]>([])
   const [isEditing, setIsEditing] = useState(false)
   const [unassigning, setUnassigning] = useState(false)
   const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false)
@@ -89,7 +90,7 @@ export default function AdminTicketDetailPage() {
   useEffect(() => {
     if (ticketId && ticketId !== 'create') {
       loadTicket()
-      getTechnicians().then(setTechnicians)
+      getResolvers().then(setResolvers)
     }
   }, [ticketId]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -242,8 +243,51 @@ export default function AdminTicketDetailPage() {
     )
   }
 
+  const isSuperAdmin = (session as any)?.user?.isSuperAdmin === true
+
+  const handleForceClose = async () => {
+    if (!ticket) return
+    const res = await fetch(`/api/tickets/${ticket.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'CLOSED' }),
+    })
+    if (res.ok) {
+      await loadTicket()
+      setTimelineKey(k => k + 1)
+    }
+  }
+
   const headerActions = (
     <div className='flex flex-wrap items-center gap-2'>
+      {/* Cierre directo — solo super admin, solo cuando está RESOLVED */}
+      {isSuperAdmin && ticket.status === 'RESOLVED' && (
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              variant='outline'
+              size='sm'
+              className='border-green-500 text-green-700 hover:bg-green-50'
+            >
+              <CheckCircle className='h-4 w-4 sm:mr-2' />
+              <span className='hidden sm:inline'>Cerrar Ticket</span>
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Cerrar ticket directamente?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Como Super Admin puedes cerrar este ticket sin esperar la calificación del
+                solicitante. Esta acción no se puede deshacer.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleForceClose}>Cerrar Ticket</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
       {/* Artículo de conocimiento */}
       {(ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') &&
         (ticket.knowledgeArticleId ? (
@@ -423,6 +467,26 @@ export default function AdminTicketDetailPage() {
             </CardContent>
           </Card>
 
+          {/* Banner: ticket resuelto esperando calificación del solicitante */}
+          {ticket.status === 'RESOLVED' && session?.user?.id !== ticket.client?.id && (
+            <Card className='border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950'>
+              <CardContent className='pt-4 pb-4 flex items-start gap-3'>
+                <AlertCircle className='h-5 w-5 text-amber-600 shrink-0 mt-0.5' />
+                <div>
+                  <p className='font-medium text-amber-900 dark:text-amber-100 text-sm'>
+                    Esperando calificación del solicitante
+                  </p>
+                  <p className='text-xs text-amber-800 dark:text-amber-200 mt-0.5'>
+                    El ticket se cerrará automáticamente cuando{' '}
+                    <strong>{ticket.client?.name}</strong> envíe su calificación.
+                    {isSuperAdmin &&
+                      ' Como Super Admin puedes cerrarlo directamente desde el botón en el encabezado.'}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Banner: admin es el solicitante y el ticket está resuelto — puede calificar */}
           {session?.user?.id === ticket.client?.id &&
             (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') && (
@@ -537,11 +601,16 @@ export default function AdminTicketDetailPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value='unassigned'>Sin asignar</SelectItem>
-                        {technicians
-                          .filter(t => t.id !== ticket.client?.id)
-                          .map(t => (
-                            <SelectItem key={t.id} value={t.id}>
-                              {t.name}
+                        {resolvers
+                          .filter(r => r.id !== ticket.client?.id)
+                          .map(r => (
+                            <SelectItem key={r.id} value={r.id}>
+                              <div className='flex items-center gap-2'>
+                                <span>{r.name}</span>
+                                {r.role === 'ADMIN' && (
+                                  <span className='text-xs text-muted-foreground'>(Admin)</span>
+                                )}
+                              </div>
                             </SelectItem>
                           ))}
                       </SelectContent>
