@@ -276,6 +276,9 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
         equipmentCode={equipment.code}
         equipmentBrand={equipment.brand}
         equipmentModel={equipment.model}
+        acquisitionMode={
+          (equipment as any).acquisitionMode ?? equipment.ownershipType ?? 'FIXED_ASSET'
+        }
         onSuccess={loadEquipmentDetail}
       />
     </div>

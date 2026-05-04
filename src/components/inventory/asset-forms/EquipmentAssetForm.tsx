@@ -515,6 +515,21 @@ export function EquipmentAssetForm({
         </div>
       </div>
 
+      {/* Aviso para activos registrados directamente como RETIRED (históricos) */}
+      {equipmentStatus === 'RETIRED' && (
+        <div className='rounded-md border border-muted-foreground/20 bg-muted/40 px-4 py-3 space-y-1'>
+          <p className='text-sm font-medium text-muted-foreground'>
+            Registro de activo histórico retirado
+          </p>
+          <p className='text-xs text-muted-foreground'>
+            Estás registrando un activo que ya fue dado de baja. Este modo es exclusivo para
+            migración de datos históricos. Para dar de baja un activo activo, usa el botón
+            &ldquo;Solicitar baja&rdquo; desde el detalle del equipo — eso inicia el flujo formal
+            con aprobación, acta y folio.
+          </p>
+        </div>
+      )}
+
       {/* Asignar a usuario — el usuario es el campo principal; el departamento se deriva de él */}
       {equipmentStatus === 'ASSIGNED' && (
         <div className='rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3'>
