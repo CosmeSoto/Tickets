@@ -121,6 +121,18 @@ export function EquipmentAssetForm({
   const [attachments, setAttachments] = useState<File[]>([])
   const [priceError, setPriceError] = useState('')
 
+  // Mantenimiento
+  const [maintenanceDate, setMaintenanceDate] = useState(
+    () => new Date().toISOString().split('T')[0]
+  )
+  const [maintenanceType, setMaintenanceType] = useState<'PREVENTIVE' | 'CORRECTIVE'>('CORRECTIVE')
+  const [maintenanceTechnicianId, setMaintenanceTechnicianId] = useState('')
+  const [maintenanceDescription, setMaintenanceDescription] = useState('')
+  const [techniciansList, setTechniciansList] = useState<
+    { id: string; name: string; email: string }[]
+  >([])
+  const [loadingTechnicians, setLoadingTechnicians] = useState(false)
+
   // ✅ Departamentos desde contexto global — filtrados por familyId en memoria
   const { departments: allDepartments } = useActiveDepartments()
   const departments = allDepartments.filter(
@@ -128,10 +140,10 @@ export function EquipmentAssetForm({
   )
   const loadingDepartments = false
 
-  // Departamento manual (solo cuando el activo NO está asignado a un usuario)
+  // Departamento manual (AVAILABLE, MAINTENANCE, DAMAGED)
   const [departmentId, setDepartmentId] = useState('')
 
-  // departmentId efectivo: si está asignado, viene del usuario; si no, del selector manual
+  // departmentId efectivo según estado
   const effectiveDepartmentId =
     equipmentStatus === 'ASSIGNED' ? (assignedUserDept?.id ?? '') : departmentId
 
@@ -142,6 +154,12 @@ export function EquipmentAssetForm({
   // Resolver secciones según modalidad activa (sectionsByMode tiene prioridad sobre global)
   const resolvedSections = resolveSectionsForMode(familyConfig, acquisitionMode)
   const isVisible = (s: string) => resolvedSections.visible.includes(s as never)
+
+  // Visibilidad condicional por estado — definidas después de isVisible
+  // Departamento manual: AVAILABLE, MAINTENANCE, DAMAGED (no ASSIGNED ni RETIRED)
+  const showDepartmentSelector = ['AVAILABLE', 'MAINTENANCE', 'DAMAGED'].includes(equipmentStatus)
+  // Bodega: solo cuando el equipo está físicamente almacenado (AVAILABLE o DAMAGED)
+  const showWarehouse = isVisible('WAREHOUSE') && ['AVAILABLE', 'DAMAGED'].includes(equipmentStatus)
 
   // Task 19.1: determine if family supports depreciation
   const supportsDepreciation = familyCode ? familySupportsDepreciation(familyCode) : true
@@ -226,6 +244,25 @@ export function EquipmentAssetForm({
       setAssignedUserId('')
       setAssignedUserDept(null)
     }
+    // Limpiar bodega si el estado ya no la soporta
+    if (!['AVAILABLE', 'DAMAGED'].includes(equipmentStatus)) {
+      setWarehouseId('')
+    }
+    // Limpiar departamento manual si pasa a RETIRED (no aplica)
+    if (equipmentStatus === 'RETIRED') {
+      setDepartmentId('')
+    }
+  }, [equipmentStatus])
+
+  // Cargar técnicos cuando el estado es MAINTENANCE
+  useEffect(() => {
+    if (equipmentStatus !== 'MAINTENANCE') return
+    setLoadingTechnicians(true)
+    fetch('/api/users?role=TECHNICIAN&isActive=true&limit=200')
+      .then(r => (r.ok ? r.json() : { data: [] }))
+      .then(data => setTechniciansList(data.data ?? []))
+      .catch(() => setTechniciansList([]))
+      .finally(() => setLoadingTechnicians(false))
   }, [equipmentStatus])
 
   // Task 19.2: auto-calculate suggested residual value when purchasePrice changes
@@ -316,8 +353,15 @@ export function EquipmentAssetForm({
       depreciationMethod: depreciationMethod || undefined,
       usefulLifeYears: usefulLifeYears ? parseFloat(usefulLifeYears) : undefined,
       residualValue: residualValue ? parseFloat(residualValue) : undefined,
-      warehouseId: equipmentStatus !== 'ASSIGNED' ? warehouseId || undefined : undefined,
+      warehouseId: showWarehouse ? warehouseId || undefined : undefined,
       assignedUserId: equipmentStatus === 'ASSIGNED' ? assignedUserId || undefined : undefined,
+      // Mantenimiento — solo cuando el estado es MAINTENANCE
+      ...(equipmentStatus === 'MAINTENANCE' && {
+        maintenanceDate: maintenanceDate || undefined,
+        maintenanceType: maintenanceType || undefined,
+        maintenanceTechnicianId: maintenanceTechnicianId || undefined,
+        maintenanceDescription: maintenanceDescription || undefined,
+      }),
       physicalLocation: physicalLocation || undefined,
       notes: notes || undefined,
     }
@@ -416,8 +460,8 @@ export function EquipmentAssetForm({
       </div>
 
       {/* ── 2. UBICACIÓN ──────────────────────────────────────────── */}
-      {/* Departamento — solo visible cuando el activo NO está asignado a un usuario */}
-      {equipmentStatus !== 'ASSIGNED' && (
+      {/* Departamento — visible en AVAILABLE, MAINTENANCE, DAMAGED */}
+      {showDepartmentSelector && (
         <div className='space-y-1'>
           <Label>Departamento</Label>
           {loadingDepartments ? (
@@ -510,8 +554,58 @@ export function EquipmentAssetForm({
         </div>
       )}
 
-      {/* Bodega — solo si no está asignado */}
-      {isVisible('WAREHOUSE') && equipmentStatus !== 'ASSIGNED' && (
+      {/* Mantenimiento — fecha de ingreso, tipo y técnico asignado */}
+      {equipmentStatus === 'MAINTENANCE' && (
+        <div className='rounded-lg border border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-800 p-4 space-y-3'>
+          <p className='text-sm font-medium text-orange-800 dark:text-orange-300'>
+            Datos del mantenimiento
+          </p>
+          <div className='grid grid-cols-2 gap-3'>
+            <div className='space-y-1'>
+              <Label>
+                Fecha de ingreso <span className='text-destructive'>*</span>
+              </Label>
+              <Input
+                type='date'
+                value={maintenanceDate}
+                onChange={e => setMaintenanceDate(e.target.value)}
+              />
+            </div>
+            <div className='space-y-1'>
+              <Label>Tipo de mantenimiento</Label>
+              <SimpleSelect
+                value={maintenanceType}
+                onChange={e => setMaintenanceType(e.target.value as 'PREVENTIVE' | 'CORRECTIVE')}
+              >
+                <option value='CORRECTIVE'>Correctivo</option>
+                <option value='PREVENTIVE'>Preventivo</option>
+              </SimpleSelect>
+            </div>
+          </div>
+          <div className='space-y-1'>
+            <Label>Técnico asignado</Label>
+            <SearchableSelect
+              options={techniciansList.map(t => ({ id: t.id, name: t.name || t.email }))}
+              value={maintenanceTechnicianId}
+              onChange={setMaintenanceTechnicianId}
+              placeholder={loadingTechnicians ? 'Cargando técnicos...' : 'Buscar técnico...'}
+              disabled={loadingTechnicians}
+            />
+          </div>
+          <div className='space-y-1'>
+            <Label>Descripción del problema / trabajo</Label>
+            <Textarea
+              value={maintenanceDescription}
+              onChange={e => setMaintenanceDescription(e.target.value)}
+              rows={2}
+              placeholder='Describe el motivo del mantenimiento...'
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Bodega — solo AVAILABLE y DAMAGED */}
+      {showWarehouse && (
         <div className='space-y-1'>
           <Label>Bodega</Label>
           <InlineCreateSelect
