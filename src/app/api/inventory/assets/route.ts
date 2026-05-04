@@ -5,7 +5,10 @@ import { prisma } from '@/lib/prisma'
 import { canManageInventory } from '@/lib/inventory-access'
 import { randomUUID } from 'crypto'
 import { getFamilyConfig, validateSubtypeForFamily } from '@/lib/inventory/family-config'
-import { validateSupplierRequirement, validateContractRequirement } from '@/lib/inventory/asset-validation'
+import {
+  validateSupplierRequirement,
+  validateContractRequirement,
+} from '@/lib/inventory/asset-validation'
 import { generateAssetCode } from '@/lib/inventory/asset-code-generator'
 import { calculateConsumableStatus } from '@/lib/inventory/consumable-status'
 
@@ -46,7 +49,7 @@ export async function GET(req: NextRequest) {
       include: { type: { include: { family: true } } },
       orderBy: { createdAt: 'desc' },
     })
-    const mapped = items.map((item) => ({
+    const mapped = items.map(item => ({
       id: item.id,
       name: `${item.brand} ${item.model}`,
       subtype: 'EQUIPMENT' as const,
@@ -61,8 +64,11 @@ export async function GET(req: NextRequest) {
       acquisitionMode: (item as any).acquisitionMode ?? (item as any).ownershipType ?? undefined,
       createdAt: item.createdAt.toISOString(),
     }))
-    const filtered = mapped.filter(i =>
-      !searchQuery || i.name.toLowerCase().includes(searchQuery) || (i.code ?? '').toLowerCase().includes(searchQuery)
+    const filtered = mapped.filter(
+      i =>
+        !searchQuery ||
+        i.name.toLowerCase().includes(searchQuery) ||
+        (i.code ?? '').toLowerCase().includes(searchQuery)
     )
     const total = filtered.length
     return NextResponse.json({
@@ -84,7 +90,12 @@ export async function GET(req: NextRequest) {
   let restrictToAssignedOnly = false
 
   if (role === 'ADMIN' || userCanManageInventory) {
-    allowedFamilyIds = await getAccessibleFamilyIds(userId, role, isSuperAdmin, userCanManageInventory)
+    allowedFamilyIds = await getAccessibleFamilyIds(
+      userId,
+      role,
+      isSuperAdmin,
+      userCanManageInventory
+    )
   } else if (role === 'CLIENT') {
     // Cliente sin gestión: solo sus equipos asignados personalmente
     restrictToAssignedOnly = true
@@ -120,9 +131,7 @@ export async function GET(req: NextRequest) {
     }
     if (effectiveFamilyIds !== undefined) {
       // Gestor con familias: equipos de sus familias OR asignados a él
-      const conditions: object[] = [
-        { type: { familyId: { in: effectiveFamilyIds } } },
-      ]
+      const conditions: object[] = [{ type: { familyId: { in: effectiveFamilyIds } } }]
       if (personalEquipmentIds.length > 0) {
         conditions.push({ id: { in: personalEquipmentIds } })
       }
@@ -136,7 +145,7 @@ export async function GET(req: NextRequest) {
   // Nota: como combinamos 3 tablas y ordenamos por createdAt global, hacemos take con margen
   // y luego paginamos en memoria solo sobre el slice necesario. Para inventarios muy grandes
   // se recomienda filtrar siempre por familyId o subtype.
-  const dbLimit = (page * pageSize) + pageSize // traer solo lo necesario
+  const dbLimit = page * pageSize + pageSize // traer solo lo necesario
   const [equipmentItems, consumableItems, licenseItems] = await Promise.all([
     // EQUIPMENT
     subtypeParam && subtypeParam !== 'EQUIPMENT'
@@ -186,7 +195,7 @@ export async function GET(req: NextRequest) {
     createdAt: string
   }
 
-  const mappedEquipment: UnifiedAsset[] = equipmentItems.map((item) => ({
+  const mappedEquipment: UnifiedAsset[] = equipmentItems.map(item => ({
     id: item.id,
     name: `${item.brand} ${item.model}`,
     subtype: 'EQUIPMENT' as const,
@@ -202,7 +211,7 @@ export async function GET(req: NextRequest) {
     createdAt: item.createdAt.toISOString(),
   }))
 
-  const mappedConsumables: UnifiedAsset[] = consumableItems.map((item) => ({
+  const mappedConsumables: UnifiedAsset[] = consumableItems.map(item => ({
     id: item.id,
     name: item.name,
     subtype: 'MRO' as const,
@@ -217,7 +226,7 @@ export async function GET(req: NextRequest) {
     createdAt: item.createdAt.toISOString(),
   }))
 
-  const mappedLicenses: UnifiedAsset[] = licenseItems.map((item) => ({
+  const mappedLicenses: UnifiedAsset[] = licenseItems.map(item => ({
     id: item.id,
     name: item.name,
     subtype: 'LICENSE' as const,
@@ -234,10 +243,11 @@ export async function GET(req: NextRequest) {
 
   // Combinar, filtrar por búsqueda, ordenar por createdAt DESC y paginar
   const allItems = [...mappedEquipment, ...mappedConsumables, ...mappedLicenses]
-    .filter(item =>
-      !searchQuery ||
-      item.name.toLowerCase().includes(searchQuery) ||
-      (item.code ?? '').toLowerCase().includes(searchQuery)
+    .filter(
+      item =>
+        !searchQuery ||
+        item.name.toLowerCase().includes(searchQuery) ||
+        (item.code ?? '').toLowerCase().includes(searchQuery)
     )
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
@@ -324,7 +334,11 @@ export async function POST(req: NextRequest) {
   }
 
   // Validar contrato
-  const contractValidation = validateContractRequirement(acquisitionMode, bodyContractId, contractAction)
+  const contractValidation = validateContractRequirement(
+    acquisitionMode,
+    bodyContractId,
+    contractAction
+  )
   if (!contractValidation.valid) {
     return NextResponse.json({ error: contractValidation.error }, { status: 422 })
   }
@@ -355,9 +369,10 @@ export async function POST(req: NextRequest) {
   }
 
   // Generar código automático si no se proporcionó uno
-  const resolvedCode = (code && String(code).trim())
-    ? String(code).trim()
-    : await generateAssetCode(familyId, subtype, acquisitionMode)
+  const resolvedCode =
+    code && String(code).trim()
+      ? String(code).trim()
+      : await generateAssetCode(familyId, subtype, acquisitionMode)
 
   // Resolver bodega por defecto una sola vez
   let defaultWarehouseId: string | undefined
@@ -369,95 +384,169 @@ export async function POST(req: NextRequest) {
   // Enrutar creación según subtype
   let asset: { id: string; [key: string]: unknown }
 
-  if (subtype === 'EQUIPMENT') {
-    const resolvedEquipmentWarehouseId = warehouseId ?? defaultWarehouseId
-    asset = await prisma.equipment.create({
+  try {
+    if (subtype === 'EQUIPMENT') {
+      const resolvedEquipmentWarehouseId = warehouseId ?? defaultWarehouseId
+      const {
+        status,
+        condition,
+        totalUnits,
+        usedUnits,
+        physicalLocation,
+        assignedUserId,
+        maintenanceDate,
+        maintenanceType,
+        maintenanceTechnicianId,
+        maintenanceDescription,
+      } = body as {
+        status?: string
+        condition?: string
+        totalUnits?: number
+        usedUnits?: number
+        physicalLocation?: string
+        assignedUserId?: string
+        maintenanceDate?: string
+        maintenanceType?: string
+        maintenanceTechnicianId?: string
+        maintenanceDescription?: string
+      }
+
+      asset = await prisma.equipment.create({
+        data: {
+          id: randomUUID(),
+          code: resolvedCode,
+          serialNumber: serialNumber ?? '',
+          brand: brand ?? '',
+          model: model ?? '',
+          typeId: typeId ?? '',
+          departmentId: departmentId ?? undefined,
+          status: (status as any) ?? 'AVAILABLE',
+          condition: (condition as any) ?? 'GOOD',
+          ownershipType: (acquisitionMode as any) ?? 'FIXED_ASSET',
+          acquisitionMode: (acquisitionMode as any) ?? undefined,
+          supplierId: supplierId ?? undefined,
+          contractId: resolvedContractId ?? undefined,
+          purchaseDate: purchaseDate ? new Date(purchaseDate) : undefined,
+          purchasePrice: purchasePrice ?? undefined,
+          invoiceNumber: invoiceNumber ?? undefined,
+          usefulLifeYears: usefulLifeYears ?? undefined,
+          residualValue: residualValue ?? undefined,
+          depreciationMethod: (depreciationMethod as any) ?? undefined,
+          totalUnits: totalUnits ?? undefined,
+          usedUnits: usedUnits ?? undefined,
+          physicalLocation: physicalLocation ?? undefined,
+          warehouseId: resolvedEquipmentWarehouseId,
+          qrCode: randomUUID(),
+        } as any,
+      })
+
+      // Si el activo se crea como ASSIGNED, registrar la asignación
+      if (status === 'ASSIGNED' && assignedUserId) {
+        await prisma.equipment_assignments.create({
+          data: {
+            id: randomUUID(),
+            equipmentId: asset.id,
+            receiverId: assignedUserId,
+            delivererId: userId,
+            assignmentType: 'PERMANENT',
+            startDate: new Date(),
+            isActive: true,
+            accessories: body.accessories ?? [],
+          },
+        })
+      }
+
+      // Si el activo se crea en MAINTENANCE, registrar el mantenimiento
+      if (status === 'MAINTENANCE' && maintenanceDescription) {
+        await prisma.maintenance_records.create({
+          data: {
+            id: randomUUID(),
+            equipmentId: asset.id,
+            type: (maintenanceType as any) ?? 'CORRECTIVE',
+            status: 'SCHEDULED',
+            date: maintenanceDate ? new Date(maintenanceDate) : new Date(),
+            description: maintenanceDescription,
+            technicianId: maintenanceTechnicianId ?? undefined,
+            requestedById: userId,
+          },
+        })
+      }
+    } else if (subtype === 'MRO') {
+      const resolvedWarehouseId = warehouseId ?? defaultWarehouseId
+      const initialStatus = calculateConsumableStatus(
+        currentStock ?? 0,
+        minStock ?? 0,
+        expirationDate ? new Date(expirationDate) : null
+      )
+      asset = await prisma.consumables.create({
+        data: {
+          id: randomUUID(),
+          name: name ?? '',
+          typeId: typeId ?? '',
+          unitOfMeasureId: unitOfMeasureId ?? '',
+          currentStock: currentStock ?? 0,
+          minStock: minStock ?? 0,
+          maxStock: maxStock ?? 0,
+          supplierId: supplierId ?? undefined,
+          warehouseId: resolvedWarehouseId,
+          status: initialStatus,
+          expirationDate: expirationDate ? new Date(expirationDate) : undefined,
+        },
+      })
+    } else if (subtype === 'LICENSE') {
+      asset = await prisma.software_licenses.create({
+        data: {
+          id: randomUUID(),
+          name: name ?? '',
+          typeId: typeId ?? '',
+          key: key ?? undefined,
+          expirationDate: expirationDate ? new Date(expirationDate) : undefined,
+          supplierId: supplierId ?? undefined,
+          cost: cost ?? undefined,
+        },
+      })
+    } else {
+      return NextResponse.json({ error: 'Subtipo no válido' }, { status: 422 })
+    }
+
+    // Registrar en audit_logs
+    await prisma.audit_logs.create({
       data: {
         id: randomUUID(),
-        code: resolvedCode,
-        serialNumber: serialNumber ?? '',
-        brand: brand ?? '',
-        model: model ?? '',
-        typeId: typeId ?? '',
-        departmentId: departmentId ?? undefined,
-        ownershipType: acquisitionMode ?? 'FIXED_ASSET',
-        acquisitionMode: acquisitionMode ?? undefined,
-        supplierId: supplierId ?? undefined,
-        contractId: resolvedContractId ?? undefined,
-        purchaseDate: purchaseDate ? new Date(purchaseDate) : undefined,
-        purchasePrice: purchasePrice ?? undefined,
-        invoiceNumber: invoiceNumber ?? undefined,
-        usefulLifeYears: usefulLifeYears ?? undefined,
-        residualValue: residualValue ?? undefined,
-        depreciationMethod: depreciationMethod ?? undefined,
-        warehouseId: resolvedEquipmentWarehouseId,
-        qrCode: randomUUID(),
-      } as any,
+        action: 'CREATE',
+        entityType: 'asset',
+        entityId: asset.id,
+        userId,
+        details: {
+          subtype,
+          familyId,
+          acquisitionMode: acquisitionMode ?? null,
+          ...(subtype === 'MRO' && {
+            warehouseId: warehouseId ?? defaultWarehouseId,
+            initialStock: currentStock ?? 0,
+          }),
+          ...(subtype === 'EQUIPMENT' && {
+            warehouseId: warehouseId ?? defaultWarehouseId,
+          }),
+        },
+      },
     })
-  } else if (subtype === 'MRO') {
-    const resolvedWarehouseId = warehouseId ?? defaultWarehouseId
-    const initialStatus = calculateConsumableStatus(
-      currentStock ?? 0,
-      minStock ?? 0,
-      expirationDate ? new Date(expirationDate) : null
+
+    // Invalidar caché de inventario para que la lista se actualice inmediatamente
+    const { invalidateCache } = await import('@/lib/api-cache')
+    await invalidateCache([
+      'inventory:equipment:*',
+      'inventory:consumables:*',
+      'inventory:licenses:*',
+    ]).catch(() => {})
+
+    return NextResponse.json({ ...asset, subtype }, { status: 201 })
+  } catch (error) {
+    console.error('[POST /api/inventory/assets] Error:', error)
+    const message = error instanceof Error ? error.message : String(error)
+    return NextResponse.json(
+      { error: 'Error al crear el activo', detail: message },
+      { status: 500 }
     )
-    asset = await prisma.consumables.create({
-      data: {
-        id: randomUUID(),
-        name: name ?? '',
-        typeId: typeId ?? '',
-        unitOfMeasureId: unitOfMeasureId ?? '',
-        currentStock: currentStock ?? 0,
-        minStock: minStock ?? 0,
-        maxStock: maxStock ?? 0,
-        supplierId: supplierId ?? undefined,
-        warehouseId: resolvedWarehouseId,
-        status: initialStatus,
-        expirationDate: expirationDate ? new Date(expirationDate) : undefined,
-      },
-    })
-  } else if (subtype === 'LICENSE') {
-    asset = await prisma.software_licenses.create({
-      data: {
-        id: randomUUID(),
-        name: name ?? '',
-        typeId: typeId ?? '',
-        key: key ?? undefined,
-        expirationDate: expirationDate ? new Date(expirationDate) : undefined,
-        supplierId: supplierId ?? undefined,
-        cost: cost ?? undefined,
-      },
-    })
-  } else {
-    return NextResponse.json({ error: 'Subtipo no válido' }, { status: 422 })
   }
-
-  // Registrar en audit_logs
-  await prisma.audit_logs.create({
-    data: {
-      id: randomUUID(),
-      action: 'CREATE',
-      entityType: 'asset',
-      entityId: asset.id,
-      userId,
-      details: {
-        subtype,
-        familyId,
-        acquisitionMode: acquisitionMode ?? null,
-        ...(subtype === 'MRO' && {
-          warehouseId: warehouseId ?? defaultWarehouseId,
-          initialStock: currentStock ?? 0,
-        }),
-        ...(subtype === 'EQUIPMENT' && {
-          warehouseId: warehouseId ?? defaultWarehouseId,
-        }),
-      },
-    },
-  })
-
-  // Invalidar caché de inventario para que la lista se actualice inmediatamente
-  const { invalidateCache } = await import('@/lib/api-cache')
-  await invalidateCache(['inventory:equipment:*', 'inventory:consumables:*', 'inventory:licenses:*']).catch(() => {})
-
-  return NextResponse.json({ ...asset, subtype }, { status: 201 })
 }
