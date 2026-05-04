@@ -22,7 +22,6 @@ import {
   DEFAULT_USEFUL_LIFE_YEARS,
   type DepreciationMethod,
 } from '@/lib/inventory/depreciation'
-import { useUserList } from '@/hooks/use-user-list'
 import { useActiveDepartments } from '@/contexts/departments-context'
 import { X, Plus, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react'
 
@@ -38,20 +37,33 @@ interface EquipmentAssetFormProps {
 }
 
 const ACQUISITION_MODES = [
-  { value: 'FIXED_ASSET', label: 'Compra directa (Activo Fijo)', help: 'Lo compraste — es propiedad de la empresa, se deprecia.' },
-  { value: 'RENTAL',      label: 'Arrendamiento',                help: 'Pagas mensualidad; el proveedor sigue siendo el dueño.' },
-  { value: 'LOAN',        label: 'Activo de Tercero',            help: 'Te lo prestan sin costo; el propietario conserva la titularidad.' },
+  {
+    value: 'FIXED_ASSET',
+    label: 'Compra directa (Activo Fijo)',
+    help: 'Lo compraste — es propiedad de la empresa, se deprecia.',
+  },
+  {
+    value: 'RENTAL',
+    label: 'Arrendamiento',
+    help: 'Pagas mensualidad; el proveedor sigue siendo el dueño.',
+  },
+  {
+    value: 'LOAN',
+    label: 'Activo de Tercero',
+    help: 'Te lo prestan sin costo; el propietario conserva la titularidad.',
+  },
 ]
 
 const DEPRECIATION_METHODS = [
-  { value: 'LINEAR',              label: 'Línea Recta' },
-  { value: 'DECLINING_BALANCE',   label: 'Saldo Decreciente' },
+  { value: 'LINEAR', label: 'Línea Recta' },
+  { value: 'DECLINING_BALANCE', label: 'Saldo Decreciente' },
   { value: 'UNITS_OF_PRODUCTION', label: 'Unidades de Producción' },
 ]
 
 const DEPRECIATION_METHOD_HELP: Record<string, string> = {
-  LINEAR:              'Deprecia el mismo monto cada año durante la vida útil del activo.',
-  DECLINING_BALANCE:   'Deprecia un porcentaje mayor en los primeros años, reduciendo el valor más rápido.',
+  LINEAR: 'Deprecia el mismo monto cada año durante la vida útil del activo.',
+  DECLINING_BALANCE:
+    'Deprecia un porcentaje mayor en los primeros años, reduciendo el valor más rápido.',
   UNITS_OF_PRODUCTION: 'Deprecia según el uso real del activo (horas, unidades producidas, etc.).',
 }
 
@@ -62,9 +74,18 @@ interface FamilyDepreciationConfig {
 }
 
 export function EquipmentAssetForm({
-  familyId, familyCode, familyConfig, onSubmit, onBack, submitting, submitError, maxFileSizeMB = 10,
+  familyId,
+  familyCode,
+  familyConfig,
+  onSubmit,
+  onBack,
+  submitting,
+  submitError,
+  maxFileSizeMB = 10,
 }: EquipmentAssetFormProps) {
-  const [acquisitionMode, setAcquisitionMode] = useState<'FIXED_ASSET' | 'RENTAL' | 'LOAN'>('FIXED_ASSET')
+  const [acquisitionMode, setAcquisitionMode] = useState<'FIXED_ASSET' | 'RENTAL' | 'LOAN'>(
+    'FIXED_ASSET'
+  )
   const [code, setCode] = useState('')
   const [serialNumber, setSerialNumber] = useState('')
   const [brand, setBrand] = useState('')
@@ -87,8 +108,14 @@ export function EquipmentAssetForm({
   const [usefulLifeYears, setUsefulLifeYears] = useState('')
   const [residualValue, setResidualValue] = useState('')
   const [warehouseId, setWarehouseId] = useState('')
-  const [warehouses, setWarehouses] = useState<{ id: string; name: string; description?: string }[]>([])
+  const [warehouses, setWarehouses] = useState<
+    { id: string; name: string; description?: string }[]
+  >([])
   const [assignedUserId, setAssignedUserId] = useState('')
+  // Departamento derivado del usuario asignado (solo lectura cuando estado=ASSIGNED)
+  const [assignedUserDept, setAssignedUserDept] = useState<{ id: string; name: string } | null>(
+    null
+  )
   const [notes, setNotes] = useState('')
   const [physicalLocation, setPhysicalLocation] = useState('')
   const [attachments, setAttachments] = useState<File[]>([])
@@ -101,8 +128,12 @@ export function EquipmentAssetForm({
   )
   const loadingDepartments = false
 
-  // Department selector state
+  // Departamento manual (solo cuando el activo NO está asignado a un usuario)
   const [departmentId, setDepartmentId] = useState('')
+
+  // departmentId efectivo: si está asignado, viene del usuario; si no, del selector manual
+  const effectiveDepartmentId =
+    equipmentStatus === 'ASSIGNED' ? (assignedUserDept?.id ?? '') : departmentId
 
   // Task 19.1: family depreciation config from API
   const [familyDepConfig, setFamilyDepConfig] = useState<FamilyDepreciationConfig | null>(null)
@@ -117,15 +148,17 @@ export function EquipmentAssetForm({
 
   useEffect(() => {
     fetch(`/api/inventory/equipment-types?familyId=${familyId}`)
-      .then(r => r.json()).then(d => setEquipmentTypes(d.types ?? []))
+      .then(r => r.json())
+      .then(d => setEquipmentTypes(d.types ?? []))
     fetch(`/api/inventory/warehouses?familyId=${familyId}`)
-      .then(r => r.json()).then(d => setWarehouses(d.warehouses ?? d ?? []))
+      .then(r => r.json())
+      .then(d => setWarehouses(d.warehouses ?? d ?? []))
   }, [familyId])
 
   // Task 19.1: fetch family-config depreciation defaults when familyId changes
   useEffect(() => {
     fetch(`/api/inventory/family-config/${familyId}`)
-      .then(r => r.ok ? r.json() : null)
+      .then(r => (r.ok ? r.json() : null))
       .then((data: (FamilyDepreciationConfig & Record<string, unknown>) | null) => {
         if (!data) return
         const cfg: FamilyDepreciationConfig = {
@@ -154,24 +187,46 @@ export function EquipmentAssetForm({
       .catch(() => {})
   }, [familyId, familyCode])
 
-  // Usuarios asignables: filtrados por departamento seleccionado cuando estado es ASSIGNED
-  const { users: assignableUsersList } = useUserList({
-    departmentId: departmentId || undefined,
-    isActive: true,
-    limit: 200,
-    enabled: equipmentStatus === 'ASSIGNED',
-  })
+  // Usuarios asignables: cargados desde el endpoint de inventario con lógica de rol/familia
+  const [assignableUsersList, setAssignableUsersList] = useState<
+    { id: string; name: string; email: string; department?: { id: string; name: string } | null }[]
+  >([])
+  const [loadingAssignableUsers, setLoadingAssignableUsers] = useState(false)
+
+  useEffect(() => {
+    if (equipmentStatus !== 'ASSIGNED') return
+
+    setLoadingAssignableUsers(true)
+    const params = new URLSearchParams()
+    if (familyId) params.set('familyId', familyId)
+
+    fetch(`/api/inventory/assignable-users?${params}`)
+      .then(r => (r.ok ? r.json() : { users: [] }))
+      .then(data => setAssignableUsersList(data.users ?? []))
+      .catch(() => setAssignableUsersList([]))
+      .finally(() => setLoadingAssignableUsers(false))
+  }, [equipmentStatus, familyId])
 
   // Convertir a formato SearchableSelectOption
   const assignableUsers: SearchableSelectOption[] = assignableUsersList.map(u => ({
     id: u.id,
-    name: u.name || u.email || u.id,
+    name: u.department ? `${u.name || u.email} — ${u.department.name}` : u.name || u.email || u.id,
   }))
 
-  // Resetear usuario asignado si cambia el departamento
+  // Al seleccionar usuario, auto-completar departamento
+  const handleAssignedUserChange = (userId: string) => {
+    setAssignedUserId(userId)
+    const user = assignableUsersList.find(u => u.id === userId)
+    setAssignedUserDept(user?.department ?? null)
+  }
+
+  // Limpiar asignación al cambiar estado
   useEffect(() => {
-    setAssignedUserId('')
-  }, [departmentId])
+    if (equipmentStatus !== 'ASSIGNED') {
+      setAssignedUserId('')
+      setAssignedUserDept(null)
+    }
+  }, [equipmentStatus])
 
   // Task 19.2: auto-calculate suggested residual value when purchasePrice changes
   const suggestedResidualValue = useMemo(() => {
@@ -208,15 +263,28 @@ export function EquipmentAssetForm({
 
   const addAccessory = () => {
     const v = accessoryInput.trim()
-    if (v && !accessories.includes(v)) { setAccessories(p => [...p, v]); setAccessoryInput('') }
+    if (v && !accessories.includes(v)) {
+      setAccessories(p => [...p, v])
+      setAccessoryInput('')
+    }
   }
 
   const addSpec = () => {
-    const k = specKey.trim(); const v = specValue.trim()
-    if (k && v) { setSpecifications(p => ({ ...p, [k]: v })); setSpecKey(''); setSpecValue('') }
+    const k = specKey.trim()
+    const v = specValue.trim()
+    if (k && v) {
+      setSpecifications(p => ({ ...p, [k]: v }))
+      setSpecKey('')
+      setSpecValue('')
+    }
   }
 
-  const supplierLabel = acquisitionMode === 'RENTAL' ? 'Proveedor del Arrendamiento' : acquisitionMode === 'LOAN' ? 'Propietario del Bien' : 'Proveedor'
+  const supplierLabel =
+    acquisitionMode === 'RENTAL'
+      ? 'Proveedor del Arrendamiento'
+      : acquisitionMode === 'LOAN'
+        ? 'Propietario del Bien'
+        : 'Proveedor'
   const supplierRequired = acquisitionMode === 'RENTAL' || acquisitionMode === 'LOAN'
   const requireFinancialForNew = familyConfig.requireFinancialForNew ?? true
   const showFinancial = isVisible('FINANCIAL') || (requireFinancialForNew && condition === 'NEW')
@@ -235,7 +303,7 @@ export function EquipmentAssetForm({
       brand: brand || undefined,
       model: model || undefined,
       typeId: equipmentTypeId || undefined,
-      departmentId: departmentId || undefined,
+      departmentId: effectiveDepartmentId || undefined,
       condition,
       status: equipmentStatus,
       accessories: accessories.length ? accessories : undefined,
@@ -248,8 +316,8 @@ export function EquipmentAssetForm({
       depreciationMethod: depreciationMethod || undefined,
       usefulLifeYears: usefulLifeYears ? parseFloat(usefulLifeYears) : undefined,
       residualValue: residualValue ? parseFloat(residualValue) : undefined,
-      warehouseId: equipmentStatus !== 'ASSIGNED' ? (warehouseId || undefined) : undefined,
-      assignedUserId: equipmentStatus === 'ASSIGNED' ? (assignedUserId || undefined) : undefined,
+      warehouseId: equipmentStatus !== 'ASSIGNED' ? warehouseId || undefined : undefined,
+      assignedUserId: equipmentStatus === 'ASSIGNED' ? assignedUserId || undefined : undefined,
       physicalLocation: physicalLocation || undefined,
       notes: notes || undefined,
     }
@@ -257,54 +325,77 @@ export function EquipmentAssetForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form onSubmit={handleSubmit} className='space-y-5'>
       {/* Botón atrás superior */}
-      <button type="button" onClick={onBack} className="text-sm text-muted-foreground hover:text-foreground">← Atrás</button>
+      <button
+        type='button'
+        onClick={onBack}
+        className='text-sm text-muted-foreground hover:text-foreground'
+      >
+        ← Atrás
+      </button>
 
       {/* ── 1. IDENTIFICACIÓN ─────────────────────────────────────── */}
       {/* Marca / Modelo */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
+      <div className='grid grid-cols-2 gap-3'>
+        <div className='space-y-1'>
           <Label>Marca</Label>
-          <Input value={brand} onChange={e => setBrand(e.target.value)} placeholder="Ej: Dell" />
+          <Input value={brand} onChange={e => setBrand(e.target.value)} placeholder='Ej: Dell' />
         </div>
-        <div className="space-y-1">
+        <div className='space-y-1'>
           <Label>Modelo</Label>
-          <Input value={model} onChange={e => setModel(e.target.value)} placeholder="Ej: Latitude 5520" />
+          <Input
+            value={model}
+            onChange={e => setModel(e.target.value)}
+            placeholder='Ej: Latitude 5520'
+          />
         </div>
       </div>
 
       {/* N° Serie */}
-      <div className="space-y-1">
+      <div className='space-y-1'>
         <Label>N° de Serie del Fabricante</Label>
-        <Input value={serialNumber} onChange={e => setSerialNumber(e.target.value)} placeholder="Ej: SN-ABC-12345" />
+        <Input
+          value={serialNumber}
+          onChange={e => setSerialNumber(e.target.value)}
+          placeholder='Ej: SN-ABC-12345'
+        />
       </div>
 
       {/* Código */}
-      <div className="space-y-1">
-        <Label>Código Interno <span className="text-xs font-normal text-muted-foreground">(opcional — se genera automáticamente)</span></Label>
-        <Input value={code} onChange={e => setCode(e.target.value)} placeholder="Dejar vacío para generar automáticamente" />
+      <div className='space-y-1'>
+        <Label>
+          Código Interno{' '}
+          <span className='text-xs font-normal text-muted-foreground'>
+            (opcional — se genera automáticamente)
+          </span>
+        </Label>
+        <Input
+          value={code}
+          onChange={e => setCode(e.target.value)}
+          placeholder='Dejar vacío para generar automáticamente'
+        />
       </div>
 
       {/* Tipo de equipo */}
-      <div className="space-y-1">
+      <div className='space-y-1'>
         <Label>Tipo de Equipo</Label>
         <InlineCreateSelect
           options={equipmentTypes}
           value={equipmentTypeId}
           onChange={setEquipmentTypeId}
-          placeholder="Buscar tipo de equipo..."
-          createLabel="Crear tipo de equipo"
-          createTitle="Nuevo tipo de equipo"
-          editTitle="Editar tipo de equipo"
-          deleteConfirmMessage="¿Eliminar este tipo de equipo? Solo es posible si no tiene activos asociados."
+          placeholder='Buscar tipo de equipo...'
+          createLabel='Crear tipo de equipo'
+          createTitle='Nuevo tipo de equipo'
+          editTitle='Editar tipo de equipo'
+          deleteConfirmMessage='¿Eliminar este tipo de equipo? Solo es posible si no tiene activos asociados.'
           createForm={({ item, onSuccess, onCancel }) => (
             <EquipmentTypeInlineForm
               familyId={familyId}
               item={item}
-              onSuccess={(newItem) => {
+              onSuccess={newItem => {
                 if (item) {
-                  setEquipmentTypes(prev => prev.map(t => t.id === newItem.id ? newItem : t))
+                  setEquipmentTypes(prev => prev.map(t => (t.id === newItem.id ? newItem : t)))
                 } else {
                   setEquipmentTypes(prev => [...prev, newItem])
                 }
@@ -313,95 +404,128 @@ export function EquipmentAssetForm({
               onCancel={onCancel}
             />
           )}
-          onDelete={async (id) => {
+          onDelete={async id => {
             const res = await fetch(`/api/admin/equipment-types/${id}`, { method: 'DELETE' })
-            if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Error al eliminar') }
+            if (!res.ok) {
+              const d = await res.json()
+              throw new Error(d.error || 'Error al eliminar')
+            }
             setEquipmentTypes(prev => prev.filter(t => t.id !== id))
           }}
         />
       </div>
 
       {/* ── 2. UBICACIÓN ──────────────────────────────────────────── */}
-      {/* Departamento */}
-      <div className="space-y-1">
-        <Label>Departamento <span className="text-destructive">*</span></Label>
-        {loadingDepartments ? (
-          <div className="h-9 rounded-md border border-input bg-background flex items-center px-3 text-sm text-muted-foreground">
-            Cargando departamentos...
-          </div>
-        ) : departments.length === 0 ? (
-          <div className="flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            No hay departamentos activos para esta familia
-          </div>
-        ) : (
-          <SearchableSelect
-            options={departments.map(d => ({ id: d.id, name: d.name }))}
-            value={departmentId}
-            onChange={setDepartmentId}
-            placeholder="Buscar departamento..."
-          />
-        )}
-      </div>
+      {/* Departamento — solo visible cuando el activo NO está asignado a un usuario */}
+      {equipmentStatus !== 'ASSIGNED' && (
+        <div className='space-y-1'>
+          <Label>Departamento</Label>
+          {loadingDepartments ? (
+            <div className='h-9 rounded-md border border-input bg-background flex items-center px-3 text-sm text-muted-foreground'>
+              Cargando departamentos...
+            </div>
+          ) : departments.length === 0 ? (
+            <div className='flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground'>
+              <AlertCircle className='h-4 w-4 shrink-0' />
+              No hay departamentos activos para esta familia
+            </div>
+          ) : (
+            <SearchableSelect
+              options={departments.map(d => ({ id: d.id, name: d.name }))}
+              value={departmentId}
+              onChange={setDepartmentId}
+              placeholder='Buscar departamento...'
+            />
+          )}
+        </div>
+      )}
 
       {/* ── 3. ESTADO + ASIGNACIÓN ────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <Label>Condición <span className="text-destructive">*</span></Label>
+      <div className='grid grid-cols-2 gap-3'>
+        <div className='space-y-1'>
+          <Label>
+            Condición <span className='text-destructive'>*</span>
+          </Label>
           <SimpleSelect value={condition} onChange={e => setCondition(e.target.value)}>
-            <option value="NEW">Nuevo</option>
-            <option value="LIKE_NEW">Como Nuevo</option>
-            <option value="GOOD">Bueno</option>
-            <option value="FAIR">Regular</option>
-            <option value="POOR">Malo</option>
+            <option value='NEW'>Nuevo</option>
+            <option value='LIKE_NEW'>Como Nuevo</option>
+            <option value='GOOD'>Bueno</option>
+            <option value='FAIR'>Regular</option>
+            <option value='POOR'>Malo</option>
           </SimpleSelect>
-          {condition === 'NEW' && requireFinancialForNew && <p className="text-xs text-amber-600 dark:text-amber-400">Activo nuevo — información financiera obligatoria.</p>}
+          {condition === 'NEW' && requireFinancialForNew && (
+            <p className='text-xs text-amber-600 dark:text-amber-400'>
+              Activo nuevo — información financiera obligatoria.
+            </p>
+          )}
         </div>
-        <div className="space-y-1">
+        <div className='space-y-1'>
           <Label>Estado</Label>
           <SimpleSelect value={equipmentStatus} onChange={e => setEquipmentStatus(e.target.value)}>
-            <option value="AVAILABLE">Disponible</option>
-            <option value="ASSIGNED">Asignado</option>
-            <option value="MAINTENANCE">En Mantenimiento</option>
-            <option value="DAMAGED">Dañado</option>
-            <option value="RETIRED">Retirado</option>
+            <option value='AVAILABLE'>Disponible</option>
+            <option value='ASSIGNED'>Asignado</option>
+            <option value='MAINTENANCE'>En Mantenimiento</option>
+            <option value='DAMAGED'>Dañado</option>
+            <option value='RETIRED'>Retirado</option>
           </SimpleSelect>
         </div>
       </div>
 
-      {/* Asignar a usuario — aparece inmediatamente después de seleccionar "Asignado" */}
+      {/* Asignar a usuario — el usuario es el campo principal; el departamento se deriva de él */}
       {equipmentStatus === 'ASSIGNED' && (
-        <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-1">
-          <Label>Asignar a <span className="text-destructive">*</span></Label>
-          <SearchableSelect
-            options={assignableUsers}
-            value={assignedUserId}
-            onChange={setAssignedUserId}
-            placeholder={departmentId ? 'Buscar usuario del departamento...' : 'Selecciona un departamento primero'}
-            disabled={!departmentId}
-          />
-          {!departmentId && (
-            <p className="text-xs text-amber-600 dark:text-amber-400">Selecciona un departamento para ver los usuarios disponibles.</p>
-          )}
+        <div className='rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3'>
+          <div className='space-y-1'>
+            <Label>
+              Asignar a <span className='text-destructive'>*</span>
+            </Label>
+            <SearchableSelect
+              options={assignableUsers}
+              value={assignedUserId}
+              onChange={handleAssignedUserChange}
+              placeholder={
+                loadingAssignableUsers ? 'Cargando usuarios...' : 'Buscar usuario por nombre...'
+              }
+              disabled={loadingAssignableUsers}
+            />
+            {!loadingAssignableUsers && assignableUsers.length === 0 && (
+              <p className='text-xs text-amber-600 dark:text-amber-400'>
+                No se encontraron usuarios disponibles para esta familia.
+              </p>
+            )}
+          </div>
+
+          {/* Departamento auto-completado desde el usuario — solo informativo */}
+          <div className='space-y-1'>
+            <Label className='text-muted-foreground text-xs'>
+              Departamento (del usuario asignado)
+            </Label>
+            <div className='h-9 rounded-md border border-input bg-muted/40 flex items-center px-3 text-sm text-muted-foreground'>
+              {assignedUserDept ? (
+                assignedUserDept.name
+              ) : (
+                <span className='italic'>Se completará al seleccionar un usuario</span>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
       {/* Bodega — solo si no está asignado */}
       {isVisible('WAREHOUSE') && equipmentStatus !== 'ASSIGNED' && (
-        <div className="space-y-1">
+        <div className='space-y-1'>
           <Label>Bodega</Label>
           <InlineCreateSelect
             options={warehouses}
             value={warehouseId}
             onChange={setWarehouseId}
-            placeholder="Buscar bodega..."
+            placeholder='Buscar bodega...'
             allowClear
-            createLabel="Crear bodega"
-            createTitle="Nueva bodega"
+            createLabel='Crear bodega'
+            createTitle='Nueva bodega'
             createForm={({ onSuccess, onCancel }) => (
               <WarehouseInlineForm
                 defaultFamilyId={familyId}
-                onSuccess={(item) => {
+                onSuccess={item => {
                   setWarehouses(prev => [...prev, item])
                   onSuccess(item)
                 }}
@@ -414,20 +538,35 @@ export function EquipmentAssetForm({
 
       {/* ── 4. DETALLES DEL EQUIPO ────────────────────────────────── */}
       {/* Accesorios */}
-      <div className="space-y-2">
+      <div className='space-y-2'>
         <Label>Accesorios</Label>
-        <div className="flex gap-2">
-          <Input value={accessoryInput} onChange={e => setAccessoryInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addAccessory() } }}
-            placeholder="Ej: Cargador, Mouse, Funda..." />
-          <Button type="button" variant="outline" size="sm" onClick={addAccessory}><Plus className="h-4 w-4" /></Button>
+        <div className='flex gap-2'>
+          <Input
+            value={accessoryInput}
+            onChange={e => setAccessoryInput(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                addAccessory()
+              }
+            }}
+            placeholder='Ej: Cargador, Mouse, Funda...'
+          />
+          <Button type='button' variant='outline' size='sm' onClick={addAccessory}>
+            <Plus className='h-4 w-4' />
+          </Button>
         </div>
         {accessories.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
+          <div className='flex flex-wrap gap-1.5'>
             {accessories.map(a => (
-              <span key={a} className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs">
+              <span
+                key={a}
+                className='inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs'
+              >
                 {a}
-                <button type="button" onClick={() => setAccessories(p => p.filter(x => x !== a))}><X className="h-3 w-3" /></button>
+                <button type='button' onClick={() => setAccessories(p => p.filter(x => x !== a))}>
+                  <X className='h-3 w-3' />
+                </button>
               </span>
             ))}
           </div>
@@ -435,20 +574,50 @@ export function EquipmentAssetForm({
       </div>
 
       {/* Especificaciones */}
-      <div className="space-y-2">
+      <div className='space-y-2'>
         <Label>Características / Especificaciones</Label>
-        <div className="flex gap-2">
-          <Input value={specKey} onChange={e => setSpecKey(e.target.value)} placeholder="Ej: Procesador" className="flex-1" />
-          <Input value={specValue} onChange={e => setSpecValue(e.target.value)} placeholder="Ej: Intel i5-1135G7" className="flex-1"
-            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSpec() } }} />
-          <Button type="button" variant="outline" size="sm" onClick={addSpec}><Plus className="h-4 w-4" /></Button>
+        <div className='flex gap-2'>
+          <Input
+            value={specKey}
+            onChange={e => setSpecKey(e.target.value)}
+            placeholder='Ej: Procesador'
+            className='flex-1'
+          />
+          <Input
+            value={specValue}
+            onChange={e => setSpecValue(e.target.value)}
+            placeholder='Ej: Intel i5-1135G7'
+            className='flex-1'
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                addSpec()
+              }
+            }}
+          />
+          <Button type='button' variant='outline' size='sm' onClick={addSpec}>
+            <Plus className='h-4 w-4' />
+          </Button>
         </div>
         {Object.keys(specifications).length > 0 && (
-          <div className="rounded-md border border-border divide-y divide-border text-sm">
+          <div className='rounded-md border border-border divide-y divide-border text-sm'>
             {Object.entries(specifications).map(([k, v]) => (
-              <div key={k} className="flex items-center justify-between px-3 py-1.5">
-                <span><span className="font-medium">{k}:</span> {v}</span>
-                <button type="button" onClick={() => setSpecifications(p => { const n = { ...p }; delete n[k]; return n })}><X className="h-3 w-3 text-muted-foreground" /></button>
+              <div key={k} className='flex items-center justify-between px-3 py-1.5'>
+                <span>
+                  <span className='font-medium'>{k}:</span> {v}
+                </span>
+                <button
+                  type='button'
+                  onClick={() =>
+                    setSpecifications(p => {
+                      const n = { ...p }
+                      delete n[k]
+                      return n
+                    })
+                  }
+                >
+                  <X className='h-3 w-3 text-muted-foreground' />
+                </button>
               </div>
             ))}
           </div>
@@ -457,19 +626,23 @@ export function EquipmentAssetForm({
 
       {/* ── 5. ADQUISICIÓN ────────────────────────────────────────── */}
       {/* Modalidad */}
-      <div className="space-y-1">
+      <div className='space-y-1'>
         <Label>¿Cómo se adquirió este equipo?</Label>
         <SimpleSelect
           value={acquisitionMode}
           onChange={e => setAcquisitionMode(e.target.value as typeof acquisitionMode)}
           options={ACQUISITION_MODES}
         />
-        <p className="text-xs text-muted-foreground">{ACQUISITION_MODES.find(m => m.value === acquisitionMode)?.help}</p>
+        <p className='text-xs text-muted-foreground'>
+          {ACQUISITION_MODES.find(m => m.value === acquisitionMode)?.help}
+        </p>
       </div>
 
       {/* Proveedor */}
-      <div className="space-y-1">
-        <Label>{supplierLabel} {supplierRequired && <span className="text-destructive">*</span>}</Label>
+      <div className='space-y-1'>
+        <Label>
+          {supplierLabel} {supplierRequired && <span className='text-destructive'>*</span>}
+        </Label>
         <SupplierSelect
           value={supplierId || null}
           onChange={v => setSupplierId(v || '')}
@@ -479,9 +652,11 @@ export function EquipmentAssetForm({
 
       {/* Contrato — RENTAL y LOAN */}
       {(acquisitionMode === 'RENTAL' || acquisitionMode === 'LOAN') && (
-        <div className="rounded-md border border-border p-4 space-y-3">
-          <p className="text-sm font-medium">
-            {acquisitionMode === 'RENTAL' ? 'Contrato de arrendamiento' : 'Contrato del activo de tercero'}
+        <div className='rounded-md border border-border p-4 space-y-3'>
+          <p className='text-sm font-medium'>
+            {acquisitionMode === 'RENTAL'
+              ? 'Contrato de arrendamiento'
+              : 'Contrato del activo de tercero'}
           </p>
           <ContractPicker
             value={linkedContractId}
@@ -494,72 +669,138 @@ export function EquipmentAssetForm({
 
       {/* ── 6. FINANCIERO + DEPRECIACIÓN ──────────────────────────── */}
       {showFinancial && (
-        <fieldset className="rounded-lg border border-border p-4 space-y-3">
-          <legend className="px-2 text-sm font-semibold text-foreground">
-            Información Financiera {requireFinancialForNew && condition === 'NEW' && <span className="text-destructive">*</span>}
+        <fieldset className='rounded-lg border border-border p-4 space-y-3'>
+          <legend className='px-2 text-sm font-semibold text-foreground'>
+            Información Financiera{' '}
+            {requireFinancialForNew && condition === 'NEW' && (
+              <span className='text-destructive'>*</span>
+            )}
           </legend>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label>Precio de Compra {requireFinancialForNew && condition === 'NEW' && <span className="text-destructive">*</span>}</Label>
-              <Input type="number" min="0" step="0.01" value={purchasePrice} onChange={e => setPurchasePrice(e.target.value)} placeholder="0.00" />
-              {priceError && <p className="text-xs text-destructive">{priceError}</p>}
+          <div className='grid grid-cols-2 gap-3'>
+            <div className='space-y-1'>
+              <Label>
+                Precio de Compra{' '}
+                {requireFinancialForNew && condition === 'NEW' && (
+                  <span className='text-destructive'>*</span>
+                )}
+              </Label>
+              <Input
+                type='number'
+                min='0'
+                step='0.01'
+                value={purchasePrice}
+                onChange={e => setPurchasePrice(e.target.value)}
+                placeholder='0.00'
+              />
+              {priceError && <p className='text-xs text-destructive'>{priceError}</p>}
             </div>
-            <div className="space-y-1">
+            <div className='space-y-1'>
               <Label>Fecha de Compra</Label>
-              <Input type="date" value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} />
+              <Input
+                type='date'
+                value={purchaseDate}
+                onChange={e => setPurchaseDate(e.target.value)}
+              />
             </div>
-            <div className="space-y-1 col-span-2">
+            <div className='space-y-1 col-span-2'>
               <Label>N° de Factura</Label>
-              <Input value={invoiceNumber} onChange={e => setInvoiceNumber(e.target.value)} placeholder="Ej: FAC-2024-0123" />
+              <Input
+                value={invoiceNumber}
+                onChange={e => setInvoiceNumber(e.target.value)}
+                placeholder='Ej: FAC-2024-0123'
+              />
             </div>
           </div>
         </fieldset>
       )}
 
       {isVisible('DEPRECIATION') && supportsDepreciation && (
-        <fieldset className="rounded-lg border border-border p-4 space-y-3">
-          <legend className="px-2 text-sm font-semibold text-foreground">Depreciación</legend>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1 col-span-2">
+        <fieldset className='rounded-lg border border-border p-4 space-y-3'>
+          <legend className='px-2 text-sm font-semibold text-foreground'>Depreciación</legend>
+          <div className='grid grid-cols-2 gap-3'>
+            <div className='space-y-1 col-span-2'>
               <Label>Método de Depreciación</Label>
-              <SimpleSelect value={depreciationMethod} onChange={e => setDepreciationMethod(e.target.value)} options={DEPRECIATION_METHODS} />
+              <SimpleSelect
+                value={depreciationMethod}
+                onChange={e => setDepreciationMethod(e.target.value)}
+                options={DEPRECIATION_METHODS}
+              />
               {DEPRECIATION_METHOD_HELP[depreciationMethod] && (
-                <p className="text-xs text-muted-foreground">{DEPRECIATION_METHOD_HELP[depreciationMethod]}</p>
+                <p className='text-xs text-muted-foreground'>
+                  {DEPRECIATION_METHOD_HELP[depreciationMethod]}
+                </p>
               )}
             </div>
-            <div className="space-y-1">
+            <div className='space-y-1'>
               <Label>Vida Útil (años)</Label>
-              <Input type="number" min="1" value={usefulLifeYears} onChange={e => setUsefulLifeYears(e.target.value)} />
-              <p className="text-xs text-muted-foreground">Ej: laptops 3-5 años, servidores 5-7 años, mobiliario 10 años.</p>
+              <Input
+                type='number'
+                min='1'
+                value={usefulLifeYears}
+                onChange={e => setUsefulLifeYears(e.target.value)}
+              />
+              <p className='text-xs text-muted-foreground'>
+                Ej: laptops 3-5 años, servidores 5-7 años, mobiliario 10 años.
+              </p>
             </div>
-            <div className="space-y-1">
+            <div className='space-y-1'>
               <Label>Valor Residual</Label>
-              <Input type="number" min="0" step="0.01" value={residualValue} onChange={e => setResidualValue(e.target.value)} placeholder="0.00" />
-              <p className="text-xs text-muted-foreground">Valor estimado del activo al final de su vida útil.</p>
+              <Input
+                type='number'
+                min='0'
+                step='0.01'
+                value={residualValue}
+                onChange={e => setResidualValue(e.target.value)}
+                placeholder='0.00'
+              />
+              <p className='text-xs text-muted-foreground'>
+                Valor estimado del activo al final de su vida útil.
+              </p>
               {suggestedResidualValue != null && !residualValue && (
-                <button type="button" className="text-xs text-primary hover:underline"
-                  onClick={() => setResidualValue(String(suggestedResidualValue))}>
-                  Sugerido: ${suggestedResidualValue.toLocaleString('es-CL')} ({familyDepConfig?.defaultResidualValuePct}% del precio)
+                <button
+                  type='button'
+                  className='text-xs text-primary hover:underline'
+                  onClick={() => setResidualValue(String(suggestedResidualValue))}
+                >
+                  Sugerido: ${suggestedResidualValue.toLocaleString('es-CL')} (
+                  {familyDepConfig?.defaultResidualValuePct}% del precio)
                 </button>
               )}
             </div>
           </div>
           {depreciationPreview && depreciationPreview.length > 0 && (
-            <div className="mt-2 rounded-md border border-border bg-muted/30">
-              <button type="button"
-                className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium"
-                onClick={() => setDepreciationPreviewOpen(p => !p)}>
+            <div className='mt-2 rounded-md border border-border bg-muted/30'>
+              <button
+                type='button'
+                className='flex w-full items-center justify-between px-3 py-2 text-sm font-medium'
+                onClick={() => setDepreciationPreviewOpen(p => !p)}
+              >
                 <span>Vista previa de depreciación</span>
-                {depreciationPreviewOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                {depreciationPreviewOpen ? (
+                  <ChevronUp className='h-4 w-4' />
+                ) : (
+                  <ChevronDown className='h-4 w-4' />
+                )}
               </button>
               {depreciationPreviewOpen && (
-                <div className="border-t border-border px-3 py-2 space-y-1">
-                  <p className="text-xs text-muted-foreground mb-2">Valor libro estimado (solo informativo):</p>
-                  <div className="grid grid-cols-3 gap-2">
+                <div className='border-t border-border px-3 py-2 space-y-1'>
+                  <p className='text-xs text-muted-foreground mb-2'>
+                    Valor libro estimado (solo informativo):
+                  </p>
+                  <div className='grid grid-cols-3 gap-2'>
                     {depreciationPreview.map(({ year, bookValue }) => (
-                      <div key={year} className="rounded-md bg-background border border-border p-2 text-center">
-                        <p className="text-xs text-muted-foreground">Año {year}</p>
-                        <p className="text-sm font-semibold">${bookValue.toLocaleString('es-CL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+                      <div
+                        key={year}
+                        className='rounded-md bg-background border border-border p-2 text-center'
+                      >
+                        <p className='text-xs text-muted-foreground'>Año {year}</p>
+                        <p className='text-sm font-semibold'>
+                          $
+                          {bookValue.toLocaleString('es-CL', {
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: 0,
+                          })}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -571,28 +812,40 @@ export function EquipmentAssetForm({
       )}
 
       {/* ── 7. NOTAS Y ADJUNTOS ───────────────────────────────────── */}
-      <div className="space-y-1">
-        <Label>Ubicación física actual <span className="text-xs font-normal text-muted-foreground">(opcional)</span></Label>
+      <div className='space-y-1'>
+        <Label>
+          Ubicación física actual{' '}
+          <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+        </Label>
         <Input
           value={physicalLocation}
           onChange={e => setPhysicalLocation(e.target.value)}
-          placeholder="Ej: Oficina 201, Piso 3, Sala de Servidores..."
+          placeholder='Ej: Oficina 201, Piso 3, Sala de Servidores...'
         />
-        <p className="text-xs text-muted-foreground">Dónde se encuentra el equipo actualmente (distinto a la bodega de almacenamiento).</p>
+        <p className='text-xs text-muted-foreground'>
+          Dónde se encuentra el equipo actualmente (distinto a la bodega de almacenamiento).
+        </p>
       </div>
 
-      <div className="space-y-1">
+      <div className='space-y-1'>
         <Label>Observaciones</Label>
-        <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="Notas adicionales sobre el activo..." />
+        <Textarea
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+          rows={3}
+          placeholder='Notas adicionales sobre el activo...'
+        />
       </div>
 
       <FileUploadZone files={attachments} onChange={setAttachments} maxFileSizeMB={maxFileSizeMB} />
 
-      {submitError && <p className="text-sm text-destructive">{submitError}</p>}
+      {submitError && <p className='text-sm text-destructive'>{submitError}</p>}
 
-      <div className="flex gap-3 pt-2">
-        <Button type="button" variant="outline" onClick={onBack} disabled={submitting}>← Atrás</Button>
-        <Button type="submit" disabled={submitting} className="flex-1">
+      <div className='flex gap-3 pt-2'>
+        <Button type='button' variant='outline' onClick={onBack} disabled={submitting}>
+          ← Atrás
+        </Button>
+        <Button type='submit' disabled={submitting} className='flex-1'>
           {submitting ? 'Guardando...' : 'Crear Activo'}
         </Button>
       </div>

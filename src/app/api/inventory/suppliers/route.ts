@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    if (!await canManageInventory(session.user.id, session.user.role)) {
+    if (!(await canManageInventory(session.user.id, session.user.role))) {
       return inventoryForbidden()
     }
 
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    if (!await canManageInventory(session.user.id, session.user.role)) {
+    if (!(await canManageInventory(session.user.id, session.user.role))) {
       return inventoryForbidden()
     }
 
@@ -87,10 +87,7 @@ export async function POST(request: NextRequest) {
 
     // Validar nombre
     if (!name || !name.trim()) {
-      return NextResponse.json(
-        { error: 'El nombre del proveedor es obligatorio' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'El nombre del proveedor es obligatorio' }, { status: 400 })
     }
 
     // Validar al menos email o teléfono
@@ -115,7 +112,7 @@ export async function POST(request: NextRequest) {
     const supplier = await (prisma.suppliers.create as any)({
       data: {
         name: name.trim(),
-        type: typeId || null,
+        typeId: typeId || null,
         familyId: familyId || null,
         taxId: taxId || null,
         email: email || null,
