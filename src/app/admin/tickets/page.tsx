@@ -97,6 +97,7 @@ export default function AdminTicketsPage() {
 
   const pagination = usePagination(activeTickets, { pageSize: 20 })
 
+  // Stats "Todos los Tickets" — sobre datos filtrados (el admin ve todo, los filtros son su herramienta)
   const allStats = useMemo(
     () => ({
       total: filteredAll.length,
@@ -107,16 +108,17 @@ export default function AdminTicketsPage() {
     [filteredAll]
   )
 
-  const createdStats = useMemo(
-    () => ({
-      total: filteredCreated.length,
-      open: filteredCreated.filter(t => t.status === 'OPEN').length,
-      inProgress: filteredCreated.filter(t => t.status === 'IN_PROGRESS').length,
-      resolved: filteredCreated.filter(t => t.status === 'RESOLVED' || t.status === 'CLOSED')
-        .length,
-    }),
-    [filteredCreated]
-  )
+  // Stats "Mis Solicitudes" — sobre datos crudos para que los badges sean precisos
+  const createdStats = useMemo(() => {
+    if (!session?.user?.id) return { total: 0, open: 0, inProgress: 0, resolved: 0 }
+    const myCreated = createdTicketsRaw.filter(t => t.client?.id === session.user.id)
+    return {
+      total: myCreated.length,
+      open: myCreated.filter(t => t.status === 'OPEN').length,
+      inProgress: myCreated.filter(t => t.status === 'IN_PROGRESS').length,
+      resolved: myCreated.filter(t => t.status === 'RESOLVED' || t.status === 'CLOSED').length,
+    }
+  }, [createdTicketsRaw, session?.user?.id])
 
   const handleViewTicket = (ticket: TicketType) => router.push(`/admin/tickets/${ticket.id}`)
 
@@ -306,19 +308,41 @@ export default function AdminTicketsPage() {
 
         {/* ── Tab: Mis Solicitudes ── */}
         <TabsContent value='created' className='space-y-6 mt-0'>
-          <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+          <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
+            <SymmetricStatsCard
+              title='Total Solicitudes'
+              value={createdStats.total}
+              icon={Send}
+              color='purple'
+            />
             <SymmetricStatsCard
               title='Abiertas'
               value={createdStats.open}
               icon={AlertCircle}
               color='orange'
               status={createdStats.open > 3 ? 'warning' : 'normal'}
+              badge={
+                createdStats.total > 0
+                  ? {
+                      text: `${Math.round((createdStats.open / createdStats.total) * 100)}%`,
+                      variant: 'secondary',
+                    }
+                  : undefined
+              }
             />
             <SymmetricStatsCard
               title='En Progreso'
               value={createdStats.inProgress}
               icon={Clock}
               color='blue'
+              badge={
+                createdStats.total > 0
+                  ? {
+                      text: `${Math.round((createdStats.inProgress / createdStats.total) * 100)}%`,
+                      variant: 'secondary',
+                    }
+                  : undefined
+              }
             />
             <SymmetricStatsCard
               title='Resueltas / Cerradas'
@@ -326,6 +350,14 @@ export default function AdminTicketsPage() {
               icon={CheckCircle}
               color='green'
               status='success'
+              badge={
+                createdStats.total > 0
+                  ? {
+                      text: `${Math.round((createdStats.resolved / createdStats.total) * 100)}%`,
+                      variant: 'secondary',
+                    }
+                  : undefined
+              }
             />
           </div>
 

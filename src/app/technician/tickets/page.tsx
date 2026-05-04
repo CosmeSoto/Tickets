@@ -9,9 +9,6 @@ import {
   CheckCircle,
   Target,
   Ticket as TicketIcon,
-  BarChart3,
-  FolderTree,
-  BookOpen,
   Plus,
   Send,
 } from 'lucide-react'
@@ -78,7 +75,7 @@ export default function TechnicianTicketsPage() {
     }
   }, [filters.family]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Tickets filtrados según tab activo
+  // Tickets filtrados según tab activo (para la tabla — incluye filtros de búsqueda/estado/etc.)
   const filteredAssigned = useMemo(() => {
     if (!session?.user?.id) return []
     return filterTicketsTechnician(assignedTickets, debouncedFilters, session.user.id)
@@ -111,9 +108,14 @@ export default function TechnicianTicketsPage() {
 
   const pagination = usePagination(activeTickets, { pageSize: 20 })
 
-  // Stats del tab "Asignados"
+  // Stats del tab "Asignados" — calculadas sobre datos crudos (sin filtros de búsqueda/estado)
+  // para que reflejen la realidad independientemente de los filtros activos en la tabla
   const assignedStats = useMemo(() => {
-    const resolvedTickets = filteredAssigned.filter(t => t.status === 'RESOLVED' && t.resolvedAt)
+    if (!session?.user?.id)
+      return { total: 0, open: 0, inProgress: 0, resolvedToday: 0, avgResolutionTime: 'N/A' }
+    // Solo tickets realmente asignados al técnico (no los sin asignar de su familia)
+    const myTickets = assignedTickets.filter(t => t.assignee?.id === session.user.id)
+    const resolvedTickets = myTickets.filter(t => t.status === 'RESOLVED' && t.resolvedAt)
     let avgResolutionTime = 'N/A'
     if (resolvedTickets.length > 0) {
       const totalMinutes = resolvedTickets.reduce((sum, ticket) => {
@@ -129,10 +131,10 @@ export default function TechnicianTicketsPage() {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     return {
-      total: filteredAssigned.length,
-      open: filteredAssigned.filter(t => t.status === 'OPEN').length,
-      inProgress: filteredAssigned.filter(t => t.status === 'IN_PROGRESS').length,
-      resolvedToday: filteredAssigned.filter(t => {
+      total: myTickets.length,
+      open: myTickets.filter(t => t.status === 'OPEN').length,
+      inProgress: myTickets.filter(t => t.status === 'IN_PROGRESS').length,
+      resolvedToday: myTickets.filter(t => {
         if (t.status !== 'RESOLVED' || !t.resolvedAt) return false
         const d = new Date(t.resolvedAt)
         d.setHours(0, 0, 0, 0)
@@ -140,18 +142,19 @@ export default function TechnicianTicketsPage() {
       }).length,
       avgResolutionTime,
     }
-  }, [filteredAssigned])
+  }, [assignedTickets, session?.user?.id])
 
-  // Stats del tab "Mis Solicitudes"
+  // Stats del tab "Mis Solicitudes" — calculadas sobre datos crudos
   const createdStats = useMemo(() => {
+    if (!session?.user?.id) return { total: 0, open: 0, inProgress: 0, resolved: 0 }
+    const myCreated = createdTickets.filter(t => t.client?.id === session.user.id)
     return {
-      total: filteredCreated.length,
-      open: filteredCreated.filter(t => t.status === 'OPEN').length,
-      inProgress: filteredCreated.filter(t => t.status === 'IN_PROGRESS').length,
-      resolved: filteredCreated.filter(t => t.status === 'RESOLVED' || t.status === 'CLOSED')
-        .length,
+      total: myCreated.length,
+      open: myCreated.filter(t => t.status === 'OPEN').length,
+      inProgress: myCreated.filter(t => t.status === 'IN_PROGRESS').length,
+      resolved: myCreated.filter(t => t.status === 'RESOLVED' || t.status === 'CLOSED').length,
     }
-  }, [filteredCreated])
+  }, [createdTickets, session?.user?.id])
 
   const handleViewTicket = (ticket: TicketType) => router.push(`/technician/tickets/${ticket.id}`)
 
@@ -193,18 +196,6 @@ export default function TechnicianTicketsPage() {
               <span className='hidden sm:inline'>Crear Ticket</span>
             </Button>
           </Link>
-          <Link href='/technician/stats'>
-            <Button variant='outline' size='sm'>
-              <BarChart3 className='h-4 w-4 sm:mr-2' />
-              <span className='hidden sm:inline'>Estadísticas</span>
-            </Button>
-          </Link>
-          <Link href='/technician/knowledge'>
-            <Button variant='outline' size='sm'>
-              <BookOpen className='h-4 w-4 sm:mr-2' />
-              <span className='hidden sm:inline'>Conocimientos</span>
-            </Button>
-          </Link>
         </div>
       }
     >
@@ -219,9 +210,9 @@ export default function TechnicianTicketsPage() {
           <TabsTrigger value='assigned' className='gap-2'>
             <TicketIcon className='h-4 w-4' />
             Asignados a mí
-            {assignedStats.open > 0 && (
+            {assignedStats.open + assignedStats.inProgress > 0 && (
               <Badge variant='secondary' className='ml-1 h-5 px-1.5 text-xs'>
-                {assignedStats.open}
+                {assignedStats.open + assignedStats.inProgress}
               </Badge>
             )}
           </TabsTrigger>
@@ -239,6 +230,12 @@ export default function TechnicianTicketsPage() {
         {/* ── Tab: Asignados ── */}
         <TabsContent value='assigned' className='space-y-6 mt-0'>
           <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
+            <SymmetricStatsCard
+              title='Total Asignados'
+              value={assignedStats.total}
+              icon={TicketIcon}
+              color='purple'
+            />
             <SymmetricStatsCard
               title='Abiertos'
               value={assignedStats.open}
@@ -265,18 +262,6 @@ export default function TechnicianTicketsPage() {
                       text: `${Math.round((assignedStats.inProgress / assignedStats.total) * 100)}%`,
                       variant: 'secondary',
                     }
-                  : undefined
-              }
-            />
-            <SymmetricStatsCard
-              title='Resueltos Hoy'
-              value={assignedStats.resolvedToday}
-              icon={CheckCircle}
-              color='green'
-              status='success'
-              trend={
-                assignedStats.resolvedToday > 0
-                  ? { value: assignedStats.resolvedToday, label: 'completados', isPositive: true }
                   : undefined
               }
             />
@@ -349,19 +334,41 @@ export default function TechnicianTicketsPage() {
 
         {/* ── Tab: Mis Solicitudes ── */}
         <TabsContent value='created' className='space-y-6 mt-0'>
-          <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+          <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
+            <SymmetricStatsCard
+              title='Total Solicitudes'
+              value={createdStats.total}
+              icon={Send}
+              color='purple'
+            />
             <SymmetricStatsCard
               title='Abiertas'
               value={createdStats.open}
               icon={AlertCircle}
               color='orange'
               status={createdStats.open > 3 ? 'warning' : 'normal'}
+              badge={
+                createdStats.total > 0
+                  ? {
+                      text: `${Math.round((createdStats.open / createdStats.total) * 100)}%`,
+                      variant: 'secondary',
+                    }
+                  : undefined
+              }
             />
             <SymmetricStatsCard
               title='En Progreso'
               value={createdStats.inProgress}
               icon={Clock}
               color='blue'
+              badge={
+                createdStats.total > 0
+                  ? {
+                      text: `${Math.round((createdStats.inProgress / createdStats.total) * 100)}%`,
+                      variant: 'secondary',
+                    }
+                  : undefined
+              }
             />
             <SymmetricStatsCard
               title='Resueltas / Cerradas'
@@ -369,6 +376,14 @@ export default function TechnicianTicketsPage() {
               icon={CheckCircle}
               color='green'
               status='success'
+              badge={
+                createdStats.total > 0
+                  ? {
+                      text: `${Math.round((createdStats.resolved / createdStats.total) * 100)}%`,
+                      variant: 'secondary',
+                    }
+                  : undefined
+              }
             />
           </div>
 
