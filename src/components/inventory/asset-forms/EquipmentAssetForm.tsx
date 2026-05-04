@@ -612,8 +612,8 @@ export function EquipmentAssetForm({
 
       {/* Mantenimiento — fecha de ingreso, tipo y técnico asignado */}
       {equipmentStatus === 'MAINTENANCE' && (
-        <div className='rounded-lg border border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-800 p-4 space-y-3'>
-          <p className='text-sm font-medium text-orange-800 dark:text-orange-300'>
+        <div className='rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-4 space-y-3'>
+          <p className='text-sm font-medium text-amber-800 dark:text-amber-300'>
             Datos del mantenimiento
           </p>
           <div className='grid grid-cols-2 gap-3'>
@@ -884,7 +884,7 @@ export function EquipmentAssetForm({
               )}
               {/* Ejemplo concreto */}
               {DEPRECIATION_METHOD_EXAMPLE[depreciationMethod] && (
-                <p className='text-xs text-primary/70 italic'>
+                <p className='text-xs text-muted-foreground italic'>
                   {DEPRECIATION_METHOD_EXAMPLE[depreciationMethod]}
                 </p>
               )}
