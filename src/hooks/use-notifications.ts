@@ -170,32 +170,36 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     async (notification: NotificationData) => {
       markAsRead(notification.id)
 
+      const role = (session?.user?.role ?? 'CLIENT').toLowerCase()
+      const rolePrefix =
+        role === 'admin' ? 'admin' : role === 'technician' ? 'technician' : 'client'
+
       let destination: string | null = null
-      if (notification.metadata?.link) {
+
+      // Si la notificación tiene ticketId, construir la URL directamente con el rol actual
+      // Esto garantiza navegación correcta independientemente del link guardado en metadata
+      if (notification.ticketId) {
+        destination = `/${rolePrefix}/tickets/${notification.ticketId}`
+      } else if (notification.metadata?.link) {
+        // Para links no relacionados con tickets (inventario, etc.), normalizar si aplica
         destination = notification.metadata.link as string
+        if (destination.includes('/tickets/')) {
+          const ticketIdMatch = destination.match(/\/tickets\/([^/]+)/)
+          if (ticketIdMatch) {
+            destination = `/${rolePrefix}/tickets/${ticketIdMatch[1]}`
+          }
+        }
       } else if (notification.metadata?.actId) {
         destination = `/inventory/acts/${notification.metadata.actId}`
       } else if (notification.metadata?.maintenanceId) {
         destination = `/inventory/maintenance/${notification.metadata.maintenanceId}`
       } else if (notification.metadata?.equipmentId) {
         destination = `/inventory/equipment/${notification.metadata.equipmentId}`
-      } else if (notification.ticketId) {
-        destination = `/${(session?.user?.role ?? 'client').toLowerCase()}/tickets/${notification.ticketId}`
+      } else if (notification.metadata?.ticketId) {
+        destination = `/${rolePrefix}/tickets/${notification.metadata.ticketId}`
       }
 
       if (!destination) return
-
-      // Normalizar el destino al rol actual del usuario para evitar redirigir
-      // a /client/tickets/... cuando el usuario es ADMIN o TECHNICIAN
-      if (destination.includes('/tickets/')) {
-        const ticketIdMatch = destination.match(/\/tickets\/([^/]+)/)
-        if (ticketIdMatch) {
-          const role = (session?.user?.role ?? 'CLIENT').toLowerCase()
-          const rolePrefix =
-            role === 'admin' ? 'admin' : role === 'technician' ? 'technician' : 'client'
-          destination = `/${rolePrefix}/tickets/${ticketIdMatch[1]}`
-        }
-      }
 
       const destRole = destination.startsWith('/admin')
         ? 'ADMIN'

@@ -19,7 +19,12 @@ export class NotificationService {
   private static async shouldNotify(
     userId: string,
     notificationType: 'push' | 'email',
-    specificType?: 'ticketCreated' | 'ticketAssigned' | 'statusChanged' | 'newComments' | 'ticketUpdates'
+    specificType?:
+      | 'ticketCreated'
+      | 'ticketAssigned'
+      | 'statusChanged'
+      | 'newComments'
+      | 'ticketUpdates'
   ): Promise<boolean> {
     try {
       const prefs = await prisma.user_settings.findUnique({
@@ -35,40 +40,42 @@ export class NotificationService {
           quietHoursEnabled: true,
           quietHoursStart: true,
           quietHoursEnd: true,
-        }
+        },
       })
 
       // Si no hay preferencias, crear defaults y enviar
       if (!prefs) {
         // Crear settings por defecto en background (no bloquear)
-        prisma.user_settings.upsert({
-          where: { userId },
-          update: {},
-          create: {
-            id: randomUUID(),
-            userId,
-            emailNotifications: true,
-            pushNotifications: true,
-            ticketCreated: true,
-            ticketAssigned: true,
-            statusChanged: true,
-            newComments: true,
-            ticketUpdated: true,
-            ticketUpdates: true,
-            systemAlerts: true,
-            weeklyReport: false,
-            soundEnabled: true,
-            quietHoursEnabled: false,
-            quietHoursStart: '22:00',
-            quietHoursEnd: '08:00',
-            autoAssignEnabled: true,
-            maxConcurrentTickets: 10,
-            theme: 'light',
-            language: 'es',
-            timezone: 'America/Guayaquil',
-            updatedAt: new Date(),
-          }
-        }).catch(err => console.error('[NOTIFICATION] Error creating default settings:', err))
+        prisma.user_settings
+          .upsert({
+            where: { userId },
+            update: {},
+            create: {
+              id: randomUUID(),
+              userId,
+              emailNotifications: true,
+              pushNotifications: true,
+              ticketCreated: true,
+              ticketAssigned: true,
+              statusChanged: true,
+              newComments: true,
+              ticketUpdated: true,
+              ticketUpdates: true,
+              systemAlerts: true,
+              weeklyReport: false,
+              soundEnabled: true,
+              quietHoursEnabled: false,
+              quietHoursStart: '22:00',
+              quietHoursEnd: '08:00',
+              autoAssignEnabled: true,
+              maxConcurrentTickets: 10,
+              theme: 'light',
+              language: 'es',
+              timezone: 'America/Guayaquil',
+              updatedAt: new Date(),
+            },
+          })
+          .catch(err => console.error('[NOTIFICATION] Error creating default settings:', err))
         return true
       }
 
@@ -76,7 +83,7 @@ export class NotificationService {
       if (prefs.quietHoursEnabled && prefs.quietHoursStart && prefs.quietHoursEnd) {
         const now = new Date()
         const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
-        
+
         // Comparar horarios
         if (prefs.quietHoursStart <= prefs.quietHoursEnd) {
           // Rango normal (ej: 22:00 - 08:00 del día siguiente)
@@ -181,11 +188,20 @@ export class NotificationService {
   /**
    * Crear una notificación in-app (con verificación de preferencias)
    */
-  static async createNotification(data: CreateNotificationData & { specificType?: 'ticketCreated' | 'ticketAssigned' | 'statusChanged' | 'newComments' | 'ticketUpdates' }) {
+  static async createNotification(
+    data: CreateNotificationData & {
+      specificType?:
+        | 'ticketCreated'
+        | 'ticketAssigned'
+        | 'statusChanged'
+        | 'newComments'
+        | 'ticketUpdates'
+    }
+  ) {
     try {
       // Verificar si el usuario quiere notificaciones push
       const shouldSend = await this.shouldNotify(data.userId, 'push', data.specificType)
-      
+
       if (!shouldSend) {
         return null
       }
@@ -371,7 +387,7 @@ export class NotificationService {
       }
 
       await Promise.all(
-        recipientIds.map((userId) =>
+        recipientIds.map(userId =>
           this.createNotification({
             userId,
             type: NotificationType.TICKET_FAMILY_CHANGE,
@@ -430,7 +446,7 @@ export class NotificationService {
           metadata: {
             priority: ticket.priority,
             clientName: ticket.users_tickets_clientIdTousers.name,
-            link: `/technician/tickets/${ticket.id}`,
+            ticketId: ticket.id,
           },
         })
         if (techNotification) {
@@ -448,7 +464,7 @@ export class NotificationService {
           metadata: {
             priority: ticket.priority,
             clientName: ticket.users_tickets_clientIdTousers.name,
-            link: `/technician/tickets/${ticket.id}`,
+            ticketId: ticket.id,
           },
         })
         if (techNotification) {
@@ -456,19 +472,21 @@ export class NotificationService {
         }
       }
 
-      // Notificar al cliente
-      const clientNotification = await this.createNotification({
-        userId: ticket.clientId,
-        type: 'SUCCESS',
-        title: 'Ticket asignado',
-        message: `Tu ticket "${ticket.title}" ha sido asignado a ${ticket.users_tickets_assigneeIdTousers?.name || 'un técnico'}`,
-        ticketId: ticket.id,
-        specificType: 'ticketAssigned',
-        metadata: {
-          link: `/client/tickets/${ticket.id}`,
-        },
-      })
-      if (clientNotification) notifications.push(clientNotification)
+      // Notificar al cliente (solo si es diferente al técnico asignado)
+      if (ticket.clientId !== technicianId) {
+        const clientNotification = await this.createNotification({
+          userId: ticket.clientId,
+          type: 'SUCCESS',
+          title: 'Ticket asignado',
+          message: `Tu ticket "${ticket.title}" ha sido asignado a ${ticket.users_tickets_assigneeIdTousers?.name || 'un técnico'}`,
+          ticketId: ticket.id,
+          specificType: 'ticketAssigned',
+          metadata: {
+            ticketId: ticket.id,
+          },
+        })
+        if (clientNotification) notifications.push(clientNotification)
+      }
 
       return notifications
     } catch (error) {
