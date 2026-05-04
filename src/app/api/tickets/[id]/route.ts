@@ -11,6 +11,23 @@ import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit
 import { NotificationService } from '@/lib/services/notification-service'
 import { invalidateCache } from '@/lib/api-cache'
 
+// Traducción de nombres de campo técnicos a español para el historial
+const FIELD_LABELS_ES: Record<string, string> = {
+  title: 'título',
+  description: 'descripción',
+  status: 'estado',
+  priority: 'prioridad',
+  assigneeId: 'técnico asignado',
+  categoryId: 'categoría',
+  location: 'ubicación',
+  tags: 'etiquetas',
+  familyId: 'área',
+}
+
+function translateFieldNames(fields: string[]): string {
+  return fields.map(f => FIELD_LABELS_ES[f] || f).join(', ')
+}
+
 // Helper: invalida caché de tickets y dashboard cuando un ticket cambia
 async function invalidateTicketCaches() {
   await invalidateCache([
@@ -289,7 +306,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
         data: {
           id: randomUUID(),
           action: 'updated',
-          comment: `Cliente actualizó: ${Object.keys(filteredUpdates).join(', ')}`,
+          comment: `Cliente actualizó: ${translateFieldNames(Object.keys(filteredUpdates))}`,
           ticketId: finalId,
           userId: session.user.id,
           createdAt: new Date(),
@@ -455,7 +472,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
         data: {
           id: randomUUID(),
           action: 'updated',
-          comment: `Técnico actualizó: ${Object.keys(filteredUpdates).join(', ')}`,
+          comment: `Técnico actualizó: ${translateFieldNames(Object.keys(filteredUpdates))}`,
           ticketId: finalId,
           userId: session.user.id,
           createdAt: new Date(),
@@ -805,7 +822,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
         data: {
           id: randomUUID(),
           action: 'updated',
-          comment: `Administrador actualizó: ${Object.keys(processedUpdates).join(', ')}`,
+          comment: `Administrador actualizó: ${translateFieldNames(Object.keys(processedUpdates))}`,
           ticketId: finalId,
           userId: session.user.id,
           createdAt: new Date(),

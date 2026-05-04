@@ -7,17 +7,11 @@ import prisma from '@/lib/prisma'
  * GET /api/tickets/[id]/timeline
  * Obtiene el timeline (historial) de un ticket
  */
-export async function GET(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
-      return NextResponse.json(
-        { success: false, error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
     }
 
     const params = await context.params
@@ -86,14 +80,18 @@ export async function GET(
         targetDate: true,
         completedDate: true,
         createdAt: true,
-      }
+      },
     })
 
     // Recopilar IDs de attachments referenciados en comentarios
     const commentAttachmentIds = history
       .filter(e => e.action === 'comment_added' && e.newValue)
       .flatMap(e => {
-        try { return JSON.parse(e.newValue!) as string[] } catch { return [] }
+        try {
+          return JSON.parse(e.newValue!) as string[]
+        } catch {
+          return []
+        }
       })
 
     // También recopilar IDs de file_uploaded (newValue es el ID directo)
@@ -103,21 +101,27 @@ export async function GET(
 
     // Cargar attachments de comentarios en una sola query
     const allAttachmentIds = [...commentAttachmentIds, ...fileUploadedIds]
-    const commentAttachments = allAttachmentIds.length > 0
-      ? await prisma.attachments.findMany({
-          where: { id: { in: allAttachmentIds } },
-          select: { id: true, originalName: true, mimeType: true, size: true }
-        })
-      : []
+    const commentAttachments =
+      allAttachmentIds.length > 0
+        ? await prisma.attachments.findMany({
+            where: { id: { in: allAttachmentIds } },
+            select: { id: true, originalName: true, mimeType: true, size: true },
+          })
+        : []
     const attachmentMap = new Map(commentAttachments.map(a => [a.id, a]))
 
     // Formatear timeline con transformación de eventos
-    const timeline = history.map((entry) => {
+    const timeline = history.map(entry => {
       const baseEvent = {
         id: entry.id,
         type: mapActionToType(entry.action),
         title: generateTitle(entry.action, entry.field, entry.newValue, entry.oldValue),
-        description: generateDescription(entry.action, entry.comment, entry.newValue, entry.oldValue),
+        description: generateDescription(
+          entry.action,
+          entry.comment,
+          entry.newValue,
+          entry.oldValue
+        ),
         isInternal: entry.field === 'internal_comment',
         user: entry.users
           ? {
@@ -129,7 +133,13 @@ export async function GET(
             }
           : null,
         createdAt: entry.createdAt.toISOString(),
-        metadata: parseMetadata(entry.action, entry.newValue, entry.oldValue, resolutionPlan, attachmentMap)
+        metadata: parseMetadata(
+          entry.action,
+          entry.newValue,
+          entry.oldValue,
+          resolutionPlan,
+          attachmentMap
+        ),
       }
 
       return baseEvent
@@ -151,93 +161,196 @@ export async function GET(
 // Mapear acciones de BD a tipos de timeline
 function mapActionToType(action: string): string {
   const mapping: Record<string, string> = {
-    'created': 'created',
-    'status_changed': 'status_change',
-    'assigned': 'assignment',
-    'unassigned': 'assignment',
-    'auto_assigned': 'assignment',
-    'reassigned': 'assignment',
-    'updated': 'status_change',
-    'priority_changed': 'priority_change',
-    'comment_added': 'comment',
-    'resolution_plan_created': 'resolution_plan',
-    'resolution_plan_updated': 'resolution_plan',
-    'resolution_plan_completed': 'resolution_plan',
-    'resolution_plan_deleted': 'resolution_plan',
-    'resolution_task_created': 'resolution_task',
-    'resolution_task_updated': 'resolution_task',
-    'resolution_task_deleted': 'resolution_task',
-    'rating_submitted': 'rating',
-    'resolved': 'resolution',
-    'file_uploaded': 'file_uploaded',
+    created: 'created',
+    status_changed: 'status_change',
+    assigned: 'assignment',
+    unassigned: 'assignment',
+    auto_assigned: 'assignment',
+    reassigned: 'assignment',
+    updated: 'status_change',
+    priority_changed: 'priority_change',
+    comment_added: 'comment',
+    resolution_plan_created: 'resolution_plan',
+    resolution_plan_updated: 'resolution_plan',
+    resolution_plan_completed: 'resolution_plan',
+    resolution_plan_deleted: 'resolution_plan',
+    resolution_task_created: 'resolution_task',
+    resolution_task_updated: 'resolution_task',
+    resolution_task_deleted: 'resolution_task',
+    rating_submitted: 'rating',
+    resolved: 'resolution',
+    file_uploaded: 'file_uploaded',
   }
-  
+
   return mapping[action] || 'created'
 }
 
+// Traducción de valores de campos técnicos a español legible
+const STATUS_LABELS: Record<string, string> = {
+  OPEN: 'Abierto',
+  IN_PROGRESS: 'En Progreso',
+  RESOLVED: 'Resuelto',
+  CLOSED: 'Cerrado',
+  ON_HOLD: 'En Espera',
+}
+
+const PRIORITY_LABELS: Record<string, string> = {
+  LOW: 'Baja',
+  MEDIUM: 'Media',
+  HIGH: 'Alta',
+  URGENT: 'Urgente',
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  title: 'título',
+  description: 'descripción',
+  status: 'estado',
+  priority: 'prioridad',
+  assigneeId: 'técnico asignado',
+  categoryId: 'categoría',
+  location: 'ubicación',
+  tags: 'etiquetas',
+}
+
+function translateValue(field: string | null, value: string | null): string {
+  if (!value) return '—'
+  if (field === 'status' || STATUS_LABELS[value]) return STATUS_LABELS[value] || value
+  if (field === 'priority' || PRIORITY_LABELS[value]) return PRIORITY_LABELS[value] || value
+  return value
+}
+
+function translateFields(fields: string): string {
+  return fields
+    .split(',')
+    .map(f => FIELD_LABELS[f.trim()] || f.trim())
+    .join(', ')
+}
+
 // Generar título descriptivo basado en la acción
-function generateTitle(action: string, field: string | null, newValue: string | null, oldValue: string | null): string {
-  const titles: Record<string, string> = {
-    'created': 'Ticket creado',
-    'status_changed': 'Estado actualizado',
-    'updated': 'Ticket actualizado',
-    'assigned': 'Ticket asignado',
-    'unassigned': 'Ticket desasignado',
-    'auto_assigned': 'Ticket asignado automáticamente',
-    'reassigned': 'Ticket reasignado',
-    'priority_changed': 'Prioridad cambiada',
-    'comment_added': field === 'internal_comment' ? 'Comentario interno agregado' : 'Comentario agregado',
-    'resolution_plan_created': '📋 Plan de resolución creado',
-    'resolution_plan_updated': '📋 Plan de resolución actualizado',
-    'resolution_plan_completed': '✅ Plan de resolución completado',
-    'resolution_plan_deleted': '🗑️ Plan de resolución eliminado',
-    'resolution_task_created': '✓ Nueva tarea agregada',
-    'resolution_task_updated': '✓ Tarea actualizada',
-    'resolution_task_deleted': '✓ Tarea eliminada',
-    'rating_submitted': '⭐ Calificación recibida',
-    'resolved': 'Ticket resuelto',
-    'file_uploaded': 'Archivo adjunto',
+function generateTitle(
+  action: string,
+  field: string | null,
+  newValue: string | null,
+  oldValue: string | null
+): string {
+  switch (action) {
+    case 'created':
+      return 'Ticket creado'
+    case 'status_changed': {
+      const from = translateValue('status', oldValue)
+      const to = translateValue('status', newValue)
+      return `Estado: ${from} → ${to}`
+    }
+    case 'updated':
+      return 'Ticket actualizado'
+    case 'assigned':
+      return 'Técnico asignado'
+    case 'unassigned':
+      return 'Técnico desasignado'
+    case 'auto_assigned':
+      return 'Asignación automática'
+    case 'reassigned':
+      return 'Técnico reasignado'
+    case 'priority_changed': {
+      const from = translateValue('priority', oldValue)
+      const to = translateValue('priority', newValue)
+      return `Prioridad: ${from} → ${to}`
+    }
+    case 'comment_added':
+      return field === 'internal_comment' ? 'Nota interna' : 'Comentario'
+    case 'resolution_plan_created':
+      return 'Plan de resolución creado'
+    case 'resolution_plan_updated':
+      return 'Plan de resolución actualizado'
+    case 'resolution_plan_completed':
+      return 'Plan de resolución completado'
+    case 'resolution_plan_deleted':
+      return 'Plan de resolución eliminado'
+    case 'resolution_task_created':
+      return 'Nueva tarea agregada'
+    case 'resolution_task_updated':
+      return 'Tarea actualizada'
+    case 'resolution_task_deleted':
+      return 'Tarea eliminada'
+    case 'rating_submitted':
+      return 'Calificación recibida'
+    case 'resolved':
+      return 'Ticket marcado como resuelto'
+    case 'file_uploaded':
+      return 'Archivo adjunto'
+    default:
+      return field ? `Cambio en ${FIELD_LABELS[field] || field}` : 'Cambio en ticket'
   }
-  
-  return titles[action] || `Cambio en ${field || 'ticket'}`
 }
 
 // Generar descripción detallada
-function generateDescription(action: string, originalComment: string | null, newValue: string | null, oldValue: string | null): string {
-  // Si ya hay un comentario, usarlo
+function generateDescription(
+  action: string,
+  originalComment: string | null,
+  newValue: string | null,
+  oldValue: string | null
+): string {
+  // Si hay un comentario en la BD, procesarlo para traducir campos técnicos
   if (originalComment) {
-    return originalComment
+    // Traducir patrones como "Administrador actualizó: title, description, status"
+    return originalComment.replace(
+      /actualizó:\s*([a-zA-Z,\s]+)/g,
+      (_, fields) => `actualizó: ${translateFields(fields)}`
+    )
   }
 
-  // Para planes de resolución, no generar descripción adicional ya que se muestra en el metadata card
-  if (action.includes('resolution_plan')) {
-    return ''
-  }
+  // Para planes de resolución, no generar descripción adicional
+  if (action.includes('resolution_plan')) return ''
 
-  // Generar descripción basada en la acción
   switch (action) {
     case 'assigned':
-      return `El ticket ha sido asignado a un técnico para su atención.`
-    
+      return newValue ? `Asignado a ${newValue}` : 'El ticket fue asignado para su atención.'
     case 'unassigned':
-      return `El ticket ha sido desasignado y está disponible para reasignación.`
-    
-    case 'status_changed':
-      return `El estado del ticket cambió de "${oldValue}" a "${newValue}".`
-    
-    case 'priority_changed':
-      return `La prioridad del ticket cambió de "${oldValue}" a "${newValue}".`
-    
+      return 'El ticket quedó sin asignar y está disponible para reasignación.'
+    case 'auto_assigned':
+      return newValue
+        ? `Asignado automáticamente a ${newValue}`
+        : 'Asignación automática completada.'
+    case 'reassigned':
+      return newValue ? `Reasignado a ${newValue}` : 'El ticket fue reasignado.'
+    case 'status_changed': {
+      const from = translateValue('status', oldValue)
+      const to = translateValue('status', newValue)
+      return `El estado cambió de "${from}" a "${to}".`
+    }
+    case 'priority_changed': {
+      const from = translateValue('priority', oldValue)
+      const to = translateValue('priority', newValue)
+      return `La prioridad cambió de "${from}" a "${to}".`
+    }
+    case 'updated': {
+      // newValue puede ser una lista de campos separados por coma
+      if (newValue) {
+        const translated = translateFields(newValue)
+        return `Se actualizó: ${translated}.`
+      }
+      return 'Se actualizaron los datos del ticket.'
+    }
+    case 'resolved':
+      return 'El técnico marcó el ticket como resuelto. El solicitante puede calificar el servicio.'
+    case 'created':
+      return 'El ticket fue registrado en el sistema.'
     default:
       return ''
   }
 }
 
 // Parsear metadata para eventos específicos
-function parseMetadata(action: string, newValue: string | null, oldValue: string | null, resolutionPlan: any, attachmentMap?: Map<string, { id: string; originalName: string; mimeType: string; size: number }>): any {
+function parseMetadata(
+  action: string,
+  newValue: string | null,
+  oldValue: string | null,
+  resolutionPlan: any,
+  attachmentMap?: Map<string, { id: string; originalName: string; mimeType: string; size: number }>
+): any {
   const metadata: any = {
     oldValue,
-    newValue
+    newValue,
   }
 
   // Para comentarios, adjuntar archivos si existen
@@ -265,12 +378,14 @@ function parseMetadata(action: string, newValue: string | null, oldValue: string
   if (action === 'file_uploaded' && newValue && attachmentMap) {
     const a = attachmentMap.get(newValue)
     if (a) {
-      metadata.attachments = [{
-        id: a.id,
-        name: a.originalName,
-        size: a.size,
-        type: a.mimeType,
-      }]
+      metadata.attachments = [
+        {
+          id: a.id,
+          name: a.originalName,
+          size: a.size,
+          type: a.mimeType,
+        },
+      ]
     }
   }
 
@@ -282,7 +397,7 @@ function parseMetadata(action: string, newValue: string | null, oldValue: string
     metadata.completedTasks = resolutionPlan.completedTasks
     metadata.estimatedHours = resolutionPlan.estimatedHours
     metadata.actualHours = resolutionPlan.actualHours
-    
+
     if (resolutionPlan.startDate) {
       metadata.startDate = resolutionPlan.startDate.toISOString()
     }

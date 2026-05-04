@@ -750,7 +750,7 @@ export function TicketTimeline({
           )}
 
           {/* Lista de eventos */}
-          <div className='space-y-4'>
+          <div className='space-y-1'>
             {events.length === 0 ? (
               <div className='text-center py-8 text-muted-foreground'>
                 <FileText className='h-12 w-12 mx-auto mb-4 text-gray-300' />
@@ -759,81 +759,142 @@ export function TicketTimeline({
             ) : (
               events
                 .filter(event => canViewInternal || !event.isInternal)
-                .map(event => (
-                  <div key={event.id} className='flex space-x-3'>
-                    {/* Ícono */}
-                    <div
-                      className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${getEventColor(event.type, event.isInternal)}`}
-                    >
-                      {event.type === 'comment' && event.isInternal ? (
-                        <Lock className='h-4 w-4' />
-                      ) : (
-                        getEventIcon(event.type)
-                      )}
-                    </div>
+                .map(event => {
+                  const isSystemEvent = !['comment', 'file_uploaded'].includes(event.type)
 
-                    {/* Contenido */}
-                    <div className='flex-1 min-w-0'>
-                      <div className='flex items-center justify-between flex-wrap gap-1'>
-                        <div className='flex items-center space-x-2 flex-wrap gap-1'>
-                          <span className='font-medium text-foreground'>{event.user.name}</span>
-                          <Badge variant='outline' className='text-xs'>
-                            {event.user.role === 'TECHNICIAN'
-                              ? 'Técnico'
-                              : event.user.role === 'ADMIN'
-                                ? 'Admin'
-                                : event.user.role === 'CLIENT'
-                                  ? 'Cliente'
-                                  : event.user.role}
-                          </Badge>
-                          {event.isInternal && (
-                            <Badge className='text-xs bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/50 dark:text-amber-300 dark:border-amber-700 flex items-center gap-1'>
-                              <Lock className='h-2.5 w-2.5' />
-                              Solo equipo
-                            </Badge>
-                          )}
-                        </div>
-                        <span className='text-sm text-muted-foreground'>
-                          {formatTimeAgo(event.createdAt)}
-                        </span>
-                      </div>
-
-                      <div className='mt-1'>
-                        <p
-                          className={`text-sm ${event.type === 'comment' ? 'font-medium' : 'text-muted-foreground'} text-foreground`}
-                        >
-                          {event.title}
-                        </p>
-
-                        {/* Contenido del comentario */}
-                        {event.type === 'comment' && event.description && (
+                  // ── Eventos de sistema: compactos, sin burbuja ──────────────
+                  if (isSystemEvent) {
+                    return (
+                      <div key={event.id} className='flex items-start gap-2.5 py-1.5 px-1 group'>
+                        {/* Línea vertical + ícono */}
+                        <div className='flex flex-col items-center shrink-0 mt-0.5'>
                           <div
-                            className={`mt-2 p-3 rounded-lg text-sm whitespace-pre-wrap ${
-                              event.isInternal
-                                ? 'bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-100'
-                                : 'bg-muted text-foreground'
-                            }`}
+                            className={`w-6 h-6 rounded-full flex items-center justify-center ${getEventColor(event.type, event.isInternal)}`}
                           >
-                            {event.description}
+                            {getEventIcon(event.type)}
                           </div>
-                        )}
+                        </div>
 
-                        {/* Descripción para otros eventos — solo si es diferente al título */}
-                        {event.type !== 'comment' &&
-                          event.description &&
-                          event.description !== event.title &&
-                          !(event.type === 'resolution_plan' && event.metadata) &&
-                          event.type !== 'file_uploaded' && (
-                            <p className='text-sm text-muted-foreground mt-1 whitespace-pre-wrap'>
+                        {/* Contenido compacto */}
+                        <div className='flex-1 min-w-0 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5'>
+                          <span className='text-sm font-medium text-foreground'>
+                            {event.user?.name ?? '—'}
+                          </span>
+                          <span className='text-xs text-muted-foreground'>
+                            {event.user?.role === 'TECHNICIAN'
+                              ? '· Técnico'
+                              : event.user?.role === 'ADMIN'
+                                ? '· Admin'
+                                : ''}
+                          </span>
+                          <span className='text-sm text-muted-foreground'>{event.title}</span>
+                          {/* Badges de cambio de estado/prioridad inline */}
+                          {(event.type === 'status_change' || event.type === 'priority_change') &&
+                            event.metadata?.oldValue &&
+                            event.metadata?.newValue && (
+                              <span className='inline-flex items-center gap-1 ml-0.5'>
+                                {event.type === 'status_change' ? (
+                                  <>
+                                    <StatusBadge
+                                      status={event.metadata.oldValue as any}
+                                      size='sm'
+                                    />
+                                    <span className='text-muted-foreground text-xs'>→</span>
+                                    <StatusBadge
+                                      status={event.metadata.newValue as any}
+                                      size='sm'
+                                    />
+                                  </>
+                                ) : (
+                                  <>
+                                    <PriorityBadge
+                                      priority={event.metadata.oldValue as any}
+                                      size='sm'
+                                    />
+                                    <span className='text-muted-foreground text-xs'>→</span>
+                                    <PriorityBadge
+                                      priority={event.metadata.newValue as any}
+                                      size='sm'
+                                    />
+                                  </>
+                                )}
+                              </span>
+                            )}
+                          <span className='text-xs text-muted-foreground ml-auto shrink-0'>
+                            {formatTimeAgo(event.createdAt)}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  }
+
+                  // ── Comentarios y archivos: burbuja completa ────────────────
+                  return (
+                    <div key={event.id} className='flex space-x-3 py-2'>
+                      {/* Avatar/ícono */}
+                      <div
+                        className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${getEventColor(event.type, event.isInternal)}`}
+                      >
+                        {event.type === 'comment' && event.isInternal ? (
+                          <Lock className='h-4 w-4' />
+                        ) : (
+                          getEventIcon(event.type)
+                        )}
+                      </div>
+
+                      {/* Contenido */}
+                      <div className='flex-1 min-w-0'>
+                        <div className='flex items-center justify-between flex-wrap gap-1'>
+                          <div className='flex items-center space-x-2 flex-wrap gap-1'>
+                            <span className='font-medium text-foreground'>
+                              {event.user?.name ?? '—'}
+                            </span>
+                            <Badge variant='outline' className='text-xs'>
+                              {event.user?.role === 'TECHNICIAN'
+                                ? 'Técnico'
+                                : event.user?.role === 'ADMIN'
+                                  ? 'Admin'
+                                  : event.user?.role === 'CLIENT'
+                                    ? 'Cliente'
+                                    : (event.user?.role ?? '')}
+                            </Badge>
+                            {event.isInternal && (
+                              <Badge className='text-xs bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/50 dark:text-amber-300 dark:border-amber-700 flex items-center gap-1'>
+                                <Lock className='h-2.5 w-2.5' />
+                                Solo equipo
+                              </Badge>
+                            )}
+                          </div>
+                          <span className='text-sm text-muted-foreground'>
+                            {formatTimeAgo(event.createdAt)}
+                          </span>
+                        </div>
+
+                        <div className='mt-1'>
+                          {/* Contenido del comentario */}
+                          {event.type === 'comment' && event.description && (
+                            <div
+                              className={`mt-1 p-3 rounded-lg text-sm whitespace-pre-wrap ${
+                                event.isInternal
+                                  ? 'bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-100'
+                                  : 'bg-muted text-foreground'
+                              }`}
+                            >
                               {event.description}
-                            </p>
+                            </div>
                           )}
 
-                        {renderEventMetadata(event)}
+                          {/* Archivo subido */}
+                          {event.type === 'file_uploaded' && (
+                            <p className='text-sm text-muted-foreground mt-0.5'>{event.title}</p>
+                          )}
+
+                          {renderEventMetadata(event)}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  )
+                })
             )}
           </div>
         </CardContent>
