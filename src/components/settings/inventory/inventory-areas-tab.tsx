@@ -221,20 +221,9 @@ export function InventoryAreasTab({
                 <h3 className='font-semibold truncate'>{selectedFamily?.name}</h3>
                 <p className='text-xs text-muted-foreground font-mono'>{selectedFamily?.code}</p>
               </div>
-              <div className='flex items-center gap-3 flex-shrink-0'>
-                <span className='text-sm text-muted-foreground hidden sm:inline'>Inventario</span>
-                <Switch
-                  checked={form.inventoryEnabled}
-                  onCheckedChange={v => onSetField('inventoryEnabled', v)}
-                  disabled={saving}
-                />
-                <Badge
-                  variant={form.inventoryEnabled ? 'default' : 'secondary'}
-                  className='hidden sm:inline-flex'
-                >
-                  {form.inventoryEnabled ? 'Habilitado' : 'Deshabilitado'}
-                </Badge>
-              </div>
+              <Badge variant={form.inventoryEnabled ? 'default' : 'secondary'}>
+                {form.inventoryEnabled ? 'Habilitado' : 'Deshabilitado'}
+              </Badge>
             </div>
 
             {/* Asset types */}
