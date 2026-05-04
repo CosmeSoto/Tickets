@@ -39,20 +39,13 @@ interface CatStat {
 }
 
 export default function TechnicianStatsPage() {
+  // ── Todos los hooks PRIMERO, sin ningún return antes ──────────────────────
   const { data: session, status } = useSession()
   const router = useRouter()
-
   const [stats, setStats] = useState<TechStats | null>(null)
   const [categoryStats, setCategoryStats] = useState<CatStat[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  // Protección de ruta
-  if (status === 'loading') return null
-  if (!session || session.user.role !== 'TECHNICIAN') {
-    if (typeof window !== 'undefined') router.push('/login')
-    return null
-  }
 
   const loadStats = async () => {
     setLoading(true)
@@ -74,10 +67,20 @@ export default function TechnicianStatsPage() {
     }
   }
 
-  // eslint-disable-next-line react-hooks/rules-of-hooks
+  // useEffect siempre se llama — la carga real solo ocurre si hay sesión válida
   useEffect(() => {
+    if (status === 'loading') return
+    if (!session || session.user.role !== 'TECHNICIAN') return
     loadStats()
-  }, [])
+  }, [status, session?.user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Returns condicionales DESPUÉS de todos los hooks ─────────────────────
+  if (status === 'loading') return null
+
+  if (!session || session.user.role !== 'TECHNICIAN') {
+    router.push('/login')
+    return null
+  }
 
   const s = stats ?? {
     today: { resolved: 0, assigned: 0, avgResponseTime: '—', avgResolutionTime: '—' },

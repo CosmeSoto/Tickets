@@ -38,6 +38,7 @@ interface TechnicianCategory {
 }
 
 export default function TechnicianCategoriesPage() {
+  // ── Todos los hooks PRIMERO, sin ningún return antes ──────────────────────
   const { data: session, status } = useSession()
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
@@ -52,10 +53,11 @@ export default function TechnicianCategoriesPage() {
     initialLoad: true,
   })
 
-  // Protección de ruta — sin redirect manual, ModuleLayout maneja el loading
+  // ── Returns condicionales DESPUÉS de todos los hooks ─────────────────────
   if (status === 'loading') return null
+
   if (!session || session.user.role !== 'TECHNICIAN') {
-    if (typeof window !== 'undefined') router.push('/login')
+    router.push('/login')
     return null
   }
 
