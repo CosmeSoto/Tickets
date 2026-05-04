@@ -42,6 +42,8 @@ import type { Article } from '@/hooks/use-knowledge'
 
 export default function TechnicianKnowledgeDetailPage() {
   const { data: session, status } = useSession()
+  const router = useRouter()
+  const params = useParams()
   const { toast } = useToast()
 
   const articleId = params.id as string

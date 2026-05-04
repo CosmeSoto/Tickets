@@ -19,127 +19,13 @@ const createArticleSchema = z.object({
   sourceTicketId: z.string().uuid().optional(),
 })
 
-// GET /api/knowledge - Listar artículos con filtros
+// GET /api/knowledge — redirige a /api/knowledge-articles que tiene filtrado por familia
+// Este endpoint se mantiene por compatibilidad pero delega al endpoint correcto
 export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
-
-    const { searchParams } = new URL(request.url)
-    const search = searchParams.get('search') || ''
-    const categoryId = searchParams.get('categoryId') || undefined
-    const tagsParam = searchParams.get('tags')
-    const tags = tagsParam ? tagsParam.split(',') : undefined
-    const authorId = searchParams.get('authorId') || undefined
-    const sortBy = searchParams.get('sortBy') || 'recent'
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '20')
-    const skip = (page - 1) * limit
-
-    // Construir condiciones de búsqueda
-    const whereConditions: any = {
-      isPublished: true,
-    }
-
-    // Búsqueda por texto
-    if (search) {
-      whereConditions.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { content: { contains: search, mode: 'insensitive' } },
-        { summary: { contains: search, mode: 'insensitive' } },
-      ]
-    }
-
-    // Filtro por categoría
-    if (categoryId) {
-      whereConditions.categoryId = categoryId
-    }
-
-    // Filtro por tags
-    if (tags && tags.length > 0) {
-      whereConditions.tags = { hasSome: tags }
-    }
-
-    // Filtro por autor
-    if (authorId) {
-      whereConditions.authorId = authorId
-    }
-
-    // Determinar ordenamiento
-    let orderBy: any = { createdAt: 'desc' }
-    if (sortBy === 'views') {
-      orderBy = { views: 'desc' }
-    } else if (sortBy === 'helpful') {
-      orderBy = { helpfulVotes: 'desc' }
-    }
-
-    // Obtener artículos
-    const [articles, total] = await Promise.all([
-      prisma.knowledge_articles.findMany({
-        where: whereConditions,
-        include: {
-          category: {
-            select: {
-              id: true,
-              name: true,
-              color: true,
-            },
-          },
-          author: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              avatar: true,
-            },
-          },
-          sourceTicket: {
-            select: {
-              id: true,
-              title: true,
-            },
-          },
-          _count: {
-            select: {
-              votes: true,
-            },
-          },
-        },
-        orderBy,
-        skip,
-        take: limit,
-      }),
-      prisma.knowledge_articles.count({ where: whereConditions }),
-    ])
-
-    // Calcular porcentaje de votos útiles
-    const articlesWithStats = articles.map(article => ({
-      ...article,
-      helpfulPercentage:
-        article.helpfulVotes + article.notHelpfulVotes > 0
-          ? Math.round(
-              (article.helpfulVotes / (article.helpfulVotes + article.notHelpfulVotes)) * 100
-            )
-          : 0,
-    }))
-
-    return NextResponse.json({
-      success: true,
-      data: articlesWithStats,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    })
-  } catch (error) {
-    console.error('Error al obtener artículos:', error)
-    return NextResponse.json({ error: 'Error al obtener artículos' }, { status: 500 })
-  }
+  const url = new URL(request.url)
+  const redirectUrl = new URL('/api/knowledge-articles', url.origin)
+  url.searchParams.forEach((value, key) => redirectUrl.searchParams.set(key, value))
+  return NextResponse.redirect(redirectUrl, { status: 307 })
 }
 
 // POST /api/knowledge - Crear nuevo artículo

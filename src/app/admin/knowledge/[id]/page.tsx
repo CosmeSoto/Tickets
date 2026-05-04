@@ -42,7 +42,7 @@ import { useToast } from '@/hooks/use-toast'
 import type { Article } from '@/hooks/use-knowledge'
 
 export default function AdminKnowledgeDetailPage() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const router = useRouter()
   const params = useParams()
   const { toast } = useToast()
@@ -58,6 +58,8 @@ export default function AdminKnowledgeDetailPage() {
   const [toggling, setToggling] = useState(false)
 
   useEffect(() => {
+    if (status === 'loading') return
+
     if (!session || session.user.role !== 'ADMIN') {
       router.push('/login')
       return
@@ -67,7 +69,7 @@ export default function AdminKnowledgeDetailPage() {
     if (articleId && articleId !== 'create' && articleId !== 'new') {
       loadArticle()
     }
-  }, [session, articleId, router]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session, status, articleId, router]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (article) {
@@ -210,6 +212,8 @@ export default function AdminKnowledgeDetailPage() {
       setShowDeleteDialog(false)
     }
   }
+
+  if (status === 'loading') return null
 
   if (!session || session.user.role !== 'ADMIN') {
     return null

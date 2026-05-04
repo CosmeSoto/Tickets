@@ -226,7 +226,9 @@ export default function KnowledgeDetailPage() {
                       </Badge>
                     )}
                     {article.isPublished ? (
-                      <Badge className='bg-green-100 text-green-800'>Publicado</Badge>
+                      <Badge className='bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300'>
+                        Publicado
+                      </Badge>
                     ) : (
                       <Badge variant='secondary'>Borrador</Badge>
                     )}
@@ -258,11 +260,11 @@ export default function KnowledgeDetailPage() {
                     <span>{article.views} vistas</span>
                   </div>
                   <div className='flex items-center gap-3'>
-                    <div className='flex items-center gap-1 text-green-600'>
+                    <div className='flex items-center gap-1 text-green-600 dark:text-green-400'>
                       <ThumbsUp className='h-4 w-4' />
                       <span>{article.helpfulVotes}</span>
                     </div>
-                    <div className='flex items-center gap-1 text-red-600'>
+                    <div className='flex items-center gap-1 text-red-600 dark:text-red-400'>
                       <ThumbsDown className='h-4 w-4' />
                       <span>{article.notHelpfulVotes}</span>
                     </div>
