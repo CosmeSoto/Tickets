@@ -28,6 +28,7 @@ import { MaintenanceDialog } from './equipment/dialogs/maintenance-dialog'
 import { DeleteDialog } from './equipment/dialogs/delete-dialog'
 import { PermanentDeleteDialog } from './equipment/dialogs/permanent-delete-dialog'
 import { DecommissionDialog } from './equipment/dialogs/decommission-dialog'
+import { ConvertToPurchaseDialog } from './equipment/dialogs/convert-to-purchase-dialog'
 
 interface EquipmentDetailProps {
   equipmentId: string
@@ -61,6 +62,8 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
     setShowPermanentDeleteDialog,
     showDecommissionForm,
     setShowDecommissionForm,
+    showConvertToPurchaseDialog,
+    setShowConvertToPurchaseDialog,
 
     // Loading States
     assigning,
@@ -89,6 +92,7 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
     canRetire,
     canPermanentDelete,
     canReportProblem,
+    canConvertToPurchase,
 
     // Actions
     loadEquipmentDetail,
@@ -138,6 +142,7 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
           canMaintenance={canMaintenance ?? false}
           canRetire={canRetire ?? false}
           canPermanentDelete={canPermanentDelete ?? false}
+          canConvertToPurchase={canConvertToPurchase ?? false}
           isInMaintenance={isInMaintenance}
           onReportProblem={handleReportProblem}
           onRequestMaintenance={() => setShowMaintenanceDialog(true)}
@@ -147,6 +152,7 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
           onMaintenance={() => setShowMaintenanceDialog(true)}
           onRetire={() => setShowDecommissionForm(true)}
           onPermanentDelete={() => setShowPermanentDeleteDialog(true)}
+          onConvertToPurchase={() => setShowConvertToPurchaseDialog(true)}
         />
       </div>
 
@@ -282,6 +288,17 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
         acquisitionMode={
           (equipment as any).acquisitionMode ?? equipment.ownershipType ?? 'FIXED_ASSET'
         }
+        onSuccess={loadEquipmentDetail}
+      />
+
+      <ConvertToPurchaseDialog
+        open={showConvertToPurchaseDialog}
+        onOpenChange={setShowConvertToPurchaseDialog}
+        equipmentId={equipmentId}
+        equipmentCode={equipment.code}
+        equipmentBrand={equipment.brand}
+        equipmentModel={equipment.model}
+        currentOwnershipType={equipment.ownershipType}
         onSuccess={loadEquipmentDetail}
       />
     </div>

@@ -38,6 +38,7 @@ export function useEquipmentDetail({ equipmentId, userRole, userId }: UseEquipme
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showPermanentDeleteDialog, setShowPermanentDeleteDialog] = useState(false)
   const [showDecommissionForm, setShowDecommissionForm] = useState(false)
+  const [showConvertToPurchaseDialog, setShowConvertToPurchaseDialog] = useState(false)
 
   // ── Loading States ──
   const [assigning, setAssigning] = useState(false)
@@ -393,6 +394,11 @@ export function useEquipmentDetail({ equipmentId, userRole, userId }: UseEquipme
   const canRetire = canManage && !isRetired && !isAssigned
   const canPermanentDelete = isAdmin && isRetired
   const canReportProblem = userRole === 'CLIENT' && currentAssignment?.receiverId === userId
+  // Conversión a activo propio: solo para RENTAL/LOAN, no retirados, con permisos de gestión
+  const canConvertToPurchase =
+    canManage &&
+    !isRetired &&
+    (equipment?.ownershipType === 'RENTAL' || equipment?.ownershipType === 'LOAN')
 
   return {
     // Data
@@ -419,6 +425,8 @@ export function useEquipmentDetail({ equipmentId, userRole, userId }: UseEquipme
     setShowPermanentDeleteDialog,
     showDecommissionForm,
     setShowDecommissionForm,
+    showConvertToPurchaseDialog,
+    setShowConvertToPurchaseDialog,
 
     // Loading States
     assigning,
@@ -449,6 +457,7 @@ export function useEquipmentDetail({ equipmentId, userRole, userId }: UseEquipme
     canPermanentDelete,
     canReportProblem,
     hasActiveMaintenance,
+    canConvertToPurchase,
 
     // Actions
     loadEquipmentDetail,

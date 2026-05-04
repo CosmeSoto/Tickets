@@ -3,7 +3,7 @@
  * Displays action buttons based on permissions
  */
 
-import { Edit, UserPlus, Wrench, Trash2, AlertCircle } from 'lucide-react'
+import { Edit, UserPlus, Wrench, Trash2, AlertCircle, ShoppingCart } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface EquipmentActionButtonsProps {
@@ -15,6 +15,7 @@ interface EquipmentActionButtonsProps {
   canMaintenance: boolean
   canRetire: boolean
   canPermanentDelete: boolean
+  canConvertToPurchase: boolean
   isInMaintenance: boolean
   onReportProblem: () => void
   onRequestMaintenance: () => void
@@ -24,6 +25,7 @@ interface EquipmentActionButtonsProps {
   onMaintenance: () => void
   onRetire: () => void
   onPermanentDelete: () => void
+  onConvertToPurchase: () => void
 }
 
 export function EquipmentActionButtons({
@@ -35,6 +37,7 @@ export function EquipmentActionButtons({
   canMaintenance,
   canRetire,
   canPermanentDelete,
+  canConvertToPurchase,
   isInMaintenance,
   onReportProblem,
   onRequestMaintenance,
@@ -44,9 +47,10 @@ export function EquipmentActionButtons({
   onMaintenance,
   onRetire,
   onPermanentDelete,
+  onConvertToPurchase,
 }: EquipmentActionButtonsProps) {
   return (
-    <div className='flex gap-2'>
+    <div className='flex gap-2 flex-wrap'>
       {canReportProblem && (
         <Button onClick={onReportProblem} variant='default'>
           <AlertCircle className='mr-2 h-4 w-4' />
@@ -61,6 +65,12 @@ export function EquipmentActionButtons({
         >
           <Wrench className='mr-2 h-4 w-4' />
           Solicitar Mantenimiento
+        </Button>
+      )}
+      {canConvertToPurchase && (
+        <Button onClick={onConvertToPurchase} variant='outline'>
+          <ShoppingCart className='mr-2 h-4 w-4' />
+          Adquirir en propiedad
         </Button>
       )}
       {canEdit && (
