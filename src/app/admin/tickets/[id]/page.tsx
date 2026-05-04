@@ -423,6 +423,18 @@ export default function AdminTicketDetailPage() {
             </CardContent>
           </Card>
 
+          {/* Banner: admin es el solicitante y el ticket está resuelto — puede calificar */}
+          {session?.user?.id === ticket.client?.id &&
+            (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') && (
+              <TicketRatingSystem
+                ticketId={ticket.id}
+                technicianId={ticket.assignee?.id}
+                canRate={ticket.status === 'RESOLVED' || ticket.status === 'CLOSED'}
+                mode='client'
+                onRatingSubmitted={loadTicket}
+              />
+            )}
+
           {/* Tabs */}
           <Tabs defaultValue='timeline'>
             <TabsList className='grid w-full grid-cols-4'>
@@ -525,11 +537,13 @@ export default function AdminTicketDetailPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value='unassigned'>Sin asignar</SelectItem>
-                        {technicians.map(t => (
-                          <SelectItem key={t.id} value={t.id}>
-                            {t.name}
-                          </SelectItem>
-                        ))}
+                        {technicians
+                          .filter(t => t.id !== ticket.client?.id)
+                          .map(t => (
+                            <SelectItem key={t.id} value={t.id}>
+                              {t.name}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                   ) : (

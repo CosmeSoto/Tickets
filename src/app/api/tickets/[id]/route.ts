@@ -385,6 +385,17 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
         filteredUpdates.assigneeId = null
       }
 
+      // Bloquear asignación al propio solicitante del ticket
+      if (filteredUpdates.assigneeId && filteredUpdates.assigneeId === existingTicket.clientId) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'No se puede asignar el ticket al mismo usuario que lo solicitó.',
+          },
+          { status: 400 }
+        )
+      }
+
       // Si intenta modificar título o descripción, rechazar
       if (updates.title || updates.description) {
         return NextResponse.json(
@@ -725,6 +736,17 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
         (processedUpdates.assigneeId === undefined || processedUpdates.assigneeId === '')
       ) {
         processedUpdates.assigneeId = null
+      }
+
+      // Bloquear asignación al propio solicitante del ticket
+      if (processedUpdates.assigneeId && processedUpdates.assigneeId === existingTicket.clientId) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'No se puede asignar el ticket al mismo usuario que lo solicitó.',
+          },
+          { status: 400 }
+        )
       }
 
       // Si se desasigna el técnico, volver el estado a OPEN automáticamente

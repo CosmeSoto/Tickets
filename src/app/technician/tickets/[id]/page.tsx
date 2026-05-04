@@ -63,6 +63,9 @@ export default function TechnicianTicketDetailPage() {
 
   const canCreateArticle = ticket?.status === 'RESOLVED' || ticket?.status === 'CLOSED'
   const hasArticle = !!ticket?.knowledgeArticleId
+  // El técnico es el solicitante de este ticket (lo creó para sí mismo)
+  const isRequester = ticket?.client?.id === session?.user?.id
+  const canRate = isRequester && (ticket?.status === 'RESOLVED' || ticket?.status === 'CLOSED')
 
   useEffect(() => {
     if (authStatus === 'loading') return
@@ -248,7 +251,7 @@ export default function TechnicianTicketDetailPage() {
           </Card>
 
           {/* Banners de estado */}
-          {ticket.status === 'RESOLVED' && (
+          {ticket.status === 'RESOLVED' && !isRequester && (
             <Card className='border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950'>
               <CardContent className='pt-5 flex items-start gap-3'>
                 <Star className='h-5 w-5 text-amber-600 shrink-0 mt-0.5' />
@@ -289,6 +292,17 @@ export default function TechnicianTicketDetailPage() {
             </Card>
           )}
 
+          {/* Calificación — visible cuando el técnico es el solicitante y el ticket está resuelto/cerrado */}
+          {isRequester && (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') && (
+            <TicketRatingSystem
+              ticketId={ticket.id}
+              technicianId={ticket.assignee?.id}
+              canRate={canRate}
+              mode='client'
+              onRatingSubmitted={loadTicket}
+            />
+          )}
+
           {/* Tabs */}
           <Tabs defaultValue='timeline'>
             <TabsList className='grid w-full grid-cols-4'>
@@ -309,7 +323,7 @@ export default function TechnicianTicketDetailPage() {
             </TabsContent>
 
             <TabsContent value='status' className='space-y-4'>
-              {ticket.status !== 'CLOSED' ? (
+              {ticket.status !== 'CLOSED' && !isRequester ? (
                 <Card>
                   <CardHeader className='pb-2'>
                     <CardTitle className='text-sm font-semibold flex items-center gap-1.5'>
@@ -367,7 +381,9 @@ export default function TechnicianTicketDetailPage() {
                 </Card>
               ) : (
                 <p className='text-sm text-muted-foreground text-center py-8'>
-                  El ticket está cerrado y no puede cambiar de estado.
+                  {isRequester
+                    ? 'Eres el solicitante de este ticket. El técnico asignado gestiona el estado.'
+                    : 'El ticket está cerrado y no puede cambiar de estado.'}
                 </p>
               )}
             </TabsContent>

@@ -29,6 +29,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const currentTicket = await prisma.tickets.findUnique({
       where: { id: ticketId },
       select: {
+        clientId: true,
         assigneeId: true,
         users_tickets_assigneeIdTousers: {
           select: { id: true, name: true, email: true },
@@ -43,6 +44,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           message: 'Ticket no encontrado',
         },
         { status: 404 }
+      )
+    }
+
+    // Bloquear asignación al propio solicitante del ticket.
+    // Un técnico o admin que creó el ticket como cliente no puede ser asignado como resolutor.
+    if (assignmentData.assigneeId && assignmentData.assigneeId === currentTicket.clientId) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'No se puede asignar el ticket al mismo usuario que lo solicitó.',
+        },
+        { status: 400 }
       )
     }
 
