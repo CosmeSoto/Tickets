@@ -18,6 +18,9 @@ import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+
 // Componentes
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Button } from '@/components/ui/button'
@@ -331,13 +334,14 @@ export default function TechnicianKnowledgeDetailPage() {
 
             {/* Metadata */}
             <Card>
-              <CardContent className='p-6'>
+              <CardContent className='p-4 sm:p-6'>
                 <div className='space-y-4'>
                   {/* Categoría y tags */}
                   <div className='flex flex-wrap gap-2'>
                     {article.category && (
                       <Badge
                         variant='outline'
+                        className='font-medium'
                         style={{
                           borderColor: article.category.color || undefined,
                           color: article.category.color || undefined,
@@ -347,8 +351,8 @@ export default function TechnicianKnowledgeDetailPage() {
                       </Badge>
                     )}
                     {article.tags.map((tag, index) => (
-                      <Badge key={index} variant='secondary'>
-                        <Tag className='h-3 w-3 mr-1' />
+                      <Badge key={index} variant='secondary' className='gap-1'>
+                        <Tag className='h-3 w-3' />
                         {tag}
                       </Badge>
                     ))}
@@ -357,7 +361,7 @@ export default function TechnicianKnowledgeDetailPage() {
                   <Separator />
 
                   {/* Información del autor y fecha */}
-                  <div className='flex items-center justify-between text-sm text-muted-foreground'>
+                  <div className='flex flex-wrap items-center justify-between gap-4 text-sm text-muted-foreground'>
                     <div className='flex items-center space-x-4'>
                       {article.author && (
                         <div className='flex items-center space-x-2'>
@@ -377,8 +381,8 @@ export default function TechnicianKnowledgeDetailPage() {
                       )}
                     </div>
 
-                    <div className='flex items-center space-x-4'>
-                      <div className='flex items-center space-x-1'>
+                    <div className='flex items-center gap-4'>
+                      <div className='flex items-center gap-1.5'>
                         <Calendar className='h-4 w-4' />
                         <span>
                           {formatDistanceToNow(new Date(article.createdAt), {
@@ -387,7 +391,7 @@ export default function TechnicianKnowledgeDetailPage() {
                           })}
                         </span>
                       </div>
-                      <div className='flex items-center space-x-1'>
+                      <div className='flex items-center gap-1.5'>
                         <Eye className='h-4 w-4' />
                         <span>{article.views} vistas</span>
                       </div>
@@ -399,9 +403,9 @@ export default function TechnicianKnowledgeDetailPage() {
 
             {/* Contenido del artículo */}
             <Card>
-              <CardContent className='p-6'>
-                <div className='prose prose-sm max-w-none dark:prose-invert'>
-                  <div className='whitespace-pre-wrap'>{article.content}</div>
+              <CardContent className='p-6 sm:p-8'>
+                <div className='markdown-body'>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{article.content}</ReactMarkdown>
                 </div>
               </CardContent>
             </Card>

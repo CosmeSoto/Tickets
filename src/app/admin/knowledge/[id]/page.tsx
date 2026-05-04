@@ -19,6 +19,9 @@ import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+
 // Componentes
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Button } from '@/components/ui/button'
@@ -406,9 +409,9 @@ export default function AdminKnowledgeDetailPage() {
 
             {/* Contenido del artículo */}
             <Card>
-              <CardContent className='p-6'>
-                <div className='prose prose-sm max-w-none dark:prose-invert'>
-                  <div className='whitespace-pre-wrap'>{article.content}</div>
+              <CardContent className='p-6 sm:p-8'>
+                <div className='markdown-body'>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{article.content}</ReactMarkdown>
                 </div>
               </CardContent>
             </Card>
