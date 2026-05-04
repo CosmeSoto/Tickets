@@ -56,15 +56,28 @@ const ACQUISITION_MODES = [
 
 const DEPRECIATION_METHODS = [
   { value: 'LINEAR', label: 'Línea Recta' },
-  { value: 'DECLINING_BALANCE', label: 'Saldo Decreciente' },
-  { value: 'UNITS_OF_PRODUCTION', label: 'Unidades de Producción' },
+  { value: 'DECLINING_BALANCE', label: 'Saldo Decreciente Acelerado' },
+  { value: 'UNITS_OF_PRODUCTION', label: 'Por Uso (horas / km / ciclos)' },
 ]
 
+// Descripción corta visible bajo el selector
 const DEPRECIATION_METHOD_HELP: Record<string, string> = {
-  LINEAR: 'Deprecia el mismo monto cada año durante la vida útil del activo.',
+  LINEAR:
+    'Descuenta el mismo monto cada año. Ideal para mobiliario, infraestructura y equipos de uso constante.',
   DECLINING_BALANCE:
-    'Deprecia un porcentaje mayor en los primeros años, reduciendo el valor más rápido.',
-  UNITS_OF_PRODUCTION: 'Deprecia según el uso real del activo (horas, unidades producidas, etc.).',
+    'Descuenta más en los primeros años y menos al final. Ideal para tecnología que se vuelve obsoleta rápido (laptops, servidores).',
+  UNITS_OF_PRODUCTION:
+    'Descuenta según cuánto se usa el equipo, no por el tiempo. Ideal para generadores, vehículos, compresores o cualquier equipo donde puedas medir horas de operación, kilómetros o ciclos.',
+}
+
+// Ejemplo concreto expandido que aparece al seleccionar el método
+const DEPRECIATION_METHOD_EXAMPLE: Record<string, string> = {
+  LINEAR:
+    'Ejemplo: una laptop de $1.200 con vida útil de 4 años deprecia $300 por año, todos los años por igual.',
+  DECLINING_BALANCE:
+    'Ejemplo: una laptop de $1.200 deprecia ~$600 el primer año, ~$300 el segundo, ~$150 el tercero — el valor cae rápido al inicio.',
+  UNITS_OF_PRODUCTION:
+    'Ejemplo: un generador de $10.000 con vida útil de 10.000 horas. Si este año operó 1.500 horas, deprecia $1.500 ese año. Si el próximo año solo operó 500 horas, deprecia $500.',
 }
 
 interface FamilyDepreciationConfig {
@@ -107,6 +120,10 @@ export function EquipmentAssetForm({
   const [depreciationMethod, setDepreciationMethod] = useState('LINEAR')
   const [usefulLifeYears, setUsefulLifeYears] = useState('')
   const [residualValue, setResidualValue] = useState('')
+  // Campos para método "Por Uso"
+  const [totalUnits, setTotalUnits] = useState('') // capacidad total (horas/km/ciclos)
+  const [usedUnits, setUsedUnits] = useState('') // unidades ya consumidas
+  const [unitLabel, setUnitLabel] = useState('horas') // etiqueta personalizable
   const [warehouseId, setWarehouseId] = useState('')
   const [warehouses, setWarehouses] = useState<
     { id: string; name: string; description?: string }[]
@@ -277,26 +294,45 @@ export function EquipmentAssetForm({
     const price = parseFloat(purchasePrice)
     const years = parseFloat(usefulLifeYears)
     const residual = parseFloat(residualValue) || 0
-    if (!price || !purchaseDate || !years || years <= 0) return null
-
-    const purchaseDateObj = new Date(purchaseDate)
-    if (isNaN(purchaseDateObj.getTime())) return null
+    if (!price || !years || years <= 0) return null
 
     const method = depreciationMethod as DepreciationMethod
+
+    // Para "Por Uso": la preview simula uso uniforme anual (no necesita fecha)
+    if (method === 'UNITS_OF_PRODUCTION') {
+      const total = parseFloat(totalUnits)
+      if (!total || total <= 0) return null
+      const unitsPerYear = total / years
+      const checkYears = [1, 3, 5].filter(y => y <= years)
+      if (!checkYears.includes(Math.floor(years)) && years < 5) {
+        checkYears.push(Math.floor(years))
+        checkYears.sort((a, b) => a - b)
+      }
+      return checkYears.map(year => {
+        const simulatedUsed = Math.min(unitsPerYear * year, total)
+        const ratePerUnit = (price - residual) / total
+        const bookValue = Math.max(price - ratePerUnit * simulatedUsed, residual)
+        return { year, bookValue: Math.round(bookValue) }
+      })
+    }
+
+    // Para LINEAR y DECLINING_BALANCE: usa fecha de compra si existe, si no simula desde hoy
+    const baseDateObj = purchaseDate ? new Date(purchaseDate) : new Date()
+    if (isNaN(baseDateObj.getTime())) return null
+
     const checkYears = [1, 3, 5].filter(y => y <= years)
-    // Always include the last year if not already included
     if (!checkYears.includes(Math.floor(years)) && years < 5) {
       checkYears.push(Math.floor(years))
       checkYears.sort((a, b) => a - b)
     }
 
     return checkYears.map(year => {
-      const refDate = new Date(purchaseDateObj)
+      const refDate = new Date(baseDateObj)
       refDate.setFullYear(refDate.getFullYear() + year)
-      const result = calculateDepreciation(price, purchaseDateObj, years, residual, refDate, method)
+      const result = calculateDepreciation(price, baseDateObj, years, residual, refDate, method)
       return { year, bookValue: result.bookValue }
     })
-  }, [purchasePrice, purchaseDate, usefulLifeYears, residualValue, depreciationMethod])
+  }, [purchasePrice, purchaseDate, usefulLifeYears, residualValue, depreciationMethod, totalUnits])
 
   const addAccessory = () => {
     const v = accessoryInput.trim()
@@ -353,6 +389,11 @@ export function EquipmentAssetForm({
       depreciationMethod: depreciationMethod || undefined,
       usefulLifeYears: usefulLifeYears ? parseFloat(usefulLifeYears) : undefined,
       residualValue: residualValue ? parseFloat(residualValue) : undefined,
+      // Campos "Por Uso" — solo cuando el método es UNITS_OF_PRODUCTION
+      ...(depreciationMethod === 'UNITS_OF_PRODUCTION' && {
+        totalUnits: totalUnits ? parseFloat(totalUnits) : undefined,
+        usedUnits: usedUnits ? parseFloat(usedUnits) : undefined,
+      }),
       warehouseId: showWarehouse ? warehouseId || undefined : undefined,
       assignedUserId: equipmentStatus === 'ASSIGNED' ? assignedUserId || undefined : undefined,
       // Mantenimiento — solo cuando el estado es MAINTENANCE
@@ -827,6 +868,7 @@ export function EquipmentAssetForm({
         <fieldset className='rounded-lg border border-border p-4 space-y-3'>
           <legend className='px-2 text-sm font-semibold text-foreground'>Depreciación</legend>
           <div className='grid grid-cols-2 gap-3'>
+            {/* Método */}
             <div className='space-y-1 col-span-2'>
               <Label>Método de Depreciación</Label>
               <SimpleSelect
@@ -834,14 +876,27 @@ export function EquipmentAssetForm({
                 onChange={e => setDepreciationMethod(e.target.value)}
                 options={DEPRECIATION_METHODS}
               />
+              {/* Descripción corta */}
               {DEPRECIATION_METHOD_HELP[depreciationMethod] && (
                 <p className='text-xs text-muted-foreground'>
                   {DEPRECIATION_METHOD_HELP[depreciationMethod]}
                 </p>
               )}
+              {/* Ejemplo concreto */}
+              {DEPRECIATION_METHOD_EXAMPLE[depreciationMethod] && (
+                <p className='text-xs text-primary/70 italic'>
+                  {DEPRECIATION_METHOD_EXAMPLE[depreciationMethod]}
+                </p>
+              )}
             </div>
+
+            {/* Vida útil */}
             <div className='space-y-1'>
-              <Label>Vida Útil (años)</Label>
+              <Label>
+                {depreciationMethod === 'UNITS_OF_PRODUCTION'
+                  ? 'Vida útil estimada (años)'
+                  : 'Vida Útil (años)'}
+              </Label>
               <Input
                 type='number'
                 min='1'
@@ -852,6 +907,8 @@ export function EquipmentAssetForm({
                 Ej: laptops 3-5 años, servidores 5-7 años, mobiliario 10 años.
               </p>
             </div>
+
+            {/* Valor residual */}
             <div className='space-y-1'>
               <Label>Valor Residual</Label>
               <Input
@@ -876,7 +933,108 @@ export function EquipmentAssetForm({
                 </button>
               )}
             </div>
+
+            {/* ── Campos extra para "Por Uso" ── */}
+            {depreciationMethod === 'UNITS_OF_PRODUCTION' && (
+              <>
+                {/* Unidad de medida */}
+                <div className='space-y-1 col-span-2'>
+                  <Label>¿Qué unidad mide el uso de este equipo?</Label>
+                  <div className='flex gap-2'>
+                    {['horas', 'km', 'ciclos', 'horas de vuelo'].map(u => (
+                      <button
+                        key={u}
+                        type='button'
+                        onClick={() => setUnitLabel(u)}
+                        className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                          unitLabel === u
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-muted border-border hover:border-primary/50'
+                        }`}
+                      >
+                        {u}
+                      </button>
+                    ))}
+                    <Input
+                      value={
+                        ['horas', 'km', 'ciclos', 'horas de vuelo'].includes(unitLabel)
+                          ? ''
+                          : unitLabel
+                      }
+                      onChange={e => setUnitLabel(e.target.value || 'horas')}
+                      placeholder='Otra unidad...'
+                      className='h-7 text-xs flex-1'
+                    />
+                  </div>
+                  <p className='text-xs text-muted-foreground'>
+                    Ej: un generador usa &ldquo;horas&rdquo;, un vehículo usa &ldquo;km&rdquo;, una
+                    prensa usa &ldquo;ciclos&rdquo;.
+                  </p>
+                </div>
+
+                {/* Capacidad total */}
+                <div className='space-y-1'>
+                  <Label>
+                    Capacidad total de vida ({unitLabel})
+                    <span className='text-destructive ml-1'>*</span>
+                  </Label>
+                  <Input
+                    type='number'
+                    min='1'
+                    value={totalUnits}
+                    onChange={e => setTotalUnits(e.target.value)}
+                    placeholder={`Ej: 10000 ${unitLabel}`}
+                  />
+                  <p className='text-xs text-muted-foreground'>
+                    Total de {unitLabel} que el equipo puede operar en toda su vida útil.
+                  </p>
+                </div>
+
+                {/* Unidades ya usadas */}
+                <div className='space-y-1'>
+                  <Label>
+                    {unitLabel.charAt(0).toUpperCase() + unitLabel.slice(1)} ya utilizados
+                  </Label>
+                  <Input
+                    type='number'
+                    min='0'
+                    value={usedUnits}
+                    onChange={e => setUsedUnits(e.target.value)}
+                    placeholder={`Ej: 1500 ${unitLabel}`}
+                  />
+                  <p className='text-xs text-muted-foreground'>
+                    Cuántos {unitLabel} lleva acumulados hasta hoy (0 si es nuevo).
+                  </p>
+                </div>
+
+                {/* Indicador visual de uso */}
+                {totalUnits && usedUnits && parseFloat(totalUnits) > 0 && (
+                  <div className='col-span-2 space-y-1'>
+                    <div className='flex justify-between text-xs text-muted-foreground'>
+                      <span>Uso acumulado</span>
+                      <span>
+                        {Math.min(
+                          100,
+                          Math.round((parseFloat(usedUnits) / parseFloat(totalUnits)) * 100)
+                        )}
+                        % &nbsp;({usedUnits} / {totalUnits} {unitLabel})
+                      </span>
+                    </div>
+                    <div className='h-2 rounded-full bg-muted overflow-hidden'>
+                      <div
+                        className='h-full rounded-full bg-primary transition-all'
+                        style={{
+                          width: `${Math.min(100, (parseFloat(usedUnits) / parseFloat(totalUnits)) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
+
+          {/* ── Vista previa enrollable ── */}
           {depreciationPreview && depreciationPreview.length > 0 && (
             <div className='mt-2 rounded-md border border-border bg-muted/30'>
               <button
@@ -892,9 +1050,27 @@ export function EquipmentAssetForm({
                 )}
               </button>
               {depreciationPreviewOpen && (
-                <div className='border-t border-border px-3 py-2 space-y-1'>
-                  <p className='text-xs text-muted-foreground mb-2'>
-                    Valor libro estimado (solo informativo):
+                <div className='border-t border-border px-3 py-2 space-y-2'>
+                  {/* Fórmula del método seleccionado */}
+                  <div className='rounded-md bg-muted/60 px-3 py-2 text-xs font-mono text-muted-foreground'>
+                    {depreciationMethod === 'LINEAR' && (
+                      <span>Depreciación anual = (Precio − Valor residual) ÷ Vida útil</span>
+                    )}
+                    {depreciationMethod === 'DECLINING_BALANCE' && (
+                      <span>Depreciación año N = Valor libro × (2 ÷ Vida útil)</span>
+                    )}
+                    {depreciationMethod === 'UNITS_OF_PRODUCTION' && (
+                      <span>
+                        Depreciación = (Precio − Residual) ÷ Total {unitLabel} × {unitLabel} usados
+                      </span>
+                    )}
+                  </div>
+                  <p className='text-xs text-muted-foreground'>
+                    Valor libro estimado (solo informativo
+                    {!purchaseDate && depreciationMethod !== 'UNITS_OF_PRODUCTION'
+                      ? ' — simulado desde hoy'
+                      : ''}
+                    ):
                   </p>
                   <div className='grid grid-cols-3 gap-2'>
                     {depreciationPreview.map(({ year, bookValue }) => (
@@ -913,6 +1089,12 @@ export function EquipmentAssetForm({
                       </div>
                     ))}
                   </div>
+                  {depreciationMethod === 'UNITS_OF_PRODUCTION' && (
+                    <p className='text-xs text-muted-foreground italic'>
+                      * Simulado con uso uniforme anual. El valor real depende de los {unitLabel}{' '}
+                      registrados cada año.
+                    </p>
+                  )}
                 </div>
               )}
             </div>

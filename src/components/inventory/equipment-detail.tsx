@@ -179,6 +179,9 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
               usefulLifeYears={(equipment as any).usefulLifeYears}
               residualValue={(equipment as any).residualValue}
               depreciation={(equipment as any).depreciation}
+              depreciationMethod={(equipment as any).depreciationMethod}
+              totalUnits={(equipment as any).totalUnits}
+              usedUnits={(equipment as any).usedUnits}
             />
             <FinancialInfoSection
               supplierId={(equipment as any).supplierId}

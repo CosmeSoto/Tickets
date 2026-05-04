@@ -16,6 +16,15 @@ interface DepreciationCardProps {
   usefulLifeYears?: number | null
   residualValue?: number | null
   depreciation?: DepreciationInfo | null
+  depreciationMethod?: string | null
+  totalUnits?: number | null
+  usedUnits?: number | null
+}
+
+const METHOD_LABELS: Record<string, string> = {
+  LINEAR: 'Línea Recta',
+  DECLINING_BALANCE: 'Saldo Decreciente Acelerado',
+  UNITS_OF_PRODUCTION: 'Por Uso',
 }
 
 function fmt(n: number) {
@@ -28,15 +37,23 @@ export function DepreciationCard({
   usefulLifeYears,
   residualValue,
   depreciation,
+  depreciationMethod,
+  totalUnits,
+  usedUnits,
 }: DepreciationCardProps) {
   if (!usefulLifeYears) return null
+
+  const methodLabel = METHOD_LABELS[depreciationMethod ?? 'LINEAR'] ?? 'Línea Recta'
+  const isUsageBased = depreciationMethod === 'UNITS_OF_PRODUCTION'
+  const usagePct =
+    totalUnits && usedUnits ? Math.min(100, Math.round((usedUnits / totalUnits) * 100)) : null
 
   return (
     <Card>
       <CardHeader className='pb-3'>
         <CardTitle className='flex items-center gap-2 text-base'>
           <TrendingDown className='h-4 w-4 text-amber-600 dark:text-amber-400' />
-          Depreciación Lineal
+          Depreciación — {methodLabel}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -73,11 +90,41 @@ export function DepreciationCard({
               <p className='font-semibold'>${fmt(residualValue)}</p>
             </div>
           )}
+
+          {/* Campos específicos de "Por Uso" */}
+          {isUsageBased && totalUnits != null && (
+            <div>
+              <p className='text-xs font-medium uppercase text-muted-foreground'>Capacidad total</p>
+              <p className='font-semibold'>{totalUnits.toLocaleString('es-EC')} unidades</p>
+            </div>
+          )}
+          {isUsageBased && usedUnits != null && (
+            <div>
+              <p className='text-xs font-medium uppercase text-muted-foreground'>Uso acumulado</p>
+              <p className='font-semibold'>
+                {usedUnits.toLocaleString('es-EC')} unidades
+                {usagePct != null && (
+                  <span className='ml-1 text-xs text-muted-foreground'>({usagePct}%)</span>
+                )}
+              </p>
+            </div>
+          )}
+          {isUsageBased && usagePct != null && (
+            <div className='col-span-2 sm:col-span-3'>
+              <div className='h-2 rounded-full bg-muted overflow-hidden'>
+                <div
+                  className='h-full rounded-full bg-amber-500 transition-all'
+                  style={{ width: `${usagePct}%` }}
+                />
+              </div>
+            </div>
+          )}
+
           {depreciation && (
             <>
               <div>
                 <p className='text-xs font-medium uppercase text-muted-foreground'>
-                  Depreciación anual
+                  {isUsageBased ? 'Depreciación estimada/año' : 'Depreciación anual'}
                 </p>
                 <p className='font-semibold text-amber-600 dark:text-amber-400'>
                   ${fmt(depreciation.annualDepreciation)}
