@@ -386,14 +386,20 @@ export function EquipmentAssetForm({
       purchaseDate: purchaseDate || undefined,
       purchasePrice: purchasePrice ? parseFloat(purchasePrice) : undefined,
       invoiceNumber: invoiceNumber || undefined,
-      depreciationMethod: depreciationMethod || undefined,
-      usefulLifeYears: usefulLifeYears ? parseFloat(usefulLifeYears) : undefined,
-      residualValue: residualValue ? parseFloat(residualValue) : undefined,
-      // Campos "Por Uso" — solo cuando el método es UNITS_OF_PRODUCTION
-      ...(depreciationMethod === 'UNITS_OF_PRODUCTION' && {
-        totalUnits: totalUnits ? parseFloat(totalUnits) : undefined,
-        usedUnits: usedUnits ? parseFloat(usedUnits) : undefined,
-      }),
+      depreciationMethod:
+        acquisitionMode === 'FIXED_ASSET' ? depreciationMethod || undefined : undefined,
+      usefulLifeYears:
+        acquisitionMode === 'FIXED_ASSET' && usefulLifeYears
+          ? parseFloat(usefulLifeYears)
+          : undefined,
+      residualValue:
+        acquisitionMode === 'FIXED_ASSET' && residualValue ? parseFloat(residualValue) : undefined,
+      // Campos "Por Uso" — solo cuando el método es UNITS_OF_PRODUCTION y es activo propio
+      ...(acquisitionMode === 'FIXED_ASSET' &&
+        depreciationMethod === 'UNITS_OF_PRODUCTION' && {
+          totalUnits: totalUnits ? parseFloat(totalUnits) : undefined,
+          usedUnits: usedUnits ? parseFloat(usedUnits) : undefined,
+        }),
       warehouseId: showWarehouse ? warehouseId || undefined : undefined,
       assignedUserId: equipmentStatus === 'ASSIGNED' ? assignedUserId || undefined : undefined,
       // Mantenimiento — solo cuando el estado es MAINTENANCE
@@ -864,7 +870,7 @@ export function EquipmentAssetForm({
         </fieldset>
       )}
 
-      {isVisible('DEPRECIATION') && supportsDepreciation && (
+      {isVisible('DEPRECIATION') && supportsDepreciation && acquisitionMode === 'FIXED_ASSET' && (
         <fieldset className='rounded-lg border border-border p-4 space-y-3'>
           <legend className='px-2 text-sm font-semibold text-foreground'>Depreciación</legend>
           <div className='grid grid-cols-2 gap-3'>
@@ -1100,6 +1106,18 @@ export function EquipmentAssetForm({
             </div>
           )}
         </fieldset>
+      )}
+
+      {/* Nota: RENTAL y LOAN no deprecian — el activo no es propiedad de la empresa */}
+      {isVisible('DEPRECIATION') && supportsDepreciation && acquisitionMode !== 'FIXED_ASSET' && (
+        <div className='rounded-md border border-border bg-muted/40 px-4 py-3 space-y-1'>
+          <p className='text-sm font-medium text-foreground'>Sin depreciación</p>
+          <p className='text-xs text-muted-foreground'>
+            {acquisitionMode === 'RENTAL'
+              ? 'Los equipos arrendados no se deprecian — el proveedor es el propietario y quien registra la depreciación. La empresa registra el costo mensual del arrendamiento como gasto operativo.'
+              : 'Los activos de tercero no se deprecian — el propietario original conserva la titularidad y es quien aplica la depreciación contable.'}
+          </p>
+        </div>
       )}
 
       {/* ── 7. NOTAS Y ADJUNTOS ───────────────────────────────────── */}
