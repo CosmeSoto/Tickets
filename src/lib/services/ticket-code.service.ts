@@ -10,7 +10,7 @@ export class TicketCodeService {
   static async generateCode(familyId: string, year?: number): Promise<string> {
     const currentYear = year ?? new Date().getFullYear()
 
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async tx => {
       // Obtener config y familia para el prefijo
       const config = await tx.ticket_family_config.findUnique({
         where: { familyId },
@@ -26,6 +26,8 @@ export class TicketCodeService {
         throw new Error(`Familia con id "${familyId}" no encontrada`)
       }
 
+      const prefix = config?.codePrefix ?? family.code
+
       // Bloquear fila del contador para esta familia+año con SELECT ... FOR UPDATE
       const counters = await tx.$queryRaw<Array<{ last_sequence: number }>>`
         SELECT last_sequence FROM ticket_code_counters
@@ -33,17 +35,29 @@ export class TicketCodeService {
         FOR UPDATE
       `
 
-      const currentSeq = counters[0]?.last_sequence ?? 0
-      const nextSeq = currentSeq + 1
+      const counterSeq = counters[0]?.last_sequence ?? 0
 
-      // Upsert del contador
+      // Sincronizar con el máximo real en tickets para evitar colisiones
+      // cuando el contador esté desincronizado con los datos reales
+      const maxInDb = await tx.$queryRaw<Array<{ max_seq: number | null }>>`
+        SELECT MAX(
+          CAST(SPLIT_PART(ticket_code, '-', ARRAY_LENGTH(STRING_TO_ARRAY(ticket_code, '-'), 1)) AS INTEGER)
+        ) AS max_seq
+        FROM tickets
+        WHERE family_id = ${familyId}
+          AND ticket_code LIKE ${prefix + '-' + currentYear + '-%'}
+      `
+
+      const dbMaxSeq = maxInDb[0]?.max_seq ?? 0
+      const nextSeq = Math.max(counterSeq, dbMaxSeq) + 1
+
+      // Upsert del contador con el valor sincronizado
       await tx.ticket_code_counters.upsert({
         where: { familyId_year: { familyId, year: currentYear } },
         update: { lastSequence: nextSeq },
         create: { familyId, year: currentYear, lastSequence: nextSeq },
       })
 
-      const prefix = config?.codePrefix ?? family.code
       return `${prefix}-${currentYear}-${String(nextSeq).padStart(4, '0')}`
     })
   }
