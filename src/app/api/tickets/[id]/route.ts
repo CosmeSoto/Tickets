@@ -10,23 +10,7 @@ import { EmailService } from '@/lib/services/email/email-service'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { NotificationService } from '@/lib/services/notification-service'
 import { invalidateCache } from '@/lib/api-cache'
-
-// Traducción de nombres de campo técnicos a español para el historial
-const FIELD_LABELS_ES: Record<string, string> = {
-  title: 'título',
-  description: 'descripción',
-  status: 'estado',
-  priority: 'prioridad',
-  assigneeId: 'técnico asignado',
-  categoryId: 'categoría',
-  location: 'ubicación',
-  tags: 'etiquetas',
-  familyId: 'área',
-}
-
-function translateFieldNames(fields: string[]): string {
-  return fields.map(f => FIELD_LABELS_ES[f] || f).join(', ')
-}
+import { translateFieldNames } from '@/lib/constants/ticket-labels'
 
 // Helper: invalida caché de tickets y dashboard cuando un ticket cambia
 async function invalidateTicketCaches() {

@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import {
+  translateStatus,
+  translatePriority,
+  translateField,
+  translateFieldNames,
+  translateFieldValue,
+  TICKET_FIELD_LABELS,
+  TICKET_ACTION_LABELS,
+} from '@/lib/constants/ticket-labels'
 
 /**
  * GET /api/tickets/[id]/timeline
@@ -186,44 +195,14 @@ function mapActionToType(action: string): string {
 }
 
 // Traducción de valores de campos técnicos a español legible
-const STATUS_LABELS: Record<string, string> = {
-  OPEN: 'Abierto',
-  IN_PROGRESS: 'En Progreso',
-  RESOLVED: 'Resuelto',
-  CLOSED: 'Cerrado',
-  ON_HOLD: 'En Espera',
-}
-
-const PRIORITY_LABELS: Record<string, string> = {
-  LOW: 'Baja',
-  MEDIUM: 'Media',
-  HIGH: 'Alta',
-  URGENT: 'Urgente',
-}
-
-const FIELD_LABELS: Record<string, string> = {
-  title: 'título',
-  description: 'descripción',
-  status: 'estado',
-  priority: 'prioridad',
-  assigneeId: 'técnico asignado',
-  categoryId: 'categoría',
-  location: 'ubicación',
-  tags: 'etiquetas',
-}
+// — Ahora importado desde @/lib/constants/ticket-labels —
 
 function translateValue(field: string | null, value: string | null): string {
-  if (!value) return '—'
-  if (field === 'status' || STATUS_LABELS[value]) return STATUS_LABELS[value] || value
-  if (field === 'priority' || PRIORITY_LABELS[value]) return PRIORITY_LABELS[value] || value
-  return value
+  return translateFieldValue(field, value)
 }
 
 function translateFields(fields: string): string {
-  return fields
-    .split(',')
-    .map(f => FIELD_LABELS[f.trim()] || f.trim())
-    .join(', ')
+  return translateFieldNames(fields.split(','))
 }
 
 // Generar título descriptivo basado en la acción
@@ -237,8 +216,8 @@ function generateTitle(
     case 'created':
       return 'Ticket creado'
     case 'status_changed': {
-      const from = translateValue('status', oldValue)
-      const to = translateValue('status', newValue)
+      const from = translateFieldValue('status', oldValue)
+      const to = translateFieldValue('status', newValue)
       return `Estado: ${from} → ${to}`
     }
     case 'updated':
@@ -252,8 +231,8 @@ function generateTitle(
     case 'reassigned':
       return 'Técnico reasignado'
     case 'priority_changed': {
-      const from = translateValue('priority', oldValue)
-      const to = translateValue('priority', newValue)
+      const from = translateFieldValue('priority', oldValue)
+      const to = translateFieldValue('priority', newValue)
       return `Prioridad: ${from} → ${to}`
     }
     case 'comment_added':
@@ -279,7 +258,7 @@ function generateTitle(
     case 'file_uploaded':
       return 'Archivo adjunto'
     default:
-      return field ? `Cambio en ${FIELD_LABELS[field] || field}` : 'Cambio en ticket'
+      return field ? `Cambio en ${translateField(field)}` : 'Cambio en ticket'
   }
 }
 
@@ -290,18 +269,13 @@ function generateDescription(
   newValue: string | null,
   oldValue: string | null
 ): string {
-  // Si hay un comentario en la BD, procesarlo para traducir campos técnicos
   if (originalComment) {
-    // Traducir patrones como "Administrador actualizó: title, description, status"
     return originalComment.replace(
       /actualizó:\s*([a-zA-Z,\s]+)/g,
-      (_, fields) => `actualizó: ${translateFields(fields)}`
+      (_, fields) => `actualizó: ${translateFieldNames(fields.split(','))}`
     )
   }
-
-  // Para planes de resolución, no generar descripción adicional
   if (action.includes('resolution_plan')) return ''
-
   switch (action) {
     case 'assigned':
       return newValue ? `Asignado a ${newValue}` : 'El ticket fue asignado para su atención.'
@@ -314,21 +288,17 @@ function generateDescription(
     case 'reassigned':
       return newValue ? `Reasignado a ${newValue}` : 'El ticket fue reasignado.'
     case 'status_changed': {
-      const from = translateValue('status', oldValue)
-      const to = translateValue('status', newValue)
+      const from = translateStatus(oldValue ?? '')
+      const to = translateStatus(newValue ?? '')
       return `El estado cambió de "${from}" a "${to}".`
     }
     case 'priority_changed': {
-      const from = translateValue('priority', oldValue)
-      const to = translateValue('priority', newValue)
+      const from = translatePriority(oldValue ?? '')
+      const to = translatePriority(newValue ?? '')
       return `La prioridad cambió de "${from}" a "${to}".`
     }
     case 'updated': {
-      // newValue puede ser una lista de campos separados por coma
-      if (newValue) {
-        const translated = translateFields(newValue)
-        return `Se actualizó: ${translated}.`
-      }
+      if (newValue) return `Se actualizó: ${translateFieldNames(newValue.split(','))}.`
       return 'Se actualizaron los datos del ticket.'
     }
     case 'resolved':
