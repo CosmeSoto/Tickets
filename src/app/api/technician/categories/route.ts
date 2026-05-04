@@ -36,8 +36,10 @@ export async function GET(request: Request) {
     const categoryIds = assignments.map(a => a.categoryId)
 
     if (categoryIds.length === 0) {
-      return NextResponse.json({ success: true, categories: [] })
+      return NextResponse.json({ success: true, data: [] })
     }
+
+    console.log('[TECH-CATEGORIES] categoryIds:', categoryIds)
 
     // Paso 1: hijos directos
     const children = await prisma.categories.findMany({
@@ -45,6 +47,7 @@ export async function GET(request: Request) {
       select: { id: true, parentId: true },
     })
     const childIds = children.map(c => c.id)
+    console.log('[TECH-CATEGORIES] childIds:', childIds)
 
     // Paso 2: nietos (hijos de los hijos)
     const grandchildren =
@@ -55,9 +58,17 @@ export async function GET(request: Request) {
           })
         : []
     const grandchildIds = grandchildren.map(c => c.id)
+    console.log('[TECH-CATEGORIES] grandchildIds:', grandchildIds)
 
     // Todos los IDs: raíces + hijos + nietos
     const allCategoryIds = Array.from(new Set([...categoryIds, ...childIds, ...grandchildIds]))
+    console.log('[TECH-CATEGORIES] allCategoryIds:', allCategoryIds)
+
+    // Verificar cuántos tickets hay en total para estos IDs
+    const totalTicketsCheck = await prisma.tickets.count({
+      where: { categoryId: { in: allCategoryIds } },
+    })
+    console.log('[TECH-CATEGORIES] Total tickets en estas categorias:', totalTicketsCheck)
 
     // Construir mapa: rootId → todos sus descendientes
     const rootToAllIds = new Map<string, string[]>()
