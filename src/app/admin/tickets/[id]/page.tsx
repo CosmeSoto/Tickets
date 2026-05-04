@@ -260,14 +260,14 @@ export default function AdminTicketDetailPage() {
 
   const headerActions = (
     <div className='flex flex-wrap items-center gap-2'>
-      {/* Cierre directo — solo super admin, solo cuando está RESOLVED */}
-      {isSuperAdmin && ticket.status === 'RESOLVED' && (
+      {/* Cierre directo — solo super admin, en cualquier estado activo */}
+      {isSuperAdmin && ticket.status !== 'CLOSED' && (
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button
               variant='outline'
               size='sm'
-              className='border-green-500 text-green-700 hover:bg-green-50'
+              className='border-green-500 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-400'
             >
               <CheckCircle className='h-4 w-4 sm:mr-2' />
               <span className='hidden sm:inline'>Cerrar Ticket</span>

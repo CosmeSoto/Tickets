@@ -171,14 +171,27 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (mode === 'auto') {
       const body = await request.json()
 
-      // ⭐ IMPORTAR Y USAR EL SERVICIO REAL
       const { AssignmentService } = await import('@/lib/services/assignment-service')
 
       try {
-        const result = await AssignmentService.autoAssignTicket(ticketId, {
-          workloadBalance: body.workloadBalance !== false,
-          skillMatch: body.skillMatch !== false,
+        // Obtener el clientId del ticket para excluirlo de candidatos
+        const ticket = await prisma.tickets.findUnique({
+          where: { id: ticketId },
+          select: { clientId: true },
         })
+
+        if (!ticket) {
+          return NextResponse.json({ error: 'Ticket no encontrado' }, { status: 404 })
+        }
+
+        const result = await AssignmentService.autoAssignTicket(
+          ticketId,
+          {
+            workloadBalance: body.workloadBalance !== false,
+            skillMatch: body.skillMatch !== false,
+          },
+          ticket.clientId // excluir al solicitante
+        )
 
         return NextResponse.json(result)
       } catch (error) {

@@ -12,7 +12,11 @@ export class AssignmentService {
   /**
    * Asigna automáticamente un ticket al técnico más apropiado
    */
-  static async autoAssignTicket(ticketId: string, criteria: AssignmentCriteria = {}) {
+  static async autoAssignTicket(
+    ticketId: string,
+    criteria: AssignmentCriteria = {},
+    excludeUserId?: string
+  ) {
     try {
       // Obtener información del ticket con categoría y departamento
       const ticket = await prisma.tickets.findUnique({
@@ -36,21 +40,28 @@ export class AssignmentService {
         throw new Error('Ticket no encontrado')
       }
 
-      // Obtener técnicos disponibles
-      let availableTechnicians = await this.getAvailableTechnicians(criteria)
+      // El solicitante nunca puede ser el resolutor
+      const blockedUserId = excludeUserId ?? ticket.clientId
+
+      // Obtener candidatos disponibles, excluyendo al solicitante
+      let availableTechnicians = await this.getAvailableTechnicians(criteria, blockedUserId)
 
       if (availableTechnicians.length === 0) {
-        throw new Error('No hay técnicos disponibles')
+        throw new Error('No hay técnicos disponibles para este ticket')
       }
 
       // 🎯 PRIORIDAD 1: técnicos asignados a la familia del ticket
+      // Los admins son elegibles para cualquier familia
       if (ticket.familyId) {
         const techsFromFamily = await prisma.technician_family_assignments.findMany({
           where: { familyId: ticket.familyId, isActive: true },
           select: { technicianId: true },
         })
         const familyTechIds = new Set(techsFromFamily.map(t => t.technicianId))
-        const techsInFamily = availableTechnicians.filter(t => familyTechIds.has(t.id))
+        // Técnicos de la familia + todos los admins (no están restringidos por familia)
+        const techsInFamily = availableTechnicians.filter(
+          t => familyTechIds.has(t.id) || t.role === 'ADMIN'
+        )
         if (techsInFamily.length > 0) {
           availableTechnicians = techsInFamily
         }
@@ -166,13 +177,21 @@ export class AssignmentService {
   }
 
   /**
-   * Obtiene técnicos y admins disponibles para resolver tickets
+   * Obtiene técnicos y admins disponibles para resolver tickets.
+   * Excluye al solicitante (blockedUserId) para evitar auto-asignación.
    */
-  private static async getAvailableTechnicians(criteria: AssignmentCriteria) {
-    // Incluir técnicos Y admins activos como posibles resolutores
+  private static async getAvailableTechnicians(
+    criteria: AssignmentCriteria,
+    blockedUserId?: string
+  ) {
     const where: any = {
       role: { in: ['TECHNICIAN', 'ADMIN'] },
       isActive: true,
+    }
+
+    // Nunca incluir al solicitante del ticket
+    if (blockedUserId) {
+      where.id = { not: blockedUserId }
     }
 
     const technicians = await prisma.users.findMany({
@@ -181,6 +200,7 @@ export class AssignmentService {
         id: true,
         name: true,
         email: true,
+        role: true,
         departmentId: true,
         departments: {
           select: {
@@ -235,6 +255,12 @@ export class AssignmentService {
       technicians.map(async technician => {
         let score = 0
         const reasons: string[] = []
+
+        // Factor 0: Preferir técnicos sobre admins (admins son fallback)
+        if (technician.role === 'TECHNICIAN') {
+          score += 0.3
+          reasons.push('Técnico especializado')
+        }
 
         // Factor 1: Familia coincidente (20% del peso)
         if (ticket.familyId) {
