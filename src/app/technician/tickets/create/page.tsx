@@ -27,7 +27,7 @@ export default function TechnicianCreateTicketPage() {
 
   if (status === 'loading' || !session) {
     return (
-      <ModuleLayout title='Nueva Solicitud' subtitle='Cargando...' loading={true}>
+      <ModuleLayout title='Crear Ticket' subtitle='Cargando...' loading={true}>
         <div />
       </ModuleLayout>
     )
@@ -35,8 +35,8 @@ export default function TechnicianCreateTicketPage() {
 
   return (
     <ModuleLayout
-      title='Nueva Solicitud'
-      subtitle='Crea una solicitud de soporte — será atendida por otro técnico o administrador'
+      title='Crear Ticket'
+      subtitle='Tu solicitud será atendida por otro técnico o administrador'
       headerActions={
         <Button variant='outline' size='sm' asChild>
           <Link href='/technician/tickets'>
@@ -51,8 +51,8 @@ export default function TechnicianCreateTicketPage() {
         clientId={session.user.id}
         afterSuccessHref='/technician/tickets'
         cancelHref='/technician/tickets'
-        submitLabel='Enviar Solicitud'
-        cardTitle='Nueva Solicitud de Soporte'
+        submitLabel='Crear Ticket'
+        cardTitle='Crear Ticket de Soporte'
         cardDescription='Describe el problema con el mayor detalle posible para agilizar la resolución'
         infoAlert={
           <>
