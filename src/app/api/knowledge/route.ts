@@ -71,20 +71,31 @@ export async function POST(request: NextRequest) {
     // Derivar familyId: categoría → departamento → familia
     const familyId = category.departments?.familyId ?? null
 
-    // Si hay sourceTicketId, verificar que el ticket existe y está resuelto
+    // Si hay sourceTicketId, verificar que el ticket existe, está resuelto/cerrado,
+    // y que quien crea el artículo es el resolutor asignado o un admin
     if (data.sourceTicketId) {
       const ticket = await prisma.tickets.findUnique({
         where: { id: data.sourceTicketId },
+        select: { status: true, assigneeId: true },
       })
 
       if (!ticket) {
         return NextResponse.json({ error: 'Ticket no encontrado' }, { status: 404 })
       }
 
-      if (ticket.status !== 'RESOLVED') {
+      if (ticket.status !== 'RESOLVED' && ticket.status !== 'CLOSED') {
         return NextResponse.json(
-          { error: 'Solo se pueden crear artículos desde tickets resueltos' },
+          { error: 'Solo se pueden crear artículos desde tickets resueltos o cerrados' },
           { status: 400 }
+        )
+      }
+
+      // Solo el resolutor asignado puede crear el artículo desde este ticket
+      // Los admins pueden crear desde cualquier ticket resuelto/cerrado
+      if (session.user.role !== UserRole.ADMIN && ticket.assigneeId !== session.user.id) {
+        return NextResponse.json(
+          { error: 'Solo el técnico que resolvió el ticket puede crear un artículo desde él' },
+          { status: 403 }
         )
       }
     }

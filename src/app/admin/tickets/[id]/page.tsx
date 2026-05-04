@@ -299,8 +299,9 @@ export default function AdminTicketDetailPage() {
 
   const headerActions = (
     <div className='flex flex-wrap items-center gap-2'>
-      {/* Artículo de conocimiento */}
+      {/* Artículo de conocimiento — solo el resolutor asignado o cualquier admin puede crear/ver */}
       {(ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') &&
+        (isAssignedResolver || (!isRequester && session?.user?.role === 'ADMIN')) &&
         (ticket.knowledgeArticleId ? (
           <Button
             variant='outline'
@@ -320,44 +321,45 @@ export default function AdminTicketDetailPage() {
             <span className='hidden sm:inline'>Crear Artículo</span>
           </Button>
         ))}
-      {/* Asignación */}
-      {ticket.assignee ? (
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button variant='outline' size='sm' disabled={unassigning}>
-              {unassigning ? (
-                <Loader2 className='h-4 w-4 mr-2 animate-spin' />
-              ) : (
-                <UserX className='h-4 w-4 sm:mr-2' />
-              )}
-              <span className='hidden sm:inline'>Desasignar</span>
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>¿Desasignar técnico?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Se removerá a <strong>{ticket.assignee.name}</strong> y el estado volverá a
-                &quot;Abierto&quot;.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={handleUnassign}>Confirmar</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      ) : (
-        <AutoAssignment
-          ticketId={ticket.id}
-          currentAssignee={ticket.assignee}
-          onAssignmentComplete={async () => {
-            await loadTicket()
-            setTimelineKey(k => k + 1)
-          }}
-          onOpenChange={setAssignmentDialogOpen}
-        />
-      )}
+      {/* Asignación — solo visible cuando el ticket está activo (no resuelto ni cerrado) */}
+      {!['RESOLVED', 'CLOSED'].includes(ticket.status) &&
+        (ticket.assignee ? (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant='outline' size='sm' disabled={unassigning}>
+                {unassigning ? (
+                  <Loader2 className='h-4 w-4 mr-2 animate-spin' />
+                ) : (
+                  <UserX className='h-4 w-4 sm:mr-2' />
+                )}
+                <span className='hidden sm:inline'>Desasignar</span>
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Desasignar técnico?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Se removerá a <strong>{ticket.assignee.name}</strong> y el estado volverá a
+                  &quot;Abierto&quot;.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleUnassign}>Confirmar</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        ) : (
+          <AutoAssignment
+            ticketId={ticket.id}
+            currentAssignee={ticket.assignee}
+            onAssignmentComplete={async () => {
+              await loadTicket()
+              setTimelineKey(k => k + 1)
+            }}
+            onOpenChange={setAssignmentDialogOpen}
+          />
+        ))}
       {/* Editar */}
       {!isEditing ? (
         <Button size='sm' onClick={() => setIsEditing(true)}>
@@ -513,11 +515,11 @@ export default function AdminTicketDetailPage() {
           {/* Tabs */}
           <Tabs defaultValue='timeline'>
             <TabsList
-              className={`grid w-full ${isAssignedResolver && !isRequester ? 'grid-cols-5' : 'grid-cols-4'}`}
+              className={`grid w-full ${isAssignedResolver && !isRequester && ticket.status !== 'CLOSED' ? 'grid-cols-5' : 'grid-cols-4'}`}
             >
               <TabsTrigger value='timeline'>Historial</TabsTrigger>
-              {/* Tab Estado: visible solo cuando el admin es el resolutor asignado (no el solicitante) */}
-              {isAssignedResolver && !isRequester && (
+              {/* Tab Estado: solo cuando el admin es el resolutor, no el solicitante, y el ticket no está cerrado */}
+              {isAssignedResolver && !isRequester && ticket.status !== 'CLOSED' && (
                 <TabsTrigger value='status'>Estado</TabsTrigger>
               )}
               <TabsTrigger value='resolution'>Plan</TabsTrigger>
@@ -535,8 +537,8 @@ export default function AdminTicketDetailPage() {
               />
             </TabsContent>
 
-            {/* Tab Estado — solo para el admin/super admin asignado como resolutor */}
-            {isAssignedResolver && !isRequester && (
+            {/* Tab Estado — solo para el admin/super admin asignado como resolutor, no cuando está cerrado */}
+            {isAssignedResolver && !isRequester && ticket.status !== 'CLOSED' && (
               <TabsContent value='status' className='space-y-4'>
                 {ticket.status !== 'CLOSED' ? (
                   <Card>

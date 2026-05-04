@@ -61,7 +61,10 @@ export default function TechnicianTicketDetailPage() {
   const [timelineKey, setTimelineKey] = useState(0)
   const [fileKey, setFileKey] = useState(0)
 
-  const canCreateArticle = ticket?.status === 'RESOLVED' || ticket?.status === 'CLOSED'
+  // Solo puede crear artículo quien resolvió el ticket (assignee), no el solicitante
+  const isAssignedResolver = ticket?.assignee?.id === session?.user?.id
+  const canCreateArticle =
+    isAssignedResolver && (ticket?.status === 'RESOLVED' || ticket?.status === 'CLOSED')
   const hasArticle = !!ticket?.knowledgeArticleId
   // El técnico es el solicitante de este ticket (lo creó para sí mismo)
   const isRequester = ticket?.client?.id === session?.user?.id
@@ -271,10 +274,9 @@ export default function TechnicianTicketDetailPage() {
               <CardContent className='pt-5 flex items-start gap-3'>
                 <CheckCircle className='h-5 w-5 text-green-600 shrink-0 mt-0.5' />
                 <div>
-                  <p className='font-medium text-green-900 dark:text-green-100'>
-                    Ticket cerrado y calificado
-                  </p>
-                  {!hasArticle && (
+                  <p className='font-medium text-green-900 dark:text-green-100'>Ticket cerrado</p>
+                  {/* Solo el resolutor puede promover a artículo */}
+                  {isAssignedResolver && !hasArticle && (
                     <Button
                       variant='outline'
                       size='sm'
@@ -305,9 +307,14 @@ export default function TechnicianTicketDetailPage() {
 
           {/* Tabs */}
           <Tabs defaultValue='timeline'>
-            <TabsList className='grid w-full grid-cols-4'>
+            <TabsList
+              className={`grid w-full ${!isRequester && ticket.status !== 'CLOSED' ? 'grid-cols-4' : 'grid-cols-3'}`}
+            >
               <TabsTrigger value='timeline'>Historial</TabsTrigger>
-              <TabsTrigger value='status'>Estado</TabsTrigger>
+              {/* Tab Estado: solo para el resolutor asignado, no para el solicitante, no cuando está cerrado */}
+              {!isRequester && ticket.status !== 'CLOSED' && (
+                <TabsTrigger value='status'>Estado</TabsTrigger>
+              )}
               <TabsTrigger value='resolution'>Plan</TabsTrigger>
               <TabsTrigger value='files'>Archivos</TabsTrigger>
             </TabsList>
