@@ -210,20 +210,22 @@ export default function TechnicianTicketsPage() {
           <TabsTrigger value='assigned' className='gap-2'>
             <TicketIcon className='h-4 w-4' />
             Asignados a mí
-            {assignedStats.open + assignedStats.inProgress > 0 && (
-              <Badge variant='secondary' className='ml-1 h-5 px-1.5 text-xs'>
-                {assignedStats.open + assignedStats.inProgress}
-              </Badge>
-            )}
+            <Badge
+              variant={assignedStats.open + assignedStats.inProgress > 0 ? 'default' : 'secondary'}
+              className='ml-1 h-5 px-1.5 text-xs'
+            >
+              {assignedStats.total}
+            </Badge>
           </TabsTrigger>
           <TabsTrigger value='created' className='gap-2'>
             <Send className='h-4 w-4' />
             Mis Solicitudes
-            {createdStats.open + createdStats.inProgress > 0 && (
-              <Badge variant='secondary' className='ml-1 h-5 px-1.5 text-xs'>
-                {createdStats.open + createdStats.inProgress}
-              </Badge>
-            )}
+            <Badge
+              variant={createdStats.open + createdStats.inProgress > 0 ? 'default' : 'secondary'}
+              className='ml-1 h-5 px-1.5 text-xs'
+            >
+              {createdStats.total}
+            </Badge>
           </TabsTrigger>
         </TabsList>
 

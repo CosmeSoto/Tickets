@@ -169,8 +169,11 @@ export default function AdminTicketsPage() {
           <TabsTrigger value='all' className='gap-2'>
             <Ticket className='h-4 w-4' />
             Todos los Tickets
+            <Badge variant='secondary' className='ml-1 h-5 px-1.5 text-xs'>
+              {allStats.total}
+            </Badge>
             {allStats.unassigned > 0 && (
-              <Badge variant='secondary' className='ml-1 h-5 px-1.5 text-xs'>
+              <Badge variant='destructive' className='ml-0.5 h-5 px-1.5 text-xs'>
                 {allStats.unassigned} sin asignar
               </Badge>
             )}
@@ -178,11 +181,12 @@ export default function AdminTicketsPage() {
           <TabsTrigger value='created' className='gap-2'>
             <Send className='h-4 w-4' />
             Mis Solicitudes
-            {createdStats.open + createdStats.inProgress > 0 && (
-              <Badge variant='secondary' className='ml-1 h-5 px-1.5 text-xs'>
-                {createdStats.open + createdStats.inProgress}
-              </Badge>
-            )}
+            <Badge
+              variant={createdStats.open + createdStats.inProgress > 0 ? 'default' : 'secondary'}
+              className='ml-1 h-5 px-1.5 text-xs'
+            >
+              {createdStats.total}
+            </Badge>
           </TabsTrigger>
         </TabsList>
 
