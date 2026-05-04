@@ -12,6 +12,8 @@ import {
   BarChart3,
   FolderTree,
   BookOpen,
+  Plus,
+  Send,
 } from 'lucide-react'
 
 import { ModuleLayout } from '@/components/common/layout/module-layout'
@@ -23,41 +25,46 @@ import { TicketFilters } from '@/components/tickets/ticket-filters'
 import { createTechnicianTicketColumns } from '@/components/tickets/technician/ticket-columns'
 import { Button } from '@/components/ui/button'
 import { ExportButton } from '@/components/common/export-button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Badge } from '@/components/ui/badge'
 
 import { useModuleData } from '@/hooks/common/use-module-data'
 import { useTicketFilters } from '@/hooks/common/use-ticket-filters'
 import { usePagination } from '@/hooks/common/use-pagination'
 import { useExport } from '@/hooks/common/use-export'
 import type { Ticket as TicketType } from '@/hooks/use-ticket-data'
-import { filterTicketsTechnician } from '@/lib/utils/ticket-filters'
+import { filterTicketsTechnician, filterTicketsCreatedBy } from '@/lib/utils/ticket-filters'
 import { TECHNICIAN_TICKET_EXPORT_COLUMNS } from '@/lib/utils/ticket-utils'
 import { useFamilies } from '@/contexts/families-context'
-
-interface FamilyOption {
-  id: string
-  name: string
-  code: string
-  color?: string | null
-}
 
 export default function TechnicianTicketsPage() {
   const { data: session } = useSession()
   const router = useRouter()
+  const [activeTab, setActiveTab] = useState<'assigned' | 'created'>('assigned')
 
-  // Familias desde el contexto global (cache Redis, sin peticion extra)
   const { families } = useFamilies()
 
+  // Carga de tickets asignados (modo por defecto)
   const {
-    data: allTickets,
-    loading,
-    error,
-    reload,
+    data: assignedTickets,
+    loading: loadingAssigned,
+    error: errorAssigned,
+    reload: reloadAssigned,
   } = useModuleData<TicketType>({
     endpoint: '/api/tickets',
     initialLoad: true,
   })
 
-  // Familias ya disponibles desde el contexto global
+  // Carga de tickets creados por el técnico (como solicitante)
+  const {
+    data: createdTickets,
+    loading: loadingCreated,
+    error: errorCreated,
+    reload: reloadCreated,
+  } = useModuleData<TicketType>({
+    endpoint: '/api/tickets?viewMode=created',
+    initialLoad: true,
+  })
 
   const { filters, debouncedFilters, setFilter, clearFilters, hasActiveFilters } =
     useTicketFilters()
@@ -71,36 +78,42 @@ export default function TechnicianTicketsPage() {
     }
   }, [filters.family]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const filteredTickets = useMemo(() => {
+  // Tickets filtrados según tab activo
+  const filteredAssigned = useMemo(() => {
     if (!session?.user?.id) return []
-    return filterTicketsTechnician(allTickets, debouncedFilters, session.user.id)
-  }, [allTickets, debouncedFilters, session?.user?.id])
+    return filterTicketsTechnician(assignedTickets, debouncedFilters, session.user.id)
+  }, [assignedTickets, debouncedFilters, session?.user?.id])
 
-  // Categorías derivadas de los tickets del técnico filtrados por familia
+  const filteredCreated = useMemo(() => {
+    if (!session?.user?.id) return []
+    return filterTicketsCreatedBy(createdTickets, debouncedFilters, session.user.id)
+  }, [createdTickets, debouncedFilters, session?.user?.id])
+
+  const activeTickets = activeTab === 'assigned' ? filteredAssigned : filteredCreated
+  const loading = activeTab === 'assigned' ? loadingAssigned : loadingCreated
+  const error = activeTab === 'assigned' ? errorAssigned : errorCreated
+  const reload = activeTab === 'assigned' ? reloadAssigned : reloadCreated
+
+  // Categorías derivadas de los tickets del tab activo
   const categories = useMemo(() => {
     if (!session?.user?.id) return []
+    const source = activeTab === 'assigned' ? assignedTickets : createdTickets
     const seen = new Map<string, { id: string; name: string }>()
-    allTickets
-      .filter(
-        t =>
-          t.assignee?.id === session.user.id &&
-          (debouncedFilters.family === 'all' || t.family?.id === debouncedFilters.family)
-      )
+    source
+      .filter(t => debouncedFilters.family === 'all' || t.family?.id === debouncedFilters.family)
       .forEach(t => {
         if (t.category && !seen.has(t.category.id)) {
           seen.set(t.category.id, { id: t.category.id, name: t.category.name })
         }
       })
     return Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name))
-  }, [allTickets, debouncedFilters.family, session?.user?.id])
+  }, [assignedTickets, createdTickets, activeTab, debouncedFilters.family, session?.user?.id])
 
-  const pagination = usePagination(filteredTickets, { pageSize: 20 })
+  const pagination = usePagination(activeTickets, { pageSize: 20 })
 
-  const stats = useMemo(() => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
-    const resolvedTickets = filteredTickets.filter(t => t.status === 'RESOLVED' && t.resolvedAt)
+  // Stats del tab "Asignados"
+  const assignedStats = useMemo(() => {
+    const resolvedTickets = filteredAssigned.filter(t => t.status === 'RESOLVED' && t.resolvedAt)
     let avgResolutionTime = 'N/A'
     if (resolvedTickets.length > 0) {
       const totalMinutes = resolvedTickets.reduce((sum, ticket) => {
@@ -113,12 +126,13 @@ export default function TechnicianTicketsPage() {
       else if (avgMinutes < 1440) avgResolutionTime = `${Math.round(avgMinutes / 60)}h`
       else avgResolutionTime = `${Math.round(avgMinutes / 1440)}d`
     }
-
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
     return {
-      total: filteredTickets.length,
-      open: filteredTickets.filter(t => t.status === 'OPEN').length,
-      inProgress: filteredTickets.filter(t => t.status === 'IN_PROGRESS').length,
-      resolvedToday: filteredTickets.filter(t => {
+      total: filteredAssigned.length,
+      open: filteredAssigned.filter(t => t.status === 'OPEN').length,
+      inProgress: filteredAssigned.filter(t => t.status === 'IN_PROGRESS').length,
+      resolvedToday: filteredAssigned.filter(t => {
         if (t.status !== 'RESOLVED' || !t.resolvedAt) return false
         const d = new Date(t.resolvedAt)
         d.setHours(0, 0, 0, 0)
@@ -126,23 +140,33 @@ export default function TechnicianTicketsPage() {
       }).length,
       avgResolutionTime,
     }
-  }, [filteredTickets])
+  }, [filteredAssigned])
+
+  // Stats del tab "Mis Solicitudes"
+  const createdStats = useMemo(() => {
+    return {
+      total: filteredCreated.length,
+      open: filteredCreated.filter(t => t.status === 'OPEN').length,
+      inProgress: filteredCreated.filter(t => t.status === 'IN_PROGRESS').length,
+      resolved: filteredCreated.filter(t => t.status === 'RESOLVED' || t.status === 'CLOSED')
+        .length,
+    }
+  }, [filteredCreated])
 
   const handleViewTicket = (ticket: TicketType) => router.push(`/technician/tickets/${ticket.id}`)
 
-  // Exportación — tickets asignados al técnico con filtros activos
   const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
-    filename: 'mis-tickets',
-    title: 'Mis Tickets Asignados',
-    subtitle: `${session?.user?.name ?? ''} • ${filteredTickets.length} tickets`,
-    getData: () => filteredTickets,
+    filename: activeTab === 'assigned' ? 'tickets-asignados' : 'mis-solicitudes',
+    title: activeTab === 'assigned' ? 'Tickets Asignados' : 'Mis Solicitudes',
+    subtitle: `${session?.user?.name ?? ''} • ${activeTickets.length} tickets`,
+    getData: () => activeTickets,
     columns: TECHNICIAN_TICKET_EXPORT_COLUMNS,
   })
 
   const paginationConfig = {
     page: pagination.currentPage,
     limit: pagination.pageSize,
-    total: filteredTickets.length,
+    total: activeTickets.length,
     onPageChange: (page: number) => pagination.goToPage(page),
     onLimitChange: (limit: number) => pagination.setPageSize(limit),
   }
@@ -151,23 +175,28 @@ export default function TechnicianTicketsPage() {
 
   return (
     <ModuleLayout
-      title='Tickets Asignados'
-      subtitle='Tickets que tienes asignados para resolver'
-      loading={loading && allTickets.length === 0}
+      title='Tickets'
+      subtitle='Gestiona tus tickets asignados y tus solicitudes de soporte'
+      loading={
+        loadingAssigned &&
+        assignedTickets.length === 0 &&
+        loadingCreated &&
+        createdTickets.length === 0
+      }
       error={error}
       onRetry={reload}
       headerActions={
         <div className='flex gap-2 flex-wrap'>
+          <Link href='/technician/tickets/create'>
+            <Button size='sm'>
+              <Plus className='h-4 w-4 sm:mr-2' />
+              <span className='hidden sm:inline'>Nueva Solicitud</span>
+            </Button>
+          </Link>
           <Link href='/technician/stats'>
             <Button variant='outline' size='sm'>
               <BarChart3 className='h-4 w-4 sm:mr-2' />
               <span className='hidden sm:inline'>Estadísticas</span>
-            </Button>
-          </Link>
-          <Link href='/technician/categories'>
-            <Button variant='outline' size='sm'>
-              <FolderTree className='h-4 w-4 sm:mr-2' />
-              <span className='hidden sm:inline'>Mis Categorías</span>
             </Button>
           </Link>
           <Link href='/technician/knowledge'>
@@ -179,112 +208,236 @@ export default function TechnicianTicketsPage() {
         </div>
       }
     >
-      <div className='space-y-6'>
-        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
-          <SymmetricStatsCard
-            title='Abiertos'
-            value={stats.open}
-            icon={AlertCircle}
-            color='orange'
-            badge={
-              stats.total > 0
-                ? { text: `${Math.round((stats.open / stats.total) * 100)}%`, variant: 'secondary' }
-                : undefined
-            }
-            status={stats.open > 5 ? 'warning' : 'normal'}
-          />
-          <SymmetricStatsCard
-            title='En Progreso'
-            value={stats.inProgress}
-            icon={Clock}
-            color='blue'
-            badge={
-              stats.total > 0
-                ? {
-                    text: `${Math.round((stats.inProgress / stats.total) * 100)}%`,
-                    variant: 'secondary',
-                  }
-                : undefined
-            }
-          />
-          <SymmetricStatsCard
-            title='Resueltos Hoy'
-            value={stats.resolvedToday}
-            icon={CheckCircle}
-            color='green'
-            status='success'
-            trend={
-              stats.resolvedToday > 0
-                ? { value: stats.resolvedToday, label: 'completados', isPositive: true }
-                : undefined
-            }
-          />
-          <SymmetricStatsCard
-            title='Tiempo Promedio'
-            value={stats.avgResolutionTime}
-            icon={Target}
-            color='purple'
-          />
-        </div>
+      <Tabs
+        value={activeTab}
+        onValueChange={v => {
+          setActiveTab(v as 'assigned' | 'created')
+          clearFilters()
+        }}
+      >
+        <TabsList className='mb-6'>
+          <TabsTrigger value='assigned' className='gap-2'>
+            <TicketIcon className='h-4 w-4' />
+            Asignados a mí
+            {assignedStats.open > 0 && (
+              <Badge variant='secondary' className='ml-1 h-5 px-1.5 text-xs'>
+                {assignedStats.open}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value='created' className='gap-2'>
+            <Send className='h-4 w-4' />
+            Mis Solicitudes
+            {createdStats.open + createdStats.inProgress > 0 && (
+              <Badge variant='secondary' className='ml-1 h-5 px-1.5 text-xs'>
+                {createdStats.open + createdStats.inProgress}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
 
-        <TicketFilters
-          searchTerm={filters.search}
-          statusFilter={filters.status}
-          priorityFilter={filters.priority}
-          categoryFilter={filters.category}
-          dateFilter={filters.dateRange}
-          familyFilter={filters.family}
-          setSearchTerm={term => setFilter('search', term)}
-          onStatusChange={status => setFilter('status', status)}
-          onPriorityChange={priority => setFilter('priority', priority)}
-          onCategoryChange={category => setFilter('category', category)}
-          onDateChange={date => setFilter('dateRange', date)}
-          onFamilyChange={family => setFilter('family', family)}
-          onRefresh={reload}
-          onClearFilters={clearFilters}
-          categories={categories}
-          families={families}
-          variant='technician'
-          loading={loading}
-          showDateFilter={true}
-          showAssigneeFilter={false}
-          searchPlaceholder='Buscar por título, descripción o cliente...'
-        />
-
-        <DataTable
-          title='Mis Tickets Asignados'
-          description={`Tickets que tienes asignados para resolver (${filteredTickets.length} tickets)`}
-          data={pagination.currentItems}
-          columns={createTechnicianTicketColumns({ onView: handleViewTicket })}
-          loading={loading}
-          pagination={paginationConfig}
-          onRefresh={reload}
-          externalSearch={true}
-          hideInternalFilters={true}
-          onRowClick={handleViewTicket}
-          actions={
-            <ExportButton
-              onExportCSV={exportCSV}
-              onExportExcel={exportExcel}
-              onExportPDF={exportPDF}
-              loading={exporting}
-              disabled={filteredTickets.length === 0}
+        {/* ── Tab: Asignados ── */}
+        <TabsContent value='assigned' className='space-y-6 mt-0'>
+          <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
+            <SymmetricStatsCard
+              title='Abiertos'
+              value={assignedStats.open}
+              icon={AlertCircle}
+              color='orange'
+              badge={
+                assignedStats.total > 0
+                  ? {
+                      text: `${Math.round((assignedStats.open / assignedStats.total) * 100)}%`,
+                      variant: 'secondary',
+                    }
+                  : undefined
+              }
+              status={assignedStats.open > 5 ? 'warning' : 'normal'}
             />
-          }
-          emptyState={{
-            icon: <TicketIcon className='h-12 w-12 text-muted-foreground mx-auto mb-4' />,
-            title: hasActiveFilters ? 'No se encontraron tickets' : 'No hay tickets asignados',
-            description: hasActiveFilters
-              ? 'Intenta ajustar los filtros de búsqueda'
-              : 'No tienes tickets asignados en este momento',
-            action: hasActiveFilters ? (
-              <Button variant='outline' onClick={clearFilters}>
-                Limpiar filtros
-              </Button>
-            ) : undefined,
-          }}
-        />
-      </div>
+            <SymmetricStatsCard
+              title='En Progreso'
+              value={assignedStats.inProgress}
+              icon={Clock}
+              color='blue'
+              badge={
+                assignedStats.total > 0
+                  ? {
+                      text: `${Math.round((assignedStats.inProgress / assignedStats.total) * 100)}%`,
+                      variant: 'secondary',
+                    }
+                  : undefined
+              }
+            />
+            <SymmetricStatsCard
+              title='Resueltos Hoy'
+              value={assignedStats.resolvedToday}
+              icon={CheckCircle}
+              color='green'
+              status='success'
+              trend={
+                assignedStats.resolvedToday > 0
+                  ? { value: assignedStats.resolvedToday, label: 'completados', isPositive: true }
+                  : undefined
+              }
+            />
+            <SymmetricStatsCard
+              title='Tiempo Promedio'
+              value={assignedStats.avgResolutionTime}
+              icon={Target}
+              color='purple'
+            />
+          </div>
+
+          <TicketFilters
+            searchTerm={filters.search}
+            statusFilter={filters.status}
+            priorityFilter={filters.priority}
+            categoryFilter={filters.category}
+            dateFilter={filters.dateRange}
+            familyFilter={filters.family}
+            setSearchTerm={term => setFilter('search', term)}
+            onStatusChange={status => setFilter('status', status)}
+            onPriorityChange={priority => setFilter('priority', priority)}
+            onCategoryChange={category => setFilter('category', category)}
+            onDateChange={date => setFilter('dateRange', date)}
+            onFamilyChange={family => setFilter('family', family)}
+            onRefresh={reloadAssigned}
+            onClearFilters={clearFilters}
+            categories={categories}
+            families={families}
+            variant='technician'
+            loading={loadingAssigned}
+            showDateFilter={true}
+            showAssigneeFilter={false}
+            searchPlaceholder='Buscar por título, descripción o cliente...'
+          />
+
+          <DataTable
+            title='Tickets Asignados'
+            description={`Tickets que tienes asignados para resolver (${filteredAssigned.length} tickets)`}
+            data={pagination.currentItems}
+            columns={createTechnicianTicketColumns({ onView: handleViewTicket })}
+            loading={loadingAssigned}
+            pagination={paginationConfig}
+            onRefresh={reloadAssigned}
+            externalSearch={true}
+            hideInternalFilters={true}
+            onRowClick={handleViewTicket}
+            actions={
+              <ExportButton
+                onExportCSV={exportCSV}
+                onExportExcel={exportExcel}
+                onExportPDF={exportPDF}
+                loading={exporting}
+                disabled={filteredAssigned.length === 0}
+              />
+            }
+            emptyState={{
+              icon: <TicketIcon className='h-12 w-12 text-muted-foreground mx-auto mb-4' />,
+              title: hasActiveFilters ? 'No se encontraron tickets' : 'No hay tickets asignados',
+              description: hasActiveFilters
+                ? 'Intenta ajustar los filtros de búsqueda'
+                : 'No tienes tickets asignados en este momento',
+              action: hasActiveFilters ? (
+                <Button variant='outline' onClick={clearFilters}>
+                  Limpiar filtros
+                </Button>
+              ) : undefined,
+            }}
+          />
+        </TabsContent>
+
+        {/* ── Tab: Mis Solicitudes ── */}
+        <TabsContent value='created' className='space-y-6 mt-0'>
+          <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+            <SymmetricStatsCard
+              title='Abiertas'
+              value={createdStats.open}
+              icon={AlertCircle}
+              color='orange'
+              status={createdStats.open > 3 ? 'warning' : 'normal'}
+            />
+            <SymmetricStatsCard
+              title='En Progreso'
+              value={createdStats.inProgress}
+              icon={Clock}
+              color='blue'
+            />
+            <SymmetricStatsCard
+              title='Resueltas / Cerradas'
+              value={createdStats.resolved}
+              icon={CheckCircle}
+              color='green'
+              status='success'
+            />
+          </div>
+
+          <TicketFilters
+            searchTerm={filters.search}
+            statusFilter={filters.status}
+            priorityFilter={filters.priority}
+            categoryFilter={filters.category}
+            dateFilter={filters.dateRange}
+            familyFilter={filters.family}
+            setSearchTerm={term => setFilter('search', term)}
+            onStatusChange={status => setFilter('status', status)}
+            onPriorityChange={priority => setFilter('priority', priority)}
+            onCategoryChange={category => setFilter('category', category)}
+            onDateChange={date => setFilter('dateRange', date)}
+            onFamilyChange={family => setFilter('family', family)}
+            onRefresh={reloadCreated}
+            onClearFilters={clearFilters}
+            categories={categories}
+            families={families}
+            variant='technician'
+            loading={loadingCreated}
+            showDateFilter={true}
+            showAssigneeFilter={false}
+            searchPlaceholder='Buscar por título o descripción...'
+          />
+
+          <DataTable
+            title='Mis Solicitudes'
+            description={`Tickets que creaste como solicitante (${filteredCreated.length} tickets)`}
+            data={pagination.currentItems}
+            columns={createTechnicianTicketColumns({ onView: handleViewTicket })}
+            loading={loadingCreated}
+            pagination={paginationConfig}
+            onRefresh={reloadCreated}
+            externalSearch={true}
+            hideInternalFilters={true}
+            onRowClick={handleViewTicket}
+            actions={
+              <ExportButton
+                onExportCSV={exportCSV}
+                onExportExcel={exportExcel}
+                onExportPDF={exportPDF}
+                loading={exporting}
+                disabled={filteredCreated.length === 0}
+              />
+            }
+            emptyState={{
+              icon: <Send className='h-12 w-12 text-muted-foreground mx-auto mb-4' />,
+              title: hasActiveFilters ? 'No se encontraron solicitudes' : 'No tienes solicitudes',
+              description: hasActiveFilters
+                ? 'Intenta ajustar los filtros de búsqueda'
+                : 'Aún no has creado ninguna solicitud de soporte',
+              action: hasActiveFilters ? (
+                <Button variant='outline' onClick={clearFilters}>
+                  Limpiar filtros
+                </Button>
+              ) : (
+                <Button asChild>
+                  <Link href='/technician/tickets/create'>
+                    <Plus className='h-4 w-4 mr-2' />
+                    Nueva Solicitud
+                  </Link>
+                </Button>
+              ),
+            }}
+          />
+        </TabsContent>
+      </Tabs>
     </ModuleLayout>
   )
 }

@@ -65,11 +65,20 @@ export function filterTicketsAdmin(tickets: Ticket[], filters: TicketFilterValue
       if (!match) return false
     }
     if (filters.status && filters.status !== 'all' && ticket.status !== filters.status) return false
-    if (filters.priority && filters.priority !== 'all' && ticket.priority !== filters.priority) return false
-    if (filters.category && filters.category !== 'all' && ticket.category?.id !== filters.category) return false
+    if (filters.priority && filters.priority !== 'all' && ticket.priority !== filters.priority)
+      return false
+    if (filters.category && filters.category !== 'all' && ticket.category?.id !== filters.category)
+      return false
     if (filters.assignee === 'unassigned' && ticket.assignee) return false
-    if (filters.assignee && filters.assignee !== 'all' && filters.assignee !== 'unassigned' && ticket.assignee?.id !== filters.assignee) return false
-    if (filters.family && filters.family !== 'all' && ticket.family?.id !== filters.family) return false
+    if (
+      filters.assignee &&
+      filters.assignee !== 'all' &&
+      filters.assignee !== 'unassigned' &&
+      ticket.assignee?.id !== filters.assignee
+    )
+      return false
+    if (filters.family && filters.family !== 'all' && ticket.family?.id !== filters.family)
+      return false
     if (!matchesDateRange(ticket.createdAt, filters.dateRange ?? 'all')) return false
     return true
   })
@@ -79,7 +88,11 @@ export function filterTicketsAdmin(tickets: Ticket[], filters: TicketFilterValue
  * Filtra tickets para el panel de TÉCNICO.
  * Solo muestra tickets asignados al técnico dado.
  */
-export function filterTicketsTechnician(tickets: Ticket[], filters: TicketFilterValues, technicianId: string): Ticket[] {
+export function filterTicketsTechnician(
+  tickets: Ticket[],
+  filters: TicketFilterValues,
+  technicianId: string
+): Ticket[] {
   return tickets.filter(ticket => {
     if (ticket.assignee?.id !== technicianId) return false
     if (filters.search) {
@@ -91,9 +104,12 @@ export function filterTicketsTechnician(tickets: Ticket[], filters: TicketFilter
       if (!match) return false
     }
     if (filters.status && filters.status !== 'all' && ticket.status !== filters.status) return false
-    if (filters.priority && filters.priority !== 'all' && ticket.priority !== filters.priority) return false
-    if (filters.category && filters.category !== 'all' && ticket.category?.id !== filters.category) return false
-    if (filters.family && filters.family !== 'all' && ticket.family?.id !== filters.family) return false
+    if (filters.priority && filters.priority !== 'all' && ticket.priority !== filters.priority)
+      return false
+    if (filters.category && filters.category !== 'all' && ticket.category?.id !== filters.category)
+      return false
+    if (filters.family && filters.family !== 'all' && ticket.family?.id !== filters.family)
+      return false
     if (!matchesDateRange(ticket.createdAt, filters.dateRange ?? 'all')) return false
     return true
   })
@@ -103,7 +119,11 @@ export function filterTicketsTechnician(tickets: Ticket[], filters: TicketFilter
  * Filtra tickets para el panel de CLIENTE.
  * Solo muestra tickets del cliente dado.
  */
-export function filterTicketsClient(tickets: Ticket[], filters: TicketFilterValues, clientId: string): Ticket[] {
+export function filterTicketsClient(
+  tickets: Ticket[],
+  filters: TicketFilterValues,
+  clientId: string
+): Ticket[] {
   return tickets.filter(ticket => {
     if (ticket.client?.id !== clientId) return false
     if (filters.search) {
@@ -115,9 +135,43 @@ export function filterTicketsClient(tickets: Ticket[], filters: TicketFilterValu
       if (!match) return false
     }
     if (filters.status && filters.status !== 'all' && ticket.status !== filters.status) return false
-    if (filters.priority && filters.priority !== 'all' && ticket.priority !== filters.priority) return false
-    if (filters.category && filters.category !== 'all' && ticket.category?.id !== filters.category) return false
-    if (filters.family && filters.family !== 'all' && ticket.family?.id !== filters.family) return false
+    if (filters.priority && filters.priority !== 'all' && ticket.priority !== filters.priority)
+      return false
+    if (filters.category && filters.category !== 'all' && ticket.category?.id !== filters.category)
+      return false
+    if (filters.family && filters.family !== 'all' && ticket.family?.id !== filters.family)
+      return false
+    if (!matchesDateRange(ticket.createdAt, filters.dateRange ?? 'all')) return false
+    return true
+  })
+}
+
+/**
+ * Filtra tickets donde el usuario dado es el solicitante (clientId).
+ * Usado para la vista "Mis Solicitudes" de técnicos y admins.
+ */
+export function filterTicketsCreatedBy(
+  tickets: Ticket[],
+  filters: TicketFilterValues,
+  userId: string
+): Ticket[] {
+  return tickets.filter(ticket => {
+    if (ticket.client?.id !== userId) return false
+    if (filters.search) {
+      const q = filters.search.toLowerCase()
+      const match =
+        ticket.title.toLowerCase().includes(q) ||
+        (ticket.description?.toLowerCase().includes(q) ?? false) ||
+        (ticket.assignee?.name?.toLowerCase().includes(q) ?? false)
+      if (!match) return false
+    }
+    if (filters.status && filters.status !== 'all' && ticket.status !== filters.status) return false
+    if (filters.priority && filters.priority !== 'all' && ticket.priority !== filters.priority)
+      return false
+    if (filters.category && filters.category !== 'all' && ticket.category?.id !== filters.category)
+      return false
+    if (filters.family && filters.family !== 'all' && ticket.family?.id !== filters.family)
+      return false
     if (!matchesDateRange(ticket.createdAt, filters.dateRange ?? 'all')) return false
     return true
   })

@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { Plus, Ticket, AlertCircle, Clock, UserX } from 'lucide-react'
+import { Plus, Ticket, AlertCircle, Clock, UserX, Send, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
 
 import { ModuleLayout } from '@/components/common/layout/module-layout'
@@ -13,41 +13,46 @@ import { TicketFilters } from '@/components/tickets/ticket-filters'
 import { Button } from '@/components/ui/button'
 import { ExportButton } from '@/components/common/export-button'
 import { createAdminTicketColumns } from '@/components/tickets/admin/ticket-columns'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Badge } from '@/components/ui/badge'
 
 import { useModuleData } from '@/hooks/common/use-module-data'
 import { useTicketFilters } from '@/hooks/common/use-ticket-filters'
 import { usePagination } from '@/hooks/common/use-pagination'
 import { useExport } from '@/hooks/common/use-export'
 import type { Ticket as TicketType } from '@/hooks/use-ticket-data'
-import { filterTicketsAdmin } from '@/lib/utils/ticket-filters'
+import { filterTicketsAdmin, filterTicketsCreatedBy } from '@/lib/utils/ticket-filters'
 import { ADMIN_TICKET_EXPORT_COLUMNS } from '@/lib/utils/ticket-utils'
 import { useFamilies } from '@/contexts/families-context'
-
-interface FamilyOption {
-  id: string
-  name: string
-  code: string
-  color?: string | null
-}
 
 export default function AdminTicketsPage() {
   const { data: session } = useSession()
   const router = useRouter()
+  const [activeTab, setActiveTab] = useState<'all' | 'created'>('all')
 
-  // Familias desde el contexto global (cache Redis, sin peticion extra)
   const { families } = useFamilies()
 
+  // Todos los tickets del sistema
   const {
     data: allTickets,
-    loading,
-    error,
-    reload,
+    loading: loadingAll,
+    error: errorAll,
+    reload: reloadAll,
   } = useModuleData<TicketType>({
     endpoint: '/api/tickets',
     initialLoad: true,
   })
 
-  // Familias ya disponibles desde el contexto global
+  // Tickets creados por el admin como solicitante
+  const {
+    data: createdTicketsRaw,
+    loading: loadingCreated,
+    error: errorCreated,
+    reload: reloadCreated,
+  } = useModuleData<TicketType>({
+    endpoint: '/api/tickets?viewMode=created',
+    initialLoad: true,
+  })
 
   const { filters, debouncedFilters, setFilter, clearFilters, hasActiveFilters } =
     useTicketFilters()
@@ -61,15 +66,26 @@ export default function AdminTicketsPage() {
     }
   }, [filters.family]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Filtrar en memoria
-  const filteredTickets = useMemo(() => {
-    return filterTicketsAdmin(allTickets, debouncedFilters)
-  }, [allTickets, debouncedFilters])
+  const filteredAll = useMemo(
+    () => filterTicketsAdmin(allTickets, debouncedFilters),
+    [allTickets, debouncedFilters]
+  )
 
-  // Categorías derivadas de los tickets de la familia seleccionada
+  const filteredCreated = useMemo(() => {
+    if (!session?.user?.id) return []
+    return filterTicketsCreatedBy(createdTicketsRaw, debouncedFilters, session.user.id)
+  }, [createdTicketsRaw, debouncedFilters, session?.user?.id])
+
+  const activeTickets = activeTab === 'all' ? filteredAll : filteredCreated
+  const loading = activeTab === 'all' ? loadingAll : loadingCreated
+  const error = activeTab === 'all' ? errorAll : errorCreated
+  const reload = activeTab === 'all' ? reloadAll : reloadCreated
+
+  // Categorías derivadas de los tickets del tab activo
   const categories = useMemo(() => {
+    const source = activeTab === 'all' ? allTickets : createdTicketsRaw
     const seen = new Map<string, { id: string; name: string }>()
-    allTickets
+    source
       .filter(t => debouncedFilters.family === 'all' || t.family?.id === debouncedFilters.family)
       .forEach(t => {
         if (t.category && !seen.has(t.category.id)) {
@@ -77,36 +93,45 @@ export default function AdminTicketsPage() {
         }
       })
     return Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name))
-  }, [allTickets, debouncedFilters.family])
+  }, [allTickets, createdTicketsRaw, activeTab, debouncedFilters.family])
 
-  const pagination = usePagination(filteredTickets, { pageSize: 20 })
+  const pagination = usePagination(activeTickets, { pageSize: 20 })
 
-  const stats = useMemo(() => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    return {
-      total: filteredTickets.length,
-      open: filteredTickets.filter(t => t.status === 'OPEN').length,
-      inProgress: filteredTickets.filter(t => t.status === 'IN_PROGRESS').length,
-      unassigned: filteredTickets.filter(t => !t.assignee).length,
-    }
-  }, [filteredTickets])
+  const allStats = useMemo(
+    () => ({
+      total: filteredAll.length,
+      open: filteredAll.filter(t => t.status === 'OPEN').length,
+      inProgress: filteredAll.filter(t => t.status === 'IN_PROGRESS').length,
+      unassigned: filteredAll.filter(t => !t.assignee).length,
+    }),
+    [filteredAll]
+  )
+
+  const createdStats = useMemo(
+    () => ({
+      total: filteredCreated.length,
+      open: filteredCreated.filter(t => t.status === 'OPEN').length,
+      inProgress: filteredCreated.filter(t => t.status === 'IN_PROGRESS').length,
+      resolved: filteredCreated.filter(t => t.status === 'RESOLVED' || t.status === 'CLOSED')
+        .length,
+    }),
+    [filteredCreated]
+  )
 
   const handleViewTicket = (ticket: TicketType) => router.push(`/admin/tickets/${ticket.id}`)
 
-  // Exportación — usa los tickets filtrados actuales (lo que el admin ve en pantalla)
   const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
-    filename: 'tickets-admin',
-    title: 'Gestión de Tickets',
-    subtitle: `Exportado el ${new Date().toLocaleDateString('es-ES')} • ${filteredTickets.length} tickets`,
-    getData: () => filteredTickets,
+    filename: activeTab === 'all' ? 'tickets-admin' : 'mis-solicitudes-admin',
+    title: activeTab === 'all' ? 'Gestión de Tickets' : 'Mis Solicitudes',
+    subtitle: `Exportado el ${new Date().toLocaleDateString('es-ES')} • ${activeTickets.length} tickets`,
+    getData: () => activeTickets,
     columns: ADMIN_TICKET_EXPORT_COLUMNS,
   })
 
   const paginationConfig = {
     page: pagination.currentPage,
     limit: pagination.pageSize,
-    total: filteredTickets.length,
+    total: activeTickets.length,
     onPageChange: (page: number) => pagination.goToPage(page),
     onLimitChange: (limit: number) => pagination.setPageSize(limit),
   }
@@ -115,9 +140,9 @@ export default function AdminTicketsPage() {
 
   return (
     <ModuleLayout
-      title='Gestión de Tickets'
-      subtitle='Administrar todos los tickets del sistema'
-      loading={loading && allTickets.length === 0}
+      title='Tickets'
+      subtitle='Gestiona todos los tickets del sistema y tus propias solicitudes'
+      loading={loadingAll && allTickets.length === 0}
       error={error}
       onRetry={reload}
       headerActions={
@@ -131,121 +156,242 @@ export default function AdminTicketsPage() {
         </div>
       }
     >
-      <div className='space-y-6'>
-        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
-          <SymmetricStatsCard
-            title='Total Tickets'
-            value={stats.total}
-            icon={Ticket}
-            color='purple'
-          />
-          <SymmetricStatsCard
-            title='Abiertos'
-            value={stats.open}
-            icon={AlertCircle}
-            color='blue'
-            badge={
-              stats.total > 0
-                ? { text: `${Math.round((stats.open / stats.total) * 100)}%`, variant: 'secondary' }
-                : undefined
-            }
-            status={stats.open > 10 ? 'warning' : 'normal'}
-          />
-          <SymmetricStatsCard
-            title='En Progreso'
-            value={stats.inProgress}
-            icon={Clock}
-            color='orange'
-            badge={
-              stats.total > 0
-                ? {
-                    text: `${Math.round((stats.inProgress / stats.total) * 100)}%`,
-                    variant: 'secondary',
-                  }
-                : undefined
-            }
-          />
-          <SymmetricStatsCard
-            title='Sin Asignar'
-            value={stats.unassigned}
-            icon={UserX}
-            color='red'
-            status={stats.unassigned > 5 ? 'error' : 'normal'}
-            badge={
-              stats.total > 0
-                ? {
-                    text: `${Math.round((stats.unassigned / stats.total) * 100)}%`,
-                    variant: 'secondary',
-                  }
-                : undefined
-            }
-          />
-        </div>
+      <Tabs
+        value={activeTab}
+        onValueChange={v => {
+          setActiveTab(v as 'all' | 'created')
+          clearFilters()
+        }}
+      >
+        <TabsList className='mb-6'>
+          <TabsTrigger value='all' className='gap-2'>
+            <Ticket className='h-4 w-4' />
+            Todos los Tickets
+            {allStats.unassigned > 0 && (
+              <Badge variant='secondary' className='ml-1 h-5 px-1.5 text-xs'>
+                {allStats.unassigned} sin asignar
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value='created' className='gap-2'>
+            <Send className='h-4 w-4' />
+            Mis Solicitudes
+            {createdStats.open + createdStats.inProgress > 0 && (
+              <Badge variant='secondary' className='ml-1 h-5 px-1.5 text-xs'>
+                {createdStats.open + createdStats.inProgress}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
 
-        <TicketFilters
-          searchTerm={filters.search}
-          statusFilter={filters.status}
-          priorityFilter={filters.priority}
-          categoryFilter={filters.category}
-          assigneeFilter={filters.assignee}
-          familyFilter={filters.family}
-          setSearchTerm={term => setFilter('search', term)}
-          onStatusChange={status => setFilter('status', status)}
-          onPriorityChange={priority => setFilter('priority', priority)}
-          onCategoryChange={category => setFilter('category', category)}
-          onAssigneeChange={assignee => setFilter('assignee', assignee)}
-          onFamilyChange={family => setFilter('family', family)}
-          onRefresh={reload}
-          onClearFilters={clearFilters}
-          categories={categories}
-          families={families}
-          variant='admin'
-          loading={loading}
-          showAssigneeFilter={true}
-          searchPlaceholder='Buscar por título, descripción, cliente o técnico...'
-        />
-
-        <DataTable
-          title='Tickets'
-          description={`Gestión de tickets del sistema (${filteredTickets.length} tickets)`}
-          data={pagination.currentItems}
-          columns={createAdminTicketColumns({ onView: handleViewTicket })}
-          loading={loading}
-          pagination={paginationConfig}
-          onRefresh={reload}
-          externalSearch={true}
-          hideInternalFilters={true}
-          onRowClick={handleViewTicket}
-          actions={
-            <ExportButton
-              onExportCSV={exportCSV}
-              onExportExcel={exportExcel}
-              onExportPDF={exportPDF}
-              loading={exporting}
-              disabled={filteredTickets.length === 0}
+        {/* ── Tab: Todos los Tickets ── */}
+        <TabsContent value='all' className='space-y-6 mt-0'>
+          <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
+            <SymmetricStatsCard
+              title='Total Tickets'
+              value={allStats.total}
+              icon={Ticket}
+              color='purple'
             />
-          }
-          emptyState={{
-            icon: <Ticket className='h-12 w-12 text-muted-foreground mx-auto mb-4' />,
-            title: hasActiveFilters ? 'No se encontraron tickets' : 'No hay tickets',
-            description: hasActiveFilters
-              ? 'Intenta ajustar los filtros de búsqueda'
-              : 'No se encontraron tickets en el sistema',
-            action: hasActiveFilters ? (
-              <Button variant='outline' onClick={clearFilters}>
-                Limpiar filtros
-              </Button>
-            ) : (
-              <Button asChild>
-                <Link href='/admin/tickets/create'>
-                  <Plus className='h-4 w-4 mr-2' />
-                  Crear primer ticket
-                </Link>
-              </Button>
-            ),
-          }}
-        />
-      </div>
+            <SymmetricStatsCard
+              title='Abiertos'
+              value={allStats.open}
+              icon={AlertCircle}
+              color='blue'
+              badge={
+                allStats.total > 0
+                  ? {
+                      text: `${Math.round((allStats.open / allStats.total) * 100)}%`,
+                      variant: 'secondary',
+                    }
+                  : undefined
+              }
+              status={allStats.open > 10 ? 'warning' : 'normal'}
+            />
+            <SymmetricStatsCard
+              title='En Progreso'
+              value={allStats.inProgress}
+              icon={Clock}
+              color='orange'
+              badge={
+                allStats.total > 0
+                  ? {
+                      text: `${Math.round((allStats.inProgress / allStats.total) * 100)}%`,
+                      variant: 'secondary',
+                    }
+                  : undefined
+              }
+            />
+            <SymmetricStatsCard
+              title='Sin Asignar'
+              value={allStats.unassigned}
+              icon={UserX}
+              color='red'
+              status={allStats.unassigned > 5 ? 'error' : 'normal'}
+              badge={
+                allStats.total > 0
+                  ? {
+                      text: `${Math.round((allStats.unassigned / allStats.total) * 100)}%`,
+                      variant: 'secondary',
+                    }
+                  : undefined
+              }
+            />
+          </div>
+
+          <TicketFilters
+            searchTerm={filters.search}
+            statusFilter={filters.status}
+            priorityFilter={filters.priority}
+            categoryFilter={filters.category}
+            assigneeFilter={filters.assignee}
+            familyFilter={filters.family}
+            setSearchTerm={term => setFilter('search', term)}
+            onStatusChange={status => setFilter('status', status)}
+            onPriorityChange={priority => setFilter('priority', priority)}
+            onCategoryChange={category => setFilter('category', category)}
+            onAssigneeChange={assignee => setFilter('assignee', assignee)}
+            onFamilyChange={family => setFilter('family', family)}
+            onRefresh={reloadAll}
+            onClearFilters={clearFilters}
+            categories={categories}
+            families={families}
+            variant='admin'
+            loading={loadingAll}
+            showAssigneeFilter={true}
+            searchPlaceholder='Buscar por título, descripción, cliente o técnico...'
+          />
+
+          <DataTable
+            title='Tickets'
+            description={`Gestión de tickets del sistema (${filteredAll.length} tickets)`}
+            data={pagination.currentItems}
+            columns={createAdminTicketColumns({ onView: handleViewTicket })}
+            loading={loadingAll}
+            pagination={paginationConfig}
+            onRefresh={reloadAll}
+            externalSearch={true}
+            hideInternalFilters={true}
+            onRowClick={handleViewTicket}
+            actions={
+              <ExportButton
+                onExportCSV={exportCSV}
+                onExportExcel={exportExcel}
+                onExportPDF={exportPDF}
+                loading={exporting}
+                disabled={filteredAll.length === 0}
+              />
+            }
+            emptyState={{
+              icon: <Ticket className='h-12 w-12 text-muted-foreground mx-auto mb-4' />,
+              title: hasActiveFilters ? 'No se encontraron tickets' : 'No hay tickets',
+              description: hasActiveFilters
+                ? 'Intenta ajustar los filtros de búsqueda'
+                : 'No se encontraron tickets en el sistema',
+              action: hasActiveFilters ? (
+                <Button variant='outline' onClick={clearFilters}>
+                  Limpiar filtros
+                </Button>
+              ) : (
+                <Button asChild>
+                  <Link href='/admin/tickets/create'>
+                    <Plus className='h-4 w-4 mr-2' />
+                    Crear primer ticket
+                  </Link>
+                </Button>
+              ),
+            }}
+          />
+        </TabsContent>
+
+        {/* ── Tab: Mis Solicitudes ── */}
+        <TabsContent value='created' className='space-y-6 mt-0'>
+          <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+            <SymmetricStatsCard
+              title='Abiertas'
+              value={createdStats.open}
+              icon={AlertCircle}
+              color='orange'
+              status={createdStats.open > 3 ? 'warning' : 'normal'}
+            />
+            <SymmetricStatsCard
+              title='En Progreso'
+              value={createdStats.inProgress}
+              icon={Clock}
+              color='blue'
+            />
+            <SymmetricStatsCard
+              title='Resueltas / Cerradas'
+              value={createdStats.resolved}
+              icon={CheckCircle}
+              color='green'
+              status='success'
+            />
+          </div>
+
+          <TicketFilters
+            searchTerm={filters.search}
+            statusFilter={filters.status}
+            priorityFilter={filters.priority}
+            categoryFilter={filters.category}
+            familyFilter={filters.family}
+            setSearchTerm={term => setFilter('search', term)}
+            onStatusChange={status => setFilter('status', status)}
+            onPriorityChange={priority => setFilter('priority', priority)}
+            onCategoryChange={category => setFilter('category', category)}
+            onFamilyChange={family => setFilter('family', family)}
+            onRefresh={reloadCreated}
+            onClearFilters={clearFilters}
+            categories={categories}
+            families={families}
+            variant='admin'
+            loading={loadingCreated}
+            showAssigneeFilter={false}
+            searchPlaceholder='Buscar por título o descripción...'
+          />
+
+          <DataTable
+            title='Mis Solicitudes'
+            description={`Tickets que creaste como solicitante (${filteredCreated.length} tickets)`}
+            data={pagination.currentItems}
+            columns={createAdminTicketColumns({ onView: handleViewTicket })}
+            loading={loadingCreated}
+            pagination={paginationConfig}
+            onRefresh={reloadCreated}
+            externalSearch={true}
+            hideInternalFilters={true}
+            onRowClick={handleViewTicket}
+            actions={
+              <ExportButton
+                onExportCSV={exportCSV}
+                onExportExcel={exportExcel}
+                onExportPDF={exportPDF}
+                loading={exporting}
+                disabled={filteredCreated.length === 0}
+              />
+            }
+            emptyState={{
+              icon: <Send className='h-12 w-12 text-muted-foreground mx-auto mb-4' />,
+              title: hasActiveFilters ? 'No se encontraron solicitudes' : 'No tienes solicitudes',
+              description: hasActiveFilters
+                ? 'Intenta ajustar los filtros de búsqueda'
+                : 'Aún no has creado ninguna solicitud de soporte',
+              action: hasActiveFilters ? (
+                <Button variant='outline' onClick={clearFilters}>
+                  Limpiar filtros
+                </Button>
+              ) : (
+                <Button asChild>
+                  <Link href='/admin/tickets/create'>
+                    <Plus className='h-4 w-4 mr-2' />
+                    Nueva Solicitud
+                  </Link>
+                </Button>
+              ),
+            }}
+          />
+        </TabsContent>
+      </Tabs>
     </ModuleLayout>
   )
 }

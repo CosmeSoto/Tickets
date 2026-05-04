@@ -66,27 +66,34 @@ export async function GET(request: NextRequest) {
     }
 
     // Filtrar por rol del usuario
+    const viewMode = searchParams.get('viewMode') // 'assigned' | 'created' | null (all)
+
     if (session.user.role === 'CLIENT') {
       where.clientId = session.user.id
     } else if (session.user.role === 'TECHNICIAN') {
-      // Técnico: solo tickets de sus familias asignadas
-      const techFamilies = await prisma.technician_family_assignments.findMany({
-        where: { technicianId: session.user.id, isActive: true },
-        select: { familyId: true },
-      })
-      const techFamilyIds = techFamilies.map(a => a.familyId)
-
-      if (techFamilyIds.length > 0) {
-        // Tickets asignados a él O sin asignar de sus familias
-        where.AND = [
-          { familyId: { in: techFamilyIds } },
-          {
-            OR: [{ assigneeId: session.user.id }, { assigneeId: null }],
-          },
-        ]
+      if (viewMode === 'created') {
+        // Modo "Mis Solicitudes": tickets donde el técnico es el solicitante
+        where.clientId = session.user.id
       } else {
-        // Sin asignaciones de familia: solo sus tickets asignados
-        where.OR = [{ assigneeId: session.user.id }, { assigneeId: null }]
+        // Modo por defecto "Asignados": tickets de sus familias asignadas
+        const techFamilies = await prisma.technician_family_assignments.findMany({
+          where: { technicianId: session.user.id, isActive: true },
+          select: { familyId: true },
+        })
+        const techFamilyIds = techFamilies.map(a => a.familyId)
+
+        if (techFamilyIds.length > 0) {
+          // Tickets asignados a él O sin asignar de sus familias
+          where.AND = [
+            { familyId: { in: techFamilyIds } },
+            {
+              OR: [{ assigneeId: session.user.id }, { assigneeId: null }],
+            },
+          ]
+        } else {
+          // Sin asignaciones de familia: solo sus tickets asignados
+          where.OR = [{ assigneeId: session.user.id }, { assigneeId: null }]
+        }
       }
     }
 
