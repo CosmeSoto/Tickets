@@ -77,6 +77,8 @@ export default function AdminTicketDetailPage() {
   const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false)
   const [timelineKey, setTimelineKey] = useState(0)
   const [fileKey, setFileKey] = useState(0)
+  const [newStatus, setNewStatus] = useState<Ticket['status']>('OPEN')
+  const [updatingStatus, setUpdatingStatus] = useState(false)
   const [editForm, setEditForm] = useState({
     title: '',
     description: '',
@@ -143,6 +145,7 @@ export default function AdminTicketDetailPage() {
       const { success, data } = await res.json()
       if (success && data) {
         setTicket(data)
+        setNewStatus(data.status)
         setEditForm({
           title: data.title,
           description: data.description,
@@ -155,6 +158,51 @@ export default function AdminTicketDetailPage() {
       setLoading(false)
     }
   }
+
+  const handleForceClose = async () => {
+    const res = await fetch(`/api/tickets/${ticketId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'CLOSED' }),
+    })
+    if (res.ok) {
+      await loadTicket()
+      setTimelineKey(k => k + 1)
+    }
+  }
+
+  const handleStatusUpdate = async () => {
+    if (!ticket || newStatus === ticket.status) return
+    setUpdatingStatus(true)
+    try {
+      const res = await fetch(`/api/tickets/${ticket.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        setTicket(data.data)
+        setTimelineKey(k => k + 1)
+      }
+    } finally {
+      setUpdatingStatus(false)
+    }
+  }
+
+  const availableStatuses = (): Ticket['status'][] => {
+    if (!ticket) return []
+    const map: Record<string, Ticket['status'][]> = {
+      OPEN: ['OPEN', 'IN_PROGRESS'],
+      IN_PROGRESS: ['IN_PROGRESS', 'RESOLVED', 'ON_HOLD'],
+      ON_HOLD: ['ON_HOLD', 'IN_PROGRESS'],
+      RESOLVED: ['RESOLVED', 'IN_PROGRESS'],
+      CLOSED: ['CLOSED'],
+    }
+    return map[ticket.status] ?? [ticket.status]
+  }
+
+  const getStatusLabel = (s: string) => TICKET_STATUSES.find(x => x.value === s)?.label ?? s
 
   const handleSave = async () => {
     if (!ticket) return
@@ -244,50 +292,13 @@ export default function AdminTicketDetailPage() {
   }
 
   const isSuperAdmin = (session as any)?.user?.isSuperAdmin === true
-
-  const handleForceClose = async () => {
-    if (!ticket) return
-    const res = await fetch(`/api/tickets/${ticket.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'CLOSED' }),
-    })
-    if (res.ok) {
-      await loadTicket()
-      setTimelineKey(k => k + 1)
-    }
-  }
+  // El admin es el solicitante de este ticket (lo creó para sí mismo)
+  const isRequester = ticket.client?.id === session?.user?.id
+  // El admin está asignado como resolutor
+  const isAssignedResolver = ticket.assignee?.id === session?.user?.id
 
   const headerActions = (
     <div className='flex flex-wrap items-center gap-2'>
-      {/* Cierre directo — solo super admin, en cualquier estado activo */}
-      {isSuperAdmin && ticket.status !== 'CLOSED' && (
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button
-              variant='outline'
-              size='sm'
-              className='border-green-500 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-400'
-            >
-              <CheckCircle className='h-4 w-4 sm:mr-2' />
-              <span className='hidden sm:inline'>Cerrar Ticket</span>
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>¿Cerrar ticket directamente?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Como Super Admin puedes cerrar este ticket sin esperar la calificación del
-                solicitante. Esta acción no se puede deshacer.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={handleForceClose}>Cerrar Ticket</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
       {/* Artículo de conocimiento */}
       {(ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') &&
         (ticket.knowledgeArticleId ? (
@@ -501,8 +512,14 @@ export default function AdminTicketDetailPage() {
 
           {/* Tabs */}
           <Tabs defaultValue='timeline'>
-            <TabsList className='grid w-full grid-cols-4'>
+            <TabsList
+              className={`grid w-full ${isAssignedResolver && !isRequester ? 'grid-cols-5' : 'grid-cols-4'}`}
+            >
               <TabsTrigger value='timeline'>Historial</TabsTrigger>
+              {/* Tab Estado: visible solo cuando el admin es el resolutor asignado (no el solicitante) */}
+              {isAssignedResolver && !isRequester && (
+                <TabsTrigger value='status'>Estado</TabsTrigger>
+              )}
               <TabsTrigger value='resolution'>Plan</TabsTrigger>
               <TabsTrigger value='rating'>Calificación</TabsTrigger>
               <TabsTrigger value='files'>Archivos</TabsTrigger>
@@ -517,6 +534,112 @@ export default function AdminTicketDetailPage() {
                 onCommentAdded={() => setFileKey(k => k + 1)}
               />
             </TabsContent>
+
+            {/* Tab Estado — solo para el admin/super admin asignado como resolutor */}
+            {isAssignedResolver && !isRequester && (
+              <TabsContent value='status' className='space-y-4'>
+                {ticket.status !== 'CLOSED' ? (
+                  <Card>
+                    <CardHeader className='pb-2'>
+                      <CardTitle className='text-sm font-semibold flex items-center gap-1.5'>
+                        <Clock className='h-3.5 w-3.5' />
+                        Actualizar Estado
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className='space-y-3'>
+                      <div className='flex gap-3'>
+                        <Select
+                          value={newStatus}
+                          onValueChange={v => setNewStatus(v as Ticket['status'])}
+                        >
+                          <SelectTrigger className='flex-1'>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableStatuses().map(s => (
+                              <SelectItem key={s} value={s}>
+                                <div className='flex items-center gap-2'>
+                                  <div
+                                    className={`w-2.5 h-2.5 rounded-full ${
+                                      s === 'OPEN'
+                                        ? 'bg-orange-500'
+                                        : s === 'IN_PROGRESS'
+                                          ? 'bg-yellow-500'
+                                          : s === 'RESOLVED'
+                                            ? 'bg-green-500'
+                                            : s === 'ON_HOLD'
+                                              ? 'bg-purple-500'
+                                              : 'bg-gray-500'
+                                    }`}
+                                  />
+                                  {getStatusLabel(s)}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          onClick={handleStatusUpdate}
+                          disabled={updatingStatus || newStatus === ticket.status}
+                        >
+                          <Save className='h-4 w-4 mr-2' />
+                          {updatingStatus ? 'Guardando...' : 'Actualizar'}
+                        </Button>
+                      </div>
+                      {newStatus !== ticket.status && (
+                        <p className='text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded p-2'>
+                          Cambiará de <strong>{getStatusLabel(ticket.status)}</strong> a{' '}
+                          <strong>{getStatusLabel(newStatus)}</strong>
+                        </p>
+                      )}
+                      {newStatus === 'RESOLVED' && (
+                        <p className='text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2'>
+                          Al marcar como Resuelto, el solicitante recibirá una notificación para
+                          calificar el ticket. El ticket se cerrará automáticamente al recibir la
+                          calificación.
+                          {isSuperAdmin &&
+                            ' Como Super Admin también puedes cerrarlo directamente desde aquí.'}
+                        </p>
+                      )}
+                      {/* Cierre directo para super admin */}
+                      {isSuperAdmin && ticket.status !== 'OPEN' && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant='outline'
+                              size='sm'
+                              className='w-full border-green-500 text-green-700 hover:bg-green-50'
+                            >
+                              <CheckCircle className='h-4 w-4 mr-2' />
+                              Cerrar Ticket Directamente
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿Cerrar ticket directamente?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Como Super Admin puedes cerrar este ticket sin esperar la
+                                calificación del solicitante. Esta acción no se puede deshacer.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={handleForceClose}>
+                                Cerrar Ticket
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <p className='text-sm text-muted-foreground text-center py-8'>
+                    El ticket está cerrado y no puede cambiar de estado.
+                  </p>
+                )}
+              </TabsContent>
+            )}
 
             <TabsContent value='resolution' className='space-y-4'>
               <TicketResolutionTracker

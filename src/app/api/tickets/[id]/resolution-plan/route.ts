@@ -38,12 +38,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ success: false, message: 'Ticket no encontrado' }, { status: 404 })
     }
 
-    // Verificar permisos: Admin o Técnico asignado
+    // Verificar permisos: Admin, Técnico asignado, o el solicitante del ticket
     const isAdmin = session.user.role === 'ADMIN'
     const isAssignedTechnician =
       session.user.role === 'TECHNICIAN' && ticket.assigneeId === session.user.id
+    const isRequester = ticket.clientId === session.user.id
 
-    if (!isAdmin && !isAssignedTechnician) {
+    if (!isAdmin && !isAssignedTechnician && !isRequester) {
       return NextResponse.json(
         { success: false, message: 'No tienes permiso para ver este plan' },
         { status: 403 }

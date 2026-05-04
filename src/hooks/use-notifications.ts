@@ -44,32 +44,35 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
   const { settings } = useUserSettings()
 
   // ── Carga de notificaciones ─────────────────────────────────────────────────
-  const loadNotifications = useCallback(async (force = false) => {
-    if (status !== 'authenticated' || !session?.user?.id) return
-    if (!force && pendingOps.current > 0) return
+  const loadNotifications = useCallback(
+    async (force = false) => {
+      if (status !== 'authenticated' || !session?.user?.id) return
+      if (!force && pendingOps.current > 0) return
 
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await safeFetch('/api/notifications?limit=50', {
-        cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache' },
-      })
-      if (!res) return
-      const data = await res.json()
-      const arr: NotificationData[] = Array.isArray(data) ? data : []
-      setNotifications(
-        arr
-          .filter(n => !deletedIds.current.has(n.id))
-          .map(n => (readIds.current.has(n.id) ? { ...n, isRead: true } : n))
-          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      )
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido')
-    } finally {
-      setLoading(false)
-    }
-  }, [status, session?.user?.id])
+      setLoading(true)
+      setError(null)
+      try {
+        const res = await safeFetch('/api/notifications?limit=50', {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' },
+        })
+        if (!res) return
+        const data = await res.json()
+        const arr: NotificationData[] = Array.isArray(data) ? data : []
+        setNotifications(
+          arr
+            .filter(n => !deletedIds.current.has(n.id))
+            .map(n => (readIds.current.has(n.id) ? { ...n, isRead: true } : n))
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        )
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error desconocido')
+      } finally {
+        setLoading(false)
+      }
+    },
+    [status, session?.user?.id]
+  )
 
   useEffect(() => {
     if (!autoLoad || status !== 'authenticated' || !session?.user?.id) return
@@ -119,25 +122,28 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     }
   }, [toast, loadNotifications])
 
-  const deleteNotification = useCallback(async (id: string) => {
-    deletedIds.current.add(id)
-    setNotifications(prev => prev.filter(n => n.id !== id))
-    pendingOps.current++
-    try {
-      const res = await fetch(`/api/notifications/${id}`, { method: 'DELETE' })
-      if (!res.ok && res.status !== 404 && res.status !== 403) {
+  const deleteNotification = useCallback(
+    async (id: string) => {
+      deletedIds.current.add(id)
+      setNotifications(prev => prev.filter(n => n.id !== id))
+      pendingOps.current++
+      try {
+        const res = await fetch(`/api/notifications/${id}`, { method: 'DELETE' })
+        if (!res.ok && res.status !== 404 && res.status !== 403) {
+          deletedIds.current.delete(id)
+          await loadNotifications(true)
+          toast({ title: 'Error al eliminar', variant: 'destructive' })
+        }
+      } catch {
         deletedIds.current.delete(id)
         await loadNotifications(true)
         toast({ title: 'Error al eliminar', variant: 'destructive' })
+      } finally {
+        pendingOps.current--
       }
-    } catch {
-      deletedIds.current.delete(id)
-      await loadNotifications(true)
-      toast({ title: 'Error al eliminar', variant: 'destructive' })
-    } finally {
-      pendingOps.current--
-    }
-  }, [toast, loadNotifications])
+    },
+    [toast, loadNotifications]
+  )
 
   const clearAllNotifications = useCallback(async () => {
     const currentIds = notifications.map(n => n.id)
@@ -145,9 +151,11 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     setNotifications([])
     pendingOps.current++
     try {
-      await Promise.all(currentIds.map(id =>
-        fetch(`/api/notifications/${id}`, { method: 'DELETE' }).catch(() => {})
-      ))
+      await Promise.all(
+        currentIds.map(id =>
+          fetch(`/api/notifications/${id}`, { method: 'DELETE' }).catch(() => {})
+        )
+      )
       toast({ title: 'Notificaciones eliminadas' })
     } catch {
       currentIds.forEach(id => deletedIds.current.delete(id))
@@ -158,40 +166,58 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     }
   }, [notifications, toast, loadNotifications])
 
-  const navigateToTicket = useCallback(async (notification: NotificationData) => {
-    markAsRead(notification.id)
+  const navigateToTicket = useCallback(
+    async (notification: NotificationData) => {
+      markAsRead(notification.id)
 
-    let destination: string | null = null
-    if (notification.metadata?.link) {
-      destination = notification.metadata.link as string
-    } else if (notification.metadata?.actId) {
-      destination = `/inventory/acts/${notification.metadata.actId}`
-    } else if (notification.metadata?.maintenanceId) {
-      destination = `/inventory/maintenance/${notification.metadata.maintenanceId}`
-    } else if (notification.metadata?.equipmentId) {
-      destination = `/inventory/equipment/${notification.metadata.equipmentId}`
-    } else if (notification.ticketId) {
-      destination = `/${(session?.user?.role ?? 'client').toLowerCase()}/tickets/${notification.ticketId}`
-    }
+      let destination: string | null = null
+      if (notification.metadata?.link) {
+        destination = notification.metadata.link as string
+      } else if (notification.metadata?.actId) {
+        destination = `/inventory/acts/${notification.metadata.actId}`
+      } else if (notification.metadata?.maintenanceId) {
+        destination = `/inventory/maintenance/${notification.metadata.maintenanceId}`
+      } else if (notification.metadata?.equipmentId) {
+        destination = `/inventory/equipment/${notification.metadata.equipmentId}`
+      } else if (notification.ticketId) {
+        destination = `/${(session?.user?.role ?? 'client').toLowerCase()}/tickets/${notification.ticketId}`
+      }
 
-    if (!destination) return
+      if (!destination) return
 
-    const destRole = destination.startsWith('/admin') ? 'ADMIN'
-      : destination.startsWith('/technician') ? 'TECHNICIAN'
-      : destination.startsWith('/client') ? 'CLIENT'
-      : null
+      // Normalizar el destino al rol actual del usuario para evitar redirigir
+      // a /client/tickets/... cuando el usuario es ADMIN o TECHNICIAN
+      if (destination.includes('/tickets/')) {
+        const ticketIdMatch = destination.match(/\/tickets\/([^/]+)/)
+        if (ticketIdMatch) {
+          const role = (session?.user?.role ?? 'CLIENT').toLowerCase()
+          const rolePrefix =
+            role === 'admin' ? 'admin' : role === 'technician' ? 'technician' : 'client'
+          destination = `/${rolePrefix}/tickets/${ticketIdMatch[1]}`
+        }
+      }
 
-    if (destRole && destRole !== session?.user?.role) {
-      window.location.href = destination
-      return
-    }
+      const destRole = destination.startsWith('/admin')
+        ? 'ADMIN'
+        : destination.startsWith('/technician')
+          ? 'TECHNICIAN'
+          : destination.startsWith('/client')
+            ? 'CLIENT'
+            : null
 
-    router.push(destination)
-  }, [session?.user?.role, markAsRead, router])
+      if (destRole && destRole !== session?.user?.role) {
+        window.location.href = destination
+        return
+      }
+
+      router.push(destination)
+    },
+    [session?.user?.role, markAsRead, router]
+  )
 
   // ── SSE — usa soundEnabled del store global ─────────────────────────────────
   useNotificationSSE({
-    onNotification: (notif) => {
+    onNotification: notif => {
       setNotifications(prev => {
         if (prev.some(n => n.id === notif.id)) return prev
         const newNotif: NotificationData = {
@@ -228,13 +254,16 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     })
   }, [notifications, filterRead, filterType, searchTerm])
 
-  const stats = useMemo(() => ({
-    total: notifications.length,
-    unread: notifications.filter(n => !n.isRead).length,
-    read: notifications.filter(n => n.isRead).length,
-    filtered: filteredNotifications.length,
-    hasActiveFilters: filterRead !== 'all' || filterType !== 'all' || searchTerm !== '',
-  }), [notifications, filteredNotifications, filterRead, filterType, searchTerm])
+  const stats = useMemo(
+    () => ({
+      total: notifications.length,
+      unread: notifications.filter(n => !n.isRead).length,
+      read: notifications.filter(n => n.isRead).length,
+      filtered: filteredNotifications.length,
+      hasActiveFilters: filterRead !== 'all' || filterType !== 'all' || searchTerm !== '',
+    }),
+    [notifications, filteredNotifications, filterRead, filterType, searchTerm]
+  )
 
   return {
     notifications,
