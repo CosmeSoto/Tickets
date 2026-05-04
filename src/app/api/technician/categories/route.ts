@@ -39,15 +39,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, data: [] })
     }
 
-    console.log('[TECH-CATEGORIES] categoryIds:', categoryIds)
-
     // Paso 1: hijos directos
     const children = await prisma.categories.findMany({
       where: { parentId: { in: categoryIds }, isActive: true },
       select: { id: true, parentId: true },
     })
     const childIds = children.map(c => c.id)
-    console.log('[TECH-CATEGORIES] childIds:', childIds)
 
     // Paso 2: nietos (hijos de los hijos)
     const grandchildren =
@@ -58,17 +55,9 @@ export async function GET(request: Request) {
           })
         : []
     const grandchildIds = grandchildren.map(c => c.id)
-    console.log('[TECH-CATEGORIES] grandchildIds:', grandchildIds)
 
     // Todos los IDs: raíces + hijos + nietos
     const allCategoryIds = Array.from(new Set([...categoryIds, ...childIds, ...grandchildIds]))
-    console.log('[TECH-CATEGORIES] allCategoryIds:', allCategoryIds)
-
-    // Verificar cuántos tickets hay en total para estos IDs
-    const totalTicketsCheck = await prisma.tickets.count({
-      where: { categoryId: { in: allCategoryIds } },
-    })
-    console.log('[TECH-CATEGORIES] Total tickets en estas categorias:', totalTicketsCheck)
 
     // Construir mapa: rootId → todos sus descendientes
     const rootToAllIds = new Map<string, string[]>()
@@ -86,7 +75,7 @@ export async function GET(request: Request) {
         by: ['categoryId', 'status'],
         where: {
           categoryId: { in: allCategoryIds },
-          status: { in: ['OPEN', 'IN_PROGRESS', 'RESOLVED'] },
+          status: { in: ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'] },
         },
         _count: { id: true },
       }),
@@ -109,7 +98,8 @@ export async function GET(request: Request) {
       const entry = rawStatsMap.get(row.categoryId) ?? { open: 0, inProgress: 0, resolved: 0 }
       if (row.status === 'OPEN') entry.open = row._count.id
       if (row.status === 'IN_PROGRESS') entry.inProgress = row._count.id
-      if (row.status === 'RESOLVED') entry.resolved = row._count.id
+      // RESOLVED y CLOSED cuentan como resueltos
+      if (row.status === 'RESOLVED' || row.status === 'CLOSED') entry.resolved += row._count.id
       rawStatsMap.set(row.categoryId, entry)
     }
 
