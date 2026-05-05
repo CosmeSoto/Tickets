@@ -419,7 +419,6 @@ export async function POST(req: NextRequest) {
           brand: brand ?? '',
           model: model ?? '',
           typeId: typeId ?? '',
-          departmentId: departmentId ?? undefined,
           status: (status as any) ?? 'AVAILABLE',
           condition: (condition as any) ?? 'GOOD',
           ownershipType: (acquisitionMode as any) ?? 'FIXED_ASSET',
