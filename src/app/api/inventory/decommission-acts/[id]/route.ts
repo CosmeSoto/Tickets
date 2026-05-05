@@ -9,8 +9,14 @@ const decommissionInclude = {
   reviewer: { select: { id: true, name: true, email: true } },
   equipment: {
     select: {
-      id: true, code: true, brand: true, model: true,
-      serialNumber: true, status: true, photoUrl: true,
+      id: true,
+      code: true,
+      brand: true,
+      model: true,
+      serialNumber: true,
+      status: true,
+      photoUrl: true,
+      type: { select: { familyId: true, family: { select: { id: true, name: true } } } },
     },
   },
   license: { select: { id: true, name: true, vendor: true } },
@@ -25,10 +31,7 @@ const decommissionInclude = {
 /**
  * GET /api/inventory/decommission-acts/[id]
  */
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
@@ -45,10 +48,16 @@ export async function GET(
 
   // Gestor/Técnico solo puede ver sus propias solicitudes
   if (!isAdmin && !canManage && request.requestedById !== session.user.id) {
-    return NextResponse.json({ error: 'No tienes permiso para ver esta solicitud' }, { status: 403 })
+    return NextResponse.json(
+      { error: 'No tienes permiso para ver esta solicitud' },
+      { status: 403 }
+    )
   }
   if (canManage && !isAdmin && request.requestedById !== session.user.id) {
-    return NextResponse.json({ error: 'No tienes permiso para ver esta solicitud' }, { status: 403 })
+    return NextResponse.json(
+      { error: 'No tienes permiso para ver esta solicitud' },
+      { status: 403 }
+    )
   }
 
   // Agregar URLs públicas a los adjuntos

@@ -389,7 +389,7 @@ function DecommissionActsTab() {
                   'cursor-pointer transition-all hover:shadow-md border-l-4',
                   req.status === 'PENDING' ? 'border-l-red-400' : 'border-l-transparent'
                 )}
-                onClick={() => router.push(`/inventory/decommission`)}
+                onClick={() => router.push(`/inventory/decommission/${req.id}`)}
               >
                 <CardContent className='p-4'>
                   <div className='flex items-start justify-between gap-3'>

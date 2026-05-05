@@ -19,7 +19,7 @@ interface EquipmentStatusBannersProps {
 }
 
 export function EquipmentStatusBanners({
-  equipment: _equipment,
+  equipment,
   currentAssignment,
   maintenanceRecords,
   userRole,
@@ -93,9 +93,37 @@ export function EquipmentStatusBanners({
         <Alert className='border-border bg-muted'>
           <AlertCircle className='h-4 w-4 text-muted-foreground' />
           <AlertDescription className='text-muted-foreground'>
-            <span className='font-medium'>Equipo dado de baja.</span> Ya no está activo en el
-            inventario.
-            {canPermanentDelete && ' Puedes eliminarlo definitivamente del sistema.'}
+            <div className='flex items-center justify-between gap-3 flex-wrap'>
+              <div>
+                <span className='font-medium'>Equipo dado de baja.</span> Ya no está activo en el
+                inventario.
+                {canPermanentDelete && ' Puedes eliminarlo definitivamente del sistema.'}
+              </div>
+              {/* Folio y PDF del acta de baja */}
+              {(() => {
+                const decommissionReq = ((equipment as any).decommission_requests ?? [])[0]
+                const act = decommissionReq?.act
+                if (!act) return null
+                return (
+                  <div className='flex items-center gap-2 flex-shrink-0'>
+                    {act.folio && (
+                      <span className='font-mono text-xs font-semibold'>{act.folio}</span>
+                    )}
+                    {act.pdfPath && (
+                      <a
+                        href={`/api/inventory/decommission-acts/${decommissionReq.id}/pdf`}
+                        target='_blank'
+                        rel='noopener noreferrer'
+                        className='flex items-center gap-1 text-xs font-medium underline underline-offset-2 hover:text-foreground'
+                      >
+                        <ExternalLink className='h-3 w-3' />
+                        Descargar acta
+                      </a>
+                    )}
+                  </div>
+                )
+              })()}
+            </div>
           </AlertDescription>
         </Alert>
       )}

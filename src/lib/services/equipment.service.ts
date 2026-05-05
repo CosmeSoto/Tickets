@@ -131,6 +131,15 @@ export class EquipmentService {
           licenses: {
             orderBy: { createdAt: 'desc' },
           },
+          decommission_requests: {
+            where: { status: 'APPROVED' },
+            include: {
+              act: { select: { id: true, folio: true, pdfPath: true } },
+              reviewer: { select: { id: true, name: true } },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
         },
       })
 
