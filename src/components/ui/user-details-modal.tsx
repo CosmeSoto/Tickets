@@ -1,411 +1,231 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './dialog'
-import { Card, CardContent, CardHeader, CardTitle } from './card'
+/**
+ * UserDetailsModal — Panel de información del usuario para gestión.
+ *
+ * Muestra datos relevantes para administrar el usuario:
+ * perfil, rol, módulos habilitados, departamento y acceso.
+ *
+ * Las métricas de tickets pertenecen al módulo de tickets, no aquí.
+ */
+
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './dialog'
 import { Badge } from './badge'
 import { Button } from './button'
-import { useToast } from '@/hooks/use-toast'
+import { Avatar, AvatarFallback, AvatarImage } from './avatar'
+import { Separator } from './separator'
 import {
   User,
-  Ticket,
+  Mail,
+  Phone,
+  Building2,
   Clock,
-  CheckCircle,
-  AlertCircle,
-  Calendar,
-  TrendingUp,
-  Activity,
-  BarChart3,
-  RefreshCw,
+  Shield,
+  Package,
+  Ticket,
+  Edit,
+  Trash2,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { RoleBadge } from '@/components/ui/role-badge'
+import { formatTimeAgo } from '@/hooks/use-users'
+import type { UserData } from '@/hooks/use-users'
 
 interface UserDetailsModalProps {
   isOpen: boolean
   onClose: () => void
-  userId: string
-  userName: string
+  /** Pasar el objeto completo evita una petición extra a la API */
+  user: UserData | null
   onEdit?: () => void
   onDelete?: () => void
   canEdit?: boolean
   canDelete?: boolean
 }
 
-interface TicketStats {
-  total: number
-  created: number
-  assigned: number
-  byStatus: {
-    OPEN: number
-    IN_PROGRESS: number
-    RESOLVED: number
-    CLOSED: number
-  }
-  byPriority: {
-    LOW: number
-    MEDIUM: number
-    HIGH: number
-    URGENT: number
-  }
-  avgResolutionTime: number
-  thisMonth: number
-  lastMonth: number
-  trend: 'up' | 'down' | 'stable'
+function InfoRow({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ElementType
+  label: string
+  value: React.ReactNode
+}) {
+  return (
+    <div className='flex items-start gap-3'>
+      <Icon className='h-4 w-4 text-muted-foreground mt-0.5 shrink-0' />
+      <div className='min-w-0'>
+        <p className='text-xs text-muted-foreground'>{label}</p>
+        <div className='text-sm font-medium'>{value}</div>
+      </div>
+    </div>
+  )
 }
 
-interface RecentTicket {
-  id: string
-  title: string
-  status: string
-  priority: string
-  createdAt: string
-  updatedAt: string
-  category?: {
-    name: string
-    color: string
-  }
-}
-
-const statusLabels = {
-  OPEN: 'Abierto',
-  IN_PROGRESS: 'En Progreso',
-  RESOLVED: 'Resuelto',
-  CLOSED: 'Cerrado',
-}
-
-const statusColors = {
-  OPEN: 'bg-blue-100 text-blue-800',
-  IN_PROGRESS: 'bg-yellow-100 text-yellow-800',
-  RESOLVED: 'bg-green-100 text-green-800',
-  CLOSED: 'bg-muted text-foreground',
-}
-
-const priorityLabels = {
-  LOW: 'Baja',
-  MEDIUM: 'Media',
-  HIGH: 'Alta',
-  URGENT: 'Urgente',
-}
-
-const priorityColors = {
-  LOW: 'bg-muted text-foreground',
-  MEDIUM: 'bg-blue-100 text-blue-800',
-  HIGH: 'bg-orange-100 text-orange-800',
-  URGENT: 'bg-red-100 text-red-800',
+function ModuleChip({ enabled, label }: { enabled: boolean; label: string }) {
+  return (
+    <div
+      className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs border ${
+        enabled
+          ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/30 dark:text-green-400'
+          : 'border-border bg-muted text-muted-foreground'
+      }`}
+    >
+      {enabled ? <CheckCircle2 className='h-3 w-3' /> : <XCircle className='h-3 w-3' />}
+      {label}
+    </div>
+  )
 }
 
 export function UserDetailsModal({
   isOpen,
   onClose,
-  userId,
-  userName,
-  onEdit: _onEdit,
+  user,
+  onEdit,
   onDelete,
   canEdit = true,
   canDelete = true,
 }: UserDetailsModalProps) {
-  const [loading, setLoading] = useState(false)
-  const [stats, setStats] = useState<TicketStats | null>(null)
-  const [recentTickets, setRecentTickets] = useState<RecentTicket[]>([])
-  const [error, setError] = useState<string | null>(null)
-  const { toast } = useToast()
+  if (!user) return null
 
-  useEffect(() => {
-    if (isOpen && userId) {
-      loadUserDetails()
-    }
-  }, [isOpen, userId]) // eslint-disable-line react-hooks/exhaustive-deps
+  const deptName = user.department
+    ? typeof user.department === 'string'
+      ? user.department
+      : user.department.name
+    : null
 
-  const loadUserDetails = async () => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      // Cargar estadísticas del usuario
-      const statsResponse = await fetch(`/api/users/${userId}/stats`)
-      if (!statsResponse.ok) throw new Error('Error al cargar estadísticas')
-
-      const statsData = await statsResponse.json()
-      setStats(statsData.data)
-
-      // Cargar tickets recientes
-      const ticketsResponse = await fetch(`/api/users/${userId}/tickets?limit=10`)
-      if (!ticketsResponse.ok) throw new Error('Error al cargar tickets')
-
-      const ticketsData = await ticketsResponse.json()
-      setRecentTickets(ticketsData.data || [])
-
-      // Eliminado el toast molesto - los datos se cargan silenciosamente
-    } catch (error) {
-      console.error('Error loading user details:', error)
-      setError('Error al cargar los detalles del usuario')
-
-      toast({
-        title: 'Error al cargar detalles',
-        description: 'No se pudieron cargar los detalles del usuario',
-        variant: 'destructive',
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-ES', {
-      day: 'numeric',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  }
-
-  const formatDuration = (hours: number) => {
-    if (hours < 24) return `${hours.toFixed(1)}h`
-    const days = Math.floor(hours / 24)
-    return `${days}d ${(hours % 24).toFixed(0)}h`
-  }
+  const deptColor =
+    user.department && typeof user.department !== 'string' ? user.department.color : undefined
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent
-        className='max-w-4xl max-h-[90vh] overflow-y-auto'
-        aria-describedby={undefined}
-      >
+      <DialogContent className='max-w-md' aria-describedby={undefined}>
         <DialogHeader>
-          <div className='flex items-center justify-between'>
-            <div>
-              <DialogTitle className='flex items-center space-x-2'>
-                <User className='h-5 w-5' />
-                <span>Detalles de {userName}</span>
-              </DialogTitle>
-              <DialogDescription>
-                Información detallada de tickets y actividad del usuario
-              </DialogDescription>
-            </div>
-          </div>
+          <DialogTitle className='flex items-center gap-2'>
+            <User className='h-4 w-4' />
+            Detalles del usuario
+          </DialogTitle>
         </DialogHeader>
 
-        {loading ? (
-          <div className='flex items-center justify-center py-12'>
-            <RefreshCw className='h-8 w-8 animate-spin text-blue-600' />
-            <span className='ml-2 text-muted-foreground'>Cargando detalles...</span>
-          </div>
-        ) : error ? (
-          <div className='text-center py-12'>
-            <AlertCircle className='h-12 w-12 mx-auto mb-4 text-red-500' />
-            <p className='text-red-600 mb-4'>{error}</p>
-            <Button onClick={loadUserDetails} variant='outline'>
-              <RefreshCw className='h-4 w-4 mr-2' />
-              Reintentar
-            </Button>
-          </div>
-        ) : stats ? (
-          <div className='space-y-6'>
-            {/* Estadísticas generales */}
-            <div className='grid grid-cols-2 md:grid-cols-4 gap-4'>
-              <Card>
-                <CardContent className='p-4 text-center'>
-                  <div className='flex items-center justify-center space-x-2 mb-2'>
-                    <Ticket className='h-5 w-5 text-blue-600' />
-                    <span className='text-sm font-medium text-muted-foreground'>Total</span>
-                  </div>
-                  <div className='text-2xl font-bold text-blue-600'>{stats.total}</div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className='p-4 text-center'>
-                  <div className='flex items-center justify-center space-x-2 mb-2'>
-                    <Activity className='h-5 w-5 text-green-600' />
-                    <span className='text-sm font-medium text-muted-foreground'>Este Mes</span>
-                  </div>
-                  <div className='text-2xl font-bold text-green-600'>{stats.thisMonth}</div>
-                  <div className='flex items-center justify-center space-x-1 mt-1'>
-                    <TrendingUp
-                      className={cn(
-                        'h-3 w-3',
-                        stats.trend === 'up'
-                          ? 'text-green-500'
-                          : stats.trend === 'down'
-                            ? 'text-red-500'
-                            : 'text-muted-foreground'
-                      )}
-                    />
-                    <span className='text-xs text-muted-foreground'>
-                      vs {stats.lastMonth} anterior
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className='p-4 text-center'>
-                  <div className='flex items-center justify-center space-x-2 mb-2'>
-                    <Clock className='h-5 w-5 text-orange-600' />
-                    <span className='text-sm font-medium text-muted-foreground'>Tiempo Prom.</span>
-                  </div>
-                  <div className='text-2xl font-bold text-orange-600'>
-                    {formatDuration(stats.avgResolutionTime)}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className='p-4 text-center'>
-                  <div className='flex items-center justify-center space-x-2 mb-2'>
-                    <CheckCircle className='h-5 w-5 text-purple-600' />
-                    <span className='text-sm font-medium text-muted-foreground'>Resueltos</span>
-                  </div>
-                  <div className='text-2xl font-bold text-purple-600'>
-                    {stats.byStatus.RESOLVED + stats.byStatus.CLOSED}
-                  </div>
-                </CardContent>
-              </Card>
+        <div className='space-y-5'>
+          {/* Cabecera con avatar */}
+          <div className='flex items-center gap-4'>
+            <Avatar className='h-14 w-14'>
+              <AvatarImage src={user.avatar} alt={user.name} />
+              <AvatarFallback className='text-lg font-semibold'>
+                {user.name.slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className='min-w-0'>
+              <p className='text-base font-semibold truncate'>{user.name}</p>
+              <div className='flex items-center gap-2 mt-1 flex-wrap'>
+                <RoleBadge
+                  role={user.role}
+                  isSuperAdmin={(user as any).isSuperAdmin}
+                  iconSize='sm'
+                />
+                <Badge
+                  variant='outline'
+                  className={`text-xs ${
+                    user.isActive
+                      ? 'border-green-300 text-green-700 dark:border-green-700 dark:text-green-400'
+                      : 'border-muted-foreground/30 text-muted-foreground'
+                  }`}
+                >
+                  {user.isActive ? 'Activo' : 'Inactivo'}
+                </Badge>
+              </div>
             </div>
+          </div>
 
-            {/* Distribución por estado y prioridad */}
-            <div className='grid md:grid-cols-2 gap-6'>
-              <Card>
-                <CardHeader>
-                  <CardTitle className='flex items-center space-x-2'>
-                    <BarChart3 className='h-5 w-5' />
-                    <span>Por Estado</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className='space-y-3'>
-                    {Object.entries(stats.byStatus).map(([status, count]) => (
-                      <div key={status} className='flex items-center justify-between'>
-                        <div className='flex items-center space-x-2'>
-                          <Badge
-                            className={cn(
-                              'text-xs',
-                              statusColors[status as keyof typeof statusColors]
-                            )}
-                          >
-                            {statusLabels[status as keyof typeof statusLabels]}
-                          </Badge>
-                        </div>
-                        <div className='flex items-center space-x-2'>
-                          <div className='text-sm font-medium'>{count}</div>
-                          <div className='w-16 bg-gray-200 rounded-full h-2'>
-                            <div
-                              className='bg-blue-600 h-2 rounded-full'
-                              style={{
-                                width: `${stats.total > 0 ? (count / stats.total) * 100 : 0}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+          <Separator />
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className='flex items-center space-x-2'>
-                    <AlertCircle className='h-5 w-5' />
-                    <span>Por Prioridad</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className='space-y-3'>
-                    {Object.entries(stats.byPriority).map(([priority, count]) => (
-                      <div key={priority} className='flex items-center justify-between'>
-                        <div className='flex items-center space-x-2'>
-                          <Badge
-                            className={cn(
-                              'text-xs',
-                              priorityColors[priority as keyof typeof priorityColors]
-                            )}
-                          >
-                            {priorityLabels[priority as keyof typeof priorityLabels]}
-                          </Badge>
-                        </div>
-                        <div className='flex items-center space-x-2'>
-                          <div className='text-sm font-medium'>{count}</div>
-                          <div className='w-16 bg-gray-200 rounded-full h-2'>
-                            <div
-                              className='bg-orange-600 h-2 rounded-full'
-                              style={{
-                                width: `${stats.total > 0 ? (count / stats.total) * 100 : 0}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+          {/* Datos de contacto */}
+          <div className='space-y-3'>
+            <InfoRow icon={Mail} label='Email' value={user.email} />
+            {user.phone && <InfoRow icon={Phone} label='Teléfono' value={user.phone} />}
+            {deptName && (
+              <InfoRow
+                icon={Building2}
+                label='Departamento'
+                value={
+                  <div className='flex items-center gap-1.5'>
+                    {deptColor && (
+                      <span
+                        className='inline-block h-2.5 w-2.5 rounded-full'
+                        style={{ backgroundColor: deptColor }}
+                      />
+                    )}
+                    {deptName}
                   </div>
-                </CardContent>
-              </Card>
+                }
+              />
+            )}
+            <InfoRow
+              icon={Clock}
+              label='Último acceso'
+              value={user.lastLogin ? formatTimeAgo(user.lastLogin) : 'Nunca'}
+            />
+            <InfoRow
+              icon={Clock}
+              label='Registrado'
+              value={new Date(user.createdAt).toLocaleDateString('es-EC', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+              })}
+            />
+          </div>
+
+          <Separator />
+
+          {/* Módulos habilitados */}
+          <div className='space-y-2'>
+            <p className='text-xs font-medium text-muted-foreground uppercase tracking-wide'>
+              Módulos
+            </p>
+            <div className='flex flex-wrap gap-2'>
+              <ModuleChip enabled={user.ticketsEnabled !== false} label='Tickets' />
+              <ModuleChip
+                enabled={user.inventoryEnabled === true || user.canManageInventory === true}
+                label='Inventario'
+              />
+              {user.canManageInventory && (
+                <div className='flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs border border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-400'>
+                  <Shield className='h-3 w-3' />
+                  Gestor de inventario
+                </div>
+              )}
             </div>
+          </div>
 
-            {/* Tickets recientes */}
-            <Card>
-              <CardHeader>
-                <CardTitle className='flex items-center space-x-2'>
-                  <Calendar className='h-5 w-5' />
-                  <span>Tickets Recientes</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {recentTickets.length > 0 ? (
-                  <div className='space-y-3'>
-                    {recentTickets.map(ticket => (
-                      <div
-                        key={ticket.id}
-                        className='flex items-center justify-between p-3 bg-muted rounded-lg'
-                      >
-                        <div className='flex-1 min-w-0'>
-                          <div className='flex items-center space-x-2 mb-1'>
-                            <h4 className='font-medium text-foreground truncate'>{ticket.title}</h4>
-                            {ticket.category && (
-                              <div
-                                className='w-3 h-3 rounded-full flex-shrink-0'
-                                style={{ backgroundColor: ticket.category.color }}
-                                title={ticket.category.name}
-                              />
-                            )}
-                          </div>
-                          <div className='flex items-center space-x-2 text-sm text-muted-foreground'>
-                            <span>Creado: {formatDate(ticket.createdAt)}</span>
-                            <span>•</span>
-                            <span>Actualizado: {formatDate(ticket.updatedAt)}</span>
-                          </div>
-                        </div>
-                        <div className='flex items-center space-x-2 flex-shrink-0'>
-                          <Badge
-                            className={cn(
-                              'text-xs',
-                              statusColors[ticket.status as keyof typeof statusColors]
-                            )}
-                          >
-                            {statusLabels[ticket.status as keyof typeof statusLabels]}
-                          </Badge>
-                          <Badge
-                            className={cn(
-                              'text-xs',
-                              priorityColors[ticket.priority as keyof typeof priorityColors]
-                            )}
-                          >
-                            {priorityLabels[ticket.priority as keyof typeof priorityLabels]}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className='text-center py-8 text-muted-foreground'>
-                    <Ticket className='h-12 w-12 mx-auto mb-4 text-muted-foreground' />
-                    <p>No hay tickets recientes</p>
-                  </div>
+          {/* Acciones */}
+          {(canEdit || canDelete) && (
+            <>
+              <Separator />
+              <div className='flex justify-end gap-2'>
+                {canDelete && onDelete && (
+                  <Button
+                    variant='ghost'
+                    size='sm'
+                    onClick={onDelete}
+                    className='text-muted-foreground hover:text-destructive hover:bg-destructive/10'
+                  >
+                    <Trash2 className='h-4 w-4 mr-1.5' />
+                    Eliminar
+                  </Button>
                 )}
-              </CardContent>
-            </Card>
-          </div>
-        ) : null}
+                {canEdit && onEdit && (
+                  <Button size='sm' onClick={onEdit}>
+                    <Edit className='h-4 w-4 mr-1.5' />
+                    Editar
+                  </Button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   )

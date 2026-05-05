@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Eye, Edit, Trash2, UserCheck, UserX, TicketIcon } from 'lucide-react'
+import { Eye, Edit, Trash2, UserCheck, UserX } from 'lucide-react'
 import { UserData, formatTimeAgo } from '@/hooks/use-users'
 import { USER_ROLE_COLORS, USER_ROLE_ICONS } from '@/lib/constants/user-constants'
 import { RoleBadge } from '@/components/ui/role-badge'
@@ -128,25 +128,6 @@ export function createUserColumns({
       width: '140px',
     },
     {
-      key: 'tickets',
-      label: 'Tickets',
-      render: (user: UserData) => {
-        const created = user._count?.tickets_tickets_createdByIdTousers ?? 0
-        const assigned = user._count?.tickets_tickets_assigneeIdTousers ?? 0
-        const total = user.role === 'TECHNICIAN' ? assigned : created
-        const label = user.role === 'TECHNICIAN' ? 'asignados' : 'creados'
-        if (total === 0) return <span className='text-muted-foreground text-xs'>—</span>
-        return (
-          <div className='flex items-center gap-1.5'>
-            <TicketIcon className='h-3.5 w-3.5 text-muted-foreground flex-shrink-0' />
-            <span className='text-sm font-medium'>{total}</span>
-            <span className='text-xs text-muted-foreground hidden sm:inline'>{label}</span>
-          </div>
-        )
-      },
-      width: '110px',
-    },
-    {
       key: 'lastLogin',
       label: 'Último acceso',
       sortable: true,
@@ -226,8 +207,6 @@ export function UserCard({
   currentUserId?: string
 }) {
   const RoleIcon = USER_ROLE_ICONS[user.role]
-  const created = user._count?.tickets_tickets_createdByIdTousers ?? 0
-  const assigned = user._count?.tickets_tickets_assigneeIdTousers ?? 0
 
   return (
     <div
@@ -303,12 +282,7 @@ export function UserCard({
               </span>
             )}
           </div>
-          <div className='flex items-center justify-between mt-2 pt-2 border-t'>
-            <span className='text-xs text-muted-foreground'>
-              {created > 0 || assigned > 0
-                ? `${user.role === 'TECHNICIAN' ? assigned + ' asignados' : created + ' tickets'}`
-                : 'Sin tickets'}
-            </span>
+          <div className='flex items-center justify-end mt-2 pt-2 border-t'>
             <span className='text-xs text-muted-foreground'>
               {user.lastLogin ? formatTimeAgo(user.lastLogin) : 'Sin acceso'}
             </span>

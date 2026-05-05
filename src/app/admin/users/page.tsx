@@ -105,12 +105,10 @@ export default function AdminUsersPage() {
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [userDetailsModal, setUserDetailsModal] = useState<{
     isOpen: boolean
-    userId: string
-    userName: string
+    user: UserData | null
   }>({
     isOpen: false,
-    userId: '',
-    userName: '',
+    user: null,
   })
   const [avatarModal, setAvatarModal] = useState<{
     isOpen: boolean
@@ -166,11 +164,7 @@ export default function AdminUsersPage() {
   }
 
   const handleUserDetails = (user: UserData) => {
-    setUserDetailsModal({
-      isOpen: true,
-      userId: user.id,
-      userName: user.name,
-    })
+    setUserDetailsModal({ isOpen: true, user })
   }
 
   const handleAvatarEdit = (user: UserData) => {
@@ -382,20 +376,13 @@ export default function AdminUsersPage() {
       {/* Modal de detalles de usuario */}
       <UserDetailsModal
         isOpen={userDetailsModal.isOpen}
-        onClose={() => setUserDetailsModal({ isOpen: false, userId: '', userName: '' })}
-        userId={userDetailsModal.userId}
-        userName={userDetailsModal.userName}
+        onClose={() => setUserDetailsModal({ isOpen: false, user: null })}
+        user={userDetailsModal.user}
         onEdit={() => {
-          const user = users.find(u => u.id === userDetailsModal.userId)
-          if (user) {
-            handleUserEdit(user)
-          }
+          if (userDetailsModal.user) handleUserEdit(userDetailsModal.user)
         }}
         onDelete={() => {
-          const user = users.find(u => u.id === userDetailsModal.userId)
-          if (user) {
-            handleUserDelete(user)
-          }
+          if (userDetailsModal.user) handleUserDelete(userDetailsModal.user)
         }}
         canEdit={true}
         canDelete={userDetailsModal.userId !== session?.user?.id}
