@@ -1,16 +1,7 @@
-/**
- * Equipment Detail - Refactored
- * Complete refactorization following successful audit module pattern
- *
- * Reduced from 1,151 lines to ~200 lines (82.6% reduction)
- * - Business logic centralized in custom hook (use-equipment-detail.ts)
- * - Modular components for better maintainability
- * - Full dark mode support
- */
-
 'use client'
 
-import { Package, Loader2 } from 'lucide-react'
+import { useState } from 'react'
+import { Package, Loader2, ChevronDown, ChevronUp, TrendingDown } from 'lucide-react'
 import { useEquipmentDetail } from '@/hooks/use-equipment-detail'
 import { EquipmentStatusBanners } from './equipment/equipment-status-banners'
 import { EquipmentActionButtons } from './equipment/equipment-action-buttons'
@@ -37,6 +28,8 @@ interface EquipmentDetailProps {
 }
 
 export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDetailProps) {
+  const [showDepreciation, setShowDepreciation] = useState(false)
+
   const {
     // Data
     data,
@@ -123,13 +116,13 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
   return (
     <div className='space-y-6'>
       {/* Header */}
-      <div className='flex items-center justify-between'>
-        <div className='flex items-center gap-4'>
-          <Package className='h-8 w-8' />
-          <div>
-            <h1 className='text-3xl font-bold'>{equipment.code}</h1>
-            <p className='text-muted-foreground'>
-              {equipment.type?.name || 'Sin tipo'} - {equipment.brand} {equipment.model}
+      <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+        <div className='flex items-center gap-3 min-w-0'>
+          <Package className='h-7 w-7 shrink-0 text-muted-foreground' />
+          <div className='min-w-0'>
+            <h1 className='text-2xl font-bold truncate'>{equipment.code}</h1>
+            <p className='text-sm text-muted-foreground truncate'>
+              {equipment.type?.name || 'Sin tipo'} · {equipment.brand} {equipment.model}
             </p>
           </div>
         </div>
@@ -168,27 +161,34 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
         canPermanentDelete={canPermanentDelete}
       />
 
-      {/* Main Content Grid */}
-      <div className='grid gap-6 md:grid-cols-3'>
-        {/* Equipment Info */}
-        <EquipmentInfoCard equipment={equipment} />
+      {/* Main Content — 2 columnas: info principal | lateral */}
+      <div className='grid gap-6 lg:grid-cols-3'>
+        {/* Columna principal — ocupa 2/3 */}
+        <div className='lg:col-span-2 space-y-6'>
+          {/* 1. Información principal del activo */}
+          <EquipmentInfoCard equipment={equipment} />
 
-        {/* Depreciation & Financial Info */}
-        {((equipment as any).usefulLifeYears ||
-          (equipment as any).supplierId ||
-          (equipment as any).purchasePrice ||
-          (equipment as any).invoiceNumber) && (
-          <div className='space-y-4'>
-            <DepreciationCard
-              purchasePrice={(equipment as any).purchasePrice}
-              purchaseDate={(equipment as any).purchaseDate}
-              usefulLifeYears={(equipment as any).usefulLifeYears}
-              residualValue={(equipment as any).residualValue}
-              depreciation={(equipment as any).depreciation}
-              depreciationMethod={(equipment as any).depreciationMethod}
-              totalUnits={(equipment as any).totalUnits}
-              usedUnits={(equipment as any).usedUnits}
+          {/* 2. Adjuntos — fotos y documentos del equipo */}
+          <EquipmentAttachments
+            equipmentId={equipmentId}
+            canManage={userRole === 'ADMIN' || userRole === 'TECHNICIAN'}
+          />
+
+          {/* 3. Historial de eventos */}
+          <EquipmentHistoryCard history={history as any} />
+
+          {/* 4. Mantenimientos */}
+          {maintenanceRecords.length > 0 && (
+            <EquipmentMaintenanceCard
+              maintenanceRecords={maintenanceRecords}
+              equipmentStatus={equipment.status}
             />
+          )}
+
+          {/* 5. Información financiera — colapsable (el componente maneja su propio estado) */}
+          {((equipment as any).purchasePrice ||
+            (equipment as any).invoiceNumber ||
+            (equipment as any).supplierId) && (
             <FinancialInfoSection
               supplierId={(equipment as any).supplierId}
               invoiceNumber={(equipment as any).invoiceNumber}
@@ -197,32 +197,50 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
               purchaseDate={(equipment as any).purchaseDate}
               readOnly
             />
-          </div>
-        )}
+          )}
 
-        {/* QR Code & Current Assignment */}
+          {/* 6. Depreciación — colapsable */}
+          {(equipment as any).usefulLifeYears && (
+            <div className='rounded-md border border-border overflow-hidden'>
+              <button
+                type='button'
+                className='flex w-full items-center justify-between px-4 py-3 text-sm font-medium hover:bg-muted/50 transition-colors'
+                onClick={() => setShowDepreciation(p => !p)}
+              >
+                <span className='flex items-center gap-2'>
+                  <TrendingDown className='h-4 w-4 text-amber-600 dark:text-amber-400' />
+                  Depreciación
+                </span>
+                {showDepreciation ? (
+                  <ChevronUp className='h-4 w-4' />
+                ) : (
+                  <ChevronDown className='h-4 w-4' />
+                )}
+              </button>
+              {showDepreciation && (
+                <div className='border-t border-border px-4 py-4'>
+                  <DepreciationCard
+                    purchasePrice={(equipment as any).purchasePrice}
+                    purchaseDate={(equipment as any).purchaseDate}
+                    usefulLifeYears={(equipment as any).usefulLifeYears}
+                    residualValue={(equipment as any).residualValue}
+                    depreciation={(equipment as any).depreciation}
+                    depreciationMethod={(equipment as any).depreciationMethod}
+                    totalUnits={(equipment as any).totalUnits}
+                    usedUnits={(equipment as any).usedUnits}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Columna lateral — QR + asignación */}
         <div className='space-y-6'>
           <EquipmentQRCard qrCode={qrCode} equipmentCode={equipment.code} onDownload={downloadQR} />
           {currentAssignment && <EquipmentAssignmentCard assignment={currentAssignment} />}
         </div>
       </div>
-
-      {/* History */}
-      <EquipmentHistoryCard history={history as any} />
-
-      {/* Maintenance Records */}
-      {maintenanceRecords.length > 0 && (
-        <EquipmentMaintenanceCard
-          maintenanceRecords={maintenanceRecords}
-          equipmentStatus={equipment.status}
-        />
-      )}
-
-      {/* Attachments */}
-      <EquipmentAttachments
-        equipmentId={equipmentId}
-        canManage={userRole === 'ADMIN' || userRole === 'TECHNICIAN'}
-      />
 
       {/* Dialogs */}
       <AssignmentDialog

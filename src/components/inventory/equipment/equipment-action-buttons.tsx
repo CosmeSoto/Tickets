@@ -1,10 +1,21 @@
 /**
- * Equipment Action Buttons Component
- * Displays action buttons based on permissions
+ * Equipment Action Buttons
+ * Botones de acción agrupados por prioridad:
+ *   - Primarios: Asignar, Reportar Problema
+ *   - Secundarios: Editar, Devolver, Mantenimiento, Adquirir
+ *   - Destructivos: Solicitar Baja, Eliminar definitivamente
  */
 
-import { Edit, UserPlus, Wrench, Trash2, AlertCircle, ShoppingCart } from 'lucide-react'
+import { Edit, UserPlus, Wrench, Trash2, AlertCircle, ShoppingCart, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { MoreHorizontal } from 'lucide-react'
 
 interface EquipmentActionButtonsProps {
   canReportProblem: boolean
@@ -49,75 +60,98 @@ export function EquipmentActionButtons({
   onPermanentDelete,
   onConvertToPurchase,
 }: EquipmentActionButtonsProps) {
+  // Acciones secundarias que van en el menú desplegable
+  const hasSecondaryActions =
+    canEdit ||
+    canReturn ||
+    canMaintenance ||
+    canRequestMaintenance ||
+    canConvertToPurchase ||
+    canRetire ||
+    canPermanentDelete
+
   return (
-    <div className='flex gap-2 flex-wrap'>
+    <div className='flex items-center gap-2 shrink-0'>
+      {/* Acción principal del cliente */}
       {canReportProblem && (
-        <Button onClick={onReportProblem} variant='default'>
-          <AlertCircle className='mr-2 h-4 w-4' />
-          Reportar Problema
+        <Button size='sm' onClick={onReportProblem}>
+          <AlertCircle className='h-4 w-4 mr-1.5' />
+          Reportar problema
         </Button>
       )}
-      {canRequestMaintenance && !isInMaintenance && (
-        <Button
-          onClick={onRequestMaintenance}
-          variant='outline'
-          className='border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950/30'
-        >
-          <Wrench className='mr-2 h-4 w-4' />
-          Solicitar Mantenimiento
-        </Button>
-      )}
-      {canConvertToPurchase && (
-        <Button onClick={onConvertToPurchase} variant='outline'>
-          <ShoppingCart className='mr-2 h-4 w-4' />
-          Adquirir en propiedad
-        </Button>
-      )}
-      {canEdit && (
-        <Button onClick={onEdit} variant='outline'>
-          <Edit className='mr-2 h-4 w-4' />
-          Editar
-        </Button>
-      )}
+
+      {/* Asignar — acción primaria de gestión */}
       {canAssign && (
-        <Button onClick={onAssign}>
-          <UserPlus className='mr-2 h-4 w-4' />
+        <Button size='sm' onClick={onAssign}>
+          <UserPlus className='h-4 w-4 mr-1.5' />
           Asignar
         </Button>
       )}
-      {canReturn && (
-        <Button
-          onClick={onReturn}
-          variant='outline'
-          className='border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950/30'
-        >
-          <UserPlus className='mr-2 h-4 w-4 rotate-180' />
-          Devolver a Bodega
-        </Button>
-      )}
-      {canMaintenance && (
-        <Button onClick={onMaintenance} variant='outline'>
-          <Wrench className='mr-2 h-4 w-4' />
-          Mantenimiento
-        </Button>
-      )}
-      {canRetire && (
-        <Button onClick={onRetire} variant='destructive'>
-          <Trash2 className='mr-2 h-4 w-4' />
-          Solicitar Baja
-        </Button>
-      )}
-      {canPermanentDelete && (
-        <Button
-          onClick={onPermanentDelete}
-          variant='ghost'
-          size='sm'
-          className='text-muted-foreground hover:text-destructive hover:bg-destructive/10'
-          title='Eliminar permanentemente del sistema'
-        >
-          <Trash2 className='mr-2 h-4 w-4' />
-          <span className='text-xs'>Eliminar definitivamente</span>
-        </Button>
+
+      {/* Menú de acciones secundarias */}
+      {hasSecondaryActions && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size='sm' variant='outline'>
+              <MoreHorizontal className='h-4 w-4' />
+              <span className='sr-only'>Más acciones</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align='end' className='w-52'>
+            {canEdit && (
+              <DropdownMenuItem onClick={onEdit}>
+                <Edit className='h-4 w-4 mr-2' />
+                Editar
+              </DropdownMenuItem>
+            )}
+            {canReturn && (
+              <DropdownMenuItem onClick={onReturn}>
+                <RotateCcw className='h-4 w-4 mr-2' />
+                Devolver a bodega
+              </DropdownMenuItem>
+            )}
+            {canMaintenance && (
+              <DropdownMenuItem onClick={onMaintenance}>
+                <Wrench className='h-4 w-4 mr-2' />
+                Registrar mantenimiento
+              </DropdownMenuItem>
+            )}
+            {canRequestMaintenance && !isInMaintenance && (
+              <DropdownMenuItem onClick={onRequestMaintenance}>
+                <Wrench className='h-4 w-4 mr-2' />
+                Solicitar mantenimiento
+              </DropdownMenuItem>
+            )}
+            {canConvertToPurchase && (
+              <DropdownMenuItem onClick={onConvertToPurchase}>
+                <ShoppingCart className='h-4 w-4 mr-2' />
+                Adquirir en propiedad
+              </DropdownMenuItem>
+            )}
+            {(canRetire || canPermanentDelete) &&
+              (canEdit || canReturn || canMaintenance || canConvertToPurchase) && (
+                <DropdownMenuSeparator />
+              )}
+            {canRetire && (
+              <DropdownMenuItem
+                onClick={onRetire}
+                className='text-destructive focus:text-destructive focus:bg-destructive/10'
+              >
+                <Trash2 className='h-4 w-4 mr-2' />
+                Solicitar baja
+              </DropdownMenuItem>
+            )}
+            {canPermanentDelete && (
+              <DropdownMenuItem
+                onClick={onPermanentDelete}
+                className='text-destructive focus:text-destructive focus:bg-destructive/10'
+              >
+                <Trash2 className='h-4 w-4 mr-2' />
+                Eliminar definitivamente
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       )}
     </div>
   )

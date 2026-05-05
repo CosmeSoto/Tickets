@@ -1,13 +1,18 @@
 /**
- * Equipment Info Card Component
- * Displays main equipment information
+ * EquipmentInfoCard — Tarjeta principal de información del equipo.
+ *
+ * Muestra todos los datos relevantes del activo organizados en secciones:
+ * 1. Identificación (estado, condición, serie, tipo)
+ * 2. Ubicación (física, bodega)
+ * 3. Accesorios
+ * 4. Especificaciones técnicas
+ * 5. Observaciones
  */
 
-import { Calendar, DollarSign, MapPin } from 'lucide-react'
+import { MapPin, Package2, Wrench, StickyNote, Tag } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { formatDate, formatCurrency } from '@/lib/utils'
 import {
   STATUS_LABELS,
   STATUS_COLORS,
@@ -20,90 +25,94 @@ interface EquipmentInfoCardProps {
   equipment: Equipment
 }
 
-export function EquipmentInfoCard({ equipment }: EquipmentInfoCardProps) {
+function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <Card className='md:col-span-2'>
-      <CardHeader>
-        <CardTitle>Información del Equipo</CardTitle>
+    <div>
+      <p className='text-xs text-muted-foreground'>{label}</p>
+      <div className='mt-0.5 text-sm font-medium'>{value}</div>
+    </div>
+  )
+}
+
+export function EquipmentInfoCard({ equipment }: EquipmentInfoCardProps) {
+  const physicalLocation = (equipment as any).physicalLocation as string | undefined
+  const warehouseId = (equipment as any).warehouseId as string | undefined
+
+  const hasLocation = physicalLocation || equipment.location
+  const hasAccessories = equipment.accessories && equipment.accessories.length > 0
+  const hasSpecs = equipment.specifications && Object.keys(equipment.specifications).length > 0
+  const hasNotes = !!equipment.notes
+
+  return (
+    <Card>
+      <CardHeader className='pb-3'>
+        <CardTitle className='flex items-center gap-2 text-base'>
+          <Package2 className='h-4 w-4' />
+          Información del Equipo
+        </CardTitle>
       </CardHeader>
-      <CardContent className='space-y-4'>
-        <div className='grid gap-4 md:grid-cols-2'>
+      <CardContent className='space-y-5'>
+        {/* ── 1. Identificación ── */}
+        <div className='grid grid-cols-2 gap-x-6 gap-y-3'>
           <div>
-            <label className='text-sm font-medium text-muted-foreground'>Estado</label>
-            <div className='mt-1'>
+            <p className='text-xs text-muted-foreground'>Estado</p>
+            <div className='mt-0.5'>
               <Badge className={STATUS_COLORS[equipment.status]}>
                 {STATUS_LABELS[equipment.status]}
               </Badge>
             </div>
           </div>
-          <div>
-            <label className='text-sm font-medium text-muted-foreground'>Condición</label>
-            <p className='mt-1'>{CONDITION_LABELS[equipment.condition]}</p>
-          </div>
-          <div>
-            <label className='text-sm font-medium text-muted-foreground'>Número de Serie</label>
-            <p className='mt-1 font-mono'>{equipment.serialNumber}</p>
-          </div>
-          <div>
-            <label className='text-sm font-medium text-muted-foreground'>Tipo de Propiedad</label>
-            <p className='mt-1'>{OWNERSHIP_LABELS[equipment.ownershipType]}</p>
-          </div>
-        </div>
-
-        <Separator />
-
-        <div className='grid gap-4 md:grid-cols-2'>
-          {equipment.purchaseDate && (
-            <div className='flex items-center gap-2'>
-              <Calendar className='h-4 w-4 text-muted-foreground' />
-              <div>
-                <label className='text-sm font-medium text-muted-foreground'>Fecha de Compra</label>
-                <p className='text-sm'>{formatDate(equipment.purchaseDate)}</p>
-              </div>
-            </div>
-          )}
-          {equipment.purchasePrice && (
-            <div className='flex items-center gap-2'>
-              <DollarSign className='h-4 w-4 text-muted-foreground' />
-              <div>
-                <label className='text-sm font-medium text-muted-foreground'>
-                  Precio de Compra
-                </label>
-                <p className='text-sm'>{formatCurrency(equipment.purchasePrice)}</p>
-              </div>
-            </div>
-          )}
-          {equipment.warrantyExpiration && (
-            <div className='flex items-center gap-2'>
-              <Calendar className='h-4 w-4 text-muted-foreground' />
-              <div>
-                <label className='text-sm font-medium text-muted-foreground'>
-                  Vencimiento de Garantía
-                </label>
-                <p className='text-sm'>{formatDate(equipment.warrantyExpiration)}</p>
-              </div>
-            </div>
-          )}
-          {equipment.location && (
-            <div className='flex items-center gap-2'>
-              <MapPin className='h-4 w-4 text-muted-foreground' />
-              <div>
-                <label className='text-sm font-medium text-muted-foreground'>Ubicación</label>
-                <p className='text-sm'>{equipment.location}</p>
-              </div>
-            </div>
+          <InfoRow label='Condición' value={CONDITION_LABELS[equipment.condition]} />
+          <InfoRow
+            label='N° de Serie'
+            value={<span className='font-mono text-xs'>{equipment.serialNumber}</span>}
+          />
+          <InfoRow label='Tipo de propiedad' value={OWNERSHIP_LABELS[equipment.ownershipType]} />
+          {equipment.type?.name && <InfoRow label='Tipo de equipo' value={equipment.type.name} />}
+          {(equipment as any).warrantyExpiration && (
+            <InfoRow
+              label='Garantía hasta'
+              value={new Date((equipment as any).warrantyExpiration).toLocaleDateString('es-EC', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+              })}
+            />
           )}
         </div>
 
-        {equipment.accessories && equipment.accessories.length > 0 && (
+        {/* ── 2. Ubicación ── */}
+        {hasLocation && (
           <>
             <Separator />
-            <div>
-              <label className='text-sm font-medium text-muted-foreground'>Accesorios</label>
-              <div className='mt-2 flex flex-wrap gap-2'>
-                {equipment.accessories.map((accessory, index) => (
-                  <Badge key={index} variant='outline'>
-                    {accessory}
+            <div className='space-y-2'>
+              <p className='text-xs font-medium text-muted-foreground flex items-center gap-1.5'>
+                <MapPin className='h-3.5 w-3.5' />
+                Ubicación
+              </p>
+              <div className='grid grid-cols-1 gap-2 sm:grid-cols-2'>
+                {physicalLocation && <InfoRow label='Ubicación física' value={physicalLocation} />}
+                {equipment.location && (
+                  <InfoRow label='Ubicación registrada' value={equipment.location} />
+                )}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ── 3. Accesorios ── */}
+        {hasAccessories && (
+          <>
+            <Separator />
+            <div className='space-y-2'>
+              <p className='text-xs font-medium text-muted-foreground flex items-center gap-1.5'>
+                <Tag className='h-3.5 w-3.5' />
+                Accesorios
+              </p>
+              <div className='flex flex-wrap gap-1.5'>
+                {equipment.accessories!.map((acc, i) => (
+                  <Badge key={i} variant='secondary' className='text-xs font-normal'>
+                    {acc}
                   </Badge>
                 ))}
               </div>
@@ -111,18 +120,22 @@ export function EquipmentInfoCard({ equipment }: EquipmentInfoCardProps) {
           </>
         )}
 
-        {equipment.specifications && Object.keys(equipment.specifications).length > 0 && (
+        {/* ── 4. Especificaciones técnicas ── */}
+        {hasSpecs && (
           <>
             <Separator />
-            <div>
-              <label className='text-sm font-medium text-muted-foreground'>
-                Especificaciones Técnicas
-              </label>
-              <div className='mt-2 space-y-2'>
-                {Object.entries(equipment.specifications).map(([key, value]) => (
-                  <div key={key} className='flex justify-between text-sm'>
-                    <span className='font-medium'>{key}:</span>
-                    <span>{String(value)}</span>
+            <div className='space-y-2'>
+              <p className='text-xs font-medium text-muted-foreground flex items-center gap-1.5'>
+                <Wrench className='h-3.5 w-3.5' />
+                Especificaciones técnicas
+              </p>
+              <div className='rounded-md border border-border divide-y divide-border text-sm'>
+                {Object.entries(equipment.specifications!).map(([key, value]) => (
+                  <div key={key} className='flex items-center justify-between px-3 py-1.5'>
+                    <span className='text-muted-foreground text-xs'>{key}</span>
+                    <span className='font-medium text-xs text-right max-w-[60%] truncate'>
+                      {String(value)}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -130,12 +143,18 @@ export function EquipmentInfoCard({ equipment }: EquipmentInfoCardProps) {
           </>
         )}
 
-        {equipment.notes && (
+        {/* ── 5. Observaciones ── */}
+        {hasNotes && (
           <>
             <Separator />
-            <div>
-              <label className='text-sm font-medium text-muted-foreground'>Notas</label>
-              <p className='mt-2 text-sm whitespace-pre-wrap'>{equipment.notes}</p>
+            <div className='space-y-1.5'>
+              <p className='text-xs font-medium text-muted-foreground flex items-center gap-1.5'>
+                <StickyNote className='h-3.5 w-3.5' />
+                Observaciones
+              </p>
+              <p className='text-sm text-foreground whitespace-pre-wrap leading-relaxed'>
+                {equipment.notes}
+              </p>
             </div>
           </>
         )}

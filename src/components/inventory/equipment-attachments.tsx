@@ -198,66 +198,86 @@ export function EquipmentAttachments({ equipmentId, canManage }: EquipmentAttach
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className='flex items-center justify-center py-8'>
-              <Loader2 className='h-6 w-6 animate-spin text-muted-foreground' />
+            <div className='flex items-center justify-center py-6'>
+              <Loader2 className='h-5 w-5 animate-spin text-muted-foreground' />
             </div>
           ) : attachments.length === 0 ? (
-            <div className='text-center py-8 border-2 border-dashed rounded-lg'>
-              <Paperclip className='h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-40' />
-              <p className='text-sm text-muted-foreground'>Sin archivos adjuntos</p>
-              {canManage && (
-                <p className='text-xs text-muted-foreground mt-1'>
-                  Sube imágenes, PDFs o documentos del equipo
-                </p>
-              )}
+            <div className='flex items-center gap-3 rounded-lg border border-dashed px-4 py-3 text-muted-foreground'>
+              <Paperclip className='h-4 w-4 shrink-0 opacity-40' />
+              <p className='text-sm'>Sin archivos adjuntos</p>
             </div>
           ) : (
-            <div className='divide-y'>
-              {attachments.map(att => (
-                <div key={att.id} className='flex items-center gap-3 py-2.5'>
-                  <FileIcon mimeType={att.mimeType} />
-                  <div className='flex-1 min-w-0'>
-                    <p className='text-sm font-medium truncate'>{att.originalName}</p>
-                    <p className='text-xs text-muted-foreground'>
-                      {formatSize(att.size)} · {att.uploader.name} ·{' '}
-                      {new Date(att.createdAt).toLocaleDateString('es-EC')}
-                    </p>
-                  </div>
-                  <div className='flex items-center gap-1 shrink-0'>
-                    {att.mimeType.startsWith('image/') || att.mimeType === 'application/pdf' ? (
+            <div className='space-y-1'>
+              {/* Miniaturas de imágenes */}
+              {attachments.some(a => a.mimeType.startsWith('image/')) && (
+                <div className='flex flex-wrap gap-2 mb-3'>
+                  {attachments
+                    .filter(a => a.mimeType.startsWith('image/'))
+                    .map(att => (
+                      <button
+                        key={att.id}
+                        type='button'
+                        onClick={() => openFile(att)}
+                        className='relative h-16 w-16 rounded-md overflow-hidden border border-border bg-muted hover:opacity-90 transition-opacity'
+                        title={att.originalName}
+                      >
+                        <img
+                          src={`${baseUrl}/${att.id}?preview=true`}
+                          alt={att.originalName}
+                          className='h-full w-full object-cover'
+                        />
+                      </button>
+                    ))}
+                </div>
+              )}
+              {/* Lista de todos los archivos */}
+              <div className='divide-y'>
+                {attachments.map(att => (
+                  <div key={att.id} className='flex items-center gap-3 py-2'>
+                    <FileIcon mimeType={att.mimeType} />
+                    <div className='flex-1 min-w-0'>
+                      <p className='text-sm font-medium truncate'>{att.originalName}</p>
+                      <p className='text-xs text-muted-foreground'>
+                        {formatSize(att.size)} · {att.uploader.name} ·{' '}
+                        {new Date(att.createdAt).toLocaleDateString('es-EC')}
+                      </p>
+                    </div>
+                    <div className='flex items-center gap-1 shrink-0'>
+                      {att.mimeType.startsWith('image/') || att.mimeType === 'application/pdf' ? (
+                        <Button
+                          size='icon'
+                          variant='ghost'
+                          className='h-7 w-7'
+                          onClick={() => openFile(att)}
+                          title='Previsualizar'
+                        >
+                          <Eye className='h-3.5 w-3.5' />
+                        </Button>
+                      ) : null}
                       <Button
                         size='icon'
                         variant='ghost'
                         className='h-7 w-7'
-                        onClick={() => openFile(att)}
-                        title='Previsualizar'
+                        onClick={() => openFile(att, true)}
+                        title='Descargar'
                       >
-                        <Eye className='h-3.5 w-3.5' />
+                        <Download className='h-3.5 w-3.5' />
                       </Button>
-                    ) : null}
-                    <Button
-                      size='icon'
-                      variant='ghost'
-                      className='h-7 w-7'
-                      onClick={() => openFile(att, true)}
-                      title='Descargar'
-                    >
-                      <Download className='h-3.5 w-3.5' />
-                    </Button>
-                    {canManage && (
-                      <Button
-                        size='icon'
-                        variant='ghost'
-                        className='h-7 w-7 text-destructive hover:text-destructive'
-                        onClick={() => setDeleteTarget(att)}
-                        title='Eliminar'
-                      >
-                        <Trash2 className='h-3.5 w-3.5' />
-                      </Button>
-                    )}
+                      {canManage && (
+                        <Button
+                          size='icon'
+                          variant='ghost'
+                          className='h-7 w-7 text-destructive hover:text-destructive'
+                          onClick={() => setDeleteTarget(att)}
+                          title='Eliminar'
+                        >
+                          <Trash2 className='h-3.5 w-3.5' />
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
         </CardContent>

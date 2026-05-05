@@ -97,19 +97,37 @@ export function UnifiedAssetForm({ onSuccess, onCancel, defaultFamilyId }: Unifi
     setSubmitting(true)
     setSubmitError(null)
     try {
-      const fullPayload = { ...payload, subtype: selectedSubtype, familyId: selectedFamilyId }
+      // Separar archivos del payload JSON
+      const attachments = (payload.attachments as File[] | undefined) ?? []
+      const jsonPayload = { ...payload, subtype: selectedSubtype, familyId: selectedFamilyId }
+      delete jsonPayload.attachments
+
       const res = await fetch('/api/inventory/assets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(fullPayload),
+        body: JSON.stringify(jsonPayload),
       })
-      if (res.ok) {
-        const asset = await res.json()
-        onSuccess?.(asset)
-      } else {
+      if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         setSubmitError(data.error ?? 'Error al crear el activo.')
+        return
       }
+
+      const asset = await res.json()
+
+      // Subir adjuntos si los hay (solo para EQUIPMENT)
+      if (attachments.length > 0 && selectedSubtype === 'EQUIPMENT' && asset.id) {
+        const uploadUrl = `/api/inventory/equipment/${asset.id}/attachments`
+        await Promise.allSettled(
+          attachments.map(file => {
+            const fd = new FormData()
+            fd.append('file', file)
+            return fetch(uploadUrl, { method: 'POST', body: fd })
+          })
+        )
+      }
+
+      onSuccess?.(asset)
     } catch {
       setSubmitError('Error de conexión.')
     } finally {
