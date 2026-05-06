@@ -283,6 +283,10 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
+  console.log('[POST /api/inventory/assets] Body keys:', Object.keys(body))
+  console.log('[POST /api/inventory/assets] subtype:', body.subtype, 'familyId:', body.familyId, 'typeId:', body.typeId)
+  
+  try {
   const {
     subtype,
     familyId,
@@ -301,7 +305,6 @@ export async function POST(req: NextRequest) {
     brand,
     model,
     typeId,
-    departmentId,
     warehouseId,
     purchaseDate,
     purchasePrice,
@@ -321,6 +324,13 @@ export async function POST(req: NextRequest) {
   } = body
 
   // Obtener config de familia y validar subtipo
+  if (!familyId) {
+    return NextResponse.json({ error: 'Falta el área (familyId) del activo' }, { status: 400 })
+  }
+  if (!subtype) {
+    return NextResponse.json({ error: 'Falta el tipo de activo (subtype)' }, { status: 400 })
+  }
+
   const config = await getFamilyConfig(familyId)
   const subtypeValidation = validateSubtypeForFamily(subtype, config)
   if (!subtypeValidation.valid) {
@@ -372,7 +382,12 @@ export async function POST(req: NextRequest) {
   const resolvedCode =
     code && String(code).trim()
       ? String(code).trim()
-      : await generateAssetCode(familyId, subtype, acquisitionMode)
+      : await generateAssetCode(familyId ?? '', subtype, acquisitionMode).catch(err => {
+          console.error('[generateAssetCode] Error:', err.message, { familyId, subtype, acquisitionMode })
+          // Fallback: código genérico con timestamp
+          const ts = Date.now().toString(36).toUpperCase()
+          return `${(subtype ?? 'EQ').slice(0, 3)}-${ts}`
+        })
 
   // Resolver bodega por defecto una sola vez
   let defaultWarehouseId: string | undefined
@@ -384,8 +399,13 @@ export async function POST(req: NextRequest) {
   // Enrutar creación según subtype
   let asset: { id: string; [key: string]: unknown }
 
-  try {
-    if (subtype === 'EQUIPMENT') {
+  if (subtype === 'EQUIPMENT') {
+      // Validar campos obligatorios
+      if (!typeId) return NextResponse.json({ error: 'El tipo de equipo es obligatorio' }, { status: 400 })
+      if (!serialNumber) return NextResponse.json({ error: 'El número de serie es obligatorio' }, { status: 400 })
+      if (!brand) return NextResponse.json({ error: 'La marca es obligatoria' }, { status: 400 })
+      if (!model) return NextResponse.json({ error: 'El modelo es obligatorio' }, { status: 400 })
+
       const resolvedEquipmentWarehouseId = warehouseId ?? defaultWarehouseId
       const {
         status,
@@ -411,6 +431,14 @@ export async function POST(req: NextRequest) {
         maintenanceDescription?: string
       }
 
+      // Extraer campos adicionales del body
+      const accessories = Array.isArray(body.accessories) ? body.accessories : []
+      const specifications = body.specifications && typeof body.specifications === 'object' && !Array.isArray(body.specifications)
+        ? body.specifications : undefined
+      const notes = body.notes ? String(body.notes) : undefined
+      // departmentId: se establece cuando el equipo está ASSIGNED (viene del usuario receptor)
+      const resolvedDepartmentId = body.departmentId ? String(body.departmentId) : undefined
+
       asset = await prisma.equipment.create({
         data: {
           id: randomUUID(),
@@ -419,6 +447,7 @@ export async function POST(req: NextRequest) {
           brand: brand ?? '',
           model: model ?? '',
           typeId: typeId ?? '',
+          departmentId: resolvedDepartmentId,
           status: (status as any) ?? 'AVAILABLE',
           condition: (condition as any) ?? 'GOOD',
           ownershipType: (acquisitionMode as any) ?? 'FIXED_ASSET',
@@ -435,12 +464,21 @@ export async function POST(req: NextRequest) {
           usedUnits: usedUnits ?? undefined,
           physicalLocation: physicalLocation ?? undefined,
           warehouseId: resolvedEquipmentWarehouseId,
+          accessories,
+          specifications: specifications ?? undefined,
+          notes: notes ?? undefined,
           qrCode: randomUUID(),
         } as any,
       })
 
-      // Si el activo se crea como ASSIGNED, registrar la asignación
+      // Si el activo se crea como ASSIGNED, registrar la asignación y actualizar departmentId
       if (status === 'ASSIGNED' && assignedUserId) {
+        // Obtener el departamento del usuario receptor
+        const receiver = await prisma.users.findUnique({
+          where: { id: assignedUserId },
+          select: { departmentId: true },
+        })
+
         await prisma.equipment_assignments.create({
           data: {
             id: randomUUID(),
@@ -453,6 +491,14 @@ export async function POST(req: NextRequest) {
             accessories: body.accessories ?? [],
           },
         })
+
+        // Actualizar departmentId en el equipo con el departamento del receptor
+        if (receiver?.departmentId) {
+          await (prisma.equipment.update as any)({
+            where: { id: asset.id },
+            data: { departmentId: receiver.departmentId },
+          })
+        }
       }
 
       // Si el activo se crea en MAINTENANCE, registrar el mantenimiento
@@ -542,9 +588,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ...asset, subtype }, { status: 201 })
   } catch (error) {
     console.error('[POST /api/inventory/assets] Error:', error)
+    // Log the full error details for debugging
+    if (error instanceof Error) {
+      console.error('[POST /api/inventory/assets] Message:', error.message)
+      console.error('[POST /api/inventory/assets] Stack:', error.stack?.split('\n').slice(0, 5).join('\n'))
+    }
     const message = error instanceof Error ? error.message : String(error)
     return NextResponse.json(
-      { error: 'Error al crear el activo', detail: message },
+      { error: message || 'Error al crear el activo' },
       { status: 500 }
     )
   }

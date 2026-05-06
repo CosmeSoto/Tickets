@@ -17,6 +17,7 @@ interface PermanentDeleteDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   equipmentCode: string
+  equipmentStatus?: string
   onConfirm: () => void
   deleting: boolean
 }
@@ -25,9 +26,12 @@ export function PermanentDeleteDialog({
   open,
   onOpenChange,
   equipmentCode,
+  equipmentStatus,
   onConfirm,
   deleting,
 }: PermanentDeleteDialogProps) {
+  const isRetired = equipmentStatus === 'RETIRED'
+
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
@@ -40,8 +44,13 @@ export function PermanentDeleteDialog({
               <p>
                 Esta acción es <span className='font-semibold text-destructive'>irreversible</span>.
                 Se eliminará el equipo <span className='font-semibold'>{equipmentCode}</span> y
-                todos sus registros asociados (mantenimientos, asignaciones) de forma permanente.
+                todos sus registros asociados (mantenimientos, asignaciones, actas) de forma permanente.
               </p>
+              {!isRetired && (
+                <p className='text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded px-3 py-2'>
+                  ⚠ Este equipo no está retirado. Solo el Super Administrador puede eliminarlo en este estado.
+                </p>
+              )}
               <p className='text-xs text-muted-foreground'>
                 Esta acción quedará registrada en el historial de auditoría.
               </p>

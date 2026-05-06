@@ -60,7 +60,7 @@ const baseEquipmentSchema = z.object({
   
   specifications: z.record(z.any()).optional(),
   
-  accessories: z.array(z.string()).optional().default([]),
+  accessories: z.array(z.string()).optional(),
   
   location: z.string().max(100, 'La ubicación no puede exceder 100 caracteres').optional(),
   

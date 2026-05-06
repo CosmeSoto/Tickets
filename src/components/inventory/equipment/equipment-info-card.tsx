@@ -9,7 +9,7 @@
  * 5. Observaciones
  */
 
-import { MapPin, Package2, Wrench, StickyNote, Tag } from 'lucide-react'
+import { MapPin, Package2, Wrench, StickyNote, Tag, Warehouse } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -36,9 +36,9 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
 
 export function EquipmentInfoCard({ equipment }: EquipmentInfoCardProps) {
   const physicalLocation = (equipment as any).physicalLocation as string | undefined
-  const warehouseId = (equipment as any).warehouseId as string | undefined
+  const warehouse = (equipment as any).warehouse as { id: string; name: string } | undefined
 
-  const hasLocation = physicalLocation || equipment.location
+  const hasLocation = physicalLocation || equipment.location || warehouse
   const hasAccessories = equipment.accessories && equipment.accessories.length > 0
   const hasSpecs = equipment.specifications && Object.keys(equipment.specifications).length > 0
   const hasNotes = !!equipment.notes
@@ -91,9 +91,20 @@ export function EquipmentInfoCard({ equipment }: EquipmentInfoCardProps) {
                 Ubicación
               </p>
               <div className='grid grid-cols-1 gap-2 sm:grid-cols-2'>
+                {warehouse && (
+                  <InfoRow
+                    label='Bodega'
+                    value={
+                      <span className='flex items-center gap-1.5'>
+                        <Warehouse className='h-3.5 w-3.5 text-muted-foreground' />
+                        {warehouse.name}
+                      </span>
+                    }
+                  />
+                )}
                 {physicalLocation && <InfoRow label='Ubicación física' value={physicalLocation} />}
                 {equipment.location && (
-                  <InfoRow label='Ubicación registrada' value={equipment.location} />
+                  <InfoRow label='Ubicación adicional' value={equipment.location} />
                 )}
               </div>
             </div>
@@ -130,7 +141,7 @@ export function EquipmentInfoCard({ equipment }: EquipmentInfoCardProps) {
                 Especificaciones técnicas
               </p>
               <div className='rounded-md border border-border divide-y divide-border text-sm'>
-                {Object.entries(equipment.specifications!).map(([key, value]) => (
+                {Object.entries(equipment.specifications!).reverse().map(([key, value]) => (
                   <div key={key} className='flex items-center justify-between px-3 py-1.5'>
                     <span className='text-muted-foreground text-xs'>{key}</span>
                     <span className='font-medium text-xs text-right max-w-[60%] truncate'>

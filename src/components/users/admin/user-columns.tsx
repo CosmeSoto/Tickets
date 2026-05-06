@@ -1,10 +1,16 @@
 'use client'
 
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Eye, Edit, Trash2, UserCheck, UserX } from 'lucide-react'
+import { Eye, Edit, Trash2, UserCheck, UserX, LockOpen, MoreHorizontal } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { UserData, formatTimeAgo } from '@/hooks/use-users'
 import { USER_ROLE_COLORS, USER_ROLE_ICONS } from '@/lib/constants/user-constants'
 import { RoleBadge } from '@/components/ui/role-badge'
@@ -16,7 +22,9 @@ interface UserColumnsProps {
   onAvatarEdit?: (user: UserData) => void
   onToggleStatus?: (user: UserData) => void
   onPromoteUser?: (user: UserData) => void
+  onUnlockUser?: (user: UserData) => void
   currentUserId?: string
+  isSuperAdmin?: boolean
 }
 
 function ActionBtn({
@@ -58,9 +66,11 @@ export function createUserColumns({
   onUserEdit,
   onUserDelete,
   onUserDetails,
-  onAvatarEdit,
+  onAvatarEdit: _onAvatarEdit,
   onToggleStatus,
+  onUnlockUser,
   currentUserId,
+  isSuperAdmin = false,
 }: UserColumnsProps = {}) {
   return [
     {
@@ -174,7 +184,46 @@ export function createUserColumns({
               {user.isActive ? <UserX className='h-4 w-4' /> : <UserCheck className='h-4 w-4' />}
             </ActionBtn>
           )}
-          {onUserDelete && user.id !== currentUserId && (
+          {/* Menú adicional — solo SuperAdmin */}
+          {isSuperAdmin && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant='ghost'
+                  size='sm'
+                  className='h-8 w-8 p-0 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted'
+                  onClick={e => e.stopPropagation()}
+                >
+                  <MoreHorizontal className='h-4 w-4' />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align='end' className='w-52'>
+                {onUnlockUser && (
+                  <DropdownMenuItem
+                    onClick={e => { e.stopPropagation(); onUnlockUser(user) }}
+                    className='cursor-pointer text-blue-600 focus:text-blue-600 focus:bg-blue-50'
+                  >
+                    <LockOpen className='h-4 w-4 mr-2' />
+                    Desbloquear cuenta
+                  </DropdownMenuItem>
+                )}
+                {onUserDelete && user.id !== currentUserId && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={e => { e.stopPropagation(); onUserDelete(user) }}
+                      className='cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10'
+                    >
+                      <Trash2 className='h-4 w-4 mr-2' />
+                      Eliminar usuario
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          {/* Eliminar para admin normal (sin dropdown) */}
+          {!isSuperAdmin && onUserDelete && user.id !== currentUserId && (
             <ActionBtn
               title='Eliminar usuario'
               onClick={() => onUserDelete(user)}
@@ -185,7 +234,7 @@ export function createUserColumns({
           )}
         </div>
       ),
-      width: '130px',
+      width: '140px',
     },
   ]
 }

@@ -20,6 +20,7 @@ import {
   Check,
   Eye,
   ChevronLeft,
+  Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -36,17 +37,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
+import { PdfPreviewModal } from '@/components/ui/pdf-preview-modal'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
@@ -126,14 +121,14 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
   const [accessLevel, setAccessLevel] = useState<string>('participant')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const [downloadingPdf, setDownloadingPdf] = useState(false)
   const [showPdfPreview, setShowPdfPreview] = useState(false)
-  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null)
 
   const [showAcceptDialog, setShowAcceptDialog] = useState(false)
   const [showRejectDialog, setShowRejectDialog] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
+  const [deleting, setDeleting] = useState(false)
   const [copied, setCopied] = useState(false)
 
   const fetchAct = useCallback(async () => {
@@ -164,7 +159,6 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
   }, [params.id, session, status, router, fetchAct])
 
   const handleDownloadPdf = () => {
-    // Descarga directa via URL — evita blob: URLs que el navegador bloquea en HTTP
     const a = document.createElement('a')
     a.href = `/api/inventory/acts/${params.id}/pdf`
     a.download = `Acta_Entrega_${act?.folio?.replace(/\//g, '-') ?? params.id}.pdf`
@@ -172,8 +166,7 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
   }
 
   const handlePreviewPdf = () => {
-    // Abrir en nueva pestaña directamente desde la API
-    window.open(`/api/inventory/acts/${params.id}/pdf`, '_blank', 'noopener,noreferrer')
+    setShowPdfPreview(true)
   }
 
   const handleAccept = async () => {
@@ -216,6 +209,22 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
       toast({ title: 'Error', description: err.message, variant: 'destructive' })
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/inventory/acts/${params.id}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error al eliminar')
+      toast({ title: 'Acta eliminada', description: 'El acta ha sido eliminada permanentemente.' })
+      setShowDeleteDialog(false)
+      router.push('/inventory/acts')
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' })
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -303,6 +312,21 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
           <ChevronLeft className='h-4 w-4' />
           Volver a actas
         </button>
+
+        {/* Botón eliminar para SuperAdmin */}
+        {isSuperAdmin && (
+          <div className='flex justify-end'>
+            <Button
+              variant='outline'
+              size='sm'
+              className='border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400'
+              onClick={() => setShowDeleteDialog(true)}
+            >
+              <Trash2 className='mr-2 h-4 w-4' />
+              Eliminar acta
+            </Button>
+          </div>
+        )}
 
         {/* Banners contextuales */}
         {act.status === 'PENDING' && isReceiver && canAccept && (
@@ -779,59 +803,39 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Dialog: Vista previa PDF */}
-      <Dialog
-        open={showPdfPreview}
-        onOpenChange={open => {
-          setShowPdfPreview(open)
-          if (!open && pdfPreviewUrl) {
-            URL.revokeObjectURL(pdfPreviewUrl)
-            setPdfPreviewUrl(null)
-          }
-        }}
-      >
-        <DialogContent
-          className='max-w-4xl w-full h-[90vh] flex flex-col p-0'
-          aria-describedby={undefined}
-        >
-          <DialogHeader className='px-6 pt-5 pb-3 border-b flex-shrink-0'>
-            <DialogTitle className='flex items-center gap-2'>
-              <FileText className='h-5 w-5' />
-              Vista previa — {act?.folio}
-            </DialogTitle>
-            <DialogDescription>
-              Revisa el acta antes de descargarla. El PDF incluye firma digital y QR de
-              verificación.
-            </DialogDescription>
-          </DialogHeader>
-          <div className='flex-1 min-h-0 px-4 pb-4 pt-3 flex flex-col gap-3'>
-            {pdfPreviewUrl ? (
-              <iframe
-                src={pdfPreviewUrl}
-                className='w-full flex-1 rounded border border-border'
-                title={`Vista previa acta ${act?.folio}`}
-              />
-            ) : (
-              <div className='flex-1 flex items-center justify-center'>
-                <div className='animate-spin rounded-full h-10 w-10 border-b-2 border-primary' />
-              </div>
-            )}
-            <div className='flex justify-end gap-2 flex-shrink-0'>
-              <Button variant='outline' onClick={() => setShowPdfPreview(false)}>
-                Cerrar
-              </Button>
-              <Button
-                onClick={handleDownloadPdf}
-                disabled={downloadingPdf}
-                className='bg-green-600 hover:bg-green-700 text-white'
-              >
-                <Download className='mr-2 h-4 w-4' />
-                {downloadingPdf ? 'Descargando...' : 'Descargar PDF'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Dialog: Eliminar (SuperAdmin) */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar acta permanentemente</AlertDialogTitle>
+            <AlertDialogDescription>
+              Estás a punto de eliminar el acta <strong>{act?.folio}</strong>. Esta acción es
+              irreversible. La auditoría de la eliminación quedará registrada.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className='bg-red-600 hover:bg-red-700'
+            >
+              {deleting ? 'Eliminando...' : 'Eliminar permanentemente'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Vista previa PDF */}
+      {showPdfPreview && act && (
+        <PdfPreviewModal
+          previewUrl={`/api/inventory/acts/${params.id}/preview`}
+          downloadUrl={`/api/inventory/acts/${params.id}/pdf`}
+          fileName={`Acta_Entrega_${act.folio?.replace(/\//g, '-') ?? params.id}.pdf`}
+          title={`Vista previa — ${act.folio}`}
+          onClose={() => setShowPdfPreview(false)}
+        />
+      )}
     </ModuleLayout>
   )
 }

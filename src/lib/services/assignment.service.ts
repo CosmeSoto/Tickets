@@ -86,10 +86,14 @@ export class AssignmentService {
           }
         })
 
-        // Actualizar estado del equipo a ASSIGNED
-        await tx.equipment.update({
+        // Actualizar estado del equipo a ASSIGNED y sincronizar departmentId
+        await (tx.equipment.update as any)({
           where: { id: data.equipmentId },
-          data: { status: 'ASSIGNED' }
+          data: {
+            status: 'ASSIGNED',
+            // Desnormalizar el departamento del receptor para filtros rápidos
+            departmentId: (receiver as any).departmentId ?? null,
+          }
         })
 
         // Registrar en auditoría con información de requireDeliveryAct
@@ -338,11 +342,12 @@ export class AssignmentService {
           include: { equipment: true, receiver: true, deliverer: true }
         })
 
-        // Restaurar estado del equipo a AVAILABLE
-        await tx.equipment.update({
+        // Restaurar estado del equipo a AVAILABLE y limpiar departmentId
+        await (tx.equipment.update as any)({
           where: { id: assignment.equipmentId },
           data: {
             status: 'AVAILABLE',
+            departmentId: null,  // Limpiar departamento al devolver
             ...(condition && { condition: condition as any }),
           }
         })
@@ -405,10 +410,10 @@ export class AssignmentService {
           }
         })
 
-        // Restaurar estado del equipo a AVAILABLE
-        await tx.equipment.update({
+        // Restaurar estado del equipo a AVAILABLE y limpiar departmentId
+        await (tx.equipment.update as any)({
           where: { id: assignment.equipmentId },
-          data: { status: 'AVAILABLE' }
+          data: { status: 'AVAILABLE', departmentId: null }
         })
 
         // Registrar en auditoría

@@ -45,6 +45,7 @@ export default function EquipmentDetailPage({ params }: EquipmentDetailPageProps
         equipmentId={id} 
         userRole={session.user.role}
         userId={session.user.id}
+        isSuperAdmin={(session.user as any)?.isSuperAdmin === true}
       />
     </RoleDashboardLayout>
   )

@@ -52,11 +52,11 @@ export const OWNERSHIP_LABELS: Record<string, string> = {
 }
 
 export const MAINTENANCE_STATUS_BADGE: Record<string, string> = {
-  REQUESTED: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-  SCHEDULED: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
-  ACCEPTED: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-  COMPLETED: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
-  CANCELLED: 'bg-muted text-muted-foreground',
+  REQUESTED: 'bg-primary/10 text-primary border border-primary/30',
+  SCHEDULED: 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30',
+  ACCEPTED: 'bg-violet-500/15 text-violet-700 dark:text-violet-400 border border-violet-500/30',
+  COMPLETED: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30',
+  CANCELLED: 'bg-muted text-muted-foreground border border-border',
 }
 
 export const MAINTENANCE_STATUS_LABEL: Record<string, string> = {

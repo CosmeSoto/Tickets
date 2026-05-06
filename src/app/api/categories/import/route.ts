@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { invalidateCache } from '@/lib/api-cache'
+import { parseImportFile } from '@/lib/utils/parse-import-file'
 
 interface ParsedRow {
   nombre: string
@@ -35,33 +36,6 @@ interface ImportResult {
 // 'update'  → crea nuevas + actualiza las existentes
 // 'replace' → elimina todas las del área y crea desde cero
 type ImportMode = 'add' | 'update' | 'replace'
-
-function parseCSV(text: string): string[][] {
-  const lines = text
-    .split('\n')
-    .map(l => l.trim())
-    .filter(l => l && !l.startsWith('#'))
-
-  return lines.map(line => {
-    const cols: string[] = []
-    let current = ''
-    let inQuotes = false
-    for (const ch of line) {
-      if (ch === '"') {
-        inQuotes = !inQuotes
-        continue
-      }
-      if (ch === ',' && !inQuotes) {
-        cols.push(current.trim())
-        current = ''
-        continue
-      }
-      current += ch
-    }
-    cols.push(current.trim())
-    return cols
-  })
-}
 
 function normalizeColor(color: string): string | null {
   if (!color) return null
@@ -95,12 +69,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No se proporcionó archivo' }, { status: 400 })
     }
 
-    if (file.size > 2 * 1024 * 1024) {
-      return NextResponse.json({ error: 'El archivo no puede superar 2 MB' }, { status: 400 })
+    // Leer límite de tamaño desde configuración del sistema
+    let maxFileSizeMB = 10
+    try {
+      const { getSetting } = await import('@/lib/api-cache')
+      const val = await getSetting('maxFileSize', 600, '10')
+      maxFileSizeMB = parseInt(val ?? '10') || 10
+    } catch { /* usar default */ }
+
+    if (file.size > maxFileSizeMB * 1024 * 1024) {
+      return NextResponse.json(
+        { error: `El archivo no puede superar ${maxFileSizeMB} MB (configurado en ajustes del sistema)` },
+        { status: 400 }
+      )
     }
 
-    const text = await file.text()
-    const rows = parseCSV(text)
+    // Parsear CSV o Excel (.xlsx)
+    let rows: string[][]
+    try {
+      rows = await parseImportFile(file)
+    } catch {
+      return NextResponse.json({ error: 'No se pudo leer el archivo. Verifica que sea un CSV o Excel válido.' }, { status: 400 })
+    }
 
     if (rows.length === 0) {
       return NextResponse.json(
@@ -426,7 +416,7 @@ export async function POST(request: NextRequest) {
 
     // Invalidar caché de categorías
     try {
-      await invalidateCache('categories:*')
+      await invalidateCache(['categories:*'])
     } catch {}
 
     return NextResponse.json({ success: true, ...result })

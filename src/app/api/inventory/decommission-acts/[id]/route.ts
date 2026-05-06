@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { canManageInventory } from '@/lib/inventory-access'
 import prisma from '@/lib/prisma'
+import { randomUUID } from 'crypto'
 
 const decommissionInclude = {
   requester: { select: { id: true, name: true, email: true, department: true } },
@@ -67,4 +68,66 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   }))
 
   return NextResponse.json({ ...request, attachments: attachmentsWithUrls })
+}
+
+/**
+ * DELETE /api/inventory/decommission-acts/[id]
+ * Elimina una solicitud de baja. Solo SuperAdmin.
+ * La auditoría se mantiene en audit_logs.
+ */
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+  const isSuperAdmin = (session.user as any).isSuperAdmin === true
+  if (!isSuperAdmin) {
+    return NextResponse.json(
+      { error: 'Solo el Super Administrador puede eliminar solicitudes de baja' },
+      { status: 403 }
+    )
+  }
+
+  const { id } = await params
+
+  const request = await prisma.decommission_requests.findUnique({
+    where: { id },
+    include: { equipment: { select: { code: true } }, act: { select: { folio: true } } },
+  })
+
+  if (!request) return NextResponse.json({ error: 'Solicitud no encontrada' }, { status: 404 })
+
+  try {
+    // Registrar auditoría ANTES de eliminar
+    await prisma.audit_logs.create({
+      data: {
+        id: randomUUID(),
+        action: 'DELETE',
+        entityType: 'decommission_request',
+        entityId: id,
+        userId: session.user.id,
+        details: {
+          equipmentCode: (request as any).equipment?.code,
+          folio: (request as any).act?.folio,
+          status: request.status,
+          deletedBy: session.user.email,
+          reason: 'Eliminación por Super Administrador',
+        },
+      },
+    })
+
+    // Si tiene acta aprobada, eliminarla también
+    if ((request as any).act) {
+      await prisma.decommission_acts.delete({ where: { requestId: id } })
+    }
+
+    await prisma.decommission_requests.delete({ where: { id } })
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Error eliminando solicitud de baja:', error)
+    return NextResponse.json({ error: 'Error al eliminar solicitud' }, { status: 500 })
+  }
 }

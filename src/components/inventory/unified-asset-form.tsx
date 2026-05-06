@@ -7,7 +7,6 @@ import type { AssetSubtype, FamilyConfig } from '@/lib/inventory/family-config-t
 import { EquipmentAssetForm } from '@/components/inventory/asset-forms/EquipmentAssetForm'
 import { MROAssetForm } from '@/components/inventory/asset-forms/MROAssetForm'
 import { LicenseAssetForm } from '@/components/inventory/asset-forms/LicenseAssetForm'
-import { useInventoryFamilies } from '@/contexts/families-context'
 import { useFamilyOptions } from '@/hooks/use-family-options'
 
 interface UnifiedAssetFormProps {
@@ -16,13 +15,6 @@ interface UnifiedAssetFormProps {
   defaultFamilyId?: string
 }
 
-interface Family {
-  id: string
-  name: string
-  icon?: string | null
-  color?: string | null
-  code: string
-}
 
 export function UnifiedAssetForm({ onSuccess, onCancel, defaultFamilyId }: UnifiedAssetFormProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1)
@@ -116,13 +108,18 @@ export function UnifiedAssetForm({ onSuccess, onCancel, defaultFamilyId }: Unifi
       const asset = await res.json()
 
       // Subir adjuntos si los hay (solo para EQUIPMENT)
+      // IMPORTANTE: esperar a que todos los archivos terminen de subirse
+      // antes de llamar onSuccess para evitar que la navegación cancele las subidas
       if (attachments.length > 0 && selectedSubtype === 'EQUIPMENT' && asset.id) {
         const uploadUrl = `/api/inventory/equipment/${asset.id}/attachments`
         await Promise.allSettled(
-          attachments.map(file => {
+          attachments.map(async file => {
             const fd = new FormData()
             fd.append('file', file)
-            return fetch(uploadUrl, { method: 'POST', body: fd })
+            const uploadRes = await fetch(uploadUrl, { method: 'POST', body: fd })
+            if (!uploadRes.ok) {
+              console.warn(`No se pudo subir el archivo: ${file.name}`)
+            }
           })
         )
       }

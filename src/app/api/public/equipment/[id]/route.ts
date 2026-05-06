@@ -17,18 +17,48 @@ export async function GET(
       where: { id },
       include: {
         type: { select: { name: true, icon: true } },
+        department: { select: { name: true } },
+        warehouse: { select: { name: true } },
         assignments: {
           where: { isActive: true },
           orderBy: { createdAt: 'desc' },
           take: 1,
           include: {
             receiver: {
-              select: { name: true, departmentId: true },
+              select: {
+                name: true,
+                department: { select: { name: true } },
+              },
             },
-            deliverer: {
-              select: { name: true },
-            },
+            deliverer: { select: { name: true } },
           },
+        },
+        // Mantenimiento activo (status SCHEDULED o ACCEPTED)
+        maintenanceRecords: {
+          where: { status: { in: ['SCHEDULED', 'ACCEPTED'] } },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          include: {
+            technician: { select: { name: true } },
+          },
+        },
+        // Solicitud de baja aprobada
+        decommission_requests: {
+          where: { status: 'APPROVED' },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: {
+            reason: true,
+            createdAt: true,
+            condition: true,
+          },
+        },
+        // Primera imagen adjunta para mostrar como foto del equipo
+        attachments: {
+          where: { mimeType: { startsWith: 'image/' } },
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+          select: { id: true },
         },
       },
     })
@@ -39,7 +69,6 @@ export async function GET(
 
     const activeAssignment = equipment.assignments[0] ?? null
 
-    // Labels legibles para enums
     const statusLabels: Record<string, string> = {
       AVAILABLE: 'Disponible',
       ASSIGNED: 'Asignado',
@@ -94,6 +123,7 @@ export async function GET(
     const assignmentInfo = activeAssignment
       ? {
           receiverName: activeAssignment.receiver.name,
+          receiverDepartment: (activeAssignment.receiver as any).department?.name ?? null,
           deliveredBy: activeAssignment.deliverer.name,
           startDate: activeAssignment.startDate,
           endDate: activeAssignment.endDate ?? null,
@@ -104,9 +134,33 @@ export async function GET(
         }
       : null
 
+    // Mantenimiento activo
+    const activeMaintenance = equipment.maintenanceRecords[0] ?? null
+    const maintenanceInfo = activeMaintenance
+      ? {
+          type: activeMaintenance.type === 'PREVENTIVE' ? 'Preventivo' : 'Correctivo',
+          description: activeMaintenance.description,
+          date: activeMaintenance.date,
+          technicianName: activeMaintenance.technician?.name ?? null,
+        }
+      : null
+
+    // Baja aprobada
+    const decommission = equipment.decommission_requests[0] ?? null
+    const decommissionInfo = decommission
+      ? {
+          reason: decommission.reason,
+          date: decommission.createdAt,
+        }
+      : null
+
+    // Usar la primera imagen adjunta como foto principal (más confiable que photoUrl legacy)
+    const firstAttachmentId = equipment.attachments[0]?.id ?? null
+
     return NextResponse.json({
       id: equipment.id,
       code: equipment.code,
+      serialNumber: equipment.serialNumber,
       brand: equipment.brand,
       model: equipment.model,
       typeName: equipment.type.name,
@@ -118,9 +172,26 @@ export async function GET(
       ownershipType: equipment.ownershipType,
       ownershipLabel: ownership.label,
       ownershipDescription: ownership.description,
+      // Ubicación
       location: equipment.location ?? null,
-      photoUrl: equipment.photoUrl ?? null,
+      physicalLocation: equipment.physicalLocation ?? null,
+      warehouseName: equipment.warehouse?.name ?? null,
+      departmentName: equipment.department?.name ?? null,
+      // Accesorios y especificaciones
+      accessories: equipment.accessories ?? [],
+      specifications: (equipment.specifications as Record<string, string> | null) ?? null,
+      // Notas
+      notes: equipment.notes ?? null,
+      // Foto: primero adjunto, luego campo legacy
+      photoUrl: firstAttachmentId
+        ? `/api/inventory/equipment/${equipment.id}/attachments/${firstAttachmentId}?preview=true`
+        : (equipment.photoUrl ?? null),
+      // Asignación
       assignment: assignmentInfo,
+      // Mantenimiento activo
+      maintenance: maintenanceInfo,
+      // Baja
+      decommission: decommissionInfo,
       verifiedAt: new Date().toISOString(),
     })
   } catch (error) {

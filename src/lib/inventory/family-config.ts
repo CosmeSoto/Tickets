@@ -33,7 +33,10 @@ export function validateSubtypeForFamily(
  * SOLO para uso en servidor (API routes, server actions).
  * Importa prisma de forma lazy para no contaminar el bundle del cliente.
  */
-export async function getFamilyConfig(familyId: string): Promise<FamilyConfig> {
+export async function getFamilyConfig(familyId: string | null | undefined): Promise<FamilyConfig> {
+  if (!familyId) {
+    return { familyId: '', ...DEFAULT_FAMILY_CONFIG }
+  }
   const { prisma } = await import('@/lib/prisma')
   const config = await prisma.inventory_family_config.findUnique({
     where: { familyId },

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Pencil, PowerOff, RefreshCw } from 'lucide-react'
+import { Plus, Pencil, PowerOff, RefreshCw, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -32,6 +32,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useToast } from '@/hooks/use-toast'
+import { useSession } from 'next-auth/react'
 import { useTableSort, SortIcon, sortableHeaderClass } from '@/hooks/common/use-table-sort'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { SupplierForm } from '@/components/inventory/suppliers/SupplierForm'
@@ -42,6 +43,9 @@ import { useFamilyOptions } from '@/hooks/use-family-options'
 
 export default function SuppliersPage() {
   const { toast } = useToast()
+  const { data: session } = useSession()
+  const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
+
   const [suppliers, setSuppliers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -51,6 +55,8 @@ export default function SuppliersPage() {
   const [editingSupplier, setEditingSupplier] = useState<any>(null)
   const [deactivatingSupplier, setDeactivatingSupplier] = useState<any>(null)
   const [deactivating, setDeactivating] = useState(false)
+  const [deletingSupplier, setDeletingSupplier] = useState<any>(null)
+  const [deleting, setDeleting] = useState(false)
 
   // Familias de inventario desde el contexto global (cache Redis, sin peticion extra) - memoizadas
   const { families } = useFamilyOptions()
@@ -107,7 +113,6 @@ export default function SuppliersPage() {
       })
       const data = await res.json()
       if (!res.ok) {
-        // 409 = tiene activos asociados
         toast({ title: 'No se puede desactivar', description: data.error, variant: 'destructive' })
         return
       }
@@ -115,13 +120,31 @@ export default function SuppliersPage() {
       setDeactivatingSupplier(null)
       fetchSuppliers()
     } catch {
-      toast({
-        title: 'Error',
-        description: 'No se pudo desactivar el proveedor',
-        variant: 'destructive',
-      })
+      toast({ title: 'Error', description: 'No se pudo desactivar el proveedor', variant: 'destructive' })
     } finally {
       setDeactivating(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deletingSupplier) return
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/inventory/suppliers/${deletingSupplier.id}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast({ title: 'No se puede eliminar', description: data.error, variant: 'destructive' })
+        return
+      }
+      toast({ title: 'Proveedor eliminado', description: `"${deletingSupplier.name}" fue eliminado permanentemente.` })
+      setDeletingSupplier(null)
+      fetchSuppliers()
+    } catch {
+      toast({ title: 'Error', description: 'No se pudo eliminar el proveedor', variant: 'destructive' })
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -293,6 +316,19 @@ export default function SuppliersPage() {
                             <PowerOff className='h-4 w-4 text-destructive' />
                           </Button>
                         )}
+                        {isSuperAdmin && (
+                          <Button
+                            variant='ghost'
+                            size='icon'
+                            title='Eliminar permanentemente (Solo Super Admin)'
+                            onClick={e => {
+                              e.stopPropagation()
+                              setDeletingSupplier(s)
+                            }}
+                          >
+                            <Trash2 className='h-4 w-4 text-destructive' />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -343,6 +379,34 @@ export default function SuppliersPage() {
               className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
             >
               {deactivating ? 'Verificando...' : 'Desactivar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* AlertDialog eliminar (Solo SuperAdmin) */}
+      <AlertDialog
+        open={!!deletingSupplier}
+        onOpenChange={o => !o && setDeletingSupplier(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Eliminar &quot;{deletingSupplier?.name}&quot; permanentemente
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción es irreversible. El proveedor y todos sus datos serán eliminados del
+              sistema. Solo es posible si no tiene activos asociados. La auditoría quedará registrada.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
+            >
+              {deleting ? 'Eliminando...' : 'Eliminar permanentemente'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

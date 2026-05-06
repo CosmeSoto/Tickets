@@ -1,24 +1,20 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Eye, RefreshCw, Wrench, ArrowUpCircle, Clock, CheckCircle, XCircle } from 'lucide-react'
+import { Eye, RefreshCw, Wrench, ArrowUpCircle, Clock, CheckCircle, XCircle, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 import { useTableSort, SortIcon, sortableHeaderClass } from '@/hooks/common/use-table-sort'
 
@@ -56,17 +52,22 @@ const ASSET_TYPE_LABELS: Record<string, string> = {
 interface DecommissionRequestListProps {
   onViewDetail?: (request: any) => void
   refreshTrigger?: number
+  isSuperAdmin?: boolean
 }
 
 export function DecommissionRequestList({
   onViewDetail,
   refreshTrigger,
+  isSuperAdmin = false,
 }: DecommissionRequestListProps) {
+  const { toast } = useToast()
   const [requests, setRequests] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('all')
   const [assetTypeFilter, setAssetTypeFilter] = useState('all')
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; label: string } | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const fetchRequests = useCallback(async () => {
     setLoading(true)
@@ -79,16 +80,30 @@ export function DecommissionRequestList({
       const data = await res.json()
       setRequests(data.requests || [])
       setTotal(data.total || 0)
-    } catch {
-      /* silencioso */
-    } finally {
-      setLoading(false)
-    }
+    } catch { /* silencioso */ }
+    finally { setLoading(false) }
   }, [statusFilter, assetTypeFilter])
 
-  useEffect(() => {
-    fetchRequests()
-  }, [fetchRequests, refreshTrigger])
+  useEffect(() => { fetchRequests() }, [fetchRequests, refreshTrigger])
+
+  const handleDelete = async () => {
+    if (!confirmDelete) return
+    setDeletingId(confirmDelete.id)
+    try {
+      const res = await fetch(`/api/inventory/decommission-acts/${confirmDelete.id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const text = await res.text()
+        let msg = 'Error al eliminar'
+        try { msg = JSON.parse(text).error ?? msg } catch { /* HTML error page */ }
+        throw new Error(msg)
+      }
+      toast({ title: 'Solicitud eliminada', description: `${confirmDelete.label} eliminada permanentemente.` })
+      setConfirmDelete(null)
+      fetchRequests()
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' })
+    } finally { setDeletingId(null) }
+  }
 
   const getAssetName = (req: any) => {
     if (req.equipment)
@@ -251,17 +266,34 @@ export function DecommissionRequestList({
                       {fmtDate(req.createdAt)}
                     </TableCell>
                     <TableCell className='text-right'>
-                      <Button
-                        variant='ghost'
-                        size='icon'
-                        title='Ver detalle'
-                        onClick={e => {
-                          e.stopPropagation()
-                          onViewDetail?.(req)
-                        }}
-                      >
-                        <Eye className='h-4 w-4' />
-                      </Button>
+                      <div className='flex items-center justify-end gap-1'>
+                        <Button
+                          variant='ghost'
+                          size='icon'
+                          title='Ver detalle'
+                          onClick={e => {
+                            e.stopPropagation()
+                            onViewDetail?.(req)
+                          }}
+                        >
+                          <Eye className='h-4 w-4' />
+                        </Button>
+                        {isSuperAdmin && (
+                          <Button
+                            variant='ghost'
+                            size='icon'
+                            title='Eliminar (Solo Super Admin)'
+                            onClick={e => {
+                              e.stopPropagation()
+                              const label = req.act?.folio ?? req.equipment?.code ?? 'solicitud'
+                              setConfirmDelete({ id: req.id, label })
+                            }}
+                            className='text-red-400 hover:text-red-600 hover:bg-red-50'
+                          >
+                            <Trash2 className='h-4 w-4' />
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 )
@@ -270,6 +302,23 @@ export function DecommissionRequestList({
           </TableBody>
         </Table>
       </div>
+
+      <AlertDialog open={!!confirmDelete} onOpenChange={o => !o && setConfirmDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar solicitud permanentemente</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará <strong>{confirmDelete?.label}</strong>. La auditoría quedará registrada. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={!!deletingId}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={!!deletingId} className='bg-red-600 hover:bg-red-700'>
+              {deletingId ? 'Eliminando...' : 'Eliminar permanentemente'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

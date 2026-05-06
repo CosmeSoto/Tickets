@@ -35,13 +35,13 @@ export async function generateAssetCode(
   const year = new Date().getFullYear()
 
   // Obtener código de la familia y prefijo personalizado
-  const family = await prisma.families.findUnique({
+  const family = familyId ? await prisma.families.findUnique({
     where: { id: familyId },
     select: {
       code: true,
       formConfig: { select: { codePrefix: true } },
     },
-  })
+  }) : null
 
   const familyCode = family?.formConfig?.codePrefix?.trim()
     ? family.formConfig.codePrefix.trim().toUpperCase()
@@ -54,7 +54,10 @@ export async function generateAssetCode(
   const yearEnd   = new Date(`${year + 1}-01-01T00:00:00.000Z`)
 
   let count = 0
-  if (subtype === 'EQUIPMENT') {
+  if (!familyId) {
+    // Sin familia: usar timestamp como secuencial único
+    count = Date.now() % 9000
+  } else if (subtype === 'EQUIPMENT') {
     count = await prisma.equipment.count({
       where: {
         type: { familyId },

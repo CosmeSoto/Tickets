@@ -5,6 +5,7 @@ import {
   CheckCircle,
   XCircle,
   Download,
+  Eye,
   Loader2,
   FileText,
   Wrench,
@@ -30,6 +31,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { useToast } from '@/hooks/use-toast'
+import { PdfPreviewModal } from '@/components/ui/pdf-preview-modal'
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
@@ -125,6 +127,7 @@ export function DecommissionApprovalPanel({
     contractNumber: string
   } | null>(null)
   const [closingContract, setClosingContract] = useState(false)
+  const [showPdfPreview, setShowPdfPreview] = useState(false)
 
   const assetName = request.equipment
     ? `${request.equipment.code} — ${request.equipment.brand} ${request.equipment.model}`
@@ -145,11 +148,14 @@ export function DecommissionApprovalPanel({
 
   // Gestor: puede elevar desde TECHNICAL_REVIEW (o PENDING si no hay técnico asignado)
   // Admin normal: puede elevar desde PENDING o TECHNICAL_REVIEW
+  // SuperAdmin NO necesita elevar — puede aprobar directamente desde cualquier estado
   const canElevate =
-    (isManager || isAdmin) && ['PENDING', 'TECHNICAL_REVIEW'].includes(request.status)
+    !isSuperAdmin &&
+    (isManager || isAdmin) &&
+    ['PENDING', 'TECHNICAL_REVIEW'].includes(request.status)
 
   // Admin: puede aprobar/rechazar según su nivel
-  // SuperAdmin: desde cualquier estado activo
+  // SuperAdmin: desde cualquier estado activo (no necesita el flujo de elevación)
   // Admin normal: solo desde MANAGER_REVIEW (o PENDING si no hay gestores)
   const approvableStatuses = isSuperAdmin
     ? ['PENDING', 'TECHNICAL_REVIEW', 'MANAGER_REVIEW']
@@ -417,7 +423,7 @@ export function DecommissionApprovalPanel({
       {/* Acta generada (aprobada) */}
       {request.act && (
         <div className='rounded-lg bg-green-50 border border-green-200 px-4 py-3 dark:bg-green-900/20 dark:border-green-800'>
-          <div className='flex items-center justify-between'>
+          <div className='flex items-center justify-between flex-wrap gap-2'>
             <div className='flex items-center gap-2 text-sm text-green-800 dark:text-green-300'>
               <FileText className='h-4 w-4' />
               <span>
@@ -425,15 +431,27 @@ export function DecommissionApprovalPanel({
               </span>
             </div>
             {request.act.pdfPath && (
-              <a
-                href={`/api/inventory/decommission-acts/${request.id}/pdf`}
-                target='_blank'
-                rel='noopener noreferrer'
-              >
-                <Button variant='outline' size='sm'>
-                  <Download className='mr-2 h-3 w-3' /> Descargar PDF
+              <div className='flex items-center gap-2'>
+                <Button
+                  variant='outline'
+                  size='sm'
+                  onClick={() => setShowPdfPreview(true)}
+                  className='h-8 text-xs'
+                >
+                  <Eye className='mr-1.5 h-3.5 w-3.5' />
+                  Vista previa
                 </Button>
-              </a>
+                <a
+                  href={`/api/inventory/decommission-acts/${request.id}/pdf`}
+                  target='_blank'
+                  rel='noopener noreferrer'
+                >
+                  <Button variant='outline' size='sm' className='h-8 text-xs'>
+                    <Download className='mr-1.5 h-3.5 w-3.5' />
+                    Descargar PDF
+                  </Button>
+                </a>
+              </div>
             )}
           </div>
         </div>
@@ -717,6 +735,17 @@ export function DecommissionApprovalPanel({
             className='max-h-[90vh] max-w-[90vw] rounded-lg object-contain'
           />
         </div>
+      )}
+
+      {/* Vista previa PDF del acta */}
+      {showPdfPreview && request.act && (
+        <PdfPreviewModal
+          previewUrl={`/api/inventory/decommission-acts/${request.id}/preview`}
+          downloadUrl={`/api/inventory/decommission-acts/${request.id}/pdf`}
+          fileName={`Acta_Baja_${request.act.folio?.replace(/\//g, '-')}.pdf`}
+          title={`Vista previa — ${request.act.folio}`}
+          onClose={() => setShowPdfPreview(false)}
+        />
       )}
 
       {/* Dialog: último equipo del contrato */}

@@ -203,6 +203,21 @@ export default function AdminUsersPage() {
     setPromoteDialogOpen(true)
   }
 
+  const handleUnlockUser = async (user: UserData) => {
+    try {
+      const res = await fetch(`/api/users/${user.id}/unlock`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast({
+        title: 'Cuenta desbloqueada',
+        description: `Los intentos fallidos de "${user.name}" han sido limpiados.`,
+        duration: 4000,
+      })
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' })
+    }
+  }
+
   const handlePromoteSuccess = () => {
     refresh()
   }
@@ -269,7 +284,9 @@ export default function AdminUsersPage() {
     onAvatarEdit: handleAvatarEdit,
     onToggleStatus: handleToggleStatus,
     onPromoteUser: handlePromoteUser,
+    onUnlockUser: handleUnlockUser,
     currentUserId: session?.user?.id,
+    isSuperAdmin: (session?.user as any)?.isSuperAdmin === true,
   })
 
   if (!session || session.user.role !== 'ADMIN') {

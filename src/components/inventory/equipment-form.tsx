@@ -9,10 +9,10 @@ import {
   X,
   Package,
   Settings,
-  ExternalLink,
   ImageIcon,
   Building,
   AlertCircle,
+  Warehouse,
 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -34,7 +34,7 @@ import {
   createEquipmentSchema,
   type CreateEquipmentInput,
 } from '@/lib/validations/inventory/equipment'
-import type { Equipment, EquipmentFormData } from '@/types/inventory/equipment'
+import type { Equipment } from '@/types/inventory/equipment'
 import { EquipmentAttachments } from '@/components/inventory/equipment-attachments'
 import { FileUploadZone } from '@/components/ui/file-upload-zone'
 import { useActiveDepartments } from '@/contexts/departments-context'
@@ -61,6 +61,12 @@ interface Department {
   isActive: boolean
   familyId: string | null
   family?: { id: string; name: string; code: string; color?: string } | null
+}
+
+interface WarehouseOption {
+  id: string
+  name: string
+  familyId: string | null
 }
 
 const EQUIPMENT_STATUS_OPTIONS = [
@@ -90,15 +96,42 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
   const [loading, setLoading] = useState(false)
   const [loadingTypes, setLoadingTypes] = useState(true)
   const [equipmentTypes, setEquipmentTypes] = useState<EquipmentType[]>([])
-  const [accessories, setAccessories] = useState<string[]>(equipment?.accessories || [])
-  const [newAccessory, setNewAccessory] = useState('')
-  const [specifications, setSpecifications] = useState<Record<string, string>>(
-    equipment?.specifications || {}
+  const [warehouses, setWarehouses] = useState<WarehouseOption[]>([])
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(
+    (equipment as any)?.warehouseId || ''
   )
+  // Accessories y specs se inicializan desde el equipo existente
+  const [accessories, setAccessories] = useState<string[]>(() => {
+    const raw = equipment?.accessories
+    if (Array.isArray(raw)) return raw
+    return []
+  })
+  const [newAccessory, setNewAccessory] = useState('')
+  const [specifications, setSpecifications] = useState<Record<string, string>>(() => {
+    const raw = equipment?.specifications
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, string>
+    return {}
+  })
   const [newSpecKey, setNewSpecKey] = useState('')
   const [newSpecValue, setNewSpecValue] = useState('')
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [maxFileSize, setMaxFileSize] = useState(10)
+  // Campos adicionales no cubiertos por react-hook-form
+  const [physicalLocation, setPhysicalLocation] = useState<string>(
+    (equipment as any)?.physicalLocation || ''
+  )
+  const [invoiceNumber, setInvoiceNumber] = useState<string>(
+    (equipment as any)?.invoiceNumber || ''
+  )
+  const [usefulLifeYears, setUsefulLifeYears] = useState<string>(
+    (equipment as any)?.usefulLifeYears != null ? String((equipment as any).usefulLifeYears) : ''
+  )
+  const [residualValue, setResidualValue] = useState<string>(
+    (equipment as any)?.residualValue != null ? String((equipment as any).residualValue) : ''
+  )
+  const [depreciationMethod, setDepreciationMethod] = useState<string>(
+    (equipment as any)?.depreciationMethod || ''
+  )
 
   // ✅ Departamentos desde contexto global — sin petición extra
   const { departments: allDepartments } = useActiveDepartments()
@@ -111,6 +144,14 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
       .then(d => {
         if (d.maxFileSize) setMaxFileSize(d.maxFileSize)
       })
+      .catch(() => {})
+  }, [])
+
+  // Cargar bodegas
+  useEffect(() => {
+    fetch('/api/inventory/warehouses')
+      .then(r => r.ok ? r.json() : { warehouses: [] })
+      .then(d => setWarehouses(d.warehouses ?? d ?? []))
       .catch(() => {})
   }, [])
 
@@ -223,6 +264,12 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
         ...data,
         accessories,
         specifications,
+        ...(selectedWarehouseId ? { warehouseId: selectedWarehouseId } : {}),
+        ...(physicalLocation ? { physicalLocation } : {}),
+        ...(invoiceNumber ? { invoiceNumber } : {}),
+        ...(usefulLifeYears ? { usefulLifeYears: parseFloat(usefulLifeYears) } : {}),
+        ...(residualValue !== '' ? { residualValue: parseFloat(residualValue) } : {}),
+        ...(depreciationMethod ? { depreciationMethod } : {}),
       }
 
       const url = isEditing
@@ -244,8 +291,8 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
 
       const savedEquipment = await response.json()
 
-      // Si hay archivos pendientes (modo creación), subirlos ahora
-      if (!isEditing && pendingFiles.length > 0) {
+      // Subir archivos pendientes (tanto en creación como en edición)
+      if (pendingFiles.length > 0) {
         for (const file of pendingFiles) {
           try {
             const fd = new FormData()
@@ -564,8 +611,41 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
             </div>
 
             <div className='space-y-2'>
-              <Label htmlFor='location'>Ubicación</Label>
-              <Input id='location' {...register('location')} placeholder='Bodega Principal' />
+              <Label htmlFor='location'>Ubicación adicional</Label>
+              <Input id='location' {...register('location')} placeholder='Ej: Piso 2, Oficina 201' />
+            </div>
+
+            <div className='space-y-2'>
+              <Label htmlFor='physicalLocation'>Ubicación física</Label>
+              <Input
+                id='physicalLocation'
+                value={physicalLocation}
+                onChange={e => setPhysicalLocation(e.target.value)}
+                placeholder='Ej: Piso Administración, Rack A-3'
+              />
+            </div>
+
+            <div className='space-y-2'>
+              <Label htmlFor='warehouse'>Bodega</Label>
+              <Select
+                value={selectedWarehouseId || '__none__'}
+                onValueChange={v => setSelectedWarehouseId(v === '__none__' ? '' : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder='Selecciona una bodega (opcional)' />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='__none__'>Sin bodega asignada</SelectItem>
+                  {warehouses.map(w => (
+                    <SelectItem key={w.id} value={w.id}>
+                      <span className='flex items-center gap-2'>
+                        <Warehouse className='h-3 w-3' />
+                        {w.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardContent>
@@ -575,7 +655,7 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
       <Card>
         <CardHeader>
           <CardTitle>Información Financiera</CardTitle>
-          <CardDescription>Datos de compra y garantía</CardDescription>
+          <CardDescription>Datos de compra, garantía y depreciación</CardDescription>
         </CardHeader>
         <CardContent className='space-y-4'>
           <div className='grid gap-4 md:grid-cols-3'>
@@ -601,6 +681,60 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
             <div className='space-y-2'>
               <Label htmlFor='warrantyExpiration'>Vencimiento de Garantía</Label>
               <Input id='warrantyExpiration' type='date' {...register('warrantyExpiration')} />
+            </div>
+
+            <div className='space-y-2'>
+              <Label htmlFor='invoiceNumber'>N° de Factura</Label>
+              <Input
+                id='invoiceNumber'
+                value={invoiceNumber}
+                onChange={e => setInvoiceNumber(e.target.value)}
+                placeholder='FAC-2026-001'
+              />
+            </div>
+
+            <div className='space-y-2'>
+              <Label htmlFor='usefulLifeYears'>Vida útil (años)</Label>
+              <Input
+                id='usefulLifeYears'
+                type='number'
+                min='1'
+                step='1'
+                value={usefulLifeYears}
+                onChange={e => setUsefulLifeYears(e.target.value)}
+                placeholder='5'
+              />
+            </div>
+
+            <div className='space-y-2'>
+              <Label htmlFor='residualValue'>Valor residual (USD)</Label>
+              <Input
+                id='residualValue'
+                type='number'
+                min='0'
+                step='0.01'
+                value={residualValue}
+                onChange={e => setResidualValue(e.target.value)}
+                placeholder='200.00'
+              />
+            </div>
+
+            <div className='space-y-2'>
+              <Label htmlFor='depreciationMethod'>Método de depreciación</Label>
+              <Select
+                value={depreciationMethod || '__none__'}
+                onValueChange={v => setDepreciationMethod(v === '__none__' ? '' : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder='Sin método' />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='__none__'>Sin método</SelectItem>
+                  <SelectItem value='LINEAR'>Línea recta</SelectItem>
+                  <SelectItem value='DECLINING_BALANCE'>Saldo decreciente</SelectItem>
+                  <SelectItem value='UNITS_OF_PRODUCTION'>Unidades de producción</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardContent>
@@ -878,7 +1012,25 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
         </CardHeader>
         <CardContent className='pt-0'>
           {isEditing && equipment?.id ? (
-            <EquipmentAttachments equipmentId={equipment.id} canManage={true} />
+            <div className='space-y-4'>
+              <EquipmentAttachments equipmentId={equipment.id} canManage={true} />
+              <div className='border-t pt-4'>
+                <p className='text-xs text-muted-foreground mb-2'>Subir nuevos archivos:</p>
+                <FileUploadZone
+                  files={pendingFiles}
+                  onChange={setPendingFiles}
+                  maxFileSizeMB={maxFileSize}
+                  accept='image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt'
+                  onSizeError={(name, max) =>
+                    toast({
+                      title: 'Archivo muy grande',
+                      description: `"${name}" supera ${max}MB`,
+                      variant: 'destructive',
+                    })
+                  }
+                />
+              </div>
+            </div>
           ) : (
             <FileUploadZone
               files={pendingFiles}

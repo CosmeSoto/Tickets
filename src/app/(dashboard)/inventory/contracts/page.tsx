@@ -2,8 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
-import {
+import { useRouter } from 'next/navigation'import {
   Plus,
   Search,
   RefreshCw,
@@ -18,7 +17,6 @@ import {
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   AlertDialog,
@@ -40,7 +38,6 @@ import {
 import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
-import { useInventoryFamilies } from '@/contexts/families-context'
 import { useFamilyOptions } from '@/hooks/use-family-options'
 import { useFetch } from '@/hooks/common/use-fetch'
 import { useToast } from '@/hooks/use-toast'
@@ -111,8 +108,7 @@ const STATUS_CONFIG: Record<ContractStatus, { label: string; icon: any; cls: str
 // ── Página ────────────────────────────────────────────────────────────────────
 
 export default function ContractsPage() {
-  const { data: session, status } = useSession()
-  const router = useRouter()
+  const { data: session } = useSession()
   const { toast } = useToast()
 
   const [search, setSearch] = useState('')
@@ -194,6 +190,7 @@ export default function ContractsPage() {
   })
 
   const isAdmin = (session?.user as any)?.role === 'ADMIN'
+  const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
   const canManage = isAdmin || (session?.user as any)?.canManageInventory
 
   const { sorted: sortedContracts, sortKey, sortDir, toggleSort } = useTableSort(contracts, 'name')
@@ -450,11 +447,12 @@ export default function ContractsPage() {
                               >
                                 <Pencil className='h-3.5 w-3.5' />
                               </Button>
-                              {isAdmin && (
+                              {isSuperAdmin && (
                                 <Button
                                   variant='ghost'
                                   size='sm'
                                   className='h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10'
+                                  title='Eliminar contrato (Solo Super Admin)'
                                   onClick={() => setDeletingContract(c)}
                                 >
                                   <Trash2 className='h-3.5 w-3.5' />

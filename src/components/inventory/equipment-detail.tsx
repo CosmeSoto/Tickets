@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Package, Loader2, ChevronDown, ChevronUp, TrendingDown } from 'lucide-react'
+import { Package, Loader2, ChevronDown, ChevronUp, TrendingDown, ArrowLeft } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { useEquipmentDetail } from '@/hooks/use-equipment-detail'
 import { EquipmentStatusBanners } from './equipment/equipment-status-banners'
 import { EquipmentActionButtons } from './equipment/equipment-action-buttons'
@@ -25,14 +26,15 @@ interface EquipmentDetailProps {
   equipmentId: string
   userRole: string
   userId: string
+  isSuperAdmin?: boolean
 }
 
-export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDetailProps) {
+export function EquipmentDetail({ equipmentId, userRole, userId, isSuperAdmin = false }: EquipmentDetailProps) {
   const [showDepreciation, setShowDepreciation] = useState(false)
+  const router = useRouter()
 
   const {
     // Data
-    data,
     equipment,
     currentAssignment,
     history,
@@ -97,7 +99,7 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
     submitMaintenance,
     handleReportProblem,
     downloadQR,
-  } = useEquipmentDetail({ equipmentId, userRole, userId })
+  } = useEquipmentDetail({ equipmentId, userRole, userId, isSuperAdmin })
 
   // ── Loading State ──
   if (loading) {
@@ -115,14 +117,26 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
 
   return (
     <div className='space-y-6'>
+      {/* Botón regresar */}
+      <button
+        type='button'
+        onClick={() => router.push('/inventory')}
+        className='flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors'
+      >
+        <ArrowLeft className='h-4 w-4' />
+        Regresar a Equipos
+      </button>
+
       {/* Header */}
       <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
         <div className='flex items-center gap-3 min-w-0'>
-          <Package className='h-7 w-7 shrink-0 text-muted-foreground' />
+          <Package className='h-6 w-6 shrink-0 text-muted-foreground' />
           <div className='min-w-0'>
-            <h1 className='text-2xl font-bold truncate'>{equipment.code}</h1>
-            <p className='text-sm text-muted-foreground truncate'>
+            <h1 className='text-lg font-bold truncate'>
               {equipment.type?.name || 'Sin tipo'} · {equipment.brand} {equipment.model}
+            </h1>
+            <p className='text-xs text-muted-foreground font-mono truncate'>
+              {equipment.code}
             </p>
           </div>
         </div>
@@ -168,16 +182,13 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
           {/* 1. Información principal del activo */}
           <EquipmentInfoCard equipment={equipment} />
 
-          {/* 2. Adjuntos — fotos y documentos del equipo */}
+          {/* 2. Adjuntos — fotos y documentos (visible de inmediato para ver la imagen) */}
           <EquipmentAttachments
             equipmentId={equipmentId}
             canManage={userRole === 'ADMIN' || userRole === 'TECHNICIAN'}
           />
 
-          {/* 3. Historial de eventos */}
-          <EquipmentHistoryCard history={history as any} />
-
-          {/* 4. Mantenimientos */}
+          {/* 3. Mantenimientos activos o recientes */}
           {maintenanceRecords.length > 0 && (
             <EquipmentMaintenanceCard
               maintenanceRecords={maintenanceRecords}
@@ -185,7 +196,10 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
             />
           )}
 
-          {/* 5. Información financiera — colapsable (el componente maneja su propio estado) */}
+          {/* 4. Historial de eventos */}
+          <EquipmentHistoryCard history={history as any} />
+
+          {/* 5. Información financiera — colapsable */}
           {((equipment as any).purchasePrice ||
             (equipment as any).invoiceNumber ||
             (equipment as any).supplierId) && (
@@ -292,6 +306,7 @@ export function EquipmentDetail({ equipmentId, userRole, userId }: EquipmentDeta
         open={showPermanentDeleteDialog}
         onOpenChange={setShowPermanentDeleteDialog}
         equipmentCode={equipment.code}
+        equipmentStatus={equipment.status}
         onConfirm={handlePermanentDelete}
         deleting={permanentDeleting}
       />

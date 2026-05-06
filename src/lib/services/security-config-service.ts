@@ -162,37 +162,29 @@ export class SecurityConfigService {
 
   /**
    * Registrar intento de login fallido
+   * Usa solo el email como clave (sin IP) para evitar problemas con Docker/proxies
    */
-  static async recordFailedLogin(email: string, ipAddress: string): Promise<void> {
+  static async recordFailedLogin(email: string, _ipAddress: string): Promise<void> {
     try {
-      const key = `failed_login:${email}:${ipAddress}`
+      const key = `failed_login:${email.toLowerCase()}`
       const now = Date.now()
 
-      // Buscar registro existente
-      const record = await prisma.system_settings.findUnique({
-        where: { key },
-      })
+      const record = await prisma.system_settings.findUnique({ where: { key } })
 
       if (record) {
-        // Incrementar contador
         const data = JSON.parse(record.value as string)
         data.attempts = (data.attempts || 0) + 1
         data.lastAttempt = now
-
         await prisma.system_settings.update({
           where: { key },
           data: { value: JSON.stringify(data) },
         })
       } else {
-        // Crear nuevo registro
         await prisma.system_settings.create({
           data: {
             id: randomUUID(),
             key,
-            value: JSON.stringify({
-              attempts: 1,
-              lastAttempt: now,
-            }),
+            value: JSON.stringify({ attempts: 1, lastAttempt: now }),
             createdAt: new Date(),
             updatedAt: new Date(),
           },
@@ -205,21 +197,22 @@ export class SecurityConfigService {
 
   /**
    * Verificar si una cuenta está bloqueada por intentos fallidos
+   * Usa solo el email como clave (sin IP)
    */
   static async isAccountLocked(
     email: string,
-    ipAddress: string
+    _ipAddress: string
   ): Promise<{ locked: boolean; attemptsRemaining?: number }> {
     try {
       const config = await this.getConfig()
-      const key = `failed_login:${email}:${ipAddress}`
+      const key = `failed_login:${email.toLowerCase()}`
+      // 5 intentos es el estándar de seguridad (NIST SP 800-63B, PCI DSS)
+      const maxAttempts = config.maxLoginAttempts || 5
 
-      const record = await prisma.system_settings.findUnique({
-        where: { key },
-      })
+      const record = await prisma.system_settings.findUnique({ where: { key } })
 
       if (!record) {
-        return { locked: false, attemptsRemaining: config.maxLoginAttempts }
+        return { locked: false, attemptsRemaining: maxAttempts }
       }
 
       const data = JSON.parse(record.value as string)
@@ -227,23 +220,18 @@ export class SecurityConfigService {
       const lastAttempt = data.lastAttempt || 0
       const now = Date.now()
 
-      // Resetear después de 30 minutos
-      const LOCKOUT_DURATION = 30 * 60 * 1000 // 30 minutos
+      // Resetear después de 15 minutos (reducido de 30)
+      const LOCKOUT_DURATION = 15 * 60 * 1000
       if (now - lastAttempt > LOCKOUT_DURATION) {
-        // Limpiar registro
-        await prisma.system_settings.delete({ where: { key } })
-        return { locked: false, attemptsRemaining: config.maxLoginAttempts }
+        await prisma.system_settings.delete({ where: { key } }).catch(() => {})
+        return { locked: false, attemptsRemaining: maxAttempts }
       }
 
-      // Verificar si está bloqueado
-      if (attempts >= config.maxLoginAttempts) {
+      if (attempts >= maxAttempts) {
         return { locked: true, attemptsRemaining: 0 }
       }
 
-      return {
-        locked: false,
-        attemptsRemaining: config.maxLoginAttempts - attempts,
-      }
+      return { locked: false, attemptsRemaining: maxAttempts - attempts }
     } catch (error) {
       console.error('[SECURITY CONFIG] Error verificando bloqueo:', error)
       return { locked: false }
@@ -253,14 +241,24 @@ export class SecurityConfigService {
   /**
    * Limpiar intentos fallidos después de login exitoso
    */
-  static async clearFailedLogins(email: string, ipAddress: string): Promise<void> {
+  static async clearFailedLogins(email: string, _ipAddress: string): Promise<void> {
     try {
-      const key = `failed_login:${email}:${ipAddress}`
-      await prisma.system_settings.deleteMany({
-        where: { key },
-      })
+      const key = `failed_login:${email.toLowerCase()}`
+      await prisma.system_settings.deleteMany({ where: { key } })
     } catch (error) {
       console.error('[SECURITY CONFIG] Error limpiando intentos fallidos:', error)
+    }
+  }
+
+  /**
+   * Desbloquear una cuenta manualmente (para uso desde panel de admin)
+   */
+  static async unlockAccount(email: string): Promise<void> {
+    try {
+      const key = `failed_login:${email.toLowerCase()}`
+      await prisma.system_settings.deleteMany({ where: { key } })
+    } catch (error) {
+      console.error('[SECURITY CONFIG] Error desbloqueando cuenta:', error)
     }
   }
 }

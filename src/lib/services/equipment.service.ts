@@ -307,6 +307,12 @@ export class EquipmentService {
           ...(data.accessories !== undefined && { accessories: data.accessories }),
           ...(data.location !== undefined && { location: data.location }),
           ...(data.notes !== undefined && { notes: data.notes }),
+          // Campos adicionales que el formulario de edición puede enviar
+          ...((data as any).physicalLocation !== undefined && { physicalLocation: (data as any).physicalLocation || null }),
+          ...((data as any).invoiceNumber !== undefined && { invoiceNumber: (data as any).invoiceNumber || null }),
+          ...((data as any).usefulLifeYears !== undefined && { usefulLifeYears: (data as any).usefulLifeYears ?? null }),
+          ...((data as any).residualValue !== undefined && { residualValue: (data as any).residualValue ?? null }),
+          ...((data as any).depreciationMethod !== undefined && { depreciationMethod: (data as any).depreciationMethod || null }),
         },
       })
 
@@ -406,9 +412,10 @@ export class EquipmentService {
 
   /**
    * Elimina permanentemente un equipo de la base de datos.
-   * Solo ADMIN. Requiere estado RETIRED y sin asignaciones activas.
+   * Admin normal: requiere estado RETIRED.
+   * SuperAdmin: puede eliminar cualquier equipo no asignado.
    */
-  static async permanentDeleteEquipment(id: string, userId: string): Promise<void> {
+  static async permanentDeleteEquipment(id: string, userId: string, skipStatusCheck = false): Promise<void> {
     try {
       const equipment = await prisma.equipment.findUnique({ where: { id } })
 
@@ -416,7 +423,7 @@ export class EquipmentService {
         throw new Error('Equipo no encontrado')
       }
 
-      if (equipment.status !== 'RETIRED') {
+      if (!skipStatusCheck && equipment.status !== 'RETIRED') {
         throw new Error('Solo se pueden eliminar permanentemente equipos retirados')
       }
 

@@ -14,10 +14,10 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { NewMaintenanceDialog } from '@/components/inventory/new-maintenance-dialog'
-import { FamilyCombobox, type FamilyOption } from '@/components/ui/family-combobox'
+import { FamilyCombobox } from '@/components/ui/family-combobox'
+import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
-import { useInventoryFamilies } from '@/contexts/families-context'
 import { useFamilyOptions } from '@/hooks/use-family-options'
 
 interface MaintenanceItem {
@@ -104,11 +104,32 @@ export default function MaintenanceListPage() {
     ? records.filter(r => r.status === 'SCHEDULED').length
     : records.filter(r => r.status === 'REQUESTED').length
 
-  // Export
+  // Ordenamiento
+  const [sortField, setSortField] = useState<'date' | 'status' | 'type' | 'createdAt'>('date')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+
+  const sortedFiltered = [...filtered].sort((a, b) => {
+    const dir = sortDir === 'asc' ? 1 : -1
+    if (sortField === 'status') {
+      const order: Record<string, number> = { REQUESTED: 5, SCHEDULED: 4, ACCEPTED: 3, COMPLETED: 2, CANCELLED: 1 }
+      return ((order[a.status] ?? 0) - (order[b.status] ?? 0)) * dir
+    }
+    if (sortField === 'type') return a.type.localeCompare(b.type) * dir
+    const aVal = a[sortField] ?? ''
+    const bVal = b[sortField] ?? ''
+    return (aVal < bVal ? -1 : aVal > bVal ? 1 : 0) * dir
+  })
+
+  const toggleSort = (field: typeof sortField) => {
+    if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortField(field); setSortDir('desc') }
+  }
+
+  // Export usa sortedFiltered para respetar el orden actual
   const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
     filename: 'mantenimientos',
     title: 'Mantenimientos',
-    getData: () => filtered,
+    getData: () => sortedFiltered,
     columns: [
       { key: 'type', label: 'Tipo', format: v => TYPE_LABELS[v] ?? v },
       { key: 'status', label: 'Estado', format: v => STATUS_CONFIG[v]?.label ?? v },
@@ -235,12 +256,32 @@ export default function MaintenanceListPage() {
           />
         </div>
 
+        {/* Ordenar + contador */}
+        <div className='flex items-center justify-between gap-2 flex-wrap'>
+          <p className='text-xs text-muted-foreground'>
+            {filtered.length} registro{filtered.length !== 1 ? 's' : ''}
+          </p>
+          <div className='flex items-center gap-1 text-xs text-muted-foreground'>
+            <span className='hidden sm:inline'>Ordenar por:</span>
+            {([
+              { key: 'date' as const, label: 'Fecha' },
+              { key: 'status' as const, label: 'Estado' },
+              { key: 'type' as const, label: 'Tipo' },
+            ]).map(opt => (
+              <button key={opt.key} type='button' onClick={() => toggleSort(opt.key)}
+                className={`px-2 py-1 rounded transition-colors ${sortField === opt.key ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted'}`}>
+                {opt.label}{sortField === opt.key && <span className='ml-1'>{sortDir === 'asc' ? '↑' : '↓'}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Lista */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
-        ) : filtered.length === 0 ? (
+        ) : sortedFiltered.length === 0 ? (
           <div className="text-center py-20 space-y-2">
             <Wrench className="h-10 w-10 text-muted-foreground mx-auto" />
             <p className="text-muted-foreground">
@@ -253,7 +294,7 @@ export default function MaintenanceListPage() {
           </div>
         ) : (
           <div className="space-y-2">
-            {filtered.map(record => {
+            {sortedFiltered.map(record => {
               const statusCfg = STATUS_CONFIG[record.status] || STATUS_CONFIG.SCHEDULED
               const needsAction =
                 (isClient && record.status === 'SCHEDULED') ||

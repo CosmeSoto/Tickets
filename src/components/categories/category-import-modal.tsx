@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   Upload,
   Download,
@@ -109,6 +109,16 @@ export function CategoryImportModal({
   const [mode, setMode] = useState<ImportMode>('add')
   const [preview, setPreview] = useState<ImportResult | null>(null)
   const [result, setResult] = useState<ImportResult | null>(null)
+  // Límite de tamaño desde configuración del sistema
+  const [maxFileSizeMB, setMaxFileSizeMB] = useState(10)
+
+  // Cargar límite real al montar
+  useEffect(() => {
+    fetch('/api/config/upload-limits')
+      .then(r => r.ok ? r.json() : { maxFileSizeMB: 10 })
+      .then(d => setMaxFileSizeMB(d.maxFileSizeMB ?? 10))
+      .catch(() => {})
+  }, [])
 
   const reset = () => {
     setStep('upload')
@@ -131,6 +141,14 @@ export function CategoryImportModal({
       toast({
         title: 'Formato inválido',
         description: 'Se aceptan CSV o Excel (.xlsx)',
+        variant: 'destructive',
+      })
+      return
+    }
+    if (f.size > maxFileSizeMB * 1024 * 1024) {
+      toast({
+        title: 'Archivo muy grande',
+        description: `El archivo supera el límite de ${maxFileSizeMB} MB configurado en el sistema`,
         variant: 'destructive',
       })
       return
@@ -325,7 +343,7 @@ export function CategoryImportModal({
                   <Upload className='h-7 w-7 text-muted-foreground' />
                   <p className='text-sm font-medium'>Arrastra tu archivo aquí o haz clic</p>
                   <p className='text-xs text-muted-foreground'>
-                    CSV o Excel (.xlsx) · Máx. 500 categorías · 2 MB
+                    CSV o Excel (.xlsx) · Máx. 500 categorías · {maxFileSizeMB} MB
                   </p>
                 </div>
               )}
@@ -512,7 +530,7 @@ export function CategoryBulkDeleteModal({
   onSuccess,
   familyId,
   familyName,
-  isSuperAdmin,
+  isSuperAdmin: _isSuperAdmin,
 }: BulkDeleteModalProps) {
   const { toast } = useToast()
   const [confirm, setConfirm] = useState('')

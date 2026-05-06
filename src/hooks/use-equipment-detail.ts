@@ -20,9 +20,10 @@ interface UseEquipmentDetailProps {
   equipmentId: string
   userRole: string
   userId: string
+  isSuperAdmin?: boolean
 }
 
-export function useEquipmentDetail({ equipmentId, userRole, userId }: UseEquipmentDetailProps) {
+export function useEquipmentDetail({ equipmentId, userRole, userId, isSuperAdmin = false }: UseEquipmentDetailProps) {
   const router = useRouter()
   const { toast } = useToast()
 
@@ -392,7 +393,9 @@ export function useEquipmentDetail({ equipmentId, userRole, userId }: UseEquipme
     userRole === 'CLIENT' && currentAssignment?.receiverId === userId && !hasActiveMaintenance
 
   const canRetire = canManage && !isRetired && !isAssigned
-  const canPermanentDelete = isAdmin && isRetired
+  // SuperAdmin puede eliminar permanentemente cualquier equipo no asignado (sin importar estado)
+  // Admin normal solo puede eliminar equipos RETIRED
+  const canPermanentDelete = isAdmin && (isRetired || (isSuperAdmin && !isAssigned))
   const canReportProblem = userRole === 'CLIENT' && currentAssignment?.receiverId === userId
   // Conversión a activo propio: solo para RENTAL/LOAN, no retirados, con permisos de gestión
   const canConvertToPurchase =

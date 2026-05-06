@@ -45,6 +45,7 @@ export default function DecommissionPage() {
       <DecommissionRequestList
         onViewDetail={setSelectedRequest}
         refreshTrigger={refreshTrigger}
+        isSuperAdmin={isSuperAdmin}
       />
 
       <Dialog open={!!selectedRequest} onOpenChange={o => !o && setSelectedRequest(null)}>

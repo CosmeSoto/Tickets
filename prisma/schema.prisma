@@ -126,6 +126,7 @@ model departments {
   createdAt   DateTime            @default(now())
   updatedAt   DateTime
   categories  categories[]
+  equipment   equipment[]
   family      families?           @relation(fields: [familyId], references: [id])
   licenses    software_licenses[]
   users       users[]
@@ -840,6 +841,7 @@ model equipment {
   brand                 String
   model                 String
   typeId                String                  @map("type_id")
+  departmentId          String?                 @map("department_id")
   status                EquipmentStatus         @default(AVAILABLE)
   condition             EquipmentCondition      @default(GOOD)
   ownershipType         OwnershipType           @default(FIXED_ASSET) @map("ownership_type")
@@ -882,6 +884,7 @@ model equipment {
   consumables           consumables[]
   decommission_requests decommission_requests[]
   contract              software_licenses?      @relation("EquipmentContract", fields: [contractId], references: [id])
+  department            departments?            @relation(fields: [departmentId], references: [id])
   supplier              suppliers?              @relation(fields: [supplierId], references: [id])
   type                  equipment_types         @relation(fields: [typeId], references: [id])
   warehouse             warehouses?             @relation(fields: [warehouseId], references: [id])
@@ -896,6 +899,7 @@ model equipment {
   @@index([serialNumber])
   @@index([typeId, status])
   @@index([status])
+  @@index([departmentId])
   @@index([rentalProvider])
   @@index([rentalEndDate])
   @@map("equipment")

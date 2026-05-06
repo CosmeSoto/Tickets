@@ -10,17 +10,11 @@ import { SubtypeBadge } from '@/components/inventory/subtype-badge'
 import { ExportButton } from '@/components/common/export-button'
 import { getAssetStatusColor, getAssetStatusLabel } from '@/lib/utils/inventory-utils'
 import { useExport } from '@/hooks/common/use-export'
+import { useTableSort, SortIcon, sortableHeaderClass } from '@/hooks/common/use-table-sort'
 import { Search } from 'lucide-react'
 import type { AssetSubtype } from '@/lib/inventory/family-config'
-import { useInventoryFamilies } from '@/contexts/families-context'
 import { useFamilyOptions } from '@/hooks/use-family-options'
 
-interface Family {
-  id: string
-  name: string
-  icon?: string | null
-  color?: string | null
-}
 
 interface UnifiedAsset {
   id: string
@@ -107,6 +101,18 @@ export function UnifiedInventoryList({
   const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(false)
 
+  // Ordenamiento client-side sobre la página actual
+  // Añadimos familyName como campo virtual para poder ordenar por área
+  const assetsWithFamilyName = useMemo(
+    () => assets.map(a => ({ ...a, familyName: a.family?.name ?? '' })),
+    [assets]
+  )
+  const { sorted: sortedAssets, sortKey, sortDir, toggleSort } = useTableSort(
+    assetsWithFamilyName,
+    'createdAt',
+    'desc'
+  )
+
   // Debounce búsqueda
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 350)
@@ -158,33 +164,27 @@ export function UnifiedInventoryList({
     setPage(1)
   }
 
-  // Exportación — activos visibles con filtros activos
+  // Exportación — activos visibles con filtros y orden activos
   const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
     filename: 'inventario',
     title: 'Inventario de Activos',
     subtitle: `${total} activos${selectedFamilyId ? ' (filtrados por área)' : ''}`,
-    getData: () => assets,
+    getData: () => sortedAssets,
     columns: [
       {
         key: 'subtype',
         label: 'Tipo',
         format: (v: string) =>
-          (
-            ({
-              EQUIPMENT: 'Equipo',
-              MRO: 'Material / Consumible',
-              LICENSE: 'Licencia y Contrato',
-            }) as Record<string, string>
-          )[v] ?? v,
+          ({ EQUIPMENT: 'Equipo', MRO: 'Material / Consumible', LICENSE: 'Licencia y Contrato' } as Record<string, string>)[v] ?? v,
       },
-      { key: 'family', label: 'Área', format: v => v?.name ?? '' },
+      { key: 'family', label: 'Área', format: (v: any) => v?.name ?? '' },
       { key: 'name', label: 'Nombre' },
-      { key: 'code', label: 'Código', format: (v, r) => v ?? r.id.slice(0, 8) },
+      { key: 'code', label: 'Código', format: (v: any, r: any) => v ?? r.id.slice(0, 8) },
       { key: 'status', label: 'Estado', format: (v: string) => getAssetStatusLabel(v) },
       {
         key: 'createdAt',
         label: 'Creado',
-        format: v => (v ? new Date(v).toLocaleDateString('es-ES') : ''),
+        format: (v: any) => (v ? new Date(v).toLocaleDateString('es-ES') : ''),
       },
     ],
   })
@@ -252,19 +252,41 @@ export function UnifiedInventoryList({
         <table className='min-w-full divide-y divide-border text-sm'>
           <thead className='bg-muted/50'>
             <tr>
-              <th className='px-4 py-3 text-left font-medium text-muted-foreground'>Tipo</th>
-              <th className='px-4 py-3 text-left font-medium text-muted-foreground hidden sm:table-cell'>
-                Área
+              <th
+                className={`px-4 py-3 text-left font-medium text-muted-foreground ${sortableHeaderClass}`}
+                onClick={() => toggleSort('subtype')}
+              >
+                Tipo {SortIcon('subtype', sortKey, sortDir)}
               </th>
-              <th className='px-4 py-3 text-left font-medium text-muted-foreground'>Nombre</th>
-              <th className='px-4 py-3 text-left font-medium text-muted-foreground hidden md:table-cell'>
-                Código
+              <th
+                className={`px-4 py-3 text-left font-medium text-muted-foreground hidden sm:table-cell ${sortableHeaderClass}`}
+                onClick={() => toggleSort('familyName' as any)}
+              >
+                Área {SortIcon('familyName', sortKey, sortDir)}
               </th>
-              <th className='px-4 py-3 text-left font-medium text-muted-foreground hidden lg:table-cell'>
-                Estado
+              <th
+                className={`px-4 py-3 text-left font-medium text-muted-foreground ${sortableHeaderClass}`}
+                onClick={() => toggleSort('name')}
+              >
+                Nombre {SortIcon('name', sortKey, sortDir)}
               </th>
-              <th className='px-4 py-3 text-left font-medium text-muted-foreground hidden lg:table-cell'>
-                Creado
+              <th
+                className={`px-4 py-3 text-left font-medium text-muted-foreground hidden md:table-cell ${sortableHeaderClass}`}
+                onClick={() => toggleSort('code' as any)}
+              >
+                Código {SortIcon('code', sortKey, sortDir)}
+              </th>
+              <th
+                className={`px-4 py-3 text-left font-medium text-muted-foreground hidden lg:table-cell ${sortableHeaderClass}`}
+                onClick={() => toggleSort('status')}
+              >
+                Estado {SortIcon('status', sortKey, sortDir)}
+              </th>
+              <th
+                className={`px-4 py-3 text-left font-medium text-muted-foreground hidden lg:table-cell ${sortableHeaderClass}`}
+                onClick={() => toggleSort('createdAt')}
+              >
+                Creado {SortIcon('createdAt', sortKey, sortDir)}
               </th>
             </tr>
           </thead>
@@ -278,14 +300,14 @@ export function UnifiedInventoryList({
                   </div>
                 </td>
               </tr>
-            ) : assets.length === 0 ? (
+            ) : sortedAssets.length === 0 ? (
               <tr>
                 <td colSpan={6} className='px-4 py-10 text-center text-muted-foreground'>
                   No hay activos para mostrar.
                 </td>
               </tr>
             ) : (
-              assets.map(asset => (
+              sortedAssets.map(asset => (
                 <tr
                   key={asset.id}
                   className='cursor-pointer hover:bg-muted/50 transition-colors'

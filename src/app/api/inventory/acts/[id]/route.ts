@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { DeliveryActService } from '@/lib/services/delivery-act.service'
+import { randomUUID } from 'crypto'
 
 /**
  * GET /api/inventory/acts/[id]
@@ -109,5 +110,62 @@ export async function GET(
       { error: 'Error al obtener acta' },
       { status: 500 }
     )
+  }
+}
+
+/**
+ * DELETE /api/inventory/acts/[id]
+ * Elimina un acta de entrega. Solo SuperAdmin.
+ * La auditoría se mantiene en audit_logs.
+ */
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    if (!isSuperAdmin) {
+      return NextResponse.json(
+        { error: 'Solo el Super Administrador puede eliminar actas' },
+        { status: 403 }
+      )
+    }
+
+    const { id } = await params
+    const act = await DeliveryActService.getActById(id)
+    if (!act) {
+      return NextResponse.json({ error: 'Acta no encontrada' }, { status: 404 })
+    }
+
+    const { prisma } = await import('@/lib/prisma')
+
+    // Registrar auditoría ANTES de eliminar
+    await prisma.audit_logs.create({
+      data: {
+        id: randomUUID(),
+        action: 'DELETE',
+        entityType: 'delivery_act',
+        entityId: id,
+        userId: session.user.id,
+        details: {
+          folio: (act as any).folio,
+          status: act.status,
+          deletedBy: session.user.email,
+          reason: 'Eliminación por Super Administrador',
+        },
+      },
+    })
+
+    await prisma.delivery_acts.delete({ where: { id } })
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Error en DELETE /api/inventory/acts/[id]:', error)
+    return NextResponse.json({ error: 'Error al eliminar acta' }, { status: 500 })
   }
 }

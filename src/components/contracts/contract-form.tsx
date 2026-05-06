@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
-import { Plus, Trash2, RefreshCw } from 'lucide-react'
+import { Plus, Trash2, RefreshCw, Paperclip, FileText, Download, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -17,6 +17,7 @@ import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/hooks/use-toast'
 import { useInventoryFamilies } from '@/contexts/families-context'
 import { useFetch } from '@/hooks/common/use-fetch'
+import { FileUploadZone } from '@/components/ui/file-upload-zone'
 import {
   CONTRACT_CATEGORY_LABELS,
   CONTRACT_LINE_TYPE_LABELS,
@@ -24,6 +25,15 @@ import {
   type Contract,
   type ContractFormData,
 } from '@/types/contracts'
+
+interface ContractAttachment {
+  id: string
+  originalName: string
+  mimeType: string
+  size: number
+  path: string
+  createdAt: string
+}
 
 interface Props {
   contract?: Contract | null
@@ -46,6 +56,53 @@ export function ContractForm({ contract, onSuccess, onCancel }: Props) {
   const { toast } = useToast()
   const [submitting, setSubmitting] = useState(false)
   const isEditing = !!contract
+
+  // ── Adjuntos ──────────────────────────────────────────────────────────────
+  const [pendingFiles, setPendingFiles] = useState<File[]>([])
+  const [existingAttachments, setExistingAttachments] = useState<ContractAttachment[]>(
+    (contract as any)?.attachments ?? []
+  )
+  const [deletingAttachmentId, setDeletingAttachmentId] = useState<string | null>(null)
+  const [maxFileSize, setMaxFileSize] = useState(10)
+
+  useEffect(() => {
+    fetch('/api/admin/settings')
+      .then(r => r.json())
+      .then(d => { if (d.maxFileSize) setMaxFileSize(d.maxFileSize) })
+      .catch(() => {})
+  }, [])
+
+  // Recargar adjuntos cuando se edita un contrato existente
+  useEffect(() => {
+    if (!contract?.id) return
+    fetch(`/api/contracts/${contract.id}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.attachments) setExistingAttachments(d.attachments) })
+      .catch(() => {})
+  }, [contract?.id])
+
+  const handleDeleteAttachment = async (attachmentId: string) => {
+    setDeletingAttachmentId(attachmentId)
+    try {
+      const res = await fetch(
+        `/api/contracts/${contract!.id}/attachments?attachmentId=${attachmentId}`,
+        { method: 'DELETE' }
+      )
+      if (!res.ok) throw new Error((await res.json()).error)
+      setExistingAttachments(prev => prev.filter(a => a.id !== attachmentId))
+      toast({ title: 'Adjunto eliminado' })
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' })
+    } finally {
+      setDeletingAttachmentId(null)
+    }
+  }
+
+  const formatSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
 
   const { families: rawFamilies } = useInventoryFamilies()
   
@@ -182,6 +239,21 @@ export function ContractForm({ contract, onSuccess, onCancel }: Props) {
       }
 
       const saved = await res.json()
+
+      // Subir archivos pendientes
+      if (pendingFiles.length > 0) {
+        for (const file of pendingFiles) {
+          try {
+            const fd = new FormData()
+            fd.append('file', file)
+            await fetch(`/api/contracts/${saved.id}/attachments`, { method: 'POST', body: fd })
+          } catch {
+            // No bloquear si falla un adjunto individual
+          }
+        }
+        setPendingFiles([])
+      }
+
       toast({ title: isEditing ? 'Contrato actualizado' : 'Contrato creado' })
       onSuccess(saved)
     } catch (err: any) {
@@ -407,6 +479,83 @@ export function ContractForm({ contract, onSuccess, onCancel }: Props) {
               </div>
             </div>
           ))}
+        </CardContent>
+      </Card>
+
+      {/* ── Adjuntos / Contrato físico ──────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Paperclip className="h-4 w-4" />
+            Documentos adjuntos
+          </CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            Sube el contrato físico en PDF u otros documentos relacionados.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Adjuntos existentes (solo en edición) */}
+          {isEditing && existingAttachments.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Archivos guardados ({existingAttachments.length})
+              </p>
+              <ul className="space-y-1.5">
+                {existingAttachments.map(att => (
+                  <li
+                    key={att.id}
+                    className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm"
+                  >
+                    <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <span className="flex-1 truncate text-foreground">{att.originalName}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {formatSize(att.size)}
+                    </span>
+                    <a
+                      href={att.path}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 rounded p-0.5 hover:bg-muted"
+                      title="Descargar"
+                    >
+                      <Download className="h-3.5 w-3.5 text-muted-foreground" />
+                    </a>
+                    <button
+                      type="button"
+                      title="Eliminar adjunto"
+                      disabled={deletingAttachmentId === att.id}
+                      onClick={() => handleDeleteAttachment(att.id)}
+                      className="shrink-0 rounded p-0.5 hover:bg-muted disabled:opacity-50"
+                    >
+                      <X className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <Separator />
+            </div>
+          )}
+
+          {/* Subir nuevos archivos */}
+          <FileUploadZone
+            files={pendingFiles}
+            onChange={setPendingFiles}
+            maxFileSizeMB={maxFileSize}
+            label={isEditing ? 'Agregar nuevos documentos' : 'Documentos del contrato'}
+            accept="application/pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+            onSizeError={(name, max) =>
+              toast({
+                title: 'Archivo muy grande',
+                description: `"${name}" supera ${max}MB`,
+                variant: 'destructive',
+              })
+            }
+          />
+          {!isEditing && pendingFiles.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Los archivos se subirán al guardar el contrato.
+            </p>
+          )}
         </CardContent>
       </Card>
 

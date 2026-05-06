@@ -748,6 +748,7 @@ CREATE TABLE "equipment" (
     "brand" TEXT NOT NULL,
     "model" TEXT NOT NULL,
     "type_id" TEXT NOT NULL,
+    "department_id" TEXT,
     "status" "EquipmentStatus" NOT NULL DEFAULT 'AVAILABLE',
     "condition" "EquipmentCondition" NOT NULL DEFAULT 'GOOD',
     "ownership_type" "OwnershipType" NOT NULL DEFAULT 'FIXED_ASSET',
@@ -757,6 +758,7 @@ CREATE TABLE "equipment" (
     "specifications" JSONB,
     "accessories" TEXT[],
     "location" TEXT,
+    "physical_location" TEXT,
     "notes" TEXT,
     "photo_url" TEXT,
     "qr_code" TEXT NOT NULL,
@@ -1483,6 +1485,9 @@ CREATE UNIQUE INDEX "equipment_code_key" ON "equipment"("code");
 CREATE UNIQUE INDEX "equipment_qr_code_key" ON "equipment"("qr_code");
 
 -- CreateIndex
+CREATE INDEX "equipment_department_id_idx" ON "equipment"("department_id");
+
+-- CreateIndex
 CREATE INDEX "equipment_code_idx" ON "equipment"("code");
 
 -- CreateIndex
@@ -1868,6 +1873,9 @@ ALTER TABLE "equipment" ADD CONSTRAINT "equipment_warehouse_id_fkey" FOREIGN KEY
 
 -- AddForeignKey
 ALTER TABLE "equipment" ADD CONSTRAINT "equipment_contract_id_fkey" FOREIGN KEY ("contract_id") REFERENCES "software_licenses"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "equipment" ADD CONSTRAINT "equipment_department_id_fkey" FOREIGN KEY ("department_id") REFERENCES "departments"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "equipment_attachments" ADD CONSTRAINT "equipment_attachments_equipment_id_fkey" FOREIGN KEY ("equipment_id") REFERENCES "equipment"("id") ON DELETE CASCADE ON UPDATE CASCADE;

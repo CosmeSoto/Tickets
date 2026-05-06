@@ -14,6 +14,9 @@ import {
   Calendar,
   Filter,
   X,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
 } from 'lucide-react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -22,6 +25,8 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ExportButton } from '@/components/common/export-button'
+import { useExport } from '@/hooks/common/use-export'
 import Link from 'next/link'
 
 // ── Configuración de reportes ─────────────────────────────────────────────────
@@ -176,23 +181,51 @@ const URGENCY_COLORS: Record<string, string> = {
 
 const PAGE_SIZE = 25
 
-function DataTable({ rows }: { rows: Record<string, unknown>[] }) {
+function DataTable({ rows, reportName }: { rows: Record<string, unknown>[]; reportName?: string }) {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+  const [sortKey, setSortKey] = useState<string | null>(null)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
+  const toggleSort = (key: string) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortKey(key); setSortDir('asc') }
+  }
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return rows
-    const q = search.toLowerCase()
-    return rows.filter((row) =>
-      Object.values(row).some((v) => v != null && String(v).toLowerCase().includes(q))
-    )
-  }, [rows, search])
+    let result = rows
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      result = result.filter((row) =>
+        Object.values(row).some((v) => v != null && String(v).toLowerCase().includes(q))
+      )
+    }
+    if (sortKey) {
+      const dir = sortDir === 'asc' ? 1 : -1
+      result = [...result].sort((a, b) => {
+        const av = a[sortKey]; const bv = b[sortKey]
+        if (av == null) return 1; if (bv == null) return -1
+        if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir
+        return String(av).localeCompare(String(bv), 'es', { sensitivity: 'base' }) * dir
+      })
+    }
+    return result
+  }, [rows, search, sortKey, sortDir])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  // Reset page when search changes
-  useEffect(() => { setPage(1) }, [search])
+  useEffect(() => { setPage(1) }, [search, sortKey, sortDir])
+
+  // Export — usa los datos filtrados y ordenados actuales
+  const headers = rows.length > 0 ? Object.keys(rows[0]) : []
+  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+    filename: reportName ? `reporte-${reportName.toLowerCase().replace(/\s+/g, '-')}` : 'reporte-inventario',
+    title: reportName ?? 'Reporte de Inventario',
+    subtitle: `${filtered.length} registros`,
+    getData: () => filtered,
+    columns: headers.map(h => ({ key: h, label: formatHeader(h) })),
+  })
 
   if (rows.length === 0) {
     return (
@@ -203,32 +236,38 @@ function DataTable({ rows }: { rows: Record<string, unknown>[] }) {
     )
   }
 
-  const headers = Object.keys(rows[0])
-
   return (
     <div className="space-y-3">
-      {/* Búsqueda en tabla */}
-      {rows.length > PAGE_SIZE && (
-        <div className="flex items-center gap-2 px-4 pt-4">
-          <div className="relative flex-1 max-w-xs">
-            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <Input
-              placeholder="Buscar en resultados..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 h-8 text-sm"
-            />
-            {search && (
-              <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2">
-                <X className="h-3.5 w-3.5 text-muted-foreground" />
-              </button>
-            )}
-          </div>
-          <span className="text-xs text-muted-foreground shrink-0">
-            {filtered.length} de {rows.length} registros
-          </span>
+      {/* Búsqueda + Export */}
+      <div className="flex items-center gap-2 px-4 pt-4 flex-wrap">
+        <div className="relative flex-1 min-w-[180px] max-w-xs">
+          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Buscar en resultados..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-8 h-8 text-sm"
+          />
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2">
+              <X className="h-3.5 w-3.5 text-muted-foreground" />
+            </button>
+          )}
         </div>
-      )}
+        <span className="text-xs text-muted-foreground shrink-0">
+          {filtered.length} de {rows.length} registros
+        </span>
+        <div className="ml-auto">
+          <ExportButton
+            onExportCSV={exportCSV}
+            onExportExcel={exportExcel}
+            onExportPDF={exportPDF}
+            loading={exporting}
+            disabled={filtered.length === 0}
+            size="sm"
+          />
+        </div>
+      </div>
 
       {/* Tabla */}
       <div className="overflow-x-auto">
@@ -238,9 +277,16 @@ function DataTable({ rows }: { rows: Record<string, unknown>[] }) {
               {headers.map((h) => (
                 <th
                   key={h}
-                  className="px-3 py-2.5 text-left font-medium text-muted-foreground whitespace-nowrap text-xs uppercase tracking-wide"
+                  onClick={() => toggleSort(h)}
+                  className="px-3 py-2.5 text-left font-medium text-muted-foreground whitespace-nowrap text-xs uppercase tracking-wide cursor-pointer select-none hover:text-foreground transition-colors"
                 >
                   {formatHeader(h)}
+                  {sortKey === h
+                    ? sortDir === 'asc'
+                      ? <ArrowUp className="h-3 w-3 ml-1 inline text-foreground" />
+                      : <ArrowDown className="h-3 w-3 ml-1 inline text-foreground" />
+                    : <ArrowUpDown className="h-3 w-3 ml-1 inline text-muted-foreground/40" />
+                  }
                 </th>
               ))}
             </tr>
@@ -647,7 +693,7 @@ function ReportSlugContent({ slug }: { slug: string }) {
             {/* Tabla de datos */}
             <Card>
               <CardContent className="p-0">
-                <DataTable rows={reportData.data} />
+                <DataTable rows={reportData.data} reportName={REPORT_CONFIG[slug as string]?.name} />
               </CardContent>
             </Card>
           </>

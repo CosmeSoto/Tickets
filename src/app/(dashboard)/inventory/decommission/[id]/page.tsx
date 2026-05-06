@@ -3,10 +3,21 @@
 import { useState, useEffect, use } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import { ArrowLeft, Loader2, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { DecommissionApprovalPanel } from '@/components/inventory/decommission/DecommissionApprovalPanel'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { useToast } from '@/hooks/use-toast'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -20,6 +31,9 @@ export default function DecommissionDetailPage({ params }: PageProps) {
   const [request, setRequest] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const { toast } = useToast()
 
   const role = session?.user?.role ?? ''
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
@@ -62,8 +76,23 @@ export default function DecommissionDetailPage({ params }: PageProps) {
   }
 
   const handleActionComplete = () => {
-    // Recargar para reflejar el nuevo estado
     loadRequest()
+  }
+
+  const handleDelete = async () => {
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/inventory/decommission-acts/${id}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error al eliminar')
+      toast({ title: 'Solicitud eliminada', description: 'La solicitud de baja fue eliminada permanentemente.' })
+      setShowDeleteDialog(false)
+      router.push('/inventory/decommission')
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' })
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const assetName = request
@@ -78,10 +107,23 @@ export default function DecommissionDetailPage({ params }: PageProps) {
       subtitle={assetName || 'Detalle de la solicitud'}
       loading={loading}
       headerActions={
-        <Button variant='outline' size='sm' onClick={() => router.push('/inventory/decommission')}>
-          <ArrowLeft className='h-4 w-4 mr-1.5' />
-          Volver a bajas
-        </Button>
+        <div className='flex items-center gap-2'>
+          {isSuperAdmin && request && (
+            <Button
+              variant='outline'
+              size='sm'
+              className='border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400'
+              onClick={() => setShowDeleteDialog(true)}
+            >
+              <Trash2 className='h-4 w-4 mr-1.5' />
+              Eliminar
+            </Button>
+          )}
+          <Button variant='outline' size='sm' onClick={() => router.push('/inventory/decommission')}>
+            <ArrowLeft className='h-4 w-4 mr-1.5' />
+            Volver a bajas
+          </Button>
+        </div>
       }
     >
       {loading ? (
@@ -105,6 +147,29 @@ export default function DecommissionDetailPage({ params }: PageProps) {
           />
         </div>
       ) : null}
+
+      {/* Dialog: Eliminar (SuperAdmin) */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar solicitud de baja</AlertDialogTitle>
+            <AlertDialogDescription>
+              Estás a punto de eliminar esta solicitud de baja permanentemente. La auditoría
+              quedará registrada. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className='bg-red-600 hover:bg-red-700'
+            >
+              {deleting ? 'Eliminando...' : 'Eliminar permanentemente'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </ModuleLayout>
   )
 }
