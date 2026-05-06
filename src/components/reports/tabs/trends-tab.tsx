@@ -120,24 +120,45 @@ export function TrendsTab({
   const avgPerPeriod = periods.length > 0 ? Math.round(totalTickets / periods.length) : 0
 
   // ── Datos del gráfico ─────────────────────────────────────────────────────
+  // Siempre normalizar a { period, Tickets } para familia única
+  // y { period, [familyName]: count } para multi-familia
   const { chartData, familyKeys } = (() => {
     if (!isAllFamilies) {
+      // Familia específica seleccionada
       return {
         chartData: data.map(d => ({ period: d.period, Tickets: d.count })),
         familyKeys: [] as string[],
       }
     }
+
+    // Todas las familias — agrupar por período
     const familyNames = Array.from(new Set(data.map(d => d.familyName ?? 'Sin familia')))
+
+    if (familyNames.length <= 1) {
+      // Una sola familia aunque sea "todas" — usar clave simple
+      const map = new Map<string, number>()
+      for (const d of data) map.set(d.period, (map.get(d.period) ?? 0) + d.count)
+      return {
+        chartData: Array.from(map.entries())
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([period, count]) => ({ period, Tickets: count })),
+        familyKeys: [] as string[],
+      }
+    }
+
+    // Múltiples familias — clave por nombre de familia
     const periodMap = new Map<string, Record<string, number>>()
     for (const d of data) {
       const fname = d.familyName ?? 'Sin familia'
       if (!periodMap.has(d.period)) periodMap.set(d.period, {})
       periodMap.get(d.period)![fname] = (periodMap.get(d.period)![fname] ?? 0) + d.count
     }
-    const chartData = Array.from(periodMap.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([period, counts]) => ({ period, ...counts }))
-    return { chartData, familyKeys: familyNames }
+    return {
+      chartData: Array.from(periodMap.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([period, counts]) => ({ period, ...counts })),
+      familyKeys: familyNames,
+    }
   })()
 
   // Tabla
@@ -221,10 +242,10 @@ export function TrendsTab({
         </CardHeader>
         <CardContent>
           <div className='space-y-6'>
-            {/* Gráfico de área (familia única) o barras apiladas (multi-familia) */}
-            <div className='w-full' style={{ height: 300 }}>
-              <ResponsiveContainer width='100%' height='100%'>
-                {isAllFamilies && familyKeys.length > 1 ? (
+            {/* Gráfico */}
+            <div className='w-full'>
+              <ResponsiveContainer width='100%' height={300}>
+                {familyKeys.length > 1 ? (
                   <BarChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
                     <CartesianGrid
                       strokeDasharray='3 3'
