@@ -6,7 +6,16 @@
  *   - Destructivos: Solicitar Baja, Eliminar definitivamente
  */
 
-import { Edit, UserPlus, Wrench, Trash2, AlertCircle, ShoppingCart, RotateCcw } from 'lucide-react'
+import {
+  Edit,
+  UserPlus,
+  Wrench,
+  Trash2,
+  AlertCircle,
+  ShoppingCart,
+  RotateCcw,
+  DollarSign,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -27,6 +36,7 @@ interface EquipmentActionButtonsProps {
   canRetire: boolean
   canPermanentDelete: boolean
   canConvertToPurchase: boolean
+  canSell: boolean
   isInMaintenance: boolean
   onReportProblem: () => void
   onRequestMaintenance: () => void
@@ -37,6 +47,7 @@ interface EquipmentActionButtonsProps {
   onRetire: () => void
   onPermanentDelete: () => void
   onConvertToPurchase: () => void
+  onSell: () => void
 }
 
 export function EquipmentActionButtons({
@@ -49,6 +60,7 @@ export function EquipmentActionButtons({
   canRetire,
   canPermanentDelete,
   canConvertToPurchase,
+  canSell,
   isInMaintenance,
   onReportProblem,
   onRequestMaintenance,
@@ -59,14 +71,15 @@ export function EquipmentActionButtons({
   onRetire,
   onPermanentDelete,
   onConvertToPurchase,
+  onSell,
 }: EquipmentActionButtonsProps) {
-  // Acciones secundarias que van en el menú desplegable
   const hasSecondaryActions =
     canEdit ||
     canReturn ||
     canMaintenance ||
     canRequestMaintenance ||
     canConvertToPurchase ||
+    canSell ||
     canRetire ||
     canPermanentDelete
 
@@ -126,6 +139,12 @@ export function EquipmentActionButtons({
               <DropdownMenuItem onClick={onConvertToPurchase}>
                 <ShoppingCart className='h-4 w-4 mr-2' />
                 Adquirir en propiedad
+              </DropdownMenuItem>
+            )}
+            {canSell && (
+              <DropdownMenuItem onClick={onSell}>
+                <DollarSign className='h-4 w-4 mr-2' />
+                Solicitar venta
               </DropdownMenuItem>
             )}
             {(canRetire || canPermanentDelete) &&

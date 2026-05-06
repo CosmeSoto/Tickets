@@ -21,6 +21,7 @@ import { DeleteDialog } from './equipment/dialogs/delete-dialog'
 import { PermanentDeleteDialog } from './equipment/dialogs/permanent-delete-dialog'
 import { DecommissionDialog } from './equipment/dialogs/decommission-dialog'
 import { ConvertToPurchaseDialog } from './equipment/dialogs/convert-to-purchase-dialog'
+import { SaleDialog } from './equipment/dialogs/sale-dialog'
 
 interface EquipmentDetailProps {
   equipmentId: string
@@ -29,8 +30,14 @@ interface EquipmentDetailProps {
   isSuperAdmin?: boolean
 }
 
-export function EquipmentDetail({ equipmentId, userRole, userId, isSuperAdmin = false }: EquipmentDetailProps) {
+export function EquipmentDetail({
+  equipmentId,
+  userRole,
+  userId,
+  isSuperAdmin = false,
+}: EquipmentDetailProps) {
   const [showDepreciation, setShowDepreciation] = useState(false)
+  const [showSaleDialog, setShowSaleDialog] = useState(false)
   const router = useRouter()
 
   const {
@@ -135,9 +142,7 @@ export function EquipmentDetail({ equipmentId, userRole, userId, isSuperAdmin = 
             <h1 className='text-lg font-bold truncate'>
               {equipment.type?.name || 'Sin tipo'} · {equipment.brand} {equipment.model}
             </h1>
-            <p className='text-xs text-muted-foreground font-mono truncate'>
-              {equipment.code}
-            </p>
+            <p className='text-xs text-muted-foreground font-mono truncate'>{equipment.code}</p>
           </div>
         </div>
         <EquipmentActionButtons
@@ -150,6 +155,11 @@ export function EquipmentDetail({ equipmentId, userRole, userId, isSuperAdmin = 
           canRetire={canRetire ?? false}
           canPermanentDelete={canPermanentDelete ?? false}
           canConvertToPurchase={canConvertToPurchase ?? false}
+          canSell={
+            (userRole === 'ADMIN' || isSuperAdmin) &&
+            !['SOLD', 'RETIRED'].includes(equipment.status) &&
+            !(equipment as any).sale
+          }
           isInMaintenance={isInMaintenance}
           onReportProblem={handleReportProblem}
           onRequestMaintenance={() => setShowMaintenanceDialog(true)}
@@ -160,6 +170,7 @@ export function EquipmentDetail({ equipmentId, userRole, userId, isSuperAdmin = 
           onRetire={() => setShowDecommissionForm(true)}
           onPermanentDelete={() => setShowPermanentDeleteDialog(true)}
           onConvertToPurchase={() => setShowConvertToPurchaseDialog(true)}
+          onSell={() => setShowSaleDialog(true)}
         />
       </div>
 
@@ -332,6 +343,17 @@ export function EquipmentDetail({ equipmentId, userRole, userId, isSuperAdmin = 
         equipmentBrand={equipment.brand}
         equipmentModel={equipment.model}
         currentOwnershipType={equipment.ownershipType}
+        onSuccess={loadEquipmentDetail}
+      />
+
+      <SaleDialog
+        open={showSaleDialog}
+        onOpenChange={setShowSaleDialog}
+        equipmentId={equipmentId}
+        equipmentCode={equipment.code}
+        equipmentBrand={equipment.brand}
+        equipmentModel={equipment.model}
+        defaultAccessories={equipment.accessories ?? []}
         onSuccess={loadEquipmentDetail}
       />
     </div>

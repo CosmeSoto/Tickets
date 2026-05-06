@@ -76,19 +76,20 @@ interface PageProps {
 }
 
 const STATUS_CLASS: Record<string, string> = {
-  AVAILABLE:   'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30',
-  ASSIGNED:    'bg-primary/10 text-primary border-primary/30',
+  AVAILABLE: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30',
+  ASSIGNED: 'bg-primary/10 text-primary border-primary/30',
   MAINTENANCE: 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30',
-  DAMAGED:     'bg-destructive/10 text-destructive border-destructive/30',
-  RETIRED:     'bg-muted text-muted-foreground border-border',
+  DAMAGED: 'bg-destructive/10 text-destructive border-destructive/30',
+  RETIRED: 'bg-muted text-muted-foreground border-border',
+  SOLD: 'bg-muted text-muted-foreground border-border',
 }
 
 const CONDITION_CLASS: Record<string, string> = {
-  NEW:      'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30',
+  NEW: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30',
   LIKE_NEW: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
-  GOOD:     'bg-primary/10 text-primary border-primary/30',
-  FAIR:     'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30',
-  POOR:     'bg-destructive/10 text-destructive border-destructive/30',
+  GOOD: 'bg-primary/10 text-primary border-primary/30',
+  FAIR: 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30',
+  POOR: 'bg-destructive/10 text-destructive border-destructive/30',
 }
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -195,18 +196,23 @@ export default function EquipmentVerifyPage({ params }: PageProps) {
 
   return (
     <div className='min-h-screen bg-muted/30'>
-
       {/* Header con branding */}
       <div className='bg-background border-b px-4 py-3 sticky top-0 z-10'>
         <div className='max-w-lg mx-auto flex items-center justify-between'>
           <div className='flex items-center gap-2.5'>
             {branding.logoUrl ? (
-              <img src={branding.logoUrl} alt={branding.companyName} className='h-8 w-auto object-contain' />
+              <img
+                src={branding.logoUrl}
+                alt={branding.companyName}
+                className='h-8 w-auto object-contain'
+              />
             ) : (
               <>
                 <Building2 className='h-7 w-7 text-primary' />
                 {branding.companyName && (
-                  <span className='font-semibold text-foreground text-sm'>{branding.companyName}</span>
+                  <span className='font-semibold text-foreground text-sm'>
+                    {branding.companyName}
+                  </span>
                 )}
               </>
             )}
@@ -219,10 +225,12 @@ export default function EquipmentVerifyPage({ params }: PageProps) {
       </div>
 
       <div className='max-w-lg mx-auto px-4 py-5 space-y-3'>
-
         {/* Foto del equipo */}
         {equipment.photoUrl && (
-          <div className='rounded-xl overflow-hidden bg-muted border shadow-sm flex items-center justify-center' style={{ minHeight: '200px' }}>
+          <div
+            className='rounded-xl overflow-hidden bg-muted border shadow-sm flex items-center justify-center'
+            style={{ minHeight: '200px' }}
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={equipment.photoUrl}
@@ -235,7 +243,6 @@ export default function EquipmentVerifyPage({ params }: PageProps) {
         {/* ── Tarjeta principal ── */}
         <Card className='shadow-sm'>
           <CardContent className='p-5 space-y-4'>
-
             {/* Encabezado */}
             <div className='flex items-start gap-3'>
               <div className='p-2 bg-primary/10 rounded-lg shrink-0'>
@@ -254,11 +261,16 @@ export default function EquipmentVerifyPage({ params }: PageProps) {
             {/* Identificación — siempre visible */}
             <div className='grid grid-cols-2 gap-x-4 gap-y-3'>
               <InfoRow label='Código' value={<span className='font-mono'>{equipment.code}</span>} />
-              <InfoRow label='N° de Serie' value={<span className='font-mono text-xs'>{equipment.serialNumber}</span>} />
+              <InfoRow
+                label='N° de Serie'
+                value={<span className='font-mono text-xs'>{equipment.serialNumber}</span>}
+              />
               <InfoRow
                 label='Estado'
                 value={
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${STATUS_CLASS[status] ?? 'bg-muted text-muted-foreground border-border'}`}>
+                  <span
+                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${STATUS_CLASS[status] ?? 'bg-muted text-muted-foreground border-border'}`}
+                  >
                     {equipment.statusLabel}
                   </span>
                 }
@@ -266,7 +278,9 @@ export default function EquipmentVerifyPage({ params }: PageProps) {
               <InfoRow
                 label='Condición'
                 value={
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${CONDITION_CLASS[equipment.condition] ?? 'bg-muted text-muted-foreground border-border'}`}>
+                  <span
+                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${CONDITION_CLASS[equipment.condition] ?? 'bg-muted text-muted-foreground border-border'}`}
+                  >
                     {equipment.conditionLabel}
                   </span>
                 }
@@ -311,7 +325,10 @@ export default function EquipmentVerifyPage({ params }: PageProps) {
                   <SectionTitle icon={Tag} label='Accesorios' />
                   <div className='flex flex-wrap gap-1.5'>
                     {equipment.accessories.map((acc, i) => (
-                      <span key={i} className='inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-muted text-muted-foreground border border-border'>
+                      <span
+                        key={i}
+                        className='inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-muted text-muted-foreground border border-border'
+                      >
                         {acc}
                       </span>
                     ))}
@@ -327,12 +344,16 @@ export default function EquipmentVerifyPage({ params }: PageProps) {
                 <div className='space-y-2'>
                   <SectionTitle icon={Wrench} label='Especificaciones técnicas' />
                   <div className='rounded-md border border-border divide-y divide-border text-sm'>
-                    {Object.entries(equipment.specifications!).reverse().map(([key, value]) => (
-                      <div key={key} className='flex items-center justify-between px-3 py-1.5'>
-                        <span className='text-muted-foreground text-xs'>{key}</span>
-                        <span className='font-medium text-xs text-right max-w-[55%] truncate'>{String(value)}</span>
-                      </div>
-                    ))}
+                    {Object.entries(equipment.specifications!)
+                      .reverse()
+                      .map(([key, value]) => (
+                        <div key={key} className='flex items-center justify-between px-3 py-1.5'>
+                          <span className='text-muted-foreground text-xs'>{key}</span>
+                          <span className='font-medium text-xs text-right max-w-[55%] truncate'>
+                            {String(value)}
+                          </span>
+                        </div>
+                      ))}
                   </div>
                 </div>
               </>
@@ -348,7 +369,6 @@ export default function EquipmentVerifyPage({ params }: PageProps) {
                 </div>
               </>
             )}
-
           </CardContent>
         </Card>
 
@@ -361,7 +381,9 @@ export default function EquipmentVerifyPage({ params }: PageProps) {
             </div>
             <div className='bg-muted/60 rounded-lg px-3 py-2.5 border border-border'>
               <p className='font-semibold text-foreground text-sm'>{equipment.ownershipLabel}</p>
-              <p className='text-xs text-muted-foreground mt-0.5 leading-relaxed'>{equipment.ownershipDescription}</p>
+              <p className='text-xs text-muted-foreground mt-0.5 leading-relaxed'>
+                {equipment.ownershipDescription}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -376,33 +398,51 @@ export default function EquipmentVerifyPage({ params }: PageProps) {
               </div>
               <div className='space-y-2.5'>
                 <div className='flex justify-between items-start gap-2'>
-                  <span className='text-xs text-muted-foreground uppercase tracking-wide font-medium shrink-0'>Asignado a</span>
+                  <span className='text-xs text-muted-foreground uppercase tracking-wide font-medium shrink-0'>
+                    Asignado a
+                  </span>
                   <div className='text-right'>
-                    <p className='text-sm font-semibold text-foreground'>{equipment.assignment.receiverName}</p>
+                    <p className='text-sm font-semibold text-foreground'>
+                      {equipment.assignment.receiverName}
+                    </p>
                     {equipment.assignment.receiverDepartment && (
-                      <p className='text-xs text-muted-foreground'>{equipment.assignment.receiverDepartment}</p>
+                      <p className='text-xs text-muted-foreground'>
+                        {equipment.assignment.receiverDepartment}
+                      </p>
                     )}
                   </div>
                 </div>
                 <div className='flex justify-between items-start gap-2'>
-                  <span className='text-xs text-muted-foreground uppercase tracking-wide font-medium shrink-0'>Entregado por</span>
-                  <span className='text-sm text-foreground text-right'>{equipment.assignment.deliveredBy}</span>
+                  <span className='text-xs text-muted-foreground uppercase tracking-wide font-medium shrink-0'>
+                    Entregado por
+                  </span>
+                  <span className='text-sm text-foreground text-right'>
+                    {equipment.assignment.deliveredBy}
+                  </span>
                 </div>
                 <div className='flex justify-between items-start gap-2'>
-                  <span className='text-xs text-muted-foreground uppercase tracking-wide font-medium shrink-0'>Fecha de entrega</span>
+                  <span className='text-xs text-muted-foreground uppercase tracking-wide font-medium shrink-0'>
+                    Fecha de entrega
+                  </span>
                   <span className='text-sm text-foreground text-right'>{assignmentStart}</span>
                 </div>
                 {assignmentEnd && (
                   <div className='flex justify-between items-start gap-2'>
-                    <span className='text-xs text-muted-foreground uppercase tracking-wide font-medium shrink-0'>Devolución</span>
+                    <span className='text-xs text-muted-foreground uppercase tracking-wide font-medium shrink-0'>
+                      Devolución
+                    </span>
                     <span className='text-sm text-foreground text-right'>{assignmentEnd}</span>
                   </div>
                 )}
               </div>
               <Separator />
               <div className='bg-muted/60 rounded-lg px-3 py-2.5 border border-border'>
-                <p className='font-semibold text-foreground text-sm'>{equipment.assignment.type.label}</p>
-                <p className='text-xs text-muted-foreground mt-0.5 leading-relaxed'>{equipment.assignment.type.description}</p>
+                <p className='font-semibold text-foreground text-sm'>
+                  {equipment.assignment.type.label}
+                </p>
+                <p className='text-xs text-muted-foreground mt-0.5 leading-relaxed'>
+                  {equipment.assignment.type.description}
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -414,7 +454,9 @@ export default function EquipmentVerifyPage({ params }: PageProps) {
             <CardContent className='p-5'>
               <div className='flex items-center gap-3 text-muted-foreground'>
                 <Info className='h-4 w-4 shrink-0' />
-                <p className='text-sm'>Este equipo está disponible y no tiene una asignación activa.</p>
+                <p className='text-sm'>
+                  Este equipo está disponible y no tiene una asignación activa.
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -431,25 +473,39 @@ export default function EquipmentVerifyPage({ params }: PageProps) {
               {equipment.maintenance ? (
                 <div className='space-y-2.5'>
                   <div className='flex justify-between items-start gap-2'>
-                    <span className='text-xs text-muted-foreground uppercase tracking-wide font-medium shrink-0'>Tipo</span>
-                    <span className='text-sm text-foreground text-right'>{equipment.maintenance.type}</span>
+                    <span className='text-xs text-muted-foreground uppercase tracking-wide font-medium shrink-0'>
+                      Tipo
+                    </span>
+                    <span className='text-sm text-foreground text-right'>
+                      {equipment.maintenance.type}
+                    </span>
                   </div>
                   {equipment.maintenance.technicianName && (
                     <div className='flex justify-between items-start gap-2'>
-                      <span className='text-xs text-muted-foreground uppercase tracking-wide font-medium shrink-0'>Técnico</span>
-                      <span className='text-sm text-foreground text-right'>{equipment.maintenance.technicianName}</span>
+                      <span className='text-xs text-muted-foreground uppercase tracking-wide font-medium shrink-0'>
+                        Técnico
+                      </span>
+                      <span className='text-sm text-foreground text-right'>
+                        {equipment.maintenance.technicianName}
+                      </span>
                     </div>
                   )}
                   <div className='flex justify-between items-start gap-2'>
-                    <span className='text-xs text-muted-foreground uppercase tracking-wide font-medium shrink-0'>Fecha de ingreso</span>
+                    <span className='text-xs text-muted-foreground uppercase tracking-wide font-medium shrink-0'>
+                      Fecha de ingreso
+                    </span>
                     <span className='text-sm text-foreground text-right'>{maintenanceDate}</span>
                   </div>
                   <div className='bg-amber-500/10 rounded-lg px-3 py-2 border border-amber-500/20'>
-                    <p className='text-xs text-amber-700 dark:text-amber-400 leading-relaxed'>{equipment.maintenance.description}</p>
+                    <p className='text-xs text-amber-700 dark:text-amber-400 leading-relaxed'>
+                      {equipment.maintenance.description}
+                    </p>
                   </div>
                 </div>
               ) : (
-                <p className='text-sm text-muted-foreground'>El equipo se encuentra en proceso de mantenimiento.</p>
+                <p className='text-sm text-muted-foreground'>
+                  El equipo se encuentra en proceso de mantenimiento.
+                </p>
               )}
             </CardContent>
           </Card>
@@ -464,7 +520,8 @@ export default function EquipmentVerifyPage({ params }: PageProps) {
                 <div>
                   <p className='text-sm font-medium text-foreground'>Equipo dañado</p>
                   <p className='text-xs text-muted-foreground mt-0.5'>
-                    Este equipo presenta daños y no está disponible para uso. Contacta al área de TI para más información.
+                    Este equipo presenta daños y no está disponible para uso. Contacta al área de TI
+                    para más información.
                   </p>
                 </div>
               </div>
@@ -473,25 +530,35 @@ export default function EquipmentVerifyPage({ params }: PageProps) {
         )}
 
         {/* ── RETIRED: datos de baja ── */}
-        {status === 'RETIRED' && (
+        {(status === 'RETIRED' || status === 'SOLD') && (
           <Card className='shadow-sm border-border'>
             <CardContent className='p-5 space-y-3'>
               <div className='flex items-center gap-2'>
                 <Ban className='h-4 w-4 text-muted-foreground' />
-                <h2 className='font-semibold text-foreground text-sm'>Equipo Dado de Baja</h2>
+                <h2 className='font-semibold text-foreground text-sm'>
+                  {status === 'SOLD' ? 'Equipo Vendido' : 'Equipo Dado de Baja'}
+                </h2>
               </div>
               {equipment.decommission ? (
                 <div className='space-y-2.5'>
                   <div className='flex justify-between items-start gap-2'>
-                    <span className='text-xs text-muted-foreground uppercase tracking-wide font-medium shrink-0'>Fecha de baja</span>
+                    <span className='text-xs text-muted-foreground uppercase tracking-wide font-medium shrink-0'>
+                      Fecha
+                    </span>
                     <span className='text-sm text-foreground text-right'>{decommissionDate}</span>
                   </div>
                   <div className='bg-muted/60 rounded-lg px-3 py-2 border border-border'>
-                    <p className='text-xs text-muted-foreground leading-relaxed'>{equipment.decommission.reason}</p>
+                    <p className='text-xs text-muted-foreground leading-relaxed'>
+                      {equipment.decommission.reason}
+                    </p>
                   </div>
                 </div>
               ) : (
-                <p className='text-sm text-muted-foreground'>Este equipo fue dado de baja definitivamente y ya no está en uso.</p>
+                <p className='text-sm text-muted-foreground'>
+                  {status === 'SOLD'
+                    ? 'Este equipo fue vendido y ya no forma parte del inventario activo.'
+                    : 'Este equipo fue dado de baja definitivamente y ya no está en uso.'}
+                </p>
               )}
             </CardContent>
           </Card>
@@ -503,9 +570,10 @@ export default function EquipmentVerifyPage({ params }: PageProps) {
             <CheckCircle className='h-3.5 w-3.5 text-emerald-500' />
             <span>Verificado el {verifiedDate}</span>
           </div>
-          <p className='text-xs text-muted-foreground/50'>{branding.companyName} · Sistema de Inventario</p>
+          <p className='text-xs text-muted-foreground/50'>
+            {branding.companyName} · Sistema de Inventario
+          </p>
         </div>
-
       </div>
     </div>
   )

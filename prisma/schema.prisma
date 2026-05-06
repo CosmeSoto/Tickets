@@ -485,6 +485,8 @@ model users {
   webhooks_created                                  webhooks[]                      @relation("WebhookCreator")
   contractsCreated                                  contracts[]                     @relation("ContractCreator")
   contractAttachmentsUploaded                       contract_attachments[]          @relation("ContractAttachmentUploader")
+  saleRequests                                      equipment_sales[]               @relation("SaleRequester")
+  saleApprovals                                     equipment_sales[]               @relation("SaleApprover")
 
   @@index([departmentId])
   @@index([name, email])
@@ -894,6 +896,7 @@ model equipment {
   licenses              software_licenses[]
   stockMovements        stock_movements[]       @relation("StockMovementEquipment")
   contractLines         contract_lines[]        @relation("ContractLineEquipment")
+  sale                  equipment_sales?
 
   @@index([code])
   @@index([serialNumber])
@@ -1587,6 +1590,7 @@ enum EquipmentStatus {
   MAINTENANCE
   DAMAGED
   RETIRED
+  SOLD
 }
 
 enum EquipmentCondition {
@@ -1816,4 +1820,53 @@ model contract_attachments {
 
   @@index([contractId])
   @@map("contract_attachments")
+}
+
+// ── Ventas de activos ─────────────────────────────────────────────────────────
+
+enum SaleStatus {
+  PENDING    // Solicitud creada, esperando aprobación del admin
+  APPROVED   // Admin aprobó — equipo marcado como SOLD
+  REJECTED   // Admin rechazó la solicitud
+}
+
+model equipment_sales {
+  id                String          @id @default(uuid())
+  equipmentId       String          @unique @map("equipment_id")  // un equipo solo puede venderse una vez
+  requestedById     String          @map("requested_by_id")       // quien solicita (ADMIN o SUPER_ADMIN)
+  approvedById      String?         @map("approved_by_id")        // quien aprueba (ADMIN o SUPER_ADMIN)
+
+  status            SaleStatus      @default(PENDING)
+
+  // Datos del comprador — solo visibles para ADMIN / SUPER_ADMIN
+  buyerName         String          @map("buyer_name") @db.VarChar(200)
+  buyerCompany      String?         @map("buyer_company") @db.VarChar(200)
+  buyerIdNumber     String?         @map("buyer_id_number") @db.VarChar(50)  // RUC / cédula
+
+  // Datos financieros de la venta
+  salePrice         Float           @map("sale_price")
+  saleDate          DateTime        @map("sale_date")
+  invoiceNumber     String?         @map("invoice_number") @db.VarChar(100)
+  paymentMethod     String?         @map("payment_method") @db.VarChar(50)   // CASH, CARD, TRANSFER, DISCOUNT
+
+  // Accesorios incluidos en la venta (puede diferir de los del equipo)
+  accessories       String[]
+
+  // Notas internas
+  notes             String?
+  rejectionReason   String?         @map("rejection_reason")
+
+  // Timestamps
+  approvedAt        DateTime?       @map("approved_at")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  equipment         equipment       @relation(fields: [equipmentId], references: [id])
+  requestedBy       users           @relation("SaleRequester", fields: [requestedById], references: [id])
+  approvedBy        users?          @relation("SaleApprover", fields: [approvedById], references: [id])
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([requestedById])
+  @@index([approvedById])
+  @@map("equipment_sales")
 }

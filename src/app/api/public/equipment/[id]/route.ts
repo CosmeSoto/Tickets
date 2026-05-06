@@ -6,10 +6,7 @@ import { prisma } from '@/lib/prisma'
  * Endpoint público — no requiere autenticación.
  * Devuelve información segura del equipo para la página de verificación QR.
  */
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
 
   try {
@@ -75,6 +72,7 @@ export async function GET(
       MAINTENANCE: 'En mantenimiento',
       DAMAGED: 'Dañado',
       RETIRED: 'Dado de baja',
+      SOLD: 'Vendido',
     }
 
     const conditionLabels: Record<string, string> = {
@@ -88,15 +86,18 @@ export async function GET(
     const ownershipLabels: Record<string, { label: string; description: string }> = {
       FIXED_ASSET: {
         label: 'Activo Fijo',
-        description: 'Equipo de propiedad de la empresa, asignado de forma permanente a una persona o departamento.',
+        description:
+          'Equipo de propiedad de la empresa, asignado de forma permanente a una persona o departamento.',
       },
       RENTAL: {
         label: 'Alquiler',
-        description: 'Equipo rentado a un proveedor externo. La empresa paga una renta mensual por su uso.',
+        description:
+          'Equipo rentado a un proveedor externo. La empresa paga una renta mensual por su uso.',
       },
       LOAN: {
         label: 'Préstamo',
-        description: 'Equipo prestado temporalmente. Se espera su devolución al finalizar el período acordado.',
+        description:
+          'Equipo prestado temporalmente. Se espera su devolución al finalizar el período acordado.',
       },
     }
 

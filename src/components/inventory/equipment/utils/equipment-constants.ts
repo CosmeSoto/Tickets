@@ -9,6 +9,7 @@ export const STATUS_LABELS: Record<string, string> = {
   MAINTENANCE: 'Mantenimiento',
   DAMAGED: 'Dañado',
   RETIRED: 'Retirado',
+  SOLD: 'Vendido',
 }
 
 export const STATUS_COLORS: Record<string, string> = {
@@ -17,6 +18,7 @@ export const STATUS_COLORS: Record<string, string> = {
   MAINTENANCE: 'bg-amber-500 dark:bg-amber-600',
   DAMAGED: 'bg-red-500 dark:bg-red-600',
   RETIRED: 'bg-muted-foreground',
+  SOLD: 'bg-muted-foreground',
 }
 
 export const CONDITION_LABELS: Record<string, string> = {
@@ -55,7 +57,8 @@ export const MAINTENANCE_STATUS_BADGE: Record<string, string> = {
   REQUESTED: 'bg-primary/10 text-primary border border-primary/30',
   SCHEDULED: 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30',
   ACCEPTED: 'bg-violet-500/15 text-violet-700 dark:text-violet-400 border border-violet-500/30',
-  COMPLETED: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30',
+  COMPLETED:
+    'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30',
   CANCELLED: 'bg-muted text-muted-foreground border border-border',
 }
 
