@@ -74,11 +74,9 @@ export default function ReportsPage() {
 
   return (
     <ModuleLayout
-      title='Reportes Multi-Familia'
+      title='Reportes de Tickets'
       subtitle={
-        isSuperAdmin
-          ? 'Vista global — todas las familias'
-          : 'Análisis de desempeño de tus familias asignadas'
+        isSuperAdmin ? 'Vista global — todas las familias' : 'Datos de tus familias asignadas'
       }
     >
       <div className='space-y-6'>
@@ -125,8 +123,7 @@ export default function ReportsPage() {
                   className='flex items-center gap-1.5 whitespace-nowrap'
                 >
                   <BarChart3 className='h-4 w-4 flex-shrink-0' />
-                  <span className='hidden lg:inline'>Resumen Ejecutivo</span>
-                  <span className='lg:hidden'>Resumen</span>
+                  <span>Resumen</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value='technicians'
@@ -137,20 +134,18 @@ export default function ReportsPage() {
                 </TabsTrigger>
                 <TabsTrigger value='trends' className='flex items-center gap-1.5 whitespace-nowrap'>
                   <TrendingUp className='h-4 w-4 flex-shrink-0' />
-                  <span>Tendencias</span>
+                  <span>Por período</span>
                 </TabsTrigger>
                 <TabsTrigger value='sla' className='flex items-center gap-1.5 whitespace-nowrap'>
                   <ShieldCheck className='h-4 w-4 flex-shrink-0' />
-                  <span className='hidden lg:inline'>Cumplimiento SLA</span>
-                  <span className='lg:hidden'>SLA</span>
+                  <span>SLA</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value='satisfaction'
                   className='flex items-center gap-1.5 whitespace-nowrap'
                 >
                   <Star className='h-4 w-4 flex-shrink-0' />
-                  <span className='hidden lg:inline'>Satisfacción</span>
-                  <span className='lg:hidden'>★</span>
+                  <span>Calificaciones</span>
                 </TabsTrigger>
               </TabsList>
             </div>

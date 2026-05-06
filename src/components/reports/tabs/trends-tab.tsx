@@ -45,6 +45,27 @@ const FAMILY_COLORS = [
   '#6366f1',
 ]
 
+// Formatea el período según granularidad para que sea legible
+function formatPeriod(period: string, granularity: Granularity): string {
+  try {
+    if (granularity === 'day') {
+      const d = new Date(period + 'T12:00:00')
+      return d.toLocaleDateString('es-EC', { day: '2-digit', month: 'short' })
+    }
+    if (granularity === 'week') {
+      return period.replace('-W', ' Sem ')
+    }
+    if (granularity === 'month') {
+      const [year, month] = period.split('-')
+      const d = new Date(Number(year), Number(month) - 1, 1)
+      return d.toLocaleDateString('es-EC', { month: 'short', year: 'numeric' })
+    }
+  } catch {
+    // fallback
+  }
+  return period
+}
+
 // Tooltip personalizado con tema
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
@@ -126,7 +147,11 @@ export function TrendsTab({
     if (!isAllFamilies) {
       // Familia específica seleccionada
       return {
-        chartData: data.map(d => ({ period: d.period, Tickets: d.count })),
+        chartData: data.map(d => ({
+          period: formatPeriod(d.period, granularity),
+          rawPeriod: d.period,
+          Tickets: d.count,
+        })),
         familyKeys: [] as string[],
       }
     }
@@ -141,7 +166,11 @@ export function TrendsTab({
       return {
         chartData: Array.from(map.entries())
           .sort(([a], [b]) => a.localeCompare(b))
-          .map(([period, count]) => ({ period, Tickets: count })),
+          .map(([period, count]) => ({
+            period: formatPeriod(period, granularity),
+            rawPeriod: period,
+            Tickets: count,
+          })),
         familyKeys: [] as string[],
       }
     }
@@ -156,19 +185,32 @@ export function TrendsTab({
     return {
       chartData: Array.from(periodMap.entries())
         .sort(([a], [b]) => a.localeCompare(b))
-        .map(([period, counts]) => ({ period, ...counts })),
+        .map(([period, counts]) => ({
+          period: formatPeriod(period, granularity),
+          rawPeriod: period,
+          ...counts,
+        })),
       familyKeys: familyNames,
     }
   })()
 
-  // Tabla
+  // Tabla — usar períodos formateados
   const tableData = (() => {
-    if (!isAllFamilies) return data.map(d => ({ period: d.period, count: d.count }))
+    if (!isAllFamilies)
+      return data.map(d => ({
+        period: formatPeriod(d.period, granularity),
+        rawPeriod: d.period,
+        count: d.count,
+      }))
     const map = new Map<string, number>()
     for (const d of data) map.set(d.period, (map.get(d.period) ?? 0) + d.count)
     return Array.from(map.entries())
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([period, count]) => ({ period, count }))
+      .map(([period, count]) => ({
+        period: formatPeriod(period, granularity),
+        rawPeriod: period,
+        count,
+      }))
   })()
 
   const TrendIcon = trend === null ? Minus : trend > 0 ? TrendingUp : TrendingDown
@@ -203,7 +245,7 @@ export function TrendsTab({
         </Card>
         <Card>
           <CardContent className='pt-4 pb-3'>
-            <p className='text-xs text-muted-foreground'>Variación vs anterior</p>
+            <p className='text-xs text-muted-foreground'>Cambio vs período anterior</p>
             <div className='flex items-center gap-1.5 mt-1'>
               <TrendIcon className={`h-5 w-5 ${trendColor}`} />
               <p className={`text-2xl font-bold ${trendColor}`}>
@@ -221,11 +263,12 @@ export function TrendsTab({
             <div>
               <CardTitle className='flex items-center gap-2'>
                 <TrendingUp className='h-5 w-5' />
-                Tendencias Temporales
+                Tickets por período
               </CardTitle>
               <CardDescription>
-                Volumen de tickets creados por período
-                {isAllFamilies ? ' — desglose por familia' : ''}
+                {isAllFamilies && familyKeys.length > 1
+                  ? 'Desglose por familia de soporte'
+                  : 'Tickets creados en el tiempo'}
               </CardDescription>
             </div>
             <Select value={granularity} onValueChange={v => onGranularityChange(v as Granularity)}>
