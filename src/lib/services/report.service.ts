@@ -143,15 +143,12 @@ export class ReportService {
         calcAvgResolutionMinutes(where),
         prisma.tickets.findMany({
           where,
-          include: {
-            ticket_sla_metrics: { select: { resolutionSLAMet: true } },
-          },
           select: {
             slaDeadline: true,
             resolvedAt: true,
             closedAt: true,
             ticket_sla_metrics: { select: { resolutionSLAMet: true } },
-          } as any,
+          },
         }),
       ])
 
