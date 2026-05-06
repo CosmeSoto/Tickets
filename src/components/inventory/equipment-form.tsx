@@ -39,6 +39,12 @@ import { EquipmentAttachments } from '@/components/inventory/equipment-attachmen
 import { FileUploadZone } from '@/components/ui/file-upload-zone'
 import { useActiveDepartments } from '@/contexts/departments-context'
 import { AssignableUserSelect } from '@/components/inventory/shared/AssignableUserSelect'
+import { MaintenanceStatusBlock } from '@/components/inventory/shared/MaintenanceStatusBlock'
+import {
+  showWarehouseSelector,
+  showMaintenanceBlock,
+  showRetiredWarning,
+} from '@/lib/inventory/status-visibility'
 
 interface EquipmentFormProps {
   equipment?: Equipment
@@ -251,6 +257,14 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
   )
   // familyId del equipo para filtrar usuarios asignables
   const equipmentFamilyId = (equipment as any)?.type?.family?.id as string | undefined
+
+  // Estados de mantenimiento — para cuando se edita a estado MAINTENANCE
+  const [maintenanceDate, setMaintenanceDate] = useState(
+    () => new Date().toISOString().split('T')[0]
+  )
+  const [maintenanceType, setMaintenanceType] = useState<'PREVENTIVE' | 'CORRECTIVE'>('CORRECTIVE')
+  const [maintenanceTechnicianId, setMaintenanceTechnicianId] = useState('')
+  const [maintenanceDescription, setMaintenanceDescription] = useState('')
 
   // Derive the familyId of the selected equipment type
   const selectedTypeFamilyId = equipmentTypes.find(t => t.id === selectedTypeId)?.family?.id ?? null
@@ -635,6 +649,34 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
               </div>
             )}
 
+            {/* Mantenimiento — visible cuando estado = MAINTENANCE */}
+            {showMaintenanceBlock(currentStatus) && (
+              <div className='col-span-2'>
+                <MaintenanceStatusBlock
+                  date={maintenanceDate}
+                  onDateChange={setMaintenanceDate}
+                  type={maintenanceType}
+                  onTypeChange={setMaintenanceType}
+                  technicianId={maintenanceTechnicianId}
+                  onTechnicianChange={setMaintenanceTechnicianId}
+                  description={maintenanceDescription}
+                  onDescriptionChange={setMaintenanceDescription}
+                />
+              </div>
+            )}
+
+            {/* Aviso activo retirado */}
+            {showRetiredWarning(currentStatus) && (
+              <div className='col-span-2 rounded-md border border-muted-foreground/20 bg-muted/40 px-4 py-3 space-y-1'>
+                <p className='text-sm font-medium text-muted-foreground'>Activo retirado</p>
+                <p className='text-xs text-muted-foreground'>
+                  Este activo está marcado como retirado. Para reactivarlo cambia el estado a
+                  Disponible. Para un proceso formal de baja usa el botón &ldquo;Solicitar
+                  baja&rdquo; desde el detalle del equipo.
+                </p>
+              </div>
+            )}
+
             <div className='space-y-2'>
               <Label htmlFor='ownershipType'>
                 Tipo de Propiedad <span className='text-destructive'>*</span>
@@ -679,7 +721,7 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
             </div>
 
             {/* Bodega — oculta cuando el equipo está asignado (ya no está en bodega) */}
-            {!isAssignedStatus && (
+            {showWarehouseSelector(currentStatus) && (
               <div className='space-y-2'>
                 <Label htmlFor='warehouse'>Bodega</Label>
                 <Select

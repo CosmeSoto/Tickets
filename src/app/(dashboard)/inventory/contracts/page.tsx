@@ -358,7 +358,12 @@ export default function ContractsPage() {
                     <th className='text-left px-4 py-3 font-medium text-muted-foreground'>
                       Proveedor
                     </th>
-                    <th className='text-left px-4 py-3 font-medium text-muted-foreground'>Área</th>
+                    <th
+                      className={`text-left px-4 py-3 font-medium text-muted-foreground ${sortableHeaderClass}`}
+                      onClick={() => toggleSort('family.name' as any)}
+                    >
+                      Área {SortIcon('family.name', sortKey, sortDir)}
+                    </th>
                     <th
                       className={`text-left px-4 py-3 font-medium text-muted-foreground ${sortableHeaderClass}`}
                       onClick={() => toggleSort('endDate')}

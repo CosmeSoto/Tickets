@@ -14,6 +14,14 @@ import { EquipmentTypeInlineForm } from '@/components/inventory/asset-forms/Equi
 import { WarehouseInlineForm } from '@/components/inventory/asset-forms/WarehouseInlineForm'
 import { FileInputWithCamera } from '@/components/common/file-input-with-camera'
 import { AssignableUserSelect } from '@/components/inventory/shared/AssignableUserSelect'
+import { MaintenanceStatusBlock } from '@/components/inventory/shared/MaintenanceStatusBlock'
+import {
+  showDepartmentSelector,
+  showWarehouseSelector,
+  showMaintenanceBlock,
+  showAssignmentBlock,
+  showRetiredWarning,
+} from '@/lib/inventory/status-visibility'
 import type { FamilyConfig } from '@/lib/inventory/family-config-types'
 import { resolveSectionsForMode } from '@/lib/inventory/family-config-types'
 import {
@@ -415,9 +423,9 @@ export function EquipmentAssetForm({
 
   // Visibilidad condicional por estado — definidas después de isVisible
   // Departamento manual: AVAILABLE, MAINTENANCE, DAMAGED (no ASSIGNED ni RETIRED)
-  const showDepartmentSelector = ['AVAILABLE', 'MAINTENANCE', 'DAMAGED'].includes(equipmentStatus)
+  const showDepartmentSelectorFlag = showDepartmentSelector(equipmentStatus)
   // Bodega: solo cuando el equipo está físicamente almacenado (AVAILABLE o DAMAGED)
-  const showWarehouse = isVisible('WAREHOUSE') && ['AVAILABLE', 'DAMAGED'].includes(equipmentStatus)
+  const showWarehouse = isVisible('WAREHOUSE') && showWarehouseSelector(equipmentStatus)
 
   // Task 19.1: determine if family supports depreciation
   const supportsDepreciation = familyCode ? familySupportsDepreciation(familyCode) : true
@@ -751,7 +759,7 @@ export function EquipmentAssetForm({
 
       {/* ── 2. UBICACIÓN ──────────────────────────────────────────── */}
       {/* Departamento — visible en AVAILABLE, MAINTENANCE, DAMAGED */}
-      {showDepartmentSelector && (
+      {showDepartmentSelectorFlag && (
         <div className='space-y-1'>
           <Label>Departamento</Label>
           {loadingDepartments ? (
@@ -821,7 +829,7 @@ export function EquipmentAssetForm({
       )}
 
       {/* Asignar a usuario — usa el componente compartido con departamento auto-rellenado */}
-      {equipmentStatus === 'ASSIGNED' && (
+      {showAssignmentBlock(equipmentStatus) && (
         <div className='rounded-lg border border-primary/30 bg-primary/5 p-4'>
           <AssignableUserSelect
             familyId={familyId}
@@ -835,54 +843,18 @@ export function EquipmentAssetForm({
         </div>
       )}
 
-      {/* Mantenimiento — fecha de ingreso, tipo y técnico asignado */}
-      {equipmentStatus === 'MAINTENANCE' && (
-        <div className='rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-4 space-y-3'>
-          <p className='text-sm font-medium text-amber-800 dark:text-amber-300'>
-            Datos del mantenimiento
-          </p>
-          <div className='grid grid-cols-2 gap-3'>
-            <div className='space-y-1'>
-              <Label>
-                Fecha de ingreso <span className='text-destructive'>*</span>
-              </Label>
-              <Input
-                type='date'
-                value={maintenanceDate}
-                onChange={e => setMaintenanceDate(e.target.value)}
-              />
-            </div>
-            <div className='space-y-1'>
-              <Label>Tipo de mantenimiento</Label>
-              <SimpleSelect
-                value={maintenanceType}
-                onChange={e => setMaintenanceType(e.target.value as 'PREVENTIVE' | 'CORRECTIVE')}
-              >
-                <option value='CORRECTIVE'>Correctivo</option>
-                <option value='PREVENTIVE'>Preventivo</option>
-              </SimpleSelect>
-            </div>
-          </div>
-          <div className='space-y-1'>
-            <Label>Técnico asignado</Label>
-            <SearchableSelect
-              options={techniciansList.map(t => ({ id: t.id, name: t.name || t.email }))}
-              value={maintenanceTechnicianId}
-              onChange={setMaintenanceTechnicianId}
-              placeholder={loadingTechnicians ? 'Cargando técnicos...' : 'Buscar técnico...'}
-              disabled={loadingTechnicians}
-            />
-          </div>
-          <div className='space-y-1'>
-            <Label>Descripción del problema / trabajo</Label>
-            <Textarea
-              value={maintenanceDescription}
-              onChange={e => setMaintenanceDescription(e.target.value)}
-              rows={2}
-              placeholder='Describe el motivo del mantenimiento...'
-            />
-          </div>
-        </div>
+      {/* Mantenimiento — usa componente compartido */}
+      {showMaintenanceBlock(equipmentStatus) && (
+        <MaintenanceStatusBlock
+          date={maintenanceDate}
+          onDateChange={setMaintenanceDate}
+          type={maintenanceType}
+          onTypeChange={setMaintenanceType}
+          technicianId={maintenanceTechnicianId}
+          onTechnicianChange={setMaintenanceTechnicianId}
+          description={maintenanceDescription}
+          onDescriptionChange={setMaintenanceDescription}
+        />
       )}
 
       {/* Bodega — solo AVAILABLE y DAMAGED */}

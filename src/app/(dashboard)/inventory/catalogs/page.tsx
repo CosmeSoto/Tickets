@@ -397,7 +397,14 @@ function CatalogsContent() {
                   Nombre {SortIcon('name', sortKey, sortDir)}
                 </TableHead>
                 {catalog.hasSymbol && <TableHead>Símbolo</TableHead>}
-                {catalog.hasFamily && <TableHead>Familia</TableHead>}
+                {catalog.hasFamily && (
+                  <TableHead
+                    className={sortableHeaderClass}
+                    onClick={() => toggleSort('family.name' as any)}
+                  >
+                    Familia {SortIcon('family.name', sortKey, sortDir)}
+                  </TableHead>
+                )}
                 {catalog.hasLocation && <TableHead>Ubicación</TableHead>}
                 <TableHead className={sortableHeaderClass} onClick={() => toggleSort('isActive')}>
                   Estado {SortIcon('isActive', sortKey, sortDir)}

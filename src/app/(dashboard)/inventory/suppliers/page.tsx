@@ -120,7 +120,11 @@ export default function SuppliersPage() {
       setDeactivatingSupplier(null)
       fetchSuppliers()
     } catch {
-      toast({ title: 'Error', description: 'No se pudo desactivar el proveedor', variant: 'destructive' })
+      toast({
+        title: 'Error',
+        description: 'No se pudo desactivar el proveedor',
+        variant: 'destructive',
+      })
     } finally {
       setDeactivating(false)
     }
@@ -138,11 +142,18 @@ export default function SuppliersPage() {
         toast({ title: 'No se puede eliminar', description: data.error, variant: 'destructive' })
         return
       }
-      toast({ title: 'Proveedor eliminado', description: `"${deletingSupplier.name}" fue eliminado permanentemente.` })
+      toast({
+        title: 'Proveedor eliminado',
+        description: `"${deletingSupplier.name}" fue eliminado permanentemente.`,
+      })
       setDeletingSupplier(null)
       fetchSuppliers()
     } catch {
-      toast({ title: 'Error', description: 'No se pudo eliminar el proveedor', variant: 'destructive' })
+      toast({
+        title: 'Error',
+        description: 'No se pudo eliminar el proveedor',
+        variant: 'destructive',
+      })
     } finally {
       setDeleting(false)
     }
@@ -227,9 +238,24 @@ export default function SuppliersPage() {
                 >
                   Tipo {SortIcon('type', sortKey, sortDir)}
                 </TableHead>
-                <TableHead className='hidden md:table-cell'>Área</TableHead>
-                <TableHead className='hidden lg:table-cell'>RUC / NIT</TableHead>
-                <TableHead className='hidden lg:table-cell'>Email</TableHead>
+                <TableHead
+                  className={`hidden md:table-cell ${sortableHeaderClass}`}
+                  onClick={() => toggleSort('family.name' as any)}
+                >
+                  Área {SortIcon('family.name', sortKey, sortDir)}
+                </TableHead>
+                <TableHead
+                  className={`hidden lg:table-cell ${sortableHeaderClass}`}
+                  onClick={() => toggleSort('taxId' as any)}
+                >
+                  RUC / NIT {SortIcon('taxId', sortKey, sortDir)}
+                </TableHead>
+                <TableHead
+                  className={`hidden lg:table-cell ${sortableHeaderClass}`}
+                  onClick={() => toggleSort('email' as any)}
+                >
+                  Email {SortIcon('email', sortKey, sortDir)}
+                </TableHead>
                 <TableHead className='hidden xl:table-cell'>Teléfono</TableHead>
                 <TableHead className={sortableHeaderClass} onClick={() => toggleSort('isActive')}>
                   Estado {SortIcon('isActive', sortKey, sortDir)}
@@ -385,10 +411,7 @@ export default function SuppliersPage() {
       </AlertDialog>
 
       {/* AlertDialog eliminar (Solo SuperAdmin) */}
-      <AlertDialog
-        open={!!deletingSupplier}
-        onOpenChange={o => !o && setDeletingSupplier(null)}
-      >
+      <AlertDialog open={!!deletingSupplier} onOpenChange={o => !o && setDeletingSupplier(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
@@ -396,7 +419,8 @@ export default function SuppliersPage() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               Esta acción es irreversible. El proveedor y todos sus datos serán eliminados del
-              sistema. Solo es posible si no tiene activos asociados. La auditoría quedará registrada.
+              sistema. Solo es posible si no tiene activos asociados. La auditoría quedará
+              registrada.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
