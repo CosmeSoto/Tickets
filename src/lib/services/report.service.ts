@@ -82,15 +82,25 @@ function buildTicketWhere(familyId: string | 'all', dateRange?: DateRange) {
 }
 
 async function calcAvgResolutionMinutes(where: Record<string, unknown>): Promise<number | null> {
+  // Incluir tanto RESOLVED como CLOSED, usando resolvedAt o closedAt según disponibilidad
   const resolved = await prisma.tickets.findMany({
-    where: { ...where, status: 'RESOLVED', resolvedAt: { not: null } },
-    select: { createdAt: true, resolvedAt: true },
+    where: {
+      ...where,
+      status: { in: ['RESOLVED', 'CLOSED'] },
+      OR: [{ resolvedAt: { not: null } }, { closedAt: { not: null } }],
+    },
+    select: { createdAt: true, resolvedAt: true, closedAt: true },
   })
   if (resolved.length === 0) return null
   const total = resolved.reduce((acc, t) => {
-    return acc + (new Date(t.resolvedAt!).getTime() - new Date(t.createdAt).getTime())
+    // Usar resolvedAt si existe, si no closedAt
+    const endTime = t.resolvedAt ?? t.closedAt
+    if (!endTime) return acc
+    return acc + (new Date(endTime).getTime() - new Date(t.createdAt).getTime())
   }, 0)
-  return Math.round(total / resolved.length / 60000)
+  const withTime = resolved.filter(t => t.resolvedAt ?? t.closedAt)
+  if (withTime.length === 0) return null
+  return Math.round(total / withTime.length / 60000)
 }
 
 // ─────────────────────────────────────────────
@@ -136,10 +146,16 @@ export class ReportService {
           include: {
             ticket_sla_metrics: { select: { resolutionSLAMet: true } },
           },
+          select: {
+            slaDeadline: true,
+            resolvedAt: true,
+            closedAt: true,
+            ticket_sla_metrics: { select: { resolutionSLAMet: true } },
+          } as any,
         }),
       ])
 
-      // Calcular SLA compliance
+      // Calcular SLA compliance — considerar resolvedAt o closedAt
       const withSLA = slaData.filter(t => t.ticket_sla_metrics || t.slaDeadline)
       const now = new Date()
       let compliant = 0
@@ -150,8 +166,10 @@ export class ReportService {
           // breached — no increment
         } else if (t.slaDeadline) {
           const deadline = new Date(t.slaDeadline)
-          if (t.resolvedAt) {
-            if (new Date(t.resolvedAt) <= deadline) compliant++
+          // Usar resolvedAt o closedAt como tiempo de resolución efectivo
+          const endTime = t.resolvedAt ?? t.closedAt
+          if (endTime) {
+            if (new Date(endTime) <= deadline) compliant++
           } else if (now <= deadline) {
             compliant++
           }
