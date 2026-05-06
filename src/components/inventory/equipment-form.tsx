@@ -160,15 +160,6 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
   // Determine if the department selector should be disabled (active assignment in edit mode)
   const hasActiveAssignment = isEditing && !!equipment?.currentAssignment
 
-  // Estado de usuario asignado — sincronizado con el estado del equipo
-  const currentStatus = watch('status')
-  const isAssignedStatus = currentStatus === 'ASSIGNED'
-  const [assignedUserId, setAssignedUserId] = useState<string>(
-    (equipment as any)?.currentAssignment?.receiverId || ''
-  )
-  const [assignedUserDept, setAssignedUserDept] = useState<{ id: string; name: string } | null>(
-    (equipment as any)?.currentAssignment?.receiver?.department ?? null
-  )
   // familyId del equipo para filtrar usuarios asignables
   const equipmentFamilyId = (equipment as any)?.type?.family?.id as string | undefined
 
@@ -251,6 +242,16 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
   const isRental = ownershipType === 'RENTAL'
   const selectedTypeId = watch('typeId')
   const selectedDepartmentId = watch('departmentId')
+
+  // Estado de usuario asignado — debe ir después de useForm porque usa watch
+  const currentStatus = watch('status')
+  const isAssignedStatus = currentStatus === 'ASSIGNED'
+  const [assignedUserId, setAssignedUserId] = useState<string>(
+    (equipment as any)?.currentAssignment?.receiverId || ''
+  )
+  const [assignedUserDept, setAssignedUserDept] = useState<{ id: string; name: string } | null>(
+    (equipment as any)?.currentAssignment?.receiver?.department ?? null
+  )
 
   // Derive the familyId of the selected equipment type
   const selectedTypeFamilyId = equipmentTypes.find(t => t.id === selectedTypeId)?.family?.id ?? null

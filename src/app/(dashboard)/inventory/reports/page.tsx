@@ -14,6 +14,7 @@ import {
   MapPin,
   Crown,
   Lock,
+  DollarSign,
 } from 'lucide-react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -91,6 +92,16 @@ const ALL_REPORTS: ReportDef[] = [
     color: 'text-red-600',
     bg: 'bg-red-50 dark:bg-red-950/30',
     roles: ['ADMIN', 'SUPER_ADMIN', 'MANAGER'],
+  },
+  {
+    slug: 'sales',
+    name: '¿Qué se ha vendido?',
+    description:
+      'Activos vendidos con precio, comprador, forma de pago y resultado financiero vs valor libro',
+    icon: DollarSign,
+    color: 'text-emerald-600',
+    bg: 'bg-emerald-50 dark:bg-emerald-950/30',
+    roles: ['ADMIN', 'SUPER_ADMIN'],
   },
   {
     slug: 'locations',
