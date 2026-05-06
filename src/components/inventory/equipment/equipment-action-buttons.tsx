@@ -37,6 +37,7 @@ interface EquipmentActionButtonsProps {
   canPermanentDelete: boolean
   canConvertToPurchase: boolean
   canSell: boolean
+  isSuperAdmin?: boolean
   isInMaintenance: boolean
   onReportProblem: () => void
   onRequestMaintenance: () => void
@@ -61,6 +62,7 @@ export function EquipmentActionButtons({
   canPermanentDelete,
   canConvertToPurchase,
   canSell,
+  isSuperAdmin = false,
   isInMaintenance,
   onReportProblem,
   onRequestMaintenance,
@@ -144,7 +146,7 @@ export function EquipmentActionButtons({
             {canSell && (
               <DropdownMenuItem onClick={onSell}>
                 <DollarSign className='h-4 w-4 mr-2' />
-                Solicitar venta
+                {isSuperAdmin ? 'Registrar venta' : 'Solicitar venta'}
               </DropdownMenuItem>
             )}
             {(canRetire || canPermanentDelete) &&

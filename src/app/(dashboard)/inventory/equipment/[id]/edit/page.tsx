@@ -5,8 +5,8 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
 import { EquipmentForm } from '@/components/inventory/equipment-form'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Loader2 } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
+import { Loader2, ArrowLeft } from 'lucide-react'
 import type { Equipment } from '@/types/inventory/equipment'
 
 interface EditEquipmentPageProps {
@@ -21,11 +21,8 @@ export default function EditEquipmentPage({ params }: EditEquipmentPageProps) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/login')
-    } else if (session?.user?.role === 'CLIENT') {
-      router.push('/inventory')
-    }
+    if (status === 'unauthenticated') router.push('/login')
+    else if (session?.user?.role === 'CLIENT') router.push('/inventory')
   }, [status, session, router])
 
   useEffect(() => {
@@ -39,10 +36,7 @@ export default function EditEquipmentPage({ params }: EditEquipmentPageProps) {
       if (response.ok) {
         const data = await response.json()
         const eq = data.equipment || data
-        // Attach currentAssignment so the form can detect active assignments
-        if (data.currentAssignment) {
-          eq.currentAssignment = data.currentAssignment
-        }
+        if (data.currentAssignment) eq.currentAssignment = data.currentAssignment
         setEquipment(eq)
       }
     } catch (error) {
@@ -74,22 +68,30 @@ export default function EditEquipmentPage({ params }: EditEquipmentPageProps) {
     )
   }
 
+  // Título igual al detalle: "Tipo · Marca Modelo"
+  const equipmentTitle = [(equipment as any).type?.name, equipment.brand, equipment.model]
+    .filter(Boolean)
+    .join(' · ')
+
   return (
-    <RoleDashboardLayout
-      title={`Editar Equipo: ${equipment.code}`}
-      subtitle='Modifica la información del equipo'
-    >
-      <div className='max-w-4xl mx-auto'>
+    <RoleDashboardLayout title={equipmentTitle || equipment.code} subtitle={equipment.code}>
+      <div className='max-w-4xl mx-auto space-y-4'>
+        {/* Botón regresar */}
+        <button
+          type='button'
+          onClick={() => router.push(`/inventory/equipment/${id}`)}
+          className='flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors'
+        >
+          <ArrowLeft className='h-4 w-4' />
+          Regresar al detalle
+        </button>
+
         <Card>
-          <CardHeader>
-            <CardTitle>Editar Equipo</CardTitle>
-            <CardDescription>Actualiza los datos del equipo {equipment.code}</CardDescription>
-          </CardHeader>
-          <CardContent>
+          <CardContent className='pt-6'>
             <EquipmentForm
               equipment={equipment}
               onSuccess={() => router.push(`/inventory/equipment/${id}`)}
-              onCancel={() => router.back()}
+              onCancel={() => router.push(`/inventory/equipment/${id}`)}
             />
           </CardContent>
         </Card>

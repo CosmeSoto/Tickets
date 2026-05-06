@@ -160,6 +160,7 @@ export function EquipmentDetail({
             !['SOLD', 'RETIRED'].includes(equipment.status) &&
             !(equipment as any).sale
           }
+          isSuperAdmin={isSuperAdmin}
           isInMaintenance={isInMaintenance}
           onReportProblem={handleReportProblem}
           onRequestMaintenance={() => setShowMaintenanceDialog(true)}
@@ -355,6 +356,7 @@ export function EquipmentDetail({
         equipmentBrand={equipment.brand}
         equipmentModel={equipment.model}
         defaultAccessories={equipment.accessories ?? []}
+        isSuperAdmin={isSuperAdmin}
         onSuccess={loadEquipmentDetail}
       />
     </div>

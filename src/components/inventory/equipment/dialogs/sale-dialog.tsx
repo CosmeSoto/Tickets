@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { DollarSign, Loader2 } from 'lucide-react'
+import { DollarSign, Loader2, CheckCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -24,6 +24,8 @@ interface SaleDialogProps {
   equipmentBrand: string
   equipmentModel: string
   defaultAccessories?: string[]
+  /** Si es true (SUPER_ADMIN), registra y aprueba en un solo paso sin solicitud */
+  isSuperAdmin?: boolean
   onSuccess: () => void
 }
 
@@ -42,12 +44,12 @@ export function SaleDialog({
   equipmentBrand,
   equipmentModel,
   defaultAccessories = [],
+  isSuperAdmin = false,
   onSuccess,
 }: SaleDialogProps) {
   const { toast } = useToast()
   const [submitting, setSubmitting] = useState(false)
 
-  // Campos del formulario
   const [buyerName, setBuyerName] = useState('')
   const [buyerCompany, setBuyerCompany] = useState('')
   const [buyerIdNumber, setBuyerIdNumber] = useState('')
@@ -82,6 +84,8 @@ export function SaleDialog({
 
     try {
       setSubmitting(true)
+
+      // 1. Crear la solicitud
       const res = await fetch('/api/inventory/sales', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -104,16 +108,33 @@ export function SaleDialog({
         throw new Error(err.error || 'Error al crear solicitud')
       }
 
-      toast({
-        title: 'Solicitud enviada',
-        description: `La venta de ${equipmentCode} está pendiente de aprobación`,
-      })
+      const sale = await res.json()
+
+      // 2. SUPER_ADMIN aprueba inmediatamente — sin flujo de solicitud
+      if (isSuperAdmin) {
+        const approveRes = await fetch(`/api/inventory/sales/${sale.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'approve' }),
+        })
+        if (!approveRes.ok) {
+          const err = await approveRes.json()
+          throw new Error(err.error || 'Error al aprobar la venta')
+        }
+        toast({ title: 'Venta registrada', description: `${equipmentCode} marcado como vendido` })
+      } else {
+        toast({
+          title: 'Solicitud enviada',
+          description: `La venta de ${equipmentCode} está pendiente de aprobación`,
+        })
+      }
+
       onOpenChange(false)
       onSuccess()
     } catch (err) {
       toast({
         title: 'Error',
-        description: err instanceof Error ? err.message : 'No se pudo crear la solicitud',
+        description: err instanceof Error ? err.message : 'No se pudo procesar la venta',
         variant: 'destructive',
       })
     } finally {
@@ -127,10 +148,15 @@ export function SaleDialog({
         <DialogHeader>
           <DialogTitle className='flex items-center gap-2'>
             <DollarSign className='h-5 w-5' />
-            Solicitar Venta de Activo
+            {isSuperAdmin ? 'Registrar Venta' : 'Solicitar Venta de Activo'}
           </DialogTitle>
           <DialogDescription>
             {equipmentBrand} {equipmentModel} · {equipmentCode}
+            {isSuperAdmin && (
+              <span className='block mt-1 text-emerald-600 dark:text-emerald-400 text-xs font-medium'>
+                Como Super Admin, la venta se registrará y aprobará de inmediato.
+              </span>
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -208,7 +234,7 @@ export function SaleDialog({
                 <select
                   value={paymentMethod}
                   onChange={e => setPaymentMethod(e.target.value)}
-                  className='flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+                  className='flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
                 >
                   {PAYMENT_METHODS.map(m => (
                     <option key={m.value} value={m.value}>
@@ -220,7 +246,7 @@ export function SaleDialog({
             </div>
           </div>
 
-          {/* Accesorios incluidos */}
+          {/* Accesorios */}
           <div className='space-y-2'>
             <p className='text-xs font-medium text-muted-foreground uppercase tracking-wide'>
               Accesorios incluidos en la venta
@@ -283,8 +309,14 @@ export function SaleDialog({
               Cancelar
             </Button>
             <Button type='submit' disabled={submitting}>
-              {submitting && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
-              Enviar solicitud
+              {submitting ? (
+                <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+              ) : isSuperAdmin ? (
+                <CheckCircle className='mr-2 h-4 w-4' />
+              ) : (
+                <DollarSign className='mr-2 h-4 w-4' />
+              )}
+              {isSuperAdmin ? 'Registrar venta' : 'Enviar solicitud'}
             </Button>
           </DialogFooter>
         </form>
