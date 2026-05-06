@@ -198,15 +198,29 @@ export function TrendsTab({
             {/* Chart */}
             <ResponsiveContainer width='100%' height={300}>
               <BarChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray='3 3' className='stroke-muted' />
-                <XAxis dataKey='period' tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                <CartesianGrid strokeDasharray='3 3' stroke='currentColor' opacity={0.1} />
+                <XAxis
+                  dataKey='period'
+                  tick={{ fontSize: 11, fill: 'currentColor' }}
+                  tickLine={false}
+                  axisLine={false}
+                />
                 <YAxis
-                  tick={{ fontSize: 11 }}
+                  tick={{ fontSize: 11, fill: 'currentColor' }}
                   tickLine={false}
                   axisLine={false}
                   allowDecimals={false}
+                  width={30}
                 />
-                <Tooltip contentStyle={{ fontSize: 12, borderRadius: 6 }} />
+                <Tooltip
+                  contentStyle={{
+                    fontSize: 12,
+                    borderRadius: 6,
+                    backgroundColor: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    color: 'hsl(var(--foreground))',
+                  }}
+                />
                 {isAllFamilies && familyKeys.length > 0 ? (
                   <>
                     <Legend wrapperStyle={{ fontSize: 12 }} />
@@ -218,6 +232,7 @@ export function TrendsTab({
                         fill={FAMILY_COLORS[i % FAMILY_COLORS.length]}
                         radius={i === familyKeys.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
                         name={fname}
+                        minPointSize={2}
                       />
                     ))}
                   </>
@@ -227,6 +242,7 @@ export function TrendsTab({
                     fill={FAMILY_COLORS[0]}
                     radius={[4, 4, 0, 0]}
                     name='Tickets'
+                    minPointSize={2}
                   />
                 )}
               </BarChart>

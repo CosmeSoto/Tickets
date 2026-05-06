@@ -31,6 +31,7 @@ export function createTechnicianTicketColumns({
     {
       key: 'family',
       label: 'Área',
+      sortable: true,
       render: (ticket: TicketType) => {
         const family = ticket.family
         if (!family) return <span className='text-muted-foreground text-xs'>—</span>
@@ -60,6 +61,7 @@ export function createTechnicianTicketColumns({
     {
       key: 'client',
       label: 'Cliente',
+      sortable: true,
       render: (ticket: TicketType) => (
         <div className='flex items-center gap-2'>
           <User className='h-4 w-4 text-muted-foreground shrink-0' />
@@ -75,6 +77,7 @@ export function createTechnicianTicketColumns({
     {
       key: 'category',
       label: 'Categoría',
+      sortable: true,
       render: (ticket: TicketType) => (
         <div className='flex items-center gap-1.5'>
           <div

@@ -5,13 +5,10 @@ import { ReportService } from '@/lib/services/report.service'
 import prisma from '@/lib/prisma'
 
 // GET /api/reports/families/[id]?type=executive|technicians|trends|sla&granularity=day|week|month&startDate=&endDate=
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || session.user.role !== 'ADMIN') {
+    if (!session || (session.user.role !== 'ADMIN' && !(session.user as any).isSuperAdmin)) {
       return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
     }
 
@@ -33,7 +30,10 @@ export async function GET(
         where: { adminId: session.user.id, isActive: true },
       })
       if (totalAssignments > 0 && !assignment) {
-        return NextResponse.json({ success: false, message: 'No tienes acceso a esta familia' }, { status: 403 })
+        return NextResponse.json(
+          { success: false, message: 'No tienes acceso a esta familia' },
+          { status: 403 }
+        )
       }
     }
 
@@ -72,7 +72,8 @@ export async function GET(
         return NextResponse.json(
           {
             success: false,
-            message: 'Tipo de reporte inválido. Use: executive, technicians, trends, sla, satisfaction',
+            message:
+              'Tipo de reporte inválido. Use: executive, technicians, trends, sla, satisfaction',
           },
           { status: 400 }
         )

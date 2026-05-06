@@ -162,9 +162,28 @@ export function DataTable<T extends { id: string }>({
   const sortedData = useMemo(() => {
     if (!sortConfig) return safeData
     return [...safeData].sort((a, b) => {
-      const aVal = (a as any)[sortConfig.key]
-      const bVal = (b as any)[sortConfig.key]
       const dir = sortConfig.direction === 'asc' ? 1 : -1
+
+      // Extrae valor soportando notación punto y objetos con .name
+      const extractVal = (obj: any, key: string): any => {
+        if (key.includes('.')) {
+          const parts = key.split('.')
+          let val = obj
+          for (const p of parts) {
+            if (val == null) return null
+            val = val[p]
+          }
+          return val
+        }
+        const val = obj[key]
+        if (val != null && typeof val === 'object' && !Array.isArray(val)) {
+          return val.name ?? val.label ?? val.title ?? null
+        }
+        return val
+      }
+
+      const aVal = extractVal(a, sortConfig.key)
+      const bVal = extractVal(b, sortConfig.key)
 
       // Orden semántico para prioridad
       if (sortConfig.key === 'priority') {
@@ -174,13 +193,13 @@ export function DataTable<T extends { id: string }>({
       if (sortConfig.key === 'status') {
         return ((STATUS_ORDER[aVal] ?? 0) - (STATUS_ORDER[bVal] ?? 0)) * dir
       }
+      // Nulos al final
+      if (aVal == null) return 1 * dir
+      if (bVal == null) return -1 * dir
       // Fechas
       if (aVal instanceof Date || (typeof aVal === 'string' && /^\d{4}-\d{2}/.test(aVal))) {
         return (new Date(aVal).getTime() - new Date(bVal).getTime()) * dir
       }
-      // Nulos al final
-      if (aVal == null) return 1
-      if (bVal == null) return -1
       // Strings
       if (typeof aVal === 'string')
         return aVal.localeCompare(bVal, 'es', { sensitivity: 'base' }) * dir

@@ -8,7 +8,7 @@ import prisma from '@/lib/prisma'
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || session.user.role !== 'ADMIN') {
+    if (!session || (session.user.role !== 'ADMIN' && !(session.user as any).isSuperAdmin)) {
       return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
     }
 
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       if (assignments.length > 0) {
         // Pasar la primera familia asignada como scope (el ReportService filtrará)
         // Para "all" con restricción, usamos el primer ID y el servicio maneja el array
-        familyScope = assignments.map((a) => a.familyId).join(',')
+        familyScope = assignments.map(a => a.familyId).join(',')
       }
     }
 

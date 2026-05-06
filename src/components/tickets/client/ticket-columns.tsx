@@ -31,6 +31,7 @@ export function createClientTicketColumns({
     {
       key: 'family',
       label: 'Área',
+      sortable: true,
       render: (ticket: TicketType) => {
         const family = ticket.family
         if (!family) return <span className='text-muted-foreground text-xs'>—</span>
@@ -60,6 +61,7 @@ export function createClientTicketColumns({
     {
       key: 'assignee',
       label: 'Técnico',
+      sortable: true,
       render: (ticket: TicketType) =>
         ticket.assignee ? (
           <div className='flex items-center gap-2'>
@@ -75,6 +77,7 @@ export function createClientTicketColumns({
     {
       key: 'category',
       label: 'Categoría',
+      sortable: true,
       render: (ticket: TicketType) => (
         <div className='flex items-center gap-1.5'>
           <div
