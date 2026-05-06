@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = request.nextUrl
     const familyId = searchParams.get('familyId') || undefined
     const departmentId = searchParams.get('departmentId') || undefined
+    const search = searchParams.get('search') || undefined
 
     const userId = session.user.id
     const role = session.user.role
@@ -38,6 +39,14 @@ export async function GET(request: NextRequest) {
     // Construir filtro base
     const where: Record<string, unknown> = {
       isActive: true,
+    }
+
+    // Filtro de búsqueda por nombre o email
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+      ]
     }
 
     // Filtrar por departamento si se especifica

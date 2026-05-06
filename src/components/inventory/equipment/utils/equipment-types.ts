@@ -80,7 +80,13 @@ export interface MaintenanceRecord {
   }
 }
 
-export type EquipmentStatus = 'AVAILABLE' | 'ASSIGNED' | 'MAINTENANCE' | 'DAMAGED' | 'RETIRED'
+export type EquipmentStatus =
+  | 'AVAILABLE'
+  | 'ASSIGNED'
+  | 'MAINTENANCE'
+  | 'DAMAGED'
+  | 'RETIRED'
+  | 'SOLD'
 export type EquipmentCondition = 'NEW' | 'LIKE_NEW' | 'GOOD' | 'FAIR' | 'POOR'
 export type OwnershipType = 'FIXED_ASSET' | 'RENTAL' | 'LOAN'
 

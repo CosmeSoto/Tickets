@@ -272,6 +272,7 @@ export function EquipmentDetail({
         open={showAssignDialog}
         onOpenChange={setShowAssignDialog}
         equipmentCode={equipment.code}
+        familyId={(equipment as any).type?.family?.id}
         form={assignForm}
         onFormChange={setAssignForm}
         onSubmit={submitAssignment}
