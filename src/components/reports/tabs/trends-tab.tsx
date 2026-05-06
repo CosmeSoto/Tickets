@@ -1,11 +1,6 @@
 'use client'
 
-/**
- * Trends Tab Component
- * Shows temporal trends with charts and tables
- */
-
-import { TrendingUp } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import {
   Select,
@@ -15,6 +10,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
+  AreaChart,
+  Area,
   BarChart,
   Bar,
   XAxis,
@@ -35,7 +32,6 @@ interface TrendsTabProps {
   isAllFamilies: boolean
 }
 
-// Palette for multi-family stacked bars
 const FAMILY_COLORS = [
   '#3b82f6',
   '#10b981',
@@ -48,6 +44,23 @@ const FAMILY_COLORS = [
   '#ec4899',
   '#6366f1',
 ]
+
+// Tooltip personalizado con tema
+function CustomTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className='rounded-lg border border-border bg-card shadow-lg px-3 py-2 text-sm'>
+      <p className='font-medium text-foreground mb-1'>{label}</p>
+      {payload.map((entry: any) => (
+        <div key={entry.dataKey} className='flex items-center gap-2'>
+          <span className='h-2 w-2 rounded-full' style={{ backgroundColor: entry.color }} />
+          <span className='text-muted-foreground'>{entry.name}:</span>
+          <span className='font-semibold text-foreground'>{entry.value}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 export function TrendsTab({
   data,
@@ -84,28 +97,33 @@ export function TrendsTab({
       </Card>
     )
 
-  // Totales para KPIs
+  // ── Cálculos ──────────────────────────────────────────────────────────────
   const totalTickets = data.reduce((s, d) => s + d.count, 0)
   const periods = Array.from(new Set(data.map(d => d.period))).sort()
+
   const lastPeriodCount = (() => {
     const last = periods[periods.length - 1]
     return data.filter(d => d.period === last).reduce((s, d) => s + d.count, 0)
   })()
+
   const prevPeriodCount = (() => {
     if (periods.length < 2) return null
     const prev = periods[periods.length - 2]
     return data.filter(d => d.period === prev).reduce((s, d) => s + d.count, 0)
   })()
+
   const trend =
     prevPeriodCount !== null && prevPeriodCount > 0
       ? Math.round(((lastPeriodCount - prevPeriodCount) / prevPeriodCount) * 100)
       : null
 
-  // Build chart data
+  const avgPerPeriod = periods.length > 0 ? Math.round(totalTickets / periods.length) : 0
+
+  // ── Datos del gráfico ─────────────────────────────────────────────────────
   const { chartData, familyKeys } = (() => {
     if (!isAllFamilies) {
       return {
-        chartData: data.map(d => ({ period: d.period, count: d.count })),
+        chartData: data.map(d => ({ period: d.period, Tickets: d.count })),
         familyKeys: [] as string[],
       }
     }
@@ -122,7 +140,7 @@ export function TrendsTab({
     return { chartData, familyKeys: familyNames }
   })()
 
-  // Table data
+  // Tabla
   const tableData = (() => {
     if (!isAllFamilies) return data.map(d => ({ period: d.period, count: d.count }))
     const map = new Map<string, number>()
@@ -132,10 +150,18 @@ export function TrendsTab({
       .map(([period, count]) => ({ period, count }))
   })()
 
+  const TrendIcon = trend === null ? Minus : trend > 0 ? TrendingUp : TrendingDown
+  const trendColor =
+    trend === null
+      ? 'text-muted-foreground'
+      : trend > 0
+        ? 'text-orange-600 dark:text-orange-400'
+        : 'text-emerald-600 dark:text-emerald-400'
+
   return (
     <div className='space-y-4'>
       {/* KPIs */}
-      <div className='grid grid-cols-2 sm:grid-cols-3 gap-3'>
+      <div className='grid grid-cols-2 sm:grid-cols-4 gap-3'>
         <Card>
           <CardContent className='pt-4 pb-3'>
             <p className='text-xs text-muted-foreground'>Total en el período</p>
@@ -150,24 +176,24 @@ export function TrendsTab({
         </Card>
         <Card>
           <CardContent className='pt-4 pb-3'>
+            <p className='text-xs text-muted-foreground'>Promedio por período</p>
+            <p className='text-2xl font-bold mt-1'>{avgPerPeriod.toLocaleString()}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className='pt-4 pb-3'>
             <p className='text-xs text-muted-foreground'>Variación vs anterior</p>
-            <p
-              className={`text-2xl font-bold mt-1 ${
-                trend === null
-                  ? 'text-muted-foreground'
-                  : trend > 0
-                    ? 'text-orange-600 dark:text-orange-400'
-                    : trend < 0
-                      ? 'text-emerald-600 dark:text-emerald-400'
-                      : 'text-muted-foreground'
-              }`}
-            >
-              {trend === null ? '—' : `${trend > 0 ? '+' : ''}${trend}%`}
-            </p>
+            <div className='flex items-center gap-1.5 mt-1'>
+              <TrendIcon className={`h-5 w-5 ${trendColor}`} />
+              <p className={`text-2xl font-bold ${trendColor}`}>
+                {trend === null ? '—' : `${trend > 0 ? '+' : ''}${trend}%`}
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>
 
+      {/* Gráfico */}
       <Card>
         <CardHeader>
           <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3'>
@@ -195,35 +221,36 @@ export function TrendsTab({
         </CardHeader>
         <CardContent>
           <div className='space-y-6'>
-            {/* Chart */}
-            <ResponsiveContainer width='100%' height={300}>
-              <BarChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray='3 3' stroke='currentColor' opacity={0.1} />
-                <XAxis
-                  dataKey='period'
-                  tick={{ fontSize: 11, fill: 'currentColor' }}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: 'currentColor' }}
-                  tickLine={false}
-                  axisLine={false}
-                  allowDecimals={false}
-                  width={30}
-                />
-                <Tooltip
-                  contentStyle={{
-                    fontSize: 12,
-                    borderRadius: 6,
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    color: 'hsl(var(--foreground))',
-                  }}
-                />
-                {isAllFamilies && familyKeys.length > 0 ? (
-                  <>
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
+            {/* Gráfico de área (familia única) o barras apiladas (multi-familia) */}
+            <div className='w-full' style={{ height: 300 }}>
+              <ResponsiveContainer width='100%' height='100%'>
+                {isAllFamilies && familyKeys.length > 1 ? (
+                  <BarChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                    <CartesianGrid
+                      strokeDasharray='3 3'
+                      stroke='currentColor'
+                      opacity={0.08}
+                      vertical={false}
+                    />
+                    <XAxis
+                      dataKey='period'
+                      tick={{ fontSize: 11, fill: 'currentColor', opacity: 0.6 }}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 11, fill: 'currentColor', opacity: 0.6 }}
+                      tickLine={false}
+                      axisLine={false}
+                      allowDecimals={false}
+                      width={28}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend
+                      wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
+                      iconType='circle'
+                      iconSize={8}
+                    />
                     {familyKeys.map((fname, i) => (
                       <Bar
                         key={fname}
@@ -235,27 +262,63 @@ export function TrendsTab({
                         minPointSize={2}
                       />
                     ))}
-                  </>
+                  </BarChart>
                 ) : (
-                  <Bar
-                    dataKey='count'
-                    fill={FAMILY_COLORS[0]}
-                    radius={[4, 4, 0, 0]}
-                    name='Tickets'
-                    minPointSize={2}
-                  />
+                  <AreaChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                    <defs>
+                      <linearGradient id='ticketGradient' x1='0' y1='0' x2='0' y2='1'>
+                        <stop offset='5%' stopColor={FAMILY_COLORS[0]} stopOpacity={0.3} />
+                        <stop offset='95%' stopColor={FAMILY_COLORS[0]} stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid
+                      strokeDasharray='3 3'
+                      stroke='currentColor'
+                      opacity={0.08}
+                      vertical={false}
+                    />
+                    <XAxis
+                      dataKey='period'
+                      tick={{ fontSize: 11, fill: 'currentColor', opacity: 0.6 }}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 11, fill: 'currentColor', opacity: 0.6 }}
+                      tickLine={false}
+                      axisLine={false}
+                      allowDecimals={false}
+                      width={28}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Area
+                      type='monotone'
+                      dataKey='Tickets'
+                      stroke={FAMILY_COLORS[0]}
+                      strokeWidth={2}
+                      fill='url(#ticketGradient)'
+                      dot={{ fill: FAMILY_COLORS[0], strokeWidth: 0, r: 3 }}
+                      activeDot={{ r: 5, strokeWidth: 0 }}
+                    />
+                  </AreaChart>
                 )}
-              </BarChart>
-            </ResponsiveContainer>
+              </ResponsiveContainer>
+            </div>
 
-            {/* Table */}
-            <div className='overflow-x-auto'>
+            {/* Tabla de datos */}
+            <div className='overflow-x-auto rounded-md border border-border'>
               <table className='w-full text-sm'>
                 <thead>
                   <tr className='border-b bg-muted/50'>
-                    <th className='text-left p-3 font-medium'>Período</th>
-                    <th className='text-right p-3 font-medium'>Tickets</th>
-                    <th className='text-right p-3 font-medium'>Variación</th>
+                    <th className='text-left px-4 py-2.5 font-medium text-muted-foreground'>
+                      Período
+                    </th>
+                    <th className='text-right px-4 py-2.5 font-medium text-muted-foreground'>
+                      Tickets
+                    </th>
+                    <th className='text-right px-4 py-2.5 font-medium text-muted-foreground'>
+                      Variación
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -266,22 +329,34 @@ export function TrendsTab({
                         ? Math.round(((row.count - prev) / prev) * 100)
                         : null
                     return (
-                      <tr key={row.period} className='border-b hover:bg-muted/30 transition-colors'>
-                        <td className='p-3 font-mono text-sm'>{row.period}</td>
-                        <td className='p-3 text-right font-semibold'>{row.count}</td>
-                        <td className='p-3 text-right'>
+                      <tr
+                        key={row.period}
+                        className='border-b last:border-0 hover:bg-muted/30 transition-colors'
+                      >
+                        <td className='px-4 py-2.5 font-mono text-sm text-foreground'>
+                          {row.period}
+                        </td>
+                        <td className='px-4 py-2.5 text-right font-semibold text-foreground'>
+                          {row.count}
+                        </td>
+                        <td className='px-4 py-2.5 text-right'>
                           {delta === null ? (
                             <span className='text-muted-foreground'>—</span>
                           ) : (
                             <span
-                              className={
+                              className={`font-medium flex items-center justify-end gap-1 ${
                                 delta > 0
                                   ? 'text-orange-600 dark:text-orange-400'
                                   : delta < 0
                                     ? 'text-emerald-600 dark:text-emerald-400'
                                     : 'text-muted-foreground'
-                              }
+                              }`}
                             >
+                              {delta > 0 ? (
+                                <TrendingUp className='h-3 w-3' />
+                              ) : delta < 0 ? (
+                                <TrendingDown className='h-3 w-3' />
+                              ) : null}
                               {delta > 0 ? '+' : ''}
                               {delta}%
                             </span>
@@ -292,10 +367,12 @@ export function TrendsTab({
                   })}
                 </tbody>
                 <tfoot>
-                  <tr className='border-t-2 bg-muted/50 font-semibold'>
-                    <td className='p-3'>Total</td>
-                    <td className='p-3 text-right'>{totalTickets.toLocaleString()}</td>
-                    <td className='p-3 text-right text-muted-foreground'>—</td>
+                  <tr className='border-t-2 bg-muted/50'>
+                    <td className='px-4 py-2.5 font-semibold text-foreground'>Total</td>
+                    <td className='px-4 py-2.5 text-right font-bold text-foreground'>
+                      {totalTickets.toLocaleString()}
+                    </td>
+                    <td className='px-4 py-2.5 text-right text-muted-foreground'>—</td>
                   </tr>
                 </tfoot>
               </table>

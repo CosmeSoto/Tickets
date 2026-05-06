@@ -1,10 +1,5 @@
 'use client'
 
-/**
- * SLA Tab Component
- * Shows SLA compliance metrics by family and priority
- */
-
 import { ShieldCheck } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -17,14 +12,28 @@ interface SLATabProps {
   loading: boolean
 }
 
+function SLABar({ value }: { value: number }) {
+  const color = value >= 90 ? 'bg-emerald-500' : value >= 70 ? 'bg-amber-500' : 'bg-destructive'
+  return (
+    <div className='flex items-center gap-2 min-w-[100px]'>
+      <div className='flex-1 h-1.5 bg-muted rounded-full overflow-hidden'>
+        <div
+          className={`h-full rounded-full transition-all ${color}`}
+          style={{ width: `${value}%` }}
+        />
+      </div>
+      <span className={`text-xs font-medium w-9 text-right shrink-0 ${slaColor(value)}`}>
+        {value}%
+      </span>
+    </div>
+  )
+}
+
 export function SLATab({ data, loading }: SLATabProps) {
   if (loading) return <TabLoadingState />
   if (data.length === 0)
-    return (
-      <TabEmptyState message='No hay datos de cumplimiento de SLA para los filtros seleccionados.' />
-    )
+    return <TabEmptyState message='No hay datos de SLA para los filtros seleccionados.' />
 
-  // Group by family
   const byFamily = data.reduce<Record<string, SLAComplianceRow[]>>((acc, row) => {
     if (!acc[row.familyId]) acc[row.familyId] = []
     acc[row.familyId].push(row)
@@ -33,13 +42,54 @@ export function SLATab({ data, loading }: SLATabProps) {
 
   const priorities = ['URGENT', 'HIGH', 'MEDIUM', 'LOW']
 
+  // KPIs globales
+  const totalAll = data.reduce((s, r) => s + r.total, 0)
+  const compliantAll = data.reduce((s, r) => s + r.compliant, 0)
+  const breachedAll = data.reduce((s, r) => s + r.breached, 0)
+  const globalRate = totalAll > 0 ? Math.round((compliantAll / totalAll) * 1000) / 10 : 0
+
   return (
     <div className='space-y-4'>
+      {/* KPIs globales */}
+      <div className='grid grid-cols-2 sm:grid-cols-4 gap-3'>
+        <Card>
+          <CardContent className='pt-4 pb-3'>
+            <p className='text-xs text-muted-foreground'>Total evaluados</p>
+            <p className='text-2xl font-bold mt-1'>{totalAll.toLocaleString()}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className='pt-4 pb-3'>
+            <p className='text-xs text-muted-foreground'>Cumplidos</p>
+            <p className='text-2xl font-bold mt-1 text-emerald-600 dark:text-emerald-400'>
+              {compliantAll.toLocaleString()}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className='pt-4 pb-3'>
+            <p className='text-xs text-muted-foreground'>Incumplidos</p>
+            <p
+              className={`text-2xl font-bold mt-1 ${breachedAll > 0 ? 'text-destructive' : 'text-muted-foreground'}`}
+            >
+              {breachedAll.toLocaleString()}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className='pt-4 pb-3'>
+            <p className='text-xs text-muted-foreground'>Tasa global</p>
+            <p className={`text-2xl font-bold mt-1 ${slaColor(globalRate)}`}>{globalRate}%</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Por familia */}
       {Object.entries(byFamily).map(([familyId, rows]) => {
         const familyName = rows[0]?.familyName ?? familyId
-        const totalAll = rows.reduce((s, r) => s + r.total, 0)
-        const compliantAll = rows.reduce((s, r) => s + r.compliant, 0)
-        const overallRate = totalAll > 0 ? Math.round((compliantAll / totalAll) * 1000) / 10 : 0
+        const totalFam = rows.reduce((s, r) => s + r.total, 0)
+        const compliantFam = rows.reduce((s, r) => s + r.compliant, 0)
+        const overallRate = totalFam > 0 ? Math.round((compliantFam / totalFam) * 1000) / 10 : 0
 
         return (
           <Card key={familyId}>
@@ -50,7 +100,7 @@ export function SLATab({ data, loading }: SLATabProps) {
                   {familyName}
                 </CardTitle>
                 <div className='flex items-center gap-2'>
-                  <span className='text-sm text-muted-foreground'>Tasa global:</span>
+                  <span className='text-xs text-muted-foreground'>{totalFam} tickets</span>
                   <span className={`font-bold text-lg ${slaColor(overallRate)}`}>
                     {overallRate}%
                   </span>
@@ -58,16 +108,23 @@ export function SLATab({ data, loading }: SLATabProps) {
               </div>
             </CardHeader>
             <CardContent>
-              <div className='overflow-x-auto'>
+              <div className='overflow-x-auto rounded-md border border-border'>
                 <table className='w-full text-sm'>
                   <thead>
                     <tr className='border-b bg-muted/50'>
-                      <th className='text-left p-3 font-medium'>Prioridad</th>
-                      <th className='text-right p-3 font-medium'>Total</th>
-                      <th className='text-right p-3 font-medium'>Cumplidos</th>
-                      <th className='text-right p-3 font-medium'>Incumplidos</th>
-                      <th className='text-right p-3 font-medium'>Tasa SLA</th>
-                      <th className='p-3 font-medium'>Barra</th>
+                      <th className='text-left px-4 py-2.5 font-medium text-muted-foreground'>
+                        Prioridad
+                      </th>
+                      <th className='text-right px-4 py-2.5 font-medium text-muted-foreground'>
+                        Total
+                      </th>
+                      <th className='text-right px-4 py-2.5 font-medium text-muted-foreground'>
+                        Cumplidos
+                      </th>
+                      <th className='text-right px-4 py-2.5 font-medium text-muted-foreground hidden sm:table-cell'>
+                        Incumplidos
+                      </th>
+                      <th className='px-4 py-2.5 font-medium text-muted-foreground'>Tasa</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -75,37 +132,32 @@ export function SLATab({ data, loading }: SLATabProps) {
                       const row = rows.find(r => r.priority === priority)
                       if (!row) return null
                       return (
-                        <tr key={priority} className='border-b hover:bg-muted/30 transition-colors'>
-                          <td className='p-3'>
-                            <Badge className={priorityColor(priority)}>
+                        <tr
+                          key={priority}
+                          className='border-b last:border-0 hover:bg-muted/30 transition-colors'
+                        >
+                          <td className='px-4 py-2.5'>
+                            <Badge className={priorityColor(priority)} variant='outline'>
                               {priorityLabel(priority)}
                             </Badge>
                           </td>
-                          <td className='p-3 text-right'>{row.total}</td>
-                          <td className='p-3 text-right text-emerald-600 dark:text-emerald-400 font-medium'>
+                          <td className='px-4 py-2.5 text-right text-foreground'>{row.total}</td>
+                          <td className='px-4 py-2.5 text-right font-medium text-emerald-600 dark:text-emerald-400'>
                             {row.compliant}
                           </td>
-                          <td className='p-3 text-right text-red-600 dark:text-red-400 font-medium'>
-                            {row.breached}
-                          </td>
-                          <td className='p-3 text-right'>
-                            <span className={`font-semibold ${slaColor(row.complianceRate)}`}>
-                              {row.complianceRate}%
+                          <td className='px-4 py-2.5 text-right hidden sm:table-cell'>
+                            <span
+                              className={
+                                row.breached > 0
+                                  ? 'font-medium text-destructive'
+                                  : 'text-muted-foreground'
+                              }
+                            >
+                              {row.breached}
                             </span>
                           </td>
-                          <td className='p-3 min-w-[120px]'>
-                            <div className='h-2 bg-muted rounded-full overflow-hidden'>
-                              <div
-                                className={`h-full rounded-full transition-all ${
-                                  row.complianceRate >= 90
-                                    ? 'bg-emerald-500'
-                                    : row.complianceRate >= 70
-                                      ? 'bg-amber-500'
-                                      : 'bg-red-500'
-                                }`}
-                                style={{ width: `${row.complianceRate}%` }}
-                              />
-                            </div>
+                          <td className='px-4 py-2.5'>
+                            <SLABar value={row.complianceRate} />
                           </td>
                         </tr>
                       )
