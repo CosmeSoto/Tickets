@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Package, Loader2, ChevronDown, ChevronUp, TrendingDown, ArrowLeft } from 'lucide-react'
+import { Package, Loader2, ChevronDown, ChevronUp, TrendingDown, ArrowLeft, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEquipmentDetail } from '@/hooks/use-equipment-detail'
 import { EquipmentStatusBanners } from './equipment/equipment-status-banners'
@@ -14,6 +14,7 @@ import { EquipmentMaintenanceCard } from './equipment/equipment-maintenance-card
 import { EquipmentAttachments } from './equipment-attachments'
 import { DepreciationCard } from './equipment/DepreciationCard'
 import { FinancialInfoSection } from './shared/FinancialInfoSection'
+import { EquipmentForm } from './equipment-form'
 import { AssignmentDialog } from './equipment/dialogs/assignment-dialog'
 import { ReturnDialog } from './equipment/dialogs/return-dialog'
 import { MaintenanceDialog } from './equipment/dialogs/maintenance-dialog'
@@ -22,6 +23,7 @@ import { PermanentDeleteDialog } from './equipment/dialogs/permanent-delete-dial
 import { DecommissionDialog } from './equipment/dialogs/decommission-dialog'
 import { ConvertToPurchaseDialog } from './equipment/dialogs/convert-to-purchase-dialog'
 import { SaleDialog } from './equipment/dialogs/sale-dialog'
+import { Button } from '@/components/ui/button'
 
 interface EquipmentDetailProps {
   equipmentId: string
@@ -38,6 +40,7 @@ export function EquipmentDetail({
 }: EquipmentDetailProps) {
   const [showDepreciation, setShowDepreciation] = useState(false)
   const [showSaleDialog, setShowSaleDialog] = useState(false)
+  const [editMode, setEditMode] = useState(false)
   const router = useRouter()
 
   const {
@@ -98,7 +101,6 @@ export function EquipmentDetail({
 
     // Actions
     loadEquipmentDetail,
-    handleEdit,
     handleDelete,
     handlePermanentDelete,
     submitAssignment,
@@ -164,7 +166,7 @@ export function EquipmentDetail({
           isInMaintenance={isInMaintenance}
           onReportProblem={handleReportProblem}
           onRequestMaintenance={() => setShowMaintenanceDialog(true)}
-          onEdit={handleEdit}
+          onEdit={() => setEditMode(true)}
           onAssign={() => setShowAssignDialog(true)}
           onReturn={() => setShowReturnDialog(true)}
           onMaintenance={() => setShowMaintenanceDialog(true)}
@@ -187,86 +189,122 @@ export function EquipmentDetail({
         canPermanentDelete={canPermanentDelete}
       />
 
-      {/* Main Content — 2 columnas: info principal | lateral */}
-      <div className='grid gap-6 lg:grid-cols-3'>
-        {/* Columna principal — ocupa 2/3 */}
-        <div className='lg:col-span-2 space-y-6'>
-          {/* 1. Información principal del activo */}
-          <EquipmentInfoCard equipment={equipment} />
-
-          {/* 2. Adjuntos — fotos y documentos (visible de inmediato para ver la imagen) */}
-          <EquipmentAttachments
-            equipmentId={equipmentId}
-            canManage={userRole === 'ADMIN' || userRole === 'TECHNICIAN'}
+      {/* ── MODO EDICIÓN inline ── */}
+      {editMode ? (
+        <div className='space-y-4'>
+          <div className='flex items-center justify-between'>
+            <p className='text-sm text-muted-foreground'>
+              Editando equipo — los cambios se guardan al hacer clic en &quot;Actualizar&quot;
+            </p>
+            <Button
+              type='button'
+              variant='ghost'
+              size='sm'
+              onClick={() => setEditMode(false)}
+              className='gap-1.5'
+            >
+              <X className='h-4 w-4' />
+              Cancelar edición
+            </Button>
+          </div>
+          <EquipmentForm
+            equipment={equipment as any}
+            onSuccess={() => {
+              setEditMode(false)
+              loadEquipmentDetail()
+            }}
+            onCancel={() => setEditMode(false)}
           />
+        </div>
+      ) : (
+        /* ── MODO DETALLE normal ── */
+        <>
+          {/* Main Content — 2 columnas: info principal | lateral */}
+          <div className='grid gap-6 lg:grid-cols-3'>
+            {/* Columna principal — ocupa 2/3 */}
+            <div className='lg:col-span-2 space-y-6'>
+              {/* 1. Información principal del activo */}
+              <EquipmentInfoCard equipment={equipment} />
 
-          {/* 3. Mantenimientos activos o recientes */}
-          {maintenanceRecords.length > 0 && (
-            <EquipmentMaintenanceCard
-              maintenanceRecords={maintenanceRecords}
-              equipmentStatus={equipment.status}
-            />
-          )}
+              {/* 2. Adjuntos — fotos y documentos (visible de inmediato para ver la imagen) */}
+              <EquipmentAttachments
+                equipmentId={equipmentId}
+                canManage={userRole === 'ADMIN' || userRole === 'TECHNICIAN'}
+              />
 
-          {/* 4. Historial de eventos */}
-          <EquipmentHistoryCard history={history as any} />
+              {/* 3. Mantenimientos activos o recientes */}
+              {maintenanceRecords.length > 0 && (
+                <EquipmentMaintenanceCard
+                  maintenanceRecords={maintenanceRecords}
+                  equipmentStatus={equipment.status}
+                />
+              )}
 
-          {/* 5. Información financiera — colapsable */}
-          {((equipment as any).purchasePrice ||
-            (equipment as any).invoiceNumber ||
-            (equipment as any).supplierId) && (
-            <FinancialInfoSection
-              supplierId={(equipment as any).supplierId}
-              invoiceNumber={(equipment as any).invoiceNumber}
-              purchaseOrderNumber={(equipment as any).purchaseOrderNumber}
-              purchasePrice={(equipment as any).purchasePrice}
-              purchaseDate={(equipment as any).purchaseDate}
-              readOnly
-            />
-          )}
+              {/* 4. Historial de eventos */}
+              <EquipmentHistoryCard history={history as any} />
 
-          {/* 6. Depreciación — colapsable */}
-          {(equipment as any).usefulLifeYears && (
-            <div className='rounded-md border border-border overflow-hidden'>
-              <button
-                type='button'
-                className='flex w-full items-center justify-between px-4 py-3 text-sm font-medium hover:bg-muted/50 transition-colors'
-                onClick={() => setShowDepreciation(p => !p)}
-              >
-                <span className='flex items-center gap-2'>
-                  <TrendingDown className='h-4 w-4 text-amber-600 dark:text-amber-400' />
-                  Depreciación
-                </span>
-                {showDepreciation ? (
-                  <ChevronUp className='h-4 w-4' />
-                ) : (
-                  <ChevronDown className='h-4 w-4' />
-                )}
-              </button>
-              {showDepreciation && (
-                <div className='border-t border-border px-4 py-4'>
-                  <DepreciationCard
-                    purchasePrice={(equipment as any).purchasePrice}
-                    purchaseDate={(equipment as any).purchaseDate}
-                    usefulLifeYears={(equipment as any).usefulLifeYears}
-                    residualValue={(equipment as any).residualValue}
-                    depreciation={(equipment as any).depreciation}
-                    depreciationMethod={(equipment as any).depreciationMethod}
-                    totalUnits={(equipment as any).totalUnits}
-                    usedUnits={(equipment as any).usedUnits}
-                  />
+              {/* 5. Información financiera — colapsable */}
+              {((equipment as any).purchasePrice ||
+                (equipment as any).invoiceNumber ||
+                (equipment as any).supplierId) && (
+                <FinancialInfoSection
+                  supplierId={(equipment as any).supplierId}
+                  invoiceNumber={(equipment as any).invoiceNumber}
+                  purchaseOrderNumber={(equipment as any).purchaseOrderNumber}
+                  purchasePrice={(equipment as any).purchasePrice}
+                  purchaseDate={(equipment as any).purchaseDate}
+                  readOnly
+                />
+              )}
+
+              {/* 6. Depreciación — colapsable */}
+              {(equipment as any).usefulLifeYears && (
+                <div className='rounded-md border border-border overflow-hidden'>
+                  <button
+                    type='button'
+                    className='flex w-full items-center justify-between px-4 py-3 text-sm font-medium hover:bg-muted/50 transition-colors'
+                    onClick={() => setShowDepreciation(p => !p)}
+                  >
+                    <span className='flex items-center gap-2'>
+                      <TrendingDown className='h-4 w-4 text-amber-600 dark:text-amber-400' />
+                      Depreciación
+                    </span>
+                    {showDepreciation ? (
+                      <ChevronUp className='h-4 w-4' />
+                    ) : (
+                      <ChevronDown className='h-4 w-4' />
+                    )}
+                  </button>
+                  {showDepreciation && (
+                    <div className='border-t border-border px-4 py-4'>
+                      <DepreciationCard
+                        purchasePrice={(equipment as any).purchasePrice}
+                        purchaseDate={(equipment as any).purchaseDate}
+                        usefulLifeYears={(equipment as any).usefulLifeYears}
+                        residualValue={(equipment as any).residualValue}
+                        depreciation={(equipment as any).depreciation}
+                        depreciationMethod={(equipment as any).depreciationMethod}
+                        totalUnits={(equipment as any).totalUnits}
+                        usedUnits={(equipment as any).usedUnits}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          )}
-        </div>
 
-        {/* Columna lateral — QR + asignación */}
-        <div className='space-y-6'>
-          <EquipmentQRCard qrCode={qrCode} equipmentCode={equipment.code} onDownload={downloadQR} />
-          {currentAssignment && <EquipmentAssignmentCard assignment={currentAssignment} />}
-        </div>
-      </div>
+            {/* Columna lateral — QR + asignación */}
+            <div className='space-y-6'>
+              <EquipmentQRCard
+                qrCode={qrCode}
+                equipmentCode={equipment.code}
+                onDownload={downloadQR}
+              />
+              {currentAssignment && <EquipmentAssignmentCard assignment={currentAssignment} />}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Dialogs */}
       <AssignmentDialog
