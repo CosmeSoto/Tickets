@@ -4,17 +4,31 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import {
-  Wrench, Plus, Clock, Calendar, CheckCircle, XCircle, ThumbsUp,
-  Loader2, Filter, Search, Package,
+  Wrench,
+  Plus,
+  Clock,
+  Calendar,
+  CheckCircle,
+  XCircle,
+  ThumbsUp,
+  Loader2,
+  Filter,
+  Search,
+  Package,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { NewMaintenanceDialog } from '@/components/inventory/new-maintenance-dialog'
-import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
@@ -27,17 +41,44 @@ interface MaintenanceItem {
   description: string
   date: string
   createdAt: string
-  equipment: { id: string; code: string; brand: string; model: string; status: string; type: { name: string } | null }
+  equipment: {
+    id: string
+    code: string
+    brand: string
+    model: string
+    status: string
+    type: { name: string } | null
+  }
   technician: { id: string; name: string } | null
   requestedBy: { id: string; name: string } | null
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-  REQUESTED: { label: 'Solicitado',  color: 'bg-blue-100 text-blue-800',    icon: <Clock className="h-3 w-3" /> },
-  SCHEDULED: { label: 'Programado',  color: 'bg-yellow-100 text-yellow-800', icon: <Calendar className="h-3 w-3" /> },
-  ACCEPTED:  { label: 'Aceptado',    color: 'bg-purple-100 text-purple-800', icon: <ThumbsUp className="h-3 w-3" /> },
-  COMPLETED: { label: 'Completado',  color: 'bg-green-100 text-green-800',   icon: <CheckCircle className="h-3 w-3" /> },
-  CANCELLED: { label: 'Cancelado',   color: 'bg-muted text-muted-foreground',     icon: <XCircle className="h-3 w-3" /> },
+  REQUESTED: {
+    label: 'Solicitado',
+    color: 'bg-blue-100 text-blue-800',
+    icon: <Clock className='h-3 w-3' />,
+  },
+  SCHEDULED: {
+    label: 'Programado',
+    color: 'bg-yellow-100 text-yellow-800',
+    icon: <Calendar className='h-3 w-3' />,
+  },
+  ACCEPTED: {
+    label: 'Aceptado',
+    color: 'bg-purple-100 text-purple-800',
+    icon: <ThumbsUp className='h-3 w-3' />,
+  },
+  COMPLETED: {
+    label: 'Completado',
+    color: 'bg-green-100 text-green-800',
+    icon: <CheckCircle className='h-3 w-3' />,
+  },
+  CANCELLED: {
+    label: 'Cancelado',
+    color: 'bg-muted text-muted-foreground',
+    icon: <XCircle className='h-3 w-3' />,
+  },
 }
 
 const TYPE_LABELS: Record<string, string> = { PREVENTIVE: 'Preventivo', CORRECTIVE: 'Correctivo' }
@@ -64,7 +105,9 @@ export default function MaintenanceListPage() {
   const isAdminOrTech = role === 'ADMIN' || role === 'TECHNICIAN'
 
   // Tab activo: 'family' (mantenimientos de familias) | 'mine' (mis equipos)
-  const [activeTab, setActiveTab] = useState<'family' | 'mine'>(isClient && !canManageInventory ? 'mine' : 'family')
+  const [activeTab, setActiveTab] = useState<'family' | 'mine'>(
+    isClient && !canManageInventory ? 'mine' : 'family'
+  )
 
   // Familias de inventario desde el contexto global (cache Redis, sin peticion extra) - memoizadas
   const { families } = useFamilyOptions()
@@ -84,7 +127,9 @@ export default function MaintenanceListPage() {
     }
   }, [statusFilter, typeFilter, activeTab, familyFilter])
 
-  useEffect(() => { fetchRecords() }, [fetchRecords])
+  useEffect(() => {
+    fetchRecords()
+  }, [fetchRecords])
 
   const filtered = records.filter(r => {
     if (!search) return true
@@ -111,7 +156,13 @@ export default function MaintenanceListPage() {
   const sortedFiltered = [...filtered].sort((a, b) => {
     const dir = sortDir === 'asc' ? 1 : -1
     if (sortField === 'status') {
-      const order: Record<string, number> = { REQUESTED: 5, SCHEDULED: 4, ACCEPTED: 3, COMPLETED: 2, CANCELLED: 1 }
+      const order: Record<string, number> = {
+        REQUESTED: 5,
+        SCHEDULED: 4,
+        ACCEPTED: 3,
+        COMPLETED: 2,
+        CANCELLED: 1,
+      }
       return ((order[a.status] ?? 0) - (order[b.status] ?? 0)) * dir
     }
     if (sortField === 'type') return a.type.localeCompare(b.type) * dir
@@ -121,8 +172,11 @@ export default function MaintenanceListPage() {
   })
 
   const toggleSort = (field: typeof sortField) => {
-    if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-    else { setSortField(field); setSortDir('desc') }
+    if (sortField === field) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))
+    else {
+      setSortField(field)
+      setSortDir('desc')
+    }
   }
 
   // Export usa sortedFiltered para respetar el orden actual
@@ -135,47 +189,54 @@ export default function MaintenanceListPage() {
       { key: 'status', label: 'Estado', format: v => STATUS_CONFIG[v]?.label ?? v },
       { key: 'equipment', label: 'Equipo', format: v => `${v.brand} ${v.model} (${v.code})` },
       { key: 'description', label: 'Descripción' },
-      { key: 'date', label: 'Fecha', format: v => v ? new Date(v).toLocaleDateString('es-CL') : '' },
+      {
+        key: 'date',
+        label: 'Fecha',
+        format: v => (v ? new Date(v).toLocaleDateString('es-CL') : ''),
+      },
       { key: 'technician', label: 'Técnico', format: v => v?.name ?? '' },
       { key: 'requestedBy', label: 'Solicitado por', format: v => v?.name ?? '' },
     ],
   })
 
   const title = isClient && !canManageInventory ? 'Mis Mantenimientos' : 'Mantenimientos'
-  const subtitle = isClient && !canManageInventory
-    ? 'Historial de mantenimientos de tus equipos'
-    : activeTab === 'mine'
-    ? 'Mantenimientos de tus equipos asignados'
-    : 'Gestión de mantenimientos preventivos y correctivos'
+  const subtitle =
+    isClient && !canManageInventory
+      ? 'Historial de mantenimientos de tus equipos'
+      : activeTab === 'mine'
+        ? 'Mantenimientos de tus equipos asignados'
+        : 'Gestión de mantenimientos preventivos y correctivos'
 
   return (
     <ModuleLayout
       title={title}
       subtitle={subtitle}
       headerActions={
-        <div className="flex items-center gap-2">
+        <div className='flex items-center gap-2'>
           {isAdminOrTech || isManager ? (
-            <Button onClick={() => setShowNew(true)} size="sm">
-              <Plus className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Nuevo Mantenimiento</span>
+            <Button onClick={() => setShowNew(true)} size='sm'>
+              <Plus className='h-4 w-4 sm:mr-2' />
+              <span className='hidden sm:inline'>Nuevo Mantenimiento</span>
             </Button>
           ) : (
-            <Button onClick={() => setShowNew(true)} variant="outline" size="sm">
-              <Plus className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Solicitar Mantenimiento</span>
+            <Button onClick={() => setShowNew(true)} variant='outline' size='sm'>
+              <Plus className='h-4 w-4 sm:mr-2' />
+              <span className='hidden sm:inline'>Solicitar Mantenimiento</span>
             </Button>
           )}
         </div>
       }
     >
-      <div className="space-y-4">
+      <div className='space-y-4'>
         {/* Tabs para gestores/admins/técnicos */}
         {isManager && (
-          <div className="flex gap-1 p-1 bg-muted rounded-lg w-fit">
+          <div className='flex gap-1 p-1 bg-muted rounded-lg w-fit'>
             <button
               onClick={() => setActiveTab('family')}
               className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                activeTab === 'family' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+                activeTab === 'family'
+                  ? 'bg-background shadow-sm text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               De mis familias
@@ -183,7 +244,9 @@ export default function MaintenanceListPage() {
             <button
               onClick={() => setActiveTab('mine')}
               className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                activeTab === 'mine' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+                activeTab === 'mine'
+                  ? 'bg-background shadow-sm text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               Mis equipos
@@ -192,10 +255,14 @@ export default function MaintenanceListPage() {
         )}
         {/* Banner de acciones pendientes */}
         {pendingAction > 0 && (
-          <div className={`rounded-lg px-4 py-3 flex items-center gap-3 text-sm ${
-            isClient ? 'bg-yellow-50 border border-yellow-200 text-yellow-800' : 'bg-blue-50 border border-blue-200 text-blue-800'
-          }`}>
-            <Clock className="h-4 w-4 shrink-0" />
+          <div
+            className={`rounded-lg px-4 py-3 flex items-center gap-3 text-sm ${
+              isClient
+                ? 'bg-yellow-50 border border-yellow-200 text-yellow-800'
+                : 'bg-blue-50 border border-blue-200 text-blue-800'
+            }`}
+          >
+            <Clock className='h-4 w-4 shrink-0' />
             {isClient
               ? `Tienes ${pendingAction} mantenimiento${pendingAction > 1 ? 's' : ''} programado${pendingAction > 1 ? 's' : ''} esperando tu confirmación.`
               : `Hay ${pendingAction} solicitud${pendingAction > 1 ? 'es' : ''} de mantenimiento pendiente${pendingAction > 1 ? 's' : ''} de aprobación.`}
@@ -203,14 +270,14 @@ export default function MaintenanceListPage() {
         )}
 
         {/* Filtros */}
-        <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <div className='flex flex-col sm:flex-row gap-3 flex-wrap'>
+          <div className='relative flex-1 min-w-[200px]'>
+            <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
             <Input
-              placeholder="Buscar por equipo, técnico, descripción..."
+              placeholder='Buscar por equipo, técnico, descripción...'
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="pl-9"
+              className='pl-9'
             />
           </div>
           {!isClientOnly && (
@@ -219,32 +286,32 @@ export default function MaintenanceListPage() {
               value={familyFilter}
               onValueChange={v => setFamilyFilter(v || 'all')}
               allowNull
-              nullLabel="Todas las áreas"
-              popoverWidth="220px"
+              nullLabel='Todas las áreas'
+              popoverWidth='220px'
             />
           )}
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-44">
-              <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
-              <SelectValue placeholder="Estado" />
+            <SelectTrigger className='w-full sm:w-44'>
+              <Filter className='h-4 w-4 mr-2 text-muted-foreground' />
+              <SelectValue placeholder='Estado' />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ALL">Todos los estados</SelectItem>
-              <SelectItem value="REQUESTED">Solicitado</SelectItem>
-              <SelectItem value="SCHEDULED">Programado</SelectItem>
-              <SelectItem value="ACCEPTED">Aceptado</SelectItem>
-              <SelectItem value="COMPLETED">Completado</SelectItem>
-              <SelectItem value="CANCELLED">Cancelado</SelectItem>
+              <SelectItem value='ALL'>Todos los estados</SelectItem>
+              <SelectItem value='REQUESTED'>Solicitado</SelectItem>
+              <SelectItem value='SCHEDULED'>Programado</SelectItem>
+              <SelectItem value='ACCEPTED'>Aceptado</SelectItem>
+              <SelectItem value='COMPLETED'>Completado</SelectItem>
+              <SelectItem value='CANCELLED'>Cancelado</SelectItem>
             </SelectContent>
           </Select>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-full sm:w-44">
-              <SelectValue placeholder="Tipo" />
+            <SelectTrigger className='w-full sm:w-44'>
+              <SelectValue placeholder='Tipo' />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ALL">Todos los tipos</SelectItem>
-              <SelectItem value="PREVENTIVE">Preventivo</SelectItem>
-              <SelectItem value="CORRECTIVE">Correctivo</SelectItem>
+              <SelectItem value='ALL'>Todos los tipos</SelectItem>
+              <SelectItem value='PREVENTIVE'>Preventivo</SelectItem>
+              <SelectItem value='CORRECTIVE'>Correctivo</SelectItem>
             </SelectContent>
           </Select>
           <ExportButton
@@ -252,7 +319,7 @@ export default function MaintenanceListPage() {
             onExportExcel={exportExcel}
             onExportPDF={exportPDF}
             loading={exporting}
-            size="sm"
+            size='sm'
           />
         </div>
 
@@ -263,14 +330,21 @@ export default function MaintenanceListPage() {
           </p>
           <div className='flex items-center gap-1 text-xs text-muted-foreground'>
             <span className='hidden sm:inline'>Ordenar por:</span>
-            {([
+            {[
               { key: 'date' as const, label: 'Fecha' },
               { key: 'status' as const, label: 'Estado' },
               { key: 'type' as const, label: 'Tipo' },
-            ]).map(opt => (
-              <button key={opt.key} type='button' onClick={() => toggleSort(opt.key)}
-                className={`px-2 py-1 rounded transition-colors ${sortField === opt.key ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted'}`}>
-                {opt.label}{sortField === opt.key && <span className='ml-1'>{sortDir === 'asc' ? '↑' : '↓'}</span>}
+            ].map(opt => (
+              <button
+                key={opt.key}
+                type='button'
+                onClick={() => toggleSort(opt.key)}
+                className={`px-2 py-1 rounded transition-colors ${sortField === opt.key ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted'}`}
+              >
+                {opt.label}
+                {sortField === opt.key && (
+                  <span className='ml-1'>{sortDir === 'asc' ? '↑' : '↓'}</span>
+                )}
               </button>
             ))}
           </div>
@@ -278,13 +352,13 @@ export default function MaintenanceListPage() {
 
         {/* Lista */}
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <div className='flex items-center justify-center py-20'>
+            <Loader2 className='h-8 w-8 animate-spin text-muted-foreground' />
           </div>
         ) : sortedFiltered.length === 0 ? (
-          <div className="text-center py-20 space-y-2">
-            <Wrench className="h-10 w-10 text-muted-foreground mx-auto" />
-            <p className="text-muted-foreground">
+          <div className='text-center py-20 space-y-2'>
+            <Wrench className='h-10 w-10 text-muted-foreground mx-auto' />
+            <p className='text-muted-foreground'>
               {search || statusFilter !== 'ALL' || typeFilter !== 'ALL'
                 ? 'No hay mantenimientos que coincidan con los filtros.'
                 : isClient
@@ -293,7 +367,7 @@ export default function MaintenanceListPage() {
             </p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className='space-y-2'>
             {sortedFiltered.map(record => {
               const statusCfg = STATUS_CONFIG[record.status] || STATUS_CONFIG.SCHEDULED
               const needsAction =
@@ -306,49 +380,57 @@ export default function MaintenanceListPage() {
                   className={`cursor-pointer hover:shadow-md transition-shadow ${needsAction ? 'ring-2 ring-primary/30' : ''}`}
                   onClick={() => router.push(`/inventory/maintenance/${record.id}`)}
                 >
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-3 flex-wrap">
-                      <div className="flex items-start gap-3 min-w-0">
-                        <div className={`p-2 rounded-lg shrink-0 ${record.type === 'CORRECTIVE' ? 'bg-red-50' : 'bg-blue-50'}`}>
-                          <Wrench className={`h-4 w-4 ${record.type === 'CORRECTIVE' ? 'text-red-600' : 'text-blue-600'}`} />
+                  <CardContent className='p-4'>
+                    <div className='flex items-start justify-between gap-3 flex-wrap'>
+                      <div className='flex items-start gap-3 min-w-0'>
+                        <div
+                          className={`p-2 rounded-lg shrink-0 ${record.type === 'CORRECTIVE' ? 'bg-red-50' : 'bg-blue-50'}`}
+                        >
+                          <Wrench
+                            className={`h-4 w-4 ${record.type === 'CORRECTIVE' ? 'text-red-600' : 'text-blue-600'}`}
+                          />
                         </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-semibold text-sm">{record.equipment.code}</span>
-                            <span className="text-muted-foreground text-sm">
+                        <div className='min-w-0'>
+                          <div className='flex items-center gap-2 flex-wrap'>
+                            <span className='font-semibold text-sm'>{record.equipment.code}</span>
+                            <span className='text-muted-foreground text-sm'>
                               {record.equipment.brand} {record.equipment.model}
                             </span>
                             {needsAction && (
-                              <Badge className="bg-primary/10 text-primary text-xs">
+                              <Badge className='bg-primary/10 text-primary text-xs'>
                                 {isClient ? 'Requiere tu confirmación' : 'Pendiente de aprobación'}
                               </Badge>
                             )}
                           </div>
-                          <p className="text-sm text-muted-foreground mt-0.5 truncate max-w-md">
+                          <p className='text-sm text-muted-foreground mt-0.5 truncate max-w-md'>
                             {record.description}
                           </p>
-                          <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground flex-wrap">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              {new Date(record.date).toLocaleDateString('es-EC', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          <div className='flex items-center gap-3 mt-1.5 text-xs text-muted-foreground flex-wrap'>
+                            <span className='flex items-center gap-1'>
+                              <Calendar className='h-3 w-3' />
+                              {new Date(record.date).toLocaleDateString('es-EC', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric',
+                              })}
                             </span>
                             {record.technician && (
-                              <span className="flex items-center gap-1">
-                                <Wrench className="h-3 w-3" />
+                              <span className='flex items-center gap-1'>
+                                <Wrench className='h-3 w-3' />
                                 {record.technician.name}
                               </span>
                             )}
                             {record.requestedBy && (
-                              <span className="flex items-center gap-1">
-                                <Package className="h-3 w-3" />
+                              <span className='flex items-center gap-1'>
+                                <Package className='h-3 w-3' />
                                 Solicitado por {record.requestedBy.name}
                               </span>
                             )}
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Badge variant="outline" className="text-xs">
+                      <div className='flex items-center gap-2 shrink-0'>
+                        <Badge variant='outline' className='text-xs'>
                           {TYPE_LABELS[record.type] || record.type}
                         </Badge>
                         <Badge className={`${statusCfg.color} flex items-center gap-1 text-xs`}>
@@ -369,7 +451,10 @@ export default function MaintenanceListPage() {
         <NewMaintenanceDialog
           open={showNew}
           onClose={() => setShowNew(false)}
-          onCreated={() => { setShowNew(false); fetchRecords() }}
+          onCreated={() => {
+            setShowNew(false)
+            fetchRecords()
+          }}
           isClient={isClient}
         />
       )}
