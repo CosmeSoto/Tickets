@@ -140,7 +140,7 @@ export class ReportService {
       ])
 
       // Calcular SLA compliance
-      const withSLA = slaData.filter((t) => t.ticket_sla_metrics || t.slaDeadline)
+      const withSLA = slaData.filter(t => t.ticket_sla_metrics || t.slaDeadline)
       const now = new Date()
       let compliant = 0
       for (const t of withSLA) {
@@ -186,34 +186,51 @@ export class ReportService {
     familyId: string | 'all',
     dateRange?: DateRange
   ): Promise<TechnicianPerformance[]> {
-    // Obtener técnicos según familia
-    const technicianWhere: Record<string, unknown> = { role: 'TECHNICIAN', isActive: true }
+    // Obtener técnicos Y admins que pueden resolver tickets
+    const resolverWhere: Record<string, unknown> = {
+      role: { in: ['TECHNICIAN', 'ADMIN'] },
+      isActive: true,
+    }
     if (familyId !== 'all') {
-      technicianWhere.technicianFamilyAssignments = {
-        some: { familyId, isActive: true },
-      }
+      // Para técnicos: asignados a la familia
+      // Para admins: cualquier admin activo (pueden resolver en cualquier familia)
+      resolverWhere.OR = [
+        {
+          role: 'TECHNICIAN',
+          technicianFamilyAssignments: { some: { familyId, isActive: true } },
+        },
+        { role: 'ADMIN' },
+      ]
+      delete resolverWhere.role
     }
 
-    const technicians = await prisma.users.findMany({
-      where: technicianWhere,
-      select: { id: true, name: true, email: true },
+    const resolvers = await prisma.users.findMany({
+      where: resolverWhere,
+      select: { id: true, name: true, email: true, role: true },
       orderBy: { name: 'asc' },
     })
 
     const results: TechnicianPerformance[] = []
 
-    for (const tech of technicians) {
-      const where = { ...buildTicketWhere(familyId, dateRange), assigneeId: tech.id }
+    for (const resolver of resolvers) {
+      const where = { ...buildTicketWhere(familyId, dateRange), assigneeId: resolver.id }
 
-      const [assigned, resolved, avgMinutes, ratings] = await Promise.all([
+      const [assigned, resolvedCount, closedCount, avgMinutes, ratings] = await Promise.all([
         prisma.tickets.count({ where }),
+        // Contar RESOLVED + CLOSED como resueltos
         prisma.tickets.count({ where: { ...where, status: 'RESOLVED' } }),
+        prisma.tickets.count({ where: { ...where, status: 'CLOSED' } }),
         calcAvgResolutionMinutes(where),
         prisma.ticket_ratings.findMany({
-          where: { technicianId: tech.id },
+          where: { technicianId: resolver.id },
           select: { rating: true },
         }),
       ])
+
+      const resolved = resolvedCount + closedCount
+
+      // Solo incluir si tiene al menos un ticket asignado
+      if (assigned === 0) continue
 
       const avgRating =
         ratings.length > 0
@@ -221,9 +238,9 @@ export class ReportService {
           : null
 
       results.push({
-        technicianId: tech.id,
-        technicianName: tech.name,
-        technicianEmail: tech.email,
+        technicianId: resolver.id,
+        technicianName: resolver.name,
+        technicianEmail: resolver.email,
         assignedTickets: assigned,
         resolvedTickets: resolved,
         avgResolutionTimeMinutes: avgMinutes,
@@ -246,11 +263,13 @@ export class ReportService {
   ): Promise<TemporalTrendPoint[]> {
     // Rango: usar el provisto o últimos 90 días por defecto
     const endDate = dateRange?.endDate ?? new Date()
-    const startDate = dateRange?.startDate ?? (() => {
-      const d = new Date(endDate)
-      d.setDate(d.getDate() - 90)
-      return d
-    })()
+    const startDate =
+      dateRange?.startDate ??
+      (() => {
+        const d = new Date(endDate)
+        d.setDate(d.getDate() - 90)
+        return d
+      })()
 
     const where = buildTicketWhere(familyId, { startDate, endDate })
 
@@ -358,7 +377,7 @@ export class ReportService {
 
       for (const priority of priorities) {
         const group = byPriority.get(priority) ?? []
-        const withSLA = group.filter((t) => t.ticket_sla_metrics || t.slaDeadline)
+        const withSLA = group.filter(t => t.ticket_sla_metrics || t.slaDeadline)
         let compliant = 0
         let breached = 0
 
@@ -399,10 +418,7 @@ export class ReportService {
    * Reporte de satisfacción del cliente.
    * Retorna calificaciones promedio, distribución de estrellas y tendencia.
    */
-  static async getSatisfactionReport(
-    familyId: string | 'all',
-    dateRange?: DateRange
-  ) {
+  static async getSatisfactionReport(familyId: string | 'all', dateRange?: DateRange) {
     const ticketWhere = buildTicketWhere(familyId, dateRange)
 
     // Obtener todas las calificaciones del período
@@ -431,7 +447,12 @@ export class ReportService {
         totalRatings: 0,
         avgRating: null,
         distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
-        categoryAverages: { responseTime: null, technicalSkill: null, communication: null, problemResolution: null },
+        categoryAverages: {
+          responseTime: null,
+          technicalSkill: null,
+          communication: null,
+          problemResolution: null,
+        },
         satisfactionRate: null,
         byFamily: [],
       }
@@ -440,21 +461,32 @@ export class ReportService {
     const distribution: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
     for (const r of ratings) distribution[r.rating] = (distribution[r.rating] ?? 0) + 1
 
-    const avgRating = Math.round(ratings.reduce((s, r) => s + r.rating, 0) / ratings.length * 10) / 10
-    const satisfactionRate = Math.round(ratings.filter(r => r.rating >= 4).length / ratings.length * 1000) / 10
+    const avgRating =
+      Math.round((ratings.reduce((s, r) => s + r.rating, 0) / ratings.length) * 10) / 10
+    const satisfactionRate =
+      Math.round((ratings.filter(r => r.rating >= 4).length / ratings.length) * 1000) / 10
 
     const categoryAverages = {
-      responseTime: Math.round(ratings.reduce((s, r) => s + r.responseTime, 0) / ratings.length * 10) / 10,
-      technicalSkill: Math.round(ratings.reduce((s, r) => s + r.technicalSkill, 0) / ratings.length * 10) / 10,
-      communication: Math.round(ratings.reduce((s, r) => s + r.communication, 0) / ratings.length * 10) / 10,
-      problemResolution: Math.round(ratings.reduce((s, r) => s + r.problemResolution, 0) / ratings.length * 10) / 10,
+      responseTime:
+        Math.round((ratings.reduce((s, r) => s + r.responseTime, 0) / ratings.length) * 10) / 10,
+      technicalSkill:
+        Math.round((ratings.reduce((s, r) => s + r.technicalSkill, 0) / ratings.length) * 10) / 10,
+      communication:
+        Math.round((ratings.reduce((s, r) => s + r.communication, 0) / ratings.length) * 10) / 10,
+      problemResolution:
+        Math.round((ratings.reduce((s, r) => s + r.problemResolution, 0) / ratings.length) * 10) /
+        10,
     }
 
-    const familyMap = new Map<string, { name: string; code: string; color: string | null; ratings: number[] }>()
+    const familyMap = new Map<
+      string,
+      { name: string; code: string; color: string | null; ratings: number[] }
+    >()
     for (const r of ratings) {
       const fam = r.tickets?.family
       if (!fam) continue
-      if (!familyMap.has(fam.id)) familyMap.set(fam.id, { name: fam.name, code: fam.code, color: fam.color, ratings: [] })
+      if (!familyMap.has(fam.id))
+        familyMap.set(fam.id, { name: fam.name, code: fam.code, color: fam.color, ratings: [] })
       familyMap.get(fam.id)!.ratings.push(r.rating)
     }
     const byFamily = Array.from(familyMap.entries()).map(([id, f]) => ({
@@ -463,10 +495,18 @@ export class ReportService {
       familyCode: f.code,
       familyColor: f.color,
       totalRatings: f.ratings.length,
-      avgRating: Math.round(f.ratings.reduce((s, r) => s + r, 0) / f.ratings.length * 10) / 10,
-      satisfactionRate: Math.round(f.ratings.filter(r => r >= 4).length / f.ratings.length * 1000) / 10,
+      avgRating: Math.round((f.ratings.reduce((s, r) => s + r, 0) / f.ratings.length) * 10) / 10,
+      satisfactionRate:
+        Math.round((f.ratings.filter(r => r >= 4).length / f.ratings.length) * 1000) / 10,
     }))
 
-    return { totalRatings: ratings.length, avgRating, distribution, categoryAverages, satisfactionRate, byFamily }
+    return {
+      totalRatings: ratings.length,
+      avgRating,
+      distribution,
+      categoryAverages,
+      satisfactionRate,
+      byFamily,
+    }
   }
 }

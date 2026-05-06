@@ -50,14 +50,17 @@ function formatPeriod(period: string, granularity: Granularity): string {
   try {
     if (granularity === 'day') {
       const d = new Date(period + 'T12:00:00')
+      if (isNaN(d.getTime())) return period
       return d.toLocaleDateString('es-EC', { day: '2-digit', month: 'short' })
     }
     if (granularity === 'week') {
       return period.replace('-W', ' Sem ')
     }
     if (granularity === 'month') {
-      const [year, month] = period.split('-')
-      const d = new Date(Number(year), Number(month) - 1, 1)
+      const parts = period.split('-')
+      if (parts.length < 2) return period
+      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, 1)
+      if (isNaN(d.getTime())) return period
       return d.toLocaleDateString('es-EC', { month: 'short', year: 'numeric' })
     }
   } catch {
@@ -394,7 +397,7 @@ export function TrendsTab({
                         : null
                     return (
                       <tr
-                        key={row.period}
+                        key={row.rawPeriod}
                         className='border-b last:border-0 hover:bg-muted/30 transition-colors'
                       >
                         <td className='px-4 py-2.5 font-mono text-sm text-foreground'>
