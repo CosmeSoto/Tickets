@@ -38,6 +38,7 @@ import type { Equipment } from '@/types/inventory/equipment'
 import { EquipmentAttachments } from '@/components/inventory/equipment-attachments'
 import { FileUploadZone } from '@/components/ui/file-upload-zone'
 import { useActiveDepartments } from '@/contexts/departments-context'
+import { AssignableUserSelect } from '@/components/inventory/shared/AssignableUserSelect'
 
 interface EquipmentFormProps {
   equipment?: Equipment
@@ -150,7 +151,7 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
   // Cargar bodegas
   useEffect(() => {
     fetch('/api/inventory/warehouses')
-      .then(r => r.ok ? r.json() : { warehouses: [] })
+      .then(r => (r.ok ? r.json() : { warehouses: [] }))
       .then(d => setWarehouses(d.warehouses ?? d ?? []))
       .catch(() => {})
   }, [])
@@ -158,6 +159,18 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
   const isEditing = !!equipment
   // Determine if the department selector should be disabled (active assignment in edit mode)
   const hasActiveAssignment = isEditing && !!equipment?.currentAssignment
+
+  // Estado de usuario asignado — sincronizado con el estado del equipo
+  const currentStatus = watch('status')
+  const isAssignedStatus = currentStatus === 'ASSIGNED'
+  const [assignedUserId, setAssignedUserId] = useState<string>(
+    (equipment as any)?.currentAssignment?.receiverId || ''
+  )
+  const [assignedUserDept, setAssignedUserDept] = useState<{ id: string; name: string } | null>(
+    (equipment as any)?.currentAssignment?.receiver?.department ?? null
+  )
+  // familyId del equipo para filtrar usuarios asignables
+  const equipmentFamilyId = (equipment as any)?.type?.family?.id as string | undefined
 
   // Cargar tipos de equipo desde la API
   useEffect(() => {
@@ -256,6 +269,14 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
     }
   }, [selectedTypeId, selectedTypeFamilyId, selectedDepartmentId, departments, setValue])
 
+  // Limpiar usuario asignado cuando el estado cambia de ASSIGNED
+  useEffect(() => {
+    if (!isAssignedStatus) {
+      setAssignedUserId('')
+      setAssignedUserDept(null)
+    }
+  }, [isAssignedStatus])
+
   const onSubmit = async (data: CreateEquipmentInput) => {
     try {
       setLoading(true)
@@ -270,6 +291,8 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
         ...(usefulLifeYears ? { usefulLifeYears: parseFloat(usefulLifeYears) } : {}),
         ...(residualValue !== '' ? { residualValue: parseFloat(residualValue) } : {}),
         ...(depreciationMethod ? { depreciationMethod } : {}),
+        // Usuario asignado — solo cuando el estado es ASSIGNED
+        ...(isAssignedStatus && assignedUserId ? { assignedUserId } : {}),
       }
 
       const url = isEditing
@@ -456,12 +479,21 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
               {errors.typeId && <p className='text-sm text-destructive'>{errors.typeId.message}</p>}
             </div>
 
-            {/* Selector de Departamento */}
+            {/* Selector de Departamento — oculto cuando está ASSIGNED (se deriva del usuario) */}
             <div className='space-y-2'>
               <Label htmlFor='department'>
                 Departamento <span className='text-destructive'>*</span>
               </Label>
-              {loadingDepartments ? (
+              {isAssignedStatus ? (
+                /* Cuando está asignado, el departamento viene del usuario — solo lectura */
+                <div className='flex h-10 items-center rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground'>
+                  {assignedUserDept ? (
+                    assignedUserDept.name
+                  ) : (
+                    <span className='italic'>Se completará al seleccionar el usuario</span>
+                  )}
+                </div>
+              ) : loadingDepartments ? (
                 <div className='flex items-center justify-center h-10 border rounded-md'>
                   <Loader2 className='h-4 w-4 animate-spin text-muted-foreground' />
                 </div>
@@ -586,6 +618,23 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
               </div>
             )}
 
+            {/* Usuario asignado — visible solo cuando estado = ASSIGNED */}
+            {isAssignedStatus && (
+              <div className='col-span-2'>
+                <div className='rounded-lg border border-primary/30 bg-primary/5 p-4'>
+                  <AssignableUserSelect
+                    familyId={equipmentFamilyId}
+                    value={assignedUserId}
+                    onChange={(userId, user) => {
+                      setAssignedUserId(userId)
+                      setAssignedUserDept(user?.department ?? null)
+                    }}
+                    required
+                  />
+                </div>
+              </div>
+            )}
+
             <div className='space-y-2'>
               <Label htmlFor='ownershipType'>
                 Tipo de Propiedad <span className='text-destructive'>*</span>
@@ -612,7 +661,11 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
 
             <div className='space-y-2'>
               <Label htmlFor='location'>Ubicación adicional</Label>
-              <Input id='location' {...register('location')} placeholder='Ej: Piso 2, Oficina 201' />
+              <Input
+                id='location'
+                {...register('location')}
+                placeholder='Ej: Piso 2, Oficina 201'
+              />
             </div>
 
             <div className='space-y-2'>
@@ -625,28 +678,31 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
               />
             </div>
 
-            <div className='space-y-2'>
-              <Label htmlFor='warehouse'>Bodega</Label>
-              <Select
-                value={selectedWarehouseId || '__none__'}
-                onValueChange={v => setSelectedWarehouseId(v === '__none__' ? '' : v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder='Selecciona una bodega (opcional)' />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value='__none__'>Sin bodega asignada</SelectItem>
-                  {warehouses.map(w => (
-                    <SelectItem key={w.id} value={w.id}>
-                      <span className='flex items-center gap-2'>
-                        <Warehouse className='h-3 w-3' />
-                        {w.name}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Bodega — oculta cuando el equipo está asignado (ya no está en bodega) */}
+            {!isAssignedStatus && (
+              <div className='space-y-2'>
+                <Label htmlFor='warehouse'>Bodega</Label>
+                <Select
+                  value={selectedWarehouseId || '__none__'}
+                  onValueChange={v => setSelectedWarehouseId(v === '__none__' ? '' : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder='Selecciona una bodega (opcional)' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='__none__'>Sin bodega asignada</SelectItem>
+                    {warehouses.map(w => (
+                      <SelectItem key={w.id} value={w.id}>
+                        <span className='flex items-center gap-2'>
+                          <Warehouse className='h-3 w-3' />
+                          {w.name}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

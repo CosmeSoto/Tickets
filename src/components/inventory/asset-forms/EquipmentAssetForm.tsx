@@ -13,6 +13,7 @@ import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
 import { EquipmentTypeInlineForm } from '@/components/inventory/asset-forms/EquipmentTypeInlineForm'
 import { WarehouseInlineForm } from '@/components/inventory/asset-forms/WarehouseInlineForm'
 import { FileInputWithCamera } from '@/components/common/file-input-with-camera'
+import { AssignableUserSelect } from '@/components/inventory/shared/AssignableUserSelect'
 import type { FamilyConfig } from '@/lib/inventory/family-config-types'
 import { resolveSectionsForMode } from '@/lib/inventory/family-config-types'
 import {
@@ -23,7 +24,18 @@ import {
   type DepreciationMethod,
 } from '@/lib/inventory/depreciation'
 import { useActiveDepartments } from '@/contexts/departments-context'
-import { X, Plus, ChevronDown, ChevronUp, AlertCircle, Upload, Camera, Eye, FileText, Image as ImageIcon } from 'lucide-react'
+import {
+  X,
+  Plus,
+  ChevronDown,
+  ChevronUp,
+  AlertCircle,
+  Upload,
+  Camera,
+  Eye,
+  FileText,
+  Image as ImageIcon,
+} from 'lucide-react'
 
 interface EquipmentAssetFormProps {
   familyId: string
@@ -148,7 +160,13 @@ function AttachmentsField({
             {({ openFile, openCamera, showCamera }) => (
               <div className='flex items-center gap-1.5'>
                 {showCamera && (
-                  <Button type='button' size='sm' variant='outline' onClick={openCamera} title='Tomar foto'>
+                  <Button
+                    type='button'
+                    size='sm'
+                    variant='outline'
+                    onClick={openCamera}
+                    title='Tomar foto'
+                  >
                     <Camera className='h-4 w-4 mr-1.5' />
                     Foto
                   </Button>
@@ -179,10 +197,12 @@ function AttachmentsField({
                     size='sm'
                     variant='ghost'
                     className='text-xs'
-                    onClick={e => { e.stopPropagation(); openCamera() }}
+                    onClick={e => {
+                      e.stopPropagation()
+                      openCamera()
+                    }}
                   >
-                    <Camera className='h-3.5 w-3.5 mr-1' />
-                    O toma una foto con la cámara
+                    <Camera className='h-3.5 w-3.5 mr-1' />O toma una foto con la cámara
                   </Button>
                 )}
                 <p className='text-xs'>Máx. {maxFileSizeMB} MB por archivo</p>
@@ -202,7 +222,10 @@ function AttachmentsField({
                   {images.map((f, i) => {
                     const url = URL.createObjectURL(f)
                     return (
-                      <div key={i} className='group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted'>
+                      <div
+                        key={i}
+                        className='group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted'
+                      >
                         <img
                           src={url}
                           alt={f.name}
@@ -248,10 +271,15 @@ function AttachmentsField({
                 )}
                 <ul className='space-y-1'>
                   {docs.map((f, i) => (
-                    <li key={i} className='flex items-center gap-2 rounded-md border border-border bg-card px-2.5 py-1.5 text-sm'>
+                    <li
+                      key={i}
+                      className='flex items-center gap-2 rounded-md border border-border bg-card px-2.5 py-1.5 text-sm'
+                    >
                       <FileText className='h-3.5 w-3.5 shrink-0 text-muted-foreground' />
                       <span className='flex-1 truncate'>{f.name}</span>
-                      <span className='text-xs text-muted-foreground shrink-0'>{formatFileSize(f.size)}</span>
+                      <span className='text-xs text-muted-foreground shrink-0'>
+                        {formatFileSize(f.size)}
+                      </span>
                       <button
                         type='button'
                         onClick={() => remove(files.indexOf(f))}
@@ -792,42 +820,18 @@ export function EquipmentAssetForm({
         </div>
       )}
 
-      {/* Asignar a usuario — el usuario es el campo principal; el departamento se deriva de él */}
+      {/* Asignar a usuario — usa el componente compartido con departamento auto-rellenado */}
       {equipmentStatus === 'ASSIGNED' && (
-        <div className='rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3'>
-          <div className='space-y-1'>
-            <Label>
-              Asignar a <span className='text-destructive'>*</span>
-            </Label>
-            <SearchableSelect
-              options={assignableUsers}
-              value={assignedUserId}
-              onChange={handleAssignedUserChange}
-              placeholder={
-                loadingAssignableUsers ? 'Cargando usuarios...' : 'Buscar usuario por nombre...'
-              }
-              disabled={loadingAssignableUsers}
-            />
-            {!loadingAssignableUsers && assignableUsers.length === 0 && (
-              <p className='text-xs text-amber-600 dark:text-amber-400'>
-                No se encontraron usuarios disponibles para esta familia.
-              </p>
-            )}
-          </div>
-
-          {/* Departamento auto-completado desde el usuario — solo informativo */}
-          <div className='space-y-1'>
-            <Label className='text-muted-foreground text-xs'>
-              Departamento (del usuario asignado)
-            </Label>
-            <div className='h-9 rounded-md border border-input bg-muted/40 flex items-center px-3 text-sm text-muted-foreground'>
-              {assignedUserDept ? (
-                assignedUserDept.name
-              ) : (
-                <span className='italic'>Se completará al seleccionar un usuario</span>
-              )}
-            </div>
-          </div>
+        <div className='rounded-lg border border-primary/30 bg-primary/5 p-4'>
+          <AssignableUserSelect
+            familyId={familyId}
+            value={assignedUserId}
+            onChange={(userId, user) => {
+              setAssignedUserId(userId)
+              setAssignedUserDept(user?.department ?? null)
+            }}
+            required
+          />
         </div>
       )}
 
