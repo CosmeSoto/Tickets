@@ -160,9 +160,6 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
   // Determine if the department selector should be disabled (active assignment in edit mode)
   const hasActiveAssignment = isEditing && !!equipment?.currentAssignment
 
-  // familyId del equipo para filtrar usuarios asignables
-  const equipmentFamilyId = (equipment as any)?.type?.family?.id as string | undefined
-
   // Cargar tipos de equipo desde la API
   useEffect(() => {
     async function fetchEquipmentTypes() {
@@ -252,6 +249,8 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
   const [assignedUserDept, setAssignedUserDept] = useState<{ id: string; name: string } | null>(
     (equipment as any)?.currentAssignment?.receiver?.department ?? null
   )
+  // familyId del equipo para filtrar usuarios asignables
+  const equipmentFamilyId = (equipment as any)?.type?.family?.id as string | undefined
 
   // Derive the familyId of the selected equipment type
   const selectedTypeFamilyId = equipmentTypes.find(t => t.id === selectedTypeId)?.family?.id ?? null

@@ -327,9 +327,24 @@ export function TicketTable({
                 <TableHead className={sortableHeaderClass} onClick={() => toggleSort('priority')}>
                   Prioridad {SortIcon('priority', sortKey, sortDir)}
                 </TableHead>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Asignado</TableHead>
-                <TableHead>Categoría</TableHead>
+                <TableHead
+                  className={sortableHeaderClass}
+                  onClick={() => toggleSort('client.name' as any)}
+                >
+                  Cliente {SortIcon('client.name', sortKey, sortDir)}
+                </TableHead>
+                <TableHead
+                  className={sortableHeaderClass}
+                  onClick={() => toggleSort('assignee.name' as any)}
+                >
+                  Asignado {SortIcon('assignee.name', sortKey, sortDir)}
+                </TableHead>
+                <TableHead
+                  className={sortableHeaderClass}
+                  onClick={() => toggleSort('category.name' as any)}
+                >
+                  Categoría {SortIcon('category.name', sortKey, sortDir)}
+                </TableHead>
                 <TableHead className={sortableHeaderClass} onClick={() => toggleSort('createdAt')}>
                   Creado {SortIcon('createdAt', sortKey, sortDir)}
                 </TableHead>
