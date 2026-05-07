@@ -3,17 +3,24 @@
  *
  * Consulta la cantidad de equipos disponibles de un tipo específico
  * Usado para validación de disponibilidad en solicitudes de activos
+ *
+ * Optimización: Caché Redis con TTL 30s para reducir carga en DB
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import { createModuleCache } from '@/lib/api-cache'
+
+// Cache con TTL 30s - balance entre frescura y rendimiento
+const cache = createModuleCache('equipment-stock-available', 30)
 
 /**
  * GET /api/inventory/equipment/stock/available?typeId={typeId}
  *
  * Retorna la cantidad de equipos disponibles de un tipo específico
+ * Implementa caché para consultas frecuentes durante creación de solicitudes
  */
 export async function GET(request: NextRequest) {
   try {
@@ -38,15 +45,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'typeId es requerido' }, { status: 400 })
     }
 
-    // Contar equipos disponibles del tipo especificado
-    const available = await prisma.equipment.count({
-      where: {
-        typeId,
-        status: 'AVAILABLE',
-      },
-    })
+    // Usar caché para reducir consultas repetidas
+    return cache.get({ key: `available:${typeId}` }, async () => {
+      // Contar equipos disponibles del tipo especificado
+      const available = await prisma.equipment.count({
+        where: {
+          typeId,
+          status: 'AVAILABLE',
+        },
+      })
 
-    return NextResponse.json({ available })
+      return NextResponse.json({ available })
+    })
   } catch (error) {
     console.error('[API] Error fetching available stock:', error)
     return NextResponse.json({ error: 'Error al consultar stock disponible' }, { status: 500 })
