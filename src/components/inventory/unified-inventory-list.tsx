@@ -14,7 +14,8 @@ import { useTableSort, SortIcon, sortableHeaderClass } from '@/hooks/common/use-
 import { Search } from 'lucide-react'
 import type { AssetSubtype } from '@/lib/inventory/family-config'
 import { useFamilyOptions } from '@/hooks/use-family-options'
-
+import { MetricsSection } from '@/components/inventory/dashboard/metrics-section'
+import { AlertsSection } from '@/components/inventory/dashboard/alerts-section'
 
 interface UnifiedAsset {
   id: string
@@ -38,6 +39,7 @@ interface UnifiedAssetsResponse {
 interface UnifiedInventoryListProps {
   initialFamilyId?: string
   personalOnly?: boolean // true = solo equipos asignados al usuario actual
+  showDashboard?: boolean // true = mostrar métricas y alertas
 }
 
 const PAGE_SIZE = 20
@@ -72,6 +74,7 @@ function formatDate(iso: string) {
 export function UnifiedInventoryList({
   initialFamilyId,
   personalOnly = false,
+  showDashboard = false,
 }: UnifiedInventoryListProps) {
   const router = useRouter()
   const { status } = useSession()
@@ -107,11 +110,12 @@ export function UnifiedInventoryList({
     () => assets.map(a => ({ ...a, familyName: a.family?.name ?? '' })),
     [assets]
   )
-  const { sorted: sortedAssets, sortKey, sortDir, toggleSort } = useTableSort(
-    assetsWithFamilyName,
-    'createdAt',
-    'desc'
-  )
+  const {
+    sorted: sortedAssets,
+    sortKey,
+    sortDir,
+    toggleSort,
+  } = useTableSort(assetsWithFamilyName, 'createdAt', 'desc')
 
   // Debounce búsqueda
   useEffect(() => {
@@ -175,7 +179,13 @@ export function UnifiedInventoryList({
         key: 'subtype',
         label: 'Tipo',
         format: (v: string) =>
-          ({ EQUIPMENT: 'Equipo', MRO: 'Material / Consumible', LICENSE: 'Licencia y Contrato' } as Record<string, string>)[v] ?? v,
+          (
+            ({
+              EQUIPMENT: 'Equipo',
+              MRO: 'Material / Consumible',
+              LICENSE: 'Licencia y Contrato',
+            }) as Record<string, string>
+          )[v] ?? v,
       },
       { key: 'family', label: 'Área', format: (v: any) => v?.name ?? '' },
       { key: 'name', label: 'Nombre' },
@@ -191,6 +201,20 @@ export function UnifiedInventoryList({
 
   return (
     <div className='space-y-4'>
+      {/* Dashboard: Métricas y Alertas */}
+      {showDashboard && (
+        <div className='space-y-6 mb-6'>
+          <div>
+            <h2 className='text-lg font-semibold mb-4'>Métricas Clave</h2>
+            <MetricsSection />
+          </div>
+          <div>
+            <h2 className='text-lg font-semibold mb-4'>Alertas</h2>
+            <AlertsSection />
+          </div>
+        </div>
+      )}
+
       {/* Filtros: área + tipo + búsqueda + exportar */}
       <div className='flex flex-col sm:flex-row gap-2 flex-wrap'>
         {/* Área (familia) — combobox con buscador, solo en modo inventario de familias */}

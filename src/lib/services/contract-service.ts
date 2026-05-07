@@ -32,11 +32,23 @@ export function computeContractStatus(endDate?: Date | null): {
 const CONTRACT_INCLUDE = {
   supplier: { select: { id: true, name: true } },
   family: { select: { id: true, name: true, color: true, code: true } },
+  model: { select: { id: true, brand: true, model: true, sku: true } },
+  batch: {
+    select: {
+      id: true,
+      batchCode: true,
+      description: true,
+      quantity: true,
+      purchaseDate: true,
+      unitPrice: true,
+      totalPrice: true,
+    },
+  },
   creator: { select: { id: true, name: true, email: true } },
   lines: {
     orderBy: { order: 'asc' as const },
     include: {
-      equipment: { select: { id: true, code: true, brand: true, model: true } },
+      equipment: { select: { id: true, code: true, brand: true, model_old: true } },
       license: { select: { id: true, name: true } },
     },
   },
@@ -56,6 +68,8 @@ export class ContractService {
     category?: string
     familyId?: string
     supplierId?: string
+    modelId?: string
+    batchId?: string
     userId?: string
     userRole?: string
     isSuperAdmin?: boolean
@@ -68,6 +82,8 @@ export class ContractService {
       category,
       familyId,
       supplierId,
+      modelId,
+      batchId,
       userId,
       userRole,
       isSuperAdmin,
@@ -112,6 +128,8 @@ export class ContractService {
     if (category && category !== 'ALL') where.category = category
     if (familyId) where.familyId = familyId // override explícito
     if (supplierId) where.supplierId = supplierId
+    if (modelId) where.modelId = modelId
+    if (batchId) where.batchId = batchId
 
     const [rawContracts, total] = await Promise.all([
       prisma.contracts.findMany({
@@ -183,6 +201,8 @@ export class ContractService {
     category: string
     supplierId?: string
     familyId?: string
+    modelId?: string
+    batchId?: string
     startDate?: string
     endDate?: string
     autoRenew?: boolean
@@ -220,6 +240,8 @@ export class ContractService {
         status: 'DRAFT',
         supplierId: contractData.supplierId || null,
         familyId: contractData.familyId || null,
+        modelId: contractData.modelId || null,
+        batchId: contractData.batchId || null,
         startDate: contractData.startDate ? new Date(contractData.startDate) : null,
         endDate: contractData.endDate ? new Date(contractData.endDate) : null,
         autoRenew: contractData.autoRenew ?? false,
@@ -265,6 +287,8 @@ export class ContractService {
         name: contract.name,
         category: contract.category,
         status: contract.status,
+        modelId: contract.modelId,
+        batchId: contract.batchId,
       },
     })
 
@@ -282,6 +306,8 @@ export class ContractService {
       category: string
       supplierId: string
       familyId: string
+      modelId: string
+      batchId: string
       startDate: string
       endDate: string
       autoRenew: boolean
@@ -301,7 +327,7 @@ export class ContractService {
   ) {
     const before = await prisma.contracts.findUnique({
       where: { id },
-      select: { name: true, status: true, endDate: true },
+      select: { name: true, status: true, endDate: true, modelId: true, batchId: true },
     })
     if (!before) throw new Error('Contrato no encontrado')
 
@@ -314,6 +340,8 @@ export class ContractService {
         ...(data.category !== undefined && { category: data.category as any }),
         ...(data.supplierId !== undefined && { supplierId: data.supplierId || null }),
         ...(data.familyId !== undefined && { familyId: data.familyId || null }),
+        ...(data.modelId !== undefined && { modelId: data.modelId || null }),
+        ...(data.batchId !== undefined && { batchId: data.batchId || null }),
         ...(data.startDate !== undefined && {
           startDate: data.startDate ? new Date(data.startDate) : null,
         }),
@@ -342,8 +370,18 @@ export class ContractService {
       action: 'contract_updated',
       userId: updatedBy,
       changes: {
-        before: { name: before.name, status: before.status },
-        after: { name: contract.name, status: contract.status },
+        before: {
+          name: before.name,
+          status: before.status,
+          modelId: before.modelId,
+          batchId: before.batchId,
+        },
+        after: {
+          name: contract.name,
+          status: contract.status,
+          modelId: contract.modelId,
+          batchId: contract.batchId,
+        },
       },
     })
 
@@ -483,5 +521,286 @@ export class ContractService {
     })
 
     return { alertsSent: expiring.length, markedExpired: expired.count }
+  }
+
+  // ── Estadísticas por modelo ─────────────────────────────────────────────────
+
+  static async getStatsByModel(modelId: string) {
+    const contracts = await prisma.contracts.findMany({
+      where: { modelId },
+      select: { status: true, monthlyCost: true, totalValue: true, endDate: true },
+    })
+
+    const stats = contracts.reduce(
+      (acc, c) => {
+        const { status } = computeContractStatus(c.endDate)
+        acc.total++
+        if (status === 'ACTIVE') acc.active++
+        if (status === 'EXPIRING') acc.expiring++
+        if (status === 'EXPIRED') acc.expired++
+        if (c.monthlyCost) acc.monthlyCostTotal += c.monthlyCost
+        if (c.totalValue) acc.totalValueSum += c.totalValue
+        return acc
+      },
+      { total: 0, active: 0, expiring: 0, expired: 0, monthlyCostTotal: 0, totalValueSum: 0 }
+    )
+
+    return stats
+  }
+
+  // ── Estadísticas por lote ───────────────────────────────────────────────────
+
+  static async getStatsByBatch(batchId: string) {
+    const contracts = await prisma.contracts.findMany({
+      where: { batchId },
+      select: { status: true, monthlyCost: true, totalValue: true, endDate: true },
+    })
+
+    const stats = contracts.reduce(
+      (acc, c) => {
+        const { status } = computeContractStatus(c.endDate)
+        acc.total++
+        if (status === 'ACTIVE') acc.active++
+        if (status === 'EXPIRING') acc.expiring++
+        if (status === 'EXPIRED') acc.expired++
+        if (c.monthlyCost) acc.monthlyCostTotal += c.monthlyCost
+        if (c.totalValue) acc.totalValueSum += c.totalValue
+        return acc
+      },
+      { total: 0, active: 0, expiring: 0, expired: 0, monthlyCostTotal: 0, totalValueSum: 0 }
+    )
+
+    return stats
+  }
+
+  // ── Renovación de Contratos ─────────────────────────────────────────────────
+
+  /**
+   * Renueva un contrato existente creando uno nuevo vinculado
+   */
+  static async renewContract(params: {
+    contractId: string
+    newStartDate: Date
+    newEndDate: Date
+    updateTerms?: {
+      totalValue?: number
+      monthlyCost?: number
+      billingCycle?: string
+      notes?: string
+      autoRenew?: boolean
+      renewalNoticeDays?: number
+    }
+    userId: string
+  }) {
+    const { contractId, newStartDate, newEndDate, updateTerms, userId } = params
+
+    // Obtener contrato original
+    const originalContract = await prisma.contracts.findUnique({
+      where: { id: contractId },
+      include: {
+        supplier: true,
+        family: true,
+        model: true,
+        batch: true,
+        lines: true,
+      },
+    })
+
+    if (!originalContract) {
+      throw new Error('Contrato no encontrado')
+    }
+
+    // Validar fechas
+    if (newStartDate >= newEndDate) {
+      throw new Error('La fecha de inicio debe ser anterior a la fecha de fin')
+    }
+
+    // Crear nuevo contrato (renovación)
+    const renewedContract = await prisma.contracts.create({
+      data: {
+        id: randomUUID(),
+        contractNumber: null, // Se generará automáticamente si es necesario
+        name: `${originalContract.name} (Renovación ${originalContract.renewalCount + 1})`,
+        description: originalContract.description,
+        category: originalContract.category,
+        supplierId: originalContract.supplierId,
+        familyId: originalContract.familyId,
+        modelId: originalContract.modelId,
+        batchId: originalContract.batchId,
+        startDate: newStartDate,
+        endDate: newEndDate,
+        totalValue: updateTerms?.totalValue ?? originalContract.totalValue,
+        monthlyCost: updateTerms?.monthlyCost ?? originalContract.monthlyCost,
+        billingCycle: (updateTerms?.billingCycle as any) ?? originalContract.billingCycle,
+        currency: originalContract.currency,
+        contactName: originalContract.contactName,
+        contactEmail: originalContract.contactEmail,
+        contactPhone: originalContract.contactPhone,
+        notes: updateTerms?.notes ?? originalContract.notes,
+        autoRenew: updateTerms?.autoRenew ?? originalContract.autoRenew,
+        renewalNoticeDays: updateTerms?.renewalNoticeDays ?? originalContract.renewalNoticeDays,
+        status: 'ACTIVE',
+        renewedFromId: contractId,
+        renewalCount: originalContract.renewalCount + 1,
+        // Resetear alertas
+        alert60DaysSent: false,
+        alert30DaysSent: false,
+        alert15DaysSent: false,
+        expiryAlertSentAt: null,
+        lastAlertSentAt: null,
+        createdBy: userId,
+      },
+    })
+
+    // Copiar líneas del contrato original
+    if (originalContract.lines.length > 0) {
+      await prisma.contract_lines.createMany({
+        data: originalContract.lines.map((line, index) => ({
+          id: randomUUID(),
+          contractId: renewedContract.id,
+          type: line.type,
+          description: line.description,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
+          totalPrice: line.totalPrice,
+          equipmentId: line.equipmentId,
+          licenseId: line.licenseId,
+          notes: line.notes,
+          order: index,
+        })),
+      })
+    }
+
+    // Actualizar contrato original
+    await prisma.contracts.update({
+      where: { id: contractId },
+      data: {
+        status: 'RENEWED',
+        renewedToId: renewedContract.id,
+      },
+    })
+
+    // Auditoría
+    await createAuditLog({
+      entityType: 'contract',
+      entityId: renewedContract.id,
+      action: 'contract_renewed',
+      userId,
+      changes: {
+        originalContractId: contractId,
+        originalContractName: originalContract.name,
+        newContractId: renewedContract.id,
+        renewalCount: renewedContract.renewalCount,
+        termsUpdated: !!updateTerms,
+        updatedFields: updateTerms ? Object.keys(updateTerms) : [],
+        newStartDate: newStartDate.toISOString(),
+        newEndDate: newEndDate.toISOString(),
+      },
+    })
+
+    return renewedContract
+  }
+
+  /**
+   * Obtiene historial completo de renovaciones de un contrato
+   * Retorna la cadena completa desde el contrato original hasta el más reciente
+   */
+  static async getRenewalHistory(contractId: string) {
+    const contract = await prisma.contracts.findUnique({
+      where: { id: contractId },
+      include: {
+        supplier: { select: { name: true } },
+        family: { select: { name: true, color: true } },
+        model: { select: { brand: true, model: true } },
+        batch: { select: { batchCode: true } },
+        creator: { select: { name: true, email: true } },
+      },
+    })
+
+    if (!contract) {
+      throw new Error('Contrato no encontrado')
+    }
+
+    // Construir cadena de renovaciones
+    const chain: any[] = []
+
+    // Ir hacia atrás (contratos anteriores)
+    let currentId = contract.renewedFromId
+    while (currentId) {
+      const prevContract = await prisma.contracts.findUnique({
+        where: { id: currentId },
+        include: {
+          supplier: { select: { name: true } },
+          family: { select: { name: true, color: true } },
+          model: { select: { brand: true, model: true } },
+          batch: { select: { batchCode: true } },
+          creator: { select: { name: true, email: true } },
+        },
+      })
+      if (!prevContract) break
+      chain.unshift(prevContract)
+      currentId = prevContract.renewedFromId
+    }
+
+    // Agregar contrato actual
+    chain.push(contract)
+
+    // Ir hacia adelante (renovaciones)
+    currentId = contract.renewedToId
+    while (currentId) {
+      const nextContract = await prisma.contracts.findUnique({
+        where: { id: currentId },
+        include: {
+          supplier: { select: { name: true } },
+          family: { select: { name: true, color: true } },
+          model: { select: { brand: true, model: true } },
+          batch: { select: { batchCode: true } },
+          creator: { select: { name: true, email: true } },
+        },
+      })
+      if (!nextContract) break
+      chain.push(nextContract)
+      currentId = nextContract.renewedToId
+    }
+
+    // Calcular diferencias entre renovaciones consecutivas
+    const chainWithDiffs = chain.map((c, index) => {
+      const prev = index > 0 ? chain[index - 1] : null
+      const changes: any = {}
+
+      if (prev) {
+        if (c.totalValue !== prev.totalValue) {
+          changes.totalValue = {
+            from: prev.totalValue,
+            to: c.totalValue,
+            diff: c.totalValue && prev.totalValue ? c.totalValue - prev.totalValue : null,
+          }
+        }
+        if (c.monthlyCost !== prev.monthlyCost) {
+          changes.monthlyCost = {
+            from: prev.monthlyCost,
+            to: c.monthlyCost,
+            diff: c.monthlyCost && prev.monthlyCost ? c.monthlyCost - prev.monthlyCost : null,
+          }
+        }
+        if (c.billingCycle !== prev.billingCycle) {
+          changes.billingCycle = { from: prev.billingCycle, to: c.billingCycle }
+        }
+        if (c.autoRenew !== prev.autoRenew) {
+          changes.autoRenew = { from: prev.autoRenew, to: c.autoRenew }
+        }
+      }
+
+      return {
+        ...c,
+        changes: Object.keys(changes).length > 0 ? changes : null,
+        isOriginal: index === 0,
+        isCurrent: index === chain.length - 1,
+        position: index + 1,
+        totalInChain: chain.length,
+      }
+    })
+
+    return chainWithDiffs
   }
 }

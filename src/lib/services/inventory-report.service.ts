@@ -5,6 +5,201 @@ import prisma from '@/lib/prisma'
  */
 export class InventoryReportService {
   /**
+   * Reporte de inventario por modelo
+   */
+  static async getEquipmentByModel(params: {
+    familyId?: string
+    modelId?: string
+    userId?: string
+    userRole?: string
+  }) {
+    try {
+      const where: any = {}
+
+      // Aplicar scope de familias
+      if (params.familyId) where.familyId = params.familyId
+      if (params.modelId) where.modelId = params.modelId
+
+      const models = await prisma.equipment_models.findMany({
+        where: params.modelId ? { id: params.modelId } : {},
+        include: {
+          equipment: {
+            where,
+            select: {
+              id: true,
+              code: true,
+              status: true,
+              purchasePrice: true,
+              rentalMonthlyCost: true,
+              ownershipType: true,
+            },
+          },
+          type: { select: { name: true } },
+        },
+      })
+
+      return models.map(model => ({
+        modelId: model.id,
+        brand: model.brand,
+        model: model.model,
+        sku: model.sku,
+        type: model.type.name,
+        total: model.equipment.length,
+        available: model.equipment.filter(e => e.status === 'AVAILABLE').length,
+        assigned: model.equipment.filter(e => e.status === 'ASSIGNED').length,
+        maintenance: model.equipment.filter(e => e.status === 'MAINTENANCE').length,
+        retired: model.equipment.filter(e => e.status === 'RETIRED').length,
+        totalValue: model.equipment.reduce((sum, e) => sum + (e.purchasePrice || 0), 0),
+        rentalCount: model.equipment.filter(e => e.ownershipType === 'RENTAL').length,
+        rentalMonthlyCost: model.equipment
+          .filter(e => e.ownershipType === 'RENTAL')
+          .reduce((sum, e) => sum + (e.rentalMonthlyCost || 0), 0),
+      }))
+    } catch (error) {
+      console.error('Error generando reporte de equipos por modelo:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Reporte de mantenimientos por modelo
+   */
+  static async getMaintenanceByModel(params: {
+    familyId?: string
+    modelId?: string
+    startDate?: Date
+    endDate?: Date
+  }) {
+    try {
+      const where: any = {
+        equipment: {
+          ...(params.familyId && { familyId: params.familyId }),
+          ...(params.modelId && { modelId: params.modelId }),
+        },
+      }
+
+      if (params.startDate || params.endDate) {
+        where.date = {}
+        if (params.startDate) where.date.gte = params.startDate
+        if (params.endDate) where.date.lte = params.endDate
+      }
+
+      const maintenances = await prisma.maintenance_records.groupBy({
+        by: ['equipmentId'],
+        where,
+        _count: true,
+        _avg: { cost: true },
+        _sum: { cost: true },
+      })
+
+      // Obtener información de equipos y modelos
+      const equipmentIds = maintenances.map(m => m.equipmentId)
+      const equipment = await prisma.equipment.findMany({
+        where: { id: { in: equipmentIds } },
+        select: {
+          id: true,
+          modelId: true,
+          model: {
+            select: { id: true, brand: true, model: true },
+          },
+        },
+      })
+
+      // Agrupar por modelo
+      const byModel = new Map<
+        string,
+        {
+          modelId: string
+          brand: string
+          model: string
+          totalMaintenances: number
+          totalCost: number
+          avgCost: number
+        }
+      >()
+
+      maintenances.forEach(m => {
+        const eq = equipment.find(e => e.id === m.equipmentId)
+        if (!eq?.model) return
+
+        const key = eq.model.id
+        const existing = byModel.get(key)
+
+        if (existing) {
+          existing.totalMaintenances += m._count
+          existing.totalCost += m._sum.cost || 0
+          existing.avgCost = existing.totalCost / existing.totalMaintenances
+        } else {
+          byModel.set(key, {
+            modelId: eq.model.id,
+            brand: eq.model.brand,
+            model: eq.model.model,
+            totalMaintenances: m._count,
+            totalCost: m._sum.cost || 0,
+            avgCost: m._avg.cost || 0,
+          })
+        }
+      })
+
+      return Array.from(byModel.values())
+    } catch (error) {
+      console.error('Error generando reporte de mantenimientos por modelo:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Reporte de equipos por lote
+   */
+  static async getEquipmentByBatch(params: {
+    familyId?: string
+    batchId?: string
+    supplierId?: string
+  }) {
+    try {
+      const where: any = {}
+
+      if (params.batchId) where.id = params.batchId
+      if (params.supplierId) where.supplierId = params.supplierId
+
+      const batches = await prisma.equipment_batches.findMany({
+        where,
+        include: {
+          model: { select: { brand: true, model: true } },
+          supplier: { select: { name: true } },
+          equipment: {
+            where: params.familyId ? { familyId: params.familyId } : {},
+            select: {
+              id: true,
+              code: true,
+              status: true,
+            },
+          },
+        },
+      })
+
+      return batches.map(batch => ({
+        batchId: batch.id,
+        batchCode: batch.batchCode,
+        model: `${batch.model.brand} ${batch.model.model}`,
+        supplier: batch.supplier.name,
+        quantity: batch.quantity,
+        unitPrice: batch.unitPrice,
+        totalPrice: batch.totalPrice,
+        purchaseDate: batch.purchaseDate,
+        equipmentCount: batch.equipment.length,
+        available: batch.equipment.filter(e => e.status === 'AVAILABLE').length,
+        assigned: batch.equipment.filter(e => e.status === 'ASSIGNED').length,
+        maintenance: batch.equipment.filter(e => e.status === 'MAINTENANCE').length,
+        retired: batch.equipment.filter(e => e.status === 'RETIRED').length,
+      }))
+    } catch (error) {
+      console.error('Error generando reporte de equipos por lote:', error)
+      throw error
+    }
+  }
+
+  /**
    * Reporte de resumen de equipos por estado, tipo y condición
    */
   static async getEquipmentSummaryReport(filters?: {
@@ -21,57 +216,50 @@ export class InventoryReportService {
         if (filters.endDate) where.createdAt.lte = filters.endDate
       }
 
-      const [
-        total,
-        byStatus,
-        byType,
-        byCondition,
-        byOwnership,
-        totalValue,
-        rentedEquipment,
-      ] = await Promise.all([
-        prisma.equipment.count({ where }),
-        prisma.equipment.groupBy({
-          by: ['status'],
-          where,
-          _count: true,
-        }),
-        prisma.equipment.groupBy({
-          by: ['typeId'],
-          where,
-          _count: true,
-        }),
-        prisma.equipment.groupBy({
-          by: ['condition'],
-          where,
-          _count: true,
-        }),
-        prisma.equipment.groupBy({
-          by: ['ownershipType'],
-          where,
-          _count: true,
-        }),
-        prisma.equipment.aggregate({
-          where,
-          _sum: { purchasePrice: true },
-        }),
-        prisma.equipment.findMany({
-          where: {
-            ...where,
-            ownershipType: 'RENTAL',
-            status: { not: 'RETIRED' },
-          },
-          select: {
-            id: true,
-            code: true,
-            brand: true,
-            model: true,
-            rentalProvider: true,
-            rentalMonthlyCost: true,
-            rentalEndDate: true,
-          },
-        }),
-      ])
+      const [total, byStatus, byType, byCondition, byOwnership, totalValue, rentedEquipment] =
+        await Promise.all([
+          prisma.equipment.count({ where }),
+          prisma.equipment.groupBy({
+            by: ['status'],
+            where,
+            _count: true,
+          }),
+          prisma.equipment.groupBy({
+            by: ['typeId'],
+            where,
+            _count: true,
+          }),
+          prisma.equipment.groupBy({
+            by: ['condition'],
+            where,
+            _count: true,
+          }),
+          prisma.equipment.groupBy({
+            by: ['ownershipType'],
+            where,
+            _count: true,
+          }),
+          prisma.equipment.aggregate({
+            where,
+            _sum: { purchasePrice: true },
+          }),
+          prisma.equipment.findMany({
+            where: {
+              ...where,
+              ownershipType: 'RENTAL',
+              status: { not: 'RETIRED' },
+            },
+            select: {
+              id: true,
+              code: true,
+              brand: true,
+              model: true,
+              rentalProvider: true,
+              rentalMonthlyCost: true,
+              rentalEndDate: true,
+            },
+          }),
+        ])
 
       return {
         total,
@@ -212,10 +400,18 @@ export class InventoryReportService {
         }),
       ])
 
-      const deliveryPending = deliveryActs.filter(a => a.status === 'PENDING' && new Date(a.expirationDate) > now)
-      const deliveryExpired = deliveryActs.filter(a => a.status === 'EXPIRED' || new Date(a.expirationDate) <= now)
-      const returnPending = returnActs.filter(a => a.status === 'PENDING' && new Date(a.expirationDate) > now)
-      const returnExpired = returnActs.filter(a => a.status === 'EXPIRED' || new Date(a.expirationDate) <= now)
+      const deliveryPending = deliveryActs.filter(
+        a => a.status === 'PENDING' && new Date(a.expirationDate) > now
+      )
+      const deliveryExpired = deliveryActs.filter(
+        a => a.status === 'EXPIRED' || new Date(a.expirationDate) <= now
+      )
+      const returnPending = returnActs.filter(
+        a => a.status === 'PENDING' && new Date(a.expirationDate) > now
+      )
+      const returnExpired = returnActs.filter(
+        a => a.status === 'EXPIRED' || new Date(a.expirationDate) <= now
+      )
 
       return {
         delivery: {
@@ -466,9 +662,13 @@ export class InventoryReportService {
 
       // Resolver nombres de tipos
       const typeIds = byType.map(t => t.typeId)
-      const types = typeIds.length > 0
-        ? await prisma.license_types.findMany({ where: { id: { in: typeIds } }, select: { id: true, name: true } })
-        : []
+      const types =
+        typeIds.length > 0
+          ? await prisma.license_types.findMany({
+              where: { id: { in: typeIds } },
+              select: { id: true, name: true },
+            })
+          : []
       const typeMap = Object.fromEntries(types.map(t => [t.id, t.name]))
 
       return {
@@ -515,9 +715,10 @@ export class InventoryReportService {
         }),
       ])
 
-      const totalAssetValue = (totalPurchaseValue._sum.purchasePrice || 0) + 
-                             (licenseCost._sum.cost || 0) + 
-                             (consumableValue[0]?.total || 0)
+      const totalAssetValue =
+        (totalPurchaseValue._sum.purchasePrice || 0) +
+        (licenseCost._sum.cost || 0) +
+        (consumableValue[0]?.total || 0)
 
       return {
         fixedAssets: {
@@ -579,22 +780,26 @@ export class InventoryReportService {
       const thirtyDaysFromNow = new Date()
       thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30)
 
-      const expiringContracts = rentals.filter(r => 
-        r.rentalEndDate && 
-        new Date(r.rentalEndDate) <= thirtyDaysFromNow &&
-        new Date(r.rentalEndDate) >= now
+      const expiringContracts = rentals.filter(
+        r =>
+          r.rentalEndDate &&
+          new Date(r.rentalEndDate) <= thirtyDaysFromNow &&
+          new Date(r.rentalEndDate) >= now
       )
 
-      const byProvider = rentals.reduce((acc, r) => {
-        const provider = r.rentalProvider || 'Sin proveedor'
-        if (!acc[provider]) {
-          acc[provider] = { count: 0, monthlyCost: 0, items: [] }
-        }
-        acc[provider].count++
-        acc[provider].monthlyCost += r.rentalMonthlyCost || 0
-        acc[provider].items.push(r)
-        return acc
-      }, {} as Record<string, any>)
+      const byProvider = rentals.reduce(
+        (acc, r) => {
+          const provider = r.rentalProvider || 'Sin proveedor'
+          if (!acc[provider]) {
+            acc[provider] = { count: 0, monthlyCost: 0, items: [] }
+          }
+          acc[provider].count++
+          acc[provider].monthlyCost += r.rentalMonthlyCost || 0
+          acc[provider].items.push(r)
+          return acc
+        },
+        {} as Record<string, any>
+      )
 
       return {
         rentals,

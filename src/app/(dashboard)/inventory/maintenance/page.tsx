@@ -29,10 +29,17 @@ import {
 } from '@/components/ui/select'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { NewMaintenanceDialog } from '@/components/inventory/new-maintenance-dialog'
+import { CreateByModelDialog } from '@/components/inventory/maintenance/create-by-model-dialog'
 import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
 import { useFamilyOptions } from '@/hooks/use-family-options'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 interface MaintenanceItem {
   id: string
@@ -94,6 +101,7 @@ export default function MaintenanceListPage() {
   const [typeFilter, setTypeFilter] = useState('ALL')
   const [familyFilter, setFamilyFilter] = useState('all')
   const [showNew, setShowNew] = useState(false)
+  const [showByModel, setShowByModel] = useState(false)
 
   // Familias ya disponibles desde el contexto global
 
@@ -214,10 +222,24 @@ export default function MaintenanceListPage() {
       headerActions={
         <div className='flex items-center gap-2'>
           {isAdminOrTech || isManager ? (
-            <Button onClick={() => setShowNew(true)} size='sm'>
-              <Plus className='h-4 w-4 sm:mr-2' />
-              <span className='hidden sm:inline'>Nuevo Mantenimiento</span>
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size='sm'>
+                  <Plus className='h-4 w-4 sm:mr-2' />
+                  <span className='hidden sm:inline'>Nuevo Mantenimiento</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align='end'>
+                <DropdownMenuItem onClick={() => setShowNew(true)}>
+                  <Plus className='h-4 w-4 mr-2' />
+                  Mantenimiento Individual
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowByModel(true)}>
+                  <Package className='h-4 w-4 mr-2' />
+                  Mantenimiento por Modelo
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : (
             <Button onClick={() => setShowNew(true)} variant='outline' size='sm'>
               <Plus className='h-4 w-4 sm:mr-2' />
@@ -456,6 +478,17 @@ export default function MaintenanceListPage() {
             fetchRecords()
           }}
           isClient={isClient}
+        />
+      )}
+
+      {showByModel && (
+        <CreateByModelDialog
+          open={showByModel}
+          onClose={() => setShowByModel(false)}
+          onCreated={() => {
+            setShowByModel(false)
+            fetchRecords()
+          }}
         />
       )}
     </ModuleLayout>

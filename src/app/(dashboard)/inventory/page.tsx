@@ -33,7 +33,9 @@ function InventoryContent() {
 
   if (status === 'loading') {
     return (
-      <ModuleLayout title="Cargando..." loading={true}><div /></ModuleLayout>
+      <ModuleLayout title='Cargando...' loading={true}>
+        <div />
+      </ModuleLayout>
     )
   }
 
@@ -41,7 +43,9 @@ function InventoryContent() {
 
   const canCreate = role === 'ADMIN' || role === 'TECHNICIAN' || canManageInventory
   const title = isClientOnly ? 'Mis Activos' : 'Inventario'
-  const subtitle = isClientOnly ? 'Activos asignados a tu cuenta' : 'Equipos, licencias y materiales de tu organización'
+  const subtitle = isClientOnly
+    ? 'Activos asignados a tu cuenta'
+    : 'Equipos, licencias y materiales de tu organización'
 
   const setTab = (t: string) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -60,68 +64,73 @@ function InventoryContent() {
 
   return (
     <>
-    <ModuleLayout
-      title={title}
-      subtitle={subtitle}
-      headerActions={
-        canCreate && tab !== 'mine' ? (
-          <div className="flex items-center gap-2">
-            {isAdmin && (
-              <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
-                <Upload className="mr-2 h-4 w-4" />
-                Importar
-              </Button>
-            )}
-            <Link href="/inventory/equipment/new">
-              <Button size="sm">
-                <Plus className="mr-2 h-4 w-4" />
-                Nuevo Activo
-              </Button>
-            </Link>
+      <ModuleLayout
+        title={title}
+        subtitle={subtitle}
+        headerActions={
+          canCreate && tab !== 'mine' ? (
+            <div className='flex items-center gap-2'>
+              {isAdmin && (
+                <Button size='sm' variant='outline' onClick={() => setImportOpen(true)}>
+                  <Upload className='mr-2 h-4 w-4' />
+                  Importar
+                </Button>
+              )}
+              <Link href='/inventory/equipment/new'>
+                <Button size='sm'>
+                  <Plus className='mr-2 h-4 w-4' />
+                  Nuevo Activo
+                </Button>
+              </Link>
+            </div>
+          ) : undefined
+        }
+      >
+        {isManager && (
+          <div className='flex gap-1 p-1 bg-muted rounded-lg w-fit mb-4'>
+            <button
+              onClick={() => setTab('family')}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                tab !== 'mine'
+                  ? 'bg-background shadow-sm text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Package className='h-4 w-4' />
+              Inventario de Familias
+            </button>
+            <button
+              onClick={() => setTab('mine')}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                tab === 'mine'
+                  ? 'bg-background shadow-sm text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <User className='h-4 w-4' />
+              Mis Equipos
+            </button>
           </div>
-        ) : undefined
-      }
-    >
-      {isManager && (
-        <div className="flex gap-1 p-1 bg-muted rounded-lg w-fit mb-4">
-          <button
-            onClick={() => setTab('family')}
-            className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              tab !== 'mine' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Package className="h-4 w-4" />
-            Inventario de Familias
-          </button>
-          <button
-            onClick={() => setTab('mine')}
-            className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              tab === 'mine' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <User className="h-4 w-4" />
-            Mis Equipos
-          </button>
-        </div>
-      )}
-      <UnifiedInventoryList
-        initialFamilyId={tab !== 'mine' ? familyId : undefined}
-        personalOnly={tab === 'mine'}
-      />
-    </ModuleLayout>
+        )}
+        <UnifiedInventoryList
+          initialFamilyId={tab !== 'mine' ? familyId : undefined}
+          personalOnly={tab === 'mine'}
+          showDashboard={tab !== 'mine'}
+        />
+      </ModuleLayout>
 
-    {isAdmin && (
-      <EquipmentImportModal
-        open={importOpen}
-        onOpenChange={setImportOpen}
-        onSuccess={() => {
-          setImportOpen(false)
-          // Forzar recarga de la lista
-          router.refresh()
-        }}
-        familyId={familyId}
-      />
-    )}
+      {isAdmin && (
+        <EquipmentImportModal
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          onSuccess={() => {
+            setImportOpen(false)
+            // Forzar recarga de la lista
+            router.refresh()
+          }}
+          familyId={familyId}
+        />
+      )}
     </>
   )
 }

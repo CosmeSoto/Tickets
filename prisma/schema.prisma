@@ -486,6 +486,7 @@ model users {
   webhooks_created                                  webhooks[]                      @relation("WebhookCreator")
   contractsCreated                                  contracts[]                     @relation("ContractCreator")
   contractAttachmentsUploaded                       contract_attachments[]          @relation("ContractAttachmentUploader")
+  contractPaymentsCreated                           contract_payments[]             @relation("PaymentCreator")
   saleRequests                                      equipment_sales[]               @relation("SaleRequester")
   saleApprovals                                     equipment_sales[]               @relation("SaleApprover")
   assetRequestsCreated                              asset_requests[]                @relation("AssetRequestRequester")
@@ -862,6 +863,7 @@ model equipment_models {
   
   instances         equipment[]
   batches           equipment_batches[]
+  contracts         contracts[] @relation("ContractModel")
   
   @@unique([brand, model, typeId])
   @@index([typeId, isActive])
@@ -895,6 +897,8 @@ model equipment_batches {
   notes               String?
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
+  
+  contracts           contracts[] @relation("ContractBatch")
   
   @@index([modelId, status])
   @@index([supplierId])
@@ -943,6 +947,7 @@ model equipment {
   rentalContactEmail    String?                 @map("rental_contact_email")
   rentalContactPhone    String?                 @map("rental_contact_phone")
   rentalNotes           String?                 @map("rental_notes")
+  rentalAlertSentAt     DateTime?               @map("rental_alert_sent_at")
   supplierId            String?                 @map("supplier_id")
   invoiceNumber         String?                 @map("invoice_number") @db.VarChar(100)
   purchaseOrderNumber   String?                 @map("purchase_order_number") @db.VarChar(100)
@@ -1852,6 +1857,8 @@ model contracts {
   status              ContractStatus   @default(DRAFT)
   supplierId          String?          @map("supplier_id")
   familyId            String?          @map("family_id")
+  modelId             String?          @map("model_id")
+  batchId             String?          @map("batch_id")
   startDate           DateTime?        @map("start_date")
   endDate             DateTime?        @map("end_date")
   autoRenew           Boolean          @default(false) @map("auto_renew")
@@ -1866,6 +1873,18 @@ model contracts {
   notes               String?
   termsUrl            String?          @map("terms_url") @db.VarChar(500)
   expiryAlertSentAt   DateTime?        @map("expiry_alert_sent_at")
+  
+  // Alertas de vencimiento
+  alert60DaysSent     Boolean          @default(false) @map("alert_60_days_sent")
+  alert30DaysSent     Boolean          @default(false) @map("alert_30_days_sent")
+  alert15DaysSent     Boolean          @default(false) @map("alert_15_days_sent")
+  lastAlertSentAt     DateTime?        @map("last_alert_sent_at")
+  
+  // Renovación
+  renewedFromId       String?          @map("renewed_from_id")
+  renewedToId         String?          @map("renewed_to_id")
+  renewalCount        Int              @default(0) @map("renewal_count")
+  
   createdBy           String           @map("created_by")
   createdAt           DateTime         @default(now()) @map("created_at")
   updatedAt           DateTime         @updatedAt @map("updated_at")
@@ -1873,13 +1892,24 @@ model contracts {
   creator             users            @relation("ContractCreator", fields: [createdBy], references: [id])
   supplier            suppliers?       @relation(fields: [supplierId], references: [id])
   family              families?        @relation(fields: [familyId], references: [id])
+  model               equipment_models? @relation("ContractModel", fields: [modelId], references: [id], onDelete: SetNull)
+  batch               equipment_batches? @relation("ContractBatch", fields: [batchId], references: [id], onDelete: SetNull)
+  renewedFrom         contracts?       @relation("ContractRenewalFrom", fields: [renewedFromId], references: [id], onDelete: SetNull)
+  renewedTo           contracts?       @relation("ContractRenewalTo", fields: [renewedToId], references: [id], onDelete: SetNull)
+  renewalsFrom        contracts[]      @relation("ContractRenewalFrom")
+  renewalsTo          contracts[]      @relation("ContractRenewalTo")
   lines               contract_lines[]
   attachments         contract_attachments[]
+  payments            contract_payments[]  @relation("ContractPayments")
 
   @@index([status, endDate])
   @@index([supplierId])
   @@index([familyId])
+  @@index([modelId])
+  @@index([batchId])
   @@index([createdBy])
+  @@index([renewedFromId])
+  @@index([renewedToId])
   @@index([createdAt(sort: Desc)])
   @@map("contracts")
 }
@@ -1925,6 +1955,48 @@ model contract_attachments {
 
   @@index([contractId])
   @@map("contract_attachments")
+}
+
+// ── Pagos de contratos ────────────────────────────────────────────────────────
+
+enum PaymentStatus {
+  SCHEDULED  // Pago programado, aún no vence
+  DUE        // Pago vencido hoy
+  OVERDUE    // Pago vencido (pasó la fecha)
+  PAID       // Pago realizado
+  CANCELLED  // Pago cancelado
+}
+
+model contract_payments {
+  id              String        @id @default(uuid())
+  contractId      String        @map("contract_id")
+  amount          Float
+  currency        String        @default("USD") @db.VarChar(3)
+  dueDate         DateTime      @map("due_date")
+  paidDate        DateTime?     @map("paid_date")
+  status          PaymentStatus @default(SCHEDULED)
+  paymentMethod   String?       @map("payment_method") @db.VarChar(100)
+  referenceNumber String?       @map("reference_number") @db.VarChar(200)
+  notes           String?
+  
+  // Alertas de pago próximo
+  alert7DaysSent  Boolean       @default(false) @map("alert_7_days_sent")
+  alertDueSent    Boolean       @default(false) @map("alert_due_sent")
+  alertOverdueSent Boolean      @default(false) @map("alert_overdue_sent")
+  lastAlertSentAt DateTime?     @map("last_alert_sent_at")
+  
+  createdBy       String        @map("created_by")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  contract        contracts     @relation("ContractPayments", fields: [contractId], references: [id], onDelete: Cascade)
+  creator         users         @relation("PaymentCreator", fields: [createdBy], references: [id])
+
+  @@index([contractId, dueDate])
+  @@index([status, dueDate])
+  @@index([createdBy])
+  @@index([dueDate])
+  @@map("contract_payments")
 }
 
 // ── Ventas de activos ─────────────────────────────────────────────────────────

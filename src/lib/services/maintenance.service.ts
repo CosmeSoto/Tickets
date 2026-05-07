@@ -1,6 +1,10 @@
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
-import type { MaintenanceRecord, CreateMaintenanceData, UpdateMaintenanceData } from '@/types/inventory/maintenance'
+import type {
+  MaintenanceRecord,
+  CreateMaintenanceData,
+  UpdateMaintenanceData,
+} from '@/types/inventory/maintenance'
 
 /**
  * Servicio para gestión de registros de mantenimiento
@@ -11,11 +15,71 @@ import type { MaintenanceRecord, CreateMaintenanceData, UpdateMaintenanceData } 
  */
 export class MaintenanceService {
   /**
+   * Valida que un equipo pueda entrar en mantenimiento
+   */
+  private static async validateEquipmentForMaintenance(
+    equipmentId: string,
+    tx: any
+  ): Promise<{ valid: boolean; reason?: string; warning?: string }> {
+    const equipment = await tx.equipment.findUnique({
+      where: { id: equipmentId },
+      select: { status: true, code: true },
+    })
+
+    if (!equipment) {
+      return { valid: false, reason: 'Equipo no encontrado' }
+    }
+
+    // Estados que NO permiten mantenimiento
+    const invalidStatuses = ['RETIRED', 'SOLD']
+    if (invalidStatuses.includes(equipment.status)) {
+      return {
+        valid: false,
+        reason: `El equipo ${equipment.code} está en estado ${equipment.status} y no puede recibir mantenimiento`,
+      }
+    }
+
+    // Verificar si ya tiene mantenimiento activo
+    if (equipment.status === 'MAINTENANCE') {
+      const existingMaintenance = await tx.maintenance_records.findFirst({
+        where: {
+          equipmentId,
+          status: { in: ['SCHEDULED', 'ACCEPTED'] },
+        },
+      })
+      if (existingMaintenance) {
+        return {
+          valid: false,
+          reason: `El equipo ${equipment.code} ya tiene un mantenimiento activo`,
+        }
+      }
+    }
+
+    // Advertencia si está asignado
+    if (equipment.status === 'ASSIGNED') {
+      return {
+        valid: true,
+        warning: `El equipo ${equipment.code} está asignado a un usuario. Se notificará al usuario sobre el mantenimiento.`,
+      }
+    }
+
+    return { valid: true }
+  }
+  /**
    * Admin/Técnico crea un mantenimiento directamente (SCHEDULED)
    * El equipo pasa a MAINTENANCE inmediatamente
    */
-  static async createMaintenance(data: CreateMaintenanceData, userId: string): Promise<MaintenanceRecord> {
-    const result = await prisma.$transaction(async (tx) => {
+  static async createMaintenance(
+    data: CreateMaintenanceData,
+    userId: string
+  ): Promise<MaintenanceRecord> {
+    const result = await prisma.$transaction(async tx => {
+      // Validar que el equipo pueda entrar en mantenimiento
+      const validation = await this.validateEquipmentForMaintenance(data.equipmentId, tx)
+      if (!validation.valid) {
+        throw new Error(validation.reason)
+      }
+
       const equipment = await tx.equipment.findUnique({
         where: { id: data.equipmentId },
         select: { status: true },
@@ -52,11 +116,12 @@ export class MaintenanceService {
           entityId: maintenance.id,
           userId,
           details: {
-            descripcion: `Se programó mantenimiento ${data.type === 'PREVENTIVE' ? 'preventivo' : 'correctivo'} para el equipo ${(maintenance as any).equipment?.code || data.equipmentId}. Fecha: ${new Date(data.scheduledDate).toLocaleDateString('es-EC')}. Motivo: ${data.description}`,
+            descripcion: `Se programó mantenimiento ${data.type === 'PREVENTIVE' ? 'preventivo' : 'correctivo'} para el equipo ${(maintenance as any).equipment?.code || data.equipmentId}. Fecha: ${new Date(data.scheduledDate).toLocaleDateString('es-EC')}. Motivo: ${data.description}${validation.warning ? ` NOTA: ${validation.warning}` : ''}`,
             equipmentId: data.equipmentId,
             type: data.type,
             scheduledDate: data.scheduledDate,
             previousStatus: equipment?.status ?? null,
+            warning: validation.warning,
           },
         },
       })
@@ -71,8 +136,11 @@ export class MaintenanceService {
    * Cliente solicita mantenimiento de su equipo asignado (REQUESTED)
    * El equipo NO cambia de estado todavía
    */
-  static async requestMaintenance(data: CreateMaintenanceData, userId: string): Promise<MaintenanceRecord> {
-    const result = await prisma.$transaction(async (tx) => {
+  static async requestMaintenance(
+    data: CreateMaintenanceData,
+    userId: string
+  ): Promise<MaintenanceRecord> {
+    const result = await prisma.$transaction(async tx => {
       // Verificar que el equipo está asignado al cliente
       const assignment = await tx.equipment_assignments.findFirst({
         where: { equipmentId: data.equipmentId, receiverId: userId, isActive: true },
@@ -126,13 +194,14 @@ export class MaintenanceService {
     data: { scheduledDate: Date; technicianId?: string; notes?: string },
     userId: string
   ): Promise<MaintenanceRecord> {
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async tx => {
       const existing = await tx.maintenance_records.findUnique({
         where: { id },
         include: { equipment: true },
       })
       if (!existing) throw new Error('Registro de mantenimiento no encontrado')
-      if (existing.status !== 'REQUESTED') throw new Error('Solo se pueden aprobar solicitudes en estado REQUESTED')
+      if (existing.status !== 'REQUESTED')
+        throw new Error('Solo se pueden aprobar solicitudes en estado REQUESTED')
 
       const maintenance = await tx.maintenance_records.update({
         where: { id },
@@ -177,10 +246,11 @@ export class MaintenanceService {
    * Cliente acepta/confirma el mantenimiento programado (SCHEDULED → ACCEPTED)
    */
   static async acceptMaintenance(id: string, userId: string): Promise<MaintenanceRecord> {
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async tx => {
       const existing = await tx.maintenance_records.findUnique({ where: { id } })
       if (!existing) throw new Error('Registro de mantenimiento no encontrado')
-      if (existing.status !== 'SCHEDULED') throw new Error('Solo se pueden aceptar mantenimientos en estado SCHEDULED')
+      if (existing.status !== 'SCHEDULED')
+        throw new Error('Solo se pueden aceptar mantenimientos en estado SCHEDULED')
 
       const maintenance = await tx.maintenance_records.update({
         where: { id },
@@ -217,7 +287,7 @@ export class MaintenanceService {
     data: UpdateMaintenanceData & { returnTo?: 'available' | 'previous_user' },
     userId: string
   ): Promise<MaintenanceRecord & { reAssigned?: boolean }> {
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async tx => {
       const existing = await tx.maintenance_records.findUnique({
         where: { id },
         include: {
@@ -290,7 +360,10 @@ export class MaintenanceService {
           })
           reAssigned = true
         } else {
-          await tx.equipment.update({ where: { id: existing.equipmentId }, data: { status: 'AVAILABLE' } })
+          await tx.equipment.update({
+            where: { id: existing.equipmentId },
+            data: { status: 'AVAILABLE' },
+          })
         }
       } else {
         const statusToRestore = (existing as any).previousStatus ?? 'AVAILABLE'
@@ -313,7 +386,10 @@ export class MaintenanceService {
             completedAt: new Date().toISOString(),
             returnTo: data.returnTo || 'available',
             previousStatus: (existing as any).previousStatus ?? null,
-            restoredStatus: data.returnTo === 'previous_user' ? 'ASSIGNED' : ((existing as any).previousStatus ?? 'AVAILABLE'),
+            restoredStatus:
+              data.returnTo === 'previous_user'
+                ? 'ASSIGNED'
+                : ((existing as any).previousStatus ?? 'AVAILABLE'),
           },
         },
       })
@@ -328,7 +404,7 @@ export class MaintenanceService {
    * Cancela un mantenimiento y restaura el equipo a AVAILABLE (si estaba en MAINTENANCE)
    */
   static async cancel(id: string, userId: string): Promise<void> {
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async tx => {
       const maintenance = await tx.maintenance_records.findUnique({
         where: { id },
         include: { equipment: true },
@@ -373,7 +449,7 @@ export class MaintenanceService {
     data: { scheduledDate: Date; description?: string },
     userId: string
   ): Promise<MaintenanceRecord> {
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async tx => {
       const existing = await tx.maintenance_records.findUnique({ where: { id } })
       if (!existing) throw new Error('Registro de mantenimiento no encontrado')
 
@@ -404,6 +480,228 @@ export class MaintenanceService {
       return maintenance
     })
     return result as MaintenanceRecord
+  }
+
+  /**
+   * Crea mantenimiento para todos los equipos de un modelo
+   */
+  static async createMaintenanceByModel(
+    data: {
+      modelId: string
+      type: 'PREVENTIVE' | 'CORRECTIVE'
+      description: string
+      scheduledDate: Date
+      technicianId?: string
+      statusFilter?: string[]
+      familyId?: string
+      cost?: number
+      notes?: string
+    },
+    userId: string
+  ): Promise<{ created: MaintenanceRecord[]; skipped: Array<{ code: string; reason: string }> }> {
+    const equipment = await prisma.equipment.findMany({
+      where: {
+        modelId: data.modelId,
+        status: data.statusFilter
+          ? { in: data.statusFilter as any }
+          : { notIn: ['RETIRED', 'SOLD'] },
+        ...(data.familyId && { familyId: data.familyId }),
+      },
+      select: { id: true, code: true, status: true },
+    })
+
+    const created: MaintenanceRecord[] = []
+    const skipped: Array<{ code: string; reason: string }> = []
+
+    for (const eq of equipment) {
+      try {
+        const maintenance = await this.createMaintenance(
+          {
+            equipmentId: eq.id,
+            type: data.type,
+            description: data.description,
+            scheduledDate: data.scheduledDate,
+            technicianId: data.technicianId,
+            cost: data.cost,
+            notes: data.notes,
+          },
+          userId
+        )
+        created.push(maintenance)
+      } catch (error) {
+        skipped.push({
+          code: eq.code,
+          reason: error instanceof Error ? error.message : 'Error desconocido',
+        })
+      }
+    }
+
+    // Auditoría de la operación masiva
+    await prisma.audit_logs.create({
+      data: {
+        id: randomUUID(),
+        action: 'MAINTENANCE_BULK_CREATE',
+        entityType: 'equipment_model',
+        entityId: data.modelId,
+        userId,
+        details: {
+          descripcion: `Se creó mantenimiento ${data.type === 'PREVENTIVE' ? 'preventivo' : 'correctivo'} para ${created.length} equipos del modelo. ${skipped.length > 0 ? `${skipped.length} equipos omitidos.` : ''}`,
+          modelId: data.modelId,
+          type: data.type,
+          created: created.length,
+          skipped: skipped.length,
+          scheduledDate: data.scheduledDate,
+        },
+      },
+    })
+
+    return { created, skipped }
+  }
+
+  /**
+   * Crea mantenimiento para todos los equipos de un lote
+   */
+  static async createMaintenanceByBatch(
+    data: {
+      batchId: string
+      type: 'PREVENTIVE' | 'CORRECTIVE'
+      description: string
+      scheduledDate: Date
+      technicianId?: string
+      cost?: number
+      notes?: string
+    },
+    userId: string
+  ): Promise<{ created: MaintenanceRecord[]; skipped: Array<{ code: string; reason: string }> }> {
+    const equipment = await prisma.equipment.findMany({
+      where: {
+        batchId: data.batchId,
+        status: { notIn: ['RETIRED', 'SOLD'] },
+      },
+      select: { id: true, code: true, status: true },
+    })
+
+    const created: MaintenanceRecord[] = []
+    const skipped: Array<{ code: string; reason: string }> = []
+
+    for (const eq of equipment) {
+      try {
+        const maintenance = await this.createMaintenance(
+          {
+            equipmentId: eq.id,
+            type: data.type,
+            description: data.description,
+            scheduledDate: data.scheduledDate,
+            technicianId: data.technicianId,
+            cost: data.cost,
+            notes: data.notes,
+          },
+          userId
+        )
+        created.push(maintenance)
+      } catch (error) {
+        skipped.push({
+          code: eq.code,
+          reason: error instanceof Error ? error.message : 'Error desconocido',
+        })
+      }
+    }
+
+    // Auditoría de la operación masiva
+    await prisma.audit_logs.create({
+      data: {
+        id: randomUUID(),
+        action: 'MAINTENANCE_BULK_CREATE',
+        entityType: 'equipment_batch',
+        entityId: data.batchId,
+        userId,
+        details: {
+          descripcion: `Se creó mantenimiento ${data.type === 'PREVENTIVE' ? 'preventivo' : 'correctivo'} para ${created.length} equipos del lote. ${skipped.length > 0 ? `${skipped.length} equipos omitidos.` : ''}`,
+          batchId: data.batchId,
+          type: data.type,
+          created: created.length,
+          skipped: skipped.length,
+          scheduledDate: data.scheduledDate,
+        },
+      },
+    })
+
+    return { created, skipped }
+  }
+
+  /**
+   * Obtiene estadísticas de mantenimiento por modelo
+   */
+  static async getMaintenanceStatsByModel(modelId: string) {
+    const [total, byType, byStatus, avgCost, recentMaintenances] = await Promise.all([
+      prisma.maintenance_records.count({
+        where: { equipment: { modelId } },
+      }),
+      prisma.maintenance_records.groupBy({
+        by: ['type'],
+        where: { equipment: { modelId } },
+        _count: true,
+      }),
+      prisma.maintenance_records.groupBy({
+        by: ['status'],
+        where: { equipment: { modelId } },
+        _count: true,
+      }),
+      prisma.maintenance_records.aggregate({
+        where: { equipment: { modelId }, cost: { not: null } },
+        _avg: { cost: true },
+        _sum: { cost: true },
+      }),
+      prisma.maintenance_records.findMany({
+        where: { equipment: { modelId } },
+        include: { equipment: { select: { code: true } }, technician: { select: { name: true } } },
+        orderBy: { date: 'desc' },
+        take: 10,
+      }),
+    ])
+
+    return {
+      total,
+      byType: Object.fromEntries(byType.map(t => [t.type, t._count])),
+      byStatus: Object.fromEntries(byStatus.map(s => [s.status, s._count])),
+      avgCost: avgCost._avg.cost || 0,
+      totalCost: avgCost._sum.cost || 0,
+      recentMaintenances,
+    }
+  }
+
+  /**
+   * Obtiene estadísticas de mantenimiento por lote
+   */
+  static async getMaintenanceStatsByBatch(batchId: string) {
+    const [total, byType, byStatus, avgCost] = await Promise.all([
+      prisma.maintenance_records.count({
+        where: { equipment: { batchId } },
+      }),
+      prisma.maintenance_records.groupBy({
+        by: ['type'],
+        where: { equipment: { batchId } },
+        _count: true,
+      }),
+      prisma.maintenance_records.groupBy({
+        by: ['status'],
+        where: { equipment: { batchId } },
+        _count: true,
+      }),
+      prisma.maintenance_records.aggregate({
+        where: { equipment: { batchId }, cost: { not: null } },
+        _avg: { cost: true },
+        _sum: { cost: true },
+      }),
+    ])
+
+    return {
+      total,
+      byType: Object.fromEntries(byType.map(t => [t.type, t._count])),
+      byStatus: Object.fromEntries(byStatus.map(s => [s.status, s._count])),
+      avgCost: avgCost._avg.cost || 0,
+      totalCost: avgCost._sum.cost || 0,
+    }
   }
 
   /**

@@ -1,0 +1,608 @@
+/**
+ * ContractPaymentService — Lógica de negocio para pagos de contratos.
+ *
+ * Responsabilidades:
+ *  - CRUD de pagos programados
+ *  - Cálculo automático de próximos pagos
+ *  - Alertas de pagos próximos y vencidos
+ *  - Registro de auditoría en cada operación
+ */
+
+import { prisma } from '@/lib/prisma'
+import { randomUUID } from 'crypto'
+import { createAuditLog } from '@/lib/audit'
+import { NotificationService } from '@/lib/services/notification-service'
+
+// ── Tipos ─────────────────────────────────────────────────────────────────────
+
+type PaymentStatus = 'SCHEDULED' | 'DUE' | 'OVERDUE' | 'PAID' | 'CANCELLED'
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+export function computePaymentStatus(dueDate: Date, paidDate: Date | null): PaymentStatus {
+  if (paidDate) return 'PAID'
+
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const due = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate())
+
+  if (due < today) return 'OVERDUE'
+  if (due.getTime() === today.getTime()) return 'DUE'
+  return 'SCHEDULED'
+}
+
+// ── Servicio ──────────────────────────────────────────────────────────────────
+
+export class ContractPaymentService {
+  // ── Listar pagos ────────────────────────────────────────────────────────────
+
+  static async list(params: {
+    contractId?: string
+    status?: PaymentStatus
+    fromDate?: Date
+    toDate?: Date
+    page?: number
+    pageSize?: number
+  }) {
+    const { contractId, status, fromDate, toDate, page = 1, pageSize = 50 } = params
+
+    const where: any = {}
+
+    if (contractId) where.contractId = contractId
+    if (status) where.status = status
+    if (fromDate || toDate) {
+      where.dueDate = {}
+      if (fromDate) where.dueDate.gte = fromDate
+      if (toDate) where.dueDate.lte = toDate
+    }
+
+    const [payments, total] = await Promise.all([
+      prisma.contract_payments.findMany({
+        where,
+        include: {
+          contract: {
+            select: {
+              id: true,
+              name: true,
+              contractNumber: true,
+              supplier: { select: { name: true } },
+            },
+          },
+          creator: {
+            select: { id: true, name: true, email: true },
+          },
+        },
+        orderBy: { dueDate: 'asc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.contract_payments.count({ where }),
+    ])
+
+    return {
+      payments,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+    }
+  }
+
+  // ── Obtener un pago ─────────────────────────────────────────────────────────
+
+  static async getById(id: string) {
+    return await prisma.contract_payments.findUnique({
+      where: { id },
+      include: {
+        contract: {
+          select: {
+            id: true,
+            name: true,
+            contractNumber: true,
+            supplier: { select: { name: true } },
+            family: { select: { name: true, color: true } },
+          },
+        },
+        creator: {
+          select: { id: true, name: true, email: true },
+        },
+      },
+    })
+  }
+
+  // ── Crear pago ──────────────────────────────────────────────────────────────
+
+  static async create(data: {
+    contractId: string
+    amount: number
+    currency?: string
+    dueDate: Date
+    paymentMethod?: string
+    referenceNumber?: string
+    notes?: string
+    createdBy: string
+  }) {
+    const status = computePaymentStatus(data.dueDate, null)
+
+    const payment = await prisma.contract_payments.create({
+      data: {
+        id: randomUUID(),
+        contractId: data.contractId,
+        amount: data.amount,
+        currency: data.currency || 'USD',
+        dueDate: data.dueDate,
+        status,
+        paymentMethod: data.paymentMethod || null,
+        referenceNumber: data.referenceNumber || null,
+        notes: data.notes || null,
+        createdBy: data.createdBy,
+      },
+      include: {
+        contract: {
+          select: { name: true, supplier: { select: { name: true } } },
+        },
+      },
+    })
+
+    await createAuditLog({
+      entityType: 'contract_payment',
+      entityId: payment.id,
+      action: 'payment_created',
+      userId: data.createdBy,
+      changes: {
+        contractId: data.contractId,
+        amount: data.amount,
+        dueDate: data.dueDate.toISOString(),
+        status,
+      },
+    })
+
+    return payment
+  }
+
+  // ── Actualizar pago ─────────────────────────────────────────────────────────
+
+  static async update(
+    id: string,
+    data: Partial<{
+      amount: number
+      currency: string
+      dueDate: Date
+      paidDate: Date | null
+      status: PaymentStatus
+      paymentMethod: string
+      referenceNumber: string
+      notes: string
+    }>,
+    updatedBy: string
+  ) {
+    const before = await prisma.contract_payments.findUnique({
+      where: { id },
+      select: { amount: true, dueDate: true, status: true, paidDate: true },
+    })
+    if (!before) throw new Error('Pago no encontrado')
+
+    // Recalcular status si cambia la fecha de vencimiento o pago
+    let newStatus = data.status
+    if (data.dueDate !== undefined || data.paidDate !== undefined) {
+      const dueDate = data.dueDate || before.dueDate
+      const paidDate = data.paidDate !== undefined ? data.paidDate : before.paidDate
+      newStatus = computePaymentStatus(dueDate, paidDate)
+    }
+
+    const payment = await prisma.contract_payments.update({
+      where: { id },
+      data: {
+        ...(data.amount !== undefined && { amount: data.amount }),
+        ...(data.currency !== undefined && { currency: data.currency }),
+        ...(data.dueDate !== undefined && { dueDate: data.dueDate }),
+        ...(data.paidDate !== undefined && { paidDate: data.paidDate }),
+        ...(newStatus !== undefined && { status: newStatus }),
+        ...(data.paymentMethod !== undefined && { paymentMethod: data.paymentMethod || null }),
+        ...(data.referenceNumber !== undefined && {
+          referenceNumber: data.referenceNumber || null,
+        }),
+        ...(data.notes !== undefined && { notes: data.notes || null }),
+      },
+      include: {
+        contract: {
+          select: { name: true },
+        },
+      },
+    })
+
+    await createAuditLog({
+      entityType: 'contract_payment',
+      entityId: id,
+      action: 'payment_updated',
+      userId: updatedBy,
+      changes: {
+        before: { amount: before.amount, status: before.status },
+        after: { amount: payment.amount, status: payment.status },
+      },
+    })
+
+    return payment
+  }
+
+  // ── Marcar como pagado ──────────────────────────────────────────────────────
+
+  static async markAsPaid(
+    id: string,
+    data: {
+      paidDate: Date
+      paymentMethod?: string
+      referenceNumber?: string
+      notes?: string
+    },
+    updatedBy: string
+  ) {
+    return await this.update(
+      id,
+      {
+        paidDate: data.paidDate,
+        status: 'PAID',
+        paymentMethod: data.paymentMethod,
+        referenceNumber: data.referenceNumber,
+        notes: data.notes,
+      },
+      updatedBy
+    )
+  }
+
+  // ── Eliminar pago ───────────────────────────────────────────────────────────
+
+  static async delete(id: string, deletedBy: string) {
+    const payment = await prisma.contract_payments.findUnique({
+      where: { id },
+      select: { amount: true, dueDate: true, status: true },
+    })
+    if (!payment) throw new Error('Pago no encontrado')
+
+    await prisma.contract_payments.delete({ where: { id } })
+
+    await createAuditLog({
+      entityType: 'contract_payment',
+      entityId: id,
+      action: 'payment_deleted',
+      userId: deletedBy,
+      changes: { amount: payment.amount, status: payment.status },
+    })
+  }
+
+  // ── Generar pagos automáticos ───────────────────────────────────────────────
+
+  /**
+   * Genera pagos programados para un contrato según su ciclo de facturación
+   */
+  static async generateScheduledPayments(params: {
+    contractId: string
+    startDate: Date
+    endDate: Date
+    billingCycle: string
+    amount: number
+    currency?: string
+    createdBy: string
+  }) {
+    const { contractId, startDate, endDate, billingCycle, amount, currency, createdBy } = params
+
+    const payments: Date[] = []
+    const currentDate = new Date(startDate)
+
+    // Calcular fechas de pago según el ciclo
+    while (currentDate <= endDate) {
+      payments.push(new Date(currentDate))
+
+      switch (billingCycle) {
+        case 'MONTHLY':
+          currentDate.setMonth(currentDate.getMonth() + 1)
+          break
+        case 'QUARTERLY':
+          currentDate.setMonth(currentDate.getMonth() + 3)
+          break
+        case 'BIANNUAL':
+          currentDate.setMonth(currentDate.getMonth() + 6)
+          break
+        case 'ANNUAL':
+          currentDate.setFullYear(currentDate.getFullYear() + 1)
+          break
+        case 'ONE_TIME':
+          // Solo un pago
+          break
+        default:
+          throw new Error(`Ciclo de facturación no soportado: ${billingCycle}`)
+      }
+
+      if (billingCycle === 'ONE_TIME') break
+    }
+
+    // Crear pagos en la base de datos
+    const createdPayments = []
+    for (const dueDate of payments) {
+      const payment = await this.create({
+        contractId,
+        amount,
+        currency,
+        dueDate,
+        createdBy,
+      })
+      createdPayments.push(payment)
+    }
+
+    await createAuditLog({
+      entityType: 'contract',
+      entityId: contractId,
+      action: 'payments_generated',
+      userId: createdBy,
+      changes: {
+        paymentsCount: createdPayments.length,
+        billingCycle,
+        amount,
+      },
+    })
+
+    return createdPayments
+  }
+
+  // ── Job: alertas de pagos próximos ─────────────────────────────────────────
+
+  /**
+   * Verifica pagos próximos y vencidos, envía alertas
+   */
+  static async checkPaymentAlerts() {
+    const now = new Date()
+    const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+    const alerts = {
+      sent7Days: 0,
+      sentDue: 0,
+      sentOverdue: 0,
+      paymentsChecked: 0,
+    }
+
+    // Obtener pagos pendientes
+    const payments = await prisma.contract_payments.findMany({
+      where: {
+        status: { in: ['SCHEDULED', 'DUE', 'OVERDUE'] },
+      },
+      include: {
+        contract: {
+          include: {
+            supplier: { select: { name: true } },
+            family: { select: { id: true, name: true } },
+            creator: { select: { id: true, name: true } },
+          },
+        },
+      },
+    })
+
+    alerts.paymentsChecked = payments.length
+
+    for (const payment of payments) {
+      const daysUntilDue = Math.ceil(
+        (payment.dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+      )
+
+      // Actualizar status
+      const newStatus = computePaymentStatus(payment.dueDate, payment.paidDate)
+      if (newStatus !== payment.status) {
+        await prisma.contract_payments.update({
+          where: { id: payment.id },
+          data: { status: newStatus },
+        })
+      }
+
+      // Alerta 7 días antes
+      if (daysUntilDue <= 7 && daysUntilDue > 0 && !payment.alert7DaysSent) {
+        await this.sendPaymentAlert(payment, 'upcoming', daysUntilDue)
+        await prisma.contract_payments.update({
+          where: { id: payment.id },
+          data: { alert7DaysSent: true, lastAlertSentAt: now },
+        })
+        alerts.sent7Days++
+      }
+
+      // Alerta día de vencimiento
+      if (daysUntilDue === 0 && !payment.alertDueSent) {
+        await this.sendPaymentAlert(payment, 'due', 0)
+        await prisma.contract_payments.update({
+          where: { id: payment.id },
+          data: { alertDueSent: true, lastAlertSentAt: now },
+        })
+        alerts.sentDue++
+      }
+
+      // Alerta vencido
+      if (daysUntilDue < 0 && !payment.alertOverdueSent) {
+        await this.sendPaymentAlert(payment, 'overdue', Math.abs(daysUntilDue))
+        await prisma.contract_payments.update({
+          where: { id: payment.id },
+          data: { alertOverdueSent: true, lastAlertSentAt: now },
+        })
+        alerts.sentOverdue++
+      }
+    }
+
+    // Auditoría
+    await createAuditLog({
+      entityType: 'contract_payment',
+      entityId: 'system',
+      action: 'payment_alerts_checked',
+      userId: 'system',
+      changes: alerts,
+    })
+
+    return alerts
+  }
+
+  // ── Enviar alerta de pago ───────────────────────────────────────────────────
+
+  private static async sendPaymentAlert(
+    payment: any,
+    type: 'upcoming' | 'due' | 'overdue',
+    days: number
+  ) {
+    const contract = payment.contract
+    const supplierName = contract.supplier?.name ?? 'Sin proveedor'
+
+    let title = ''
+    let message = ''
+    let priority: 'LOW' | 'MEDIUM' | 'HIGH' = 'MEDIUM'
+
+    switch (type) {
+      case 'upcoming':
+        title = `Pago próximo: ${contract.name}`
+        message = `El pago de $${payment.amount.toLocaleString()} ${payment.currency} vence en ${days} día(s).`
+        priority = 'MEDIUM'
+        break
+      case 'due':
+        title = `Pago vence hoy: ${contract.name}`
+        message = `El pago de $${payment.amount.toLocaleString()} ${payment.currency} vence hoy.`
+        priority = 'HIGH'
+        break
+      case 'overdue':
+        title = `Pago vencido: ${contract.name}`
+        message = `El pago de $${payment.amount.toLocaleString()} ${payment.currency} está vencido desde hace ${days} día(s).`
+        priority = 'HIGH'
+        break
+    }
+
+    message += `\n\n**Detalles del pago:**\n`
+    message += `- Contrato: ${contract.name}\n`
+    message += `- Proveedor: ${supplierName}\n`
+    message += `- Monto: $${payment.amount.toLocaleString()} ${payment.currency}\n`
+    message += `- Fecha de vencimiento: ${payment.dueDate.toLocaleDateString('es-MX')}\n`
+    if (payment.referenceNumber) {
+      message += `- Referencia: ${payment.referenceNumber}\n`
+    }
+
+    // Obtener administradores de la familia del contrato
+    const admins = await this.getFamilyAdmins(contract.familyId)
+
+    for (const admin of admins) {
+      await NotificationService.create({
+        userId: admin.id,
+        type: type === 'overdue' ? 'CONTRACT_PAYMENT_OVERDUE' : 'CONTRACT_PAYMENT_DUE',
+        title,
+        message,
+        priority,
+        metadata: {
+          paymentId: payment.id,
+          contractId: contract.id,
+          contractName: contract.name,
+          amount: payment.amount,
+          currency: payment.currency,
+          dueDate: payment.dueDate.toISOString(),
+          daysUntilDue: type === 'overdue' ? -days : days,
+        },
+      })
+    }
+  }
+
+  // ── Obtener administradores de familia ─────────────────────────────────────
+
+  private static async getFamilyAdmins(familyId: string | null) {
+    if (!familyId) {
+      // Si no hay familia, notificar a gestores de inventario
+      return await prisma.users.findMany({
+        where: {
+          OR: [{ role: 'ADMIN' }, { canManageInventory: true }],
+        },
+        select: { id: true, name: true, email: true },
+      })
+    }
+
+    // Obtener admins de la familia
+    const familyAdmins = await prisma.users.findMany({
+      where: {
+        familyId,
+        role: { in: ['ADMIN', 'TECHNICIAN'] },
+      },
+      select: { id: true, name: true, email: true },
+    })
+
+    // Si no hay admins en la familia, usar gestores de inventario
+    if (familyAdmins.length === 0) {
+      return await prisma.users.findMany({
+        where: { canManageInventory: true },
+        select: { id: true, name: true, email: true },
+      })
+    }
+
+    return familyAdmins
+  }
+
+  // ── Estadísticas de pagos ───────────────────────────────────────────────────
+
+  static async getStats(contractId?: string) {
+    const where: any = {}
+    if (contractId) where.contractId = contractId
+
+    const [total, scheduled, due, overdue, paid, totalAmount, paidAmount] = await Promise.all([
+      prisma.contract_payments.count({ where }),
+      prisma.contract_payments.count({ where: { ...where, status: 'SCHEDULED' } }),
+      prisma.contract_payments.count({ where: { ...where, status: 'DUE' } }),
+      prisma.contract_payments.count({ where: { ...where, status: 'OVERDUE' } }),
+      prisma.contract_payments.count({ where: { ...where, status: 'PAID' } }),
+      prisma.contract_payments.aggregate({
+        where,
+        _sum: { amount: true },
+      }),
+      prisma.contract_payments.aggregate({
+        where: { ...where, status: 'PAID' },
+        _sum: { amount: true },
+      }),
+    ])
+
+    return {
+      total,
+      scheduled,
+      due,
+      overdue,
+      paid,
+      cancelled: total - scheduled - due - overdue - paid,
+      totalAmount: totalAmount._sum.amount || 0,
+      paidAmount: paidAmount._sum.amount || 0,
+      pendingAmount: (totalAmount._sum.amount || 0) - (paidAmount._sum.amount || 0),
+    }
+  }
+
+  // ── Próximos pagos ──────────────────────────────────────────────────────────
+
+  static async getUpcomingPayments(days: number = 30, familyId?: string) {
+    const now = new Date()
+    const targetDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000)
+
+    const where: any = {
+      status: { in: ['SCHEDULED', 'DUE'] },
+      dueDate: {
+        gte: now,
+        lte: targetDate,
+      },
+    }
+
+    if (familyId) {
+      where.contract = { familyId }
+    }
+
+    const payments = await prisma.contract_payments.findMany({
+      where,
+      include: {
+        contract: {
+          select: {
+            id: true,
+            name: true,
+            contractNumber: true,
+            supplier: { select: { name: true } },
+            family: { select: { name: true, color: true } },
+          },
+        },
+      },
+      orderBy: { dueDate: 'asc' },
+    })
+
+    return payments.map(payment => ({
+      ...payment,
+      daysUntilDue: Math.ceil((payment.dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+    }))
+  }
+}
