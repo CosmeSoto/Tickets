@@ -7,6 +7,7 @@ import { ZodError } from 'zod'
 import { canManageInventory, canManageAsset, inventoryForbidden } from '@/lib/inventory-access'
 import { prisma } from '@/lib/prisma'
 import { calculateDepreciation, familySupportsDepreciation } from '@/lib/inventory/depreciation'
+import { hasAccessToEquipment } from '@/lib/middleware/family-filter'
 
 /**
  * GET /api/inventory/equipment/[id]
@@ -24,37 +25,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const { id: rawId } = await params
     const { id } = equipmentIdSchema.parse({ id: rawId })
 
+    // Verificar acceso al equipo usando middleware de permisos
+    const hasAccess = await hasAccessToEquipment(
+      session.user.id,
+      session.user.role,
+      session.user.isSuperAdmin || false,
+      id
+    )
+
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'No tienes acceso a este equipo' }, { status: 403 })
+    }
+
     // Obtener equipo
     const equipmentDetail = await EquipmentService.getEquipmentDetail(id)
-
-    // Si es CLIENT sin gestión, verificar que sea su equipo asignado
-    if (session.user.role === 'CLIENT' && !(session.user as any).canManageInventory) {
-      const isAssignedToUser = equipmentDetail.currentAssignment?.receiverId === session.user.id
-      if (!isAssignedToUser) {
-        return NextResponse.json({ error: 'No tienes acceso a este equipo' }, { status: 403 })
-      }
-    }
-
-    // Si es gestor (no admin), verificar que el activo pertenezca a una de sus familias
-    if (session.user.role !== 'ADMIN' && (session.user as any).canManageInventory) {
-      const eq = equipmentDetail.equipment as any
-      const assetFamilyId = eq.type?.family?.id ?? eq.type?.familyId ?? null
-      const isSuperAdmin = (session.user as any).isSuperAdmin === true
-      const allowed = await canManageAsset(
-        session.user.id,
-        session.user.role,
-        isSuperAdmin,
-        assetFamilyId
-      )
-      if (!allowed) {
-        // Puede que tenga el equipo asignado personalmente — eso también da acceso de lectura
-        const isPersonallyAssigned =
-          equipmentDetail.currentAssignment?.receiverId === session.user.id
-        if (!isPersonallyAssigned) {
-          return NextResponse.json({ error: 'No tienes acceso a este equipo' }, { status: 403 })
-        }
-      }
-    }
 
     // Calcular depreciación si están disponibles los campos requeridos
     const eq = equipmentDetail.equipment as any

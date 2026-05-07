@@ -427,11 +427,17 @@ export class SalesManagerService {
     search?: string
     page?: number
     pageSize?: number
+    familyFilter?: any // NUEVO: filtro de permisos
   }) {
-    const { familyId, modelId, warehouseId, search, page = 1, pageSize = 50 } = params
+    const { familyId, modelId, warehouseId, search, page = 1, pageSize = 50, familyFilter } = params
 
     const where: any = {
       status: { in: ['AVAILABLE', 'ASSIGNED'] },
+    }
+
+    // Aplicar filtro de permisos PRIMERO
+    if (familyFilter) {
+      Object.assign(where, familyFilter)
     }
 
     if (familyId) where.familyId = familyId
@@ -476,11 +482,17 @@ export class SalesManagerService {
     search?: string
     page?: number
     pageSize?: number
+    familyFilter?: any // NUEVO: filtro de permisos
   }) {
-    const { familyId, modelId, search, page = 1, pageSize = 50 } = params
+    const { familyId, modelId, search, page = 1, pageSize = 50, familyFilter } = params
 
     const where: any = {
       status: 'FOR_SALE',
+    }
+
+    // Aplicar filtro de permisos PRIMERO
+    if (familyFilter) {
+      Object.assign(where, familyFilter)
     }
 
     if (familyId) where.familyId = familyId

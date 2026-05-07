@@ -173,13 +173,19 @@ export class EquipmentService {
     page: number = 1,
     limit: number = 10,
     userId?: string,
-    userRole?: string
+    userRole?: string,
+    familyFilter?: any
   ): Promise<EquipmentListResponse> {
     try {
       const skip = (page - 1) * limit
 
       // Construir filtros
       const where: Prisma.equipmentWhereInput = {}
+
+      // Aplicar filtro de familia/permisos PRIMERO (más restrictivo)
+      if (familyFilter) {
+        Object.assign(where, familyFilter)
+      }
 
       // Búsqueda de texto
       if (filters.search) {
@@ -221,16 +227,6 @@ export class EquipmentService {
         where.assignments = {
           some: {
             receiverId: filters.assignedTo,
-            isActive: true,
-          },
-        }
-      }
-
-      // Si es CLIENT, solo ver sus equipos asignados
-      if (userRole === 'CLIENT' && userId) {
-        where.assignments = {
-          some: {
-            receiverId: userId,
             isActive: true,
           },
         }
@@ -308,11 +304,21 @@ export class EquipmentService {
           ...(data.location !== undefined && { location: data.location }),
           ...(data.notes !== undefined && { notes: data.notes }),
           // Campos adicionales que el formulario de edición puede enviar
-          ...((data as any).physicalLocation !== undefined && { physicalLocation: (data as any).physicalLocation || null }),
-          ...((data as any).invoiceNumber !== undefined && { invoiceNumber: (data as any).invoiceNumber || null }),
-          ...((data as any).usefulLifeYears !== undefined && { usefulLifeYears: (data as any).usefulLifeYears ?? null }),
-          ...((data as any).residualValue !== undefined && { residualValue: (data as any).residualValue ?? null }),
-          ...((data as any).depreciationMethod !== undefined && { depreciationMethod: (data as any).depreciationMethod || null }),
+          ...((data as any).physicalLocation !== undefined && {
+            physicalLocation: (data as any).physicalLocation || null,
+          }),
+          ...((data as any).invoiceNumber !== undefined && {
+            invoiceNumber: (data as any).invoiceNumber || null,
+          }),
+          ...((data as any).usefulLifeYears !== undefined && {
+            usefulLifeYears: (data as any).usefulLifeYears ?? null,
+          }),
+          ...((data as any).residualValue !== undefined && {
+            residualValue: (data as any).residualValue ?? null,
+          }),
+          ...((data as any).depreciationMethod !== undefined && {
+            depreciationMethod: (data as any).depreciationMethod || null,
+          }),
         },
       })
 
@@ -415,7 +421,11 @@ export class EquipmentService {
    * Admin normal: requiere estado RETIRED.
    * SuperAdmin: puede eliminar cualquier equipo no asignado.
    */
-  static async permanentDeleteEquipment(id: string, userId: string, skipStatusCheck = false): Promise<void> {
+  static async permanentDeleteEquipment(
+    id: string,
+    userId: string,
+    skipStatusCheck = false
+  ): Promise<void> {
     try {
       const equipment = await prisma.equipment.findUnique({ where: { id } })
 

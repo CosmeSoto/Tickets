@@ -10,6 +10,7 @@ import { ZodError } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { withCache, invalidateCache, buildCacheKey } from '@/lib/api-cache'
 import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
+import { applyEquipmentFamilyFilter, createUserContext } from '@/lib/middleware/family-filter'
 
 /**
  * GET /api/inventory/equipment
@@ -41,6 +42,10 @@ export async function GET(request: NextRequest) {
     // Validar filtros
     const validatedFilters = equipmentFiltersSchema.parse(filters)
 
+    // Aplicar filtro de familia según rol del usuario
+    const userContext = createUserContext(session)
+    const familyFilter = await applyEquipmentFamilyFilter(userContext)
+
     // Caché 60s — se invalida en POST/PUT/DELETE
     const cacheKey = buildCacheKey('inventory:equipment', {
       uid: session.user.id,
@@ -54,7 +59,8 @@ export async function GET(request: NextRequest) {
         validatedFilters.page,
         validatedFilters.limit,
         session.user.id,
-        session.user.role
+        session.user.role,
+        familyFilter
       )
     )
 
