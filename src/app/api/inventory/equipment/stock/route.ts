@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { getCachedData, setCachedData } from '@/lib/api-cache'
+import { buildCacheKey } from '@/lib/api-cache'
 import type { StockInfo } from '@/types/equipment-grouping'
 
 export const dynamic = 'force-dynamic'
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
     const cacheKey = `inventory:equipment:stock:${brand}:${model}:${typeId}`
 
     // 5. Intentar obtener de caché
-    const cached = await getCachedData<StockInfo>(cacheKey)
+    // const cached = await getCachedData<StockInfo>(cacheKey)
 
     if (cached) {
       return NextResponse.json(cached, {
@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 8. Guardar en caché (TTL 30s)
-    await setCachedData(cacheKey, stockInfo, 30)
+    // await setCachedData(cacheKey, stockInfo, 30)
 
     // 9. Retornar respuesta
     return NextResponse.json(stockInfo, {

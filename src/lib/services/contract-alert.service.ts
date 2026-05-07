@@ -1,5 +1,5 @@
 import prisma from '@/lib/prisma'
-import { NotificationService } from './notification.service'
+import { NotificationService } from './inventory-notification.service'
 
 export class ContractAlertService {
   /**

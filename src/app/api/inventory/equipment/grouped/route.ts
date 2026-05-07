@@ -10,7 +10,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { canManageInventory } from '@/lib/inventory-access'
-import { getCachedData, setCachedData } from '@/lib/api-cache'
+import { withCache, buildCacheKey, invalidateCache } from '@/lib/api-cache'
 import type { GroupedInventoryRow, EquipmentSummary } from '@/types/equipment-grouping'
 
 export const dynamic = 'force-dynamic'
@@ -60,22 +60,17 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20', 10)
 
     // 4. Generar cache key
-    const cacheKey = `inventory:equipment:grouped:${search || 'all'}:${familyId || 'all'}:${typeId || 'all'}:${page}:${limit}`
+    const cacheKey = buildCacheKey('inventory:equipment:grouped', {
+      search: search || 'all',
+      familyId: familyId || 'all',
+      typeId: typeId || 'all',
+      page,
+      limit,
+    })
 
-    // 5. Intentar obtener de caché
-    const cached = await getCachedData<{
-      groups: GroupedInventoryRow[]
-      pagination: { page: number; limit: number; total: number; totalPages: number }
-    }>(cacheKey)
-
-    if (cached) {
-      return NextResponse.json(cached, {
-        status: 200,
-        headers: {
-          'X-Cache': 'HIT',
-        },
-      })
-    }
+    // 5. Intentar obtener de caché (temporalmente deshabilitado)
+    // TODO: Refactorizar para usar withCache correctamente
+    // const cached = await getCachedData<{...}>(cacheKey)
 
     // 6. Construir filtros
     const where: any = {}
@@ -236,8 +231,9 @@ export async function GET(request: NextRequest) {
       },
     }
 
-    // 11. Guardar en caché (TTL 30s)
-    await setCachedData(cacheKey, response, 30)
+    // 11. Guardar en caché (temporalmente deshabilitado)
+    // TODO: Refactorizar para usar withCache correctamente
+    // await setCachedData(cacheKey, response, 30)
 
     // 12. Retornar respuesta
     return NextResponse.json(response, {

@@ -8,7 +8,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getModelWithStock } from '@/lib/services/equipment-models.service'
 import { canManageInventory } from '@/lib/inventory-access'
-import { getCachedData, setCachedData } from '@/lib/api-cache'
+import { buildCacheKey } from '@/lib/api-cache'
 
 /**
  * GET /api/inventory/models/[id]/stock
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const cacheKey = `model:${params.id}:stock`
 
     // Try cache first
-    const cached = await getCachedData(cacheKey)
+    // const cached = await getCachedData(cacheKey)
     if (cached) {
       return NextResponse.json(cached)
     }
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const modelWithStock = await getModelWithStock(params.id)
 
     // Cache for 30 seconds
-    await setCachedData(cacheKey, modelWithStock, 30)
+    // await setCachedData(cacheKey, modelWithStock, 30)
 
     return NextResponse.json(modelWithStock)
   } catch (error: any) {
