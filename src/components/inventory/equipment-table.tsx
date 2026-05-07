@@ -17,6 +17,8 @@ import { EquipmentCondition } from '@prisma/client'
 import type { Equipment } from '@/types/inventory/equipment'
 import { useTableSort, SortIcon, sortableHeaderClass } from '@/hooks/common/use-table-sort'
 
+import { Checkbox } from '@/components/ui/checkbox'
+
 interface EquipmentTableProps {
   equipment: Equipment[]
   userRole: string
@@ -24,6 +26,12 @@ interface EquipmentTableProps {
   onEdit?: (equipment: Equipment) => void
   onDelete?: (equipment: Equipment) => void
   onViewQR?: (equipment: Equipment) => void
+  enableSelection?: boolean
+  selectedIds?: Set<string>
+  onToggleSelection?: (id: string) => void
+  onToggleAll?: () => void
+  isAllSelected?: boolean
+  isSomeSelected?: boolean
 }
 
 import { getAssetStatusColor, getAssetStatusLabel } from '@/lib/utils/inventory-utils'
@@ -51,6 +59,12 @@ export function EquipmentTable({
   canManageInventory = false,
   onDelete,
   onViewQR,
+  enableSelection = false,
+  selectedIds = new Set(),
+  onToggleSelection,
+  onToggleAll,
+  isAllSelected = false,
+  isSomeSelected = false,
 }: Omit<EquipmentTableProps, 'onEdit'> & { onEdit?: (e: Equipment) => void }) {
   const router = useRouter()
   const isAdmin = userRole === 'ADMIN'
@@ -71,6 +85,18 @@ export function EquipmentTable({
       <Table>
         <TableHeader>
           <TableRow>
+            {enableSelection && (
+              <TableHead className='w-12'>
+                <Checkbox
+                  checked={isAllSelected}
+                  onCheckedChange={onToggleAll}
+                  aria-label='Seleccionar todos'
+                  className={
+                    isSomeSelected && !isAllSelected ? 'data-[state=checked]:bg-muted' : ''
+                  }
+                />
+              </TableHead>
+            )}
             <TableHead className={sortableHeaderClass} onClick={() => toggleSort('code')}>
               Código {SortIcon('code', sortKey, sortDir)}
             </TableHead>
@@ -99,6 +125,15 @@ export function EquipmentTable({
               className='cursor-pointer hover:bg-muted/50'
               onClick={() => router.push(`/inventory/equipment/${item.id}`)}
             >
+              {enableSelection && (
+                <TableCell onClick={e => e.stopPropagation()}>
+                  <Checkbox
+                    checked={selectedIds.has(item.id)}
+                    onCheckedChange={() => onToggleSelection?.(item.id)}
+                    aria-label={`Seleccionar ${item.code}`}
+                  />
+                </TableCell>
+              )}
               <TableCell className='font-medium'>{item.code}</TableCell>
               <TableCell>
                 <div>

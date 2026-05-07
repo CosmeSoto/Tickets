@@ -11,6 +11,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/hooks/use-toast'
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
+import { BulkActionsToolbar } from './equipment/BulkActionsToolbar'
+import { useEquipmentSelection } from '@/hooks/inventory/use-equipment-selection'
 import type {
   Equipment,
   EquipmentFilters as EquipmentFiltersType,
@@ -21,9 +23,22 @@ interface EquipmentListProps {
   onEdit?: (equipment: Equipment) => void
   onDelete?: (equipment: Equipment) => void
   onViewQR?: (equipment: Equipment) => void
+  enableBulkActions?: boolean
+  onBulkForSale?: (equipmentIds: string[]) => void
+  onBulkMaintenance?: (equipmentIds: string[]) => void
+  onBulkDecommission?: (equipmentIds: string[]) => void
 }
 
-export function EquipmentList({ onCreateNew, onEdit, onDelete, onViewQR }: EquipmentListProps) {
+export function EquipmentList({
+  onCreateNew,
+  onEdit,
+  onDelete,
+  onViewQR,
+  enableBulkActions = false,
+  onBulkForSale,
+  onBulkMaintenance,
+  onBulkDecommission,
+}: EquipmentListProps) {
   const { data: session } = useSession()
   const { toast } = useToast()
 
@@ -34,6 +49,9 @@ export function EquipmentList({ onCreateNew, onEdit, onDelete, onViewQR }: Equip
   const [limit] = useState(20)
 
   const [filters, setFilters] = useState<EquipmentFiltersType>({})
+
+  // Hook de selección múltiple
+  const selection = useEquipmentSelection()
 
   // Cargar equipos
   useEffect(() => {
@@ -81,11 +99,29 @@ export function EquipmentList({ onCreateNew, onEdit, onDelete, onViewQR }: Equip
   const handleFiltersChange = (newFilters: EquipmentFiltersType) => {
     setFilters(newFilters)
     setPage(1) // Reset a primera página
+    selection.deselectAll() // Limpiar selección al cambiar filtros
   }
 
   const handleReset = () => {
     setFilters({})
     setPage(1)
+    selection.deselectAll()
+  }
+
+  // Handlers de acciones masivas
+  const handleBulkForSale = () => {
+    const selectedIds = selection.getSelectedIds()
+    onBulkForSale?.(selectedIds)
+  }
+
+  const handleBulkMaintenance = () => {
+    const selectedIds = selection.getSelectedIds()
+    onBulkMaintenance?.(selectedIds)
+  }
+
+  const handleBulkDecommission = () => {
+    const selectedIds = selection.getSelectedIds()
+    onBulkDecommission?.(selectedIds)
   }
 
   const canCreate =
@@ -219,6 +255,12 @@ export function EquipmentList({ onCreateNew, onEdit, onDelete, onViewQR }: Equip
                 onEdit={onEdit}
                 onDelete={onDelete}
                 onViewQR={onViewQR}
+                enableSelection={enableBulkActions}
+                selectedIds={selection.selectedIds}
+                onToggleSelection={selection.toggleSelection}
+                onToggleAll={() => selection.toggleAll(equipment.map(e => e.id))}
+                isAllSelected={selection.isAllSelected(equipment.map(e => e.id))}
+                isSomeSelected={selection.isSomeSelected(equipment.map(e => e.id))}
               />
 
               {/* Paginación */}
@@ -251,6 +293,17 @@ export function EquipmentList({ onCreateNew, onEdit, onDelete, onViewQR }: Equip
           )}
         </CardContent>
       </Card>
+
+      {/* Toolbar de acciones masivas */}
+      {enableBulkActions && (
+        <BulkActionsToolbar
+          selectedCount={selection.getSelectedCount()}
+          onForSale={handleBulkForSale}
+          onMaintenance={handleBulkMaintenance}
+          onDecommission={handleBulkDecommission}
+          onClearSelection={selection.deselectAll}
+        />
+      )}
     </div>
   )
 }
