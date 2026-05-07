@@ -31,7 +31,7 @@ async function main() {
     // 1. Contar equipos sin serial
     const withoutSerial = await prisma.equipment.findMany({
       where: {
-        OR: [{ serialNumber: null }, { serialNumber: '' }],
+        serialNumber: '',
       },
       select: {
         id: true,
