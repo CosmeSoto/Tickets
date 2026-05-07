@@ -31,15 +31,23 @@ export class FolioService {
   }
 
   /**
+   * Genera un código único para solicitud de activo
+   * Formato: AR-YYYY-NNNN (4 dígitos)
+   */
+  static async generateAssetRequestCode(): Promise<string> {
+    return this.generateFolio('AR')
+  }
+
+  /**
    * Genera un folio secuencial único
    * Thread-safe usando transacciones de Prisma
    */
-  private static async generateFolio(type: 'ACT' | 'DEV' | 'BAJ'): Promise<string> {
+  private static async generateFolio(type: 'ACT' | 'DEV' | 'BAJ' | 'AR'): Promise<string> {
     const currentYear = new Date().getFullYear()
 
     try {
       // Usar transacción para garantizar atomicidad
-      const result = await prisma.$transaction(async (tx) => {
+      const result = await prisma.$transaction(async tx => {
         // Buscar o crear contador para el año actual
         let counter = await tx.folio_counters.findUnique({
           where: {
@@ -79,8 +87,9 @@ export class FolioService {
         return counter
       })
 
-      // Formatear folio: ACT-2024-00001
-      const paddedNumber = result.lastNumber.toString().padStart(5, '0')
+      // Formatear folio: ACT-2024-00001 / AR-2024-0001
+      const digits = type === 'AR' ? 4 : 5
+      const paddedNumber = result.lastNumber.toString().padStart(digits, '0')
       return `${type}-${currentYear}-${paddedNumber}`
     } catch (error) {
       console.error('Error generando folio:', error)
@@ -113,7 +122,10 @@ export class FolioService {
   /**
    * Obtiene el último número de folio para un año y tipo
    */
-  static async getLastFolioNumber(year: number, type: 'ACT' | 'DEV' | 'BAJ'): Promise<number> {
+  static async getLastFolioNumber(
+    year: number,
+    type: 'ACT' | 'DEV' | 'BAJ' | 'AR'
+  ): Promise<number> {
     try {
       const counter = await prisma.folio_counters.findUnique({
         where: {
@@ -134,7 +146,7 @@ export class FolioService {
   /**
    * Reinicia el contador de folios para un año (solo para testing/admin)
    */
-  static async resetCounter(year: number, type: 'ACT' | 'DEV' | 'BAJ'): Promise<void> {
+  static async resetCounter(year: number, type: 'ACT' | 'DEV' | 'BAJ' | 'AR'): Promise<void> {
     try {
       await prisma.folio_counters.upsert({
         where: {

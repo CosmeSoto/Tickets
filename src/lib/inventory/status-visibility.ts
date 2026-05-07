@@ -7,6 +7,7 @@
  *   MAINTENANCE→ departamento manual + bloque de mantenimiento — sin bodega
  *   DAMAGED    → bodega + departamento manual
  *   RETIRED    → aviso histórico — sin bodega, sin departamento
+ *   FOR_SALE   → campo precio de venta — sin bodega, sin asignación, sin mantenimiento
  *   SOLD       → igual que RETIRED
  */
 
@@ -16,6 +17,7 @@ export type EquipmentStatusValue =
   | 'MAINTENANCE'
   | 'DAMAGED'
   | 'RETIRED'
+  | 'FOR_SALE'
   | 'SOLD'
 
 /** Muestra selector de departamento manual */
@@ -46,4 +48,9 @@ export function showRetiredWarning(status: string): boolean {
 /** Muestra aviso de activo vendido */
 export function showSoldWarning(status: string): boolean {
   return status === 'SOLD'
+}
+
+/** Muestra campo de precio de venta público (solo para FOR_SALE) */
+export function showForSalePriceField(status: string): boolean {
+  return status === 'FOR_SALE'
 }

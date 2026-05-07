@@ -1,9 +1,19 @@
 'use client'
 
 import { useState } from 'react'
-import { Package, Loader2, ChevronDown, ChevronUp, TrendingDown, ArrowLeft, X } from 'lucide-react'
+import {
+  Package,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+  TrendingDown,
+  ArrowLeft,
+  X,
+  Tag,
+} from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEquipmentDetail } from '@/hooks/use-equipment-detail'
+import { formatCurrency } from '@/lib/utils'
 import { EquipmentStatusBanners } from './equipment/equipment-status-banners'
 import { EquipmentActionButtons } from './equipment/equipment-action-buttons'
 import { EquipmentInfoCard } from './equipment/equipment-info-card'
@@ -145,6 +155,17 @@ export function EquipmentDetail({
               {equipment.type?.name || 'Sin tipo'} · {equipment.brand} {equipment.model}
             </h1>
             <p className='text-xs text-muted-foreground font-mono truncate'>{equipment.code}</p>
+            {equipment.status === 'FOR_SALE' && (
+              <span className='inline-flex items-center gap-1.5 mt-1.5 px-3 py-1 rounded-full text-sm font-medium bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30'>
+                <Tag className='h-3.5 w-3.5' />
+                En venta
+                {equipment.saleListingPrice && (
+                  <span className='font-semibold ml-1'>
+                    · {formatCurrency(equipment.saleListingPrice)}
+                  </span>
+                )}
+              </span>
+            )}
           </div>
         </div>
         <EquipmentActionButtons

@@ -437,6 +437,7 @@ model users {
   createdAt                                         DateTime                        @default(now())
   updatedAt                                         DateTime
   isSuperAdmin                                      Boolean                         @default(false) @map("is_super_admin")
+  canRequestAssets                                  Boolean                         @default(false) @map("can_request_assets")
   accounts                                          accounts[]
   adminFamilyAssignments                            admin_family_assignments[]
   clientFamilyAssignments                           client_family_assignments[]
@@ -487,6 +488,9 @@ model users {
   contractAttachmentsUploaded                       contract_attachments[]          @relation("ContractAttachmentUploader")
   saleRequests                                      equipment_sales[]               @relation("SaleRequester")
   saleApprovals                                     equipment_sales[]               @relation("SaleApprover")
+  assetRequestsCreated                              asset_requests[]                @relation("AssetRequestRequester")
+  assetRequestsReviewed                             asset_requests[]                @relation("AssetRequestReviewer")
+  assetRequestsFulfilled                            asset_requests[]                @relation("AssetRequestFulfiller")
 
   @@index([departmentId])
   @@index([name, email])
@@ -877,6 +881,7 @@ model equipment {
   depreciationMethod    DepreciationMethod?     @map("depreciation_method")
   totalUnits            Float?                  @map("total_units")
   usedUnits             Float?                  @map("used_units")
+  saleListingPrice      Float?                  @map("sale_listing_price")
   contractStartDate     DateTime?               @map("contract_start_date")
   contractEndDate       DateTime?               @map("contract_end_date")
   contractRenewalCost   Float?                  @map("contract_renewal_cost")
@@ -905,6 +910,12 @@ model equipment {
   @@index([departmentId])
   @@index([rentalProvider])
   @@index([rentalEndDate])
+  // Performance indexes — consultas frecuentes de listado y filtrado
+  @@index([status, createdAt(sort: Desc)])
+  @@index([departmentId, status])
+  @@index([createdAt(sort: Desc)])
+  @@index([supplierId])
+  @@index([warehouseId])
   @@map("equipment")
 }
 
@@ -1333,6 +1344,7 @@ model families {
   color                       String?                         @default("#6B7280") @db.VarChar(20)
   isActive                    Boolean                         @default(true) @map("is_active")
   order                       Int                             @default(0)
+  contactWhatsapp             String?                         @map("contact_whatsapp") @db.VarChar(30)
   createdAt                   DateTime                        @default(now()) @map("created_at")
   updatedAt                   DateTime                        @updatedAt @map("updated_at")
   adminFamilyAssignments      admin_family_assignments[]
@@ -1353,6 +1365,7 @@ model families {
   ticketFamilyConfig          ticket_family_config?
   tickets                     tickets[]
   contracts                   contracts[]
+  assetRequests               asset_requests[]
 
   @@index([isActive, order])
   @@map("families")
@@ -1590,6 +1603,7 @@ enum EquipmentStatus {
   MAINTENANCE
   DAMAGED
   RETIRED
+  FOR_SALE
   SOLD
 }
 
@@ -1869,4 +1883,88 @@ model equipment_sales {
   @@index([requestedById])
   @@index([approvedById])
   @@map("equipment_sales")
+}
+
+// ── Solicitudes de Activos ────────────────────────────────────────────────────
+
+enum AssetRequestStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  FULFILLED
+}
+
+enum AssetType {
+  EQUIPMENT
+  LICENSE
+  OTHER
+}
+
+model asset_requests {
+  id               String             @id @default(uuid())
+
+  /// Código único — formato AR-{YEAR}-{SEQUENCE}
+  code             String             @unique @db.VarChar(30)
+
+  /// Tipo de activo solicitado
+  assetType        AssetType          @map("asset_type")
+
+  /// Descripción de la necesidad (min 10 chars)
+  description      String
+
+  /// Justificación del requerimiento (min 10 chars)
+  justification    String
+
+  /// Cantidad requerida (default 1)
+  quantity         Int                @default(1)
+
+  /// Fecha estimada de necesidad (opcional)
+  neededBy         DateTime?          @map("needed_by")
+
+  /// Referencia opcional a un activo del catálogo
+  assetId          String?            @map("asset_id")
+  assetEntityType  String?            @map("asset_entity_type") @db.VarChar(20)
+
+  /// Familia a la que pertenece la solicitud
+  familyId         String             @map("family_id")
+
+  /// Solicitante
+  requesterId      String             @map("requester_id")
+
+  /// Estado del ciclo de vida
+  status           AssetRequestStatus @default(PENDING)
+
+  /// Comentario del Super Admin al aprobar/rechazar (obligatorio, min 10 chars)
+  reviewerComment  String?            @map("reviewer_comment")
+  reviewedById     String?            @map("reviewed_by_id")
+  reviewedAt       DateTime?          @map("reviewed_at")
+
+  /// Entrega (FULFILLED)
+  fulfilledById    String?            @map("fulfilled_by_id")
+  fulfilledAt      DateTime?          @map("fulfilled_at")
+
+  /// Comentarios internos de revisión — JSON array
+  /// Cada entrada: { id, userId, userName, userRole, comment, createdAt }
+  reviewComments   Json               @default("[]") @map("review_comments")
+
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+
+  // Relaciones
+  family           families           @relation(fields: [familyId], references: [id])
+  requester        users              @relation("AssetRequestRequester", fields: [requesterId], references: [id])
+  reviewedBy       users?             @relation("AssetRequestReviewer", fields: [reviewedById], references: [id])
+  fulfilledBy      users?             @relation("AssetRequestFulfiller", fields: [fulfilledById], references: [id])
+
+  // Índices de performance
+  @@index([familyId, status, createdAt(sort: Desc)])
+  @@index([requesterId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([code])
+  @@index([familyId, createdAt(sort: Desc)])
+  @@index([reviewedById])
+  @@index([fulfilledById])
+
+  @@map("asset_requests")
 }

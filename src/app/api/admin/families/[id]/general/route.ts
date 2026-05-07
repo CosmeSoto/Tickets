@@ -23,7 +23,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     const body = await request.json()
-    const { name, description, color, icon, isActive, order, code } = body
+    const { name, description, color, icon, isActive, order, code, contactWhatsapp } = body
 
     // Validate code uniqueness against other families
     if (code !== undefined && code !== existing.code) {
@@ -48,6 +48,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         ...(icon !== undefined && { icon }),
         ...(isActive !== undefined && { isActive }),
         ...(order !== undefined && { order }),
+        ...(contactWhatsapp !== undefined && { contactWhatsapp }),
       },
     })
 

@@ -5,8 +5,8 @@ import { prisma } from '@/lib/prisma'
  */
 const SUBTYPE_PREFIX: Record<string, string> = {
   EQUIPMENT: 'EQ',
-  MRO:       'MRO',
-  LICENSE:   'LIC',
+  MRO: 'MRO',
+  LICENSE: 'LIC',
 }
 
 /**
@@ -14,8 +14,8 @@ const SUBTYPE_PREFIX: Record<string, string> = {
  */
 const MODE_PREFIX: Record<string, string> = {
   FIXED_ASSET: 'FA',
-  RENTAL:      'RNT',
-  LOAN:        'LOAN',
+  RENTAL: 'RNT',
+  LOAN: 'LOAN',
 }
 
 /**
@@ -35,23 +35,27 @@ export async function generateAssetCode(
   const year = new Date().getFullYear()
 
   // Obtener código de la familia y prefijo personalizado
-  const family = familyId ? await prisma.families.findUnique({
-    where: { id: familyId },
-    select: {
-      code: true,
-      formConfig: { select: { codePrefix: true } },
-    },
-  }) : null
+  const family = familyId
+    ? await prisma.families.findUnique({
+        where: { id: familyId },
+        select: {
+          code: true,
+          formConfig: { select: { codePrefix: true } },
+        },
+      })
+    : null
 
-  const familyCode = family?.formConfig?.codePrefix?.trim()
-    ? family.formConfig.codePrefix.trim().toUpperCase()
-    : (family?.code ?? 'INV').slice(0, 6).toUpperCase()
+  const familyCode = (
+    family?.formConfig?.codePrefix?.trim()
+      ? family.formConfig.codePrefix.trim().toUpperCase()
+      : (family?.code ?? 'INV').toUpperCase()
+  ).slice(0, 4)
   const subtypePrefix = SUBTYPE_PREFIX[subtype] ?? subtype.slice(0, 3).toUpperCase()
   const modePrefix = MODE_PREFIX[acquisitionMode ?? 'FIXED_ASSET'] ?? 'FA'
 
   // Contar activos existentes de esta familia+subtipo en el año para el secuencial
   const yearStart = new Date(`${year}-01-01T00:00:00.000Z`)
-  const yearEnd   = new Date(`${year + 1}-01-01T00:00:00.000Z`)
+  const yearEnd = new Date(`${year + 1}-01-01T00:00:00.000Z`)
 
   let count = 0
   if (!familyId) {

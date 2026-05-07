@@ -284,125 +284,136 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
   console.log('[POST /api/inventory/assets] Body keys:', Object.keys(body))
-  console.log('[POST /api/inventory/assets] subtype:', body.subtype, 'familyId:', body.familyId, 'typeId:', body.typeId)
-  
-  try {
-  const {
-    subtype,
-    familyId,
-    name,
-    acquisitionMode,
-    supplierId,
-    contractAction,
-    contractId: bodyContractId,
-    contractNumber,
-    contractStartDate,
-    contractEndDate,
-    contractMonthlyCost,
-    // EQUIPMENT
-    code,
-    serialNumber,
-    brand,
-    model,
-    typeId,
-    warehouseId,
-    purchaseDate,
-    purchasePrice,
-    invoiceNumber,
-    usefulLifeYears,
-    residualValue,
-    depreciationMethod,
-    // MRO
-    unitOfMeasureId,
-    currentStock,
-    minStock,
-    maxStock,
-    expirationDate,
-    // LICENSE
-    key,
-    cost,
-  } = body
-
-  // Obtener config de familia y validar subtipo
-  if (!familyId) {
-    return NextResponse.json({ error: 'Falta el área (familyId) del activo' }, { status: 400 })
-  }
-  if (!subtype) {
-    return NextResponse.json({ error: 'Falta el tipo de activo (subtype)' }, { status: 400 })
-  }
-
-  const config = await getFamilyConfig(familyId)
-  const subtypeValidation = validateSubtypeForFamily(subtype, config)
-  if (!subtypeValidation.valid) {
-    return NextResponse.json({ error: subtypeValidation.error }, { status: 422 })
-  }
-
-  // Validar proveedor
-  const supplierValidation = validateSupplierRequirement(acquisitionMode, supplierId)
-  if (!supplierValidation.valid) {
-    return NextResponse.json({ error: supplierValidation.error }, { status: 422 })
-  }
-
-  // Validar contrato
-  const contractValidation = validateContractRequirement(
-    acquisitionMode,
-    bodyContractId,
-    contractAction
+  console.log(
+    '[POST /api/inventory/assets] subtype:',
+    body.subtype,
+    'familyId:',
+    body.familyId,
+    'typeId:',
+    body.typeId
   )
-  if (!contractValidation.valid) {
-    return NextResponse.json({ error: contractValidation.error }, { status: 422 })
-  }
 
-  // Crear contrato si contractAction === 'create'
-  let resolvedContractId: string | undefined = bodyContractId ?? undefined
+  try {
+    const {
+      subtype,
+      familyId,
+      name,
+      acquisitionMode,
+      supplierId,
+      contractAction,
+      contractId: bodyContractId,
+      contractNumber,
+      contractStartDate,
+      contractEndDate,
+      contractMonthlyCost,
+      // EQUIPMENT
+      code,
+      serialNumber,
+      brand,
+      model,
+      typeId,
+      warehouseId,
+      purchaseDate,
+      purchasePrice,
+      invoiceNumber,
+      usefulLifeYears,
+      residualValue,
+      depreciationMethod,
+      // MRO
+      unitOfMeasureId,
+      currentStock,
+      minStock,
+      maxStock,
+      expirationDate,
+      // LICENSE
+      key,
+      cost,
+    } = body
 
-  if (contractAction === 'create') {
-    // Buscar un tipo de licencia disponible
-    const defaultLicenseType = await prisma.license_types.findFirst({
-      where: { isActive: true },
-      orderBy: { order: 'asc' },
+    // Obtener config de familia y validar subtipo
+    if (!familyId) {
+      return NextResponse.json({ error: 'Falta el área (familyId) del activo' }, { status: 400 })
+    }
+    if (!subtype) {
+      return NextResponse.json({ error: 'Falta el tipo de activo (subtype)' }, { status: 400 })
+    }
+
+    const config = await getFamilyConfig(familyId)
+    const subtypeValidation = validateSubtypeForFamily(subtype, config)
+    if (!subtypeValidation.valid) {
+      return NextResponse.json({ error: subtypeValidation.error }, { status: 422 })
+    }
+
+    // Validar proveedor
+    const supplierValidation = validateSupplierRequirement(acquisitionMode, supplierId)
+    if (!supplierValidation.valid) {
+      return NextResponse.json({ error: supplierValidation.error }, { status: 422 })
+    }
+
+    // Validar contrato
+    const contractValidation = validateContractRequirement(
+      acquisitionMode,
+      bodyContractId,
+      contractAction
+    )
+    if (!contractValidation.valid) {
+      return NextResponse.json({ error: contractValidation.error }, { status: 422 })
+    }
+
+    // Crear contrato si contractAction === 'create'
+    let resolvedContractId: string | undefined = bodyContractId ?? undefined
+
+    if (contractAction === 'create') {
+      // Buscar un tipo de licencia disponible
+      const defaultLicenseType = await prisma.license_types.findFirst({
+        where: { isActive: true },
+        orderBy: { order: 'asc' },
+      })
+
+      const newContract = await prisma.software_licenses.create({
+        data: {
+          id: randomUUID(),
+          name: contractNumber ?? 'Contrato',
+          typeId: defaultLicenseType?.id ?? '',
+          vendor: supplierId ?? undefined,
+          cost: contractMonthlyCost ?? undefined,
+          purchaseDate: contractStartDate ? new Date(contractStartDate) : undefined,
+          expirationDate: contractEndDate ? new Date(contractEndDate) : undefined,
+          supplierId: supplierId ?? undefined,
+        },
+      })
+      resolvedContractId = newContract.id
+    }
+
+    // Generar código automático si no se proporcionó uno
+    const resolvedCode =
+      code && String(code).trim()
+        ? String(code).trim()
+        : await generateAssetCode(familyId ?? '', subtype, acquisitionMode).catch(err => {
+            console.error('[generateAssetCode] Error:', err.message, {
+              familyId,
+              subtype,
+              acquisitionMode,
+            })
+            // Fallback: código genérico con timestamp
+            const ts = Date.now().toString(36).toUpperCase()
+            return `${(subtype ?? 'EQ').slice(0, 3)}-${ts}`
+          })
+
+    // Resolver bodega por defecto una sola vez
+    let defaultWarehouseId: string | undefined
+    const defaultWarehouseSetting = await prisma.system_settings.findUnique({
+      where: { key: 'inventory.default_warehouse_id' },
     })
+    if (defaultWarehouseSetting?.value) defaultWarehouseId = defaultWarehouseSetting.value
 
-    const newContract = await prisma.software_licenses.create({
-      data: {
-        id: randomUUID(),
-        name: contractNumber ?? 'Contrato',
-        typeId: defaultLicenseType?.id ?? '',
-        vendor: supplierId ?? undefined,
-        cost: contractMonthlyCost ?? undefined,
-        purchaseDate: contractStartDate ? new Date(contractStartDate) : undefined,
-        expirationDate: contractEndDate ? new Date(contractEndDate) : undefined,
-        supplierId: supplierId ?? undefined,
-      },
-    })
-    resolvedContractId = newContract.id
-  }
+    // Enrutar creación según subtype
+    let asset: { id: string; [key: string]: unknown }
 
-  // Generar código automático si no se proporcionó uno
-  const resolvedCode =
-    code && String(code).trim()
-      ? String(code).trim()
-      : await generateAssetCode(familyId ?? '', subtype, acquisitionMode).catch(err => {
-          console.error('[generateAssetCode] Error:', err.message, { familyId, subtype, acquisitionMode })
-          // Fallback: código genérico con timestamp
-          const ts = Date.now().toString(36).toUpperCase()
-          return `${(subtype ?? 'EQ').slice(0, 3)}-${ts}`
-        })
-
-  // Resolver bodega por defecto una sola vez
-  let defaultWarehouseId: string | undefined
-  const defaultWarehouseSetting = await prisma.system_settings.findUnique({
-    where: { key: 'inventory.default_warehouse_id' },
-  })
-  if (defaultWarehouseSetting?.value) defaultWarehouseId = defaultWarehouseSetting.value
-
-  // Enrutar creación según subtype
-  let asset: { id: string; [key: string]: unknown }
-
-  if (subtype === 'EQUIPMENT') {
+    if (subtype === 'EQUIPMENT') {
       // Validar campos obligatorios
-      if (!typeId) return NextResponse.json({ error: 'El tipo de equipo es obligatorio' }, { status: 400 })
-      if (!serialNumber) return NextResponse.json({ error: 'El número de serie es obligatorio' }, { status: 400 })
+      if (!typeId)
+        return NextResponse.json({ error: 'El tipo de equipo es obligatorio' }, { status: 400 })
       if (!brand) return NextResponse.json({ error: 'La marca es obligatoria' }, { status: 400 })
       if (!model) return NextResponse.json({ error: 'El modelo es obligatorio' }, { status: 400 })
 
@@ -433,8 +444,12 @@ export async function POST(req: NextRequest) {
 
       // Extraer campos adicionales del body
       const accessories = Array.isArray(body.accessories) ? body.accessories : []
-      const specifications = body.specifications && typeof body.specifications === 'object' && !Array.isArray(body.specifications)
-        ? body.specifications : undefined
+      const specifications =
+        body.specifications &&
+        typeof body.specifications === 'object' &&
+        !Array.isArray(body.specifications)
+          ? body.specifications
+          : undefined
       const notes = body.notes ? String(body.notes) : undefined
       // departmentId: se establece cuando el equipo está ASSIGNED (viene del usuario receptor)
       const resolvedDepartmentId = body.departmentId ? String(body.departmentId) : undefined
@@ -591,12 +606,12 @@ export async function POST(req: NextRequest) {
     // Log the full error details for debugging
     if (error instanceof Error) {
       console.error('[POST /api/inventory/assets] Message:', error.message)
-      console.error('[POST /api/inventory/assets] Stack:', error.stack?.split('\n').slice(0, 5).join('\n'))
+      console.error(
+        '[POST /api/inventory/assets] Stack:',
+        error.stack?.split('\n').slice(0, 5).join('\n')
+      )
     }
     const message = error instanceof Error ? error.message : String(error)
-    return NextResponse.json(
-      { error: message || 'Error al crear el activo' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: message || 'Error al crear el activo' }, { status: 500 })
   }
 }

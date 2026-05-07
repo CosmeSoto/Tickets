@@ -12,18 +12,12 @@ import { calculateDepreciation, familySupportsDepreciation } from '@/lib/invento
  * GET /api/inventory/equipment/[id]
  * Obtiene detalles de un equipo
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
-      return NextResponse.json(
-        { error: 'No autenticado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
     // Validar ID
@@ -37,10 +31,7 @@ export async function GET(
     if (session.user.role === 'CLIENT' && !(session.user as any).canManageInventory) {
       const isAssignedToUser = equipmentDetail.currentAssignment?.receiverId === session.user.id
       if (!isAssignedToUser) {
-        return NextResponse.json(
-          { error: 'No tienes acceso a este equipo' },
-          { status: 403 }
-        )
+        return NextResponse.json({ error: 'No tienes acceso a este equipo' }, { status: 403 })
       }
     }
 
@@ -49,15 +40,18 @@ export async function GET(
       const eq = equipmentDetail.equipment as any
       const assetFamilyId = eq.type?.family?.id ?? eq.type?.familyId ?? null
       const isSuperAdmin = (session.user as any).isSuperAdmin === true
-      const allowed = await canManageAsset(session.user.id, session.user.role, isSuperAdmin, assetFamilyId)
+      const allowed = await canManageAsset(
+        session.user.id,
+        session.user.role,
+        isSuperAdmin,
+        assetFamilyId
+      )
       if (!allowed) {
         // Puede que tenga el equipo asignado personalmente — eso también da acceso de lectura
-        const isPersonallyAssigned = equipmentDetail.currentAssignment?.receiverId === session.user.id
+        const isPersonallyAssigned =
+          equipmentDetail.currentAssignment?.receiverId === session.user.id
         if (!isPersonallyAssigned) {
-          return NextResponse.json(
-            { error: 'No tienes acceso a este equipo' },
-            { status: 403 }
-          )
+          return NextResponse.json({ error: 'No tienes acceso a este equipo' }, { status: 403 })
         }
       }
     }
@@ -89,25 +83,16 @@ export async function GET(
     return NextResponse.json({ ...equipmentDetail, equipment: { ...eq, depreciation } })
   } catch (error) {
     console.error('Error en GET /api/inventory/equipment/[id]:', error)
-    
+
     if (error instanceof ZodError) {
-      return NextResponse.json(
-        { error: 'ID inválido', details: error.errors },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'ID inválido', details: error.errors }, { status: 400 })
     }
 
     if (error instanceof Error && error.message.includes('no encontrado')) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: error.message }, { status: 404 })
     }
 
-    return NextResponse.json(
-      { error: 'Error al obtener equipo' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al obtener equipo' }, { status: 500 })
   }
 }
 
@@ -115,18 +100,15 @@ export async function GET(
  * PUT /api/inventory/equipment/[id]
  * Actualiza un equipo
  */
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    if (!await canManageInventory(session.user.id, session.user.role)) {
+    if (!(await canManageInventory(session.user.id, session.user.role))) {
       return inventoryForbidden()
     }
 
@@ -142,7 +124,12 @@ export async function PUT(
         select: { type: { select: { familyId: true } } },
       })
       const assetFamilyId = equipment?.type?.familyId ?? null
-      const allowed = await canManageAsset(session.user.id, session.user.role, isSuperAdmin, assetFamilyId)
+      const allowed = await canManageAsset(
+        session.user.id,
+        session.user.role,
+        isSuperAdmin,
+        assetFamilyId
+      )
       if (!allowed) {
         return NextResponse.json(
           { error: 'No tienes permisos para editar este equipo' },
@@ -174,7 +161,10 @@ export async function PUT(
 
         if (activeAssignment) {
           return NextResponse.json(
-            { error: 'No se puede cambiar el departamento: el equipo tiene una asignación activa vigente' },
+            {
+              error:
+                'No se puede cambiar el departamento: el equipo tiene una asignación activa vigente',
+            },
             { status: 409 }
           )
         }
@@ -217,10 +207,7 @@ export async function PUT(
     // Validación: usefulLifeYears > 0
     if (usefulLifeYears !== undefined && usefulLifeYears !== null) {
       if (usefulLifeYears <= 0) {
-        return NextResponse.json(
-          { error: 'La vida útil debe ser mayor a cero' },
-          { status: 400 }
-        )
+        return NextResponse.json({ error: 'La vida útil debe ser mayor a cero' }, { status: 400 })
       }
     }
 
@@ -229,7 +216,8 @@ export async function PUT(
       const effectivePurchasePrice =
         validatedData.purchasePrice !== undefined
           ? validatedData.purchasePrice
-          : (await prisma.equipment.findUnique({ where: { id }, select: { purchasePrice: true } }))?.purchasePrice
+          : (await prisma.equipment.findUnique({ where: { id }, select: { purchasePrice: true } }))
+              ?.purchasePrice
 
       if (effectivePurchasePrice !== undefined && effectivePurchasePrice !== null) {
         if (residualValue > effectivePurchasePrice) {
@@ -245,10 +233,7 @@ export async function PUT(
     if (supplierId !== undefined && supplierId !== null) {
       const supplierExists = await prisma.suppliers.findUnique({ where: { id: supplierId } })
       if (!supplierExists) {
-        return NextResponse.json(
-          { error: 'El proveedor especificado no existe' },
-          { status: 400 }
-        )
+        return NextResponse.json({ error: 'El proveedor especificado no existe' }, { status: 400 })
       }
     }
 
@@ -264,25 +249,26 @@ export async function PUT(
     }
 
     // Actualizar equipo (campos base)
-    const equipment = await EquipmentService.updateEquipment(
-      id,
-      validatedData,
-      session.user.id
-    )
+    const equipment = await EquipmentService.updateEquipment(id, validatedData, session.user.id)
 
     // Persistir campos financieros nuevos si se proporcionaron
     const financialFields: Record<string, unknown> = {}
-    if ('departmentId' in body && validatedData.departmentId !== undefined) financialFields.departmentId = validatedData.departmentId
+    if ('departmentId' in body && validatedData.departmentId !== undefined)
+      financialFields.departmentId = validatedData.departmentId
     if ('supplierId' in body) financialFields.supplierId = supplierId ?? null
     if ('invoiceNumber' in body) financialFields.invoiceNumber = invoiceNumber ?? null
-    if ('purchaseOrderNumber' in body) financialFields.purchaseOrderNumber = purchaseOrderNumber ?? null
+    if ('purchaseOrderNumber' in body)
+      financialFields.purchaseOrderNumber = purchaseOrderNumber ?? null
     if ('usefulLifeYears' in body) financialFields.usefulLifeYears = usefulLifeYears ?? null
     if ('residualValue' in body) financialFields.residualValue = residualValue ?? null
     if ('warehouseId' in body) financialFields.warehouseId = warehouseId ?? null
     if ('acquisitionMode' in body) financialFields.acquisitionMode = acquisitionMode ?? null
-    if ('contractStartDate' in body) financialFields.contractStartDate = contractStartDate ? new Date(contractStartDate) : null
-    if ('contractEndDate' in body) financialFields.contractEndDate = contractEndDate ? new Date(contractEndDate) : null
-    if ('contractRenewalCost' in body) financialFields.contractRenewalCost = contractRenewalCost ?? null
+    if ('contractStartDate' in body)
+      financialFields.contractStartDate = contractStartDate ? new Date(contractStartDate) : null
+    if ('contractEndDate' in body)
+      financialFields.contractEndDate = contractEndDate ? new Date(contractEndDate) : null
+    if ('contractRenewalCost' in body)
+      financialFields.contractRenewalCost = contractRenewalCost ?? null
 
     // Campos de depreciación solo si la familia del activo los soporta
     const currentEquipment = await prisma.equipment.findUnique({
@@ -290,11 +276,14 @@ export async function PUT(
       select: { type: { include: { family: true } } },
     })
     const currentFamilyCode = (currentEquipment?.type as any)?.family?.code ?? null
-    const depreciationAllowed = currentFamilyCode ? familySupportsDepreciation(currentFamilyCode) : true
+    const depreciationAllowed = currentFamilyCode
+      ? familySupportsDepreciation(currentFamilyCode)
+      : true
 
     if (depreciationAllowed) {
       if ('depreciationRate' in body) financialFields.depreciationRate = depreciationRate ?? null
-      if ('depreciationMethod' in body) financialFields.depreciationMethod = depreciationMethod ?? null
+      if ('depreciationMethod' in body)
+        financialFields.depreciationMethod = depreciationMethod ?? null
       if ('totalUnits' in body) financialFields.totalUnits = totalUnits ?? null
       if ('usedUnits' in body) financialFields.usedUnits = usedUnits ?? null
     }
@@ -311,32 +300,80 @@ export async function PUT(
     return NextResponse.json(equipment)
   } catch (error) {
     console.error('Error en PUT /api/inventory/equipment/[id]:', error)
-    
+
     if (error instanceof ZodError) {
+      return NextResponse.json({ error: 'Datos inválidos', details: error.errors }, { status: 400 })
+    }
+
+    if (error instanceof Error && error.message.includes('no encontrado')) {
+      return NextResponse.json({ error: error.message }, { status: 404 })
+    }
+
+    if (error instanceof Error && error.message.includes('asignación activa')) {
+      return NextResponse.json({ error: error.message }, { status: 409 })
+    }
+
+    return NextResponse.json({ error: 'Error al actualizar equipo' }, { status: 500 })
+  }
+}
+
+/**
+ * PATCH /api/inventory/equipment/[id]
+ * Actualización parcial de un equipo — actualmente soporta { saleListingPrice }
+ */
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
+    if (!(await canManageInventory(session.user.id, session.user.role))) {
+      return inventoryForbidden()
+    }
+
+    const { id: rawId } = await params
+    const { id } = equipmentIdSchema.parse({ id: rawId })
+
+    const body = await request.json()
+
+    // Only allow patching saleListingPrice for now
+    if (!('saleListingPrice' in body)) {
+      return NextResponse.json({ error: 'No hay campos válidos para actualizar' }, { status: 400 })
+    }
+
+    const { saleListingPrice } = body as { saleListingPrice: number | null }
+
+    if (
+      saleListingPrice !== null &&
+      (typeof saleListingPrice !== 'number' || saleListingPrice <= 0)
+    ) {
       return NextResponse.json(
-        { error: 'Datos inválidos', details: error.errors },
+        { error: 'El precio de venta debe ser un número positivo' },
         { status: 400 }
       )
     }
 
+    const updated = await prisma.equipment.update({
+      where: { id },
+      data: { saleListingPrice: saleListingPrice ?? null },
+      select: { id: true, saleListingPrice: true },
+    })
+
+    return NextResponse.json(updated)
+  } catch (error) {
+    console.error('Error en PATCH /api/inventory/equipment/[id]:', error)
+
+    if (error instanceof ZodError) {
+      return NextResponse.json({ error: 'ID inválido', details: error.errors }, { status: 400 })
+    }
+
     if (error instanceof Error && error.message.includes('no encontrado')) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: error.message }, { status: 404 })
     }
 
-    if (error instanceof Error && error.message.includes('asignación activa')) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 409 }
-      )
-    }
-
-    return NextResponse.json(
-      { error: 'Error al actualizar equipo' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al actualizar equipo' }, { status: 500 })
   }
 }
 
@@ -350,12 +387,9 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
-      return NextResponse.json(
-        { error: 'No autenticado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
     // Solo pueden eliminar: ADMIN (cualquiera) o gestores con acceso a la familia del activo
@@ -384,7 +418,12 @@ export async function DELETE(
         select: { type: { select: { familyId: true } } },
       })
       const assetFamilyId = equipment?.type?.familyId ?? null
-      const allowed = await canManageAsset(session.user.id, session.user.role, isSuperAdmin, assetFamilyId)
+      const allowed = await canManageAsset(
+        session.user.id,
+        session.user.role,
+        isSuperAdmin,
+        assetFamilyId
+      )
       if (!allowed) {
         return NextResponse.json(
           { error: 'No tienes permisos para eliminar este equipo' },
@@ -401,31 +440,19 @@ export async function DELETE(
     return NextResponse.json({ message: 'Equipo retirado exitosamente' })
   } catch (error) {
     console.error('Error en DELETE /api/inventory/equipment/[id]:', error)
-    
+
     if (error instanceof ZodError) {
-      return NextResponse.json(
-        { error: 'ID inválido', details: error.errors },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'ID inválido', details: error.errors }, { status: 400 })
     }
 
     if (error instanceof Error && error.message.includes('no encontrado')) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: error.message }, { status: 404 })
     }
 
     if (error instanceof Error && error.message.includes('asignación activa')) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 409 }
-      )
+      return NextResponse.json({ error: error.message }, { status: 409 })
     }
 
-    return NextResponse.json(
-      { error: 'Error al eliminar equipo' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al eliminar equipo' }, { status: 500 })
   }
 }

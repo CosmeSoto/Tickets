@@ -5,10 +5,7 @@ import { FamilyService } from '@/lib/services/family.service'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
 
 // GET /api/families/[id] — Detalle de familia con ambas configs
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session || session.user.role !== 'ADMIN') {
@@ -36,10 +33,7 @@ export async function GET(
 }
 
 // PUT /api/families/[id] — Actualiza datos base de la familia
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session || session.user.role !== 'ADMIN') {
@@ -57,9 +51,16 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { name, description, color, icon, order } = body
+    const { name, description, color, icon, order, contactWhatsapp } = body
 
-    const updated = await FamilyService.update(id, { name, description, color, icon, order })
+    const updated = await FamilyService.update(id, {
+      name,
+      description,
+      color,
+      icon,
+      order,
+      contactWhatsapp,
+    })
 
     await AuditServiceComplete.log({
       action: 'FAMILY_UPDATED',

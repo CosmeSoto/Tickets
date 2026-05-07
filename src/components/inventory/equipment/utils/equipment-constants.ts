@@ -9,6 +9,7 @@ export const STATUS_LABELS: Record<string, string> = {
   MAINTENANCE: 'Mantenimiento',
   DAMAGED: 'Dañado',
   RETIRED: 'Retirado',
+  FOR_SALE: 'En venta',
   SOLD: 'Vendido',
 }
 
@@ -18,6 +19,7 @@ export const STATUS_COLORS: Record<string, string> = {
   MAINTENANCE: 'bg-amber-500 dark:bg-amber-600',
   DAMAGED: 'bg-red-500 dark:bg-red-600',
   RETIRED: 'bg-muted-foreground',
+  FOR_SALE: 'bg-amber-500 dark:bg-amber-600',
   SOLD: 'bg-muted-foreground',
 }
 

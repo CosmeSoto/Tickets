@@ -20,6 +20,7 @@ export interface UpdateFamilyData {
   color?: string
   icon?: string
   order?: number
+  contactWhatsapp?: string
 }
 
 export interface FamilyWithStats {
@@ -93,7 +94,7 @@ export class FamilyService {
    * Crea familia + ticket_family_config + inventory_family_config en una transacción.
    */
   static async create(data: CreateFamilyData): Promise<families> {
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async tx => {
       // 1. Crear registro base de familia
       const family = await tx.families.create({
         data: {
@@ -145,6 +146,7 @@ export class FamilyService {
         ...(data.color !== undefined && { color: data.color }),
         ...(data.icon !== undefined && { icon: data.icon }),
         ...(data.order !== undefined && { order: data.order }),
+        ...(data.contactWhatsapp !== undefined && { contactWhatsapp: data.contactWhatsapp }),
       },
     })
   }

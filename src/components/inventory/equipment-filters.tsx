@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useDebounce } from '@/hooks/common/use-debounce'
 import { Search, Filter, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -14,17 +15,13 @@ import {
 } from '@/components/ui/select'
 import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { EquipmentStatus, EquipmentCondition } from '@prisma/client'
-import type { EquipmentFilters as EquipmentFiltersType, EquipmentTypeInfo } from '@/types/inventory/equipment'
+import type {
+  EquipmentFilters as EquipmentFiltersType,
+  EquipmentTypeInfo,
+} from '@/types/inventory/equipment'
 import { useInventoryFamilies } from '@/contexts/families-context'
 import { useFamilyOptions } from '@/hooks/use-family-options'
 import { useActiveDepartments } from '@/contexts/departments-context'
-
-interface FamilyOption {
-  id: string
-  name: string
-  code: string
-  color?: string | null
-}
 
 interface EquipmentFiltersProps {
   filters: EquipmentFiltersType
@@ -48,14 +45,29 @@ const EQUIPMENT_CONDITION_LABELS: Record<EquipmentCondition, string> = {
   POOR: 'Malo',
 }
 
-export function EquipmentFilters({
-  filters,
-  onFiltersChange,
-  onReset,
-}: EquipmentFiltersProps) {
+export function EquipmentFilters({ filters, onFiltersChange, onReset }: EquipmentFiltersProps) {
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [equipmentTypes, setEquipmentTypes] = useState<EquipmentTypeInfo[]>([])
   const [loadingTypes, setLoadingTypes] = useState(true)
+
+  // Debounce para búsqueda — evita peticiones en cada keystroke
+  const [localSearch, setLocalSearch] = useState(filters.search || '')
+  const debouncedSearch = useDebounce(localSearch, 300)
+
+  // Sincronizar búsqueda debounced con los filtros del padre
+  useEffect(() => {
+    const trimmed = debouncedSearch.trim() || undefined
+    if (trimmed !== filters.search) {
+      onFiltersChange({ ...filters, search: trimmed })
+    }
+  }, [debouncedSearch]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sincronizar localSearch si el padre limpia los filtros externamente
+  useEffect(() => {
+    if (!filters.search && localSearch) {
+      setLocalSearch('')
+    }
+  }, [filters.search]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ✅ Familias desde contexto global — sin petición extra (memoizadas)
   const { families } = useFamilyOptions()
@@ -87,7 +99,8 @@ export function EquipmentFilters({
     : allDepartments
 
   const handleSearchChange = (value: string) => {
-    onFiltersChange({ ...filters, search: value || undefined })
+    setLocalSearch(value)
+    // La propagación al padre ocurre via el efecto del debouncedSearch
   }
 
   const handleTypeChange = (value: string) => {
@@ -141,8 +154,7 @@ export function EquipmentFilters({
     filters.departmentId,
   ].filter(Boolean).length
 
-  const getTypeName = (typeId: string) =>
-    equipmentTypes.find(t => t.id === typeId)?.name || typeId
+  const getTypeName = (typeId: string) => equipmentTypes.find(t => t.id === typeId)?.name || typeId
 
   const getFamilyName = (familyId: string) =>
     families.find(f => f.id === familyId)?.name || familyId
@@ -151,39 +163,39 @@ export function EquipmentFilters({
     allDepartments.find(d => d.id === departmentId)?.name || departmentId
 
   return (
-    <div className="space-y-4">
+    <div className='space-y-4'>
       {/* Búsqueda principal */}
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <div className='flex gap-2'>
+        <div className='relative flex-1'>
+          <Search className='absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground' />
           <Input
-            placeholder="Buscar por código, serie, marca o modelo..."
-            value={filters.search || ''}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            className="pl-9"
+            placeholder='Buscar por código, serie, marca o modelo...'
+            value={localSearch}
+            onChange={e => handleSearchChange(e.target.value)}
+            className='pl-9'
           />
         </div>
         <Button
-          variant="outline"
-          size="icon"
+          variant='outline'
+          size='icon'
           onClick={() => setShowAdvanced(!showAdvanced)}
           className={showAdvanced ? 'bg-accent' : ''}
         >
-          <Filter className="h-4 w-4" />
+          <Filter className='h-4 w-4' />
         </Button>
         {activeFiltersCount > 0 && (
-          <Button variant="ghost" size="icon" onClick={onReset}>
-            <X className="h-4 w-4" />
+          <Button variant='ghost' size='icon' onClick={onReset}>
+            <X className='h-4 w-4' />
           </Button>
         )}
       </div>
 
       {/* Filtros avanzados */}
       {showAdvanced && (
-        <div className="grid gap-4 rounded-lg border p-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className='grid gap-4 rounded-lg border p-4 md:grid-cols-2 lg:grid-cols-3'>
           {/* Familia */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Área / Familia</label>
+          <div className='space-y-2'>
+            <label className='text-sm font-medium'>Área / Familia</label>
             <FamilyCombobox
               families={families.map(f => ({ ...f, color: (f as any).color ?? null }))}
               value={filters.familyId ?? 'all'}
@@ -191,23 +203,20 @@ export function EquipmentFilters({
               allowAll
               allowClear
               disabled={false}
-              popoverWidth="240px"
+              popoverWidth='240px'
             />
           </div>
 
           {/* Departamento */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Departamento</label>
-            <Select
-              value={filters.departmentId || 'all'}
-              onValueChange={handleDepartmentChange}
-            >
+          <div className='space-y-2'>
+            <label className='text-sm font-medium'>Departamento</label>
+            <Select value={filters.departmentId || 'all'} onValueChange={handleDepartmentChange}>
               <SelectTrigger>
-                <SelectValue placeholder="Todos los departamentos" />
+                <SelectValue placeholder='Todos los departamentos' />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos los departamentos</SelectItem>
-                {filteredDepartments.map((dept) => (
+                <SelectItem value='all'>Todos los departamentos</SelectItem>
+                {filteredDepartments.map(dept => (
                   <SelectItem key={dept.id} value={dept.id}>
                     {dept.name}
                   </SelectItem>
@@ -217,8 +226,8 @@ export function EquipmentFilters({
           </div>
 
           {/* Tipo */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Tipo</label>
+          <div className='space-y-2'>
+            <label className='text-sm font-medium'>Tipo</label>
             <Select
               value={filters.typeId?.[0] || 'all'}
               onValueChange={handleTypeChange}
@@ -228,8 +237,8 @@ export function EquipmentFilters({
                 <SelectValue placeholder={loadingTypes ? 'Cargando...' : 'Todos los tipos'} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos los tipos</SelectItem>
-                {equipmentTypes.map((type) => (
+                <SelectItem value='all'>Todos los tipos</SelectItem>
+                {equipmentTypes.map(type => (
                   <SelectItem key={type.id} value={type.id}>
                     {type.name}
                   </SelectItem>
@@ -239,17 +248,14 @@ export function EquipmentFilters({
           </div>
 
           {/* Estado */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Estado</label>
-            <Select
-              value={filters.status?.[0] || 'all'}
-              onValueChange={handleStatusChange}
-            >
+          <div className='space-y-2'>
+            <label className='text-sm font-medium'>Estado</label>
+            <Select value={filters.status?.[0] || 'all'} onValueChange={handleStatusChange}>
               <SelectTrigger>
-                <SelectValue placeholder="Todos los estados" />
+                <SelectValue placeholder='Todos los estados' />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos los estados</SelectItem>
+                <SelectItem value='all'>Todos los estados</SelectItem>
                 {Object.entries(EQUIPMENT_STATUS_LABELS).map(([value, label]) => (
                   <SelectItem key={value} value={value}>
                     {label}
@@ -260,17 +266,14 @@ export function EquipmentFilters({
           </div>
 
           {/* Condición */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Condición</label>
-            <Select
-              value={filters.condition?.[0] || 'all'}
-              onValueChange={handleConditionChange}
-            >
+          <div className='space-y-2'>
+            <label className='text-sm font-medium'>Condición</label>
+            <Select value={filters.condition?.[0] || 'all'} onValueChange={handleConditionChange}>
               <SelectTrigger>
-                <SelectValue placeholder="Todas las condiciones" />
+                <SelectValue placeholder='Todas las condiciones' />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todas las condiciones</SelectItem>
+                <SelectItem value='all'>Todas las condiciones</SelectItem>
                 {Object.entries(EQUIPMENT_CONDITION_LABELS).map(([value, label]) => (
                   <SelectItem key={value} value={value}>
                     {label}
@@ -284,59 +287,47 @@ export function EquipmentFilters({
 
       {/* Badges de filtros activos */}
       {activeFiltersCount > 0 && (
-        <div className="flex flex-wrap gap-2">
+        <div className='flex flex-wrap gap-2'>
           {filters.search && (
-            <Badge variant="secondary" className="gap-1">
+            <Badge variant='secondary' className='gap-1'>
               Búsqueda: {filters.search}
               <X
-                className="h-3 w-3 cursor-pointer"
-                onClick={() => handleSearchChange('')}
+                className='h-3 w-3 cursor-pointer'
+                onClick={() => {
+                  setLocalSearch('')
+                  onFiltersChange({ ...filters, search: undefined })
+                }}
               />
             </Badge>
           )}
           {filters.familyId && (
-            <Badge variant="secondary" className="gap-1">
+            <Badge variant='secondary' className='gap-1'>
               Familia: {getFamilyName(filters.familyId)}
-              <X
-                className="h-3 w-3 cursor-pointer"
-                onClick={() => handleFamilyChange('all')}
-              />
+              <X className='h-3 w-3 cursor-pointer' onClick={() => handleFamilyChange('all')} />
             </Badge>
           )}
           {filters.departmentId && (
-            <Badge variant="secondary" className="gap-1">
+            <Badge variant='secondary' className='gap-1'>
               Departamento: {getDepartmentName(filters.departmentId)}
-              <X
-                className="h-3 w-3 cursor-pointer"
-                onClick={() => handleDepartmentChange('all')}
-              />
+              <X className='h-3 w-3 cursor-pointer' onClick={() => handleDepartmentChange('all')} />
             </Badge>
           )}
-          {filters.typeId?.map((typeId) => (
-            <Badge key={typeId} variant="secondary" className="gap-1">
+          {filters.typeId?.map(typeId => (
+            <Badge key={typeId} variant='secondary' className='gap-1'>
               Tipo: {getTypeName(typeId)}
-              <X
-                className="h-3 w-3 cursor-pointer"
-                onClick={() => handleTypeChange('all')}
-              />
+              <X className='h-3 w-3 cursor-pointer' onClick={() => handleTypeChange('all')} />
             </Badge>
           ))}
-          {filters.status?.map((status) => (
-            <Badge key={status} variant="secondary" className="gap-1">
+          {filters.status?.map(status => (
+            <Badge key={status} variant='secondary' className='gap-1'>
               Estado: {EQUIPMENT_STATUS_LABELS[status]}
-              <X
-                className="h-3 w-3 cursor-pointer"
-                onClick={() => handleStatusChange('all')}
-              />
+              <X className='h-3 w-3 cursor-pointer' onClick={() => handleStatusChange('all')} />
             </Badge>
           ))}
-          {filters.condition?.map((condition) => (
-            <Badge key={condition} variant="secondary" className="gap-1">
+          {filters.condition?.map(condition => (
+            <Badge key={condition} variant='secondary' className='gap-1'>
               Condición: {EQUIPMENT_CONDITION_LABELS[condition]}
-              <X
-                className="h-3 w-3 cursor-pointer"
-                onClick={() => handleConditionChange('all')}
-              />
+              <X className='h-3 w-3 cursor-pointer' onClick={() => handleConditionChange('all')} />
             </Badge>
           ))}
         </div>

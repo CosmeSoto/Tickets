@@ -13,6 +13,7 @@ import {
   Building,
   AlertCircle,
   Warehouse,
+  Tag,
 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -44,6 +45,7 @@ import {
   showWarehouseSelector,
   showMaintenanceBlock,
   showRetiredWarning,
+  showForSalePriceField,
 } from '@/lib/inventory/status-visibility'
 
 interface EquipmentFormProps {
@@ -82,6 +84,7 @@ const EQUIPMENT_STATUS_OPTIONS = [
   { value: 'MAINTENANCE', label: 'Mantenimiento' },
   { value: 'DAMAGED', label: 'Dañado' },
   { value: 'RETIRED', label: 'Retirado' },
+  { value: 'FOR_SALE', label: 'En venta' },
 ]
 
 const EQUIPMENT_CONDITION_OPTIONS = [
@@ -138,6 +141,9 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
   )
   const [depreciationMethod, setDepreciationMethod] = useState<string>(
     (equipment as any)?.depreciationMethod || ''
+  )
+  const [saleListingPrice, setSaleListingPrice] = useState<string>(
+    (equipment as any)?.saleListingPrice != null ? String((equipment as any).saleListingPrice) : ''
   )
 
   // ✅ Departamentos desde contexto global — sin petición extra
@@ -307,6 +313,9 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
         ...(depreciationMethod ? { depreciationMethod } : {}),
         // Usuario asignado — solo cuando el estado es ASSIGNED
         ...(isAssignedStatus && assignedUserId ? { assignedUserId } : {}),
+        ...(saleListingPrice
+          ? { saleListingPrice: parseFloat(saleListingPrice) }
+          : { saleListingPrice: null }),
       }
 
       const url = isEditing
@@ -674,6 +683,36 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
                   Disponible. Para un proceso formal de baja usa el botón &ldquo;Solicitar
                   baja&rdquo; desde el detalle del equipo.
                 </p>
+              </div>
+            )}
+
+            {/* Precio de venta — solo cuando estado es FOR_SALE */}
+            {showForSalePriceField(currentStatus) && (
+              <div className='space-y-2 col-span-2'>
+                <div className='rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 space-y-3'>
+                  <p className='text-sm font-medium text-amber-700 dark:text-amber-400 flex items-center gap-2'>
+                    <Tag className='h-4 w-4' />
+                    Activo marcado para la venta
+                  </p>
+                  <div className='space-y-1'>
+                    <Label htmlFor='saleListingPrice'>
+                      Precio de venta público (USD) — opcional
+                    </Label>
+                    <Input
+                      id='saleListingPrice'
+                      type='number'
+                      step='0.01'
+                      min='0'
+                      value={saleListingPrice}
+                      onChange={e => setSaleListingPrice(e.target.value)}
+                      placeholder="Ej: 850.00 — dejar vacío para mostrar 'Consultar precio'"
+                    />
+                    <p className='text-xs text-muted-foreground'>
+                      Este precio se mostrará en la vitrina pública. Si no lo defines, se mostrará
+                      &ldquo;Consultar precio&rdquo;.
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
 

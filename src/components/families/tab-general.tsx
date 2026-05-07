@@ -95,6 +95,7 @@ export function TabGeneral({
     color: family.color ?? '#6B7280',
     isActive: family.isActive,
     order: family.order,
+    contactWhatsapp: (family as any).contactWhatsapp ?? '',
   })
   const [saving, setSaving] = useState(false)
   const [codeError, setCodeError] = useState<string | null>(null)
@@ -129,6 +130,7 @@ export function TabGeneral({
           color: form.color,
           isActive: form.isActive,
           order: Number(form.order),
+          contactWhatsapp: form.contactWhatsapp.trim() || null,
         }),
       })
       const data = await res.json()
@@ -379,6 +381,27 @@ export function TabGeneral({
                 className='h-8 text-sm'
               />
             </div>
+          </div>
+
+          {/* WhatsApp de contacto */}
+          <div className='space-y-1'>
+            <Label htmlFor='family-whatsapp' className='text-xs'>
+              WhatsApp de contacto{' '}
+              <span className='text-muted-foreground font-normal'>(opcional)</span>
+            </Label>
+            <Input
+              id='family-whatsapp'
+              value={form.contactWhatsapp}
+              onChange={e => setForm(f => ({ ...f, contactWhatsapp: e.target.value }))}
+              placeholder='Ej: 593987654321 (sin + ni espacios)'
+              maxLength={30}
+              disabled={saving}
+              className='h-8 text-sm'
+            />
+            <p className='text-[10px] text-muted-foreground'>
+              Número de WhatsApp para contacto de activos en venta de esta familia. Lo pueden editar
+              el admin y los gestores asignados a esta familia.
+            </p>
           </div>
 
           {/* Color + Estado en la misma fila */}

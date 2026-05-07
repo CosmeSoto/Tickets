@@ -33,6 +33,7 @@ export interface Equipment {
   supplierId?: string
   invoiceNumber?: string
   purchaseOrderNumber?: string
+  saleListingPrice?: number | null
 }
 
 export interface EquipmentType {
@@ -86,6 +87,7 @@ export type EquipmentStatus =
   | 'MAINTENANCE'
   | 'DAMAGED'
   | 'RETIRED'
+  | 'FOR_SALE'
   | 'SOLD'
 export type EquipmentCondition = 'NEW' | 'LIKE_NEW' | 'GOOD' | 'FAIR' | 'POOR'
 export type OwnershipType = 'FIXED_ASSET' | 'RENTAL' | 'LOAN'

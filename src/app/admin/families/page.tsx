@@ -92,6 +92,7 @@ interface FamilyFormData {
   description: string
   color: string
   icon: string
+  contactWhatsapp: string
 }
 
 const DEFAULT_FORM: FamilyFormData = {
@@ -100,6 +101,7 @@ const DEFAULT_FORM: FamilyFormData = {
   description: '',
   color: '#6B7280',
   icon: '',
+  contactWhatsapp: '',
 }
 
 export default function FamiliesPage() {
@@ -180,6 +182,7 @@ export default function FamiliesPage() {
       description: family.description || '',
       color: family.color || '#6B7280',
       icon: family.icon || '',
+      contactWhatsapp: (family as any).contactWhatsapp || '',
     })
     setShowFormDialog(true)
   }
@@ -567,6 +570,23 @@ export default function FamiliesPage() {
                   placeholder='Descripción opcional de la familia'
                   rows={3}
                 />
+              </div>
+              <div className='col-span-2'>
+                <Label htmlFor='family-whatsapp'>
+                  WhatsApp de contacto{' '}
+                  <span className='text-xs text-muted-foreground'>(opcional)</span>
+                </Label>
+                <Input
+                  id='family-whatsapp'
+                  value={formData.contactWhatsapp}
+                  onChange={e => setFormData({ ...formData, contactWhatsapp: e.target.value })}
+                  placeholder='Ej: 593987654321 (sin + ni espacios)'
+                  maxLength={30}
+                />
+                <p className='text-xs text-muted-foreground mt-1'>
+                  Número de WhatsApp para contacto de activos en venta de esta familia. Lo pueden
+                  editar el admin y los gestores asignados a esta familia.
+                </p>
               </div>
             </div>
           </div>

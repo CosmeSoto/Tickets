@@ -20,7 +20,7 @@ import {
   showWarehouseSelector,
   showMaintenanceBlock,
   showAssignmentBlock,
-  showRetiredWarning,
+  showForSalePriceField,
 } from '@/lib/inventory/status-visibility'
 import type { FamilyConfig } from '@/lib/inventory/family-config-types'
 import { resolveSectionsForMode } from '@/lib/inventory/family-config-types'
@@ -43,6 +43,7 @@ import {
   Eye,
   FileText,
   Image as ImageIcon,
+  Tag,
 } from 'lucide-react'
 
 interface EquipmentAssetFormProps {
@@ -386,6 +387,7 @@ export function EquipmentAssetForm({
   const [physicalLocation, setPhysicalLocation] = useState('')
   const [attachments, setAttachments] = useState<File[]>([])
   const [priceError, setPriceError] = useState('')
+  const [saleListingPrice, setSaleListingPrice] = useState('')
 
   // Mantenimiento
   const [maintenanceDate, setMaintenanceDate] = useState(
@@ -662,6 +664,9 @@ export function EquipmentAssetForm({
       notes: notes || undefined,
       // Archivos adjuntos — se suben después de crear el activo
       attachments: attachments.length ? attachments : undefined,
+      ...(saleListingPrice
+        ? { saleListingPrice: parseFloat(saleListingPrice) }
+        : { saleListingPrice: null }),
     }
     onSubmit(payload)
   }
@@ -696,7 +701,10 @@ export function EquipmentAssetForm({
 
       {/* N° Serie */}
       <div className='space-y-1'>
-        <Label>N° de Serie del Fabricante</Label>
+        <Label>
+          N° de Serie del Fabricante{' '}
+          <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+        </Label>
         <Input
           value={serialNumber}
           onChange={e => setSerialNumber(e.target.value)}
@@ -809,6 +817,7 @@ export function EquipmentAssetForm({
             <option value='MAINTENANCE'>En Mantenimiento</option>
             <option value='DAMAGED'>Dañado</option>
             <option value='RETIRED'>Retirado</option>
+            <option value='FOR_SALE'>En venta</option>
           </SimpleSelect>
         </div>
       </div>
@@ -825,6 +834,33 @@ export function EquipmentAssetForm({
             &ldquo;Solicitar baja&rdquo; desde el detalle del equipo — eso inicia el flujo formal
             con aprobación, acta y folio.
           </p>
+        </div>
+      )}
+
+      {/* Precio de venta — solo cuando estado es FOR_SALE */}
+      {showForSalePriceField(equipmentStatus) && (
+        <div className='space-y-2 col-span-2'>
+          <div className='rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 space-y-3'>
+            <p className='text-sm font-medium text-amber-700 dark:text-amber-400 flex items-center gap-2'>
+              <Tag className='h-4 w-4' />
+              Activo marcado para la venta
+            </p>
+            <div className='space-y-1'>
+              <Label>Precio de venta público (USD) — opcional</Label>
+              <Input
+                type='number'
+                step='0.01'
+                min='0'
+                value={saleListingPrice}
+                onChange={e => setSaleListingPrice(e.target.value)}
+                placeholder="Ej: 850.00 — dejar vacío para mostrar 'Consultar precio'"
+              />
+              <p className='text-xs text-muted-foreground'>
+                Este precio se mostrará en la vitrina pública. Si no lo defines, se mostrará
+                &ldquo;Consultar precio&rdquo;.
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
