@@ -35,6 +35,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, CheckCircle2, AlertCircle, Package } from 'lucide-react'
 import { bulkEquipmentInputSchema } from '@/lib/validations/bulk-equipment'
 import type { BulkCreateResult } from '@/types/equipment-grouping'
+import { StockIndicatorBadge } from '@/components/inventory/equipment/StockIndicatorBadge'
 
 export interface BulkEquipmentFormProps {
   onSuccess?: (result: BulkCreateResult) => void
@@ -324,6 +325,17 @@ export function BulkEquipmentForm({ onSuccess, onCancel, prefillData }: BulkEqui
             </Label>
             <Input id='model' {...register('model')} />
             {errors.model && <p className='text-sm text-red-500'>{errors.model.message}</p>}
+
+            {/* Stock Indicator Badge */}
+            {watch('brand') && watch('model') && watch('typeId') && (
+              <div className='mt-2'>
+                <StockIndicatorBadge
+                  brand={watch('brand')}
+                  model={watch('model')}
+                  typeId={watch('typeId')}
+                />
+              </div>
+            )}
           </div>
 
           {/* Tipo de equipo */}

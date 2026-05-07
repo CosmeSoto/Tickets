@@ -41,6 +41,7 @@ import { FileUploadZone } from '@/components/ui/file-upload-zone'
 import { useActiveDepartments } from '@/contexts/departments-context'
 import { AssignableUserSelect } from '@/components/inventory/shared/AssignableUserSelect'
 import { MaintenanceStatusBlock } from '@/components/inventory/shared/MaintenanceStatusBlock'
+import { StockIndicatorBadge } from '@/components/inventory/equipment/StockIndicatorBadge'
 import {
   showWarehouseSelector,
   showMaintenanceBlock,
@@ -457,6 +458,17 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
               </Label>
               <Input id='model' {...register('model')} placeholder='Latitude 5420' />
               {errors.model && <p className='text-sm text-destructive'>{errors.model.message}</p>}
+
+              {/* Stock Indicator Badge */}
+              {watch('brand') && watch('model') && watch('typeId') && (
+                <div className='mt-2'>
+                  <StockIndicatorBadge
+                    brand={watch('brand')}
+                    model={watch('model')}
+                    typeId={watch('typeId')}
+                  />
+                </div>
+              )}
             </div>
 
             <div className='space-y-2'>
