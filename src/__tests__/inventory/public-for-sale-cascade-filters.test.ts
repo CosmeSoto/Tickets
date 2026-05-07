@@ -119,7 +119,6 @@ describe('PublicForSalePage - Cascade Filters', () => {
 
       // Act: Switch to family-2
       const newFamilyId = 'family-2'
-      const newFamilyId = 'family-2'
       const newFamily = filters.families.find(f => f.id === newFamilyId)
       const typeExistsInNewFamily = newFamily?.types.some(t => t.id === selectedTypeId)
 
