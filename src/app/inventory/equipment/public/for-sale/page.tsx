@@ -14,12 +14,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Sheet, SheetContent } from '@/components/ui/sheet'
-import {
-  PublicEquipmentCard,
-  PublicEquipmentItem,
-} from '@/components/inventory/public/PublicEquipmentCard'
-import { EquipmentDetailSheet } from '@/components/inventory/public/EquipmentDetailSheet'
+import { GroupedEquipmentCard } from '@/components/inventory/public/GroupedEquipmentCard'
+import { UnitsListSheet } from '@/components/inventory/public/UnitsListSheet'
+import type { EquipmentGroup } from '@/types/equipment-grouping'
 
 interface Family {
   id: string
@@ -44,17 +41,18 @@ interface FiltersData {
  * - Al montar: llamar a `/filters` y `/assets-for-sale` en paralelo
  * - Panel de filtros con selectores de Familia, Tipo de equipo (filtrado por familia) y Condición
  * - Filtrado client-side sobre el array en memoria al cambiar filtros
- * - Grid de tarjetas PublicEquipmentCard agrupadas por familia cuando no hay filtro activo
+ * - Grid de tarjetas GroupedEquipmentCard con agrupación por modelo
+ * - Sheet con lista de unidades individuales al hacer clic en "Ver unidades disponibles"
  * - Estado vacío cuando no hay equipos FOR_SALE
  *
- * Requisitos: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8, 8.9
+ * Requisitos: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7
  */
 export default function PublicForSalePage() {
   const [loading, setLoading] = useState(true)
-  const [items, setItems] = useState<PublicEquipmentItem[]>([])
+  const [groups, setGroups] = useState<EquipmentGroup[]>([])
   const [filters, setFilters] = useState<FiltersData>({ families: [] })
-  const [selectedItem, setSelectedItem] = useState<PublicEquipmentItem | null>(null)
-  const [sheetOpen, setSheetOpen] = useState(false)
+  const [selectedGroup, setSelectedGroup] = useState<EquipmentGroup | null>(null)
+  const [unitsSheetOpen, setUnitsSheetOpen] = useState(false)
 
   // Estados de filtros
   const [selectedFamilyId, setSelectedFamilyId] = useState<string>('')
@@ -66,16 +64,16 @@ export default function PublicForSalePage() {
     const fetchData = async () => {
       try {
         // Llamadas en paralelo
-        const [filtersRes, itemsRes] = await Promise.all([
+        const [filtersRes, groupsRes] = await Promise.all([
           fetch('/api/public/assets-for-sale/filters'),
           fetch('/api/public/assets-for-sale'),
         ])
 
         const filtersData = await filtersRes.json()
-        const itemsData = await itemsRes.json()
+        const groupsData = await groupsRes.json()
 
         setFilters(filtersData)
-        setItems(itemsData.items ?? [])
+        setGroups(groupsData.items ?? [])
       } catch (error) {
         console.error('Error al cargar datos:', error)
       } finally {
@@ -87,10 +85,10 @@ export default function PublicForSalePage() {
   }, [])
 
   // Filtrado client-side
-  const filteredItems = items.filter(item => {
-    if (selectedFamilyId && item.type.family?.id !== selectedFamilyId) return false
-    if (selectedTypeId && item.type.id !== selectedTypeId) return false
-    if (selectedCondition && item.condition !== selectedCondition) return false
+  const filteredGroups = groups.filter(group => {
+    if (selectedFamilyId && group.type.family?.id !== selectedFamilyId) return false
+    if (selectedTypeId && group.type.id !== selectedTypeId) return false
+    if (selectedCondition && group.condition !== selectedCondition) return false
     return true
   })
 
@@ -100,14 +98,14 @@ export default function PublicForSalePage() {
     : filters.families.flatMap(f => f.types)
 
   // Agrupar por familia cuando no hay filtro de familia activo
-  const groupedItems: Record<string, PublicEquipmentItem[]> = {}
+  const groupedByFamily: Record<string, EquipmentGroup[]> = {}
   if (!selectedFamilyId) {
-    filteredItems.forEach(item => {
-      const familyName = item.type.family?.name ?? 'Sin familia'
-      if (!groupedItems[familyName]) {
-        groupedItems[familyName] = []
+    filteredGroups.forEach(group => {
+      const familyName = group.type.family?.name ?? 'Sin familia'
+      if (!groupedByFamily[familyName]) {
+        groupedByFamily[familyName] = []
       }
-      groupedItems[familyName].push(item)
+      groupedByFamily[familyName].push(group)
     })
   }
 
@@ -120,10 +118,23 @@ export default function PublicForSalePage() {
 
   const hasActiveFilters = selectedFamilyId || selectedTypeId || selectedCondition
 
-  // Handler para abrir el Sheet con los detalles del equipo
-  const handleViewDetails = (item: PublicEquipmentItem) => {
-    setSelectedItem(item)
-    setSheetOpen(true)
+  // Contar total de unidades disponibles
+  const totalUnits = filteredGroups.reduce((sum, group) => sum + group.availableUnits, 0)
+
+  // Handler para abrir el Sheet con la lista de unidades
+  const handleViewDetails = (group: EquipmentGroup) => {
+    setSelectedGroup(group)
+    setUnitsSheetOpen(true)
+  }
+
+  // Handler para contacto general (tracking opcional)
+  const handleContactGeneral = (group: EquipmentGroup) => {
+    console.log('Contacto general para grupo:', group.groupId)
+  }
+
+  // Handler para contacto de unidad específica (tracking opcional)
+  const handleContactUnit = (unit: any) => {
+    console.log('Contacto para unidad:', unit.code)
   }
 
   if (loading) {
@@ -294,18 +305,16 @@ export default function PublicForSalePage() {
               {/* Contador de resultados */}
               <div className='mt-4 pt-4 border-t border-border'>
                 <p className='text-sm text-muted-foreground'>
-                  {filteredItems.length === 0
+                  {filteredGroups.length === 0
                     ? 'No se encontraron equipos'
-                    : filteredItems.length === 1
-                      ? '1 equipo encontrado'
-                      : `${filteredItems.length} equipos encontrados`}
+                    : `${filteredGroups.length} ${filteredGroups.length === 1 ? 'modelo' : 'modelos'} • ${totalUnits} ${totalUnits === 1 ? 'unidad disponible' : 'unidades disponibles'}`}
                 </p>
               </div>
             </CardContent>
           </Card>
 
           {/* Grid de Tarjetas */}
-          {filteredItems.length === 0 ? (
+          {filteredGroups.length === 0 ? (
             // Estado vacío
             <Card>
               <CardContent className='flex flex-col items-center justify-center py-16 text-center'>
@@ -326,20 +335,21 @@ export default function PublicForSalePage() {
               </CardContent>
             </Card>
           ) : selectedFamilyId ? (
-            // Vista sin agrupar (cuando hay filtro de familia activo)
+            // Vista sin agrupar por familia (cuando hay filtro de familia activo)
             <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6'>
-              {filteredItems.map(item => (
-                <PublicEquipmentCard
-                  key={item.id}
-                  item={item}
-                  onViewDetails={() => handleViewDetails(item)}
+              {filteredGroups.map(group => (
+                <GroupedEquipmentCard
+                  key={group.groupId}
+                  group={group}
+                  onViewDetails={handleViewDetails}
+                  onContactGeneral={handleContactGeneral}
                 />
               ))}
             </div>
           ) : (
             // Vista agrupada por familia (cuando no hay filtro de familia)
             <div className='space-y-12'>
-              {Object.entries(groupedItems).map(([familyName, familyItems]) => (
+              {Object.entries(groupedByFamily).map(([familyName, familyGroups]) => (
                 <div key={familyName}>
                   {/* Encabezado de familia */}
                   <div className='flex items-center gap-3 mb-6'>
@@ -352,11 +362,12 @@ export default function PublicForSalePage() {
 
                   {/* Grid de equipos de esta familia */}
                   <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6'>
-                    {familyItems.map(item => (
-                      <PublicEquipmentCard
-                        key={item.id}
-                        item={item}
-                        onViewDetails={() => handleViewDetails(item)}
+                    {familyGroups.map(group => (
+                      <GroupedEquipmentCard
+                        key={group.groupId}
+                        group={group}
+                        onViewDetails={handleViewDetails}
+                        onContactGeneral={handleContactGeneral}
                       />
                     ))}
                   </div>
@@ -367,14 +378,15 @@ export default function PublicForSalePage() {
         </div>
       </section>
 
-      {/* ── Sheet de Detalles del Equipo ──────────────────────────────── */}
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className='w-full sm:max-w-lg overflow-y-auto'>
-          {selectedItem && (
-            <EquipmentDetailSheet item={selectedItem} onClose={() => setSheetOpen(false)} />
-          )}
-        </SheetContent>
-      </Sheet>
+      {/* ── Sheet de Lista de Unidades ────────────────────────────────── */}
+      {selectedGroup && (
+        <UnitsListSheet
+          group={selectedGroup}
+          open={unitsSheetOpen}
+          onClose={() => setUnitsSheetOpen(false)}
+          onContactUnit={handleContactUnit}
+        />
+      )}
 
       {/* ── Footer ─────────────────────────────────────────────────────── */}
       <footer className='bg-card border-t border-border py-10 mt-12'>
