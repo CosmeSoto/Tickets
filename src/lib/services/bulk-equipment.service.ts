@@ -1,13 +1,14 @@
 /**
  * Servicio de Creación por Lote de Equipos
  * Crea múltiples equipos idénticos en una sola operación atómica
+ * ACTUALIZADO: Ahora usa modelId en lugar de brand/model
  */
 
 import prisma from '@/lib/prisma'
 import { generateSequentialCodes, validateManualCodes } from './code-generator.service'
 import { bulkEquipmentInputSchema } from '../validations/bulk-equipment'
 import type { BulkEquipmentInput, BulkCreateResult } from '@/types/equipment-grouping'
-import { EquipmentStatus } from '@prisma/client'
+import { EquipmentStatus, Prisma } from '@prisma/client'
 
 /**
  * Crea múltiples equipos idénticos en una sola operación
@@ -101,8 +102,7 @@ export async function createBulkEquipment(input: BulkEquipmentInput): Promise<Bu
       const equipmentData = codes.map((code, index) => ({
         code,
         serialNumber: hasSerialNumbers ? serialNumbers[index] : '',
-        brand: validatedInput.brand,
-        model: validatedInput.model,
+        modelId: validatedInput.modelId,
         typeId: validatedInput.typeId,
         departmentId: validatedInput.departmentId,
         status: EquipmentStatus.AVAILABLE,
@@ -111,7 +111,7 @@ export async function createBulkEquipment(input: BulkEquipmentInput): Promise<Bu
         purchasePrice: validatedInput.purchasePrice || null,
         supplierId: validatedInput.supplierId || null,
         purchaseDate: validatedInput.purchaseDate || null,
-        specifications: validatedInput.specifications || null,
+        specifications: validatedInput.specifications || Prisma.JsonNull,
         accessories: validatedInput.accessories || [],
         notes: validatedInput.notes || null,
         photoUrl: validatedInput.photoUrl || null,
@@ -119,6 +119,9 @@ export async function createBulkEquipment(input: BulkEquipmentInput): Promise<Bu
         location: null,
         physicalLocation: null,
         saleListingPrice: null,
+        // Campos deprecated (mantener por compatibilidad)
+        brand: validatedInput.brand,
+        model: validatedInput.model,
       }))
 
       // Crear todos los equipos

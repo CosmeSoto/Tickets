@@ -1,0 +1,52 @@
+{
+  "timestamp": "2026-05-07T06:54:11.633Z",
+  "results": [
+    {
+      "category": "Serial Numbers",
+      "status": "OK",
+      "count": 0,
+      "message": "Todos los equipos tienen número de serie"
+    },
+    {
+      "category": "Serial Numbers",
+      "status": "OK",
+      "count": 0,
+      "message": "No hay números de serie duplicados"
+    },
+    {
+      "category": "Brand/Model",
+      "status": "OK",
+      "count": 0,
+      "message": "0 modelos únicos identificados",
+      "details": []
+    },
+    {
+      "category": "Equipment Types",
+      "status": "OK",
+      "count": 0,
+      "message": "Todos los tipos tienen familia"
+    },
+    {
+      "category": "Codes",
+      "status": "OK",
+      "count": 0,
+      "message": "No hay códigos duplicados"
+    },
+    {
+      "category": "Relational Integrity",
+      "status": "OK",
+      "count": 0,
+      "message": "Integridad referencial verificada"
+    },
+    {
+      "category": "Statistics",
+      "status": "OK",
+      "count": 0,
+      "message": "Total de equipos: 0",
+      "details": {
+        "byStatus": [],
+        "byCondition": []
+      }
+    }
+  ]
+}

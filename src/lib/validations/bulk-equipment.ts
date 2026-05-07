@@ -27,7 +27,9 @@ export const bulkEquipmentInputSchema = z
 
     serialNumbers: z.array(z.string()).optional(),
 
-    // Common equipment data (reuse from existing equipment schema)
+    // Common equipment data
+    modelId: z.string().uuid('ID de modelo inválido'),
+
     brand: z.string().min(1, 'La marca es requerida').max(100, 'La marca es muy larga'),
 
     model: z.string().min(1, 'El modelo es requerido').max(100, 'El modelo es muy largo'),

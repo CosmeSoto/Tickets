@@ -92,8 +92,9 @@ export interface BulkEquipmentInput {
   serialNumbers?: string[]
 
   // Common equipment data
-  brand: string
-  model: string
+  modelId: string // NUEVO: Referencia al modelo
+  brand: string // DEPRECATED: Mantener por compatibilidad
+  model: string // DEPRECATED: Mantener por compatibilidad
   typeId: string
   departmentId: string
   condition: EquipmentCondition
