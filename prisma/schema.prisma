@@ -980,6 +980,7 @@ model equipment {
   stockMovements        stock_movements[]       @relation("StockMovementEquipment")
   contractLines         contract_lines[]        @relation("ContractLineEquipment")
   sale                  equipment_sales?
+  customValues          equipment_custom_values[]
 
   @@index([code])
   @@index([serialNumber])
@@ -1461,6 +1462,7 @@ model families {
   tickets                     tickets[]
   contracts                   contracts[]
   assetRequests               asset_requests[]
+  customFields                family_custom_fields[]
 
   @@index([isActive, order])
   @@map("families")
@@ -2130,4 +2132,50 @@ model asset_requests {
   @@index([fulfilledById])
 
   @@map("asset_requests")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ATRIBUTOS DINÁMICOS POR FAMILIA
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Definición de campos personalizados por familia
+/// Permite a cada familia definir sus propios atributos (color, talla, material, etc.)
+model family_custom_fields {
+  id           String   @id @default(uuid())
+  familyId     String   @map("family_id")
+  family       families @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  
+  fieldName    String   @map("field_name") @db.VarChar(50)    // "color", "talla", "material"
+  fieldLabel   String   @map("field_label") @db.VarChar(100)  // "Color", "Talla", "Material"
+  fieldType    String   @map("field_type") @db.VarChar(20)    // "text", "number", "select", "date", "boolean"
+  fieldOptions Json?    @map("field_options")                 // ["Rojo", "Azul"] para select, { min: 0, max: 100 } para number
+  isRequired   Boolean  @default(false) @map("is_required")
+  order        Int      @default(0)
+  helpText     String?  @map("help_text") @db.VarChar(255)    // Texto de ayuda para el usuario
+  
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  
+  @@unique([familyId, fieldName])
+  @@index([familyId, order])
+  @@map("family_custom_fields")
+}
+
+/// Valores de campos personalizados por equipo
+/// Almacena los valores específicos de cada atributo para cada equipo
+model equipment_custom_values {
+  id          String    @id @default(uuid())
+  equipmentId String    @map("equipment_id")
+  equipment   equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  
+  fieldName   String    @map("field_name") @db.VarChar(50)  // "color"
+  fieldValue  String    @map("field_value") @db.VarChar(255) // "Rojo"
+  
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  
+  @@unique([equipmentId, fieldName])
+  @@index([equipmentId])
+  @@index([fieldName, fieldValue])
+  @@map("equipment_custom_values")
 }
