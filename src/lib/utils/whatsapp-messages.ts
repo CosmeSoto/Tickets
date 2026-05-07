@@ -132,25 +132,29 @@ function getConditionText(condition: string): string {
 /**
  * Genera URL de WhatsApp con mensaje pre-llenado
  *
- * @param phoneNumber - Número de teléfono (formato: +52XXXXXXXXXX)
  * @param message - Mensaje a enviar
+ * @param phoneNumber - Número de teléfono opcional (formato: +52XXXXXXXXXX)
  * @returns URL de WhatsApp Web o App
  *
  * @example
  * ```typescript
- * const url = generateWhatsAppUrl('+525512345678', message)
+ * const url = generateWhatsAppUrl(message, '+525512345678')
  * // "https://wa.me/525512345678?text=Hola%2C%20estoy%20interesado..."
  * ```
  */
-export function generateWhatsAppUrl(phoneNumber: string, message: string): string {
-  // Limpiar número de teléfono (remover espacios, guiones, paréntesis)
-  const cleanPhone = phoneNumber.replace(/[\s\-\(\)]/g, '')
-
+export function generateWhatsAppUrl(message: string, phoneNumber?: string): string {
   // Codificar mensaje para URL
   const encodedMessage = encodeURIComponent(message)
 
-  // Generar URL de WhatsApp
-  return `https://wa.me/${cleanPhone}?text=${encodedMessage}`
+  // Si hay número de teléfono, generar URL con número
+  if (phoneNumber) {
+    // Limpiar número de teléfono (remover espacios, guiones, paréntesis)
+    const cleanPhone = phoneNumber.replace(/[\s\-\(\)]/g, '')
+    return `https://wa.me/${cleanPhone}?text=${encodedMessage}`
+  }
+
+  // Si no hay número, generar URL genérica (abre WhatsApp con el mensaje)
+  return `https://wa.me/?text=${encodedMessage}`
 }
 
 /**
