@@ -46,6 +46,7 @@ export interface RawConfig {
 
 export interface FormState {
   inventoryEnabled: boolean
+  assetRequestsEnabled: boolean
   allowedSubtypes: AssetSubtype[]
   visibleSections: FormSection[]
   requiredSections: FormSection[]
@@ -88,6 +89,7 @@ function buildForm(cfg: RawConfig | null): FormState {
   }
   return {
     inventoryEnabled: cfg?.inventoryEnabled ?? true,
+    assetRequestsEnabled: (cfg as any)?.assetRequestsEnabled ?? false,
     allowedSubtypes:
       (cfg?.allowedSubtypes as AssetSubtype[]) ?? DEFAULT_FAMILY_CONFIG.allowedSubtypes,
     visibleSections:
@@ -272,6 +274,7 @@ export function useInventorySettings() {
         codePrefix: form.codePrefix || null,
         autoApproveDecommission: form.autoApproveDecommission,
         requireDeliveryAct: form.requireDeliveryAct,
+        assetRequestsEnabled: form.assetRequestsEnabled,
       }
       const res = await fetch(`/api/inventory/family-config/${selectedFamilyId}`, {
         method: 'PUT',

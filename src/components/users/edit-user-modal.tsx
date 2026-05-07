@@ -61,6 +61,7 @@ interface EditUserData {
   phone: string
   isActive: boolean
   canManageInventory: boolean
+  canRequestAssets: boolean
   ticketsEnabled: boolean
   inventoryEnabled: boolean
   isSuperAdmin: boolean
@@ -362,6 +363,7 @@ export function EditUserModal({
     phone: '',
     isActive: true,
     canManageInventory: false,
+    canRequestAssets: false,
     ticketsEnabled: true,
     inventoryEnabled: false,
     isSuperAdmin: false,
@@ -579,6 +581,7 @@ export function EditUserModal({
         phone: user.phone || '',
         isActive: user.isActive,
         canManageInventory: (user as any).canManageInventory ?? false,
+        canRequestAssets: (user as any).canRequestAssets ?? false,
         ticketsEnabled: (user as any).ticketsEnabled ?? true,
         inventoryEnabled: (user as any).inventoryEnabled ?? false,
         isSuperAdmin: user.isSuperAdmin ?? false,
@@ -796,6 +799,7 @@ export function EditUserModal({
           phone: formData.phone.trim() || null,
           isActive: formData.isActive,
           canManageInventory: formData.canManageInventory,
+          canRequestAssets: formData.canRequestAssets,
           ticketsEnabled: formData.ticketsEnabled,
           inventoryEnabled: formData.inventoryEnabled,
           isSuperAdmin: formData.role === 'ADMIN' ? formData.isSuperAdmin : false,
@@ -1239,6 +1243,30 @@ export function EditUserModal({
                                 checked={formData.canManageInventory}
                                 onCheckedChange={v =>
                                   setFormData(p => ({ ...p, canManageInventory: v }))
+                                }
+                              />
+                            </div>
+                          )}
+
+                          {/* Sub-opción solicitar activos — solo cuando inventario está activo */}
+                          {mod.key === 'inventory' && isEnabled && (
+                            <div
+                              className={`flex items-center justify-between rounded-lg border px-2.5 py-1.5 transition-colors ${
+                                formData.canRequestAssets
+                                  ? 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20'
+                                  : 'border-dashed border-border bg-muted/20'
+                              }`}
+                            >
+                              <div className='flex items-center gap-1.5 min-w-0'>
+                                <span className='text-xs'>📋</span>
+                                <p className='text-[11px] font-medium text-foreground leading-tight'>
+                                  Solicitar activos
+                                </p>
+                              </div>
+                              <Switch
+                                checked={formData.canRequestAssets}
+                                onCheckedChange={v =>
+                                  setFormData(p => ({ ...p, canRequestAssets: v }))
                                 }
                               />
                             </div>

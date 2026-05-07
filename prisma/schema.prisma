@@ -962,6 +962,21 @@ model equipment_assignments {
   @@map("equipment_assignments")
 }
 
+model equipment_code_counters {
+  id            String   @id @default(uuid())
+  counterKey    String   @unique @map("counter_key") @db.VarChar(100)
+  familyCode    String   @map("family_code") @db.VarChar(10)
+  typeCode      String   @map("type_code") @db.VarChar(10)
+  ownershipMode String   @map("ownership_mode") @db.VarChar(3)
+  year          Int
+  lastSequence  Int      @default(0) @map("last_sequence")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([familyCode, typeCode, year])
+  @@map("equipment_code_counters")
+}
+
 model delivery_acts {
   id                 String                 @id @default(uuid())
   folio              String                 @unique

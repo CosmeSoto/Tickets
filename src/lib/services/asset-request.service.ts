@@ -1,9 +1,31 @@
-import { AssetRequestStatus, AssetType, Prisma, UserRole } from '@prisma/client'
-import { prisma } from '@/lib/prisma'
-import { getAccessibleFamilyIds } from '@/lib/inventory/family-access'
-import { createModuleCache } from '@/lib/api-cache'
+/**
+ * AssetRequestService — Servicio para gestión de solicitudes de activos
+ *
+ * Maneja el ciclo de vida completo de las solicitudes:
+ * - Creación con código AR-{YEAR}-{SEQUENCE}
+ * - Revisión por Family Admin (UNDER_REVIEW + comentarios)
+ * - Aprobación/rechazo por Super Admin (con comentario obligatorio)
+ * - Entrega (FULFILLED)
+ * - Cancelación por requester (solo desde PENDING)
+ *
+ * Integración con:
+ * - FolioService para códigos AR
+ * - AuditServiceComplete para trazabilidad
+ * - NotificationService para notificaciones
+ * - Redis cache (TTL 30s) para listados
+ * - system_settings para configuración por familia
+ */
 
-// ── Response types ────────────────────────────────────────────────────────────
+import prisma from '@/lib/prisma'
+import { AssetRequestStatus, AssetType, UserRole } from '@prisma/client'
+import { FolioService } from './folio.service'
+import { AuditServiceComplete } from './audit-service-complete'
+import { NotificationService } from './notification-service'
+import { createModuleCache, getSetting } from '@/lib/api-cache'
+import { getAccessibleFamilyIds } from '@/lib/inventory/family-access'
+import { validateReviewerComment } from '@/lib/validations/inventory/asset-request'
+
+// ── Tipos ─────────────────────────────────────────────────────────────────────
 
 export interface AssetRequestFilters {
   status?: AssetRequestStatus | AssetRequestStatus[]
@@ -14,6 +36,14 @@ export interface AssetRequestFilters {
   search?: string // Búsqueda en código y descripción
   page?: number // default: 1
   limit?: number // default: 20
+}
+
+export interface AssetRequestListResponse {
+  data: AssetRequestRow[]
+  total: number
+  page: number
+  limit: number
+  totalPages: number
 }
 
 export interface AssetRequestRow {
@@ -30,59 +60,65 @@ export interface AssetRequestRow {
   updatedAt: string
 }
 
-export interface AssetRequestListResponse {
-  data: AssetRequestRow[]
-  total: number
-  page: number
-  limit: number
-  totalPages: number
+export interface AssetRequestDetail {
+  id: string
+  code: string
+  assetType: AssetType
+  description: string
+  justification: string
+  familyId: string
+  familyName: string
+  status: AssetRequestStatus
+  requesterId: string
+  requesterName: string
+  assetId?: string | null
+  assetName?: string | null
+  quantity: number
+  neededBy?: string | null
+  reviewerComment?: string | null
+  reviewedById?: string | null
+  reviewedByName?: string | null
+  reviewedAt?: string | null
+  fulfilledById?: string | null
+  fulfilledByName?: string | null
+  fulfilledAt?: string | null
+  reviewComments: ReviewComment[]
+  createdAt: string
+  updatedAt: string
 }
 
-/**
- * Actor roles used internally by the transition validation logic.
- *
- * - SUPER_ADMIN:       ADMIN with isSuperAdmin=true
- * - FAMILY_ADMIN:      ADMIN with isSuperAdmin=false
- * - REQUESTER_CANCEL:  The requester cancelling their own PENDING request
- * - CLIENT:            User with role CLIENT (read-only on transitions)
- * - TECHNICIAN:        User with role TECHNICIAN (read-only on transitions)
- */
-export type AssetRequestActorRole =
-  | 'SUPER_ADMIN'
-  | 'FAMILY_ADMIN'
-  | 'REQUESTER_CANCEL'
-  | 'CLIENT'
-  | 'TECHNICIAN'
+export interface ReviewComment {
+  id: string
+  userId: string
+  userName: string
+  userRole: string
+  comment: string
+  createdAt: string
+}
 
-/**
- * Result returned by validateTransition.
- *
- * - `valid: true`  — the transition is allowed for the given actor
- * - `valid: false` — the transition is blocked; `error` contains the error code
- *   that the API layer should map to the appropriate HTTP status:
- *     - 'TERMINAL_STATE'         → 409  (source state is terminal)
- *     - 'INVALID_TRANSITION'     → 409  (target state unreachable from source)
- *     - 'UNAUTHORIZED_TRANSITION'→ 403  (actor role not allowed for this edge)
- */
-export interface TransitionResult {
+export interface CreateAssetRequestInput {
+  assetType: AssetType
+  description: string
+  familyId: string
+  justification: string
+  assetId?: string
+  quantity?: number
+  neededBy?: string
+}
+
+export interface TransitionValidation {
   valid: boolean
-  error?: 'TERMINAL_STATE' | 'INVALID_TRANSITION' | 'UNAUTHORIZED_TRANSITION'
+  error?: string
 }
 
-/**
- * Matriz de transiciones válidas del módulo de Solicitud de Activos.
- *
- * Estructura: VALID_TRANSITIONS[currentStatus][newStatus] = allowedActors[]
- *
- * Los estados REJECTED y FULFILLED son terminales — no tienen transiciones
- * salientes, por lo que sus entradas son objetos vacíos.
- */
+// ── Matriz de transiciones válidas ───────────────────────────────────────────
+
 const VALID_TRANSITIONS: Record<
   AssetRequestStatus,
-  Partial<Record<AssetRequestStatus, AssetRequestActorRole[]>>
+  Partial<Record<AssetRequestStatus, string[]>>
 > = {
   PENDING: {
-    UNDER_REVIEW: ['FAMILY_ADMIN'],
+    UNDER_REVIEW: ['FAMILY_ADMIN', 'SUPER_ADMIN'],
     REJECTED: ['SUPER_ADMIN', 'REQUESTER_CANCEL'],
   },
   UNDER_REVIEW: {
@@ -92,112 +128,98 @@ const VALID_TRANSITIONS: Record<
   APPROVED: {
     FULFILLED: ['SUPER_ADMIN', 'FAMILY_ADMIN'],
   },
-  REJECTED: {}, // Terminal — no outgoing transitions
-  FULFILLED: {}, // Terminal — no outgoing transitions
+  REJECTED: {}, // Terminal
+  FULFILLED: {}, // Terminal
 }
 
-/**
- * Servicio principal para el módulo de Solicitud de Activos.
- *
- * Implementa el acceso a datos con scope por rol:
- * - CLIENT / TECHNICIAN: solo sus propias solicitudes
- * - Family Admin (ADMIN, isSuperAdmin=false): solicitudes de sus familias asignadas
- * - Super Admin (ADMIN, isSuperAdmin=true): todas las solicitudes sin restricción
- */
+// ── Cache helper ──────────────────────────────────────────────────────────────
+
+const cache = createModuleCache('asset-requests', 30) // TTL 30s
+
+// ── Servicio principal ────────────────────────────────────────────────────────
+
 export class AssetRequestService {
   /**
-   * Construye el filtro de scope de Prisma según el rol del usuario.
+   * Construye el filtro de scope según el rol del usuario.
    *
-   * - Super Admin: `{}` (sin restricción — ve todas las solicitudes)
-   * - Family Admin (ADMIN, isSuperAdmin=false): `{ familyId: { in: assignedFamilyIds } }`
-   * - CLIENT / TECHNICIAN: `{ requesterId: userId }`
-   *
-   * @param userId           ID del usuario autenticado
-   * @param userRole         Rol del usuario (UserRole de Prisma)
-   * @param isSuperAdmin     true si el usuario es Super Admin
-   * @param assignedFamilyIds IDs de familias asignadas al Family Admin
-   * @returns Filtro Prisma.asset_requestsWhereInput listo para usar en queries
+   * - CLIENT/TECHNICIAN: solo sus propias solicitudes
+   * - Family Admin: solicitudes de sus familias asignadas
+   * - Super Admin: sin restricción
    */
   private static buildScopeFilter(
     userId: string,
     userRole: UserRole,
     isSuperAdmin: boolean,
-    assignedFamilyIds: string[]
-  ): Prisma.asset_requestsWhereInput {
-    // Super Admin: acceso global sin restricción
-    if (isSuperAdmin) {
+    assignedFamilyIds: string[] | undefined
+  ): any {
+    // Super Admin: sin restricción
+    if (userRole === 'ADMIN' && isSuperAdmin) {
       return {}
     }
 
-    // Family Admin (ADMIN normal): solo solicitudes de sus familias asignadas
-    if (userRole === 'ADMIN') {
-      return {
-        familyId: { in: assignedFamilyIds },
-      }
+    // Family Admin: solo sus familias asignadas
+    if (userRole === 'ADMIN' && assignedFamilyIds !== undefined) {
+      return { familyId: { in: assignedFamilyIds } }
     }
 
-    // CLIENT o TECHNICIAN: solo sus propias solicitudes
-    return {
-      requesterId: userId,
-    }
+    // CLIENT/TECHNICIAN: solo sus propias solicitudes
+    return { requesterId: userId }
   }
 
   /**
-   * Valida si una transición de estado es permitida para el actor dado.
+   * Valida si una transición de estado es válida según el rol del actor.
    *
-   * Orden de evaluación:
-   * 1. Si el estado actual es terminal (REJECTED / FULFILLED) → TERMINAL_STATE
-   * 2. Si el estado destino no existe como arista desde el estado actual → INVALID_TRANSITION
-   * 3. Si el actor no está en la lista de roles permitidos para esa arista → UNAUTHORIZED_TRANSITION
-   * 4. En cualquier otro caso → válido
-   *
-   * @param currentStatus  Estado actual de la solicitud
-   * @param newStatus      Estado al que se quiere transicionar
-   * @param actorRole      Rol del actor que intenta la transición
-   * @returns              { valid: true } o { valid: false, error: ErrorCode }
+   * Retorna { valid: true } si la transición es permitida.
+   * Retorna { valid: false, error: string } si no es permitida.
    */
   private static validateTransition(
     currentStatus: AssetRequestStatus,
     newStatus: AssetRequestStatus,
-    actorRole: AssetRequestActorRole
-  ): TransitionResult {
-    const outgoing = VALID_TRANSITIONS[currentStatus]
-
-    // 1. Terminal state — no outgoing edges at all
-    if (Object.keys(outgoing).length === 0) {
-      return { valid: false, error: 'TERMINAL_STATE' }
+    actorRole: UserRole,
+    isSuperAdmin: boolean,
+    isRequesterCancel: boolean = false
+  ): TransitionValidation {
+    // Estados terminales no pueden cambiar
+    if (currentStatus === 'REJECTED' || currentStatus === 'FULFILLED') {
+      return {
+        valid: false,
+        error: 'La solicitud está en un estado terminal y no puede modificarse',
+      }
     }
 
-    // 2. The target status is not reachable from the current status
-    const allowedActors = outgoing[newStatus]
-    if (!allowedActors) {
-      return { valid: false, error: 'INVALID_TRANSITION' }
+    // Obtener transiciones válidas desde el estado actual
+    const validTransitions = VALID_TRANSITIONS[currentStatus]
+    if (!validTransitions || !validTransitions[newStatus]) {
+      return {
+        valid: false,
+        error: `No se puede cambiar de ${currentStatus} a ${newStatus}`,
+      }
     }
 
-    // 3. The actor role is not in the allowed list for this edge
-    if (!allowedActors.includes(actorRole)) {
-      return { valid: false, error: 'UNAUTHORIZED_TRANSITION' }
+    const allowedRoles = validTransitions[newStatus]!
+
+    // Verificar autorización según el rol
+    if (isRequesterCancel && allowedRoles.includes('REQUESTER_CANCEL')) {
+      return { valid: true }
     }
 
-    return { valid: true }
+    if (isSuperAdmin && allowedRoles.includes('SUPER_ADMIN')) {
+      return { valid: true }
+    }
+
+    if (actorRole === 'ADMIN' && !isSuperAdmin && allowedRoles.includes('FAMILY_ADMIN')) {
+      return { valid: true }
+    }
+
+    return {
+      valid: false,
+      error: 'No tienes permiso para realizar esta transición de estado',
+    }
   }
 
   /**
-   * Lista solicitudes de activos con filtros, paginación y caché Redis (TTL 30s).
-   *
-   * El scope de datos se aplica automáticamente según el rol del usuario:
-   * - CLIENT / TECHNICIAN: solo sus propias solicitudes (`requesterId = userId`)
-   * - Family Admin (ADMIN, isSuperAdmin=false): solicitudes de sus familias asignadas
-   * - Super Admin (ADMIN, isSuperAdmin=true): todas las solicitudes sin restricción
-   *
-   * Filtros adicionales opcionales: `status`, `assetType`, `familyId`, `dateFrom`,
-   * `dateTo` y `search` (búsqueda en código y descripción).
-   *
-   * @param filters      Filtros de búsqueda y paginación
-   * @param userId       ID del usuario autenticado
-   * @param userRole     Rol del usuario (UserRole de Prisma)
-   * @param isSuperAdmin true si el usuario es Super Admin
-   * @returns            Página de resultados con metadatos de paginación
+   * Lista solicitudes con filtros, paginación y scope por rol.
+   * Aplica caché Redis con TTL 30s.
    */
   static async listRequests(
     filters: AssetRequestFilters,
@@ -205,105 +227,59 @@ export class AssetRequestService {
     userRole: UserRole,
     isSuperAdmin: boolean
   ): Promise<AssetRequestListResponse> {
-    const page = Math.max(1, filters.page ?? 1)
-    const limit = Math.min(100, Math.max(1, filters.limit ?? 20))
+    const page = filters.page || 1
+    const limit = filters.limit || 20
     const skip = (page - 1) * limit
 
-    // ── 1. Resolve accessible family IDs for scope filter ──────────────────
-    // getAccessibleFamilyIds returns:
-    //   undefined  → no restriction (Super Admin or Admin with no assignments)
-    //   string[]   → only those families
-    const accessibleFamilyIds = await getAccessibleFamilyIds(
+    // Obtener familias accesibles
+    const assignedFamilyIds = await getAccessibleFamilyIds(
       userId,
       userRole,
       isSuperAdmin,
-      false // canManageInventory — not relevant for asset requests scope
+      false // canManageInventory no aplica aquí
     )
 
-    // ── 2. Build scope WHERE clause ────────────────────────────────────────
-    const scopeFilter = AssetRequestService.buildScopeFilter(
-      userId,
-      userRole,
-      isSuperAdmin,
-      accessibleFamilyIds ?? []
-    )
+    // Construir filtro de scope
+    const scopeFilter = this.buildScopeFilter(userId, userRole, isSuperAdmin, assignedFamilyIds)
 
-    // ── 3. Build additional filter clauses ─────────────────────────────────
-    const additionalFilters: Prisma.asset_requestsWhereInput[] = []
+    // Construir WHERE completo
+    const where: any = { ...scopeFilter }
 
-    // Status filter — accepts single value or array
+    // Filtros adicionales
     if (filters.status) {
-      const statuses = Array.isArray(filters.status) ? filters.status : [filters.status]
-      additionalFilters.push({ status: { in: statuses } })
+      where.status = Array.isArray(filters.status) ? { in: filters.status } : filters.status
     }
 
-    // Asset type filter — accepts single value or array
     if (filters.assetType) {
-      const types = Array.isArray(filters.assetType) ? filters.assetType : [filters.assetType]
-      additionalFilters.push({ assetType: { in: types } })
+      where.assetType = Array.isArray(filters.assetType)
+        ? { in: filters.assetType }
+        : filters.assetType
     }
 
-    // Family filter — intersect with scope (scope already restricts families for Family Admin)
     if (filters.familyId) {
-      additionalFilters.push({ familyId: filters.familyId })
+      where.familyId = filters.familyId
     }
 
-    // Date range filter
     if (filters.dateFrom || filters.dateTo) {
-      additionalFilters.push({
-        createdAt: {
-          ...(filters.dateFrom ? { gte: new Date(filters.dateFrom) } : {}),
-          ...(filters.dateTo ? { lte: new Date(filters.dateTo) } : {}),
-        },
-      })
+      where.createdAt = {}
+      if (filters.dateFrom) where.createdAt.gte = new Date(filters.dateFrom)
+      if (filters.dateTo) where.createdAt.lte = new Date(filters.dateTo)
     }
 
-    // Full-text search across code and description
-    if (filters.search?.trim()) {
-      const term = filters.search.trim()
-      additionalFilters.push({
-        OR: [
-          { code: { contains: term, mode: 'insensitive' } },
-          { description: { contains: term, mode: 'insensitive' } },
-        ],
-      })
+    if (filters.search) {
+      where.OR = [
+        { code: { contains: filters.search, mode: 'insensitive' } },
+        { description: { contains: filters.search, mode: 'insensitive' } },
+      ]
     }
 
-    // Combine scope + additional filters
-    const where: Prisma.asset_requestsWhereInput =
-      additionalFilters.length > 0 ? { AND: [scopeFilter, ...additionalFilters] } : scopeFilter
+    // Usar caché con clave que incluye userId, role y filtros
+    const cacheKey = `list:${userId}:${userRole}:${JSON.stringify(filters)}`
 
-    // ── 4. Cache key params — include userId and role for per-user isolation ─
-    const cacheParams: Record<string, unknown> = {
-      userId,
-      role: userRole,
-      isSuperAdmin,
-      page,
-      limit,
-      ...(filters.status && {
-        status: Array.isArray(filters.status) ? filters.status.join(',') : filters.status,
-      }),
-      ...(filters.assetType && {
-        assetType: Array.isArray(filters.assetType)
-          ? filters.assetType.join(',')
-          : filters.assetType,
-      }),
-      ...(filters.familyId && { familyId: filters.familyId }),
-      ...(filters.dateFrom && { dateFrom: filters.dateFrom }),
-      ...(filters.dateTo && { dateTo: filters.dateTo }),
-      ...(filters.search?.trim() && { search: filters.search.trim() }),
-    }
-
-    // ── 5. Execute query with Redis cache (TTL 30s) ────────────────────────
-    const moduleCache = createModuleCache('asset-requests', 30)
-
-    return moduleCache.getList(cacheParams, async () => {
-      const [records, total] = await prisma.$transaction([
+    return cache.getList({ key: cacheKey }, async () => {
+      const [data, total] = await Promise.all([
         prisma.asset_requests.findMany({
           where,
-          skip,
-          take: limit,
-          orderBy: { createdAt: 'desc' },
           select: {
             id: true,
             code: true,
@@ -321,32 +297,845 @@ export class AssetRequestService {
               select: { name: true },
             },
           },
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limit,
         }),
         prisma.asset_requests.count({ where }),
       ])
 
-      const data: AssetRequestRow[] = records.map(r => ({
+      const rows: AssetRequestRow[] = data.map(r => ({
         id: r.id,
         code: r.code,
         assetType: r.assetType,
-        // Truncate description to 100 chars for list view (full text in detail)
-        description: r.description.length > 100 ? r.description.slice(0, 100) + '…' : r.description,
+        description: r.description.substring(0, 100), // Truncar a 100 chars
         familyId: r.familyId,
-        familyName: r.family?.name ?? '',
+        familyName: r.family.name,
         status: r.status,
         requesterId: r.requesterId,
-        requesterName: r.requester?.name ?? '',
+        requesterName: r.requester.name,
         createdAt: r.createdAt.toISOString(),
         updatedAt: r.updatedAt.toISOString(),
       }))
 
       return {
-        data,
+        data: rows,
         total,
         page,
         limit,
         totalPages: Math.ceil(total / limit),
       }
     })
+  }
+
+  /**
+   * Crea una nueva solicitud de activo.
+   *
+   * - Verifica que el módulo esté habilitado para la familia
+   * - Verifica acceso del usuario a la familia
+   * - Genera código AR-{YEAR}-{SEQUENCE}
+   * - Registra en audit_logs
+   * - Envía notificaciones a Family Admins y Super Admin
+   * - Invalida caché
+   */
+  static async createRequest(
+    data: CreateAssetRequestInput,
+    userId: string,
+    userRole: UserRole,
+    isSuperAdmin: boolean,
+    ipAddress?: string
+  ): Promise<AssetRequestDetail> {
+    // 1. Verificar que el módulo está habilitado para la familia
+    const enabled = await getSetting(`asset_requests_enabled_${data.familyId}`, 600, 'false')
+    if (enabled !== 'true') {
+      throw new Error('ASSET_REQUESTS_DISABLED')
+    }
+
+    // 2. Verificar acceso del usuario a la familia
+    const accessibleFamilyIds = await getAccessibleFamilyIds(userId, userRole, isSuperAdmin, false)
+
+    if (accessibleFamilyIds !== undefined && !accessibleFamilyIds.includes(data.familyId)) {
+      throw new Error('FAMILY_ACCESS_DENIED')
+    }
+
+    // 3. Validar disponibilidad si quantity > 1 y assetType === EQUIPMENT
+    const quantity = data.quantity || 1
+    if (quantity > 1 && data.assetType === 'EQUIPMENT' && data.assetId) {
+      const availableCount = await prisma.equipment.count({
+        where: {
+          typeId: data.assetId,
+          status: 'AVAILABLE',
+        },
+      })
+
+      if (availableCount < quantity) {
+        throw new Error(
+          `Solo hay ${availableCount} unidades disponibles de este tipo. Solicitaste ${quantity} unidades.`
+        )
+      }
+    }
+
+    // 4. Generar código AR
+    const code = await FolioService.generateAssetRequestCode()
+
+    // 5. Crear registro
+    const request = await prisma.asset_requests.create({
+      data: {
+        code,
+        assetType: data.assetType,
+        description: data.description,
+        justification: data.justification,
+        familyId: data.familyId,
+        requesterId: userId,
+        assetId: data.assetId || null,
+        quantity: quantity,
+        neededBy: data.neededBy ? new Date(data.neededBy) : null,
+        status: 'PENDING',
+        reviewComments: [],
+      },
+      include: {
+        family: { select: { name: true } },
+        requester: { select: { name: true } },
+      },
+    })
+
+    // 6. Registrar en audit_logs
+    await AuditServiceComplete.log({
+      action: 'asset_request_created',
+      entityType: 'inventory',
+      entityId: request.id,
+      userId,
+      ipAddress,
+      details: {
+        code: request.code,
+        assetType: request.assetType,
+        familyId: request.familyId,
+        familyName: request.family.name,
+        quantity: request.quantity,
+      },
+    })
+
+    // 7. Enviar notificaciones a Family Admins y Super Admin
+    await this.notifyRequestCreated(request.id, request.code, request.family.name)
+
+    // 8. Invalidar caché
+    await cache.invalidate()
+
+    // 9. Retornar detalle
+    const detail = await this.getRequestDetail(request.id, userId, userRole, isSuperAdmin)
+    if (!detail) {
+      throw new Error('REQUEST_NOT_FOUND')
+    }
+    return detail
+  }
+
+  /**
+   * Obtiene el detalle completo de una solicitud.
+   *
+   * Verifica acceso del usuario a la familia de la solicitud.
+   * Retorna null si no tiene acceso (para que el endpoint retorne 404).
+   */
+  static async getRequestDetail(
+    requestId: string,
+    userId: string,
+    userRole: UserRole,
+    isSuperAdmin: boolean
+  ): Promise<AssetRequestDetail | null> {
+    const request = await prisma.asset_requests.findUnique({
+      where: { id: requestId },
+      include: {
+        family: { select: { name: true } },
+        requester: { select: { name: true } },
+        reviewedBy: { select: { name: true } },
+        fulfilledBy: { select: { name: true } },
+      },
+    })
+
+    if (!request) return null
+
+    // Verificar acceso según rol
+    const accessibleFamilyIds = await getAccessibleFamilyIds(userId, userRole, isSuperAdmin, false)
+
+    // Super Admin: acceso total
+    if (userRole === 'ADMIN' && isSuperAdmin) {
+      // OK
+    }
+    // Family Admin: solo sus familias
+    else if (userRole === 'ADMIN' && accessibleFamilyIds !== undefined) {
+      if (!accessibleFamilyIds.includes(request.familyId)) {
+        return null
+      }
+    }
+    // CLIENT/TECHNICIAN: solo sus propias solicitudes
+    else {
+      if (request.requesterId !== userId) {
+        return null
+      }
+    }
+
+    // Parsear reviewComments (JSON array)
+    const reviewComments = Array.isArray(request.reviewComments)
+      ? (request.reviewComments as unknown as ReviewComment[])
+      : []
+
+    return {
+      id: request.id,
+      code: request.code,
+      assetType: request.assetType,
+      description: request.description,
+      justification: request.justification,
+      familyId: request.familyId,
+      familyName: request.family.name,
+      status: request.status,
+      requesterId: request.requesterId,
+      requesterName: request.requester.name,
+      assetId: request.assetId,
+      assetName: null, // TODO: resolver nombre del activo si assetId está presente
+      quantity: request.quantity,
+      neededBy: request.neededBy?.toISOString() || null,
+      reviewerComment: request.reviewerComment,
+      reviewedById: request.reviewedById,
+      reviewedByName: request.reviewedBy?.name || null,
+      reviewedAt: request.reviewedAt?.toISOString() || null,
+      fulfilledById: request.fulfilledById,
+      fulfilledByName: request.fulfilledBy?.name || null,
+      fulfilledAt: request.fulfilledAt?.toISOString() || null,
+      reviewComments,
+      createdAt: request.createdAt.toISOString(),
+      updatedAt: request.updatedAt.toISOString(),
+    }
+  }
+
+  /**
+   * Cambia el estado de una solicitud.
+   *
+   * - Valida la transición con validateTransition
+   * - Valida comentario obligatorio para APPROVED y REJECTED
+   * - Actualiza el registro con los campos correspondientes
+   * - Registra en audit_logs
+   * - Envía notificaciones según el evento
+   * - Invalida caché
+   */
+  static async updateStatus(
+    requestId: string,
+    newStatus: AssetRequestStatus,
+    comment: string | undefined,
+    userId: string,
+    userRole: UserRole,
+    isSuperAdmin: boolean,
+    ipAddress?: string
+  ): Promise<AssetRequestDetail> {
+    // 1. Obtener solicitud actual
+    const request = await prisma.asset_requests.findUnique({
+      where: { id: requestId },
+      include: {
+        family: { select: { name: true } },
+        requester: { select: { name: true, id: true } },
+      },
+    })
+
+    if (!request) {
+      throw new Error('REQUEST_NOT_FOUND')
+    }
+
+    // 2. Verificar acceso del usuario a la familia
+    const accessibleFamilyIds = await getAccessibleFamilyIds(userId, userRole, isSuperAdmin, false)
+
+    if (accessibleFamilyIds !== undefined && !accessibleFamilyIds.includes(request.familyId)) {
+      throw new Error('FAMILY_ACCESS_DENIED')
+    }
+
+    // 3. Determinar si es cancelación por requester
+    const isRequesterCancel =
+      request.requesterId === userId && request.status === 'PENDING' && newStatus === 'REJECTED'
+
+    // 4. Validar transición
+    const validation = this.validateTransition(
+      request.status,
+      newStatus,
+      userRole,
+      isSuperAdmin,
+      isRequesterCancel
+    )
+
+    if (!validation.valid) {
+      throw new Error(validation.error || 'INVALID_TRANSITION')
+    }
+
+    // 5. Validar comentario obligatorio para APPROVED y REJECTED (Super Admin)
+    if ((newStatus === 'APPROVED' || newStatus === 'REJECTED') && !isRequesterCancel) {
+      if (!comment || !validateReviewerComment(comment)) {
+        throw new Error('COMMENT_REQUIRED')
+      }
+    }
+
+    // 6. Preparar datos de actualización
+    const updateData: any = {
+      status: newStatus,
+      updatedAt: new Date(),
+    }
+
+    // Campos específicos según el nuevo estado
+    if (newStatus === 'APPROVED' || newStatus === 'REJECTED') {
+      updateData.reviewerComment = comment
+      updateData.reviewedById = userId
+      updateData.reviewedAt = new Date()
+    }
+
+    if (newStatus === 'FULFILLED') {
+      updateData.fulfilledById = userId
+      updateData.fulfilledAt = new Date()
+    }
+
+    // Cancelación por requester: comentario automático
+    if (isRequesterCancel) {
+      updateData.reviewerComment = 'Cancelada por el solicitante'
+    }
+
+    // 7. Actualizar registro
+    await prisma.asset_requests.update({
+      where: { id: requestId },
+      data: updateData,
+    })
+
+    // 8. Registrar en audit_logs
+    await AuditServiceComplete.log({
+      action: 'asset_request_status_changed',
+      entityType: 'inventory',
+      entityId: requestId,
+      userId,
+      ipAddress,
+      oldValues: { status: request.status },
+      newValues: { status: newStatus },
+      details: {
+        code: request.code,
+        familyId: request.familyId,
+        familyName: request.family.name,
+        comment: comment || updateData.reviewerComment,
+      },
+    })
+
+    // 9. Enviar notificaciones según el evento
+    await this.notifyStatusChange(
+      requestId,
+      request.code,
+      request.status,
+      newStatus,
+      request.requester.id,
+      request.requester.name,
+      request.familyId,
+      comment
+    )
+
+    // 10. Invalidar caché
+    await cache.invalidate(requestId)
+
+    // 11. Retornar detalle actualizado
+    const detail = await this.getRequestDetail(requestId, userId, userRole, isSuperAdmin)
+    if (!detail) {
+      throw new Error('REQUEST_NOT_FOUND')
+    }
+    return detail
+  }
+
+  /**
+   * Aprueba una solicitud y asigna equipos específicos.
+   *
+   * - Valida que la cantidad de equipos seleccionados coincida con la cantidad solicitada
+   * - Valida que todos los equipos estén disponibles
+   * - Crea asignaciones para cada equipo
+   * - Actualiza el estado de los equipos a ASSIGNED
+   * - Envía notificación con los códigos de equipos asignados
+   */
+  static async approveWithEquipment(
+    requestId: string,
+    equipmentIds: string[],
+    comment: string,
+    userId: string,
+    userRole: UserRole,
+    isSuperAdmin: boolean,
+    ipAddress?: string
+  ): Promise<AssetRequestDetail> {
+    // 1. Obtener solicitud actual
+    const request = await prisma.asset_requests.findUnique({
+      where: { id: requestId },
+      include: {
+        family: { select: { name: true } },
+        requester: { select: { name: true, id: true, email: true } },
+      },
+    })
+
+    if (!request) {
+      throw new Error('REQUEST_NOT_FOUND')
+    }
+
+    // 2. Verificar acceso del usuario a la familia
+    const accessibleFamilyIds = await getAccessibleFamilyIds(userId, userRole, isSuperAdmin, false)
+
+    if (accessibleFamilyIds !== undefined && !accessibleFamilyIds.includes(request.familyId)) {
+      throw new Error('FAMILY_ACCESS_DENIED')
+    }
+
+    // 3. Validar que el usuario tenga permisos para aprobar
+    const validation = this.validateTransition(
+      request.status,
+      'APPROVED',
+      userRole,
+      isSuperAdmin,
+      false
+    )
+
+    if (!validation.valid) {
+      throw new Error(validation.error || 'INVALID_TRANSITION')
+    }
+
+    // 4. Validar que la cantidad de equipos seleccionados coincida con la cantidad solicitada
+    if (equipmentIds.length !== request.quantity) {
+      throw new Error(
+        `Debes seleccionar exactamente ${request.quantity} equipos. Seleccionaste ${equipmentIds.length}.`
+      )
+    }
+
+    // 5. Validar que todos los equipos existan y estén disponibles
+    const equipment = await prisma.equipment.findMany({
+      where: {
+        id: { in: equipmentIds },
+      },
+      select: {
+        id: true,
+        code: true,
+        status: true,
+        typeId: true,
+      },
+    })
+
+    if (equipment.length !== equipmentIds.length) {
+      throw new Error('Uno o más equipos no existen')
+    }
+
+    // Verificar que todos estén disponibles
+    const unavailableEquipment = equipment.filter(eq => eq.status !== 'AVAILABLE')
+    if (unavailableEquipment.length > 0) {
+      throw new Error(`El equipo ${unavailableEquipment[0].code} ya no está disponible`)
+    }
+
+    // Verificar que todos sean del tipo solicitado (si aplica)
+    if (request.assetType === 'EQUIPMENT' && request.assetId) {
+      const wrongTypeEquipment = equipment.filter(eq => eq.typeId !== request.assetId)
+      if (wrongTypeEquipment.length > 0) {
+        throw new Error(`El equipo ${wrongTypeEquipment[0].code} no es del tipo solicitado`)
+      }
+    }
+
+    // 6. Iniciar transacción para actualizar solicitud, crear asignaciones y actualizar equipos
+    const result = await prisma.$transaction(async tx => {
+      // Actualizar solicitud a APPROVED
+      await tx.asset_requests.update({
+        where: { id: requestId },
+        data: {
+          status: 'APPROVED',
+          reviewerComment: comment,
+          reviewedById: userId,
+          reviewedAt: new Date(),
+          updatedAt: new Date(),
+        },
+      })
+
+      // Crear asignaciones para cada equipo
+      const assignments = await Promise.all(
+        equipmentIds.map(equipmentId =>
+          tx.equipment_assignments.create({
+            data: {
+              equipmentId,
+              receiverId: request.requesterId,
+              assignedById: userId,
+              assignedAt: new Date(),
+              status: 'ACTIVE',
+              notes: `Asignado por solicitud ${request.code}`,
+            },
+            include: {
+              equipment: {
+                select: {
+                  code: true,
+                },
+              },
+            },
+          })
+        )
+      )
+
+      // Actualizar estado de equipos a ASSIGNED
+      await tx.equipment.updateMany({
+        where: {
+          id: { in: equipmentIds },
+        },
+        data: {
+          status: 'ASSIGNED',
+          updatedAt: new Date(),
+        },
+      })
+
+      return assignments
+    })
+
+    // 7. Registrar en audit_logs
+    await AuditServiceComplete.log({
+      action: 'asset_request_approved_with_equipment',
+      entityType: 'inventory',
+      entityId: requestId,
+      userId,
+      ipAddress,
+      oldValues: { status: request.status },
+      newValues: { status: 'APPROVED' },
+      details: {
+        code: request.code,
+        familyId: request.familyId,
+        familyName: request.family.name,
+        comment,
+        equipmentCodes: result.map(a => a.equipment.code),
+        quantity: request.quantity,
+      },
+    })
+
+    // 8. Enviar notificación con códigos de equipos asignados
+    const equipmentCodes = result.map(a => a.equipment.code).join(', ')
+    await this.notifyApprovalWithEquipment(
+      requestId,
+      request.code,
+      request.requester.id,
+      request.requester.name,
+      request.requester.email,
+      request.familyId,
+      request.quantity,
+      equipmentCodes,
+      comment
+    )
+
+    // 9. Invalidar caché
+    await cache.invalidate(requestId)
+
+    // 10. Retornar detalle actualizado
+    const detail = await this.getRequestDetail(requestId, userId, userRole, isSuperAdmin)
+    if (!detail) {
+      throw new Error('REQUEST_NOT_FOUND')
+    }
+    return detail
+  }
+
+  /**
+   * Agrega un comentario interno a una solicitud.
+   *
+   * - Verifica acceso del usuario a la familia
+   * - Verifica que el estado permite comentarios
+   * - Agrega el comentario al array JSON reviewComments
+   * - Registra en audit_logs
+   * - Envía notificación al Super Admin si el comentario lo agrega un Family Admin
+   */
+  static async addComment(
+    requestId: string,
+    comment: string,
+    userId: string,
+    userName: string,
+    userRole: UserRole,
+    isSuperAdmin: boolean
+  ): Promise<ReviewComment> {
+    // 1. Obtener solicitud
+    const request = await prisma.asset_requests.findUnique({
+      where: { id: requestId },
+      select: {
+        id: true,
+        code: true,
+        status: true,
+        familyId: true,
+        reviewComments: true,
+      },
+    })
+
+    if (!request) {
+      throw new Error('REQUEST_NOT_FOUND')
+    }
+
+    // 2. Verificar acceso del usuario a la familia
+    const accessibleFamilyIds = await getAccessibleFamilyIds(userId, userRole, isSuperAdmin, false)
+
+    if (accessibleFamilyIds !== undefined && !accessibleFamilyIds.includes(request.familyId)) {
+      throw new Error('FAMILY_ACCESS_DENIED')
+    }
+
+    // 3. Verificar que el estado permite comentarios
+    const terminalStates: AssetRequestStatus[] = ['REJECTED', 'FULFILLED']
+    if (terminalStates.includes(request.status)) {
+      // Super Admin puede comentar en cualquier estado no terminal
+      if (!isSuperAdmin) {
+        throw new Error('CANNOT_COMMENT_ON_TERMINAL_STATE')
+      }
+    }
+
+    // Family Admin solo puede comentar en PENDING o UNDER_REVIEW
+    if (userRole === 'ADMIN' && !isSuperAdmin) {
+      const allowedStates: AssetRequestStatus[] = ['PENDING', 'UNDER_REVIEW']
+      if (!allowedStates.includes(request.status)) {
+        throw new Error('CANNOT_COMMENT_IN_THIS_STATE')
+      }
+    }
+
+    // 4. Crear nuevo comentario
+    const newComment: ReviewComment = {
+      id: crypto.randomUUID(),
+      userId,
+      userName,
+      userRole,
+      comment,
+      createdAt: new Date().toISOString(),
+    }
+
+    // 5. Agregar al array JSON
+    const currentComments = Array.isArray(request.reviewComments)
+      ? (request.reviewComments as unknown as ReviewComment[])
+      : []
+
+    await prisma.asset_requests.update({
+      where: { id: requestId },
+      data: {
+        reviewComments: [...currentComments, newComment] as any,
+        updatedAt: new Date(),
+      },
+    })
+
+    // 6. Registrar en audit_logs
+    await AuditServiceComplete.log({
+      action: 'asset_request_comment_added',
+      entityType: 'inventory',
+      entityId: requestId,
+      userId,
+      details: {
+        code: request.code,
+        comment,
+        userName,
+        userRole,
+      },
+    })
+
+    // 7. Enviar notificación al Super Admin si el comentario lo agrega un Family Admin
+    if (userRole === 'ADMIN' && !isSuperAdmin) {
+      await this.notifyCommentAdded(requestId, request.code, userName)
+    }
+
+    return newComment
+  }
+
+  // ── Métodos de notificación ────────────────────────────────────────────────
+
+  /**
+   * Notifica la creación de una solicitud a Family Admins y Super Admin.
+   */
+  private static async notifyRequestCreated(
+    requestId: string,
+    code: string,
+    familyName: string
+  ): Promise<void> {
+    try {
+      // Obtener Super Admin
+      const superAdmins = await prisma.users.findMany({
+        where: { role: 'ADMIN', isSuperAdmin: true, isActive: true },
+        select: { id: true },
+      })
+
+      // Obtener Family Admins de la familia
+      const request = await prisma.asset_requests.findUnique({
+        where: { id: requestId },
+        select: { familyId: true },
+      })
+
+      if (!request) return
+
+      const familyAdmins = await prisma.users.findMany({
+        where: {
+          role: 'ADMIN',
+          isSuperAdmin: false,
+          isActive: true,
+          adminFamilyAssignments: {
+            some: { familyId: request.familyId, isActive: true },
+          },
+        },
+        select: { id: true },
+      })
+
+      const recipients = [...superAdmins, ...familyAdmins]
+
+      await Promise.all(
+        recipients.map(recipient =>
+          NotificationService.push({
+            userId: recipient.id,
+            type: 'INVENTORY',
+            title: 'Nueva solicitud de activo',
+            message: `Se ha creado la solicitud ${code} para la familia ${familyName}`,
+            metadata: { requestId, code, familyName },
+          })
+        )
+      )
+    } catch (error) {
+      console.error('[ASSET_REQUEST] Error notifying request created:', error)
+    }
+  }
+
+  /**
+   * Notifica cambios de estado según el evento.
+   */
+  private static async notifyStatusChange(
+    requestId: string,
+    code: string,
+    oldStatus: AssetRequestStatus,
+    newStatus: AssetRequestStatus,
+    requesterId: string,
+    requesterName: string,
+    familyId: string,
+    comment?: string
+  ): Promise<void> {
+    try {
+      // UNDER_REVIEW: notificar a Super Admin
+      if (newStatus === 'UNDER_REVIEW') {
+        const superAdmins = await prisma.users.findMany({
+          where: { role: 'ADMIN', isSuperAdmin: true, isActive: true },
+          select: { id: true },
+        })
+
+        await Promise.all(
+          superAdmins.map(admin =>
+            NotificationService.push({
+              userId: admin.id,
+              type: 'INVENTORY',
+              title: 'Solicitud en revisión',
+              message: `La solicitud ${code} está en revisión`,
+              metadata: { requestId, code },
+            })
+          )
+        )
+      }
+
+      // APPROVED o REJECTED: notificar a requester y Family Admins
+      if (newStatus === 'APPROVED' || newStatus === 'REJECTED') {
+        const statusText = newStatus === 'APPROVED' ? 'aprobada' : 'rechazada'
+
+        // Notificar al requester
+        await NotificationService.push({
+          userId: requesterId,
+          type: newStatus === 'APPROVED' ? 'SUCCESS' : 'WARNING',
+          title: `Solicitud ${statusText}`,
+          message: `Tu solicitud ${code} ha sido ${statusText}. ${comment || ''}`,
+          metadata: { requestId, code, comment },
+        })
+
+        // Notificar a Family Admins de la familia
+        const familyAdmins = await prisma.users.findMany({
+          where: {
+            role: 'ADMIN',
+            isSuperAdmin: false,
+            isActive: true,
+            adminFamilyAssignments: {
+              some: { familyId, isActive: true },
+            },
+          },
+          select: { id: true },
+        })
+
+        await Promise.all(
+          familyAdmins.map(admin =>
+            NotificationService.push({
+              userId: admin.id,
+              type: 'INVENTORY',
+              title: `Solicitud ${statusText}`,
+              message: `La solicitud ${code} de ${requesterName} ha sido ${statusText}`,
+              metadata: { requestId, code },
+            })
+          )
+        )
+      }
+
+      // FULFILLED: notificar al requester
+      if (newStatus === 'FULFILLED') {
+        await NotificationService.push({
+          userId: requesterId,
+          type: 'SUCCESS',
+          title: 'Solicitud entregada',
+          message: `Tu solicitud ${code} ha sido entregada`,
+          metadata: { requestId, code },
+        })
+      }
+    } catch (error) {
+      console.error('[ASSET_REQUEST] Error notifying status change:', error)
+    }
+  }
+
+  /**
+   * Notifica al Super Admin cuando un Family Admin agrega un comentario.
+   */
+  private static async notifyCommentAdded(
+    requestId: string,
+    code: string,
+    userName: string
+  ): Promise<void> {
+    try {
+      const superAdmins = await prisma.users.findMany({
+        where: { role: 'ADMIN', isSuperAdmin: true, isActive: true },
+        select: { id: true },
+      })
+
+      await Promise.all(
+        superAdmins.map(admin =>
+          NotificationService.push({
+            userId: admin.id,
+            type: 'INVENTORY',
+            title: 'Nuevo comentario en solicitud',
+            message: `${userName} ha agregado un comentario a la solicitud ${code}`,
+            metadata: { requestId, code },
+          })
+        )
+      )
+    } catch (error) {
+      console.error('[ASSET_REQUEST] Error notifying comment added:', error)
+    }
+  }
+
+  /**
+   * Notifica al solicitante sobre la aprobación con equipos asignados
+   */
+  private static async notifyApprovalWithEquipment(
+    requestId: string,
+    code: string,
+    requesterId: string,
+    requesterName: string,
+    requesterEmail: string,
+    familyId: string,
+    quantity: number,
+    equipmentCodes: string,
+    comment?: string
+  ): Promise<void> {
+    try {
+      // Notificación push al solicitante
+      await NotificationService.push({
+        userId: requesterId,
+        type: 'INVENTORY',
+        title: 'Solicitud aprobada',
+        message: `Tu solicitud de ${quantity} unidades ha sido aprobada. Equipos asignados: ${equipmentCodes}`,
+        metadata: { requestId, code },
+      })
+
+      // Email al solicitante
+      await NotificationService.email({
+        to: requesterEmail,
+        subject: `Solicitud ${code} aprobada`,
+        template: 'asset-request-approved',
+        data: {
+          requesterName,
+          code,
+          quantity,
+          equipmentCodes,
+          comment,
+        },
+      })
+    } catch (error) {
+      console.error('[ASSET_REQUEST] Error notifying approval with equipment:', error)
+    }
   }
 }

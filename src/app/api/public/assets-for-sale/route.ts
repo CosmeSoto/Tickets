@@ -1,92 +1,95 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { Prisma, EquipmentCondition } from '@prisma/client'
-import { prisma } from '@/lib/prisma'
+/**
+ * API Endpoint: GET /api/public/assets-for-sale
+ *
+ * Lista equipos en venta (FOR_SALE) agrupados por modelo
+ * Endpoint público - no requiere autenticación
+ */
+
+import { NextResponse } from 'next/server'
+import prisma from '@/lib/prisma'
+import { groupByModel } from '@/lib/services/equipment-grouping.service'
+import type { PublicEquipmentItem } from '@/types/equipment-grouping'
+
+export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/public/assets-for-sale
- * Retorna equipos con estado FOR_SALE sin requerir autenticación.
  *
- * Query params opcionales:
- *   - familyId  — filtra por familia del tipo de equipo
- *   - typeId    — filtra por tipo de equipo específico
- *   - condition — filtra por condición del equipo (EquipmentCondition)
- *   - limit     — limita el número de resultados (para preview en landing page)
+ * Retorna equipos en venta agrupados por modelo
  *
- * Campos sensibles excluidos explícitamente mediante select:
- *   purchasePrice, purchaseDate, invoiceNumber, serialNumber,
- *   departmentId, supplierId, usefulLifeYears, residualValue,
- *   depreciationMethod, rentalProvider, contractId, warehouseId
- *
- * Resolución de contactWhatsapp (fallback en cascada):
- *   1. family.contactWhatsapp → número específico de la familia
- *   2. system_settings['contact.whatsapp_number'] → número global
- *   3. null → el frontend redirige a /login
+ * @returns {
+ *   items: EquipmentGroup[] - Grupos de equipos idénticos
+ * }
  */
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    const { searchParams } = req.nextUrl
-    const familyId = searchParams.get('familyId') ?? undefined
-    const typeId = searchParams.get('typeId') ?? undefined
-    const condition = searchParams.get('condition') ?? undefined
-    const limitParam = searchParams.get('limit')
-    const limit = limitParam ? parseInt(limitParam, 10) : undefined
-
-    // Leer el número global de WhatsApp una vez al inicio del handler
-    const globalWhatsappSetting = await prisma.system_settings.findUnique({
-      where: { key: 'contact.whatsapp_number' },
-    })
-    const globalWhatsapp = globalWhatsappSetting?.value ?? null
-
-    const where: Prisma.equipmentWhereInput = {
-      status: 'FOR_SALE',
-      ...(typeId && { typeId }),
-      ...(familyId && { type: { familyId } }),
-      ...(condition && { condition: condition as EquipmentCondition }),
-    }
-
-    const items = await prisma.equipment.findMany({
-      where,
-      select: {
-        id: true,
-        code: true,
-        brand: true,
-        model: true,
-        condition: true,
-        photoUrl: true,
-        specifications: true,
-        accessories: true,
-        notes: true,
-        saleListingPrice: true,
-        updatedAt: true,
+    // Consultar equipos con estado FOR_SALE
+    const equipment = await prisma.equipment.findMany({
+      where: {
+        status: 'FOR_SALE',
+      },
+      include: {
         type: {
-          select: {
-            id: true,
-            name: true,
-            family: {
-              select: {
-                id: true,
-                name: true,
-                icon: true,
-                color: true,
-                contactWhatsapp: true,
-              },
-            },
+          include: {
+            family: true,
           },
         },
       },
-      orderBy: { updatedAt: 'desc' },
-      ...(limit && { take: limit }),
+      orderBy: {
+        createdAt: 'desc',
+      },
     })
 
-    // Mapear cada item para resolver contactWhatsapp con fallback en cascada
-    const itemsWithResolvedContact = items.map(item => ({
-      ...item,
-      contactWhatsapp: item.type.family?.contactWhatsapp ?? globalWhatsapp ?? null,
+    // Transformar a formato PublicEquipmentItem
+    const publicItems: PublicEquipmentItem[] = equipment.map(eq => ({
+      id: eq.id,
+      code: eq.code,
+      serialNumber: eq.serialNumber,
+      brand: eq.brand,
+      model: eq.model,
+      type: {
+        id: eq.type.id,
+        name: eq.type.name,
+        code: eq.type.code,
+        family: eq.type.family
+          ? {
+              id: eq.type.family.id,
+              name: eq.type.family.name,
+              icon: eq.type.family.icon,
+              color: eq.type.family.color,
+            }
+          : null,
+      },
+      condition: eq.condition,
+      saleListingPrice: eq.saleListingPrice,
+      photoUrl: eq.photoUrl,
+      specifications: eq.specifications as Record<string, any> | null,
+      createdAt: eq.createdAt,
     }))
 
-    return NextResponse.json({ items: itemsWithResolvedContact })
+    // Agrupar equipos por modelo
+    const groups = groupByModel(publicItems)
+
+    return NextResponse.json(
+      {
+        items: groups,
+      },
+      {
+        status: 200,
+        headers: {
+          'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
+        },
+      }
+    )
   } catch (error) {
-    console.error('Error en GET /api/public/assets-for-sale:', error)
-    return NextResponse.json({ error: 'Error al obtener activos en venta' }, { status: 500 })
+    console.error('Error obteniendo equipos en venta:', error)
+
+    return NextResponse.json(
+      {
+        error: 'Error al obtener equipos en venta',
+        message: error instanceof Error ? error.message : 'Error desconocido',
+      },
+      { status: 500 }
+    )
   }
 }

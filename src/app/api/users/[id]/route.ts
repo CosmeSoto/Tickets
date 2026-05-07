@@ -17,6 +17,7 @@ const updateUserSchema = z.object({
   avatar: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
   canManageInventory: z.boolean().optional(),
+  canRequestAssets: z.boolean().optional(),
   ticketsEnabled: z.boolean().optional(),
   inventoryEnabled: z.boolean().optional(),
   isSuperAdmin: z.boolean().optional(),
@@ -108,6 +109,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       delete validatedData.role
       delete validatedData.isActive
       delete validatedData.assignedCategories // Solo admins pueden asignar categorías
+      delete (validatedData as any).canRequestAssets // Solo admins pueden modificar canRequestAssets
     }
 
     const targetId = (await params).id
@@ -224,6 +226,23 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         (validatedData as any).canManageInventory !== undefined &&
         (validatedData as any).canManageInventory !== (currentUser as any).canManageInventory
       ) {
+        NotificationEvents.emit(targetId, {
+          type: 'session_refresh',
+          reason: 'permissions_changed',
+        })
+      }
+
+      // Si cambia canRequestAssets, notificar para refrescar sesión
+      if (
+        (validatedData as any).canRequestAssets !== undefined &&
+        (validatedData as any).canRequestAssets !== (currentUser as any).canRequestAssets
+      ) {
+        changes.canRequestAssets = {
+          old: (currentUser as any).canRequestAssets ? 'Puede solicitar' : 'No puede solicitar',
+          new: (validatedData as any).canRequestAssets ? 'Puede solicitar' : 'No puede solicitar',
+        }
+        oldValues.canRequestAssets = (currentUser as any).canRequestAssets
+        newValues.canRequestAssets = (validatedData as any).canRequestAssets
         NotificationEvents.emit(targetId, {
           type: 'session_refresh',
           reason: 'permissions_changed',

@@ -221,9 +221,28 @@ export function InventoryAreasTab({
                 <h3 className='font-semibold truncate'>{selectedFamily?.name}</h3>
                 <p className='text-xs text-muted-foreground font-mono'>{selectedFamily?.code}</p>
               </div>
-              <Badge variant={form.inventoryEnabled ? 'default' : 'secondary'}>
-                {form.inventoryEnabled ? 'Habilitado' : 'Deshabilitado'}
-              </Badge>
+              <div className='flex items-center gap-2 flex-shrink-0'>
+                <Badge variant={form.inventoryEnabled ? 'default' : 'secondary'}>
+                  {form.inventoryEnabled ? 'Habilitado' : 'Deshabilitado'}
+                </Badge>
+                {form.inventoryEnabled && (
+                  <div className='flex items-center gap-2 pl-2 border-l'>
+                    <Label
+                      htmlFor='asset-requests-enabled'
+                      className='text-xs cursor-pointer whitespace-nowrap text-muted-foreground'
+                    >
+                      Solicitudes
+                    </Label>
+                    <Switch
+                      id='asset-requests-enabled'
+                      checked={form.assetRequestsEnabled}
+                      onCheckedChange={v => onSetField('assetRequestsEnabled', v)}
+                      disabled={saving || !form.inventoryEnabled}
+                      className='scale-75'
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Asset types */}

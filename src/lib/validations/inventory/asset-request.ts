@@ -32,8 +32,11 @@ export const createAssetRequestSchema = z.object({
     .min(1, {
       message: 'La cantidad debe ser al menos 1',
     })
-    .default(1)
-    .optional(),
+    .max(100, {
+      message: 'La cantidad no puede exceder 100 unidades',
+    })
+    .optional()
+    .default(1),
   neededBy: z
     .string()
     .datetime({
@@ -49,6 +52,17 @@ export const updateStatusSchema = z.object({
     errorMap: () => ({ message: 'Estado inválido' }),
   }),
   comment: z.string().optional(),
+})
+
+// ── Aprobación con selección de equipos ───────────────────────────────────────
+
+export const approveWithEquipmentSchema = z.object({
+  comment: z.string().min(10, {
+    message: 'El comentario debe tener al menos 10 caracteres',
+  }),
+  equipmentIds: z.array(z.string().uuid()).min(1, {
+    message: 'Debes seleccionar al menos un equipo',
+  }),
 })
 
 // ── Agregar comentario ────────────────────────────────────────────────────────
@@ -83,5 +97,6 @@ export function validateReviewerComment(comment: string): boolean {
 
 export type CreateAssetRequestInput = z.infer<typeof createAssetRequestSchema>
 export type UpdateStatusInput = z.infer<typeof updateStatusSchema>
+export type ApproveWithEquipmentInput = z.infer<typeof approveWithEquipmentSchema>
 export type AddCommentInput = z.infer<typeof addCommentSchema>
 export type UpdateFamilyConfigInput = z.infer<typeof updateFamilyConfigSchema>
