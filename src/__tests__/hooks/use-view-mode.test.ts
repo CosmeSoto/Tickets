@@ -20,12 +20,12 @@ const localStorageMock = (() => {
     },
     clear: () => {
       store = {}
-    }
+    },
   }
 })()
 
 Object.defineProperty(window, 'localStorage', {
-  value: localStorageMock
+  value: localStorageMock,
 })
 
 // Mock window.innerWidth for responsive tests
@@ -33,7 +33,7 @@ const setWindowWidth = (width: number) => {
   Object.defineProperty(window, 'innerWidth', {
     writable: true,
     configurable: true,
-    value: width
+    value: width,
   })
 }
 
@@ -56,7 +56,7 @@ describe('useViewMode', () => {
 
     it('should change view mode', () => {
       const { result } = renderHook(() => useViewMode('cards'))
-      
+
       act(() => {
         result.current.setViewMode('list')
       })
@@ -66,7 +66,7 @@ describe('useViewMode', () => {
 
     it('should change to table mode', () => {
       const { result } = renderHook(() => useViewMode('cards'))
-      
+
       act(() => {
         result.current.setViewMode('table')
       })
@@ -82,10 +82,12 @@ describe('useViewMode', () => {
 
   describe('localStorage Persistence', () => {
     it('should persist view mode to localStorage', () => {
-      const { result } = renderHook(() => useViewMode('cards', {
-        storageKey: 'test-view-mode'
-      }))
-      
+      const { result } = renderHook(() =>
+        useViewMode('cards', {
+          storageKey: 'test-view-mode',
+        })
+      )
+
       act(() => {
         result.current.setViewMode('list')
       })
@@ -95,25 +97,29 @@ describe('useViewMode', () => {
 
     it('should load view mode from localStorage', () => {
       localStorageMock.setItem('test-view-mode', 'table')
-      
-      const { result } = renderHook(() => useViewMode('cards', {
-        storageKey: 'test-view-mode'
-      }))
+
+      const { result } = renderHook(() =>
+        useViewMode('cards', {
+          storageKey: 'test-view-mode',
+        })
+      )
 
       expect(result.current.viewMode).toBe('table')
     })
 
     it('should use default mode if localStorage is empty', () => {
-      const { result } = renderHook(() => useViewMode('cards', {
-        storageKey: 'empty-key'
-      }))
+      const { result } = renderHook(() =>
+        useViewMode('cards', {
+          storageKey: 'empty-key',
+        })
+      )
 
       expect(result.current.viewMode).toBe('cards')
     })
 
     it('should use default storage key when not provided', () => {
       const { result } = renderHook(() => useViewMode('cards'))
-      
+
       act(() => {
         result.current.setViewMode('list')
       })
@@ -123,7 +129,7 @@ describe('useViewMode', () => {
 
     it('should handle localStorage errors gracefully', () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation()
-      
+
       // Mock localStorage.setItem to throw error
       const originalSetItem = localStorageMock.setItem
       localStorageMock.setItem = () => {
@@ -131,13 +137,13 @@ describe('useViewMode', () => {
       }
 
       const { result } = renderHook(() => useViewMode('cards'))
-      
+
       act(() => {
         result.current.setViewMode('list')
       })
 
       expect(consoleErrorSpy).toHaveBeenCalled()
-      
+
       // Restore
       localStorageMock.setItem = originalSetItem
       consoleErrorSpy.mockRestore()
@@ -146,20 +152,24 @@ describe('useViewMode', () => {
 
   describe('Available Modes Configuration', () => {
     it('should respect custom available modes', () => {
-      const { result } = renderHook(() => useViewMode('cards', {
-        availableModes: ['cards', 'list']
-      }))
+      const { result } = renderHook(() =>
+        useViewMode('cards', {
+          availableModes: ['cards', 'list'],
+        })
+      )
 
       expect(result.current.availableModes).toEqual(['cards', 'list'])
     })
 
     it('should warn when setting unavailable mode', () => {
       const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation()
-      
-      const { result } = renderHook(() => useViewMode('cards', {
-        availableModes: ['cards', 'list']
-      }))
-      
+
+      const { result } = renderHook(() =>
+        useViewMode('cards', {
+          availableModes: ['cards', 'list'],
+        })
+      )
+
       act(() => {
         result.current.setViewMode('table')
       })
@@ -174,11 +184,13 @@ describe('useViewMode', () => {
     })
 
     it('should not persist unavailable mode', () => {
-      const { result } = renderHook(() => useViewMode('cards', {
-        availableModes: ['cards', 'list'],
-        storageKey: 'test-key'
-      }))
-      
+      const { result } = renderHook(() =>
+        useViewMode('cards', {
+          availableModes: ['cards', 'list'],
+          storageKey: 'test-key',
+        })
+      )
+
       act(() => {
         result.current.setViewMode('table' as ViewMode)
       })
@@ -188,11 +200,13 @@ describe('useViewMode', () => {
 
     it('should ignore invalid mode from localStorage', () => {
       localStorageMock.setItem('test-key', 'invalid-mode')
-      
-      const { result } = renderHook(() => useViewMode('cards', {
-        availableModes: ['cards', 'list'],
-        storageKey: 'test-key'
-      }))
+
+      const { result } = renderHook(() =>
+        useViewMode('cards', {
+          availableModes: ['cards', 'list'],
+          storageKey: 'test-key',
+        })
+      )
 
       expect(result.current.viewMode).toBe('cards') // Should use default
     })
@@ -201,9 +215,9 @@ describe('useViewMode', () => {
   describe('Responsive Behavior', () => {
     it('should detect mobile viewport', () => {
       setWindowWidth(500) // Mobile width
-      
+
       const { result } = renderHook(() => useViewMode('cards'))
-      
+
       // Trigger resize event
       act(() => {
         window.dispatchEvent(new Event('resize'))
@@ -214,9 +228,9 @@ describe('useViewMode', () => {
 
     it('should detect desktop viewport', () => {
       setWindowWidth(1024) // Desktop width
-      
+
       const { result } = renderHook(() => useViewMode('cards'))
-      
+
       act(() => {
         window.dispatchEvent(new Event('resize'))
       })
@@ -226,12 +240,14 @@ describe('useViewMode', () => {
 
     it('should auto-switch to mobile mode on mobile viewport', () => {
       setWindowWidth(500) // Mobile width
-      
-      const { result } = renderHook(() => useViewMode('cards', {
-        responsive: true,
-        mobileMode: 'list'
-      }))
-      
+
+      const { result } = renderHook(() =>
+        useViewMode('cards', {
+          responsive: true,
+          mobileMode: 'list',
+        })
+      )
+
       act(() => {
         window.dispatchEvent(new Event('resize'))
       })
@@ -241,11 +257,13 @@ describe('useViewMode', () => {
 
     it('should not auto-switch when responsive is false', () => {
       setWindowWidth(500) // Mobile width
-      
-      const { result } = renderHook(() => useViewMode('cards', {
-        responsive: false
-      }))
-      
+
+      const { result } = renderHook(() =>
+        useViewMode('cards', {
+          responsive: false,
+        })
+      )
+
       act(() => {
         window.dispatchEvent(new Event('resize'))
       })
@@ -255,12 +273,14 @@ describe('useViewMode', () => {
 
     it('should use custom mobile mode', () => {
       setWindowWidth(500) // Mobile width
-      
-      const { result } = renderHook(() => useViewMode('cards', {
-        responsive: true,
-        mobileMode: 'table'
-      }))
-      
+
+      const { result } = renderHook(() =>
+        useViewMode('cards', {
+          responsive: true,
+          mobileMode: 'table',
+        })
+      )
+
       act(() => {
         window.dispatchEvent(new Event('resize'))
       })
@@ -270,11 +290,13 @@ describe('useViewMode', () => {
 
     it('should switch back to desktop mode when resizing', () => {
       setWindowWidth(500) // Start mobile
-      
-      const { result } = renderHook(() => useViewMode('cards', {
-        responsive: true
-      }))
-      
+
+      const { result } = renderHook(() =>
+        useViewMode('cards', {
+          responsive: true,
+        })
+      )
+
       act(() => {
         window.dispatchEvent(new Event('resize'))
       })
@@ -292,7 +314,7 @@ describe('useViewMode', () => {
 
     it('should handle window resize events', () => {
       const { result } = renderHook(() => useViewMode('cards'))
-      
+
       setWindowWidth(500)
       act(() => {
         window.dispatchEvent(new Event('resize'))
@@ -310,7 +332,7 @@ describe('useViewMode', () => {
   describe('Edge Cases', () => {
     it('should handle SSR (no window)', () => {
       const originalWindow = global.window
-      // @ts-ignore
+      // @ts-expect-error - Testing SSR scenario where window is undefined
       delete global.window
 
       const { result } = renderHook(() => useViewMode('cards'))
@@ -321,13 +343,17 @@ describe('useViewMode', () => {
     })
 
     it('should handle multiple instances with different storage keys', () => {
-      const { result: result1 } = renderHook(() => useViewMode('cards', {
-        storageKey: 'view-1'
-      }))
-      
-      const { result: result2 } = renderHook(() => useViewMode('list', {
-        storageKey: 'view-2'
-      }))
+      const { result: result1 } = renderHook(() =>
+        useViewMode('cards', {
+          storageKey: 'view-1',
+        })
+      )
+
+      const { result: result2 } = renderHook(() =>
+        useViewMode('list', {
+          storageKey: 'view-2',
+        })
+      )
 
       act(() => {
         result1.current.setViewMode('table')
@@ -344,12 +370,14 @@ describe('useViewMode', () => {
     })
 
     it('should handle tree view mode', () => {
-      const { result } = renderHook(() => useViewMode('tree', {
-        availableModes: ['cards', 'list', 'tree']
-      }))
+      const { result } = renderHook(() =>
+        useViewMode('tree', {
+          availableModes: ['cards', 'list', 'tree'],
+        })
+      )
 
       expect(result.current.viewMode).toBe('tree')
-      
+
       act(() => {
         result.current.setViewMode('list')
       })
@@ -360,10 +388,12 @@ describe('useViewMode', () => {
 
   describe('Persistence Across Remounts', () => {
     it('should persist mode across hook remounts', () => {
-      const { result, unmount } = renderHook(() => useViewMode('cards', {
-        storageKey: 'persist-test'
-      }))
-      
+      const { result, unmount } = renderHook(() =>
+        useViewMode('cards', {
+          storageKey: 'persist-test',
+        })
+      )
+
       act(() => {
         result.current.setViewMode('table')
       })
@@ -371,9 +401,11 @@ describe('useViewMode', () => {
       unmount()
 
       // Remount
-      const { result: result2 } = renderHook(() => useViewMode('cards', {
-        storageKey: 'persist-test'
-      }))
+      const { result: result2 } = renderHook(() =>
+        useViewMode('cards', {
+          storageKey: 'persist-test',
+        })
+      )
 
       expect(result2.current.viewMode).toBe('table')
     })
@@ -382,13 +414,13 @@ describe('useViewMode', () => {
   describe('Cleanup', () => {
     it('should cleanup resize listener on unmount', () => {
       const removeEventListenerSpy = jest.spyOn(window, 'removeEventListener')
-      
+
       const { unmount } = renderHook(() => useViewMode('cards'))
-      
+
       unmount()
 
       expect(removeEventListenerSpy).toHaveBeenCalledWith('resize', expect.any(Function))
-      
+
       removeEventListenerSpy.mockRestore()
     })
   })
