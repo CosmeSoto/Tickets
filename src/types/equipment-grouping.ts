@@ -31,6 +31,14 @@ export interface PublicEquipmentItem {
   saleListingPrice: number | null
   photoUrl: string | null
   specifications: Record<string, any> | null
+  customAttributes?: Record<
+    string,
+    {
+      value: string
+      label: string
+      type: string
+    }
+  >
   createdAt: Date
 }
 
@@ -61,6 +69,14 @@ export interface EquipmentGroup {
   saleListingPrice: number | null
   photoUrl: string | null
   specifications: Record<string, any> | null
+  commonAttributes?: Record<
+    string,
+    {
+      value: string
+      label: string
+      type: string
+    }
+  >
 
   /** Individual units in this group */
   units: PublicEquipmentItem[]

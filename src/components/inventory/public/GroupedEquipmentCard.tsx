@@ -164,6 +164,20 @@ export function GroupedEquipmentCard({
             </div>
           </div>
         )}
+
+        {/* Atributos Personalizados Comunes (si existen) */}
+        {group.commonAttributes && Object.keys(group.commonAttributes).length > 0 && (
+          <div className='pt-2 border-t'>
+            <p className='text-xs font-medium text-gray-700 mb-1'>Características:</p>
+            <div className='flex flex-wrap gap-2'>
+              {Object.entries(group.commonAttributes).map(([key, attr]) => (
+                <Badge key={key} variant='outline' className='text-xs'>
+                  {attr.label}: {attr.value}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
       </CardContent>
 
       <CardFooter className='p-4 pt-0 flex flex-col gap-2'>

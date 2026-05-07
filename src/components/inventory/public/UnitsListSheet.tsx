@@ -137,6 +137,7 @@ export function UnitsListSheet({ group, open, onClose, onContactUnit }: UnitsLis
                 <TableRow>
                   <TableHead>Código</TableHead>
                   <TableHead>Número de Serie</TableHead>
+                  <TableHead>Características</TableHead>
                   <TableHead>Fecha de Ingreso</TableHead>
                   <TableHead className='text-right'>Acción</TableHead>
                 </TableRow>
@@ -147,6 +148,26 @@ export function UnitsListSheet({ group, open, onClose, onContactUnit }: UnitsLis
                     <TableCell className='font-mono text-sm'>{unit.code}</TableCell>
                     <TableCell className='font-mono text-sm text-gray-600'>
                       {unit.serialNumber || '—'}
+                    </TableCell>
+                    <TableCell>
+                      {unit.customAttributes && Object.keys(unit.customAttributes).length > 0 ? (
+                        <div className='flex flex-wrap gap-1'>
+                          {Object.entries(unit.customAttributes)
+                            .slice(0, 3)
+                            .map(([key, attr]) => (
+                              <Badge key={key} variant='secondary' className='text-xs'>
+                                {attr.label}: {attr.value}
+                              </Badge>
+                            ))}
+                          {Object.keys(unit.customAttributes).length > 3 && (
+                            <Badge variant='outline' className='text-xs'>
+                              +{Object.keys(unit.customAttributes).length - 3}
+                            </Badge>
+                          )}
+                        </div>
+                      ) : (
+                        <span className='text-sm text-gray-400'>—</span>
+                      )}
                     </TableCell>
                     <TableCell className='text-sm text-gray-600'>
                       {formatDate(unit.createdAt)}
@@ -160,7 +181,7 @@ export function UnitsListSheet({ group, open, onClose, onContactUnit }: UnitsLis
                         disabled={loadingUnitId === unit.id}
                       >
                         <MessageCircle className='mr-2 h-4 w-4' />
-                        {loadingUnitId === unit.id ? 'Abriendo...' : 'Contactar por esta unidad'}
+                        {loadingUnitId === unit.id ? 'Abriendo...' : 'Contactar'}
                       </Button>
                     </TableCell>
                   </TableRow>

@@ -34,6 +34,11 @@ export async function GET() {
             family: true,
           },
         },
+        custom_values: {
+          include: {
+            field: true,
+          },
+        },
       },
       orderBy: {
         createdAt: 'desc',
@@ -41,31 +46,49 @@ export async function GET() {
     })
 
     // Transformar a formato PublicEquipmentItem
-    const publicItems: PublicEquipmentItem[] = equipment.map(eq => ({
-      id: eq.id,
-      code: eq.code,
-      serialNumber: eq.serialNumber,
-      brand: eq.brand,
-      model: eq.model,
-      type: {
-        id: eq.type.id,
-        name: eq.type.name,
-        code: eq.type.code,
-        family: eq.type.family
-          ? {
-              id: eq.type.family.id,
-              name: eq.type.family.name,
-              icon: eq.type.family.icon,
-              color: eq.type.family.color,
+    const publicItems: PublicEquipmentItem[] = equipment.map(eq => {
+      // Transformar custom_values a un objeto key-value con labels
+      const customAttributes: Record<string, { value: string; label: string; type: string }> = {}
+
+      if (eq.custom_values && eq.custom_values.length > 0) {
+        eq.custom_values.forEach(cv => {
+          if (cv.field) {
+            customAttributes[cv.fieldName] = {
+              value: cv.fieldValue,
+              label: cv.field.fieldLabel,
+              type: cv.field.fieldType,
             }
-          : null,
-      },
-      condition: eq.condition,
-      saleListingPrice: eq.saleListingPrice,
-      photoUrl: eq.photoUrl,
-      specifications: eq.specifications as Record<string, any> | null,
-      createdAt: eq.createdAt,
-    }))
+          }
+        })
+      }
+
+      return {
+        id: eq.id,
+        code: eq.code,
+        serialNumber: eq.serialNumber,
+        brand: eq.brand,
+        model: eq.model,
+        type: {
+          id: eq.type.id,
+          name: eq.type.name,
+          code: eq.type.code,
+          family: eq.type.family
+            ? {
+                id: eq.type.family.id,
+                name: eq.type.family.name,
+                icon: eq.type.family.icon,
+                color: eq.type.family.color,
+              }
+            : null,
+        },
+        condition: eq.condition,
+        saleListingPrice: eq.saleListingPrice,
+        photoUrl: eq.photoUrl,
+        specifications: eq.specifications as Record<string, any> | null,
+        customAttributes, // Agregar atributos personalizados
+        createdAt: eq.createdAt,
+      }
+    })
 
     // Agrupar equipos por modelo
     const groups = groupByModel(publicItems)

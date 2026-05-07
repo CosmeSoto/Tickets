@@ -59,6 +59,32 @@ export function groupByModel(equipment: PublicEquipmentItem[]): EquipmentGroup[]
     // Usar el primer item como representante del grupo (todos tienen los mismos datos comunes)
     const representative = units[0]
 
+    // Extraer atributos comunes (que todos los equipos del grupo comparten)
+    const commonAttributes: Record<
+      string,
+      {
+        value: string
+        label: string
+        type: string
+      }
+    > = {}
+
+    if (representative.customAttributes) {
+      // Verificar qué atributos son comunes a todas las unidades
+      for (const [key, attr] of Object.entries(representative.customAttributes)) {
+        const isCommon = units.every(
+          unit =>
+            unit.customAttributes &&
+            unit.customAttributes[key] &&
+            unit.customAttributes[key].value === attr.value
+        )
+
+        if (isCommon) {
+          commonAttributes[key] = attr
+        }
+      }
+    }
+
     groups.push({
       groupId,
       brand: representative.brand,
@@ -68,6 +94,7 @@ export function groupByModel(equipment: PublicEquipmentItem[]): EquipmentGroup[]
       saleListingPrice: representative.saleListingPrice,
       photoUrl: representative.photoUrl,
       specifications: representative.specifications,
+      commonAttributes: Object.keys(commonAttributes).length > 0 ? commonAttributes : undefined,
       units,
       availableUnits: units.length,
       createdAt: representative.createdAt,
