@@ -197,16 +197,14 @@ export function CustomFieldsManager({ familyId }: CustomFieldsManagerProps) {
   }
 
   const getFieldTypeBadge = (type: FieldType) => {
-    const variants: Record<FieldType, { label: string; variant: any }> = {
-      text: { label: 'Texto', variant: 'default' },
-      number: { label: 'Número', variant: 'secondary' },
-      select: { label: 'Selección', variant: 'outline' },
-      date: { label: 'Fecha', variant: 'default' },
-      boolean: { label: 'Sí/No', variant: 'secondary' },
+    const labels: Record<FieldType, string> = {
+      text: 'Texto',
+      number: 'Número',
+      select: 'Lista',
+      date: 'Fecha',
+      boolean: 'Sí/No',
     }
-
-    const config = variants[type]
-    return <Badge variant={config.variant}>{config.label}</Badge>
+    return labels[type]
   }
 
   if (isLoading) {
@@ -253,103 +251,121 @@ export function CustomFieldsManager({ familyId }: CustomFieldsManagerProps) {
         </div>
       ) : (
         <>
-          {/* Vista Desktop: Tabla */}
+          {/* Vista Desktop: Tabla Compacta */}
           <div className='hidden md:block border rounded-lg overflow-hidden'>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className='w-20'>Orden</TableHead>
-                  <TableHead>Campo</TableHead>
-                  <TableHead className='w-28'>Tipo</TableHead>
-                  <TableHead className='w-24'>Requerido</TableHead>
-                  <TableHead className='w-32'>Opciones</TableHead>
-                  <TableHead className='w-24 text-right'>Acciones</TableHead>
+                  <TableHead className='w-16 py-2'>#</TableHead>
+                  <TableHead className='py-2'>Campo</TableHead>
+                  <TableHead className='w-24 py-2'>Tipo</TableHead>
+                  <TableHead className='w-16 py-2 text-center'>Req.</TableHead>
+                  <TableHead className='w-20 py-2 text-right'>Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {fields.map((field, index) => (
                   <TableRow key={field.id}>
-                    <TableCell>
+                    <TableCell className='py-2'>
                       <div className='flex items-center gap-1'>
-                        <span className='text-sm text-muted-foreground'>{field.order}</span>
-                        <div className='flex flex-col'>
+                        <span className='text-sm font-mono text-muted-foreground w-6'>
+                          {field.order}
+                        </span>
+                        <div className='flex flex-col gap-0.5'>
                           <Button
                             variant='ghost'
                             size='sm'
-                            className='h-4 w-4 p-0'
+                            className='h-5 w-5 p-0 hover:bg-muted'
                             onClick={() => handleReorder(field, 'up')}
                             disabled={index === 0}
+                            title='Subir'
                           >
                             <MoveUp className='h-3 w-3' />
                           </Button>
                           <Button
                             variant='ghost'
                             size='sm'
-                            className='h-4 w-4 p-0'
+                            className='h-5 w-5 p-0 hover:bg-muted'
                             onClick={() => handleReorder(field, 'down')}
                             disabled={index === fields.length - 1}
+                            title='Bajar'
                           >
                             <MoveDown className='h-3 w-3' />
                           </Button>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className='font-medium'>{field.fieldLabel}</div>
+                    <TableCell className='py-2'>
+                      <div className='space-y-0.5'>
+                        <div className='font-medium text-sm'>{field.fieldLabel}</div>
                         <div className='text-xs text-muted-foreground font-mono'>
                           {field.fieldName}
                         </div>
                         {field.helpText && (
-                          <div className='text-xs text-muted-foreground mt-1'>{field.helpText}</div>
+                          <div className='text-xs text-muted-foreground line-clamp-1'>
+                            {field.helpText}
+                          </div>
+                        )}
+                        {/* Opciones inline para ahorrar espacio */}
+                        {field.fieldType === 'select' && Array.isArray(field.fieldOptions) && (
+                          <div className='text-xs text-muted-foreground'>
+                            {field.fieldOptions.length} opciones:{' '}
+                            {field.fieldOptions.slice(0, 2).join(', ')}
+                            {field.fieldOptions.length > 2 && '...'}
+                          </div>
+                        )}
+                        {field.fieldType === 'number' && field.fieldOptions && (
+                          <div className='text-xs text-muted-foreground'>
+                            {field.fieldOptions.min !== undefined &&
+                              `Min: ${field.fieldOptions.min}`}
+                            {field.fieldOptions.max !== undefined &&
+                              ` • Max: ${field.fieldOptions.max}`}
+                          </div>
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>{getFieldTypeBadge(field.fieldType)}</TableCell>
-                    <TableCell>
+                    <TableCell className='py-2'>
+                      <Badge variant='secondary' className='text-xs px-2 py-0.5'>
+                        {field.fieldType === 'text' && 'Texto'}
+                        {field.fieldType === 'number' && 'Número'}
+                        {field.fieldType === 'select' && 'Lista'}
+                        {field.fieldType === 'date' && 'Fecha'}
+                        {field.fieldType === 'boolean' && 'Sí/No'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className='py-2 text-center'>
                       {field.isRequired ? (
-                        <Badge variant='destructive' className='text-xs'>
+                        <Badge variant='destructive' className='text-xs px-1.5 py-0'>
                           Sí
                         </Badge>
                       ) : (
-                        <Badge variant='outline' className='text-xs'>
+                        <Badge variant='outline' className='text-xs px-1.5 py-0'>
                           No
                         </Badge>
                       )}
                     </TableCell>
-                    <TableCell>
-                      {field.fieldType === 'select' && Array.isArray(field.fieldOptions) && (
-                        <div className='text-xs text-muted-foreground'>
-                          {field.fieldOptions.length} opciones
-                        </div>
-                      )}
-                      {field.fieldType === 'number' && field.fieldOptions && (
-                        <div className='text-xs text-muted-foreground'>
-                          {field.fieldOptions.min !== undefined && `Min: ${field.fieldOptions.min}`}
-                          {field.fieldOptions.max !== undefined &&
-                            ` Max: ${field.fieldOptions.max}`}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className='text-right'>
-                      <div className='flex justify-end gap-1'>
+                    <TableCell className='py-2 text-right'>
+                      <div className='flex justify-end gap-0.5'>
                         <Button
                           variant='ghost'
                           size='sm'
+                          className='h-7 w-7 p-0'
                           onClick={() => {
                             setEditingField(field)
                             setIsDialogOpen(true)
                           }}
+                          title='Editar'
                         >
-                          <Edit className='h-4 w-4' />
+                          <Edit className='h-3.5 w-3.5' />
                         </Button>
                         <Button
                           variant='ghost'
                           size='sm'
+                          className='h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10'
                           onClick={() => handleDelete(field)}
-                          className='text-destructive hover:text-destructive'
+                          title='Eliminar'
                         >
-                          <Trash2 className='h-4 w-4' />
+                          <Trash2 className='h-3.5 w-3.5' />
                         </Button>
                       </div>
                     </TableCell>
@@ -397,18 +413,20 @@ export function CustomFieldsManager({ familyId }: CustomFieldsManagerProps) {
                 )}
 
                 <div className='flex flex-wrap items-center gap-2'>
-                  {getFieldTypeBadge(field.fieldType)}
+                  <Badge variant='secondary' className='text-xs px-2 py-0.5'>
+                    {getFieldTypeBadge(field.fieldType)}
+                  </Badge>
                   {field.isRequired ? (
-                    <Badge variant='destructive' className='text-xs'>
+                    <Badge variant='destructive' className='text-xs px-2 py-0.5'>
                       Requerido
                     </Badge>
                   ) : (
-                    <Badge variant='outline' className='text-xs'>
+                    <Badge variant='outline' className='text-xs px-2 py-0.5'>
                       Opcional
                     </Badge>
                   )}
-                  <Badge variant='secondary' className='text-xs'>
-                    Orden: {field.order}
+                  <Badge variant='outline' className='text-xs px-2 py-0.5 font-mono'>
+                    #{field.order}
                   </Badge>
                 </div>
 
