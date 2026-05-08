@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 
 /**
  * GET /api/inventory/dashboard/alerts
@@ -54,13 +55,25 @@ export async function GET(request: NextRequest) {
       pendingActs,
       pendingRequests,
     ] = await Promise.all([
-      // Consumibles con stock bajo
-      prisma.consumables.count({
-        where: {
-          ...familyScope,
-          currentStock: { lte: prisma.raw('min_stock') },
-        },
-      }),
+      // Consumibles con stock bajo - usar queryRaw para comparar campos
+      (async () => {
+        if (familyScope.familyId) {
+          const result = await prisma.$queryRaw<Array<{ count: bigint }>>`
+            SELECT COUNT(*) as count
+            FROM consumables
+            WHERE family_id = ${familyScope.familyId}
+            AND current_stock <= min_stock
+          `
+          return Number(result[0]?.count || 0)
+        } else {
+          const result = await prisma.$queryRaw<Array<{ count: bigint }>>`
+            SELECT COUNT(*) as count
+            FROM consumables
+            WHERE current_stock <= min_stock
+          `
+          return Number(result[0]?.count || 0)
+        }
+      })(),
 
       // Mantenimientos vencidos o próximos
       prisma.maintenance_records.count({

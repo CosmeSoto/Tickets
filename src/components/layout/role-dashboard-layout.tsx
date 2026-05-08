@@ -88,6 +88,8 @@ const navigationByRole: Record<string, NavItem[]> = {
       icon: Package,
       children: [
         { name: 'Activos', href: '/inventory', icon: Monitor },
+        { name: 'Solicitudes de Compras', href: '/inventory/asset-requests', icon: FileText },
+        { name: 'Ventas', href: '/inventory/sales', icon: Database },
         { name: 'Mantenimientos', href: '/inventory/maintenance', icon: Wrench },
         { name: 'Contratos', href: '/inventory/contracts', icon: FileSignature },
         { name: 'Actas', href: '/inventory/acts', icon: FileText },
