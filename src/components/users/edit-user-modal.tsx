@@ -4,29 +4,17 @@ import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
-import { RoleBadge } from '@/components/ui/role-badge'
 import { Separator } from '@/components/ui/separator'
 import {
-  User,
-  Building,
-  Camera,
-  Save,
-  AlertCircle,
   AlertTriangle,
   Activity,
-  RotateCcw,
-  X,
-  Lock,
-  Unlock,
-  Calendar,
-  Ticket,
+  Building,
   Layers,
   Package,
   ShieldCheck,
+  Save,
+  User,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { UserData } from '@/hooks/use-users'
@@ -45,6 +33,9 @@ import {
 } from '@/components/users/family-assignment-section'
 import { UnassignConfirmDialog } from '@/components/users/unassign-confirm-dialog'
 import { UserModulesPanel } from '@/components/users/user-modules-panel'
+import { UserHeaderCard } from '@/components/users/edit-modal/UserHeaderCard'
+import { UserPersonalDataSection } from '@/components/users/edit-modal/UserPersonalDataSection'
+import { UserSecuritySection } from '@/components/users/edit-modal/UserSecuritySection'
 
 interface EditUserModalProps {
   isOpen: boolean
@@ -82,10 +73,6 @@ export function EditUserModal({
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
-  const [resetPasswordLoading, setResetPasswordLoading] = useState(false)
-  const [newPassword, setNewPassword] = useState('')
-  const [showResetPassword, setShowResetPassword] = useState(false)
-  const [unlockLoading, setUnlockLoading] = useState(false)
   const [isLocked, setIsLocked] = useState(false)
   const [formData, setFormData] = useState<EditUserData>({
     name: '',
@@ -322,8 +309,6 @@ export function EditUserModal({
       setAvatarPreview(user.avatar || null)
       setErrors({})
       setIsLocked(false)
-      setShowResetPassword(false)
-      setNewPassword('')
       fetch(`/api/users/${user.id}/reset-password`, { method: 'GET' })
         .then(r => r.json())
         .then(data => setIsLocked(data.isLocked || false))
@@ -411,51 +396,33 @@ export function EditUserModal({
   const handleClose = () => {
     setErrors({})
     setAvatarPreview(null)
-    setShowResetPassword(false)
-    setNewPassword('')
     onClose()
   }
 
-  const handleResetPassword = async () => {
-    if (!user || !newPassword || newPassword.length < 6) return
-    setResetPasswordLoading(true)
-    try {
-      const res = await fetch(`/api/users/${user.id}/reset-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ newPassword }),
-      })
-      const result = await res.json()
-      if (res.ok && result.success) {
-        toast({ title: 'Contraseña actualizada', description: result.message })
-        setShowResetPassword(false)
-        setNewPassword('')
-      } else {
-        showApiError('Error al resetear contraseña', result)
-      }
-    } catch (err) {
-      showNetworkError(err)
-    } finally {
-      setResetPasswordLoading(false)
+  const handleResetPassword = async (newPassword: string) => {
+    if (!user || newPassword.length < 6) return
+    const res = await fetch(`/api/users/${user.id}/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newPassword }),
+    })
+    const result = await res.json()
+    if (res.ok && result.success) {
+      toast({ title: 'Contraseña actualizada', description: result.message })
+    } else {
+      showApiError('Error al resetear contraseña', result)
     }
   }
 
   const handleUnlockAccess = async () => {
     if (!user) return
-    setUnlockLoading(true)
-    try {
-      const res = await fetch(`/api/users/${user.id}/reset-password`, { method: 'DELETE' })
-      const result = await res.json()
-      if (res.ok && result.success) {
-        toast({ title: 'Acceso desbloqueado', description: result.message })
-        setIsLocked(false)
-      } else {
-        showApiError('Error al desbloquear', result)
-      }
-    } catch (err) {
-      showNetworkError(err)
-    } finally {
-      setUnlockLoading(false)
+    const res = await fetch(`/api/users/${user.id}/reset-password`, { method: 'DELETE' })
+    const result = await res.json()
+    if (res.ok && result.success) {
+      toast({ title: 'Acceso desbloqueado', description: result.message })
+      setIsLocked(false)
+    } else {
+      showApiError('Error al desbloquear', result)
     }
   }
 
@@ -571,16 +538,6 @@ export function EditUserModal({
 
   const isCurrentUser = user?.id === session?.user?.id
   const { modules: systemModules } = useSystemModules()
-  const formatDate = (dateString?: string) =>
-    dateString
-      ? new Date(dateString).toLocaleDateString('es-ES', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        })
-      : '—'
 
   if (!user) return null
 
@@ -600,106 +557,21 @@ export function EditUserModal({
 
           <div className='space-y-6'>
             {/* Cabecera: Avatar + info */}
-            <div className='flex items-center gap-4 p-4 rounded-lg bg-muted/40 border border-border'>
-              <div className='relative group shrink-0'>
-                <Avatar className='h-16 w-16 border-2 border-background shadow'>
-                  <AvatarImage src={avatarPreview || user.avatar || undefined} alt={user.name} />
-                  <AvatarFallback className='text-base font-semibold bg-primary/10 text-primary'>
-                    {user.name
-                      .split(' ')
-                      .slice(0, 2)
-                      .map(n => n[0])
-                      .join('')
-                      .toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <div className='absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1'>
-                  <button
-                    type='button'
-                    title='Cambiar foto'
-                    onClick={() => document.getElementById('edit-avatar-input')?.click()}
-                    className='p-1 rounded-full bg-white/20 hover:bg-white/40 text-white'
-                  >
-                    <Camera className='h-3.5 w-3.5' />
-                  </button>
-                  {(avatarPreview || user.avatar) && (
-                    <button
-                      type='button'
-                      title='Eliminar foto'
-                      onClick={handleDeleteAvatar}
-                      className='p-1 rounded-full bg-white/20 hover:bg-red-500/60 text-white'
-                    >
-                      <X className='h-3.5 w-3.5' />
-                    </button>
-                  )}
-                  {formData.avatar && (
-                    <button
-                      type='button'
-                      title='Deshacer'
-                      onClick={() => {
-                        setFormData(p => ({ ...p, avatar: undefined }))
-                        setAvatarPreview(user.avatar || null)
-                      }}
-                      className='p-1 rounded-full bg-white/20 hover:bg-amber-500/60 text-white'
-                    >
-                      <RotateCcw className='h-3.5 w-3.5' />
-                    </button>
-                  )}
-                </div>
-                <input
-                  id='edit-avatar-input'
-                  type='file'
-                  accept='image/*'
-                  onChange={handleAvatarChange}
-                  className='hidden'
-                />
-              </div>
-              <div className='flex-1 min-w-0'>
-                <div className='flex items-center gap-2 flex-wrap'>
-                  <span className='font-semibold text-foreground truncate'>{user.name}</span>
-                  <RoleBadge role={formData.role} isSuperAdmin={formData.isSuperAdmin} />
-                  {isCurrentUser && (
-                    <Badge variant='outline' className='text-xs'>
-                      Tu cuenta
-                    </Badge>
-                  )}
-                  {isLocked && (
-                    <Badge variant='destructive' className='text-xs flex items-center gap-1'>
-                      <Lock className='h-3 w-3' />
-                      Bloqueado
-                    </Badge>
-                  )}
-                </div>
-                <p className='text-sm text-muted-foreground mt-0.5'>{user.email}</p>
-                <div className='flex items-center gap-3 mt-1.5 text-xs text-muted-foreground'>
-                  <span className='flex items-center gap-1'>
-                    <Calendar className='h-3 w-3' />
-                    Registro: {formatDate(user.createdAt)}
-                  </span>
-                  <span className='flex items-center gap-1'>
-                    <Activity className='h-3 w-3' />
-                    Último acceso: {formatDate(user.lastLogin)}
-                  </span>
-                </div>
-              </div>
-              <div className='flex gap-3 shrink-0'>
-                <div className='text-center'>
-                  <p className='text-lg font-bold text-primary'>
-                    {(user._count as any)?.tickets_tickets_clientIdTousers ?? 0}
-                  </p>
-                  <p className='text-xs text-muted-foreground flex items-center gap-0.5'>
-                    <Ticket className='h-3 w-3' />
-                    Tickets
-                  </p>
-                </div>
-                <div className='text-center'>
-                  <p className='text-lg font-bold text-green-600 dark:text-green-400'>
-                    {user._count?.tickets_tickets_assigneeIdTousers ?? 0}
-                  </p>
-                  <p className='text-xs text-muted-foreground'>Asignados</p>
-                </div>
-              </div>
-            </div>
+            <UserHeaderCard
+              user={user}
+              avatarPreview={avatarPreview}
+              role={formData.role}
+              isSuperAdmin={formData.isSuperAdmin}
+              isCurrentUser={isCurrentUser}
+              isLocked={isLocked}
+              hasNewAvatar={!!formData.avatar}
+              onAvatarChange={handleAvatarChange}
+              onDeleteAvatar={handleDeleteAvatar}
+              onResetAvatar={() => {
+                setFormData(p => ({ ...p, avatar: undefined }))
+                setAvatarPreview(user.avatar || null)
+              }}
+            />
 
             {isCurrentUser && (
               <div className='flex items-start gap-2 rounded-lg bg-muted/50 border px-3 py-2 text-sm text-muted-foreground'>
@@ -711,60 +583,13 @@ export function EditUserModal({
             )}
 
             {/* Datos personales */}
-            <div className='space-y-3'>
-              <h3 className='text-sm font-semibold text-foreground flex items-center gap-1.5'>
-                <User className='h-4 w-4 text-muted-foreground' />
-                Datos personales
-              </h3>
-              <div className='grid grid-cols-2 gap-3'>
-                {[
-                  {
-                    id: 'edit-name',
-                    label: 'Nombre completo',
-                    key: 'name' as const,
-                    placeholder: 'Juan Pérez',
-                    type: undefined as string | undefined,
-                    required: true,
-                  },
-                  {
-                    id: 'edit-email',
-                    label: 'Email',
-                    key: 'email' as const,
-                    placeholder: 'usuario@empresa.com',
-                    type: 'email' as string | undefined,
-                    required: true,
-                  },
-                  {
-                    id: 'edit-phone',
-                    label: 'Teléfono',
-                    key: 'phone' as const,
-                    placeholder: '+593 99 999 9999',
-                    type: undefined as string | undefined,
-                    required: false,
-                  },
-                ].map(({ id, label, key, placeholder, type, required }) => (
-                  <div key={id} className='space-y-1'>
-                    <Label htmlFor={id}>
-                      {label} {required && <span className='text-destructive'>*</span>}
-                    </Label>
-                    <Input
-                      id={id}
-                      type={type}
-                      value={(formData as any)[key]}
-                      onChange={e => setFormData(p => ({ ...p, [key]: e.target.value }))}
-                      placeholder={placeholder}
-                      className={errors[key] ? 'border-destructive' : ''}
-                    />
-                    {errors[key] && (
-                      <p className='text-xs text-destructive flex items-center gap-1'>
-                        <AlertCircle className='h-3 w-3' />
-                        {errors[key]}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+            <UserPersonalDataSection
+              name={formData.name}
+              email={formData.email}
+              phone={formData.phone}
+              errors={errors}
+              onChange={(field, value) => setFormData(p => ({ ...p, [field]: value }))}
+            />
 
             <Separator />
 
@@ -1161,73 +986,11 @@ export function EditUserModal({
             <Separator />
 
             {/* Seguridad */}
-            <div className='space-y-3'>
-              <h3 className='text-sm font-semibold text-foreground flex items-center gap-1.5'>
-                <Lock className='h-4 w-4 text-muted-foreground' />
-                Seguridad
-              </h3>
-              <div className='flex flex-wrap gap-2'>
-                {!showResetPassword ? (
-                  <>
-                    <Button
-                      type='button'
-                      variant='outline'
-                      size='sm'
-                      onClick={() => setShowResetPassword(true)}
-                      className='text-amber-600 border-amber-300 hover:bg-amber-50'
-                    >
-                      <Lock className='h-3.5 w-3.5 mr-1.5' />
-                      Resetear contraseña
-                    </Button>
-                    {isLocked && (
-                      <Button
-                        type='button'
-                        variant='outline'
-                        size='sm'
-                        onClick={handleUnlockAccess}
-                        disabled={unlockLoading}
-                        className='text-primary border-primary/30 hover:bg-primary/10'
-                      >
-                        <Unlock className='h-3.5 w-3.5 mr-1.5' />
-                        {unlockLoading ? 'Desbloqueando...' : 'Desbloquear acceso'}
-                      </Button>
-                    )}
-                  </>
-                ) : (
-                  <div className='flex items-center gap-2 w-full'>
-                    <Input
-                      type='password'
-                      placeholder='Nueva contraseña (mín. 6 caracteres)'
-                      value={newPassword}
-                      onChange={e => setNewPassword(e.target.value)}
-                      className='flex-1 h-8 text-sm'
-                      autoFocus
-                    />
-                    <Button
-                      type='button'
-                      size='sm'
-                      onClick={handleResetPassword}
-                      disabled={resetPasswordLoading || newPassword.length < 6}
-                      className='bg-amber-600 hover:bg-amber-700 text-white shrink-0'
-                    >
-                      {resetPasswordLoading ? 'Guardando...' : 'Confirmar'}
-                    </Button>
-                    <Button
-                      type='button'
-                      variant='ghost'
-                      size='sm'
-                      onClick={() => {
-                        setShowResetPassword(false)
-                        setNewPassword('')
-                      }}
-                      className='shrink-0'
-                    >
-                      <X className='h-4 w-4' />
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
+            <UserSecuritySection
+              isLocked={isLocked}
+              onResetPassword={handleResetPassword}
+              onUnlock={handleUnlockAccess}
+            />
 
             {/* Footer */}
             <div className='flex justify-end gap-2 pt-2'>
