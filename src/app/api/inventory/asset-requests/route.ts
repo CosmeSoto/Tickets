@@ -19,16 +19,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    // Verificar que el usuario tenga acceso al inventario
-    // Por defecto true para compatibilidad con sesiones antiguas
-    const inventoryEnabled = session.user.inventoryEnabled ?? true
-    if (!inventoryEnabled) {
-      return NextResponse.json(
-        { error: 'No tienes acceso al módulo de inventario' },
-        { status: 403 }
-      )
-    }
-
     // Parsear query params
     const searchParams = request.nextUrl.searchParams
 
@@ -86,16 +76,6 @@ export async function POST(request: NextRequest) {
 
     if (!session?.user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
-
-    // Verificar que el usuario tenga acceso al inventario
-    // Por defecto true para compatibilidad con sesiones antiguas
-    const inventoryEnabled = session.user.inventoryEnabled ?? true
-    if (!inventoryEnabled) {
-      return NextResponse.json(
-        { error: 'No tienes acceso al módulo de inventario' },
-        { status: 403 }
-      )
     }
 
     // Verificar que el usuario tenga permiso para crear solicitudes
