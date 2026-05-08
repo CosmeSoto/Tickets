@@ -52,7 +52,9 @@ export function CustomFieldsInput({
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    loadFields()
+    if (familyId) {
+      loadFields()
+    }
   }, [familyId])
 
   const loadFields = async () => {
@@ -61,6 +63,11 @@ export function CustomFieldsInput({
       const response = await fetch(`/api/inventory/families/${familyId}/custom-fields`)
       if (!response.ok) throw new Error('Error al cargar campos')
       const data = await response.json()
+      console.log('📋 Campos personalizados cargados:', {
+        familyId,
+        fieldsCount: data.length,
+        fields: data.map((f: CustomField) => ({ name: f.fieldName, label: f.fieldLabel })),
+      })
       setFields(data)
     } catch (error) {
       console.error('Error loading custom fields:', error)
@@ -213,21 +220,24 @@ export function CustomFieldsInput({
   }
 
   if (isLoading) {
-    return <div className='text-sm text-muted-foreground'>Cargando campos personalizados...</div>
+    return (
+      <div className='text-sm text-muted-foreground py-4 text-center'>
+        Cargando campos personalizados...
+      </div>
+    )
   }
 
   if (fields.length === 0) {
-    return (
-      <div className='text-sm text-muted-foreground'>
-        No hay campos personalizados configurados para esta familia.
-      </div>
-    )
+    return null // No mostrar nada si no hay campos configurados
   }
 
   return (
     <div className='space-y-4'>
       <div className='border-t pt-4'>
-        <h3 className='text-sm font-semibold mb-4'>Atributos Personalizados</h3>
+        <h3 className='text-sm font-semibold mb-4 flex items-center gap-2'>
+          <span className='h-1 w-1 rounded-full bg-primary' />
+          Atributos Personalizados
+        </h3>
         <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
           {fields.map(field => renderField(field))}
         </div>

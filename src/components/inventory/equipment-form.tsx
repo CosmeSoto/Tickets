@@ -103,6 +103,60 @@ const OWNERSHIP_TYPE_OPTIONS = [
   { value: 'LOAN', label: 'Préstamo' },
 ]
 
+// Wrapper para campos personalizados que solo muestra la Card si hay campos
+function CustomFieldsSection({
+  familyId,
+  equipmentId,
+  values,
+  onChange,
+}: {
+  familyId: string
+  equipmentId?: string
+  values: Array<{ fieldName: string; fieldValue: string }>
+  onChange: (values: Array<{ fieldName: string; fieldValue: string }>) => void
+}) {
+  const [hasFields, setHasFields] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    async function checkFields() {
+      try {
+        const response = await fetch(`/api/inventory/families/${familyId}/custom-fields`)
+        if (response.ok) {
+          const data = await response.json()
+          setHasFields(data.length > 0)
+        }
+      } catch (error) {
+        console.error('Error checking custom fields:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    checkFields()
+  }, [familyId])
+
+  if (isLoading || !hasFields) return null
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Atributos Personalizados</CardTitle>
+        <CardDescription>
+          Campos específicos configurados para esta familia de activos
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <CustomFieldsInput
+          familyId={familyId}
+          equipmentId={equipmentId}
+          values={values}
+          onChange={onChange}
+        />
+      </CardContent>
+    </Card>
+  )
+}
+
 export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormProps) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
@@ -279,15 +333,25 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
   // Derive the familyId of the selected equipment type
   const selectedTypeFamilyId = equipmentTypes.find(t => t.id === selectedTypeId)?.family?.id ?? null
 
-  // Debug: Log para verificar
+  // Debug: Log para verificar - MEJORADO
   useEffect(() => {
     if (selectedTypeId) {
       const selectedType = equipmentTypes.find(t => t.id === selectedTypeId)
-      console.log('🔍 Tipo seleccionado:', selectedType?.name)
-      console.log('🔍 Familia del tipo:', selectedType?.family)
-      console.log('🔍 Family ID:', selectedTypeFamilyId)
+      console.log('🔍 DEBUG - Tipo seleccionado:', {
+        typeId: selectedTypeId,
+        typeName: selectedType?.name,
+        typeCode: selectedType?.code,
+        hasFamily: !!selectedType?.family,
+        family: selectedType?.family,
+        familyId: selectedType?.family?.id,
+        allTypes: equipmentTypes.map(t => ({
+          name: t.name,
+          hasFamily: !!t.family,
+          familyName: t.family?.name,
+        })),
+      })
     }
-  }, [selectedTypeId, equipmentTypes, selectedTypeFamilyId])
+  }, [selectedTypeId, equipmentTypes])
 
   // Filter departments by the family of the selected equipment type
   const filteredDepartments = selectedTypeFamilyId
@@ -1050,34 +1114,15 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
         </CardContent>
       </Card>
 
-      {/* Campos Personalizados por Familia */}
-      {selectedTypeFamilyId ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Atributos Personalizados</CardTitle>
-            <CardDescription>
-              Campos específicos configurados para esta familia de activos
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <CustomFieldsInput
-              familyId={selectedTypeFamilyId}
-              equipmentId={equipment?.id}
-              values={customFieldValues}
-              onChange={setCustomFieldValues}
-            />
-          </CardContent>
-        </Card>
-      ) : selectedTypeId ? (
-        <Card>
-          <CardContent className='py-8 text-center text-muted-foreground'>
-            <p>El tipo de equipo seleccionado no tiene una familia asignada.</p>
-            <p className='text-xs mt-2'>
-              Contacta al administrador para asignar una familia a este tipo de equipo.
-            </p>
-          </CardContent>
-        </Card>
-      ) : null}
+      {/* Campos Personalizados por Familia - Solo se muestra si hay campos configurados */}
+      {selectedTypeFamilyId && (
+        <CustomFieldsSection
+          familyId={selectedTypeFamilyId}
+          values={customFieldValues}
+          onChange={setCustomFieldValues}
+          equipmentId={equipment?.id}
+        />
+      )}
 
       {/* Notas */}
       <Card>

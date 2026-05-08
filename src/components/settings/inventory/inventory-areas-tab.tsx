@@ -3,6 +3,7 @@
  * Per-family inventory configuration
  */
 
+import { useState } from 'react'
 import {
   Package,
   RefreshCw,
@@ -12,6 +13,7 @@ import {
   TrendingDown,
   FileText,
   Box,
+  Settings,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -27,8 +29,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { FamilyIcon } from '@/components/inventory/family-badge'
 import { SectionTable } from '@/components/families/section-table'
+import { CustomFieldsManager } from '@/components/inventory/custom-fields/custom-fields-manager'
 import type {
   AcquisitionMode,
   FormSection,
@@ -118,6 +122,8 @@ export function InventoryAreasTab({
   onSetModeRequired,
   onValidateResidual,
 }: InventoryAreasTabProps) {
+  const [activeSubTab, setActiveSubTab] = useState<'config' | 'custom-fields'>('config')
+
   return (
     <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
       {/* Family list */}
@@ -245,262 +251,296 @@ export function InventoryAreasTab({
               </div>
             </div>
 
-            {/* Asset types */}
-            <Card>
-              <CardHeader>
-                <CardTitle className='text-base flex items-center gap-2'>
-                  <Box className='h-4 w-4' />
-                  Tipos de activos permitidos
-                </CardTitle>
-                <CardDescription>
-                  Define qué tipos de activos puede gestionar esta área
-                </CardDescription>
-              </CardHeader>
-              <CardContent className='space-y-2'>
-                {ALL_SUBTYPES.map(subtype => (
-                  <div
-                    key={subtype}
-                    className='flex items-start gap-3 p-3 border rounded-lg hover:bg-muted/30 transition-colors'
-                  >
-                    <Checkbox
-                      id={`subtype-${subtype}`}
-                      checked={form.allowedSubtypes.includes(subtype)}
-                      onCheckedChange={() => onToggleSubtype(subtype)}
-                      disabled={saving}
-                      className='mt-0.5'
-                    />
-                    <div className='flex-1'>
-                      <label
-                        htmlFor={`subtype-${subtype}`}
-                        className='text-sm font-medium cursor-pointer'
-                      >
-                        {SUBTYPE_LABELS[subtype]}
-                      </label>
-                      <p className='text-xs text-muted-foreground mt-0.5'>
-                        {SUBTYPE_DESCRIPTIONS[subtype]}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
+            {/* Sub-tabs: Configuración | Campos Personalizados */}
+            <Tabs value={activeSubTab} onValueChange={v => setActiveSubTab(v as any)}>
+              <TabsList className='w-full'>
+                <TabsTrigger value='config' className='flex-1 flex items-center gap-2'>
+                  <Settings className='h-4 w-4' />
+                  Configuración
+                </TabsTrigger>
+                <TabsTrigger value='custom-fields' className='flex-1 flex items-center gap-2'>
+                  <FileText className='h-4 w-4' />
+                  Campos Personalizados
+                </TabsTrigger>
+              </TabsList>
 
-            {/* Form sections */}
-            <Card>
-              <CardHeader>
-                <div className='flex items-start justify-between gap-4'>
-                  <div>
+              <TabsContent value='config' className='space-y-4 mt-4'>
+                {/* Asset types */}
+                <Card>
+                  <CardHeader>
                     <CardTitle className='text-base flex items-center gap-2'>
-                      <FileText className='h-4 w-4' />
-                      Secciones del formulario
+                      <Box className='h-4 w-4' />
+                      Tipos de activos permitidos
                     </CardTitle>
                     <CardDescription>
-                      Controla qué secciones se muestran y cuáles son obligatorias al crear activos
+                      Define qué tipos de activos puede gestionar esta área
                     </CardDescription>
-                  </div>
-                  <div className='flex items-center gap-2 flex-shrink-0'>
-                    <Switch
-                      id='use-mode-config'
-                      checked={useModeConfig}
-                      onCheckedChange={onSetUseModeConfig}
-                      disabled={saving}
-                    />
-                    <Label
-                      htmlFor='use-mode-config'
-                      className='text-xs cursor-pointer whitespace-nowrap'
-                    >
-                      Por modalidad
-                    </Label>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {useModeConfig ? (
-                  <div className='space-y-3'>
-                    <p className='text-xs text-muted-foreground flex items-center gap-1.5'>
-                      <Info className='h-3.5 w-3.5' />
-                      Configura secciones distintas según la modalidad de adquisición del equipo
-                    </p>
-                    <div className='flex gap-2 flex-wrap'>
-                      {ACQUISITION_MODES.map(m => (
-                        <button
-                          key={m.value}
-                          type='button'
-                          onClick={() => onSetActiveModeTab(m.value)}
-                          className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
-                            activeModeTab === m.value
-                              ? 'bg-primary text-primary-foreground border-primary'
-                              : 'bg-background border-border hover:bg-muted'
-                          }`}
+                  </CardHeader>
+                  <CardContent className='space-y-2'>
+                    {ALL_SUBTYPES.map(subtype => (
+                      <div
+                        key={subtype}
+                        className='flex items-start gap-3 p-3 border rounded-lg hover:bg-muted/30 transition-colors'
+                      >
+                        <Checkbox
+                          id={`subtype-${subtype}`}
+                          checked={form.allowedSubtypes.includes(subtype)}
+                          onCheckedChange={() => onToggleSubtype(subtype)}
+                          disabled={saving}
+                          className='mt-0.5'
+                        />
+                        <div className='flex-1'>
+                          <label
+                            htmlFor={`subtype-${subtype}`}
+                            className='text-sm font-medium cursor-pointer'
+                          >
+                            {SUBTYPE_LABELS[subtype]}
+                          </label>
+                          <p className='text-xs text-muted-foreground mt-0.5'>
+                            {SUBTYPE_DESCRIPTIONS[subtype]}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+
+                {/* Form sections */}
+                <Card>
+                  <CardHeader>
+                    <div className='flex items-start justify-between gap-4'>
+                      <div>
+                        <CardTitle className='text-base flex items-center gap-2'>
+                          <FileText className='h-4 w-4' />
+                          Secciones del formulario
+                        </CardTitle>
+                        <CardDescription>
+                          Controla qué secciones se muestran y cuáles son obligatorias al crear
+                          activos
+                        </CardDescription>
+                      </div>
+                      <div className='flex items-center gap-2 flex-shrink-0'>
+                        <Switch
+                          id='use-mode-config'
+                          checked={useModeConfig}
+                          onCheckedChange={onSetUseModeConfig}
+                          disabled={saving}
+                        />
+                        <Label
+                          htmlFor='use-mode-config'
+                          className='text-xs cursor-pointer whitespace-nowrap'
                         >
-                          {m.label}
-                          <span className='ml-1.5 text-xs opacity-70'>({m.help})</span>
-                        </button>
-                      ))}
+                          Por modalidad
+                        </Label>
+                      </div>
                     </div>
-                    <SectionTable
-                      sections={ALL_SECTIONS}
-                      visible={onGetModeConfig(activeModeTab).visible}
-                      required={onGetModeConfig(activeModeTab).required}
-                      onToggleVisible={(s, v) => onSetModeVisible(activeModeTab, s, v)}
-                      onToggleRequired={(s, v) => onSetModeRequired(activeModeTab, s, v)}
-                      disabled={saving}
-                    />
-                  </div>
-                ) : (
-                  <SectionTable
-                    sections={ALL_SECTIONS}
-                    visible={form.visibleSections}
-                    required={form.requiredSections}
-                    onToggleVisible={onToggleVisible}
-                    onToggleRequired={onToggleRequired}
-                    disabled={saving}
-                  />
-                )}
-              </CardContent>
-            </Card>
+                  </CardHeader>
+                  <CardContent>
+                    {useModeConfig ? (
+                      <div className='space-y-3'>
+                        <p className='text-xs text-muted-foreground flex items-center gap-1.5'>
+                          <Info className='h-3.5 w-3.5' />
+                          Configura secciones distintas según la modalidad de adquisición del equipo
+                        </p>
+                        <div className='flex gap-2 flex-wrap'>
+                          {ACQUISITION_MODES.map(m => (
+                            <button
+                              key={m.value}
+                              type='button'
+                              onClick={() => onSetActiveModeTab(m.value)}
+                              className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
+                                activeModeTab === m.value
+                                  ? 'bg-primary text-primary-foreground border-primary'
+                                  : 'bg-background border-border hover:bg-muted'
+                              }`}
+                            >
+                              {m.label}
+                              <span className='ml-1.5 text-xs opacity-70'>({m.help})</span>
+                            </button>
+                          ))}
+                        </div>
+                        <SectionTable
+                          sections={ALL_SECTIONS}
+                          visible={onGetModeConfig(activeModeTab).visible}
+                          required={onGetModeConfig(activeModeTab).required}
+                          onToggleVisible={(s, v) => onSetModeVisible(activeModeTab, s, v)}
+                          onToggleRequired={(s, v) => onSetModeRequired(activeModeTab, s, v)}
+                          disabled={saving}
+                        />
+                      </div>
+                    ) : (
+                      <SectionTable
+                        sections={ALL_SECTIONS}
+                        visible={form.visibleSections}
+                        required={form.requiredSections}
+                        onToggleVisible={onToggleVisible}
+                        onToggleRequired={onToggleRequired}
+                        disabled={saving}
+                      />
+                    )}
+                  </CardContent>
+                </Card>
 
-            {/* Registration rules */}
-            <Card>
-              <CardHeader>
-                <CardTitle className='text-base'>Reglas de registro</CardTitle>
-                <CardDescription>Comportamiento al crear y gestionar activos</CardDescription>
-              </CardHeader>
-              <CardContent className='space-y-2'>
-                {(
-                  [
-                    {
-                      id: 'require-financial',
-                      label: 'Requerir datos financieros para nuevos activos',
-                      desc: 'Obliga a completar la sección financiera al crear un activo',
-                      key: 'requireFinancialForNew' as const,
-                    },
-                    {
-                      id: 'require-delivery-act',
-                      label: 'Requerir acta de entrega',
-                      desc: 'Genera un acta de entrega al asignar un activo a un usuario',
-                      key: 'requireDeliveryAct' as const,
-                    },
-                    {
-                      id: 'auto-approve-decommission',
-                      label: 'Auto-aprobar baja de activos',
-                      desc: 'Las solicitudes de baja se aprueban automáticamente sin revisión',
-                      key: 'autoApproveDecommission' as const,
-                    },
-                  ] as const
-                ).map(item => (
-                  <div
-                    key={item.id}
-                    className='flex items-center justify-between p-3 border rounded-lg'
-                  >
-                    <div>
-                      <p className='text-sm font-medium'>{item.label}</p>
-                      <p className='text-xs text-muted-foreground'>{item.desc}</p>
+                {/* Registration rules */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className='text-base'>Reglas de registro</CardTitle>
+                    <CardDescription>Comportamiento al crear y gestionar activos</CardDescription>
+                  </CardHeader>
+                  <CardContent className='space-y-2'>
+                    {(
+                      [
+                        {
+                          id: 'require-financial',
+                          label: 'Requerir datos financieros para nuevos activos',
+                          desc: 'Obliga a completar la sección financiera al crear un activo',
+                          key: 'requireFinancialForNew' as const,
+                        },
+                        {
+                          id: 'require-delivery-act',
+                          label: 'Requerir acta de entrega',
+                          desc: 'Genera un acta de entrega al asignar un activo a un usuario',
+                          key: 'requireDeliveryAct' as const,
+                        },
+                        {
+                          id: 'auto-approve-decommission',
+                          label: 'Auto-aprobar baja de activos',
+                          desc: 'Las solicitudes de baja se aprueban automáticamente sin revisión',
+                          key: 'autoApproveDecommission' as const,
+                        },
+                      ] as const
+                    ).map(item => (
+                      <div
+                        key={item.id}
+                        className='flex items-center justify-between p-3 border rounded-lg'
+                      >
+                        <div>
+                          <p className='text-sm font-medium'>{item.label}</p>
+                          <p className='text-xs text-muted-foreground'>{item.desc}</p>
+                        </div>
+                        <Switch
+                          id={item.id}
+                          checked={form[item.key] as boolean}
+                          onCheckedChange={v => onSetField(item.key, v)}
+                          disabled={saving}
+                        />
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+
+                {/* Default depreciation */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className='text-base flex items-center gap-2'>
+                      <TrendingDown className='h-4 w-4' />
+                      Depreciación por defecto
+                    </CardTitle>
+                    <CardDescription>
+                      Valores pre-cargados al crear activos fijos en esta área
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className='space-y-4'>
+                    <div className='grid grid-cols-1 sm:grid-cols-3 gap-4'>
+                      <div className='space-y-1'>
+                        <Label htmlFor='depreciation-method'>Método</Label>
+                        <Select
+                          value={form.defaultDepreciationMethod ?? '__none__'}
+                          onValueChange={v =>
+                            onSetField('defaultDepreciationMethod', v === '__none__' ? null : v)
+                          }
+                          disabled={saving}
+                        >
+                          <SelectTrigger id='depreciation-method'>
+                            <SelectValue placeholder='Sin método por defecto' />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value='__none__'>Sin método por defecto</SelectItem>
+                            {DEPRECIATION_METHODS.map(m => (
+                              <SelectItem key={m.value} value={m.value}>
+                                {m.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className='space-y-1'>
+                        <Label htmlFor='useful-life'>Vida útil (años)</Label>
+                        <Input
+                          id='useful-life'
+                          type='number'
+                          min={0}
+                          step={0.5}
+                          value={form.defaultUsefulLifeYears}
+                          onChange={e => onSetField('defaultUsefulLifeYears', e.target.value)}
+                          placeholder='Ej: 5'
+                          disabled={saving}
+                        />
+                      </div>
+                      <div className='space-y-1'>
+                        <Label htmlFor='residual-pct'>Valor residual (%)</Label>
+                        <Input
+                          id='residual-pct'
+                          type='number'
+                          min={0}
+                          max={100}
+                          step={0.01}
+                          value={form.defaultResidualValuePct}
+                          onChange={e => {
+                            onSetField('defaultResidualValuePct', e.target.value)
+                            onValidateResidual(e.target.value)
+                          }}
+                          placeholder='Ej: 10'
+                          disabled={saving}
+                          className={residualError ? 'border-destructive' : ''}
+                        />
+                        {residualError && (
+                          <p className='text-xs text-destructive'>{residualError}</p>
+                        )}
+                      </div>
                     </div>
-                    <Switch
-                      id={item.id}
-                      checked={form[item.key] as boolean}
-                      onCheckedChange={v => onSetField(item.key, v)}
-                      disabled={saving}
-                    />
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
 
-            {/* Default depreciation */}
-            <Card>
-              <CardHeader>
-                <CardTitle className='text-base flex items-center gap-2'>
-                  <TrendingDown className='h-4 w-4' />
-                  Depreciación por defecto
-                </CardTitle>
-                <CardDescription>
-                  Valores pre-cargados al crear activos fijos en esta área
-                </CardDescription>
-              </CardHeader>
-              <CardContent className='space-y-4'>
-                <div className='grid grid-cols-1 sm:grid-cols-3 gap-4'>
-                  <div className='space-y-1'>
-                    <Label htmlFor='depreciation-method'>Método</Label>
-                    <Select
-                      value={form.defaultDepreciationMethod ?? '__none__'}
-                      onValueChange={v =>
-                        onSetField('defaultDepreciationMethod', v === '__none__' ? null : v)
-                      }
-                      disabled={saving}
-                    >
-                      <SelectTrigger id='depreciation-method'>
-                        <SelectValue placeholder='Sin método por defecto' />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value='__none__'>Sin método por defecto</SelectItem>
-                        {DEPRECIATION_METHODS.map(m => (
-                          <SelectItem key={m.value} value={m.value}>
-                            {m.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className='space-y-1'>
-                    <Label htmlFor='useful-life'>Vida útil (años)</Label>
-                    <Input
-                      id='useful-life'
-                      type='number'
-                      min={0}
-                      step={0.5}
-                      value={form.defaultUsefulLifeYears}
-                      onChange={e => onSetField('defaultUsefulLifeYears', e.target.value)}
-                      placeholder='Ej: 5'
-                      disabled={saving}
-                    />
-                  </div>
-                  <div className='space-y-1'>
-                    <Label htmlFor='residual-pct'>Valor residual (%)</Label>
-                    <Input
-                      id='residual-pct'
-                      type='number'
-                      min={0}
-                      max={100}
-                      step={0.01}
-                      value={form.defaultResidualValuePct}
-                      onChange={e => {
-                        onSetField('defaultResidualValuePct', e.target.value)
-                        onValidateResidual(e.target.value)
-                      }}
-                      placeholder='Ej: 10'
-                      disabled={saving}
-                      className={residualError ? 'border-destructive' : ''}
-                    />
-                    {residualError && <p className='text-xs text-destructive'>{residualError}</p>}
-                  </div>
-                </div>
+                    <Separator />
 
-                <Separator />
+                    <div className='space-y-1 max-w-xs'>
+                      <Label htmlFor='code-prefix'>Prefijo de código de activo</Label>
+                      <Input
+                        id='code-prefix'
+                        value={form.codePrefix}
+                        onChange={e =>
+                          onSetField('codePrefix', e.target.value.toUpperCase().slice(0, 10))
+                        }
+                        placeholder={`Ej: ${selectedFamily?.code || 'IT'}`}
+                        maxLength={10}
+                        disabled={saving}
+                        className='font-mono'
+                      />
+                      <p className='text-xs text-muted-foreground'>
+                        Ejemplo:{' '}
+                        <span className='font-mono'>
+                          {form.codePrefix || selectedFamily?.code || 'IT'}-2026-0001
+                        </span>
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-                <div className='space-y-1 max-w-xs'>
-                  <Label htmlFor='code-prefix'>Prefijo de código de activo</Label>
-                  <Input
-                    id='code-prefix'
-                    value={form.codePrefix}
-                    onChange={e =>
-                      onSetField('codePrefix', e.target.value.toUpperCase().slice(0, 10))
-                    }
-                    placeholder={`Ej: ${selectedFamily?.code || 'IT'}`}
-                    maxLength={10}
-                    disabled={saving}
-                    className='font-mono'
-                  />
-                  <p className='text-xs text-muted-foreground'>
-                    Ejemplo:{' '}
-                    <span className='font-mono'>
-                      {form.codePrefix || selectedFamily?.code || 'IT'}-2026-0001
-                    </span>
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+              <TabsContent value='custom-fields' className='mt-4'>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Campos Personalizados</CardTitle>
+                    <CardDescription>
+                      Define los atributos específicos que se mostrarán en el formulario de equipos
+                      de esta familia
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <CustomFieldsManager familyId={selectedFamilyId} />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
           </>
         )}
       </div>
