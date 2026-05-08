@@ -382,13 +382,25 @@ export const authOptions: NextAuthOptions = {
             try {
               const dbUser = await prisma.users.findUnique({
                 where: { id: user.id },
-                select: { canManageInventory: true, isSuperAdmin: true },
+                select: {
+                  canManageInventory: true,
+                  isSuperAdmin: true,
+                  ticketsEnabled: true,
+                  inventoryEnabled: true,
+                  canRequestAssets: true,
+                },
               })
               token.canManageInventory = dbUser?.canManageInventory ?? false
               token.isSuperAdmin = dbUser?.isSuperAdmin ?? false
+              token.ticketsEnabled = dbUser?.ticketsEnabled ?? true
+              token.inventoryEnabled = dbUser?.inventoryEnabled ?? true
+              token.canRequestAssets = dbUser?.canRequestAssets ?? false
             } catch {
               token.canManageInventory = false
               token.isSuperAdmin = false
+              token.ticketsEnabled = true
+              token.inventoryEnabled = true
+              token.canRequestAssets = false
             }
           }
         }
@@ -406,6 +418,9 @@ export const authOptions: NextAuthOptions = {
                   isActive: true,
                   canManageInventory: true,
                   isSuperAdmin: true,
+                  ticketsEnabled: true,
+                  inventoryEnabled: true,
+                  canRequestAssets: true,
                   departmentId: true,
                   departments: { select: { name: true } },
                 },
@@ -418,6 +433,9 @@ export const authOptions: NextAuthOptions = {
               token.role = dbUser.role
               token.canManageInventory = dbUser.canManageInventory ?? false
               token.isSuperAdmin = (dbUser as any).isSuperAdmin ?? false
+              token.ticketsEnabled = dbUser.ticketsEnabled ?? true
+              token.inventoryEnabled = dbUser.inventoryEnabled ?? true
+              token.canRequestAssets = dbUser.canRequestAssets ?? false
               token.departmentId = dbUser.departmentId || undefined
               token.department = dbUser.departments?.name || undefined
             }
@@ -455,6 +473,11 @@ export const authOptions: NextAuthOptions = {
           session.user.isOAuth = (token.isOAuth as boolean) || false
           ;(session.user as any).canManageInventory = (token.canManageInventory as boolean) || false
           ;(session.user as any).isSuperAdmin = (token.isSuperAdmin as boolean) || false
+
+          // Agregar ticketsEnabled e inventoryEnabled desde el token
+          ;(session.user as any).ticketsEnabled = (token.ticketsEnabled as boolean) ?? true
+          ;(session.user as any).inventoryEnabled = (token.inventoryEnabled as boolean) ?? true
+          ;(session.user as any).canRequestAssets = (token.canRequestAssets as boolean) ?? false
 
           // IMPORTANTE: Pasar loginTime a la sesión para el monitor de timeout
           if (token.loginTime) {
