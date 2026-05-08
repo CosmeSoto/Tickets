@@ -1051,7 +1051,7 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
       </Card>
 
       {/* Campos Personalizados por Familia */}
-      {selectedTypeFamilyId && (
+      {selectedTypeFamilyId ? (
         <Card>
           <CardHeader>
             <CardTitle>Atributos Personalizados</CardTitle>
@@ -1068,7 +1068,16 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
             />
           </CardContent>
         </Card>
-      )}
+      ) : selectedTypeId ? (
+        <Card>
+          <CardContent className='py-8 text-center text-muted-foreground'>
+            <p>El tipo de equipo seleccionado no tiene una familia asignada.</p>
+            <p className='text-xs mt-2'>
+              Contacta al administrador para asignar una familia a este tipo de equipo.
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Notas */}
       <Card>
