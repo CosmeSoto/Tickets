@@ -34,15 +34,28 @@ export async function GET() {
             family: true,
           },
         },
-        customValues: {
-          include: {
-            field: true,
-          },
-        },
+        customValues: true,
       },
       orderBy: {
         createdAt: 'desc',
       },
+    })
+
+    // Obtener todos los custom fields de las familias involucradas
+    const familyIds = [...new Set(equipment.map(eq => eq.type.familyId).filter(Boolean))]
+    const customFields = await prisma.family_custom_fields.findMany({
+      where: {
+        familyId: { in: familyIds as string[] },
+      },
+    })
+
+    // Crear un mapa de fieldName -> field info por familia
+    const fieldsByFamily = new Map<string, Map<string, (typeof customFields)[0]>>()
+    customFields.forEach(field => {
+      if (!fieldsByFamily.has(field.familyId)) {
+        fieldsByFamily.set(field.familyId, new Map())
+      }
+      fieldsByFamily.get(field.familyId)!.set(field.fieldName, field)
     })
 
     // Transformar a formato PublicEquipmentItem
@@ -50,13 +63,16 @@ export async function GET() {
       // Transformar customValues a un objeto key-value con labels
       const customAttributes: Record<string, { value: string; label: string; type: string }> = {}
 
-      if (eq.customValues && eq.customValues.length > 0) {
+      if (eq.customValues && eq.customValues.length > 0 && eq.type.familyId) {
+        const familyFields = fieldsByFamily.get(eq.type.familyId)
+
         eq.customValues.forEach(cv => {
-          if (cv.field) {
+          const fieldInfo = familyFields?.get(cv.fieldName)
+          if (fieldInfo) {
             customAttributes[cv.fieldName] = {
               value: cv.fieldValue,
-              label: cv.field.fieldLabel,
-              type: cv.field.fieldType,
+              label: fieldInfo.fieldLabel,
+              type: fieldInfo.fieldType,
             }
           }
         })
