@@ -9,10 +9,7 @@ import { canManageInventory } from '@/lib/inventory-access'
  * Retorna los tipos de equipo, consumible y licencia activos de una familia.
  * Requiere sesión activa con canManageInventory o rol ADMIN.
  */
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
 
@@ -58,9 +55,6 @@ export async function GET(
 
     return NextResponse.json({ equipmentTypes, consumableTypes, licenseTypes })
   } catch {
-    return NextResponse.json(
-      { error: 'Error al obtener los tipos de la familia' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al obtener los tipos de la familia' }, { status: 500 })
   }
 }

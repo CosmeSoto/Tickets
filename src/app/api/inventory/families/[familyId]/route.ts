@@ -6,13 +6,13 @@ import { canManageInventory } from '@/lib/inventory-access'
 import { randomUUID } from 'crypto'
 
 /**
- * GET /api/inventory/families/[id]
+ * GET /api/inventory/families/[familyId]
  * Retorna el detalle de una familia con sus tipos activos relacionados.
  * Requiere sesión activa con canManageInventory o rol ADMIN.
  */
 export async function GET(
   _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ familyId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -32,10 +32,10 @@ export async function GET(
       )
     }
 
-    const { id } = await params
+    const { familyId } = await params
 
     const family = await prisma.families.findUnique({
-      where: { id },
+      where: { id: familyId },
       include: {
         equipmentTypes: {
           where: { isActive: true },
@@ -58,10 +58,7 @@ export async function GET(
 
     return NextResponse.json({ family })
   } catch {
-    return NextResponse.json(
-      { error: 'Error al obtener la familia' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al obtener la familia' }, { status: 500 })
   }
 }
 
@@ -70,10 +67,7 @@ export async function GET(
  * Edita una familia de inventario.
  * Solo ADMIN.
  */
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
 
@@ -109,16 +103,18 @@ export async function PUT(
       },
     })
 
-    await prisma.audit_logs.create({
-      data: {
-        id: randomUUID(),
-        action: 'UPDATE',
-        entityType: 'inventory_family',
-        entityId: family.id,
-        userId: session.user.id,
-        details: { name: family.name },
-      },
-    }).catch(err => console.warn('[audit] families PUT:', err?.message))
+    await prisma.audit_logs
+      .create({
+        data: {
+          id: randomUUID(),
+          action: 'UPDATE',
+          entityType: 'inventory_family',
+          entityId: family.id,
+          userId: session.user.id,
+          details: { name: family.name },
+        },
+      })
+      .catch(err => console.warn('[audit] families PUT:', err?.message))
 
     return NextResponse.json({ family })
   } catch (err) {
@@ -165,23 +161,22 @@ export async function PATCH(
       data: { isActive: !existing.isActive },
     })
 
-    await prisma.audit_logs.create({
-      data: {
-        id: randomUUID(),
-        action: 'TOGGLE',
-        entityType: 'inventory_family',
-        entityId: family.id,
-        userId: session.user.id,
-        details: { isActive: family.isActive },
-      },
-    }).catch(err => console.warn('[audit] families PATCH:', err?.message))
+    await prisma.audit_logs
+      .create({
+        data: {
+          id: randomUUID(),
+          action: 'TOGGLE',
+          entityType: 'inventory_family',
+          entityId: family.id,
+          userId: session.user.id,
+          details: { isActive: family.isActive },
+        },
+      })
+      .catch(err => console.warn('[audit] families PATCH:', err?.message))
 
     return NextResponse.json({ family })
   } catch {
-    return NextResponse.json(
-      { error: 'Error al cambiar el estado de la familia' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al cambiar el estado de la familia' }, { status: 500 })
   }
 }
 
@@ -233,22 +228,21 @@ export async function DELETE(
 
     await prisma.families.delete({ where: { id } })
 
-    await prisma.audit_logs.create({
-      data: {
-        id: randomUUID(),
-        action: 'DELETE',
-        entityType: 'inventory_family',
-        entityId: id,
-        userId: session.user.id,
-        details: { name: existing.name },
-      },
-    }).catch(err => console.warn('[audit] families DELETE:', err?.message))
+    await prisma.audit_logs
+      .create({
+        data: {
+          id: randomUUID(),
+          action: 'DELETE',
+          entityType: 'inventory_family',
+          entityId: id,
+          userId: session.user.id,
+          details: { name: existing.name },
+        },
+      })
+      .catch(err => console.warn('[audit] families DELETE:', err?.message))
 
     return new NextResponse(null, { status: 204 })
   } catch {
-    return NextResponse.json(
-      { error: 'Error al eliminar la familia' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al eliminar la familia' }, { status: 500 })
   }
 }
