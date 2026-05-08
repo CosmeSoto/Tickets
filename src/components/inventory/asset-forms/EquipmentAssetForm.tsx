@@ -16,6 +16,7 @@ import { AssignableUserSelect } from '@/components/inventory/shared/AssignableUs
 import { MaintenanceStatusBlock } from '@/components/inventory/shared/MaintenanceStatusBlock'
 import { CustomFieldsInput } from '@/components/inventory/custom-fields/custom-fields-input'
 import { AttachmentsField } from '@/components/inventory/shared/AttachmentsField'
+import { AccessoriesSection } from '@/components/inventory/shared/AccessoriesSection'
 import {
   showDepartmentSelector,
   showWarehouseSelector,
@@ -118,7 +119,6 @@ export function EquipmentAssetForm({
   const [condition, setCondition] = useState('NEW')
   const [equipmentStatus, setEquipmentStatus] = useState('AVAILABLE')
   const [accessories, setAccessories] = useState<string[]>([])
-  const [accessoryInput, setAccessoryInput] = useState('')
   // Campos personalizados
   const [customFieldValues, setCustomFieldValues] = useState<
     Array<{ fieldName: string; fieldValue: string }>
@@ -345,14 +345,6 @@ export function EquipmentAssetForm({
       return { year, bookValue: result.bookValue }
     })
   }, [purchasePrice, purchaseDate, usefulLifeYears, residualValue, depreciationMethod, totalUnits])
-
-  const addAccessory = () => {
-    const v = accessoryInput.trim()
-    if (v && !accessories.includes(v)) {
-      setAccessories(p => [...p, v])
-      setAccessoryInput('')
-    }
-  }
 
   const supplierLabel =
     acquisitionMode === 'RENTAL'
@@ -672,40 +664,7 @@ export function EquipmentAssetForm({
 
       {/* ── 4. DETALLES DEL EQUIPO ────────────────────────────────── */}
       {/* Accesorios */}
-      <div className='space-y-2'>
-        <Label>Accesorios</Label>
-        <div className='flex gap-2'>
-          <Input
-            value={accessoryInput}
-            onChange={e => setAccessoryInput(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                addAccessory()
-              }
-            }}
-            placeholder='Ej: Cargador, Mouse, Funda...'
-          />
-          <Button type='button' variant='outline' size='sm' onClick={addAccessory}>
-            <Plus className='h-4 w-4' />
-          </Button>
-        </div>
-        {accessories.length > 0 && (
-          <div className='flex flex-wrap gap-1.5'>
-            {accessories.map(a => (
-              <span
-                key={a}
-                className='inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs'
-              >
-                {a}
-                <button type='button' onClick={() => setAccessories(p => p.filter(x => x !== a))}>
-                  <X className='h-3 w-3' />
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
+      <AccessoriesSection accessories={accessories} onChange={setAccessories} inline />
 
       {/* Campos Personalizados */}
       {familyId && (

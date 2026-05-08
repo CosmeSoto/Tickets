@@ -3,18 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import {
-  Loader2,
-  Plus,
-  X,
-  Package,
-  Settings,
-  ImageIcon,
-  Building,
-  AlertCircle,
-  Warehouse,
-  Tag,
-} from 'lucide-react'
+import { Loader2, Plus, ImageIcon, Building, AlertCircle, Warehouse, Tag } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -43,6 +32,8 @@ import { AssignableUserSelect } from '@/components/inventory/shared/AssignableUs
 import { MaintenanceStatusBlock } from '@/components/inventory/shared/MaintenanceStatusBlock'
 import { StockIndicatorBadge } from '@/components/inventory/equipment/StockIndicatorBadge'
 import { CustomFieldsInput } from '@/components/inventory/custom-fields/custom-fields-input'
+import { AccessoriesSection } from '@/components/inventory/shared/AccessoriesSection'
+import { RentalInformationCard } from '@/components/inventory/shared/RentalInformationCard'
 import {
   showWarehouseSelector,
   showMaintenanceBlock,
@@ -172,7 +163,6 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
     if (Array.isArray(raw)) return raw
     return []
   })
-  const [newAccessory, setNewAccessory] = useState('')
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [maxFileSize, setMaxFileSize] = useState(10)
   // Campos adicionales no cubiertos por react-hook-form
@@ -447,18 +437,6 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
     } finally {
       setLoading(false)
     }
-  }
-
-  const addAccessory = () => {
-    const trimmed = newAccessory.trim()
-    if (trimmed && trimmed.length > 0) {
-      setAccessories([...accessories, trimmed])
-      setNewAccessory('')
-    }
-  }
-
-  const removeAccessory = (index: number) => {
-    setAccessories(accessories.filter((_, i) => i !== index))
   }
 
   return (
@@ -950,169 +928,10 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
       </Card>
 
       {/* Información de Renta (solo para equipos rentados) */}
-      {isRental && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Información de Renta/Alquiler</CardTitle>
-            <CardDescription>Datos del proveedor y contrato de renta</CardDescription>
-          </CardHeader>
-          <CardContent className='space-y-4'>
-            <div className='grid gap-4 md:grid-cols-2'>
-              <div className='space-y-2'>
-                <Label htmlFor='rentalProvider'>
-                  Proveedor <span className='text-destructive'>*</span>
-                </Label>
-                <Input
-                  id='rentalProvider'
-                  {...register('rentalProvider')}
-                  placeholder='TechRent Solutions'
-                />
-                {errors.rentalProvider && (
-                  <p className='text-sm text-destructive'>{errors.rentalProvider.message}</p>
-                )}
-              </div>
-
-              <div className='space-y-2'>
-                <Label htmlFor='rentalContractNumber'>Número de Contrato</Label>
-                <Input
-                  id='rentalContractNumber'
-                  {...register('rentalContractNumber')}
-                  placeholder='TR-2026-0123'
-                />
-              </div>
-
-              <div className='space-y-2'>
-                <Label htmlFor='rentalStartDate'>Fecha de Inicio</Label>
-                <Input id='rentalStartDate' type='date' {...register('rentalStartDate')} />
-              </div>
-
-              <div className='space-y-2'>
-                <Label htmlFor='rentalEndDate'>Fecha de Fin</Label>
-                <Input id='rentalEndDate' type='date' {...register('rentalEndDate')} />
-                {errors.rentalEndDate && (
-                  <p className='text-sm text-destructive'>{errors.rentalEndDate.message}</p>
-                )}
-              </div>
-
-              <div className='space-y-2'>
-                <Label htmlFor='rentalMonthlyCost'>Costo Mensual (USD)</Label>
-                <Input
-                  id='rentalMonthlyCost'
-                  type='number'
-                  step='0.01'
-                  {...register('rentalMonthlyCost', { valueAsNumber: true })}
-                  placeholder='150.00'
-                />
-                {errors.rentalMonthlyCost && (
-                  <p className='text-sm text-destructive'>{errors.rentalMonthlyCost.message}</p>
-                )}
-              </div>
-
-              <div className='space-y-2'>
-                <Label htmlFor='rentalContactName'>Nombre de Contacto</Label>
-                <Input
-                  id='rentalContactName'
-                  {...register('rentalContactName')}
-                  placeholder='Juan Pérez'
-                />
-              </div>
-
-              <div className='space-y-2'>
-                <Label htmlFor='rentalContactEmail'>Email de Contacto</Label>
-                <Input
-                  id='rentalContactEmail'
-                  type='email'
-                  {...register('rentalContactEmail')}
-                  placeholder='contacto@proveedor.com'
-                />
-                {errors.rentalContactEmail && (
-                  <p className='text-sm text-destructive'>{errors.rentalContactEmail.message}</p>
-                )}
-              </div>
-
-              <div className='space-y-2'>
-                <Label htmlFor='rentalContactPhone'>Teléfono de Contacto</Label>
-                <Input
-                  id='rentalContactPhone'
-                  {...register('rentalContactPhone')}
-                  placeholder='+1-555-0123'
-                />
-              </div>
-            </div>
-
-            <div className='space-y-2'>
-              <Label htmlFor='rentalNotes'>Notas de Renta</Label>
-              <Textarea
-                id='rentalNotes'
-                {...register('rentalNotes')}
-                placeholder='Información adicional sobre el contrato, términos especiales, etc.'
-                rows={3}
-              />
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {isRental && <RentalInformationCard register={register} errors={errors} />}
 
       {/* Accesorios */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Accesorios</CardTitle>
-          <CardDescription>Lista de accesorios incluidos con el equipo</CardDescription>
-        </CardHeader>
-        <CardContent className='space-y-4'>
-          <div className='flex gap-2'>
-            <Input
-              value={newAccessory}
-              onChange={e => setNewAccessory(e.target.value)}
-              placeholder='Ej: Cargador, Mouse inalámbrico, Cable HDMI'
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  addAccessory()
-                }
-              }}
-              className='flex-1'
-            />
-            <Button
-              type='button'
-              onClick={addAccessory}
-              size='icon'
-              variant='secondary'
-              disabled={!newAccessory.trim()}
-            >
-              <Plus className='h-4 w-4' />
-            </Button>
-          </div>
-
-          {accessories.length === 0 ? (
-            <div className='text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg'>
-              <Package className='h-8 w-8 mx-auto mb-2 opacity-50' />
-              <p className='text-sm'>No se han agregado accesorios</p>
-              <p className='text-xs mt-1'>Agrega accesorios usando el campo de arriba</p>
-            </div>
-          ) : (
-            <div className='flex flex-wrap gap-2'>
-              {accessories.map((accessory, index) => (
-                <div
-                  key={index}
-                  className='flex items-center gap-2 rounded-md bg-secondary px-3 py-2 text-sm'
-                >
-                  <Package className='h-3 w-3' />
-                  <span>{accessory}</span>
-                  <button
-                    type='button'
-                    onClick={() => removeAccessory(index)}
-                    className='ml-1 hover:text-destructive transition-colors'
-                    aria-label={`Eliminar ${accessory}`}
-                  >
-                    <X className='h-3 w-3' />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <AccessoriesSection accessories={accessories} onChange={setAccessories} />
 
       {/* Campos Personalizados por Familia - Solo se muestra si hay campos configurados */}
       {selectedTypeFamilyId && (
