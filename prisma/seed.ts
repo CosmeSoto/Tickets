@@ -1,6 +1,7 @@
 import { PrismaClient, UserRole } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { randomUUID } from 'crypto'
+import { seedCustomFields } from './seeds/custom-fields.seed'
 
 const prisma = new PrismaClient()
 const now = new Date()
@@ -55,7 +56,10 @@ async function main() {
   // 13b. TIPOS DE PROVEEDOR
   await seedSupplierTypes(familyMap)
 
-  // 13c. MIGRAR suppliers existentes: type enum → typeId
+  // 13c. CAMPOS PERSONALIZADOS (custom fields por familia)
+  await seedCustomFields(prisma, familyMap)
+
+  // 13d. MIGRAR suppliers existentes: type enum → typeId
   await migrateSupplierTypes()
 
   // 14. CONFIGURACIONES DE INVENTARIO (system_settings)
