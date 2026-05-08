@@ -13,6 +13,7 @@ import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { useInventorySettings } from '@/hooks/use-inventory-settings'
 import { InventoryAreasTab } from '@/components/settings/inventory/inventory-areas-tab'
 import { InventoryGlobalTab } from '@/components/settings/inventory/inventory-global-tab'
+import { InventoryCustomFieldsTab } from '@/components/settings/inventory/inventory-custom-fields-tab'
 
 function InventorySettingsContent() {
   const {
@@ -52,14 +53,6 @@ function InventorySettingsContent() {
       subtitle='Configura el comportamiento del módulo de inventario por área'
       headerActions={
         <div className='flex items-center gap-2'>
-          <Button
-            variant='outline'
-            size='sm'
-            onClick={() => (window.location.href = '/admin/settings/inventory/custom-fields')}
-          >
-            <Layers className='h-4 w-4 sm:mr-2' />
-            <span className='hidden sm:inline'>Campos Personalizados</span>
-          </Button>
           <Button variant='outline' size='sm' onClick={loadFamilies} disabled={loadingFamilies}>
             <RefreshCw className={`h-4 w-4 ${loadingFamilies ? 'animate-spin' : ''} sm:mr-2`} />
             <span className='hidden sm:inline'>Recargar</span>
@@ -80,6 +73,13 @@ function InventorySettingsContent() {
           <TabsTrigger value='global' className='flex-1 sm:flex-none flex items-center gap-2'>
             <Settings className='h-4 w-4' />
             Reglas generales
+          </TabsTrigger>
+          <TabsTrigger
+            value='custom-fields'
+            className='flex-1 sm:flex-none flex items-center gap-2'
+          >
+            <Settings className='h-4 w-4' />
+            Campos Personalizados
           </TabsTrigger>
         </TabsList>
 
@@ -117,6 +117,10 @@ function InventorySettingsContent() {
             onSetGlobal={setGlobal}
             onSave={handleSaveGlobal}
           />
+        </TabsContent>
+
+        <TabsContent value='custom-fields'>
+          <InventoryCustomFieldsTab families={families} />
         </TabsContent>
       </Tabs>
     </ModuleLayout>

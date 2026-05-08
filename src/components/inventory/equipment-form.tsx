@@ -286,6 +286,16 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
   // Derive the familyId of the selected equipment type
   const selectedTypeFamilyId = equipmentTypes.find(t => t.id === selectedTypeId)?.family?.id ?? null
 
+  // Debug: Log para verificar
+  useEffect(() => {
+    if (selectedTypeId) {
+      const selectedType = equipmentTypes.find(t => t.id === selectedTypeId)
+      console.log('🔍 Tipo seleccionado:', selectedType?.name)
+      console.log('🔍 Familia del tipo:', selectedType?.family)
+      console.log('🔍 Family ID:', selectedTypeFamilyId)
+    }
+  }, [selectedTypeId, equipmentTypes, selectedTypeFamilyId])
+
   // Filter departments by the family of the selected equipment type
   const filteredDepartments = selectedTypeFamilyId
     ? departments.filter(d => d.familyId === selectedTypeFamilyId)
