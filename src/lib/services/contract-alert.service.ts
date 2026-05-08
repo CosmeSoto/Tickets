@@ -1,5 +1,5 @@
 import prisma from '@/lib/prisma'
-import { NotificationService } from './inventory-notification.service'
+import { InventoryNotificationService } from './inventory-notification.service'
 
 export class ContractAlertService {
   /**
@@ -134,7 +134,7 @@ Por favor, revise el contrato y considere su renovación.
 
     // Enviar notificaciones
     for (const admin of admins) {
-      await NotificationService.create({
+      await InventoryNotificationService.create({
         userId: admin.id,
         type: 'CONTRACT_EXPIRING',
         title: `Contrato próximo a vencer (${actualDays} días)`,
