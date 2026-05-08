@@ -217,7 +217,11 @@ export function CustomFieldsInput({
   }
 
   if (fields.length === 0) {
-    return null
+    return (
+      <div className='text-sm text-muted-foreground'>
+        No hay campos personalizados configurados para esta familia.
+      </div>
+    )
   }
 
   return (
