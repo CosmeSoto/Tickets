@@ -120,7 +120,7 @@ function InventorySettingsContent() {
         </TabsContent>
 
         <TabsContent value='custom-fields'>
-          <InventoryCustomFieldsTab families={families} />
+          <InventoryCustomFieldsTab families={families} selectedFamilyId={selectedFamilyId} />
         </TabsContent>
       </Tabs>
     </ModuleLayout>
