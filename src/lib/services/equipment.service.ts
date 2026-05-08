@@ -53,6 +53,7 @@ export class EquipmentService {
             : undefined,
           specifications: data.specifications || {},
           accessories: data.accessories || [],
+          customValues: (data as any).customValues || [],
           location: data.location,
           notes: data.notes,
           qrCode: qrCodeId,
@@ -301,6 +302,9 @@ export class EquipmentService {
           }),
           ...(data.specifications !== undefined && { specifications: data.specifications }),
           ...(data.accessories !== undefined && { accessories: data.accessories }),
+          ...((data as any).customValues !== undefined && {
+            customValues: (data as any).customValues,
+          }),
           ...(data.location !== undefined && { location: data.location }),
           ...(data.notes !== undefined && { notes: data.notes }),
           // Campos adicionales que el formulario de edición puede enviar

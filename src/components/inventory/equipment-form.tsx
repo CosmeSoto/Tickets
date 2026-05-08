@@ -42,6 +42,7 @@ import { useActiveDepartments } from '@/contexts/departments-context'
 import { AssignableUserSelect } from '@/components/inventory/shared/AssignableUserSelect'
 import { MaintenanceStatusBlock } from '@/components/inventory/shared/MaintenanceStatusBlock'
 import { StockIndicatorBadge } from '@/components/inventory/equipment/StockIndicatorBadge'
+import { CustomFieldsInput } from '@/components/inventory/custom-fields/custom-fields-input'
 import {
   showWarehouseSelector,
   showMaintenanceBlock,
@@ -146,6 +147,15 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
   const [saleListingPrice, setSaleListingPrice] = useState<string>(
     (equipment as any)?.saleListingPrice != null ? String((equipment as any).saleListingPrice) : ''
   )
+
+  // Estado para campos personalizados
+  const [customFieldValues, setCustomFieldValues] = useState<
+    Array<{ fieldName: string; fieldValue: string }>
+  >(() => {
+    const raw = (equipment as any)?.customValues
+    if (Array.isArray(raw)) return raw
+    return []
+  })
 
   // ✅ Departamentos desde contexto global — sin petición extra
   const { departments: allDepartments } = useActiveDepartments()
@@ -306,6 +316,7 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
         ...data,
         accessories,
         specifications,
+        customValues: customFieldValues,
         ...(selectedWarehouseId ? { warehouseId: selectedWarehouseId } : {}),
         ...(physicalLocation ? { physicalLocation } : {}),
         ...(invoiceNumber ? { invoiceNumber } : {}),
@@ -1129,6 +1140,26 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
           )}
         </CardContent>
       </Card>
+
+      {/* Campos Personalizados por Familia */}
+      {selectedTypeFamilyId && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Atributos Personalizados</CardTitle>
+            <CardDescription>
+              Campos específicos configurados para esta familia de activos
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <CustomFieldsInput
+              familyId={selectedTypeFamilyId}
+              equipmentId={equipment?.id}
+              values={customFieldValues}
+              onChange={setCustomFieldValues}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Notas */}
       <Card>
