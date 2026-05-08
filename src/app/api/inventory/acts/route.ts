@@ -62,12 +62,14 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Filtro por familia (a través de assignment.equipment)
+    // Filtro por familia (a través de assignment.equipment.type)
     if (familyId) {
       filters.assignment = {
         ...filters.assignment,
         equipment: {
-          familyId: familyId,
+          type: {
+            familyId: familyId,
+          },
         },
       }
     }
@@ -107,8 +109,12 @@ export async function GET(request: NextRequest) {
               include: {
                 equipment: {
                   include: {
-                    family: {
-                      select: { id: true, name: true, color: true },
+                    type: {
+                      include: {
+                        family: {
+                          select: { id: true, name: true, color: true, icon: true },
+                        },
+                      },
                     },
                   },
                 },
@@ -138,8 +144,12 @@ export async function GET(request: NextRequest) {
               include: {
                 equipment: {
                   include: {
-                    family: {
-                      select: { id: true, name: true, color: true },
+                    type: {
+                      include: {
+                        family: {
+                          select: { id: true, name: true, color: true, icon: true },
+                        },
+                      },
                     },
                   },
                 },
@@ -175,7 +185,7 @@ export async function GET(request: NextRequest) {
         receiverInfo,
         equipmentSnapshot,
         equipment: act.assignment?.equipment ?? null,
-        family: act.assignment?.equipment?.family ?? null,
+        family: act.assignment?.equipment?.type?.family ?? null,
         userRole: isFullAdmin
           ? 'admin'
           : delivererInfo?.id === userId && receiverInfo?.id === userId
