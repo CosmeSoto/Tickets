@@ -78,9 +78,9 @@ export async function GET(request: NextRequest) {
       // Mantenimientos vencidos o próximos
       prisma.maintenance_records.count({
         where: {
-          equipment: familyScope.familyId ? { familyId: familyScope.familyId } : undefined,
+          ...(familyScope.familyId && { equipment: { familyId: familyScope.familyId } }),
           status: 'SCHEDULED',
-          scheduledDate: { lte: thirtyDaysFromNow },
+          date: { lte: thirtyDaysFromNow },
         },
       }),
 
