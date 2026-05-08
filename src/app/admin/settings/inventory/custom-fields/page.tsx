@@ -40,11 +40,14 @@ export default function CustomFieldsPage() {
       const response = await fetch('/api/inventory/families')
       if (!response.ok) throw new Error('Error al cargar familias')
       const data = await response.json()
-      setFamilies(data)
+
+      // El endpoint puede devolver un array o un objeto con propiedad families
+      const familiesArray = Array.isArray(data) ? data : data.families || []
+      setFamilies(familiesArray)
 
       // Seleccionar la primera familia por defecto
-      if (data.length > 0 && !selectedFamilyId) {
-        setSelectedFamilyId(data[0].id)
+      if (familiesArray.length > 0 && !selectedFamilyId) {
+        setSelectedFamilyId(familiesArray[0].id)
       }
     } catch (error) {
       console.error('Error loading families:', error)
@@ -110,20 +113,26 @@ export default function CustomFieldsPage() {
                 <SelectValue placeholder='Selecciona una familia' />
               </SelectTrigger>
               <SelectContent>
-                {families.map(family => (
-                  <SelectItem key={family.id} value={family.id}>
-                    <div className='flex items-center gap-2'>
-                      {family.color && (
-                        <div
-                          className='w-3 h-3 rounded-full'
-                          style={{ backgroundColor: family.color }}
-                        />
-                      )}
-                      <span>{family.name}</span>
-                      <span className='text-xs text-muted-foreground'>({family.code})</span>
-                    </div>
+                {Array.isArray(families) && families.length > 0 ? (
+                  families.map(family => (
+                    <SelectItem key={family.id} value={family.id}>
+                      <div className='flex items-center gap-2'>
+                        {family.color && (
+                          <div
+                            className='w-3 h-3 rounded-full'
+                            style={{ backgroundColor: family.color }}
+                          />
+                        )}
+                        <span>{family.name}</span>
+                        <span className='text-xs text-muted-foreground'>({family.code})</span>
+                      </div>
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value='none' disabled>
+                    No hay familias disponibles
                   </SelectItem>
-                ))}
+                )}
               </SelectContent>
             </Select>
           </div>
