@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { buildCacheKey } from '@/lib/api-cache'
+import { withCache, buildCacheKey } from '@/lib/api-cache'
 import type { StockInfo } from '@/types/equipment-grouping'
 
 export const dynamic = 'force-dynamic'
@@ -52,81 +52,70 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // 4. Generar cache key
-    const cacheKey = `inventory:equipment:stock:${brand}:${model}:${typeId}`
+    // 4. Generar cache key y obtener datos con caché
+    const cacheKey = buildCacheKey('inventory:equipment:stock', { brand, model, typeId })
 
-    // 5. Intentar obtener de caché
-    // const cached = await getCachedData<StockInfo>(cacheKey)
-
-    if (cached) {
-      return NextResponse.json(cached, {
-        status: 200,
-        headers: {
-          'X-Cache': 'HIT',
+    const stockInfo = await withCache(cacheKey, 30, async () => {
+      // 5. Consultar equipos que coincidan con brand, model, typeId
+      const equipment = await prisma.equipment.findMany({
+        where: {
+          brand,
+          model,
+          typeId,
+        },
+        select: {
+          status: true,
         },
       })
-    }
 
-    // 6. Consultar equipos que coincidan con brand, model, typeId
-    const equipment = await prisma.equipment.findMany({
-      where: {
+      // 6. Calcular contadores por estado
+      const info: StockInfo = {
         brand,
         model,
         typeId,
-      },
-      select: {
-        status: true,
-      },
+        total: equipment.length,
+        available: 0,
+        assigned: 0,
+        maintenance: 0,
+        forSale: 0,
+        sold: 0,
+        retired: 0,
+        isNewModel: equipment.length === 0,
+        lastUpdated: new Date(),
+      }
+
+      // Contar por estado
+      for (const eq of equipment) {
+        switch (eq.status) {
+          case 'AVAILABLE':
+            info.available++
+            break
+          case 'ASSIGNED':
+            info.assigned++
+            break
+          case 'MAINTENANCE':
+            info.maintenance++
+            break
+          case 'FOR_SALE':
+            info.forSale++
+            break
+          case 'SOLD':
+            info.sold++
+            break
+          case 'RETIRED':
+            info.retired++
+            break
+        }
+      }
+
+      return info
     })
 
-    // 7. Calcular contadores por estado
-    const stockInfo: StockInfo = {
-      brand,
-      model,
-      typeId,
-      total: equipment.length,
-      available: 0,
-      assigned: 0,
-      maintenance: 0,
-      forSale: 0,
-      sold: 0,
-      retired: 0,
-      isNewModel: equipment.length === 0,
-      lastUpdated: new Date(),
-    }
-
-    // Contar por estado
-    for (const eq of equipment) {
-      switch (eq.status) {
-        case 'AVAILABLE':
-          stockInfo.available++
-          break
-        case 'ASSIGNED':
-          stockInfo.assigned++
-          break
-        case 'MAINTENANCE':
-          stockInfo.maintenance++
-          break
-        case 'FOR_SALE':
-          stockInfo.forSale++
-          break
-        case 'SOLD':
-          stockInfo.sold++
-          break
-        case 'RETIRED':
-          stockInfo.retired++
-          break
-      }
-    }
-
-    // 8. Guardar en caché (TTL 30s)
-    // await setCachedData(cacheKey, stockInfo, 30)
-
-    // 9. Retornar respuesta
+    // 7. Retornar respuesta
     return NextResponse.json(stockInfo, {
       status: 200,
       headers: {
-        'X-Cache': 'MISS',
+        'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
       },
     })
   } catch (error) {

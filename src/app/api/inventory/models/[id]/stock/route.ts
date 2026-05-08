@@ -8,7 +8,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getModelWithStock } from '@/lib/services/equipment-models.service'
 import { canManageInventory } from '@/lib/inventory-access'
-import { buildCacheKey } from '@/lib/api-cache'
+import { withCache, buildCacheKey } from '@/lib/api-cache'
 
 /**
  * GET /api/inventory/models/[id]/stock
@@ -28,21 +28,18 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
     }
 
-    const cacheKey = `model:${params.id}:stock`
+    const cacheKey = buildCacheKey('model:stock', { id: params.id })
 
-    // Try cache first
-    // const cached = await getCachedData(cacheKey)
-    if (cached) {
-      return NextResponse.json(cached)
-    }
+    // Get data with cache
+    const modelWithStock = await withCache(cacheKey, 30, async () => {
+      return await getModelWithStock(params.id)
+    })
 
-    // Get fresh data
-    const modelWithStock = await getModelWithStock(params.id)
-
-    // Cache for 30 seconds
-    // await setCachedData(cacheKey, modelWithStock, 30)
-
-    return NextResponse.json(modelWithStock)
+    return NextResponse.json(modelWithStock, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
+      },
+    })
   } catch (error: any) {
     console.error('Error getting model stock:', error)
 
