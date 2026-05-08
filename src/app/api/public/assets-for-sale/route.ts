@@ -34,7 +34,7 @@ export async function GET() {
             family: true,
           },
         },
-        custom_values: {
+        customValues: {
           include: {
             field: true,
           },
@@ -47,11 +47,11 @@ export async function GET() {
 
     // Transformar a formato PublicEquipmentItem
     const publicItems: PublicEquipmentItem[] = equipment.map(eq => {
-      // Transformar custom_values a un objeto key-value con labels
+      // Transformar customValues a un objeto key-value con labels
       const customAttributes: Record<string, { value: string; label: string; type: string }> = {}
 
-      if (eq.custom_values && eq.custom_values.length > 0) {
-        eq.custom_values.forEach(cv => {
+      if (eq.customValues && eq.customValues.length > 0) {
+        eq.customValues.forEach(cv => {
           if (cv.field) {
             customAttributes[cv.fieldName] = {
               value: cv.fieldValue,
