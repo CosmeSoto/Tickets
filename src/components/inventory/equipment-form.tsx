@@ -119,13 +119,6 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
     return []
   })
   const [newAccessory, setNewAccessory] = useState('')
-  const [specifications, setSpecifications] = useState<Record<string, string>>(() => {
-    const raw = equipment?.specifications
-    if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, string>
-    return {}
-  })
-  const [newSpecKey, setNewSpecKey] = useState('')
-  const [newSpecValue, setNewSpecValue] = useState('')
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [maxFileSize, setMaxFileSize] = useState(10)
   // Campos adicionales no cubiertos por react-hook-form
@@ -325,7 +318,6 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
       const payload = {
         ...data,
         accessories,
-        specifications,
         customValues: customFieldValues,
         ...(selectedWarehouseId ? { warehouseId: selectedWarehouseId } : {}),
         ...(physicalLocation ? { physicalLocation } : {}),
@@ -403,23 +395,6 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
 
   const removeAccessory = (index: number) => {
     setAccessories(accessories.filter((_, i) => i !== index))
-  }
-
-  const addSpecification = () => {
-    if (newSpecKey.trim() && newSpecValue.trim()) {
-      setSpecifications({
-        ...specifications,
-        [newSpecKey.trim()]: newSpecValue.trim(),
-      })
-      setNewSpecKey('')
-      setNewSpecValue('')
-    }
-  }
-
-  const removeSpecification = (key: string) => {
-    const newSpecs = { ...specifications }
-    delete newSpecs[key]
-    setSpecifications(newSpecs)
   }
 
   return (
@@ -1067,82 +1042,6 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
                     aria-label={`Eliminar ${accessory}`}
                   >
                     <X className='h-3 w-3' />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Especificaciones Técnicas */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Especificaciones Técnicas</CardTitle>
-          <CardDescription>
-            Detalles técnicos del equipo (procesador, RAM, almacenamiento, etc.)
-          </CardDescription>
-        </CardHeader>
-        <CardContent className='space-y-4'>
-          <div className='grid gap-2 md:grid-cols-[1fr,1fr,auto]'>
-            <Input
-              value={newSpecKey}
-              onChange={e => setNewSpecKey(e.target.value)}
-              placeholder='Nombre (ej: Procesador)'
-              className='flex-1'
-            />
-            <Input
-              value={newSpecValue}
-              onChange={e => setNewSpecValue(e.target.value)}
-              placeholder='Valor (ej: Intel Core i7-1185G7)'
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  addSpecification()
-                }
-              }}
-              className='flex-1'
-            />
-            <Button
-              type='button'
-              onClick={addSpecification}
-              size='icon'
-              variant='secondary'
-              disabled={!newSpecKey.trim() || !newSpecValue.trim()}
-            >
-              <Plus className='h-4 w-4' />
-            </Button>
-          </div>
-
-          {Object.keys(specifications).length === 0 ? (
-            <div className='text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg'>
-              <Settings className='h-8 w-8 mx-auto mb-2 opacity-50' />
-              <p className='text-sm'>No se han agregado especificaciones</p>
-              <p className='text-xs mt-1'>
-                Agrega especificaciones técnicas usando los campos de arriba
-              </p>
-            </div>
-          ) : (
-            <div className='space-y-2'>
-              {Object.entries(specifications).map(([key, value]) => (
-                <div
-                  key={key}
-                  className='flex items-center justify-between rounded-md border p-3 hover:bg-accent/50 transition-colors'
-                >
-                  <div className='flex items-center gap-2'>
-                    <Settings className='h-4 w-4 text-muted-foreground' />
-                    <div>
-                      <span className='font-medium'>{key}:</span>{' '}
-                      <span className='text-muted-foreground'>{value}</span>
-                    </div>
-                  </div>
-                  <button
-                    type='button'
-                    onClick={() => removeSpecification(key)}
-                    className='hover:text-destructive transition-colors'
-                    aria-label={`Eliminar especificación ${key}`}
-                  >
-                    <X className='h-4 w-4' />
                   </button>
                 </div>
               ))}

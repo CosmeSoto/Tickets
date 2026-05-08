@@ -51,7 +51,6 @@ export class EquipmentService {
           warrantyExpiration: data.warrantyExpiration
             ? new Date(data.warrantyExpiration as string | number)
             : undefined,
-          specifications: data.specifications || {},
           accessories: data.accessories || [],
           customValues: (data as any).customValues || [],
           location: data.location,
@@ -300,7 +299,6 @@ export class EquipmentService {
           ...(data.warrantyExpiration !== undefined && {
             warrantyExpiration: data.warrantyExpiration ? new Date(data.warrantyExpiration) : null,
           }),
-          ...(data.specifications !== undefined && { specifications: data.specifications }),
           ...(data.accessories !== undefined && { accessories: data.accessories }),
           ...((data as any).customValues !== undefined && {
             customValues: (data as any).customValues,
@@ -342,7 +340,6 @@ export class EquipmentService {
         location: 'Ubicación',
         notes: 'Notas',
         accessories: 'Accesorios',
-        specifications: 'Especificaciones',
       }
 
       for (const key of Object.keys(data)) {

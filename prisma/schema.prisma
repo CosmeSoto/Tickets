@@ -853,7 +853,6 @@ model equipment_models {
   sku               String?  @unique @db.VarChar(100)
   typeId            String   @map("type_id")
   type              equipment_types @relation(fields: [typeId], references: [id])
-  specifications    Json?
   defaultAccessories String[] @default([])
   standardPrice     Float?   @map("standard_price")
   modelPhotoUrl     String?  @map("model_photo_url")
@@ -931,7 +930,6 @@ model equipment {
   purchaseDate          DateTime?               @map("purchase_date")
   purchasePrice         Float?                  @map("purchase_price")
   warrantyExpiration    DateTime?               @map("warranty_expiration")
-  specifications        Json?
   accessories           String[]
   location              String?
   physicalLocation      String?                 @map("physical_location")
