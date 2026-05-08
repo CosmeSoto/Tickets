@@ -15,6 +15,9 @@ declare module 'next-auth' {
       isOAuth?: boolean
       isSuperAdmin?: boolean
       canManageInventory?: boolean
+      inventoryEnabled?: boolean
+      ticketsEnabled?: boolean
+      canRequestAssets?: boolean
     }
   }
 
@@ -37,5 +40,11 @@ declare module 'next-auth/jwt' {
     phone?: string
     avatar?: string
     isOAuth?: boolean
+    canManageInventory?: boolean
+    isSuperAdmin?: boolean
+    inventoryEnabled?: boolean
+    ticketsEnabled?: boolean
+    canRequestAssets?: boolean
+    loginTime?: number
   }
 }

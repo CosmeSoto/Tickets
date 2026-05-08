@@ -20,7 +20,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Verificar que el usuario tenga acceso al inventario
-    if (!session.user.inventoryEnabled) {
+    // Por defecto true para compatibilidad con sesiones antiguas
+    const inventoryEnabled = session.user.inventoryEnabled ?? true
+    if (!inventoryEnabled) {
       return NextResponse.json(
         { error: 'No tienes acceso al módulo de inventario' },
         { status: 403 }
@@ -87,7 +89,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Verificar que el usuario tenga acceso al inventario
-    if (!session.user.inventoryEnabled) {
+    // Por defecto true para compatibilidad con sesiones antiguas
+    const inventoryEnabled = session.user.inventoryEnabled ?? true
+    if (!inventoryEnabled) {
       return NextResponse.json(
         { error: 'No tienes acceso al módulo de inventario' },
         { status: 403 }
@@ -95,7 +99,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Verificar que el usuario tenga permiso para crear solicitudes
-    if (!session.user.canRequestAssets) {
+    // Por defecto false para compatibilidad con sesiones antiguas
+    const canRequestAssets = session.user.canRequestAssets ?? false
+    if (!canRequestAssets) {
       return NextResponse.json(
         {
           error: 'CANNOT_REQUEST_ASSETS',
