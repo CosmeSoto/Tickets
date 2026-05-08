@@ -1,0 +1,329 @@
+/**
+ * Seed: Inventory Types (Tipos de Inventario)
+ *
+ * Crea los tipos de inventario para diferentes familias:
+ * - Tipos de Equipo: laptops, desktops, impresoras, cámaras, herramientas, etc.
+ * - Tipos de Licencia: Windows, Office 365, contratos, seguros, etc.
+ * - Tipos de Consumible: tóner, papel, repuestos, productos de limpieza, etc.
+ */
+
+import { PrismaClient } from '@prisma/client'
+import { randomUUID } from 'crypto'
+
+export async function seedEquipmentTypes(prisma: PrismaClient, familyMap: Map<string, string>) {
+  const fam = (code: string) => familyMap.get(code)!
+  const types = [
+    // TECHNOLOGY
+    { code: 'LAPTOP', name: 'Laptop', icon: 'Laptop', order: 1, familyId: fam('TECHNOLOGY') },
+    { code: 'DESKTOP', name: 'Desktop', icon: 'Monitor', order: 2, familyId: fam('TECHNOLOGY') },
+    { code: 'MONITOR', name: 'Monitor', icon: 'Monitor', order: 3, familyId: fam('TECHNOLOGY') },
+    { code: 'PRINTER', name: 'Impresora', icon: 'Printer', order: 4, familyId: fam('TECHNOLOGY') },
+    { code: 'PHONE', name: 'Teléfono', icon: 'Phone', order: 5, familyId: fam('TECHNOLOGY') },
+    { code: 'TABLET', name: 'Tablet', icon: 'Tablet', order: 6, familyId: fam('TECHNOLOGY') },
+    { code: 'KEYBOARD', name: 'Teclado', icon: 'Keyboard', order: 7, familyId: fam('TECHNOLOGY') },
+    { code: 'MOUSE', name: 'Mouse', icon: 'Mouse', order: 8, familyId: fam('TECHNOLOGY') },
+    {
+      code: 'HEADSET',
+      name: 'Audífonos',
+      icon: 'Headphones',
+      order: 9,
+      familyId: fam('TECHNOLOGY'),
+    },
+    { code: 'WEBCAM', name: 'Webcam', icon: 'Camera', order: 10, familyId: fam('TECHNOLOGY') },
+    {
+      code: 'DOCKING_STATION',
+      name: 'Docking Station',
+      icon: 'Cpu',
+      order: 11,
+      familyId: fam('TECHNOLOGY'),
+    },
+    { code: 'UPS', name: 'UPS', icon: 'Battery', order: 12, familyId: fam('TECHNOLOGY') },
+    { code: 'ROUTER', name: 'Router', icon: 'Router', order: 13, familyId: fam('TECHNOLOGY') },
+    { code: 'SWITCH', name: 'Switch de Red', icon: 'Wifi', order: 14, familyId: fam('TECHNOLOGY') },
+    { code: 'SERVER', name: 'Servidor', icon: 'Server', order: 15, familyId: fam('TECHNOLOGY') },
+    // FIXED_ASSETS
+    {
+      code: 'AC_UNIT',
+      name: 'Aire Acondicionado',
+      icon: 'Wind',
+      order: 20,
+      familyId: fam('FIXED_ASSETS'),
+    },
+    { code: 'GENERATOR', name: 'Generador', icon: 'Zap', order: 21, familyId: fam('FIXED_ASSETS') },
+    {
+      code: 'ELEVATOR',
+      name: 'Ascensor',
+      icon: 'Building2',
+      order: 22,
+      familyId: fam('FIXED_ASSETS'),
+    },
+    {
+      code: 'WATER_PUMP',
+      name: 'Bomba de Agua',
+      icon: 'Droplets',
+      order: 23,
+      familyId: fam('FIXED_ASSETS'),
+    },
+    {
+      code: 'COMPRESSOR',
+      name: 'Compresor',
+      icon: 'Gauge',
+      order: 24,
+      familyId: fam('FIXED_ASSETS'),
+    },
+    // SECURITY
+    { code: 'IP_CAMERA', name: 'Cámara IP', icon: 'Camera', order: 30, familyId: fam('SECURITY') },
+    { code: 'DVR_NVR', name: 'DVR/NVR', icon: 'HardDrive', order: 31, familyId: fam('SECURITY') },
+    {
+      code: 'ACCESS_CONTROL',
+      name: 'Control de Acceso',
+      icon: 'Fingerprint',
+      order: 32,
+      familyId: fam('SECURITY'),
+    },
+    {
+      code: 'ALARM_PANEL',
+      name: 'Panel de Alarma',
+      icon: 'AlertTriangle',
+      order: 33,
+      familyId: fam('SECURITY'),
+    },
+    // MAINTENANCE
+    {
+      code: 'POWER_TOOL',
+      name: 'Herramienta Eléctrica',
+      icon: 'Zap',
+      order: 40,
+      familyId: fam('MAINTENANCE'),
+    },
+    {
+      code: 'HAND_TOOL',
+      name: 'Herramienta Manual',
+      icon: 'Wrench',
+      order: 41,
+      familyId: fam('MAINTENANCE'),
+    },
+    {
+      code: 'MEASURING_TOOL',
+      name: 'Equipo de Medición',
+      icon: 'Ruler',
+      order: 42,
+      familyId: fam('MAINTENANCE'),
+    },
+    // SERVICES
+    {
+      code: 'CLEANING_MACHINE',
+      name: 'Equipo de Limpieza',
+      icon: 'Sparkles',
+      order: 50,
+      familyId: fam('SERVICES'),
+    },
+    {
+      code: 'COFFEE_MACHINE',
+      name: 'Máquina de Café',
+      icon: 'Coffee',
+      order: 51,
+      familyId: fam('SERVICES'),
+    },
+    // COMMERCIAL
+    {
+      code: 'POS_TERMINAL',
+      name: 'Terminal POS',
+      icon: 'CreditCard',
+      order: 60,
+      familyId: fam('COMMERCIAL'),
+    },
+    {
+      code: 'CASH_REGISTER',
+      name: 'Caja Registradora',
+      icon: 'DollarSign',
+      order: 61,
+      familyId: fam('COMMERCIAL'),
+    },
+    {
+      code: 'BARCODE_READER',
+      name: 'Lector de Código de Barras',
+      icon: 'Tag',
+      order: 62,
+      familyId: fam('COMMERCIAL'),
+    },
+    // General
+    { code: 'OTHER', name: 'Otro', icon: 'Box', order: 99, familyId: fam('TECHNOLOGY') },
+  ]
+
+  for (const t of types) {
+    await prisma.equipment_types.upsert({
+      where: { code: t.code },
+      update: { name: t.name, icon: t.icon, order: t.order, familyId: t.familyId },
+      create: { id: randomUUID(), ...t, isActive: true },
+    })
+  }
+  console.log(`  ✓ ${types.length} tipos de equipo`)
+}
+
+export async function seedLicenseTypes(prisma: PrismaClient, familyMap: Map<string, string>) {
+  const fam = (code: string) => familyMap.get(code)!
+  const types = [
+    { code: 'WINDOWS', name: 'Windows', icon: 'Monitor', order: 1, familyId: fam('TECHNOLOGY') },
+    {
+      code: 'OFFICE_365',
+      name: 'Office 365',
+      icon: 'FileText',
+      order: 2,
+      familyId: fam('TECHNOLOGY'),
+    },
+    { code: 'ANTIVIRUS', name: 'Antivirus', icon: 'Shield', order: 3, familyId: fam('TECHNOLOGY') },
+    { code: 'ADOBE', name: 'Adobe', icon: 'Paintbrush', order: 4, familyId: fam('TECHNOLOGY') },
+    { code: 'AUTOCAD', name: 'AutoCAD', icon: 'Ruler', order: 5, familyId: fam('TECHNOLOGY') },
+    {
+      code: 'GOOGLE_WORKSPACE',
+      name: 'Google Workspace',
+      icon: 'Cloud',
+      order: 6,
+      familyId: fam('TECHNOLOGY'),
+    },
+    { code: 'SAAS', name: 'SaaS (Otro)', icon: 'Globe', order: 7, familyId: fam('TECHNOLOGY') },
+    {
+      code: 'SUBSCRIPTION',
+      name: 'Suscripción',
+      icon: 'RefreshCw',
+      order: 8,
+      familyId: fam('TECHNOLOGY'),
+    },
+    {
+      code: 'PERPETUAL',
+      name: 'Licencia Perpetua',
+      icon: 'Key',
+      order: 9,
+      familyId: fam('TECHNOLOGY'),
+    },
+    {
+      code: 'MAINTENANCE_CONTRACT',
+      name: 'Contrato de Mantenimiento',
+      icon: 'Wrench',
+      order: 20,
+      familyId: fam('FIXED_ASSETS'),
+    },
+    {
+      code: 'SERVICE_CONTRACT',
+      name: 'Contrato de Servicio',
+      icon: 'ClipboardList',
+      order: 21,
+      familyId: fam('FIXED_ASSETS'),
+    },
+    {
+      code: 'ASSET_INSURANCE',
+      name: 'Seguro de Activos',
+      icon: 'ShieldCheck',
+      order: 22,
+      familyId: fam('FIXED_ASSETS'),
+    },
+    {
+      code: 'CLEANING_CONTRACT',
+      name: 'Contrato de Limpieza',
+      icon: 'Sparkles',
+      order: 30,
+      familyId: fam('SERVICES'),
+    },
+    {
+      code: 'SECURITY_CONTRACT',
+      name: 'Contrato de Seguridad',
+      icon: 'Shield',
+      order: 31,
+      familyId: fam('SECURITY'),
+    },
+    {
+      code: 'POS_LICENSE',
+      name: 'Licencia Software POS',
+      icon: 'CreditCard',
+      order: 40,
+      familyId: fam('COMMERCIAL'),
+    },
+    { code: 'OTHER', name: 'Otro', icon: 'Box', order: 99, familyId: fam('TECHNOLOGY') },
+  ]
+
+  for (const t of types) {
+    await prisma.license_types.upsert({
+      where: { code: t.code },
+      update: { name: t.name, icon: t.icon, order: t.order, familyId: t.familyId },
+      create: { id: randomUUID(), ...t, isActive: true },
+    })
+  }
+  console.log(`  ✓ ${types.length} tipos de licencia`)
+}
+
+export async function seedConsumableTypes(prisma: PrismaClient, familyMap: Map<string, string>) {
+  const fam = (code: string) => familyMap.get(code)!
+  const types = [
+    { code: 'TONER', name: 'Tóner', icon: 'Printer', order: 1, familyId: fam('TECHNOLOGY') },
+    { code: 'INK', name: 'Tinta', icon: 'Droplets', order: 2, familyId: fam('TECHNOLOGY') },
+    { code: 'PAPER', name: 'Papel', icon: 'FileText', order: 3, familyId: fam('TECHNOLOGY') },
+    { code: 'CABLE', name: 'Cable', icon: 'Cable', order: 4, familyId: fam('TECHNOLOGY') },
+    { code: 'BATTERY', name: 'Batería', icon: 'Battery', order: 5, familyId: fam('TECHNOLOGY') },
+    {
+      code: 'STORAGE',
+      name: 'Almacenamiento',
+      icon: 'HardDrive',
+      order: 6,
+      familyId: fam('TECHNOLOGY'),
+    },
+    {
+      code: 'SPARE_PART',
+      name: 'Repuesto Mecánico',
+      icon: 'Wrench',
+      order: 10,
+      familyId: fam('MAINTENANCE'),
+    },
+    {
+      code: 'LUBRICANT',
+      name: 'Lubricante',
+      icon: 'Droplets',
+      order: 11,
+      familyId: fam('MAINTENANCE'),
+    },
+    { code: 'FILTER', name: 'Filtro', icon: 'Settings', order: 12, familyId: fam('MAINTENANCE') },
+    { code: 'TOOL', name: 'Herramienta', icon: 'Wrench', order: 13, familyId: fam('MAINTENANCE') },
+    {
+      code: 'CLEANING',
+      name: 'Producto de Limpieza',
+      icon: 'Sparkles',
+      order: 20,
+      familyId: fam('SERVICES'),
+    },
+    { code: 'HYGIENE', name: 'Higiene', icon: 'Sparkles', order: 21, familyId: fam('SERVICES') },
+    {
+      code: 'SECURITY_BATTERY',
+      name: 'Batería de Respaldo',
+      icon: 'Battery',
+      order: 30,
+      familyId: fam('SECURITY'),
+    },
+    {
+      code: 'FERTILIZER',
+      name: 'Fertilizante',
+      icon: 'Leaf',
+      order: 40,
+      familyId: fam('GREEN_AREAS'),
+    },
+    { code: 'PESTICIDE', name: 'Pesticida', icon: 'Leaf', order: 41, familyId: fam('GREEN_AREAS') },
+    { code: 'SEED', name: 'Semilla', icon: 'Flower2', order: 42, familyId: fam('GREEN_AREAS') },
+    { code: 'OTHER', name: 'Otro', icon: 'Box', order: 99, familyId: fam('TECHNOLOGY') },
+  ]
+
+  for (const t of types) {
+    await prisma.consumable_types.upsert({
+      where: { code: t.code },
+      update: { name: t.name, icon: t.icon, order: t.order, familyId: t.familyId },
+      create: { id: randomUUID(), ...t, isActive: true },
+    })
+  }
+  console.log(`  ✓ ${types.length} tipos de consumible`)
+}
+
+export async function seedInventoryTypes(prisma: PrismaClient, familyMap: Map<string, string>) {
+  console.log('📦 Creando tipos de inventario...')
+  await seedEquipmentTypes(prisma, familyMap)
+  await seedLicenseTypes(prisma, familyMap)
+  await seedConsumableTypes(prisma, familyMap)
+  console.log('✅ Tipos de inventario creados')
+}
