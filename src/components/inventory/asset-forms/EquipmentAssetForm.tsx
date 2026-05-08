@@ -15,6 +15,7 @@ import { WarehouseInlineForm } from '@/components/inventory/asset-forms/Warehous
 import { FileInputWithCamera } from '@/components/common/file-input-with-camera'
 import { AssignableUserSelect } from '@/components/inventory/shared/AssignableUserSelect'
 import { MaintenanceStatusBlock } from '@/components/inventory/shared/MaintenanceStatusBlock'
+import { CustomFieldsInput } from '@/components/inventory/custom-fields/custom-fields-input'
 import {
   showDepartmentSelector,
   showWarehouseSelector,
@@ -359,9 +360,10 @@ export function EquipmentAssetForm({
   const [equipmentStatus, setEquipmentStatus] = useState('AVAILABLE')
   const [accessories, setAccessories] = useState<string[]>([])
   const [accessoryInput, setAccessoryInput] = useState('')
-  const [specKey, setSpecKey] = useState('')
-  const [specValue, setSpecValue] = useState('')
-  const [specifications, setSpecifications] = useState<Record<string, string>>({})
+  // Campos personalizados
+  const [customFieldValues, setCustomFieldValues] = useState<
+    Array<{ fieldName: string; fieldValue: string }>
+  >([])
   const [supplierId, setSupplierId] = useState('')
   const [linkedContractId, setLinkedContractId] = useState<string | null>(null)
   const [purchaseDate, setPurchaseDate] = useState('')
@@ -593,16 +595,6 @@ export function EquipmentAssetForm({
     }
   }
 
-  const addSpec = () => {
-    const k = specKey.trim()
-    const v = specValue.trim()
-    if (k && v) {
-      setSpecifications(p => ({ ...p, [k]: v }))
-      setSpecKey('')
-      setSpecValue('')
-    }
-  }
-
   const supplierLabel =
     acquisitionMode === 'RENTAL'
       ? 'Proveedor del Arrendamiento'
@@ -631,7 +623,7 @@ export function EquipmentAssetForm({
       condition,
       status: equipmentStatus,
       accessories: accessories.length ? accessories : undefined,
-      specifications: Object.keys(specifications).length ? specifications : undefined,
+      customValues: customFieldValues.length ? customFieldValues : undefined,
       supplierId: supplierId || undefined,
       contractId: linkedContractId || undefined,
       purchaseDate: purchaseDate || undefined,
@@ -956,56 +948,14 @@ export function EquipmentAssetForm({
         )}
       </div>
 
-      {/* Especificaciones */}
-      <div className='space-y-2'>
-        <Label>Características / Especificaciones</Label>
-        <div className='flex gap-2'>
-          <Input
-            value={specKey}
-            onChange={e => setSpecKey(e.target.value)}
-            placeholder='Ej: Procesador'
-            className='flex-1'
-          />
-          <Input
-            value={specValue}
-            onChange={e => setSpecValue(e.target.value)}
-            placeholder='Ej: Intel i5-1135G7'
-            className='flex-1'
-            onKeyDown={e => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                addSpec()
-              }
-            }}
-          />
-          <Button type='button' variant='outline' size='sm' onClick={addSpec}>
-            <Plus className='h-4 w-4' />
-          </Button>
-        </div>
-        {Object.keys(specifications).length > 0 && (
-          <div className='rounded-md border border-border divide-y divide-border text-sm'>
-            {Object.entries(specifications).map(([k, v]) => (
-              <div key={k} className='flex items-center justify-between px-3 py-1.5'>
-                <span>
-                  <span className='font-medium'>{k}:</span> {v}
-                </span>
-                <button
-                  type='button'
-                  onClick={() =>
-                    setSpecifications(p => {
-                      const n = { ...p }
-                      delete n[k]
-                      return n
-                    })
-                  }
-                >
-                  <X className='h-3 w-3 text-muted-foreground' />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Campos Personalizados */}
+      {familyId && (
+        <CustomFieldsSection
+          familyId={familyId}
+          values={customFieldValues}
+          onChange={setCustomFieldValues}
+        />
+      )}
 
       {/* ── 5. ADQUISICIÓN ────────────────────────────────────────── */}
       {/* Modalidad */}
@@ -1390,5 +1340,45 @@ export function EquipmentAssetForm({
         </Button>
       </div>
     </form>
+  )
+}
+
+// Wrapper para campos personalizados que solo muestra si hay campos configurados
+function CustomFieldsSection({
+  familyId,
+  values,
+  onChange,
+}: {
+  familyId: string
+  values: Array<{ fieldName: string; fieldValue: string }>
+  onChange: (values: Array<{ fieldName: string; fieldValue: string }>) => void
+}) {
+  const [hasFields, setHasFields] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    async function checkFields() {
+      try {
+        const response = await fetch(`/api/inventory/families/${familyId}/custom-fields`)
+        if (response.ok) {
+          const data = await response.json()
+          setHasFields(data.length > 0)
+        }
+      } catch (error) {
+        console.error('Error checking custom fields:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    checkFields()
+  }, [familyId])
+
+  if (isLoading || !hasFields) return null
+
+  return (
+    <div className='space-y-2'>
+      <Label>Atributos Personalizados</Label>
+      <CustomFieldsInput familyId={familyId} values={values} onChange={onChange} />
+    </div>
   )
 }
