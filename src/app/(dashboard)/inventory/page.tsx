@@ -7,7 +7,13 @@ import { useSearchParams } from 'next/navigation'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { UnifiedInventoryList } from '@/components/inventory/unified-inventory-list'
 import { Button } from '@/components/ui/button'
-import { Plus, Package, User, Upload } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Plus, Package, User, Upload, Layers } from 'lucide-react'
 import Link from 'next/link'
 import { EquipmentImportModal } from '@/components/inventory/equipment-import-modal'
 
@@ -76,12 +82,28 @@ function InventoryContent() {
                   Importar
                 </Button>
               )}
-              <Link href='/inventory/equipment/new'>
-                <Button size='sm'>
-                  <Plus className='mr-2 h-4 w-4' />
-                  Nuevo Activo
-                </Button>
-              </Link>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size='sm'>
+                    <Plus className='mr-2 h-4 w-4' />
+                    Nuevo Activo
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align='end'>
+                  <DropdownMenuItem asChild>
+                    <Link href='/inventory/equipment/new' className='cursor-pointer'>
+                      <Package className='mr-2 h-4 w-4' />
+                      Activo Individual
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href='/inventory/equipment/bulk/new' className='cursor-pointer'>
+                      <Layers className='mr-2 h-4 w-4' />
+                      Lote de Activos
+                    </Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           ) : undefined
         }
