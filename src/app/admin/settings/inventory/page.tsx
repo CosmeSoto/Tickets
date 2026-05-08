@@ -52,6 +52,14 @@ function InventorySettingsContent() {
       subtitle='Configura el comportamiento del módulo de inventario por área'
       headerActions={
         <div className='flex items-center gap-2'>
+          <Button
+            variant='outline'
+            size='sm'
+            onClick={() => (window.location.href = '/admin/settings/inventory/custom-fields')}
+          >
+            <Layers className='h-4 w-4 sm:mr-2' />
+            <span className='hidden sm:inline'>Campos Personalizados</span>
+          </Button>
           <Button variant='outline' size='sm' onClick={loadFamilies} disabled={loadingFamilies}>
             <RefreshCw className={`h-4 w-4 ${loadingFamilies ? 'animate-spin' : ''} sm:mr-2`} />
             <span className='hidden sm:inline'>Recargar</span>
