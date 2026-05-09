@@ -2,7 +2,6 @@
 
 import { useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
 import {
   Plus,
   Search,
@@ -47,7 +46,6 @@ import { useFetch } from '@/hooks/common/use-fetch'
 import { useToast } from '@/hooks/use-toast'
 import { ContractForm } from '@/components/contracts/contract-form'
 import { useTableSort } from '@/hooks/common/use-table-sort'
-import { SortableTableHead } from '@/components/ui/sortable-table-head'
 import {
   CONTRACT_STATUS_LABELS,
   CONTRACT_CATEGORY_LABELS,

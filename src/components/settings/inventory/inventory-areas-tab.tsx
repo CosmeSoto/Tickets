@@ -23,6 +23,12 @@ import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -234,12 +240,25 @@ export function InventoryAreasTab({
                 </Badge>
                 {form.inventoryEnabled && (
                   <div className='flex items-center gap-2 pl-2 border-l'>
-                    <Label
-                      htmlFor='asset-requests-enabled'
-                      className='text-xs cursor-pointer whitespace-nowrap text-muted-foreground'
-                    >
-                      Solicitudes
-                    </Label>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Label
+                            htmlFor='asset-requests-enabled'
+                            className='text-xs cursor-pointer whitespace-nowrap text-muted-foreground flex items-center gap-1'
+                          >
+                            Solicitudes
+                            <Info className='h-3 w-3' />
+                          </Label>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className='max-w-xs'>
+                            Permite a los usuarios solicitar activos de inventario. Los
+                            administradores pueden aprobar o rechazar las solicitudes.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                     <Switch
                       id='asset-requests-enabled'
                       checked={form.assetRequestsEnabled}

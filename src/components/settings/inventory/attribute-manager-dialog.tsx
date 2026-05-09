@@ -6,7 +6,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Plus, Edit, Trash2, MoveUp, MoveDown, Download } from 'lucide-react'
+import { Plus, Edit, Trash2, MoveUp, MoveDown, Download, Eye, EyeOff } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import {
   Table,
   TableBody,
@@ -79,7 +85,6 @@ export function AttributeManagerDialog({
   typeKind,
   typeId,
   typeName,
-  familyColor,
 }: AttributeManagerDialogProps) {
   const {
     attributes,
@@ -183,6 +188,12 @@ export function AttributeManagerDialog({
     await reorderAttributes(reordered.map(a => a.id))
   }
 
+  const handleToggleVisible = async (attribute: Attribute) => {
+    await updateAttribute(attribute.id, {
+      isVisible: !attribute.isVisible,
+    })
+  }
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -257,7 +268,8 @@ export function AttributeManagerDialog({
                           <TableHead className='py-2'>Atributo</TableHead>
                           <TableHead className='w-24 py-2'>Tipo</TableHead>
                           <TableHead className='w-16 py-2 text-center'>Req.</TableHead>
-                          <TableHead className='w-20 py-2 text-right'>Acciones</TableHead>
+                          <TableHead className='w-16 py-2 text-center'>Vis.</TableHead>
+                          <TableHead className='w-24 py-2 text-right'>Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -331,28 +343,72 @@ export function AttributeManagerDialog({
                                 </Badge>
                               )}
                             </TableCell>
+                            <TableCell className='py-2 text-center'>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant='ghost'
+                                      size='sm'
+                                      className='h-7 w-7 p-0'
+                                      onClick={() => handleToggleVisible(attr)}
+                                      disabled={saving}
+                                    >
+                                      {attr.isVisible ? (
+                                        <Eye className='h-3.5 w-3.5 text-green-600' />
+                                      ) : (
+                                        <EyeOff className='h-3.5 w-3.5 text-gray-400' />
+                                      )}
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>
+                                      {attr.isVisible
+                                        ? 'Visible en formularios'
+                                        : 'Oculto en formularios'}
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </TableCell>
                             <TableCell className='py-2 text-right'>
                               <div className='flex justify-end gap-0.5'>
-                                <Button
-                                  variant='ghost'
-                                  size='sm'
-                                  className='h-7 w-7 p-0'
-                                  onClick={() => handleEdit(attr)}
-                                  disabled={saving}
-                                  title='Editar'
-                                >
-                                  <Edit className='h-3.5 w-3.5' />
-                                </Button>
-                                <Button
-                                  variant='ghost'
-                                  size='sm'
-                                  className='h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10'
-                                  onClick={() => handleDeleteClick(attr)}
-                                  disabled={saving}
-                                  title='Eliminar'
-                                >
-                                  <Trash2 className='h-3.5 w-3.5' />
-                                </Button>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant='ghost'
+                                        size='sm'
+                                        className='h-7 w-7 p-0'
+                                        onClick={() => handleEdit(attr)}
+                                        disabled={saving}
+                                      >
+                                        <Edit className='h-3.5 w-3.5' />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Editar atributo</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant='ghost'
+                                        size='sm'
+                                        className='h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10'
+                                        onClick={() => handleDeleteClick(attr)}
+                                        disabled={saving}
+                                      >
+                                        <Trash2 className='h-3.5 w-3.5' />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Eliminar atributo</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
                               </div>
                             </TableCell>
                           </TableRow>
@@ -412,8 +468,14 @@ export function AttributeManagerDialog({
                             Opcional
                           </Badge>
                         )}
-                        {!attr.isVisible && (
+                        {attr.isVisible ? (
+                          <Badge variant='default' className='text-xs px-2 py-0.5 bg-green-600'>
+                            <Eye className='h-3 w-3 mr-1' />
+                            Visible
+                          </Badge>
+                        ) : (
                           <Badge variant='secondary' className='text-xs px-2 py-0.5'>
+                            <EyeOff className='h-3 w-3 mr-1' />
                             Oculto
                           </Badge>
                         )}
@@ -433,6 +495,25 @@ export function AttributeManagerDialog({
                         )}
 
                       <div className='flex gap-2 pt-2 border-t'>
+                        <Button
+                          variant='outline'
+                          size='sm'
+                          className='flex-1'
+                          onClick={() => handleToggleVisible(attr)}
+                          disabled={saving}
+                        >
+                          {attr.isVisible ? (
+                            <>
+                              <EyeOff className='h-4 w-4 mr-2' />
+                              Ocultar
+                            </>
+                          ) : (
+                            <>
+                              <Eye className='h-4 w-4 mr-2' />
+                              Mostrar
+                            </>
+                          )}
+                        </Button>
                         <Button
                           variant='outline'
                           size='sm'
