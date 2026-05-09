@@ -66,6 +66,8 @@ interface AttributeManagerDialogProps {
   typeId: string
   typeName: string
   familyColor?: string | null
+  /** Callback cuando cambia el número de atributos */
+  onAttributesChange?: () => void
 }
 
 const ATTRIBUTE_TYPE_LABELS: Record<string, string> = {
@@ -84,6 +86,7 @@ export function AttributeManagerDialog({
   typeKind,
   typeId,
   typeName,
+  onAttributesChange,
 }: AttributeManagerDialogProps) {
   const {
     attributes,
@@ -170,6 +173,8 @@ export function AttributeManagerDialog({
     if (success) {
       setDeleteDialogOpen(false)
       setAttributeToDelete(null)
+      // Notificar al padre que cambió el número de atributos
+      onAttributesChange?.()
     }
   }
 
@@ -180,6 +185,10 @@ export function AttributeManagerDialog({
       success = await updateAttribute(editingAttribute.id, data)
     } else {
       success = await createAttribute(data)
+      // Notificar al padre solo cuando se crea (no cuando se edita)
+      if (success) {
+        onAttributesChange?.()
+      }
     }
 
     if (success) {

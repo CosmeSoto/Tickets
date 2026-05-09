@@ -190,9 +190,7 @@ export function CatalogsTab({ familyId, familyColor }: CatalogsTabProps) {
             <FileKey className='h-5 w-5' />
             Licencias
           </CardTitle>
-          <CardDescription>
-            Tipos de licencias y contratos de software
-          </CardDescription>
+          <CardDescription>Tipos de licencias y contratos de software</CardDescription>
         </CardHeader>
         <CardContent>
           <TypeSection
@@ -219,9 +217,7 @@ export function CatalogsTab({ familyId, familyColor }: CatalogsTabProps) {
             <Box className='h-5 w-5' />
             Consumibles
           </CardTitle>
-          <CardDescription>
-            Tipos de materiales y consumibles (tóner, cables, etc.)
-          </CardDescription>
+          <CardDescription>Tipos de materiales y consumibles (tóner, cables, etc.)</CardDescription>
         </CardHeader>
         <CardContent>
           <TypeSection
@@ -248,6 +244,16 @@ export function CatalogsTab({ familyId, familyColor }: CatalogsTabProps) {
           typeId={selectedType.type.id}
           typeName={selectedType.type.name}
           familyColor={familyColor}
+          onAttributesChange={() => {
+            // Recargar los tipos para actualizar el contador de atributos
+            if (selectedType.kind === 'equipment') {
+              equipmentTypes.loadTypes()
+            } else if (selectedType.kind === 'license') {
+              licenseTypes.loadTypes()
+            } else {
+              consumableTypes.loadTypes()
+            }
+          }}
         />
       )}
 
