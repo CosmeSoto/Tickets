@@ -14,6 +14,9 @@ import {
   Clock,
   Pencil,
   Trash2,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Button } from '@/components/ui/button'
@@ -43,7 +46,8 @@ import { useFamilyOptions } from '@/hooks/use-family-options'
 import { useFetch } from '@/hooks/common/use-fetch'
 import { useToast } from '@/hooks/use-toast'
 import { ContractForm } from '@/components/contracts/contract-form'
-import { useTableSort, SortIcon, sortableHeaderClass } from '@/hooks/common/use-table-sort'
+import { useTableSort } from '@/hooks/common/use-table-sort'
+import { SortableTableHead } from '@/components/ui/sortable-table-head'
 import {
   CONTRACT_STATUS_LABELS,
   CONTRACT_CATEGORY_LABELS,
@@ -194,7 +198,15 @@ export default function ContractsPage() {
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
   const canManage = isAdmin || (session?.user as any)?.canManageInventory
 
-  const { sorted: sortedContracts, sortKey, sortDir, toggleSort } = useTableSort(contracts, 'name')
+  const { sortedData: sortedContracts, requestSort, getSortIcon } = useTableSort(contracts, { key: 'name', direction: 'asc' })
+
+  // Helper para renderizar iconos de ordenamiento
+  const renderSortIcon = (key: string) => {
+    const sortState = getSortIcon(key)
+    if (sortState === 'asc') return <ArrowUp className='inline h-3.5 w-3.5 ml-1' />
+    if (sortState === 'desc') return <ArrowDown className='inline h-3.5 w-3.5 ml-1' />
+    return <ArrowUpDown className='inline h-3.5 w-3.5 ml-1 opacity-40' />
+  }
 
   const handleDelete = async () => {
     if (!deletingContract) return
@@ -344,43 +356,43 @@ export default function ContractsPage() {
                 <thead className='bg-muted/50 border-b'>
                   <tr>
                     <th
-                      className={`text-left px-4 py-3 font-medium text-muted-foreground ${sortableHeaderClass}`}
-                      onClick={() => toggleSort('name')}
+                      className='text-left px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors select-none'
+                      onClick={() => requestSort('name')}
                     >
-                      Contrato {SortIcon('name', sortKey, sortDir)}
+                      Contrato {renderSortIcon('name')}
                     </th>
                     <th
-                      className={`text-left px-4 py-3 font-medium text-muted-foreground ${sortableHeaderClass}`}
-                      onClick={() => toggleSort('category')}
+                      className='text-left px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors select-none'
+                      onClick={() => requestSort('category')}
                     >
-                      Categoría {SortIcon('category', sortKey, sortDir)}
+                      Categoría {renderSortIcon('category')}
                     </th>
                     <th className='text-left px-4 py-3 font-medium text-muted-foreground'>
                       Proveedor
                     </th>
                     <th
-                      className={`text-left px-4 py-3 font-medium text-muted-foreground ${sortableHeaderClass}`}
-                      onClick={() => toggleSort('family.name' as any)}
+                      className='text-left px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors select-none'
+                      onClick={() => requestSort('family.name')}
                     >
-                      Área {SortIcon('family.name', sortKey, sortDir)}
+                      Área {renderSortIcon('family.name')}
                     </th>
                     <th
-                      className={`text-left px-4 py-3 font-medium text-muted-foreground ${sortableHeaderClass}`}
-                      onClick={() => toggleSort('endDate')}
+                      className='text-left px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors select-none'
+                      onClick={() => requestSort('endDate')}
                     >
-                      Vencimiento {SortIcon('endDate', sortKey, sortDir)}
+                      Vencimiento {renderSortIcon('endDate')}
                     </th>
                     <th
-                      className={`text-right px-4 py-3 font-medium text-muted-foreground ${sortableHeaderClass}`}
-                      onClick={() => toggleSort('monthlyCost')}
+                      className='text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors select-none'
+                      onClick={() => requestSort('monthlyCost')}
                     >
-                      Costo/mes {SortIcon('monthlyCost', sortKey, sortDir)}
+                      Costo/mes {renderSortIcon('monthlyCost')}
                     </th>
                     <th
-                      className={`text-left px-4 py-3 font-medium text-muted-foreground ${sortableHeaderClass}`}
-                      onClick={() => toggleSort('status')}
+                      className='text-left px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors select-none'
+                      onClick={() => requestSort('status')}
                     >
-                      Estado {SortIcon('status', sortKey, sortDir)}
+                      Estado {renderSortIcon('status')}
                     </th>
                     {canManage && <th className='px-4 py-3' />}
                   </tr>

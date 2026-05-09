@@ -4,6 +4,8 @@ import { randomUUID } from 'crypto'
 import { seedCustomFields } from './seeds/custom-fields.seed'
 import { seedInventoryTypes } from './seeds/inventory-types.seed'
 import { seedCategories, seedCategoriesOtherFamilies } from './seeds/categories.seed'
+import { seedAttributes } from './seeds/attributes.seed'
+import { seedWarehouses } from './seeds/warehouses.seed'
 
 const prisma = new PrismaClient()
 const now = new Date()
@@ -57,6 +59,12 @@ async function main() {
 
   // 13d. MIGRAR suppliers existentes: type enum → typeId
   await migrateSupplierTypes()
+
+  // 13e. ATRIBUTOS DE TIPOS (equipment, license, consumable)
+  await seedAttributes(prisma, familyMap)
+
+  // 13f. BODEGAS POR FAMILIA
+  await seedWarehouses(prisma, familyMap)
 
   // 14. CONFIGURACIONES DE INVENTARIO (system_settings)
   await seedInventorySettings()

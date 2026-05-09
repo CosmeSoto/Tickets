@@ -15,7 +15,8 @@ import {
 } from '@/components/ui/table'
 import { EquipmentCondition } from '@prisma/client'
 import type { Equipment } from '@/types/inventory/equipment'
-import { useTableSort, SortIcon, sortableHeaderClass } from '@/hooks/common/use-table-sort'
+import { useTableSort } from '@/hooks/common/use-table-sort'
+import { SortableTableHead } from '@/components/ui/sortable-table-head'
 
 import { Checkbox } from '@/components/ui/checkbox'
 
@@ -70,7 +71,7 @@ export function EquipmentTable({
   const isAdmin = userRole === 'ADMIN'
   const canDelete = isAdmin || canManageInventory
 
-  const { sorted, sortKey, sortDir, toggleSort } = useTableSort(equipment, 'code')
+  const { sortedData: sorted, requestSort, getSortIcon } = useTableSort(equipment, { key: 'code', direction: 'asc' })
 
   if (equipment.length === 0) {
     return (
@@ -97,23 +98,20 @@ export function EquipmentTable({
                 />
               </TableHead>
             )}
-            <TableHead className={sortableHeaderClass} onClick={() => toggleSort('code')}>
-              Código {SortIcon('code', sortKey, sortDir)}
-            </TableHead>
-            <TableHead className={sortableHeaderClass} onClick={() => toggleSort('brand')}>
-              Equipo {SortIcon('brand', sortKey, sortDir)}
-            </TableHead>
+            <SortableTableHead sortKey='code' currentSort={getSortIcon('code')} onSort={requestSort}>
+              Código
+            </SortableTableHead>
+            <SortableTableHead sortKey='brand' currentSort={getSortIcon('brand')} onSort={requestSort}>
+              Equipo
+            </SortableTableHead>
             <TableHead className='hidden md:table-cell'>Tipo</TableHead>
             <TableHead className='hidden lg:table-cell'>Departamento</TableHead>
-            <TableHead className={sortableHeaderClass} onClick={() => toggleSort('status')}>
-              Estado {SortIcon('status', sortKey, sortDir)}
-            </TableHead>
-            <TableHead
-              className={`hidden md:table-cell ${sortableHeaderClass}`}
-              onClick={() => toggleSort('condition')}
-            >
-              Condición {SortIcon('condition', sortKey, sortDir)}
-            </TableHead>
+            <SortableTableHead sortKey='status' currentSort={getSortIcon('status')} onSort={requestSort}>
+              Estado
+            </SortableTableHead>
+            <SortableTableHead sortKey='condition' currentSort={getSortIcon('condition')} onSort={requestSort} className='hidden md:table-cell'>
+              Condición
+            </SortableTableHead>
             <TableHead className='hidden lg:table-cell'>Ubicación</TableHead>
             <TableHead className='text-right'>Acciones</TableHead>
           </TableRow>

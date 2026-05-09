@@ -10,8 +10,9 @@ import { SubtypeBadge } from '@/components/inventory/subtype-badge'
 import { ExportButton } from '@/components/common/export-button'
 import { getAssetStatusColor, getAssetStatusLabel } from '@/lib/utils/inventory-utils'
 import { useExport } from '@/hooks/common/use-export'
-import { useTableSort, SortIcon, sortableHeaderClass } from '@/hooks/common/use-table-sort'
-import { Search } from 'lucide-react'
+import { useTableSort } from '@/hooks/common/use-table-sort'
+import { SortableTableHead } from '@/components/ui/sortable-table-head'
+import { Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import type { AssetSubtype } from '@/lib/inventory/family-config'
 import { useFamilyOptions } from '@/hooks/use-family-options'
 import { MetricsSection } from '@/components/inventory/dashboard/metrics-section'
@@ -111,11 +112,18 @@ export function UnifiedInventoryList({
     [assets]
   )
   const {
-    sorted: sortedAssets,
-    sortKey,
-    sortDir,
-    toggleSort,
-  } = useTableSort(assetsWithFamilyName, 'createdAt', 'desc')
+    sortedData: sortedAssets,
+    requestSort,
+    getSortIcon,
+  } = useTableSort(assetsWithFamilyName, { key: 'createdAt', direction: 'desc' })
+
+  // Helper para renderizar iconos de ordenamiento
+  const renderSortIcon = (key: string) => {
+    const sortState = getSortIcon(key)
+    if (sortState === 'asc') return <ArrowUp className='inline h-3.5 w-3.5 ml-1' />
+    if (sortState === 'desc') return <ArrowDown className='inline h-3.5 w-3.5 ml-1' />
+    return <ArrowUpDown className='inline h-3.5 w-3.5 ml-1 opacity-40' />
+  }
 
   // Debounce búsqueda
   useEffect(() => {
@@ -277,40 +285,40 @@ export function UnifiedInventoryList({
           <thead className='bg-muted/50'>
             <tr>
               <th
-                className={`px-4 py-3 text-left font-medium text-muted-foreground ${sortableHeaderClass}`}
-                onClick={() => toggleSort('subtype')}
+                className='px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors select-none'
+                onClick={() => requestSort('subtype')}
               >
-                Tipo {SortIcon('subtype', sortKey, sortDir)}
+                Tipo {renderSortIcon('subtype')}
               </th>
               <th
-                className={`px-4 py-3 text-left font-medium text-muted-foreground hidden sm:table-cell ${sortableHeaderClass}`}
-                onClick={() => toggleSort('familyName' as any)}
+                className='px-4 py-3 text-left font-medium text-muted-foreground hidden sm:table-cell cursor-pointer hover:bg-muted/50 transition-colors select-none'
+                onClick={() => requestSort('familyName')}
               >
-                Área {SortIcon('familyName', sortKey, sortDir)}
+                Área {renderSortIcon('familyName')}
               </th>
               <th
-                className={`px-4 py-3 text-left font-medium text-muted-foreground ${sortableHeaderClass}`}
-                onClick={() => toggleSort('name')}
+                className='px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors select-none'
+                onClick={() => requestSort('name')}
               >
-                Nombre {SortIcon('name', sortKey, sortDir)}
+                Nombre {renderSortIcon('name')}
               </th>
               <th
-                className={`px-4 py-3 text-left font-medium text-muted-foreground hidden md:table-cell ${sortableHeaderClass}`}
-                onClick={() => toggleSort('code' as any)}
+                className='px-4 py-3 text-left font-medium text-muted-foreground hidden md:table-cell cursor-pointer hover:bg-muted/50 transition-colors select-none'
+                onClick={() => requestSort('code')}
               >
-                Código {SortIcon('code', sortKey, sortDir)}
+                Código {renderSortIcon('code')}
               </th>
               <th
-                className={`px-4 py-3 text-left font-medium text-muted-foreground hidden lg:table-cell ${sortableHeaderClass}`}
-                onClick={() => toggleSort('status')}
+                className='px-4 py-3 text-left font-medium text-muted-foreground hidden lg:table-cell cursor-pointer hover:bg-muted/50 transition-colors select-none'
+                onClick={() => requestSort('status')}
               >
-                Estado {SortIcon('status', sortKey, sortDir)}
+                Estado {renderSortIcon('status')}
               </th>
               <th
-                className={`px-4 py-3 text-left font-medium text-muted-foreground hidden lg:table-cell ${sortableHeaderClass}`}
-                onClick={() => toggleSort('createdAt')}
+                className='px-4 py-3 text-left font-medium text-muted-foreground hidden lg:table-cell cursor-pointer hover:bg-muted/50 transition-colors select-none'
+                onClick={() => requestSort('createdAt')}
               >
-                Creado {SortIcon('createdAt', sortKey, sortDir)}
+                Creado {renderSortIcon('createdAt')}
               </th>
             </tr>
           </thead>

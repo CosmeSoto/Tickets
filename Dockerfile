@@ -62,6 +62,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modul
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma  ./node_modules/prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 
+# Scripts de migración de datos
+COPY --chown=nextjs:nodejs docker/migrate-data.sh ./docker/migrate-data.sh
+RUN chmod +x ./docker/migrate-data.sh
+
 # Herramientas para seed (tsx + bcryptjs)
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/tsx        ./node_modules/tsx
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/bcryptjs   ./node_modules/bcryptjs

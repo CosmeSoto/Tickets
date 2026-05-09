@@ -32,6 +32,7 @@ export async function GET() {
         type: {
           include: {
             family: true,
+            attributes: true, // Nuevos atributos por tipo
           },
         },
         customValues: true,
@@ -41,21 +42,21 @@ export async function GET() {
       },
     })
 
-    // Obtener todos los custom fields de las familias involucradas
+    // Obtener todos los custom fields legacy de las familias involucradas (fallback)
     const familyIds = [...new Set(equipment.map(eq => eq.type.familyId).filter(Boolean))]
-    const customFields = await prisma.family_custom_fields.findMany({
+    const legacyCustomFields = await prisma.family_custom_fields.findMany({
       where: {
         familyId: { in: familyIds as string[] },
       },
     })
 
-    // Crear un mapa de fieldName -> field info por familia
-    const fieldsByFamily = new Map<string, Map<string, (typeof customFields)[0]>>()
-    customFields.forEach(field => {
-      if (!fieldsByFamily.has(field.familyId)) {
-        fieldsByFamily.set(field.familyId, new Map())
+    // Crear un mapa de fieldName -> field info por familia (legacy)
+    const legacyFieldsByFamily = new Map<string, Map<string, (typeof legacyCustomFields)[0]>>()
+    legacyCustomFields.forEach(field => {
+      if (!legacyFieldsByFamily.has(field.familyId)) {
+        legacyFieldsByFamily.set(field.familyId, new Map())
       }
-      fieldsByFamily.get(field.familyId)!.set(field.fieldName, field)
+      legacyFieldsByFamily.get(field.familyId)!.set(field.fieldName, field)
     })
 
     // Transformar a formato PublicEquipmentItem
@@ -63,19 +64,39 @@ export async function GET() {
       // Transformar customValues a un objeto key-value con labels
       const customAttributes: Record<string, { value: string; label: string; type: string }> = {}
 
-      if (eq.customValues && eq.customValues.length > 0 && eq.type.familyId) {
-        const familyFields = fieldsByFamily.get(eq.type.familyId)
+      if (eq.customValues && eq.customValues.length > 0) {
+        // PRIORIDAD 1: Usar atributos del nuevo sistema (por tipo)
+        if (eq.type.attributes && eq.type.attributes.length > 0) {
+          const typeAttributesMap = new Map(
+            eq.type.attributes.map((attr: any) => [attr.attributeName, attr])
+          )
 
-        eq.customValues.forEach(cv => {
-          const fieldInfo = familyFields?.get(cv.fieldName)
-          if (fieldInfo) {
-            customAttributes[cv.fieldName] = {
-              value: cv.fieldValue,
-              label: fieldInfo.fieldLabel,
-              type: fieldInfo.fieldType,
+          eq.customValues.forEach(cv => {
+            const attrInfo = typeAttributesMap.get(cv.fieldName)
+            if (attrInfo && attrInfo.isVisible) {
+              customAttributes[cv.fieldName] = {
+                value: cv.fieldValue,
+                label: attrInfo.attributeLabel,
+                type: attrInfo.attributeType,
+              }
             }
-          }
-        })
+          })
+        } 
+        // FALLBACK: Usar custom fields legacy por familia
+        else if (eq.type.familyId) {
+          const familyFields = legacyFieldsByFamily.get(eq.type.familyId)
+
+          eq.customValues.forEach(cv => {
+            const fieldInfo = familyFields?.get(cv.fieldName)
+            if (fieldInfo) {
+              customAttributes[cv.fieldName] = {
+                value: cv.fieldValue,
+                label: fieldInfo.fieldLabel,
+                type: fieldInfo.fieldType,
+              }
+            }
+          })
+        }
       }
 
       return {
@@ -101,7 +122,7 @@ export async function GET() {
         saleListingPrice: eq.saleListingPrice,
         photoUrl: eq.photoUrl,
         specifications: eq.specifications as Record<string, any> | null,
-        customAttributes, // Agregar atributos personalizados
+        customAttributes, // Atributos personalizados (nuevo sistema + legacy)
         createdAt: eq.createdAt,
       }
     })

@@ -95,7 +95,6 @@ const navigationByRole: Record<string, NavItem[]> = {
         { name: 'Actas', href: '/inventory/acts', icon: FileText },
         { name: 'Proveedores', href: '/inventory/suppliers', icon: Building2 },
         { name: 'Reportes', href: '/inventory/reports', icon: BarChart3 },
-        { name: 'Catálogos', href: '/inventory/catalogs', icon: Database },
         { name: 'Configuración', href: '/admin/settings/inventory', icon: Settings },
       ],
     },

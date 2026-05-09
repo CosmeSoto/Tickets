@@ -106,6 +106,7 @@ function InventorySettingsContent() {
           <InventoryGlobalTab
             globalRules={globalRules}
             savingGlobal={savingGlobal}
+            families={families}
             onSetGlobal={setGlobal}
             onSave={handleSaveGlobal}
           />

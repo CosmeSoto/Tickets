@@ -33,7 +33,8 @@ import {
 } from '@/components/ui/table'
 import { useToast } from '@/hooks/use-toast'
 import { useSession } from 'next-auth/react'
-import { useTableSort, SortIcon, sortableHeaderClass } from '@/hooks/common/use-table-sort'
+import { useTableSort } from '@/hooks/common/use-table-sort'
+import { SortableTableHead } from '@/components/ui/sortable-table-head'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { SupplierForm } from '@/components/inventory/suppliers/SupplierForm'
 import { ExportButton } from '@/components/common/export-button'
@@ -161,7 +162,10 @@ export default function SuppliersPage() {
 
   const total = suppliers.length
 
-  const { sorted: sortedSuppliers, sortKey, sortDir, toggleSort } = useTableSort(suppliers, 'name')
+  const { sortedData: sortedSuppliers, requestSort, getSortIcon } = useTableSort(suppliers, {
+    key: 'name',
+    direction: 'asc',
+  })
 
   return (
     <ModuleLayout
@@ -229,37 +233,53 @@ export default function SuppliersPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className={sortableHeaderClass} onClick={() => toggleSort('name')}>
-                  Nombre {SortIcon('name', sortKey, sortDir)}
-                </TableHead>
-                <TableHead
-                  className={`hidden md:table-cell ${sortableHeaderClass}`}
-                  onClick={() => toggleSort('type')}
+                <SortableTableHead
+                  sortKey='name'
+                  currentSort={getSortIcon('name')}
+                  onSort={requestSort}
                 >
-                  Tipo {SortIcon('type', sortKey, sortDir)}
-                </TableHead>
-                <TableHead
-                  className={`hidden md:table-cell ${sortableHeaderClass}`}
-                  onClick={() => toggleSort('family.name' as any)}
+                  Nombre
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey='type'
+                  currentSort={getSortIcon('type')}
+                  onSort={requestSort}
+                  className='hidden md:table-cell'
                 >
-                  Área {SortIcon('family.name', sortKey, sortDir)}
-                </TableHead>
-                <TableHead
-                  className={`hidden lg:table-cell ${sortableHeaderClass}`}
-                  onClick={() => toggleSort('taxId' as any)}
+                  Tipo
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey='family.name'
+                  currentSort={getSortIcon('family.name')}
+                  onSort={requestSort}
+                  className='hidden md:table-cell'
                 >
-                  RUC / NIT {SortIcon('taxId', sortKey, sortDir)}
-                </TableHead>
-                <TableHead
-                  className={`hidden lg:table-cell ${sortableHeaderClass}`}
-                  onClick={() => toggleSort('email' as any)}
+                  Área
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey='taxId'
+                  currentSort={getSortIcon('taxId')}
+                  onSort={requestSort}
+                  className='hidden lg:table-cell'
                 >
-                  Email {SortIcon('email', sortKey, sortDir)}
-                </TableHead>
+                  RUC / NIT
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey='email'
+                  currentSort={getSortIcon('email')}
+                  onSort={requestSort}
+                  className='hidden lg:table-cell'
+                >
+                  Email
+                </SortableTableHead>
                 <TableHead className='hidden xl:table-cell'>Teléfono</TableHead>
-                <TableHead className={sortableHeaderClass} onClick={() => toggleSort('isActive')}>
-                  Estado {SortIcon('isActive', sortKey, sortDir)}
-                </TableHead>
+                <SortableTableHead
+                  sortKey='isActive'
+                  currentSort={getSortIcon('isActive')}
+                  onSort={requestSort}
+                >
+                  Estado
+                </SortableTableHead>
                 <TableHead className='text-right'>Acciones</TableHead>
               </TableRow>
             </TableHeader>

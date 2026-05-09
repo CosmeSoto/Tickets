@@ -41,7 +41,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { useTableSort, SortIcon, sortableHeaderClass } from '@/hooks/common/use-table-sort'
+import { useTableSort } from '@/hooks/common/use-table-sort'
+import { SortableTableHead } from '@/components/ui/sortable-table-head'
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -77,14 +78,12 @@ export default function AdminDashboard() {
   }
 
   const {
-    sorted: sortedFamilyMetrics,
-    sortKey: familySortKey,
-    sortDir: familySortDir,
-    toggleSort: toggleFamilySort,
+    sortedData: sortedFamilyMetrics,
+    requestSort: requestFamilySort,
+    getSortIcon: getFamilySortIcon,
   } = useTableSort<FamilyMetric>(
     (stats?.familyMetrics ?? []) as FamilyMetric[],
-    'openTickets',
-    'desc'
+    { key: 'openTickets', direction: 'desc' }
   )
 
   const {
@@ -180,31 +179,38 @@ export default function AdminDashboard() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead
-                      className={sortableHeaderClass}
-                      onClick={() => toggleFamilySort('familyName')}
+                    <SortableTableHead
+                      sortKey='familyName'
+                      currentSort={getFamilySortIcon('familyName')}
+                      onSort={requestFamilySort}
                     >
-                      Familia {SortIcon('familyName', familySortKey, familySortDir)}
-                    </TableHead>
+                      Familia
+                    </SortableTableHead>
                     <TableHead>Módulos</TableHead>
-                    <TableHead
-                      className={`text-center ${sortableHeaderClass}`}
-                      onClick={() => toggleFamilySort('openTickets')}
+                    <SortableTableHead
+                      sortKey='openTickets'
+                      currentSort={getFamilySortIcon('openTickets')}
+                      onSort={requestFamilySort}
+                      align='center'
                     >
-                      Tickets abiertos {SortIcon('openTickets', familySortKey, familySortDir)}
-                    </TableHead>
-                    <TableHead
-                      className={`text-center ${sortableHeaderClass}`}
-                      onClick={() => toggleFamilySort('inProgressTickets')}
+                      Tickets abiertos
+                    </SortableTableHead>
+                    <SortableTableHead
+                      sortKey='inProgressTickets'
+                      currentSort={getFamilySortIcon('inProgressTickets')}
+                      onSort={requestFamilySort}
+                      align='center'
                     >
-                      En progreso {SortIcon('inProgressTickets', familySortKey, familySortDir)}
-                    </TableHead>
-                    <TableHead
-                      className={`text-center ${sortableHeaderClass}`}
-                      onClick={() => toggleFamilySort('technicianCount')}
+                      En progreso
+                    </SortableTableHead>
+                    <SortableTableHead
+                      sortKey='technicianCount'
+                      currentSort={getFamilySortIcon('technicianCount')}
+                      onSort={requestFamilySort}
+                      align='center'
                     >
-                      Técnicos {SortIcon('technicianCount', familySortKey, familySortDir)}
-                    </TableHead>
+                      Técnicos
+                    </SortableTableHead>
                     <TableHead className='text-center hidden lg:table-cell'>Inventario</TableHead>
                   </TableRow>
                 </TableHeader>

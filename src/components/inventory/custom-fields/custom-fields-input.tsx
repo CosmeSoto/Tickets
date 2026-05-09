@@ -14,9 +14,10 @@ import { Switch } from '@/components/ui/switch'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Button } from '@/components/ui/button'
-import { CalendarIcon } from 'lucide-react'
+import { CalendarIcon, AlertTriangle } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
 interface CustomField {
   id: string
@@ -41,6 +42,12 @@ interface CustomFieldsInputProps {
   errors?: Record<string, string>
 }
 
+/**
+ * @deprecated Este componente usa el sistema legacy de custom fields por familia.
+ * Usa TypeAttributesInput para el nuevo sistema de atributos por tipo.
+ * 
+ * Este componente seguirá funcionando hasta el 2026-06-08 para compatibilidad.
+ */
 export function CustomFieldsInput({
   familyId,
   equipmentId,
@@ -63,7 +70,7 @@ export function CustomFieldsInput({
       const response = await fetch(`/api/inventory/families/${familyId}/custom-fields`)
       if (!response.ok) throw new Error('Error al cargar campos')
       const data = await response.json()
-      console.log('📋 Campos personalizados cargados:', {
+      console.log('📋 Campos personalizados cargados (LEGACY):', {
         familyId,
         fieldsCount: data.length,
         fields: data.map((f: CustomField) => ({ name: f.fieldName, label: f.fieldLabel })),
@@ -233,10 +240,20 @@ export function CustomFieldsInput({
 
   return (
     <div className='space-y-4'>
+      {/* Aviso de deprecación */}
+      <Alert variant='default' className='border-amber-200 bg-amber-50'>
+        <AlertTriangle className='h-4 w-4 text-amber-600' />
+        <AlertDescription className='text-sm text-amber-800'>
+          <strong>Sistema Legacy:</strong> Los campos personalizados por familia están deprecados.
+          Los nuevos activos deben usar atributos específicos por tipo en la sección{' '}
+          <strong>Catálogos</strong>.
+        </AlertDescription>
+      </Alert>
+
       <div className='border-t pt-4'>
         <h3 className='text-sm font-semibold mb-4 flex items-center gap-2'>
           <span className='h-1 w-1 rounded-full bg-primary' />
-          Atributos Personalizados
+          Atributos Personalizados (Legacy)
         </h3>
         <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
           {fields.map(field => renderField(field))}

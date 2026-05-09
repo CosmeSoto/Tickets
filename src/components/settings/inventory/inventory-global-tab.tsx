@@ -9,11 +9,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
+import { SupplierTypesSection } from './supplier-types-section'
 import type { GlobalRules } from '@/hooks/use-inventory-settings'
 
 interface InventoryGlobalTabProps {
   globalRules: GlobalRules
   savingGlobal: boolean
+  families: Array<{ id: string; name: string; code: string; color: string | null }>
   onSetGlobal: <K extends keyof GlobalRules>(key: K, value: GlobalRules[K]) => void
   onSave: () => void
 }
@@ -21,11 +23,12 @@ interface InventoryGlobalTabProps {
 export function InventoryGlobalTab({
   globalRules,
   savingGlobal,
+  families,
   onSetGlobal,
   onSave,
 }: InventoryGlobalTabProps) {
   return (
-    <div className='max-w-2xl space-y-6'>
+    <div className='max-w-4xl space-y-6'>
       <div className='flex items-start gap-3 p-4 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800'>
         <Info className='h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0' />
         <p className='text-sm text-blue-800 dark:text-blue-300'>
@@ -196,6 +199,9 @@ export function InventoryGlobalTab({
           </div>
         </CardContent>
       </Card>
+
+      {/* Tipos de Proveedor */}
+      <SupplierTypesSection families={families} />
 
       <div className='flex justify-end'>
         <Button onClick={onSave} disabled={savingGlobal}>

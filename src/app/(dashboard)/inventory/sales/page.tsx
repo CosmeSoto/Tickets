@@ -38,7 +38,8 @@ import {
 } from '@/components/ui/select'
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
-import { useTableSort, SortIcon, sortableHeaderClass } from '@/hooks/common/use-table-sort'
+import { useTableSort } from '@/hooks/common/use-table-sort'
+import { SortableTableHead } from '@/components/ui/sortable-table-head'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
@@ -424,7 +425,7 @@ export default function SalesPage() {
   })
 
   // Ordenamiento con el hook estándar
-  const { sorted, sortKey, sortDir, toggleSort } = useTableSort(filtered, 'createdAt', 'desc')
+  const { sortedData: sorted, requestSort, getSortIcon } = useTableSort(filtered, { key: 'createdAt', direction: 'desc' })
 
   // Exportación
   const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
@@ -591,39 +592,46 @@ export default function SalesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead
-                    className={sortableHeaderClass}
-                    onClick={() => toggleSort('equipment' as any)}
+                  <SortableTableHead
+                    sortKey='equipment'
+                    currentSort={getSortIcon('equipment')}
+                    onSort={requestSort}
                   >
-                    Código {SortIcon('equipment', sortKey, sortDir)}
-                  </TableHead>
+                    Código
+                  </SortableTableHead>
                   <TableHead>Equipo</TableHead>
-                  <TableHead
-                    className={`hidden md:table-cell ${sortableHeaderClass}`}
-                    onClick={() => toggleSort('buyerName' as any)}
+                  <SortableTableHead
+                    sortKey='buyerName'
+                    currentSort={getSortIcon('buyerName')}
+                    onSort={requestSort}
+                    className='hidden md:table-cell'
                   >
-                    Comprador {SortIcon('buyerName', sortKey, sortDir)}
-                  </TableHead>
+                    Comprador
+                  </SortableTableHead>
                   <TableHead className='hidden lg:table-cell'>Empresa</TableHead>
-                  <TableHead
-                    className={sortableHeaderClass}
-                    onClick={() => toggleSort('salePrice' as any)}
+                  <SortableTableHead
+                    sortKey='salePrice'
+                    currentSort={getSortIcon('salePrice')}
+                    onSort={requestSort}
                   >
-                    Precio {SortIcon('salePrice', sortKey, sortDir)}
-                  </TableHead>
-                  <TableHead
-                    className={`hidden sm:table-cell ${sortableHeaderClass}`}
-                    onClick={() => toggleSort('saleDate' as any)}
+                    Precio
+                  </SortableTableHead>
+                  <SortableTableHead
+                    sortKey='saleDate'
+                    currentSort={getSortIcon('saleDate')}
+                    onSort={requestSort}
+                    className='hidden sm:table-cell'
                   >
-                    Fecha venta {SortIcon('saleDate', sortKey, sortDir)}
-                  </TableHead>
+                    Fecha venta
+                  </SortableTableHead>
                   <TableHead className='hidden md:table-cell'>Pago</TableHead>
-                  <TableHead
-                    className={sortableHeaderClass}
-                    onClick={() => toggleSort('status' as any)}
+                  <SortableTableHead
+                    sortKey='status'
+                    currentSort={getSortIcon('status')}
+                    onSort={requestSort}
                   >
-                    Estado {SortIcon('status', sortKey, sortDir)}
-                  </TableHead>
+                    Estado
+                  </SortableTableHead>
                   <TableHead className='hidden lg:table-cell'>Solicitado por</TableHead>
                   <TableHead className='w-8' />
                 </TableRow>

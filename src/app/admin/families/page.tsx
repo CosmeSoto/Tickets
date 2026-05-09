@@ -61,7 +61,8 @@ import {
 } from '@/components/ui/table'
 import { useToast } from '@/hooks/use-toast'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
-import { useTableSort, SortIcon, sortableHeaderClass } from '@/hooks/common/use-table-sort'
+import { useTableSort } from '@/hooks/common/use-table-sort'
+import { SortableTableHead } from '@/components/ui/sortable-table-head'
 
 interface Family {
   id: string
@@ -140,11 +141,10 @@ export default function FamiliesPage() {
   })
 
   const {
-    sorted: sortedFamilies,
-    sortKey,
-    sortDir,
-    toggleSort,
-  } = useTableSort(filteredFamilies, 'name')
+    sortedData: sortedFamilies,
+    requestSort,
+    getSortIcon,
+  } = useTableSort(filteredFamilies, { key: 'name', direction: 'asc' })
 
   const loadFamilies = useCallback(async () => {
     setLoading(true)
@@ -332,12 +332,20 @@ export default function FamiliesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className={sortableHeaderClass} onClick={() => toggleSort('name')}>
-                  Familia {SortIcon('name', sortKey, sortDir)}
-                </TableHead>
-                <TableHead className={sortableHeaderClass} onClick={() => toggleSort('isActive')}>
-                  Estado {SortIcon('isActive', sortKey, sortDir)}
-                </TableHead>
+                <SortableTableHead
+                  sortKey='name'
+                  currentSort={getSortIcon('name')}
+                  onSort={requestSort}
+                >
+                  Familia
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey='isActive'
+                  currentSort={getSortIcon('isActive')}
+                  onSort={requestSort}
+                >
+                  Estado
+                </SortableTableHead>
                 <TableHead className='text-center'>Depts</TableHead>
                 <TableHead className='text-center'>Tickets</TableHead>
                 <TableHead className='text-center'>Inventario</TableHead>

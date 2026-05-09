@@ -5,6 +5,10 @@ import prisma from '@/lib/prisma'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
 
+/**
+ * @deprecated Este endpoint está deprecado y será eliminado el 2026-06-08.
+ * Las unidades de medida ahora son atributos de consumable_types.
+ */
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -47,7 +51,11 @@ export async function PUT(
       userAgent: request.headers.get('user-agent') || 'unknown',
     }).catch(err => console.error('[AUDIT] Error registrando actualización de unidad de medida:', err))
 
-    return NextResponse.json(updated)
+    const response = NextResponse.json(updated)
+    response.headers.set('X-Deprecated', 'true')
+    response.headers.set('X-Deprecated-Date', '2026-06-08')
+    response.headers.set('Warning', '299 - "Este endpoint está deprecado. Las unidades ahora son atributos de tipos de consumibles"')
+    return response
   } catch (error: any) {
     console.error('Error en PUT /api/inventory/units-of-measure/[id]:', error)
     return NextResponse.json(
@@ -57,6 +65,9 @@ export async function PUT(
   }
 }
 
+/**
+ * @deprecated Este endpoint está deprecado y será eliminado el 2026-06-08.
+ */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -91,7 +102,11 @@ export async function DELETE(
         userAgent: request.headers.get('user-agent') || 'unknown',
       }).catch(err => console.error('[AUDIT] Error registrando desactivación de unidad de medida:', err))
 
-      return NextResponse.json({ message: `Unidad desactivada. ${count} consumible(s) la usan.`, unit: updated })
+      const response = NextResponse.json({ message: `Unidad desactivada. ${count} consumible(s) la usan.`, unit: updated })
+      response.headers.set('X-Deprecated', 'true')
+      response.headers.set('X-Deprecated-Date', '2026-06-08')
+      response.headers.set('Warning', '299 - "Este endpoint está deprecado. Las unidades ahora son atributos de tipos de consumibles"')
+      return response
     }
 
     await prisma.units_of_measure.delete({ where: { id } })
@@ -106,7 +121,11 @@ export async function DELETE(
       userAgent: request.headers.get('user-agent') || 'unknown',
     }).catch(err => console.error('[AUDIT] Error registrando eliminación de unidad de medida:', err))
 
-    return NextResponse.json({ message: 'Unidad eliminada permanentemente' })
+    const response = NextResponse.json({ message: 'Unidad eliminada permanentemente' })
+    response.headers.set('X-Deprecated', 'true')
+    response.headers.set('X-Deprecated-Date', '2026-06-08')
+    response.headers.set('Warning', '299 - "Este endpoint está deprecado. Las unidades ahora son atributos de tipos de consumibles"')
+    return response
   } catch (error: any) {
     console.error('Error en DELETE /api/inventory/units-of-measure/[id]:', error)
     const message = error?.code === 'P2003'

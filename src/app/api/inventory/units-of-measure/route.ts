@@ -6,6 +6,11 @@ import { randomUUID } from 'crypto'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
 
+/**
+ * @deprecated Este endpoint está deprecado y será eliminado el 2026-06-08.
+ * Las unidades de medida ahora son atributos de consumable_types.
+ * Usa en su lugar: Atributos de tipo consumable
+ */
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -22,13 +27,22 @@ export async function GET(request: NextRequest) {
       orderBy: [{ order: 'asc' }, { name: 'asc' }],
     })
 
-    return NextResponse.json(units)
+    const response = NextResponse.json(units)
+    response.headers.set('X-Deprecated', 'true')
+    response.headers.set('X-Deprecated-Date', '2026-06-08')
+    response.headers.set('X-Deprecated-Replacement', 'Atributos de consumable_types')
+    response.headers.set('Warning', '299 - "Este endpoint está deprecado. Las unidades ahora son atributos de tipos de consumibles"')
+    
+    return response
   } catch (error) {
     console.error('Error en GET /api/inventory/units-of-measure:', error)
     return NextResponse.json({ error: 'Error al obtener unidades de medida' }, { status: 500 })
   }
 }
 
+/**
+ * @deprecated Este endpoint está deprecado y será eliminado el 2026-06-08.
+ */
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -61,7 +75,12 @@ export async function POST(request: NextRequest) {
       userAgent: request.headers.get('user-agent') || 'unknown',
     }).catch(err => console.error('[AUDIT] Error registrando creación de unidad de medida:', err))
 
-    return NextResponse.json(unit, { status: 201 })
+    const response = NextResponse.json(unit, { status: 201 })
+    response.headers.set('X-Deprecated', 'true')
+    response.headers.set('X-Deprecated-Date', '2026-06-08')
+    response.headers.set('Warning', '299 - "Este endpoint está deprecado. Las unidades ahora son atributos de tipos de consumibles"')
+    
+    return response
   } catch (error) {
     console.error('Error en POST /api/inventory/units-of-measure:', error)
     return NextResponse.json({ error: 'Error al crear unidad de medida' }, { status: 500 })

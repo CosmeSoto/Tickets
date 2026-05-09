@@ -32,7 +32,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { FamilyIcon } from '@/components/inventory/family-badge'
 import { SectionTable } from '@/components/families/section-table'
-import { CustomFieldsManager } from '@/components/inventory/custom-fields/custom-fields-manager'
+import { CatalogsTab } from './catalogs-tab'
+import { WarehousesTab } from './warehouses-tab'
 import type {
   AcquisitionMode,
   FormSection,
@@ -122,7 +123,7 @@ export function InventoryAreasTab({
   onSetModeRequired,
   onValidateResidual,
 }: InventoryAreasTabProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'config' | 'custom-fields'>('config')
+  const [activeSubTab, setActiveSubTab] = useState<'config' | 'catalogs' | 'warehouses' | 'custom-fields'>('config')
 
   return (
     <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
@@ -251,16 +252,20 @@ export function InventoryAreasTab({
               </div>
             </div>
 
-            {/* Sub-tabs: Configuración | Campos Personalizados */}
+            {/* Sub-tabs: Configuración | Catálogos | Bodegas */}
             <Tabs value={activeSubTab} onValueChange={v => setActiveSubTab(v as any)}>
-              <TabsList className='w-full'>
-                <TabsTrigger value='config' className='flex-1 flex items-center gap-2'>
+              <TabsList className='w-full grid grid-cols-3'>
+                <TabsTrigger value='config' className='flex items-center gap-2'>
                   <Settings className='h-4 w-4' />
                   Configuración
                 </TabsTrigger>
-                <TabsTrigger value='custom-fields' className='flex-1 flex items-center gap-2'>
-                  <FileText className='h-4 w-4' />
-                  Campos Personalizados
+                <TabsTrigger value='catalogs' className='flex items-center gap-2'>
+                  <Layers className='h-4 w-4' />
+                  Catálogos
+                </TabsTrigger>
+                <TabsTrigger value='warehouses' className='flex items-center gap-2'>
+                  <Box className='h-4 w-4' />
+                  Bodegas
                 </TabsTrigger>
               </TabsList>
 
@@ -526,19 +531,12 @@ export function InventoryAreasTab({
                 </Card>
               </TabsContent>
 
-              <TabsContent value='custom-fields' className='mt-4'>
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Campos Personalizados</CardTitle>
-                    <CardDescription>
-                      Define los atributos específicos que se mostrarán en el formulario de equipos
-                      de esta familia
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <CustomFieldsManager familyId={selectedFamilyId} />
-                  </CardContent>
-                </Card>
+              <TabsContent value='catalogs' className='mt-4'>
+                <CatalogsTab familyId={selectedFamilyId} familyColor={selectedFamily?.color} />
+              </TabsContent>
+
+              <TabsContent value='warehouses' className='mt-4'>
+                <WarehousesTab familyId={selectedFamilyId} />
               </TabsContent>
             </Tabs>
           </>

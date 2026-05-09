@@ -824,19 +824,20 @@ model landing_page_banners {
 }
 
 model equipment_types {
-  id          String              @id @default(uuid())
-  code        String              @unique
+  id          String                       @id @default(uuid())
+  code        String                       @unique
   name        String
   description String?
   icon        String?
-  isActive    Boolean             @default(true) @map("is_active")
-  order       Int                 @default(0)
-  createdAt   DateTime            @default(now()) @map("created_at")
-  updatedAt   DateTime            @updatedAt @map("updated_at")
-  familyId    String?             @map("family_id")
+  isActive    Boolean                      @default(true) @map("is_active")
+  order       Int                          @default(0)
+  createdAt   DateTime                     @default(now()) @map("created_at")
+  updatedAt   DateTime                     @updatedAt @map("updated_at")
+  familyId    String?                      @map("family_id")
   equipment   equipment[]
   models      equipment_models[]
-  family      families?           @relation(fields: [familyId], references: [id])
+  family      families?                    @relation(fields: [familyId], references: [id])
+  attributes  equipment_type_attributes[]
 
   @@index([isActive, order])
   @@index([familyId])
@@ -1152,18 +1153,19 @@ model maintenance_records {
 }
 
 model license_types {
-  id          String              @id @default(uuid())
-  code        String              @unique
+  id          String                     @id @default(uuid())
+  code        String                     @unique
   name        String
   description String?
   icon        String?
-  isActive    Boolean             @default(true) @map("is_active")
-  order       Int                 @default(0)
-  createdAt   DateTime            @default(now()) @map("created_at")
-  updatedAt   DateTime            @updatedAt @map("updated_at")
-  familyId    String?             @map("family_id")
-  family      families?           @relation(fields: [familyId], references: [id])
+  isActive    Boolean                    @default(true) @map("is_active")
+  order       Int                        @default(0)
+  createdAt   DateTime                   @default(now()) @map("created_at")
+  updatedAt   DateTime                   @updatedAt @map("updated_at")
+  familyId    String?                    @map("family_id")
+  family      families?                  @relation(fields: [familyId], references: [id])
   licenses    software_licenses[]
+  attributes  license_type_attributes[]
 
   @@index([isActive, order])
   @@index([familyId])
@@ -1210,22 +1212,87 @@ model software_licenses {
 }
 
 model consumable_types {
-  id          String        @id @default(uuid())
-  code        String        @unique
+  id          String                        @id @default(uuid())
+  code        String                        @unique
   name        String
   description String?
   icon        String?
-  isActive    Boolean       @default(true) @map("is_active")
-  order       Int           @default(0)
-  createdAt   DateTime      @default(now()) @map("created_at")
-  updatedAt   DateTime      @updatedAt @map("updated_at")
-  familyId    String?       @map("family_id")
-  family      families?     @relation(fields: [familyId], references: [id])
+  isActive    Boolean                       @default(true) @map("is_active")
+  order       Int                           @default(0)
+  createdAt   DateTime                      @default(now()) @map("created_at")
+  updatedAt   DateTime                      @updatedAt @map("updated_at")
+  familyId    String?                       @map("family_id")
+  family      families?                     @relation(fields: [familyId], references: [id])
   consumables consumables[]
+  attributes  consumable_type_attributes[]
 
   @@index([isActive, order])
   @@index([familyId])
   @@map("consumable_types")
+}
+
+// ============================================
+// TYPE ATTRIBUTES - Atributos por Tipo
+// ============================================
+
+model equipment_type_attributes {
+  id              String          @id @default(uuid())
+  equipmentTypeId String          @map("equipment_type_id")
+  attributeName   String          @map("attribute_name") @db.VarChar(100)
+  attributeLabel  String          @map("attribute_label") @db.VarChar(200)
+  attributeType   String          @map("attribute_type") @db.VarChar(20)
+  options         Json?
+  isRequired      Boolean         @default(false) @map("is_required")
+  isVisible       Boolean         @default(true) @map("is_visible")
+  order           Int             @default(0)
+  helpText        String?         @map("help_text")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  equipmentType   equipment_types @relation(fields: [equipmentTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([equipmentTypeId, attributeName])
+  @@index([equipmentTypeId, order])
+  @@map("equipment_type_attributes")
+}
+
+model license_type_attributes {
+  id             String        @id @default(uuid())
+  licenseTypeId  String        @map("license_type_id")
+  attributeName  String        @map("attribute_name") @db.VarChar(100)
+  attributeLabel String        @map("attribute_label") @db.VarChar(200)
+  attributeType  String        @map("attribute_type") @db.VarChar(20)
+  options        Json?
+  isRequired     Boolean       @default(false) @map("is_required")
+  isVisible      Boolean       @default(true) @map("is_visible")
+  order          Int           @default(0)
+  helpText       String?       @map("help_text")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  licenseType    license_types @relation(fields: [licenseTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([licenseTypeId, attributeName])
+  @@index([licenseTypeId, order])
+  @@map("license_type_attributes")
+}
+
+model consumable_type_attributes {
+  id               String           @id @default(uuid())
+  consumableTypeId String           @map("consumable_type_id")
+  attributeName    String           @map("attribute_name") @db.VarChar(100)
+  attributeLabel   String           @map("attribute_label") @db.VarChar(200)
+  attributeType    String           @map("attribute_type") @db.VarChar(20)
+  options          Json?
+  isRequired       Boolean          @default(false) @map("is_required")
+  isVisible        Boolean          @default(true) @map("is_visible")
+  order            Int              @default(0)
+  helpText         String?          @map("help_text")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+  consumableType   consumable_types @relation(fields: [consumableTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([consumableTypeId, attributeName])
+  @@index([consumableTypeId, order])
+  @@map("consumable_type_attributes")
 }
 
 model units_of_measure {

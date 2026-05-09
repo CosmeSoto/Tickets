@@ -41,7 +41,8 @@ import {
   getStatusColor,
   getStatusLabel,
 } from '@/lib/utils/ticket-utils'
-import { useTableSort, SortIcon, sortableHeaderClass } from '@/hooks/common/use-table-sort'
+import { useTableSort } from '@/hooks/common/use-table-sort'
+import { SortableTableHead } from '@/components/ui/sortable-table-head'
 
 interface Ticket {
   id: string
@@ -98,11 +99,10 @@ export function TicketTable({
   const [error, setError] = useState<string | null>(null)
 
   const {
-    sorted: sortedTickets,
-    sortKey,
-    sortDir,
-    toggleSort,
-  } = useTableSort(tickets, 'createdAt', 'desc')
+    sortedData: sortedTickets,
+    requestSort,
+    getSortIcon,
+  } = useTableSort(tickets, { key: 'createdAt', direction: 'desc' })
 
   // Filtros con debounce optimizado
   const [search, setSearch] = useState('')
@@ -318,39 +318,62 @@ export function TicketTable({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className={sortableHeaderClass} onClick={() => toggleSort('title')}>
-                  Ticket {SortIcon('title', sortKey, sortDir)}
-                </TableHead>
-                <TableHead className={sortableHeaderClass} onClick={() => toggleSort('status')}>
-                  Estado {SortIcon('status', sortKey, sortDir)}
-                </TableHead>
-                <TableHead className={sortableHeaderClass} onClick={() => toggleSort('priority')}>
-                  Prioridad {SortIcon('priority', sortKey, sortDir)}
-                </TableHead>
-                <TableHead
-                  className={sortableHeaderClass}
-                  onClick={() => toggleSort('client.name' as any)}
+                <SortableTableHead
+                  sortKey='title'
+                  currentSort={getSortIcon('title')}
+                  onSort={requestSort}
                 >
-                  Cliente {SortIcon('client.name', sortKey, sortDir)}
-                </TableHead>
-                <TableHead
-                  className={sortableHeaderClass}
-                  onClick={() => toggleSort('assignee.name' as any)}
+                  Ticket
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey='status'
+                  currentSort={getSortIcon('status')}
+                  onSort={requestSort}
                 >
-                  Asignado {SortIcon('assignee.name', sortKey, sortDir)}
-                </TableHead>
-                <TableHead
-                  className={sortableHeaderClass}
-                  onClick={() => toggleSort('category.name' as any)}
+                  Estado
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey='priority'
+                  currentSort={getSortIcon('priority')}
+                  onSort={requestSort}
                 >
-                  Categoría {SortIcon('category.name', sortKey, sortDir)}
-                </TableHead>
-                <TableHead className={sortableHeaderClass} onClick={() => toggleSort('createdAt')}>
-                  Creado {SortIcon('createdAt', sortKey, sortDir)}
-                </TableHead>
-                <TableHead className={sortableHeaderClass} onClick={() => toggleSort('updatedAt')}>
-                  Actividad {SortIcon('updatedAt', sortKey, sortDir)}
-                </TableHead>
+                  Prioridad
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey='client.name'
+                  currentSort={getSortIcon('client.name')}
+                  onSort={requestSort}
+                >
+                  Cliente
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey='assignee.name'
+                  currentSort={getSortIcon('assignee.name')}
+                  onSort={requestSort}
+                >
+                  Asignado
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey='category.name'
+                  currentSort={getSortIcon('category.name')}
+                  onSort={requestSort}
+                >
+                  Categoría
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey='createdAt'
+                  currentSort={getSortIcon('createdAt')}
+                  onSort={requestSort}
+                >
+                  Creado
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey='updatedAt'
+                  currentSort={getSortIcon('updatedAt')}
+                  onSort={requestSort}
+                >
+                  Actividad
+                </SortableTableHead>
                 <TableHead className='text-right'>Acciones</TableHead>
               </TableRow>
             </TableHeader>

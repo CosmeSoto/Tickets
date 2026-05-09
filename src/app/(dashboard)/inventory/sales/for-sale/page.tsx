@@ -47,7 +47,8 @@ import {
 } from '@/components/ui/select'
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
-import { useTableSort, SortIcon, sortableHeaderClass } from '@/hooks/common/use-table-sort'
+import { useTableSort } from '@/hooks/common/use-table-sort'
+import { SortableTableHead } from '@/components/ui/sortable-table-head'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 
@@ -545,7 +546,7 @@ export default function ForSalePage() {
     )
   })
 
-  const { sorted, sortKey, sortDir, toggleSort } = useTableSort(filtered, 'updatedAt', 'desc')
+  const { sortedData: sorted, requestSort, getSortIcon } = useTableSort(filtered, { key: 'updatedAt', direction: 'desc' })
 
   // Export
   const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
@@ -685,42 +686,59 @@ export default function ForSalePage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className={sortableHeaderClass} onClick={() => toggleSort('code')}>
-                    Código {SortIcon('code', sortKey, sortDir)}
-                  </TableHead>
-                  <TableHead className={sortableHeaderClass} onClick={() => toggleSort('brand')}>
-                    Equipo {SortIcon('brand', sortKey, sortDir)}
-                  </TableHead>
-                  <TableHead
-                    className={`hidden md:table-cell ${sortableHeaderClass}`}
-                    onClick={() => toggleSort('type.name' as any)}
+                  <SortableTableHead
+                    sortKey='code'
+                    currentSort={getSortIcon('code')}
+                    onSort={requestSort}
                   >
-                    Tipo {SortIcon('type.name', sortKey, sortDir)}
-                  </TableHead>
-                  <TableHead
-                    className={`hidden lg:table-cell ${sortableHeaderClass}`}
-                    onClick={() => toggleSort('type.family.name' as any)}
+                    Código
+                  </SortableTableHead>
+                  <SortableTableHead
+                    sortKey='brand'
+                    currentSort={getSortIcon('brand')}
+                    onSort={requestSort}
                   >
-                    Familia {SortIcon('type.family.name', sortKey, sortDir)}
-                  </TableHead>
-                  <TableHead
-                    className={`hidden sm:table-cell ${sortableHeaderClass}`}
-                    onClick={() => toggleSort('condition')}
+                    Equipo
+                  </SortableTableHead>
+                  <SortableTableHead
+                    sortKey='type.name'
+                    currentSort={getSortIcon('type.name')}
+                    onSort={requestSort}
+                    className='hidden md:table-cell'
                   >
-                    Condición {SortIcon('condition', sortKey, sortDir)}
-                  </TableHead>
-                  <TableHead
-                    className={sortableHeaderClass}
-                    onClick={() => toggleSort('saleListingPrice')}
+                    Tipo
+                  </SortableTableHead>
+                  <SortableTableHead
+                    sortKey='type.family.name'
+                    currentSort={getSortIcon('type.family.name')}
+                    onSort={requestSort}
+                    className='hidden lg:table-cell'
                   >
-                    Precio venta {SortIcon('saleListingPrice', sortKey, sortDir)}
-                  </TableHead>
-                  <TableHead
-                    className={`hidden sm:table-cell ${sortableHeaderClass}`}
-                    onClick={() => toggleSort('updatedAt')}
+                    Familia
+                  </SortableTableHead>
+                  <SortableTableHead
+                    sortKey='condition'
+                    currentSort={getSortIcon('condition')}
+                    onSort={requestSort}
+                    className='hidden sm:table-cell'
                   >
-                    Fecha marcado {SortIcon('updatedAt', sortKey, sortDir)}
-                  </TableHead>
+                    Condición
+                  </SortableTableHead>
+                  <SortableTableHead
+                    sortKey='saleListingPrice'
+                    currentSort={getSortIcon('saleListingPrice')}
+                    onSort={requestSort}
+                  >
+                    Precio venta
+                  </SortableTableHead>
+                  <SortableTableHead
+                    sortKey='updatedAt'
+                    currentSort={getSortIcon('updatedAt')}
+                    onSort={requestSort}
+                    className='hidden sm:table-cell'
+                  >
+                    Fecha marcado
+                  </SortableTableHead>
                   <TableHead className='text-right'>Acciones</TableHead>
                 </TableRow>
               </TableHeader>

@@ -4,6 +4,9 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 /**
+ * @deprecated Este endpoint está deprecado y será eliminado el 2026-06-08.
+ * Usa en su lugar: GET /api/admin/inventory/{type}-types/[typeId]/attributes
+ * 
  * GET /api/inventory/families/[familyId]/custom-fields
  * Obtiene los campos personalizados de una familia
  */
@@ -25,7 +28,13 @@ export async function GET(
       orderBy: { order: 'asc' },
     })
 
-    return NextResponse.json(fields)
+    const response = NextResponse.json(fields)
+    response.headers.set('X-Deprecated', 'true')
+    response.headers.set('X-Deprecated-Date', '2026-06-08')
+    response.headers.set('X-Deprecated-Replacement', 'GET /api/admin/inventory/{type}-types/[typeId]/attributes')
+    response.headers.set('Warning', '299 - "Este endpoint está deprecado. Usa /api/admin/inventory/{type}-types/[typeId]/attributes"')
+    
+    return response
   } catch (error) {
     console.error('Error en GET /api/inventory/families/[familyId]/custom-fields:', error)
     return NextResponse.json({ error: 'Error al obtener campos personalizados' }, { status: 500 })
@@ -33,6 +42,9 @@ export async function GET(
 }
 
 /**
+ * @deprecated Este endpoint está deprecado y será eliminado el 2026-06-08.
+ * Usa en su lugar: POST /api/admin/inventory/{type}-types/[typeId]/attributes
+ * 
  * POST /api/inventory/families/[familyId]/custom-fields
  * Crea un nuevo campo personalizado
  */
@@ -63,7 +75,13 @@ export async function POST(
       },
     })
 
-    return NextResponse.json(field, { status: 201 })
+    const response = NextResponse.json(field, { status: 201 })
+    response.headers.set('X-Deprecated', 'true')
+    response.headers.set('X-Deprecated-Date', '2026-06-08')
+    response.headers.set('X-Deprecated-Replacement', 'POST /api/admin/inventory/{type}-types/[typeId]/attributes')
+    response.headers.set('Warning', '299 - "Este endpoint está deprecado. Usa /api/admin/inventory/{type}-types/[typeId]/attributes"')
+    
+    return response
   } catch (error) {
     console.error('Error en POST /api/inventory/families/[familyId]/custom-fields:', error)
     return NextResponse.json({ error: 'Error al crear campo personalizado' }, { status: 500 })

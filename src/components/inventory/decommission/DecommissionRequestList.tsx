@@ -40,7 +40,8 @@ import {
 } from '@/components/ui/alert-dialog'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
-import { useTableSort, SortIcon, sortableHeaderClass } from '@/hooks/common/use-table-sort'
+import { useTableSort } from '@/hooks/common/use-table-sort'
+import { SortableTableHead } from '@/components/ui/sortable-table-head'
 
 const STATUS_CONFIG: Record<
   string,
@@ -165,11 +166,10 @@ export function DecommissionRequestList({
   ).length
 
   const {
-    sorted: sortedRequests,
-    sortKey,
-    sortDir,
-    toggleSort,
-  } = useTableSort(requests, 'createdAt', 'desc')
+    sortedData: sortedRequests,
+    requestSort,
+    getSortIcon,
+  } = useTableSort(requests, { key: 'createdAt', direction: 'desc' })
 
   return (
     <div className='space-y-4'>
@@ -225,37 +225,53 @@ export function DecommissionRequestList({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className={sortableHeaderClass} onClick={() => toggleSort('assetType')}>
-                Activo {SortIcon('assetType', sortKey, sortDir)}
-              </TableHead>
+              <SortableTableHead
+                sortKey='assetType'
+                currentSort={getSortIcon('assetType')}
+                onSort={requestSort}
+              >
+                Activo
+              </SortableTableHead>
               <TableHead className='hidden md:table-cell'>Tipo</TableHead>
-              <TableHead
-                className={`hidden sm:table-cell ${sortableHeaderClass}`}
-                onClick={() => toggleSort('requester.name' as any)}
+              <SortableTableHead
+                sortKey='requester.name'
+                currentSort={getSortIcon('requester.name')}
+                onSort={requestSort}
+                className='hidden sm:table-cell'
               >
-                Solicitante {SortIcon('requester.name', sortKey, sortDir)}
-              </TableHead>
-              <TableHead className={sortableHeaderClass} onClick={() => toggleSort('status')}>
-                Estado {SortIcon('status', sortKey, sortDir)}
-              </TableHead>
-              <TableHead
-                className={`hidden lg:table-cell ${sortableHeaderClass}`}
-                onClick={() => toggleSort('technician.name' as any)}
+                Solicitante
+              </SortableTableHead>
+              <SortableTableHead
+                sortKey='status'
+                currentSort={getSortIcon('status')}
+                onSort={requestSort}
               >
-                Técnico {SortIcon('technician.name', sortKey, sortDir)}
-              </TableHead>
-              <TableHead
-                className={`hidden lg:table-cell ${sortableHeaderClass}`}
-                onClick={() => toggleSort('manager.name' as any)}
+                Estado
+              </SortableTableHead>
+              <SortableTableHead
+                sortKey='technician.name'
+                currentSort={getSortIcon('technician.name')}
+                onSort={requestSort}
+                className='hidden lg:table-cell'
               >
-                Gestor {SortIcon('manager.name', sortKey, sortDir)}
-              </TableHead>
-              <TableHead
-                className={`hidden md:table-cell ${sortableHeaderClass}`}
-                onClick={() => toggleSort('createdAt')}
+                Técnico
+              </SortableTableHead>
+              <SortableTableHead
+                sortKey='manager.name'
+                currentSort={getSortIcon('manager.name')}
+                onSort={requestSort}
+                className='hidden lg:table-cell'
               >
-                Fecha {SortIcon('createdAt', sortKey, sortDir)}
-              </TableHead>
+                Gestor
+              </SortableTableHead>
+              <SortableTableHead
+                sortKey='createdAt'
+                currentSort={getSortIcon('createdAt')}
+                onSort={requestSort}
+                className='hidden md:table-cell'
+              >
+                Fecha
+              </SortableTableHead>
               <TableHead className='text-right'>Ver</TableHead>
             </TableRow>
           </TableHeader>

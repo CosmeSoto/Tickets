@@ -1,8 +1,14 @@
 /**
  * CustomFieldsService - Servicio para gestión de atributos dinámicos por familia
  *
- * Permite a cada familia definir sus propios atributos personalizados
- * (color, talla, material, etc.) más allá del serialNumber estándar.
+ * @deprecated Este servicio usa el sistema legacy de custom fields por familia.
+ * Para nuevos desarrollos, usa los servicios específicos por tipo:
+ * - EquipmentAttributesService
+ * - LicenseAttributesService  
+ * - ConsumableAttributesService
+ *
+ * Este servicio seguirá funcionando hasta el 2026-06-08 para compatibilidad.
+ * Los datos se leen de las nuevas tablas de atributos por tipo cuando están disponibles.
  */
 
 import { prisma } from '@/lib/prisma'
@@ -265,6 +271,9 @@ export class CustomFieldsService {
 
   /**
    * Obtiene los valores personalizados de un equipo con sus definiciones
+   * 
+   * ACTUALIZADO: Ahora lee de las nuevas tablas de atributos por tipo
+   * Mantiene compatibilidad con custom fields legacy
    */
   static async getCustomValuesWithDefinitions(equipmentId: string): Promise<
     Array<{
@@ -272,10 +281,17 @@ export class CustomFieldsService {
       value: CustomFieldValue | null
     }>
   > {
-    // Obtener el equipo con su familia
+    // Obtener el equipo con su familia y tipo
     const equipment = await prisma.equipment.findUnique({
       where: { id: equipmentId },
-      include: { type: { include: { family: true } } },
+      include: { 
+        type: { 
+          include: { 
+            family: true,
+            attributes: true, // Nuevos atributos por tipo
+          } 
+        } 
+      },
     })
 
     if (!equipment) {
@@ -283,9 +299,33 @@ export class CustomFieldsService {
     }
 
     const familyId = equipment.type.family.id
+    const equipmentTypeId = equipment.type.id
 
-    // Obtener campos de la familia
-    const fields = await this.getCustomFieldsByFamily(familyId)
+    // PRIORIDAD 1: Intentar obtener atributos del nuevo sistema (por tipo)
+    let fields: CustomField[] = []
+    
+    if (equipment.type.attributes && equipment.type.attributes.length > 0) {
+      // Convertir atributos de tipo a formato CustomField
+      fields = equipment.type.attributes
+        .filter((attr: any) => attr.isVisible)
+        .sort((a: any, b: any) => a.order - b.order)
+        .map((attr: any) => ({
+          id: attr.id,
+          familyId: familyId,
+          fieldName: attr.attributeName,
+          fieldLabel: attr.attributeLabel,
+          fieldType: attr.attributeType as any,
+          fieldOptions: attr.options,
+          isRequired: attr.isRequired,
+          order: attr.order,
+          helpText: attr.helpText,
+          createdAt: attr.createdAt,
+          updatedAt: attr.updatedAt,
+        }))
+    } else {
+      // FALLBACK: Usar custom fields legacy por familia
+      fields = await this.getCustomFieldsByFamily(familyId)
+    }
 
     // Obtener valores del equipo
     const values = await this.getCustomValuesByEquipment(equipmentId)

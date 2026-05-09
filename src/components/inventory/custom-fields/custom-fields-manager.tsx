@@ -18,7 +18,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Edit, Trash2, MoveUp, MoveDown } from 'lucide-react'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Plus, Edit, Trash2, MoveUp, MoveDown, AlertTriangle } from 'lucide-react'
 import { CustomFieldForm, CustomFieldFormData, FieldType } from './custom-field-form'
 import { useToast } from '@/hooks/use-toast'
 
@@ -213,6 +214,26 @@ export function CustomFieldsManager({ familyId }: CustomFieldsManagerProps) {
 
   return (
     <div className='space-y-4'>
+      {/* Banner de Deprecación */}
+      <Alert className='bg-amber-50 dark:bg-amber-950 border-l-4 border-amber-500'>
+        <AlertTriangle className='h-4 w-4 text-amber-600 dark:text-amber-400' />
+        <AlertTitle className='text-amber-800 dark:text-amber-200'>
+          Funcionalidad Deprecada
+        </AlertTitle>
+        <AlertDescription className='text-amber-700 dark:text-amber-300 space-y-2'>
+          <p className='text-sm'>
+            Los campos personalizados por familia están siendo reemplazados por{' '}
+            <strong>atributos por tipo</strong>. Eliminación: <strong>8 junio 2026</strong>.
+          </p>
+          <p className='text-sm'>
+            <strong>Nueva ubicación:</strong> Tab "Catálogos" en esta misma página.
+          </p>
+          <p className='text-xs text-amber-600 dark:text-amber-400'>
+            Migración automática. No requiere acción manual.
+          </p>
+        </AlertDescription>
+      </Alert>
+
       <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4'>
         <div>
           <p className='text-sm text-muted-foreground'>
