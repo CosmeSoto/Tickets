@@ -31,7 +31,7 @@ import { useActiveDepartments } from '@/contexts/departments-context'
 import { AssignableUserSelect } from '@/components/inventory/shared/AssignableUserSelect'
 import { MaintenanceStatusBlock } from '@/components/inventory/shared/MaintenanceStatusBlock'
 import { StockIndicatorBadge } from '@/components/inventory/equipment/StockIndicatorBadge'
-import { CustomFieldsInput } from '@/components/inventory/custom-fields/custom-fields-input'
+import { TypeAttributesInput } from '@/components/inventory/custom-fields/type-attributes-input'
 import { AccessoriesSection } from '@/components/inventory/shared/AccessoriesSection'
 import { RentalInformationCard } from '@/components/inventory/shared/RentalInformationCard'
 import {
@@ -94,52 +94,31 @@ const OWNERSHIP_TYPE_OPTIONS = [
   { value: 'LOAN', label: 'Préstamo' },
 ]
 
-// Wrapper para campos personalizados que solo muestra la Card si hay campos
-function CustomFieldsSection({
-  familyId,
-  equipmentId,
+// Wrapper para atributos por tipo que solo muestra cuando hay tipo seleccionado
+function TypeAttributesSection({
+  typeId,
   values,
   onChange,
 }: {
-  familyId: string
-  equipmentId?: string
+  typeId: string
   values: Array<{ fieldName: string; fieldValue: string }>
   onChange: (values: Array<{ fieldName: string; fieldValue: string }>) => void
 }) {
-  const [hasFields, setHasFields] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    async function checkFields() {
-      try {
-        const response = await fetch(`/api/inventory/families/${familyId}/custom-fields`)
-        if (response.ok) {
-          const data = await response.json()
-          setHasFields(data.length > 0)
-        }
-      } catch (error) {
-        console.error('Error checking custom fields:', error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    checkFields()
-  }, [familyId])
-
-  if (isLoading || !hasFields) return null
+  // No renderizar nada si no hay tipo seleccionado
+  if (!typeId) {
+    return null
+  }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Atributos Personalizados</CardTitle>
-        <CardDescription>
-          Campos específicos configurados para esta familia de activos
-        </CardDescription>
+        <CardTitle>Atributos del Tipo</CardTitle>
+        <CardDescription>Campos específicos configurados para este tipo de equipo</CardDescription>
       </CardHeader>
       <CardContent>
-        <CustomFieldsInput
-          familyId={familyId}
-          equipmentId={equipmentId}
+        <TypeAttributesInput
+          typeId={typeId}
+          assetType='equipment'
           values={values}
           onChange={onChange}
         />
@@ -933,15 +912,12 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
       {/* Accesorios */}
       <AccessoriesSection accessories={accessories} onChange={setAccessories} />
 
-      {/* Campos Personalizados por Familia - Solo se muestra si hay campos configurados */}
-      {selectedTypeFamilyId && (
-        <CustomFieldsSection
-          familyId={selectedTypeFamilyId}
-          values={customFieldValues}
-          onChange={setCustomFieldValues}
-          equipmentId={equipment?.id}
-        />
-      )}
+      {/* Atributos por Tipo - Solo se muestra si hay tipo seleccionado */}
+      <TypeAttributesSection
+        typeId={selectedTypeId || ''}
+        values={customFieldValues}
+        onChange={setCustomFieldValues}
+      />
 
       {/* Notas */}
       <Card>
