@@ -28,20 +28,8 @@ export default function BulkEquipmentNewPage() {
   }
 
   return (
-    <div className='container mx-auto py-8 px-4 max-w-4xl'>
-      {/* Header */}
-      <div className='mb-8'>
-        <Button variant='ghost' size='sm' onClick={() => router.back()} className='mb-4'>
-          <ArrowLeft className='mr-2 h-4 w-4' />
-          Volver
-        </Button>
-        <h1 className='text-3xl font-bold'>Crear Equipos por Lote</h1>
-        <p className='text-muted-foreground mt-2'>
-          Crea múltiples equipos idénticos en una sola operación
-        </p>
-      </div>
-
-      {/* Formulario */}
+    <div className='container mx-auto py-6 px-4 max-w-5xl'>
+      {/* Formulario con header integrado */}
       <BulkEquipmentForm onSuccess={handleSuccess} onCancel={handleCancel} />
     </div>
   )

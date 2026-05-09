@@ -82,8 +82,11 @@ export function TypeAttributesInput({
 
       const data = await response.json()
 
+      // Normalizar respuesta - puede ser array directo o { attributes: [] }
+      const attributesArray = Array.isArray(data) ? data : data.attributes || []
+
       // Filtrar solo atributos visibles y ordenar
-      const visibleAttributes = data
+      const visibleAttributes = attributesArray
         .filter((attr: TypeAttribute) => attr.isVisible)
         .sort((a: TypeAttribute, b: TypeAttribute) => a.order - b.order)
 
