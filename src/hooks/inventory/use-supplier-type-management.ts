@@ -63,31 +63,23 @@ export function useSupplierTypeManagement(familyId?: string | null, includeGloba
         params.append('includeGlobal', 'false')
       }
 
-      const url = `/api/admin/inventory/supplier-types?${params.toString()}`
-      console.log('🔍 Loading supplier types from:', url)
-
-      const response = await fetch(url, {
+      const response = await fetch(`/api/admin/inventory/supplier-types?${params.toString()}`, {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
       })
 
-      console.log('📡 Response status:', response.status, response.statusText)
-
       if (!response.ok) {
         const data = await response.json().catch(() => ({ error: 'Error desconocido' }))
-        console.error('❌ Error response:', data)
         throw new Error(data.error || 'Error al cargar tipos de proveedor')
       }
 
       const data = await response.json()
-      console.log('✅ Supplier types loaded:', data.supplierTypes?.length || 0, 'items')
       setSupplierTypes(data.supplierTypes || [])
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error al cargar tipos de proveedor'
       setError(message)
-      console.error('💥 Error loading supplier types:', err)
       toast.error(message)
     } finally {
       setLoading(false)

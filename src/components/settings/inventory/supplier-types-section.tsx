@@ -3,7 +3,7 @@
  * Sección para gestión de tipos de proveedor (globales y por familia)
  */
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import {
   useSupplierTypeManagement,
   SupplierType,
@@ -85,11 +85,6 @@ export function SupplierTypesSection({ families }: SupplierTypesSectionProps) {
     updateSupplierType,
     deleteSupplierType,
   } = useSupplierTypeManagement(null, true) // Cargar todos (globales + por familia)
-
-  // Debug: Log cuando se montan los datos
-  useEffect(() => {
-    console.log('SupplierTypesSection mounted, loading:', loading, 'types:', supplierTypes.length)
-  }, [loading, supplierTypes])
 
   const [formOpen, setFormOpen] = useState(false)
   const [selectedType, setSelectedType] = useState<SupplierType | null>(null)
