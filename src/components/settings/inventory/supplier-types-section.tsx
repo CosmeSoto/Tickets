@@ -94,9 +94,11 @@ export function SupplierTypesSection({ families }: SupplierTypesSectionProps) {
   // Form state
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [familyId, setFamilyId] = useState<string>('')
+  const [familyId, setFamilyId] = useState<string>('global')
   const [isActive, setIsActive] = useState(true)
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  const isEditing = !!selectedType
 
   // Sorting
   const { sortedData, requestSort, getSortIcon } = useTableSort(supplierTypes, {
@@ -120,8 +122,6 @@ export function SupplierTypesSection({ families }: SupplierTypesSectionProps) {
     title: 'Tipos de Proveedor',
     subtitle: `${supplierTypes.length} tipo${supplierTypes.length !== 1 ? 's' : ''}`,
   })
-
-  const isEditing = !!selectedType
 
   const handleCreate = () => {
     setSelectedType(null)
@@ -431,11 +431,7 @@ export function SupplierTypesSection({ families }: SupplierTypesSectionProps) {
               {/* Ámbito (Familia) */}
               <div className='space-y-2'>
                 <Label htmlFor='family'>Ámbito</Label>
-                <Select
-                  value={familyId || 'global'}
-                  onValueChange={val => setFamilyId(val === 'global' ? '' : val)}
-                  disabled={saving}
-                >
+                <Select value={familyId || 'global'} onValueChange={setFamilyId} disabled={saving}>
                   <SelectTrigger id='family'>
                     <SelectValue placeholder='Global (todas las áreas)' />
                   </SelectTrigger>
