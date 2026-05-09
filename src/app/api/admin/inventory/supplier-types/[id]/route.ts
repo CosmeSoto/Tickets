@@ -21,10 +21,7 @@ const supplierTypeUpdateSchema = z.object({
 /**
  * GET - Obtener tipo de proveedor por ID
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
 
@@ -47,9 +44,7 @@ export async function GET(
         },
         _count: {
           select: {
-            equipment: true,
-            licenses: true,
-            consumables: true,
+            suppliers: true,
           },
         },
       },
@@ -69,10 +64,7 @@ export async function GET(
 /**
  * PUT - Actualizar tipo de proveedor
  */
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
 
@@ -110,7 +102,8 @@ export async function PUT(
       const duplicate = await prisma.supplier_types.findFirst({
         where: {
           name: validation.data.name,
-          familyId: validation.data.familyId !== undefined ? validation.data.familyId : existing.familyId,
+          familyId:
+            validation.data.familyId !== undefined ? validation.data.familyId : existing.familyId,
           id: { not: id },
         },
       })
@@ -183,9 +176,7 @@ export async function DELETE(
       include: {
         _count: {
           select: {
-            equipment: true,
-            licenses: true,
-            consumables: true,
+            suppliers: true,
           },
         },
       },
@@ -195,11 +186,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'Tipo de proveedor no encontrado' }, { status: 404 })
     }
 
-    // Verificar si tiene items asignados
-    const totalItems =
-      existing._count.equipment + existing._count.licenses + existing._count.consumables
-
-    if (totalItems > 0) {
+    // Verificar si tiene proveedores asignados
+    if (existing._count.suppliers > 0) {
       // Soft delete - solo desactivar
       const supplierType = await prisma.supplier_types.update({
         where: { id },
@@ -208,7 +196,7 @@ export async function DELETE(
 
       return NextResponse.json({
         success: true,
-        message: `Tipo de proveedor desactivado (tiene ${totalItems} items asignados)`,
+        message: `Tipo de proveedor desactivado (tiene ${existing._count.suppliers} proveedores asignados)`,
         supplierType,
       })
     } else {

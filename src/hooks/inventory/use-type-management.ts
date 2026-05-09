@@ -8,6 +8,23 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useToast } from '@/hooks/use-toast'
 
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+/**
+ * Genera un código slug a partir de un nombre
+ * Ej: "Laptop HP" -> "laptop-hp"
+ */
+function generateCode(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD') // Normalizar caracteres acentuados
+    .replace(/[\u0300-\u036f]/g, '') // Remover acentos
+    .replace(/[^a-z0-9\s-]/g, '') // Remover caracteres especiales
+    .trim()
+    .replace(/\s+/g, '-') // Espacios a guiones
+    .replace(/-+/g, '-') // Múltiples guiones a uno solo
+}
+
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export type TypeKind = 'equipment' | 'license' | 'consumable'
@@ -43,10 +60,13 @@ export interface ConsumableType extends BaseType {
 export type AnyType = EquipmentType | LicenseType | ConsumableType
 
 export interface CreateTypeData {
+  code?: string // Auto-generado si no se proporciona
   name: string
   description?: string
+  icon?: string | null
   familyId: string
   isActive?: boolean
+  order?: number
   // Equipment specific
   requiresSerial?: boolean
   requiresModel?: boolean
@@ -119,10 +139,13 @@ export function useTypeManagement<T extends AnyType = AnyType>(
 
       setSaving(true)
       try {
+        // Generar code automáticamente si no se proporciona
+        const code = data.code || generateCode(data.name)
+
         const res = await fetch(getEndpoint(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...data, familyId }),
+          body: JSON.stringify({ ...data, code, familyId }),
         })
         const result = await res.json()
 
