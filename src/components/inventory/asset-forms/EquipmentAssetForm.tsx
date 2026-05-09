@@ -14,7 +14,7 @@ import { EquipmentTypeInlineForm } from '@/components/inventory/asset-forms/Equi
 import { WarehouseInlineForm } from '@/components/inventory/asset-forms/WarehouseInlineForm'
 import { AssignableUserSelect } from '@/components/inventory/shared/AssignableUserSelect'
 import { MaintenanceStatusBlock } from '@/components/inventory/shared/MaintenanceStatusBlock'
-import { CustomFieldsInput } from '@/components/inventory/custom-fields/custom-fields-input'
+import { TypeAttributesInput } from '@/components/inventory/custom-fields/type-attributes-input'
 import { AttachmentsField } from '@/components/inventory/shared/AttachmentsField'
 import { AccessoriesSection } from '@/components/inventory/shared/AccessoriesSection'
 import {
@@ -666,14 +666,12 @@ export function EquipmentAssetForm({
       {/* Accesorios */}
       <AccessoriesSection accessories={accessories} onChange={setAccessories} inline />
 
-      {/* Campos Personalizados */}
-      {familyId && (
-        <CustomFieldsSection
-          familyId={familyId}
-          values={customFieldValues}
-          onChange={setCustomFieldValues}
-        />
-      )}
+      {/* Atributos por Tipo */}
+      <TypeAttributesSection
+        typeId={equipmentTypeId}
+        values={customFieldValues}
+        onChange={setCustomFieldValues}
+      />
 
       {/* ── 5. ADQUISICIÓN ────────────────────────────────────────── */}
       {/* Modalidad */}
@@ -1062,41 +1060,29 @@ export function EquipmentAssetForm({
 }
 
 // Wrapper para campos personalizados que solo muestra si hay campos configurados
-function CustomFieldsSection({
-  familyId,
+function TypeAttributesSection({
+  typeId,
   values,
   onChange,
 }: {
-  familyId: string
+  typeId: string
   values: Array<{ fieldName: string; fieldValue: string }>
   onChange: (values: Array<{ fieldName: string; fieldValue: string }>) => void
 }) {
-  const [hasFields, setHasFields] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    async function checkFields() {
-      try {
-        const response = await fetch(`/api/inventory/families/${familyId}/custom-fields`)
-        if (response.ok) {
-          const data = await response.json()
-          setHasFields(data.length > 0)
-        }
-      } catch (error) {
-        console.error('Error checking custom fields:', error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    checkFields()
-  }, [familyId])
-
-  if (isLoading || !hasFields) return null
+  // No renderizar nada si no hay tipo seleccionado
+  if (!typeId) {
+    return null
+  }
 
   return (
     <div className='space-y-2'>
-      <Label>Atributos Personalizados</Label>
-      <CustomFieldsInput familyId={familyId} values={values} onChange={onChange} />
+      <Label>Atributos del Tipo</Label>
+      <TypeAttributesInput
+        typeId={typeId}
+        assetType='equipment'
+        values={values}
+        onChange={onChange}
+      />
     </div>
   )
 }

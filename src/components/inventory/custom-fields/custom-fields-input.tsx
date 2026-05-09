@@ -43,10 +43,15 @@ interface CustomFieldsInputProps {
 }
 
 /**
- * @deprecated Este componente usa el sistema legacy de custom fields por familia.
- * Usa TypeAttributesInput para el nuevo sistema de atributos por tipo.
- * 
- * Este componente seguirá funcionando hasta el 2026-06-08 para compatibilidad.
+ * ⚠️ COMPONENTE COMPLETAMENTE DEPRECADO ⚠️
+ *
+ * Este componente usa el sistema legacy de custom fields por familia.
+ * YA NO SE USA EN NINGÚN FORMULARIO DEL SISTEMA.
+ *
+ * ✅ REEMPLAZO: Usa TypeAttributesInput para el nuevo sistema de atributos por tipo.
+ *
+ * Este archivo se mantiene solo para referencia histórica y será eliminado en junio 2026.
+ * NO USAR EN NUEVOS DESARROLLOS.
  */
 export function CustomFieldsInput({
   familyId,
