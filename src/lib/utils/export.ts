@@ -15,10 +15,14 @@
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 export interface ExportColumn {
-  /** Clave del campo en el objeto de datos */
-  key: string
+  /** Clave del campo en el objeto de datos (opcional si se usa accessor) */
+  key?: string
   /** Encabezado legible para el usuario */
-  label: string
+  label?: string
+  /** Alias para label (compatibilidad) */
+  header?: string
+  /** Función para extraer el valor (alternativa a key) */
+  accessor?: string | ((row: any) => any)
   /** Transformación opcional del valor antes de exportar */
   format?: (value: any, row: any) => string
 }
@@ -37,12 +41,31 @@ export interface ExportOptions<T = any> {
 
 /** Extrae el valor de texto plano de una celda */
 function getCellText<T>(row: T, col: ExportColumn): string {
-  const raw = (row as any)[col.key]
+  let raw: any
+
+  // Soportar tanto key como accessor
+  if (col.accessor) {
+    if (typeof col.accessor === 'function') {
+      raw = col.accessor(row)
+    } else {
+      raw = (row as any)[col.accessor]
+    }
+  } else if (col.key) {
+    raw = (row as any)[col.key]
+  } else {
+    raw = ''
+  }
+
   if (col.format) return col.format(raw, row)
   if (raw === null || raw === undefined) return ''
   if (typeof raw === 'boolean') return raw ? 'Sí' : 'No'
   if (raw instanceof Date) return raw.toLocaleDateString('es-ES')
   return String(raw)
+}
+
+/** Obtiene el label de una columna */
+function getColumnLabel(col: ExportColumn): string {
+  return col.label || col.header || col.key || col.accessor?.toString() || ''
 }
 
 /** Escapa un valor para CSV (RFC 4180) */
@@ -62,7 +85,7 @@ function escapeCSV(value: string): string {
 export function exportToCSV<T>(options: ExportOptions<T>): void {
   const { filename, columns, rows } = options
 
-  const header = columns.map(c => escapeCSV(c.label)).join(',')
+  const header = columns.map(c => escapeCSV(getColumnLabel(c))).join(',')
   const body = rows
     .map(row => columns.map(col => escapeCSV(getCellText(row, col))).join(','))
     .join('\n')
@@ -86,7 +109,7 @@ export async function exportToExcel<T>(options: ExportOptions<T>): Promise<void>
   // Importación dinámica para no aumentar el bundle inicial
   const XLSX = await import('xlsx')
 
-  const headerRow = columns.map(c => c.label)
+  const headerRow = columns.map(c => getColumnLabel(c))
   const dataRows = rows.map(row => columns.map(col => getCellText(row, col)))
 
   const wsData = [headerRow, ...dataRows]
@@ -94,10 +117,7 @@ export async function exportToExcel<T>(options: ExportOptions<T>): Promise<void>
 
   // Ancho de columnas automático (máximo 50 chars)
   ws['!cols'] = columns.map((col, i) => {
-    const maxLen = Math.max(
-      col.label.length,
-      ...dataRows.map(r => (r[i] ?? '').length)
-    )
+    const maxLen = Math.max(getColumnLabel(col).length, ...dataRows.map(r => (r[i] ?? '').length))
     return { wch: Math.min(maxLen + 2, 50) }
   })
 
@@ -134,9 +154,7 @@ export function exportToPDF<T>(options: ExportOptions<T>): void {
   const tableRows = rows
     .map(
       row =>
-        `<tr>${columns
-          .map(col => `<td>${escapeHTML(getCellText(row, col))}</td>`)
-          .join('')}</tr>`
+        `<tr>${columns.map(col => `<td>${escapeHTML(getCellText(row, col))}</td>`).join('')}</tr>`
     )
     .join('')
 
@@ -176,7 +194,7 @@ export function exportToPDF<T>(options: ExportOptions<T>): void {
   </div>
   <table>
     <thead>
-      <tr>${columns.map(c => `<th>${escapeHTML(c.label)}</th>`).join('')}</tr>
+      <tr>${columns.map(c => `<th>${escapeHTML(getColumnLabel(c))}</th>`).join('')}</tr>
     </thead>
     <tbody>${tableRows}</tbody>
   </table>

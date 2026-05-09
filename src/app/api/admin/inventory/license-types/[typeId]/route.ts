@@ -148,7 +148,7 @@ export async function PUT(
       },
     })
 
-    return NextResponse.json({ licenseType })
+    return NextResponse.json({ type: licenseType })
   } catch (error) {
     console.error('Error actualizando tipo de licencia:', error)
     return NextResponse.json({ error: 'Error al actualizar tipo de licencia' }, { status: 500 })
@@ -202,7 +202,7 @@ export async function DELETE(
       return NextResponse.json({
         success: true,
         message: `Tipo de licencia desactivado (tiene ${existing._count.licenses} licencias asignadas)`,
-        licenseType,
+        type: licenseType,
       })
     } else {
       // Hard delete - eliminar completamente

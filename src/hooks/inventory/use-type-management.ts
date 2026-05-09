@@ -207,10 +207,16 @@ export function useTypeManagement<T extends AnyType = AnyType>(
         const result = await res.json()
 
         if (res.ok && result.success) {
-          setTypes(prev => prev.filter(t => t.id !== typeId))
+          // Si fue soft delete, actualizar el tipo en lugar de eliminarlo
+          if (result.type) {
+            setTypes(prev => prev.map(t => (t.id === typeId ? result.type : t)))
+          } else {
+            // Hard delete, remover de la lista
+            setTypes(prev => prev.filter(t => t.id !== typeId))
+          }
           toast({
             title: 'Éxito',
-            description: 'Tipo eliminado correctamente',
+            description: result.message || 'Tipo eliminado correctamente',
           })
           return true
         } else {

@@ -13,11 +13,11 @@ import { z } from 'zod'
 const consumableTypeSchema = z.object({
   code: z.string().min(2, 'El código debe tener al menos 2 caracteres').max(50),
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(100),
-  description: z.string().optional(),
-  icon: z.string().optional(),
+  description: z.string().optional().nullable(),
+  icon: z.string().optional().nullable(),
   familyId: z.string().uuid('ID de familia inválido').optional().nullable(),
   isActive: z.boolean().default(true),
-  order: z.number().int().min(0).default(0),
+  order: z.number().int().min(0).optional().default(999),
 })
 
 /**
@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    return NextResponse.json({ consumableType }, { status: 201 })
+    return NextResponse.json({ type: consumableType }, { status: 201 })
   } catch (error) {
     console.error('Error creando tipo de consumible:', error)
     return NextResponse.json({ error: 'Error al crear tipo de consumible' }, { status: 500 })

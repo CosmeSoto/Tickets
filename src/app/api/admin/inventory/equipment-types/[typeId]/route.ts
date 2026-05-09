@@ -148,7 +148,7 @@ export async function PUT(
       },
     })
 
-    return NextResponse.json({ equipmentType })
+    return NextResponse.json({ type: equipmentType })
   } catch (error) {
     console.error('Error actualizando tipo de equipo:', error)
     return NextResponse.json({ error: 'Error al actualizar tipo de equipo' }, { status: 500 })
@@ -202,7 +202,7 @@ export async function DELETE(
       return NextResponse.json({
         success: true,
         message: `Tipo de equipo desactivado (tiene ${existing._count.equipment} equipos asignados)`,
-        equipmentType,
+        type: equipmentType,
       })
     } else {
       // Hard delete - eliminar completamente

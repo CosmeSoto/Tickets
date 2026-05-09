@@ -148,7 +148,7 @@ export async function PUT(
       },
     })
 
-    return NextResponse.json({ consumableType })
+    return NextResponse.json({ type: consumableType })
   } catch (error) {
     console.error('Error actualizando tipo de consumible:', error)
     return NextResponse.json({ error: 'Error al actualizar tipo de consumible' }, { status: 500 })
@@ -202,7 +202,7 @@ export async function DELETE(
       return NextResponse.json({
         success: true,
         message: `Tipo de consumible desactivado (tiene ${existing._count.consumables} consumibles asignados)`,
-        consumableType,
+        type: consumableType,
       })
     } else {
       // Hard delete - eliminar completamente
