@@ -5,6 +5,7 @@ import { Plus, Pencil, PowerOff, RefreshCw, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Select,
   SelectContent,
@@ -37,6 +38,7 @@ import { useTableSort } from '@/hooks/common/use-table-sort'
 import { SortableTableHead } from '@/components/ui/sortable-table-head'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { SupplierForm } from '@/components/inventory/suppliers/SupplierForm'
+import { SupplierTypesSection } from '@/components/settings/inventory/supplier-types-section'
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
 import { FamilyCombobox } from '@/components/ui/family-combobox'
@@ -162,228 +164,253 @@ export default function SuppliersPage() {
 
   const total = suppliers.length
 
-  const { sortedData: sortedSuppliers, requestSort, getSortIcon } = useTableSort(suppliers, {
+  const {
+    sortedData: sortedSuppliers,
+    requestSort,
+    getSortIcon,
+  } = useTableSort(suppliers, {
     key: 'name',
     direction: 'asc',
   })
 
   return (
-    <ModuleLayout
-      title='Proveedores'
-      subtitle={`${total} proveedor${total !== 1 ? 'es' : ''} ${activeFilter === 'true' ? 'activos' : activeFilter === 'false' ? 'inactivos' : 'en total'}`}
-      headerActions={
-        <div className='flex flex-wrap gap-2'>
-          <Button variant='outline' size='sm' onClick={fetchSuppliers} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 sm:mr-2 ${loading ? 'animate-spin' : ''}`} />
-            <span className='hidden sm:inline'>Actualizar</span>
-          </Button>
-          <Button
-            onClick={() => {
-              setEditingSupplier(null)
-              setFormOpen(true)
-            }}
-          >
-            <Plus className='h-4 w-4 sm:mr-2' />
-            <span className='hidden sm:inline'>Nuevo proveedor</span>
-          </Button>
-        </div>
-      }
-    >
-      <div className='space-y-6'>
-        {/* Filtros */}
-        <div className='flex flex-wrap gap-3'>
-          <Input
-            placeholder='Buscar por nombre o RUC/NIT...'
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className='flex-1 min-w-[200px]'
-          />
-          {families.length > 1 && (
-            <FamilyCombobox
-              families={families}
-              value={familyFilter}
-              onValueChange={setFamilyFilter}
-              allowAll
-              allowClear
-              popoverWidth='240px'
-              className='w-full sm:w-52'
-            />
-          )}
-          <Select value={activeFilter} onValueChange={setActiveFilter}>
-            <SelectTrigger className='w-full sm:w-36'>
-              <SelectValue placeholder='Estado' />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value='all'>Todos</SelectItem>
-              <SelectItem value='true'>Activos</SelectItem>
-              <SelectItem value='false'>Inactivos</SelectItem>
-            </SelectContent>
-          </Select>
-          <ExportButton
-            onExportCSV={exportCSV}
-            onExportExcel={exportExcel}
-            onExportPDF={exportPDF}
-            loading={exporting}
-            disabled={suppliers.length === 0}
-          />
-        </div>
+    <ModuleLayout title='Proveedores' subtitle='Gestiona proveedores y tipos de proveedor'>
+      <Tabs defaultValue='suppliers' className='space-y-6'>
+        <TabsList>
+          <TabsTrigger value='suppliers'>
+            Proveedores
+            <Badge variant='secondary' className='ml-2'>
+              {total}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value='types'>Tipos de Proveedor</TabsTrigger>
+        </TabsList>
 
-        {/* Tabla */}
-        <div className='overflow-x-auto rounded-md border'>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <SortableTableHead
-                  sortKey='name'
-                  currentSort={getSortIcon('name')}
-                  onSort={requestSort}
-                >
-                  Nombre
-                </SortableTableHead>
-                <SortableTableHead
-                  sortKey='type'
-                  currentSort={getSortIcon('type')}
-                  onSort={requestSort}
-                  className='hidden md:table-cell'
-                >
-                  Tipo
-                </SortableTableHead>
-                <SortableTableHead
-                  sortKey='family.name'
-                  currentSort={getSortIcon('family.name')}
-                  onSort={requestSort}
-                  className='hidden md:table-cell'
-                >
-                  Área
-                </SortableTableHead>
-                <SortableTableHead
-                  sortKey='taxId'
-                  currentSort={getSortIcon('taxId')}
-                  onSort={requestSort}
-                  className='hidden lg:table-cell'
-                >
-                  RUC / NIT
-                </SortableTableHead>
-                <SortableTableHead
-                  sortKey='email'
-                  currentSort={getSortIcon('email')}
-                  onSort={requestSort}
-                  className='hidden lg:table-cell'
-                >
-                  Email
-                </SortableTableHead>
-                <TableHead className='hidden xl:table-cell'>Teléfono</TableHead>
-                <SortableTableHead
-                  sortKey='isActive'
-                  currentSort={getSortIcon('isActive')}
-                  onSort={requestSort}
-                >
-                  Estado
-                </SortableTableHead>
-                <TableHead className='text-right'>Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
+        <TabsContent value='suppliers' className='space-y-6'>
+          <div className='flex flex-wrap gap-2 justify-between items-center'>
+            <p className='text-sm text-muted-foreground'>
+              {total} proveedor{total !== 1 ? 'es' : ''}{' '}
+              {activeFilter === 'true'
+                ? 'activos'
+                : activeFilter === 'false'
+                  ? 'inactivos'
+                  : 'en total'}
+            </p>
+            <div className='flex flex-wrap gap-2'>
+              <Button variant='outline' size='sm' onClick={fetchSuppliers} disabled={loading}>
+                <RefreshCw className={`h-4 w-4 sm:mr-2 ${loading ? 'animate-spin' : ''}`} />
+                <span className='hidden sm:inline'>Actualizar</span>
+              </Button>
+              <Button
+                onClick={() => {
+                  setEditingSupplier(null)
+                  setFormOpen(true)
+                }}
+              >
+                <Plus className='h-4 w-4 sm:mr-2' />
+                <span className='hidden sm:inline'>Nuevo proveedor</span>
+              </Button>
+            </div>
+          </div>
+          {/* Filtros */}
+          <div className='flex flex-wrap gap-3'>
+            <Input
+              placeholder='Buscar por nombre o RUC/NIT...'
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className='flex-1 min-w-[200px]'
+            />
+            {families.length > 1 && (
+              <FamilyCombobox
+                families={families}
+                value={familyFilter}
+                onValueChange={setFamilyFilter}
+                allowAll
+                allowClear
+                popoverWidth='240px'
+                className='w-full sm:w-52'
+              />
+            )}
+            <Select value={activeFilter} onValueChange={setActiveFilter}>
+              <SelectTrigger className='w-full sm:w-36'>
+                <SelectValue placeholder='Estado' />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='all'>Todos</SelectItem>
+                <SelectItem value='true'>Activos</SelectItem>
+                <SelectItem value='false'>Inactivos</SelectItem>
+              </SelectContent>
+            </Select>
+            <ExportButton
+              onExportCSV={exportCSV}
+              onExportExcel={exportExcel}
+              onExportPDF={exportPDF}
+              loading={exporting}
+              disabled={suppliers.length === 0}
+            />
+          </div>
+
+          {/* Tabla */}
+          <div className='overflow-x-auto rounded-md border'>
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={8} className='text-center py-8 text-muted-foreground'>
-                    <RefreshCw className='h-4 w-4 animate-spin mx-auto mb-2' />
-                    Cargando...
-                  </TableCell>
-                </TableRow>
-              ) : suppliers.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className='text-center py-8 text-muted-foreground'>
-                    No se encontraron proveedores
-                    {activeFilter === 'true' && (
-                      <p className='text-xs mt-1'>
-                        <button className='underline' onClick={() => setActiveFilter('all')}>
-                          Ver todos
-                        </button>
-                      </p>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                sortedSuppliers.map(s => (
-                  <TableRow
-                    key={s.id}
-                    className='cursor-pointer hover:bg-muted/50'
-                    onClick={() => {
-                      setEditingSupplier(s)
-                      setFormOpen(true)
-                    }}
+                  <SortableTableHead
+                    sortKey='name'
+                    currentSort={getSortIcon('name')}
+                    onSort={requestSort}
                   >
-                    <TableCell className='font-medium'>{s.name}</TableCell>
-                    <TableCell className='text-sm text-muted-foreground hidden md:table-cell'>
-                      {s.supplierType?.name ?? s.type ?? '—'}
-                    </TableCell>
-                    <TableCell className='text-sm text-muted-foreground hidden md:table-cell'>
-                      {s.family?.name ?? '—'}
-                    </TableCell>
-                    <TableCell className='text-muted-foreground hidden lg:table-cell'>
-                      {s.taxId || '—'}
-                    </TableCell>
-                    <TableCell className='text-muted-foreground hidden lg:table-cell'>
-                      {s.email || '—'}
-                    </TableCell>
-                    <TableCell className='text-muted-foreground hidden xl:table-cell'>
-                      {s.phone || '—'}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={s.isActive ? 'default' : 'secondary'}>
-                        {s.isActive ? 'Activo' : 'Inactivo'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className='text-right'>
-                      <div className='flex justify-end gap-1'>
-                        <Button
-                          variant='ghost'
-                          size='icon'
-                          title='Editar'
-                          onClick={e => {
-                            e.stopPropagation()
-                            setEditingSupplier(s)
-                            setFormOpen(true)
-                          }}
-                        >
-                          <Pencil className='h-4 w-4' />
-                        </Button>
-                        {s.isActive && (
-                          <Button
-                            variant='ghost'
-                            size='icon'
-                            title='Desactivar'
-                            onClick={e => {
-                              e.stopPropagation()
-                              setDeactivatingSupplier(s)
-                            }}
-                          >
-                            <PowerOff className='h-4 w-4 text-destructive' />
-                          </Button>
-                        )}
-                        {isSuperAdmin && (
-                          <Button
-                            variant='ghost'
-                            size='icon'
-                            title='Eliminar permanentemente (Solo Super Admin)'
-                            onClick={e => {
-                              e.stopPropagation()
-                              setDeletingSupplier(s)
-                            }}
-                          >
-                            <Trash2 className='h-4 w-4 text-destructive' />
-                          </Button>
-                        )}
-                      </div>
+                    Nombre
+                  </SortableTableHead>
+                  <SortableTableHead
+                    sortKey='type'
+                    currentSort={getSortIcon('type')}
+                    onSort={requestSort}
+                    className='hidden md:table-cell'
+                  >
+                    Tipo
+                  </SortableTableHead>
+                  <SortableTableHead
+                    sortKey='family.name'
+                    currentSort={getSortIcon('family.name')}
+                    onSort={requestSort}
+                    className='hidden md:table-cell'
+                  >
+                    Área
+                  </SortableTableHead>
+                  <SortableTableHead
+                    sortKey='taxId'
+                    currentSort={getSortIcon('taxId')}
+                    onSort={requestSort}
+                    className='hidden lg:table-cell'
+                  >
+                    RUC / NIT
+                  </SortableTableHead>
+                  <SortableTableHead
+                    sortKey='email'
+                    currentSort={getSortIcon('email')}
+                    onSort={requestSort}
+                    className='hidden lg:table-cell'
+                  >
+                    Email
+                  </SortableTableHead>
+                  <TableHead className='hidden xl:table-cell'>Teléfono</TableHead>
+                  <SortableTableHead
+                    sortKey='isActive'
+                    currentSort={getSortIcon('isActive')}
+                    onSort={requestSort}
+                  >
+                    Estado
+                  </SortableTableHead>
+                  <TableHead className='text-right'>Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className='text-center py-8 text-muted-foreground'>
+                      <RefreshCw className='h-4 w-4 animate-spin mx-auto mb-2' />
+                      Cargando...
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
+                ) : suppliers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className='text-center py-8 text-muted-foreground'>
+                      No se encontraron proveedores
+                      {activeFilter === 'true' && (
+                        <p className='text-xs mt-1'>
+                          <button className='underline' onClick={() => setActiveFilter('all')}>
+                            Ver todos
+                          </button>
+                        </p>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  sortedSuppliers.map(s => (
+                    <TableRow
+                      key={s.id}
+                      className='cursor-pointer hover:bg-muted/50'
+                      onClick={() => {
+                        setEditingSupplier(s)
+                        setFormOpen(true)
+                      }}
+                    >
+                      <TableCell className='font-medium'>{s.name}</TableCell>
+                      <TableCell className='text-sm text-muted-foreground hidden md:table-cell'>
+                        {s.supplierType?.name ?? s.type ?? '—'}
+                      </TableCell>
+                      <TableCell className='text-sm text-muted-foreground hidden md:table-cell'>
+                        {s.family?.name ?? '—'}
+                      </TableCell>
+                      <TableCell className='text-muted-foreground hidden lg:table-cell'>
+                        {s.taxId || '—'}
+                      </TableCell>
+                      <TableCell className='text-muted-foreground hidden lg:table-cell'>
+                        {s.email || '—'}
+                      </TableCell>
+                      <TableCell className='text-muted-foreground hidden xl:table-cell'>
+                        {s.phone || '—'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={s.isActive ? 'default' : 'secondary'}>
+                          {s.isActive ? 'Activo' : 'Inactivo'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className='text-right'>
+                        <div className='flex justify-end gap-1'>
+                          <Button
+                            variant='ghost'
+                            size='icon'
+                            title='Editar'
+                            onClick={e => {
+                              e.stopPropagation()
+                              setEditingSupplier(s)
+                              setFormOpen(true)
+                            }}
+                          >
+                            <Pencil className='h-4 w-4' />
+                          </Button>
+                          {s.isActive && (
+                            <Button
+                              variant='ghost'
+                              size='icon'
+                              title='Desactivar'
+                              onClick={e => {
+                                e.stopPropagation()
+                                setDeactivatingSupplier(s)
+                              }}
+                            >
+                              <PowerOff className='h-4 w-4 text-destructive' />
+                            </Button>
+                          )}
+                          {isSuperAdmin && (
+                            <Button
+                              variant='ghost'
+                              size='icon'
+                              title='Eliminar permanentemente (Solo Super Admin)'
+                              onClick={e => {
+                                e.stopPropagation()
+                                setDeletingSupplier(s)
+                              }}
+                            >
+                              <Trash2 className='h-4 w-4 text-destructive' />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+
+        <TabsContent value='types'>
+          <SupplierTypesSection families={families} />
+        </TabsContent>
+      </Tabs>
 
       {/* Dialog formulario */}
       <Dialog open={formOpen} onOpenChange={setFormOpen}>

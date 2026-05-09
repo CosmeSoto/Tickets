@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
-import { SupplierTypesSection } from './supplier-types-section'
 import type { GlobalRules } from '@/hooks/use-inventory-settings'
 
 interface InventoryGlobalTabProps {
@@ -199,9 +198,6 @@ export function InventoryGlobalTab({
           </div>
         </CardContent>
       </Card>
-
-      {/* Tipos de Proveedor */}
-      <SupplierTypesSection families={families} />
 
       <div className='flex justify-end'>
         <Button onClick={onSave} disabled={savingGlobal}>

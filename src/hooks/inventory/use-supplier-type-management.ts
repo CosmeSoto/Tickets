@@ -23,9 +23,7 @@ export interface SupplierType {
   updatedAt: string
   family?: SupplierTypeFamily | null
   _count?: {
-    equipment: number
-    licenses: number
-    consumables: number
+    suppliers: number
   }
 }
 

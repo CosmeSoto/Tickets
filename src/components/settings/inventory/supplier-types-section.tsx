@@ -4,7 +4,10 @@
  */
 
 import { useState } from 'react'
-import { useSupplierTypeManagement, SupplierType } from '@/hooks/inventory/use-supplier-type-management'
+import {
+  useSupplierTypeManagement,
+  SupplierType,
+} from '@/hooks/inventory/use-supplier-type-management'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -34,6 +37,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -45,7 +56,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Plus, RefreshCw, Truck, Edit, Trash2, Globe, AlertTriangle } from 'lucide-react'
+import {
+  Plus,
+  RefreshCw,
+  Truck,
+  Edit,
+  Trash2,
+  Globe,
+  AlertTriangle,
+  Download,
+  CheckCircle,
+  XCircle,
+} from 'lucide-react'
+import { useTableSort } from '@/hooks/common/use-table-sort'
+import { SortableTableHead } from '@/components/ui/sortable-table-head'
+import { useExport } from '@/hooks/common/use-export'
 
 interface SupplierTypesSectionProps {
   families: Array<{ id: string; name: string; code: string; color: string | null }>
@@ -73,13 +98,36 @@ export function SupplierTypesSection({ families }: SupplierTypesSectionProps) {
   const [isActive, setIsActive] = useState(true)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
+  // Sorting
+  const { sortedData, requestSort, getSortIcon } = useTableSort(supplierTypes, {
+    key: 'name',
+    direction: 'asc',
+  })
+
+  // Export configuration
+  const exportColumns = [
+    { header: 'Nombre', accessor: (t: SupplierType) => t.name },
+    { header: 'Descripción', accessor: (t: SupplierType) => t.description || '' },
+    { header: 'Ámbito', accessor: (t: SupplierType) => t.family?.name || 'Global' },
+    { header: 'Proveedores', accessor: (t: SupplierType) => t._count?.suppliers || 0 },
+    { header: 'Estado', accessor: (t: SupplierType) => (t.isActive ? 'Activo' : 'Inactivo') },
+  ]
+
+  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+    getData: () => supplierTypes,
+    columns: exportColumns,
+    filename: 'tipos-proveedor',
+    title: 'Tipos de Proveedor',
+    subtitle: `${supplierTypes.length} tipo${supplierTypes.length !== 1 ? 's' : ''}`,
+  })
+
   const isEditing = !!selectedType
 
   const handleCreate = () => {
     setSelectedType(null)
     setName('')
     setDescription('')
-    setFamilyId('')
+    setFamilyId('global')
     setIsActive(true)
     setErrors({})
     setFormOpen(true)
@@ -89,7 +137,7 @@ export function SupplierTypesSection({ families }: SupplierTypesSectionProps) {
     setSelectedType(type)
     setName(type.name)
     setDescription(type.description || '')
-    setFamilyId(type.familyId || '')
+    setFamilyId(type.familyId || 'global')
     setIsActive(type.isActive)
     setErrors({})
     setFormOpen(true)
@@ -135,7 +183,7 @@ export function SupplierTypesSection({ families }: SupplierTypesSectionProps) {
     const data = {
       name: name.trim(),
       description: description.trim() || undefined,
-      familyId: familyId || null,
+      familyId: familyId === 'global' ? null : familyId,
       isActive,
     }
 
@@ -154,11 +202,7 @@ export function SupplierTypesSection({ families }: SupplierTypesSectionProps) {
     }
   }
 
-  const totalItems = typeToDelete
-    ? (typeToDelete._count?.equipment || 0) +
-      (typeToDelete._count?.licenses || 0) +
-      (typeToDelete._count?.consumables || 0)
-    : 0
+  const totalItems = typeToDelete ? typeToDelete._count?.suppliers || 0 : 0
 
   return (
     <>
@@ -174,10 +218,29 @@ export function SupplierTypesSection({ families }: SupplierTypesSectionProps) {
                 Define tipos de proveedor globales o específicos por área
               </CardDescription>
             </div>
-            <Button onClick={handleCreate} disabled={loading || saving} size='sm'>
-              <Plus className='h-4 w-4 mr-1.5' />
-              Nuevo Tipo
-            </Button>
+            <div className='flex gap-2'>
+              {supplierTypes.length > 0 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant='outline' size='sm' disabled={exporting || loading}>
+                      <Download className='h-4 w-4 mr-2' />
+                      Exportar
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align='end'>
+                    <DropdownMenuLabel>Formato</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={exportCSV}>CSV</DropdownMenuItem>
+                    <DropdownMenuItem onClick={exportExcel}>Excel</DropdownMenuItem>
+                    <DropdownMenuItem onClick={exportPDF}>PDF</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              <Button onClick={handleCreate} disabled={loading || saving} size='sm'>
+                <Plus className='h-4 w-4 mr-1.5' />
+                Nuevo Tipo
+              </Button>
+            </div>
           </div>
         </CardHeader>
 
@@ -205,35 +268,57 @@ export function SupplierTypesSection({ families }: SupplierTypesSectionProps) {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Descripción</TableHead>
-                    <TableHead>Ámbito</TableHead>
-                    <TableHead className='text-center'>Items</TableHead>
-                    <TableHead className='text-center'>Estado</TableHead>
-                    <TableHead className='text-right'>Acciones</TableHead>
+                    <SortableTableHead
+                      sortKey='name'
+                      currentSort={getSortIcon('name')}
+                      onSort={requestSort}
+                      className='w-[25%]'
+                    >
+                      Nombre
+                    </SortableTableHead>
+                    <SortableTableHead
+                      sortKey='description'
+                      currentSort={getSortIcon('description')}
+                      onSort={requestSort}
+                      className='w-[30%]'
+                    >
+                      Descripción
+                    </SortableTableHead>
+                    <SortableTableHead
+                      sortKey='family.name'
+                      currentSort={getSortIcon('family.name')}
+                      onSort={requestSort}
+                      className='w-[20%]'
+                    >
+                      Ámbito
+                    </SortableTableHead>
+                    <TableHead className='text-center w-[15%]'>Proveedores</TableHead>
+                    <TableHead className='text-right w-[10%]'>Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {supplierTypes.map(type => {
-                    const totalTypeItems =
-                      (type._count?.equipment || 0) +
-                      (type._count?.licenses || 0) +
-                      (type._count?.consumables || 0)
+                  {sortedData.map(type => {
+                    const totalTypeItems = type._count?.suppliers || 0
 
                     return (
                       <TableRow key={type.id}>
-                        <TableCell className='font-medium'>{type.name}</TableCell>
-                        <TableCell className='text-sm text-muted-foreground max-w-xs truncate'>
-                          {type.description || '—'}
+                        <TableCell className='align-top'>
+                          <div className='flex items-start gap-2'>
+                            <Truck className='h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0' />
+                            <span className='font-medium text-sm break-words'>{type.name}</span>
+                          </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className='text-sm text-muted-foreground align-top'>
+                          <span className='break-words'>{type.description || '—'}</span>
+                        </TableCell>
+                        <TableCell className='align-top'>
                           {type.family ? (
-                            <div className='flex items-center gap-2'>
+                            <div className='flex items-start gap-2'>
                               <div
-                                className='w-3 h-3 rounded-full flex-shrink-0'
+                                className='w-3 h-3 rounded-full flex-shrink-0 mt-0.5'
                                 style={{ backgroundColor: type.family.color || '#6B7280' }}
                               />
-                              <span className='text-sm'>{type.family.name}</span>
+                              <span className='text-sm break-words'>{type.family.name}</span>
                             </div>
                           ) : (
                             <div className='flex items-center gap-1.5 text-muted-foreground'>
@@ -242,29 +327,48 @@ export function SupplierTypesSection({ families }: SupplierTypesSectionProps) {
                             </div>
                           )}
                         </TableCell>
-                        <TableCell className='text-center text-sm'>{totalTypeItems}</TableCell>
-                        <TableCell className='text-center'>
-                          <Badge variant={type.isActive ? 'default' : 'secondary'} className='text-xs'>
-                            {type.isActive ? 'Activo' : 'Inactivo'}
+                        <TableCell className='text-center align-top'>
+                          <Badge variant='secondary' className='font-mono'>
+                            {totalTypeItems}
                           </Badge>
                         </TableCell>
-                        <TableCell className='text-right'>
-                          <div className='flex items-center justify-end gap-2'>
+                        <TableCell className='text-right align-top'>
+                          <div className='flex items-center justify-end gap-1'>
                             <Button
                               variant='ghost'
                               size='sm'
+                              className='h-8 w-8 p-0'
                               onClick={() => handleEdit(type)}
                               disabled={saving}
+                              title='Editar tipo'
                             >
                               <Edit className='h-4 w-4' />
                             </Button>
                             <Button
                               variant='ghost'
                               size='sm'
+                              className='h-8 w-8 p-0'
+                              onClick={() =>
+                                updateSupplierType(type.id, { isActive: !type.isActive })
+                              }
+                              disabled={saving}
+                              title={type.isActive ? 'Desactivar tipo' : 'Activar tipo'}
+                            >
+                              {type.isActive ? (
+                                <CheckCircle className='h-4 w-4 text-green-600 dark:text-green-500' />
+                              ) : (
+                                <XCircle className='h-4 w-4 text-muted-foreground' />
+                              )}
+                            </Button>
+                            <Button
+                              variant='ghost'
+                              size='sm'
+                              className='h-8 w-8 p-0'
                               onClick={() => handleDelete(type)}
                               disabled={saving}
+                              title='Eliminar tipo'
                             >
-                              <Trash2 className='h-4 w-4' />
+                              <Trash2 className='h-4 w-4 text-destructive' />
                             </Button>
                           </div>
                         </TableCell>
@@ -327,12 +431,16 @@ export function SupplierTypesSection({ families }: SupplierTypesSectionProps) {
               {/* Ámbito (Familia) */}
               <div className='space-y-2'>
                 <Label htmlFor='family'>Ámbito</Label>
-                <Select value={familyId} onValueChange={setFamilyId} disabled={saving}>
+                <Select
+                  value={familyId || 'global'}
+                  onValueChange={val => setFamilyId(val === 'global' ? '' : val)}
+                  disabled={saving}
+                >
                   <SelectTrigger id='family'>
                     <SelectValue placeholder='Global (todas las áreas)' />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value=''>
+                    <SelectItem value='global'>
                       <div className='flex items-center gap-2'>
                         <Globe className='h-3.5 w-3.5' />
                         Global (todas las áreas)
@@ -428,7 +536,11 @@ export function SupplierTypesSection({ families }: SupplierTypesSectionProps) {
           <AlertDialogFooter>
             <AlertDialogCancel disabled={saving}>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} disabled={saving}>
-              {saving ? 'Procesando...' : totalItems > 0 ? 'Desactivar' : 'Eliminar Definitivamente'}
+              {saving
+                ? 'Procesando...'
+                : totalItems > 0
+                  ? 'Desactivar'
+                  : 'Eliminar Definitivamente'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

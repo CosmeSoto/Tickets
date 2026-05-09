@@ -65,9 +65,7 @@ export async function GET(request: NextRequest) {
         },
         _count: {
           select: {
-            equipment: true,
-            licenses: true,
-            consumables: true,
+            suppliers: true,
           },
         },
       },
