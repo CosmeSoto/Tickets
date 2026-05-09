@@ -117,7 +117,7 @@ export function InlineCreateSelect({
   return (
     <>
       <div className='flex gap-2'>
-        <Popover open={open} onOpenChange={setOpen}>
+        <Popover open={open} onOpenChange={setOpen} modal={false}>
           <PopoverTrigger asChild>
             <Button
               type='button'
@@ -133,10 +133,15 @@ export function InlineCreateSelect({
               <ChevronsUpDown className='ml-2 h-4 w-4 shrink-0 opacity-50' />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className='w-[400px] p-0' align='start' side='bottom' sideOffset={4}>
-            <Command>
-              <CommandInput placeholder='Buscar...' />
-              <CommandList className='max-h-[300px]'>
+          <PopoverContent
+            className='w-[400px] p-0 max-h-[400px] overflow-hidden'
+            align='start'
+            side='bottom'
+            sideOffset={4}
+          >
+            <Command shouldFilter={true} className='h-full'>
+              <CommandInput placeholder='Buscar...' className='border-b' />
+              <CommandList className='max-h-[340px] overflow-y-scroll scroll-smooth'>
                 {/* Botón crear */}
                 {createForm && (
                   <CommandGroup>
