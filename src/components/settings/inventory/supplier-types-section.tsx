@@ -8,6 +8,7 @@ import {
   useSupplierTypeManagement,
   SupplierType,
 } from '@/hooks/inventory/use-supplier-type-management'
+import { useExport } from '@/hooks/common/use-export'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DataTable, type Column } from '@/components/ui/data-table'
@@ -40,7 +41,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Plus, Truck, Edit, Trash2, Globe, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  Plus,
+  Truck,
+  Edit,
+  Trash2,
+  Globe,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  Download,
+} from 'lucide-react'
 
 interface SupplierTypesSectionProps {
   families: Array<{ id: string; name: string; code: string; color: string | null }>
@@ -151,6 +170,25 @@ export function SupplierTypesSection({ families }: SupplierTypesSectionProps) {
 
   const totalItems = typeToDelete ? typeToDelete._count?.suppliers || 0 : 0
 
+  // Estado para paginación
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(10)
+
+  // Export configuration
+  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+    getData: () => supplierTypes,
+    columns: [
+      { header: 'Nombre', accessor: (t: SupplierType) => t.name },
+      { header: 'Descripción', accessor: (t: SupplierType) => t.description || '' },
+      { header: 'Ámbito', accessor: (t: SupplierType) => t.family?.name || 'Global' },
+      { header: 'Proveedores', accessor: (t: SupplierType) => String(t._count?.suppliers || 0) },
+      { header: 'Estado', accessor: (t: SupplierType) => (t.isActive ? 'Activo' : 'Inactivo') },
+    ],
+    filename: `tipos-proveedor`,
+    title: 'Tipos de Proveedor',
+    subtitle: `${supplierTypes.length} tipo${supplierTypes.length !== 1 ? 's' : ''}`,
+  })
+
   // Configuración de columnas para DataTable
   const columns: Column<SupplierType>[] = [
     {
@@ -234,26 +272,34 @@ export function SupplierTypesSection({ families }: SupplierTypesSectionProps) {
         loading={loading}
         searchable={true}
         searchPlaceholder='Buscar por nombre...'
-        filters={[
-          {
-            key: 'scope',
-            label: 'Ámbito',
-            type: 'select',
-            options: [
-              { value: 'global', label: 'Global' },
-              ...families.map(f => ({ value: f.id, label: f.name })),
-            ],
+        externalSearch={false}
+        onExport={
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant='outline' size='sm' disabled={exporting || loading}>
+                <Download className='h-4 w-4 mr-2' />
+                Exportar
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align='end'>
+              <DropdownMenuLabel>Formato</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={exportCSV}>CSV</DropdownMenuItem>
+              <DropdownMenuItem onClick={exportExcel}>Excel</DropdownMenuItem>
+              <DropdownMenuItem onClick={exportPDF}>PDF</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        }
+        pagination={{
+          page,
+          limit,
+          total: supplierTypes.length,
+          onPageChange: setPage,
+          onLimitChange: newLimit => {
+            setLimit(newLimit)
+            setPage(1)
           },
-          {
-            key: 'status',
-            label: 'Estado',
-            type: 'select',
-            options: [
-              { value: 'active', label: 'Activos' },
-              { value: 'inactive', label: 'Inactivos' },
-            ],
-          },
-        ]}
+        }}
         actions={
           <Button onClick={handleCreate} disabled={loading || saving} size='sm'>
             <Plus className='h-4 w-4 mr-2' />

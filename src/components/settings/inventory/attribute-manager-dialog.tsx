@@ -15,14 +15,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { DataTable, type Column } from '@/components/ui/data-table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -103,6 +96,10 @@ export function AttributeManagerDialog({
   const [editingAttribute, setEditingAttribute] = useState<Attribute | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [attributeToDelete, setAttributeToDelete] = useState<Attribute | null>(null)
+
+  // Estado para paginación
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(10)
 
   // Export configuration
   const exportColumns: ExportColumnConfig<Attribute>[] = [
@@ -219,6 +216,96 @@ export function AttributeManagerDialog({
     })
   }
 
+  // Configuración de columnas para DataTable
+  const columns: Column<Attribute>[] = [
+    {
+      key: 'attributeLabel',
+      label: 'Atributo',
+      sortable: true,
+      render: (attr: Attribute) => (
+        <div className='space-y-0.5'>
+          <div className='font-medium text-sm'>{attr.attributeLabel}</div>
+          <div className='text-xs text-muted-foreground font-mono'>{attr.attributeName}</div>
+          {attr.helpText && (
+            <div className='text-xs text-muted-foreground line-clamp-1'>{attr.helpText}</div>
+          )}
+          {attr.attributeType === 'select' &&
+            attr.options?.options &&
+            Array.isArray(attr.options.options) && (
+              <div className='text-xs text-muted-foreground'>
+                {attr.options.options.length} opciones:{' '}
+                {attr.options.options.slice(0, 2).join(', ')}
+                {attr.options.options.length > 2 && '...'}
+              </div>
+            )}
+        </div>
+      ),
+    },
+    {
+      key: 'attributeType',
+      label: 'Tipo',
+      sortable: true,
+      width: '120px',
+      render: (attr: Attribute) => (
+        <Badge variant='secondary' className='text-xs px-2 py-0.5'>
+          {ATTRIBUTE_TYPE_LABELS[attr.attributeType]}
+        </Badge>
+      ),
+    },
+    {
+      key: 'isRequired',
+      label: 'Req.',
+      sortable: true,
+      width: '80px',
+      render: (attr: Attribute) =>
+        attr.isRequired ? (
+          <div className='flex justify-center'>
+            <Badge variant='destructive' className='text-xs px-1.5 py-0'>
+              Sí
+            </Badge>
+          </div>
+        ) : (
+          <div className='flex justify-center'>
+            <Badge variant='outline' className='text-xs px-1.5 py-0'>
+              No
+            </Badge>
+          </div>
+        ),
+    },
+    {
+      key: 'isVisible',
+      label: 'Vis.',
+      sortable: true,
+      width: '80px',
+      render: (attr: Attribute) => (
+        <div className='flex justify-center'>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant='ghost'
+                  size='sm'
+                  className='h-7 w-7 p-0'
+                  onClick={() => handleToggleVisible(attr)}
+                  disabled={saving}
+                >
+                  {attr.isVisible ? (
+                    <Eye className='h-3.5 w-3.5 text-green-600' />
+                  ) : (
+                    <EyeOff className='h-3.5 w-3.5 text-gray-400' />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{attr.isVisible ? 'Visible en formularios' : 'Oculto en formularios'}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      ),
+    },
+  ]
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -231,17 +318,25 @@ export function AttributeManagerDialog({
           </DialogHeader>
 
           <div className='space-y-4 py-4'>
-            {/* Header con contador y acciones */}
-            <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4'>
-              <div>
-                <p className='text-sm text-muted-foreground'>
-                  {attributes.length === 0
-                    ? 'No hay atributos configurados'
-                    : `${attributes.length} atributo${attributes.length !== 1 ? 's' : ''} configurado${attributes.length !== 1 ? 's' : ''}`}
-                </p>
-              </div>
-              <div className='flex gap-2'>
-                {attributes.length > 0 && (
+            <DataTable
+              data={attributes}
+              columns={columns}
+              loading={loading}
+              searchable={true}
+              searchPlaceholder='Buscar atributo...'
+              externalSearch={false}
+              pagination={{
+                page,
+                limit,
+                total: attributes.length,
+                onPageChange: setPage,
+                onLimitChange: newLimit => {
+                  setLimit(newLimit)
+                  setPage(1)
+                },
+              }}
+              onExport={
+                attributes.length > 0 ? (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant='outline' size='sm' disabled={exporting}>
@@ -257,319 +352,104 @@ export function AttributeManagerDialog({
                       <DropdownMenuItem onClick={exportPDF}>PDF</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                )}
+                ) : undefined
+              }
+              actions={
                 <Button onClick={handleCreate} disabled={loading || saving} size='sm'>
                   <Plus className='h-4 w-4 mr-2' />
                   Nuevo Atributo
                 </Button>
-              </div>
-            </div>
-
-            {/* Loading state */}
-            {loading ? (
-              <div className='flex items-center justify-center py-12'>
-                <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary' />
-              </div>
-            ) : attributes.length === 0 ? (
-              /* Empty state */
-              <div className='text-center py-12 border-2 border-dashed rounded-lg'>
-                <p className='text-muted-foreground mb-4'>
-                  Crea atributos personalizados para capturar información específica
-                </p>
-                <Button variant='outline' onClick={handleCreate}>
-                  <Plus className='h-4 w-4 mr-2' />
-                  Crear Primer Atributo
-                </Button>
-              </div>
-            ) : (
-              <>
-                {/* Vista Desktop: Tabla Compacta */}
-                <div className='hidden md:block border rounded-lg overflow-hidden'>
-                  <div className='overflow-x-auto'>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className='py-2'>Atributo</TableHead>
-                          <TableHead className='w-24 py-2'>Tipo</TableHead>
-                          <TableHead className='w-16 py-2 text-center'>Req.</TableHead>
-                          <TableHead className='w-16 py-2 text-center'>Vis.</TableHead>
-                          <TableHead className='w-32 py-2 text-right'>Acciones</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {attributes.map((attr, index) => (
-                          <TableRow key={attr.id}>
-                            <TableCell className='py-2'>
-                              <div className='space-y-0.5'>
-                                <div className='font-medium text-sm'>{attr.attributeLabel}</div>
-                                <div className='text-xs text-muted-foreground font-mono'>
-                                  {attr.attributeName}
-                                </div>
-                                {attr.helpText && (
-                                  <div className='text-xs text-muted-foreground line-clamp-1'>
-                                    {attr.helpText}
-                                  </div>
-                                )}
-                                {/* Opciones inline */}
-                                {attr.attributeType === 'select' &&
-                                  attr.options?.options &&
-                                  Array.isArray(attr.options.options) && (
-                                    <div className='text-xs text-muted-foreground'>
-                                      {attr.options.options.length} opciones:{' '}
-                                      {attr.options.options.slice(0, 2).join(', ')}
-                                      {attr.options.options.length > 2 && '...'}
-                                    </div>
-                                  )}
-                              </div>
-                            </TableCell>
-                            <TableCell className='py-2'>
-                              <Badge variant='secondary' className='text-xs px-2 py-0.5'>
-                                {ATTRIBUTE_TYPE_LABELS[attr.attributeType]}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className='py-2 text-center'>
-                              {attr.isRequired ? (
-                                <Badge variant='destructive' className='text-xs px-1.5 py-0'>
-                                  Sí
-                                </Badge>
-                              ) : (
-                                <Badge variant='outline' className='text-xs px-1.5 py-0'>
-                                  No
-                                </Badge>
-                              )}
-                            </TableCell>
-                            <TableCell className='py-2 text-center'>
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant='ghost'
-                                      size='sm'
-                                      className='h-7 w-7 p-0'
-                                      onClick={() => handleToggleVisible(attr)}
-                                      disabled={saving}
-                                    >
-                                      {attr.isVisible ? (
-                                        <Eye className='h-3.5 w-3.5 text-green-600' />
-                                      ) : (
-                                        <EyeOff className='h-3.5 w-3.5 text-gray-400' />
-                                      )}
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>
-                                      {attr.isVisible
-                                        ? 'Visible en formularios'
-                                        : 'Oculto en formularios'}
-                                    </p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            </TableCell>
-                            <TableCell className='py-2 text-right'>
-                              <div className='flex justify-end gap-0.5'>
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button
-                                        variant='ghost'
-                                        size='sm'
-                                        className='h-7 w-7 p-0'
-                                        onClick={() => handleReorder(attr, 'up')}
-                                        disabled={index === 0 || saving}
-                                      >
-                                        <MoveUp className='h-3.5 w-3.5' />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>Subir en el orden</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button
-                                        variant='ghost'
-                                        size='sm'
-                                        className='h-7 w-7 p-0'
-                                        onClick={() => handleReorder(attr, 'down')}
-                                        disabled={index === attributes.length - 1 || saving}
-                                      >
-                                        <MoveDown className='h-3.5 w-3.5' />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>Bajar en el orden</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button
-                                        variant='ghost'
-                                        size='sm'
-                                        className='h-7 w-7 p-0'
-                                        onClick={() => handleEdit(attr)}
-                                        disabled={saving}
-                                      >
-                                        <Edit className='h-3.5 w-3.5' />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>Editar atributo</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button
-                                        variant='ghost'
-                                        size='sm'
-                                        className='h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10'
-                                        onClick={() => handleDeleteClick(attr)}
-                                        disabled={saving}
-                                      >
-                                        <Trash2 className='h-3.5 w-3.5' />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>Eliminar atributo</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-
-                {/* Vista Mobile: Cards */}
-                <div className='md:hidden space-y-3'>
-                  {attributes.map((attr, index) => (
-                    <div key={attr.id} className='border rounded-lg p-4 space-y-3'>
-                      <div className='flex items-start justify-between gap-2'>
-                        <div className='flex-1 min-w-0'>
-                          <div className='font-medium truncate'>{attr.attributeLabel}</div>
-                          <div className='text-xs text-muted-foreground font-mono truncate'>
-                            {attr.attributeName}
-                          </div>
-                        </div>
-                        <div className='flex items-center gap-1 flex-shrink-0'>
+              }
+              rowActions={(attr: Attribute) => {
+                const index = attributes.findIndex(a => a.id === attr.id)
+                return (
+                  <div className='flex items-center justify-end gap-0.5'>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
                           <Button
                             variant='ghost'
                             size='sm'
-                            className='h-8 w-8 p-0'
+                            className='h-7 w-7 p-0'
                             onClick={() => handleReorder(attr, 'up')}
                             disabled={index === 0 || saving}
-                            title='Subir'
                           >
-                            <MoveUp className='h-4 w-4' />
+                            <MoveUp className='h-3.5 w-3.5' />
                           </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Subir en el orden</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
                           <Button
                             variant='ghost'
                             size='sm'
-                            className='h-8 w-8 p-0'
+                            className='h-7 w-7 p-0'
                             onClick={() => handleReorder(attr, 'down')}
                             disabled={index === attributes.length - 1 || saving}
-                            title='Bajar'
                           >
-                            <MoveDown className='h-4 w-4' />
+                            <MoveDown className='h-3.5 w-3.5' />
                           </Button>
-                        </div>
-                      </div>
-
-                      {attr.helpText && (
-                        <div className='text-xs text-muted-foreground'>{attr.helpText}</div>
-                      )}
-
-                      <div className='flex flex-wrap items-center gap-2'>
-                        <Badge variant='secondary' className='text-xs px-2 py-0.5'>
-                          {ATTRIBUTE_TYPE_LABELS[attr.attributeType]}
-                        </Badge>
-                        {attr.isRequired ? (
-                          <Badge variant='destructive' className='text-xs px-2 py-0.5'>
-                            Requerido
-                          </Badge>
-                        ) : (
-                          <Badge variant='outline' className='text-xs px-2 py-0.5'>
-                            Opcional
-                          </Badge>
-                        )}
-                        {attr.isVisible ? (
-                          <Badge variant='default' className='text-xs px-2 py-0.5 bg-green-600'>
-                            <Eye className='h-3 w-3 mr-1' />
-                            Visible
-                          </Badge>
-                        ) : (
-                          <Badge variant='secondary' className='text-xs px-2 py-0.5'>
-                            <EyeOff className='h-3 w-3 mr-1' />
-                            Oculto
-                          </Badge>
-                        )}
-                      </div>
-
-                      {attr.attributeType === 'select' &&
-                        attr.options?.options &&
-                        Array.isArray(attr.options.options) && (
-                          <div className='text-xs text-muted-foreground'>
-                            {attr.options.options.length} opciones:{' '}
-                            {attr.options.options.slice(0, 3).join(', ')}
-                            {attr.options.options.length > 3 && '...'}
-                          </div>
-                        )}
-
-                      <div className='flex gap-2 pt-2 border-t'>
-                        <Button
-                          variant='outline'
-                          size='sm'
-                          className='flex-1'
-                          onClick={() => handleToggleVisible(attr)}
-                          disabled={saving}
-                        >
-                          {attr.isVisible ? (
-                            <>
-                              <EyeOff className='h-4 w-4 mr-2' />
-                              Ocultar
-                            </>
-                          ) : (
-                            <>
-                              <Eye className='h-4 w-4 mr-2' />
-                              Mostrar
-                            </>
-                          )}
-                        </Button>
-                        <Button
-                          variant='outline'
-                          size='sm'
-                          className='flex-1'
-                          onClick={() => handleEdit(attr)}
-                          disabled={saving}
-                        >
-                          <Edit className='h-4 w-4 mr-2' />
-                          Editar
-                        </Button>
-                        <Button
-                          variant='outline'
-                          size='sm'
-                          className='flex-1 text-destructive hover:text-destructive'
-                          onClick={() => handleDeleteClick(attr)}
-                          disabled={saving}
-                        >
-                          <Trash2 className='h-4 w-4 mr-2' />
-                          Eliminar
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Bajar en el orden</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant='ghost'
+                            size='sm'
+                            className='h-7 w-7 p-0'
+                            onClick={() => handleEdit(attr)}
+                            disabled={saving}
+                          >
+                            <Edit className='h-3.5 w-3.5' />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Editar atributo</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant='ghost'
+                            size='sm'
+                            className='h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10'
+                            onClick={() => handleDeleteClick(attr)}
+                            disabled={saving}
+                          >
+                            <Trash2 className='h-3.5 w-3.5' />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Eliminar atributo</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                )
+              }}
+              emptyState={{
+                title: 'No hay atributos configurados',
+                description: 'Crea atributos personalizados para capturar información específica',
+                action: (
+                  <Button variant='outline' onClick={handleCreate}>
+                    <Plus className='h-4 w-4 mr-2' />
+                    Crear Primer Atributo
+                  </Button>
+                ),
+              }}
+            />
           </div>
         </DialogContent>
       </Dialog>

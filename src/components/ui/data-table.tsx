@@ -78,7 +78,7 @@ interface DataTableProps<T> {
 
   // Callbacks
   onRefresh?: () => void
-  onExport?: () => void
+  onExport?: (() => void) | ReactNode
   onSettings?: () => void
 
   // Estado vacío
@@ -208,6 +208,14 @@ export function DataTable<T extends { id: string }>({
     })
   }, [safeData, sortConfig]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Paginar datos si se proporciona configuración de paginación
+  const paginatedData = useMemo(() => {
+    if (!pagination) return sortedData
+    const startIndex = (pagination.page - 1) * pagination.limit
+    const endIndex = startIndex + pagination.limit
+    return sortedData.slice(startIndex, endIndex)
+  }, [sortedData, pagination])
+
   const clearFilters = () => {
     setSearchTerm('')
     setFilterValues({})
@@ -225,11 +233,13 @@ export function DataTable<T extends { id: string }>({
         onExport ||
         onSettings ||
         onViewModeChange) && (
-        <CardHeader className='pb-4'>
-          <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
+        <CardHeader className='pb-3 pt-4'>
+          <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-2'>
             <div className='min-w-0'>
               {title && <CardTitle className='text-base'>{title}</CardTitle>}
-              {description && <CardDescription className='mt-0.5'>{description}</CardDescription>}
+              {description && (
+                <CardDescription className='mt-0.5 text-xs'>{description}</CardDescription>
+              )}
             </div>
             <div className='flex flex-wrap items-center gap-2 flex-shrink-0'>
               {onRefresh && (
@@ -237,12 +247,15 @@ export function DataTable<T extends { id: string }>({
                   <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
                 </Button>
               )}
-              {onExport && (
-                <Button variant='outline' size='sm' onClick={onExport}>
-                  <Download className='h-4 w-4 mr-2' />
-                  Exportar
-                </Button>
-              )}
+              {onExport &&
+                (typeof onExport === 'function' ? (
+                  <Button variant='outline' size='sm' onClick={onExport}>
+                    <Download className='h-4 w-4 mr-2' />
+                    Exportar
+                  </Button>
+                ) : (
+                  onExport
+                ))}
               {onSettings && (
                 <Button variant='outline' size='sm' onClick={onSettings}>
                   <Settings className='h-4 w-4' />
@@ -374,7 +387,7 @@ export function DataTable<T extends { id: string }>({
           </div>
         ) : viewMode === 'cards' && cardRenderer ? (
           <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
-            {sortedData.map(item => (
+            {paginatedData.map(item => (
               <div key={item.id}>{cardRenderer(item)}</div>
             ))}
           </div>
@@ -409,7 +422,7 @@ export function DataTable<T extends { id: string }>({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedData.map(item => (
+                {paginatedData.map(item => (
                   <TableRow
                     key={item.id}
                     className={cn(onRowClick && 'cursor-pointer')}

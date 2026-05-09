@@ -6,10 +6,28 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Settings, Trash2, Eye, EyeOff, Edit2, CheckCircle, XCircle } from 'lucide-react'
+import {
+  Plus,
+  Settings,
+  Trash2,
+  Eye,
+  EyeOff,
+  Edit2,
+  CheckCircle,
+  XCircle,
+  Download,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DataTable, type Column } from '@/components/ui/data-table'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,6 +38,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { useExport } from '@/hooks/common/use-export'
 import type { AnyType, TypeKind } from '@/hooks/inventory/use-type-management'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -61,6 +80,24 @@ export function TypeSection<T extends AnyType>({
   const [typeToDelete, setTypeToDelete] = useState<T | null>(null)
 
   const labels = TYPE_LABELS[typeKind]
+
+  // Estado para paginación
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(10)
+
+  // Export configuration
+  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+    getData: () => types,
+    columns: [
+      { header: 'Nombre', accessor: (t: T) => t.name },
+      { header: 'Descripción', accessor: (t: T) => t.description || '' },
+      { header: 'Atributos', accessor: (t: T) => String((t as any)._count?.attributes || 0) },
+      { header: 'Estado', accessor: (t: T) => (t.isActive ? 'Activo' : 'Inactivo') },
+    ],
+    filename: `tipos-${typeKind}`,
+    title: labels.plural,
+    subtitle: `${types.length} tipo${types.length !== 1 ? 's' : ''}`,
+  })
 
   const handleDeleteClick = (type: T) => {
     setTypeToDelete(type)
@@ -133,17 +170,34 @@ export function TypeSection<T extends AnyType>({
         loading={loading}
         searchable={true}
         searchPlaceholder='Buscar por nombre...'
-        filters={[
-          {
-            key: 'status',
-            label: 'Estado',
-            type: 'select',
-            options: [
-              { value: 'active', label: 'Activos' },
-              { value: 'inactive', label: 'Inactivos' },
-            ],
+        externalSearch={false}
+        pagination={{
+          page,
+          limit,
+          total: types.length,
+          onPageChange: setPage,
+          onLimitChange: newLimit => {
+            setLimit(newLimit)
+            setPage(1)
           },
-        ]}
+        }}
+        onExport={
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant='outline' size='sm' disabled={exporting || loading}>
+                <Download className='h-4 w-4 mr-2' />
+                Exportar
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align='end'>
+              <DropdownMenuLabel>Formato</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={exportCSV}>CSV</DropdownMenuItem>
+              <DropdownMenuItem onClick={exportExcel}>Excel</DropdownMenuItem>
+              <DropdownMenuItem onClick={exportPDF}>PDF</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        }
         actions={
           <Button onClick={onCreateType} disabled={saving} size='sm'>
             <Plus className='h-4 w-4 mr-2' />
