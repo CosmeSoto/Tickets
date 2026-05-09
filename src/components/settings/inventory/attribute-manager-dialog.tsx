@@ -14,12 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Table,
   TableBody,
@@ -56,9 +51,13 @@ import {
   type CreateAttributeData,
 } from '@/hooks/inventory/use-attribute-management'
 import { useExport } from '@/hooks/common/use-export'
-import type { ExportColumn } from '@/lib/utils/export'
 
 // ── Types ──────────────────────────────────────────────────────────────────
+
+interface ExportColumnConfig<T> {
+  header: string
+  accessor: keyof T | ((item: T) => string | number)
+}
 
 interface AttributeManagerDialogProps {
   open: boolean
@@ -103,22 +102,39 @@ export function AttributeManagerDialog({
   const [attributeToDelete, setAttributeToDelete] = useState<Attribute | null>(null)
 
   // Export configuration
-  const exportColumns: ExportColumn<Attribute>[] = [
-    { header: 'Orden', accessor: 'order' },
+  const exportColumns: ExportColumnConfig<Attribute>[] = [
     { header: 'Nombre Técnico', accessor: 'attributeName' },
     { header: 'Etiqueta', accessor: 'attributeLabel' },
     {
       header: 'Tipo',
-      accessor: attr => ATTRIBUTE_TYPE_LABELS[attr.attributeType] || attr.attributeType,
+      accessor: (attr: Attribute) =>
+        ATTRIBUTE_TYPE_LABELS[attr.attributeType] || attr.attributeType,
     },
-    { header: 'Requerido', accessor: attr => (attr.isRequired ? 'Sí' : 'No') },
-    { header: 'Visible', accessor: attr => (attr.isVisible ? 'Sí' : 'No') },
-    { header: 'Texto de Ayuda', accessor: attr => attr.helpText || '' },
+    { header: 'Requerido', accessor: (attr: Attribute) => (attr.isRequired ? 'Sí' : 'No') },
+    { header: 'Visible', accessor: (attr: Attribute) => (attr.isVisible ? 'Sí' : 'No') },
+    { header: 'Texto de Ayuda', accessor: (attr: Attribute) => attr.helpText || '' },
   ]
+
+  // Convert to format expected by useExport
+  const exportColumnsForHook = exportColumns.map(col => {
+    if (typeof col.accessor === 'string') {
+      return {
+        key: col.accessor,
+        label: col.header,
+      }
+    } else {
+      const accessorFn = col.accessor as (item: Attribute) => string | number
+      return {
+        key: '_computed',
+        label: col.header,
+        format: (_: any, row: Attribute) => String(accessorFn(row)),
+      }
+    }
+  })
 
   const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
     getData: () => attributes,
-    columns: exportColumns,
+    columns: exportColumnsForHook,
     filename: `atributos-${typeName.toLowerCase().replace(/\s+/g, '-')}`,
     title: `Atributos de ${typeName}`,
     subtitle: `${attributes.length} atributo${attributes.length !== 1 ? 's' : ''}`,
@@ -264,46 +280,16 @@ export function AttributeManagerDialog({
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className='w-16 py-2'>#</TableHead>
                           <TableHead className='py-2'>Atributo</TableHead>
                           <TableHead className='w-24 py-2'>Tipo</TableHead>
                           <TableHead className='w-16 py-2 text-center'>Req.</TableHead>
                           <TableHead className='w-16 py-2 text-center'>Vis.</TableHead>
-                          <TableHead className='w-24 py-2 text-right'>Acciones</TableHead>
+                          <TableHead className='w-32 py-2 text-right'>Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {attributes.map((attr, index) => (
                           <TableRow key={attr.id}>
-                            <TableCell className='py-2'>
-                              <div className='flex items-center gap-1'>
-                                <span className='text-sm font-mono text-muted-foreground w-6'>
-                                  {attr.order}
-                                </span>
-                                <div className='flex flex-col gap-0.5'>
-                                  <Button
-                                    variant='ghost'
-                                    size='sm'
-                                    className='h-5 w-5 p-0 hover:bg-muted'
-                                    onClick={() => handleReorder(attr, 'up')}
-                                    disabled={index === 0 || saving}
-                                    title='Subir'
-                                  >
-                                    <MoveUp className='h-3 w-3' />
-                                  </Button>
-                                  <Button
-                                    variant='ghost'
-                                    size='sm'
-                                    className='h-5 w-5 p-0 hover:bg-muted'
-                                    onClick={() => handleReorder(attr, 'down')}
-                                    disabled={index === attributes.length - 1 || saving}
-                                    title='Bajar'
-                                  >
-                                    <MoveDown className='h-3 w-3' />
-                                  </Button>
-                                </div>
-                              </div>
-                            </TableCell>
                             <TableCell className='py-2'>
                               <div className='space-y-0.5'>
                                 <div className='font-medium text-sm'>{attr.attributeLabel}</div>
@@ -380,6 +366,42 @@ export function AttributeManagerDialog({
                                         variant='ghost'
                                         size='sm'
                                         className='h-7 w-7 p-0'
+                                        onClick={() => handleReorder(attr, 'up')}
+                                        disabled={index === 0 || saving}
+                                      >
+                                        <MoveUp className='h-3.5 w-3.5' />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Subir en el orden</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant='ghost'
+                                        size='sm'
+                                        className='h-7 w-7 p-0'
+                                        onClick={() => handleReorder(attr, 'down')}
+                                        disabled={index === attributes.length - 1 || saving}
+                                      >
+                                        <MoveDown className='h-3.5 w-3.5' />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Bajar en el orden</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant='ghost'
+                                        size='sm'
+                                        className='h-7 w-7 p-0'
                                         onClick={() => handleEdit(attr)}
                                         disabled={saving}
                                       >
@@ -436,6 +458,7 @@ export function AttributeManagerDialog({
                             className='h-8 w-8 p-0'
                             onClick={() => handleReorder(attr, 'up')}
                             disabled={index === 0 || saving}
+                            title='Subir'
                           >
                             <MoveUp className='h-4 w-4' />
                           </Button>
@@ -445,6 +468,7 @@ export function AttributeManagerDialog({
                             className='h-8 w-8 p-0'
                             onClick={() => handleReorder(attr, 'down')}
                             disabled={index === attributes.length - 1 || saving}
+                            title='Bajar'
                           >
                             <MoveDown className='h-4 w-4' />
                           </Button>
@@ -479,9 +503,6 @@ export function AttributeManagerDialog({
                             Oculto
                           </Badge>
                         )}
-                        <Badge variant='outline' className='text-xs px-2 py-0.5 font-mono'>
-                          #{attr.order}
-                        </Badge>
                       </div>
 
                       {attr.attributeType === 'select' &&

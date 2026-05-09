@@ -52,11 +52,8 @@ export class AttributeHandler {
 
       return NextResponse.json({ attributes })
     } catch (error) {
-      console.error(`Error obteniendo atributos de ${this.typeKind}:`, error)
-      return NextResponse.json(
-        { error: 'Error al obtener atributos' },
-        { status: 500 }
-      )
+      console.error(`❌ Error obteniendo atributos de ${this.typeKind}:`, error)
+      return NextResponse.json({ error: 'Error al obtener atributos' }, { status: 500 })
     }
   }
 
@@ -93,10 +90,7 @@ export class AttributeHandler {
       })
 
       if (existing) {
-        return NextResponse.json(
-          { error: 'Ya existe un atributo con ese nombre' },
-          { status: 409 }
-        )
+        return NextResponse.json({ error: 'Ya existe un atributo con ese nombre' }, { status: 409 })
       }
 
       // Crear atributo
@@ -110,10 +104,7 @@ export class AttributeHandler {
       return NextResponse.json({ attribute }, { status: 201 })
     } catch (error) {
       console.error(`Error creando atributo de ${this.typeKind}:`, error)
-      return NextResponse.json(
-        { error: 'Error al crear atributo' },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'Error al crear atributo' }, { status: 500 })
     }
   }
 
@@ -137,10 +128,7 @@ export class AttributeHandler {
       return NextResponse.json({ attribute })
     } catch (error) {
       console.error(`Error actualizando atributo de ${this.typeKind}:`, error)
-      return NextResponse.json(
-        { error: 'Error al actualizar atributo' },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'Error al actualizar atributo' }, { status: 500 })
     }
   }
 
@@ -150,10 +138,7 @@ export class AttributeHandler {
       return NextResponse.json({ success: true })
     } catch (error) {
       console.error(`Error eliminando atributo de ${this.typeKind}:`, error)
-      return NextResponse.json(
-        { error: 'Error al eliminar atributo' },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'Error al eliminar atributo' }, { status: 500 })
     }
   }
 
@@ -172,10 +157,7 @@ export class AttributeHandler {
       return NextResponse.json({ success: true })
     } catch (error) {
       console.error(`Error reordenando atributos de ${this.typeKind}:`, error)
-      return NextResponse.json(
-        { error: 'Error al reordenar atributos' },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'Error al reordenar atributos' }, { status: 500 })
     }
   }
 }

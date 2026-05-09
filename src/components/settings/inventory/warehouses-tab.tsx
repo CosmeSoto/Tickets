@@ -89,8 +89,11 @@ export function WarehousesTab({ familyId }: WarehousesTabProps) {
     { header: 'Responsable', accessor: w => w.manager?.name || 'Sin responsable' },
     { header: 'Equipos', accessor: w => w._count?.equipment || 0 },
     { header: 'Consumibles', accessor: w => w._count?.consumables || 0 },
+    {
+      header: 'Total Items',
+      accessor: w => (w._count?.equipment || 0) + (w._count?.consumables || 0),
+    },
     { header: 'Estado', accessor: w => (w.isActive ? 'Activa' : 'Inactiva') },
-    { header: 'Descripción', accessor: w => w.description || '' },
   ]
 
   const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
@@ -215,6 +218,7 @@ export function WarehousesTab({ familyId }: WarehousesTabProps) {
                         sortKey='name'
                         currentSort={getSortIcon('name')}
                         onSort={requestSort}
+                        className='w-[25%]'
                       >
                         Nombre
                       </SortableTableHead>
@@ -222,6 +226,7 @@ export function WarehousesTab({ familyId }: WarehousesTabProps) {
                         sortKey='location'
                         currentSort={getSortIcon('location')}
                         onSort={requestSort}
+                        className='w-[25%]'
                       >
                         Ubicación
                       </SortableTableHead>
@@ -229,50 +234,29 @@ export function WarehousesTab({ familyId }: WarehousesTabProps) {
                         sortKey='manager.name'
                         currentSort={getSortIcon('manager.name')}
                         onSort={requestSort}
+                        className='w-[25%]'
                       >
                         Responsable
                       </SortableTableHead>
-                      <SortableTableHead
-                        sortKey='_count.equipment'
-                        currentSort={getSortIcon('_count.equipment')}
-                        onSort={requestSort}
-                        align='center'
-                      >
-                        Equipos
-                      </SortableTableHead>
-                      <SortableTableHead
-                        sortKey='_count.consumables'
-                        currentSort={getSortIcon('_count.consumables')}
-                        onSort={requestSort}
-                        align='center'
-                      >
-                        Consumibles
-                      </SortableTableHead>
-                      <SortableTableHead
-                        sortKey='isActive'
-                        currentSort={getSortIcon('isActive')}
-                        onSort={requestSort}
-                        align='center'
-                      >
-                        Estado
-                      </SortableTableHead>
-                      <TableHead className='w-[70px]'></TableHead>
+                      <TableHead className='text-center w-[15%]'>Items</TableHead>
+                      <TableHead className='text-right w-[10%]'>Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {sortedData.map(warehouse => {
                       const equipmentCount = warehouse._count?.equipment || 0
                       const consumablesCount = warehouse._count?.consumables || 0
+                      const totalItems = equipmentCount + consumablesCount
 
                       return (
                         <TableRow key={warehouse.id}>
-                          <TableCell>
+                          <TableCell className='align-top'>
                             <div className='flex items-start gap-2'>
                               <WarehouseIcon className='h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0' />
-                              <div className='min-w-0'>
-                                <p className='font-medium text-sm'>{warehouse.name}</p>
+                              <div className='min-w-0 flex-1'>
+                                <p className='font-medium text-sm break-words'>{warehouse.name}</p>
                                 {warehouse.description && (
-                                  <p className='text-xs text-muted-foreground line-clamp-1'>
+                                  <p className='text-xs text-muted-foreground mt-0.5 break-words'>
                                     {warehouse.description}
                                   </p>
                                 )}
@@ -280,83 +264,86 @@ export function WarehousesTab({ familyId }: WarehousesTabProps) {
                             </div>
                           </TableCell>
 
-                          <TableCell>
+                          <TableCell className='align-top'>
                             {warehouse.location ? (
-                              <div className='flex items-center gap-1.5 text-sm'>
-                                <MapPin className='h-3.5 w-3.5 text-muted-foreground flex-shrink-0' />
-                                <span className='line-clamp-1'>{warehouse.location}</span>
+                              <div className='flex items-start gap-1.5 text-sm'>
+                                <MapPin className='h-3.5 w-3.5 text-muted-foreground flex-shrink-0 mt-0.5' />
+                                <span className='break-words'>{warehouse.location}</span>
                               </div>
                             ) : (
-                              <span className='text-xs text-muted-foreground'>Sin ubicación</span>
+                              <span className='text-xs text-muted-foreground'>—</span>
                             )}
                           </TableCell>
 
-                          <TableCell>
+                          <TableCell className='align-top'>
                             {warehouse.manager ? (
-                              <div className='flex items-center gap-1.5 text-sm'>
-                                <User className='h-3.5 w-3.5 text-muted-foreground flex-shrink-0' />
-                                <span className='line-clamp-1'>{warehouse.manager.name}</span>
+                              <div className='flex items-start gap-1.5 text-sm'>
+                                <User className='h-3.5 w-3.5 text-muted-foreground flex-shrink-0 mt-0.5' />
+                                <span className='break-words'>{warehouse.manager.name}</span>
                               </div>
                             ) : (
-                              <span className='text-xs text-muted-foreground'>Sin responsable</span>
+                              <span className='text-xs text-muted-foreground'>—</span>
                             )}
                           </TableCell>
 
-                          <TableCell className='text-center'>
-                            <div className='flex items-center justify-center gap-1.5'>
-                              <Package className='h-3.5 w-3.5 text-muted-foreground' />
-                              <span className='text-sm font-medium'>{equipmentCount}</span>
+                          <TableCell className='text-center align-top'>
+                            <div className='flex items-center justify-center gap-3'>
+                              <div
+                                className='flex items-center gap-1 cursor-help'
+                                title={`${equipmentCount} Equipo${equipmentCount !== 1 ? 's' : ''}`}
+                              >
+                                <Package className='h-3.5 w-3.5 text-blue-500' />
+                                <span className='text-sm font-medium'>{equipmentCount}</span>
+                              </div>
+                              <div
+                                className='flex items-center gap-1 cursor-help'
+                                title={`${consumablesCount} Consumible${consumablesCount !== 1 ? 's' : ''}`}
+                              >
+                                <Box className='h-3.5 w-3.5 text-amber-500' />
+                                <span className='text-sm font-medium'>{consumablesCount}</span>
+                              </div>
                             </div>
                           </TableCell>
 
-                          <TableCell className='text-center'>
-                            <div className='flex items-center justify-center gap-1.5'>
-                              <Box className='h-3.5 w-3.5 text-muted-foreground' />
-                              <span className='text-sm font-medium'>{consumablesCount}</span>
+                          <TableCell className='text-right align-top'>
+                            <div className='flex items-center justify-end gap-1'>
+                              <Button
+                                variant='ghost'
+                                size='sm'
+                                className='h-8 w-8 p-0'
+                                onClick={() => handleEdit(warehouse)}
+                                disabled={saving}
+                                title='Editar bodega'
+                              >
+                                <Pencil className='h-4 w-4' />
+                              </Button>
+                              <Button
+                                variant='ghost'
+                                size='sm'
+                                className='h-8 w-8 p-0'
+                                onClick={() =>
+                                  updateWarehouse(warehouse.id, { isActive: !warehouse.isActive })
+                                }
+                                disabled={saving}
+                                title={warehouse.isActive ? 'Desactivar bodega' : 'Activar bodega'}
+                              >
+                                {warehouse.isActive ? (
+                                  <CheckCircle className='h-4 w-4 text-green-600 dark:text-green-500' />
+                                ) : (
+                                  <XCircle className='h-4 w-4 text-muted-foreground' />
+                                )}
+                              </Button>
+                              <Button
+                                variant='ghost'
+                                size='sm'
+                                className='h-8 w-8 p-0'
+                                onClick={() => handleDelete(warehouse)}
+                                disabled={saving}
+                                title='Eliminar bodega'
+                              >
+                                <Trash2 className='h-4 w-4 text-destructive' />
+                              </Button>
                             </div>
-                          </TableCell>
-
-                          <TableCell className='text-center'>
-                            {warehouse.isActive ? (
-                              <div className='flex items-center justify-center gap-1.5 text-green-600 dark:text-green-500'>
-                                <CheckCircle className='h-4 w-4' />
-                                <span className='text-sm font-medium'>Activa</span>
-                              </div>
-                            ) : (
-                              <div className='flex items-center justify-center gap-1.5 text-muted-foreground'>
-                                <XCircle className='h-4 w-4' />
-                                <span className='text-sm font-medium'>Inactiva</span>
-                              </div>
-                            )}
-                          </TableCell>
-
-                          <TableCell>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant='ghost'
-                                  size='sm'
-                                  className='h-8 w-8 p-0'
-                                  disabled={saving}
-                                >
-                                  <MoreVertical className='h-4 w-4' />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align='end'>
-                                <DropdownMenuItem onClick={() => handleEdit(warehouse)}>
-                                  <Pencil className='h-4 w-4 mr-2' />
-                                  Editar
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onClick={() => handleDelete(warehouse)}
-                                  className='text-destructive'
-                                >
-                                  <Trash2 className='h-4 w-4 mr-2' />
-                                  Eliminar
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
                           </TableCell>
                         </TableRow>
                       )

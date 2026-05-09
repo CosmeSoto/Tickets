@@ -6,7 +6,17 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Settings, Trash2, Eye, EyeOff, Edit2, Download, CheckCircle, XCircle } from 'lucide-react'
+import {
+  Plus,
+  Settings,
+  Trash2,
+  Eye,
+  EyeOff,
+  Edit2,
+  Download,
+  CheckCircle,
+  XCircle,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -90,9 +100,8 @@ export function TypeSection<T extends AnyType>({
   // Export configuration
   const exportColumns: ExportColumn<T>[] = [
     { header: 'Nombre', accessor: 'name' },
-    { header: 'Descripción', accessor: t => t.description || '' },
+    { header: 'Atributos', accessor: t => String((t as any)._count?.attributes || 0) },
     { header: 'Estado', accessor: t => (t.isActive ? 'Activo' : 'Inactivo') },
-    { header: 'Familia', accessor: 'familyId' },
   ]
 
   const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
@@ -181,13 +190,7 @@ export function TypeSection<T extends AnyType>({
                   >
                     Nombre
                   </SortableTableHead>
-                  <SortableTableHead
-                    sortKey='description'
-                    currentSort={getSortIcon('description')}
-                    onSort={requestSort}
-                  >
-                    Descripción
-                  </SortableTableHead>
+                  <TableHead className='text-center'>Atributos</TableHead>
                   <SortableTableHead
                     sortKey='isActive'
                     currentSort={getSortIcon('isActive')}
@@ -203,8 +206,10 @@ export function TypeSection<T extends AnyType>({
                 {sortedData.map(type => (
                   <TableRow key={type.id}>
                     <TableCell className='font-medium'>{type.name}</TableCell>
-                    <TableCell className='text-sm text-muted-foreground max-w-md truncate'>
-                      {type.description || '—'}
+                    <TableCell className='text-center'>
+                      <Badge variant='secondary' className='font-mono'>
+                        {(type as any)._count?.attributes || 0}
+                      </Badge>
                     </TableCell>
                     <TableCell className='text-center'>
                       {type.isActive ? (

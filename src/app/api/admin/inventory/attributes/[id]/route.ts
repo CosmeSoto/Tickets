@@ -27,10 +27,7 @@ const attributeUpdateSchema = z.object({
 /**
  * PUT - Actualizar atributo
  */
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
 
@@ -42,6 +39,7 @@ export async function PUT(
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 
+    const params = await context.params
     const { id } = params
     const body = await request.json()
 
@@ -79,20 +77,14 @@ export async function PUT(
     return NextResponse.json({ attribute })
   } catch (error) {
     console.error('Error actualizando atributo:', error)
-    return NextResponse.json(
-      { error: 'Error al actualizar atributo' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al actualizar atributo' }, { status: 500 })
   }
 }
 
 /**
  * DELETE - Eliminar atributo
  */
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
 
@@ -104,6 +96,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 
+    const params = await context.params
     const { id } = params
 
     // Eliminar (intentar en las 3 tablas)
@@ -120,9 +113,6 @@ export async function DELETE(
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error eliminando atributo:', error)
-    return NextResponse.json(
-      { error: 'Error al eliminar atributo' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al eliminar atributo' }, { status: 500 })
   }
 }

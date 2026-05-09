@@ -22,12 +22,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import { Checkbox } from '@/components/ui/checkbox'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Select,
   SelectContent,
@@ -40,6 +35,7 @@ import { FamilyIcon } from '@/components/inventory/family-badge'
 import { SectionTable } from '@/components/families/section-table'
 import { CatalogsTab } from './catalogs-tab'
 import { WarehousesTab } from './warehouses-tab'
+import { useToast } from '@/hooks/use-toast'
 import type {
   AcquisitionMode,
   FormSection,
@@ -129,7 +125,20 @@ export function InventoryAreasTab({
   onSetModeRequired,
   onValidateResidual,
 }: InventoryAreasTabProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'config' | 'catalogs' | 'warehouses' | 'custom-fields'>('config')
+  const [activeSubTab, setActiveSubTab] = useState<
+    'config' | 'catalogs' | 'warehouses' | 'custom-fields'
+  >('config')
+  const { toast } = useToast()
+
+  const handleToggleAssetRequests = (checked: boolean) => {
+    onSetField('assetRequestsEnabled', checked)
+    toast({
+      title: checked ? 'Solicitudes habilitadas' : 'Solicitudes deshabilitadas',
+      description: checked
+        ? 'Los usuarios podrán solicitar activos de inventario. Recuerda guardar los cambios.'
+        : 'Las solicitudes de activos han sido deshabilitadas. Recuerda guardar los cambios.',
+    })
+  }
 
   return (
     <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
@@ -262,7 +271,7 @@ export function InventoryAreasTab({
                     <Switch
                       id='asset-requests-enabled'
                       checked={form.assetRequestsEnabled}
-                      onCheckedChange={v => onSetField('assetRequestsEnabled', v)}
+                      onCheckedChange={handleToggleAssetRequests}
                       disabled={saving || !form.inventoryEnabled}
                       className='scale-75'
                     />

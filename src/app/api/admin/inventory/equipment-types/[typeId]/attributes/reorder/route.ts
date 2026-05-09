@@ -18,7 +18,7 @@ const reorderSchema = z.object({
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { typeId: string } }
+  context: { params: Promise<{ typeId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -31,6 +31,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 
+    const params = await context.params
     const { typeId } = params
     const body = await request.json()
 
@@ -58,9 +59,6 @@ export async function PATCH(
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error reordenando atributos:', error)
-    return NextResponse.json(
-      { error: 'Error al reordenar atributos' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al reordenar atributos' }, { status: 500 })
   }
 }

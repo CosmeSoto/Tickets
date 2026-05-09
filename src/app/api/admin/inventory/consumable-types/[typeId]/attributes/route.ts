@@ -14,10 +14,7 @@ const handler = new AttributeHandler('consumable')
 /**
  * GET - Obtener atributos de un tipo de consumible
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { typeId: string } }
-) {
+export async function GET(request: NextRequest, context: { params: Promise<{ typeId: string }> }) {
   const session = await getServerSession(authOptions)
 
   if (!session?.user) {
@@ -28,16 +25,14 @@ export async function GET(
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
   }
 
+  const params = await context.params
   return handler.getAll(params.typeId)
 }
 
 /**
  * POST - Crear atributo para un tipo de consumible
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { typeId: string } }
-) {
+export async function POST(request: NextRequest, context: { params: Promise<{ typeId: string }> }) {
   const session = await getServerSession(authOptions)
 
   if (!session?.user) {
@@ -48,6 +43,7 @@ export async function POST(
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
   }
 
+  const params = await context.params
   const body = await request.json()
   return handler.create(params.typeId, body)
 }
