@@ -26,6 +26,7 @@ import { BatchMetrics } from '@/components/inventory/batch/BatchMetrics'
 import { BatchEquipmentList } from '@/components/inventory/batch/BatchEquipmentList'
 import { BatchHistory } from '@/components/inventory/batch/BatchHistory'
 import { DeleteBatchButton } from '@/components/inventory/batch/DeleteBatchButton'
+import { getHomePathForRole, loginPathWithReturnTo } from '@/lib/navigation/role-home-path'
 
 async function getBatchData(batchId: string) {
   const [details, history] = await Promise.all([
@@ -52,7 +53,10 @@ function LoadingSkeleton() {
 
 async function BatchDetailContent({ batchId }: { batchId: string }) {
   const session = await getServerSession(authOptions)
-  if (!session?.user) redirect('/auth/signin')
+  if (!session?.user) redirect(loginPathWithReturnTo(`/inventory/batches/${batchId}`))
+  if (!session.user.inventoryEnabled && !session.user.canManageInventory) {
+    redirect(getHomePathForRole(session.user.role))
+  }
 
   let batchData
   try {

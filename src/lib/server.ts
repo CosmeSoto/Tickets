@@ -31,14 +31,15 @@ function createPrisma(): PrismaClient {
     log: process.env.NODE_ENV === 'development' ? ['error'] : [],
   })
 
-  // Log de queries lentas (>100ms warn, >1s error)
+  // Log de queries lentas (umbrales más altos en dev para sesiones JWT / finds frecuentes)
+  const warnMs = process.env.NODE_ENV === 'development' ? 350 : 100
   client.$use(async (params, next) => {
     const before = Date.now()
     const result = await next(params)
     const ms = Date.now() - before
     if (ms > 1000) {
       console.error(`🚨 Query muy lenta: ${ms}ms — ${params.model}.${params.action}`)
-    } else if (ms > 100) {
+    } else if (ms > warnMs) {
       console.warn(`🐌 Query lenta: ${ms}ms — ${params.model}.${params.action}`)
     }
     return result

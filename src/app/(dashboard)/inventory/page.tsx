@@ -10,10 +10,10 @@ import { ModelCards } from '@/components/inventory/dashboard/ModelCards'
 import { BatchList } from '@/components/inventory/dashboard/BatchList'
 import { ModelAggregationService } from '@/lib/services/model-aggregation.service'
 import { BatchService } from '@/lib/services/batch-inventory.service'
-import { EquipmentService } from '@/lib/services/equipment-inventory.service'
 import { Skeleton } from '@/components/ui/skeleton'
 import { InventoryFiltersClient } from '@/components/inventory/filters/InventoryFiltersClient'
 import { prisma } from '@/lib/prisma'
+import { getHomePathForRole, loginPathWithReturnTo } from '@/lib/navigation/role-home-path'
 
 interface SearchParams {
   search?: string
@@ -23,7 +23,7 @@ interface SearchParams {
 }
 
 async function getInventoryData(filters: SearchParams) {
-  const [models, batches, allEquipment, types, departments] = await Promise.all([
+  const [models, batches, types, departments] = await Promise.all([
     ModelAggregationService.getAllModels({
       search: filters.search,
       typeId: filters.typeId,
@@ -32,12 +32,6 @@ async function getInventoryData(filters: SearchParams) {
     BatchService.getAll({
       typeId: filters.typeId,
       departmentId: filters.departmentId,
-    }),
-    EquipmentService.getPaginated(1, 50, {
-      search: filters.search,
-      typeId: filters.typeId,
-      departmentId: filters.departmentId,
-      status: filters.status,
     }),
     prisma.equipment_types.findMany({
       where: { isActive: true },
@@ -49,7 +43,7 @@ async function getInventoryData(filters: SearchParams) {
     }),
   ])
 
-  return { models, batches, allEquipment, types, departments }
+  return { models, batches, types, departments }
 }
 
 function LoadingSkeleton() {
@@ -69,14 +63,14 @@ async function InventoryContent({ searchParams }: { searchParams: SearchParams }
   const session = await getServerSession(authOptions)
 
   if (!session?.user) {
-    redirect('/auth/signin')
+    redirect(loginPathWithReturnTo('/inventory'))
   }
 
   if (!session.user.inventoryEnabled && !session.user.canManageInventory) {
-    redirect('/dashboard')
+    redirect(getHomePathForRole(session.user.role))
   }
 
-  const { models, batches, allEquipment, types, departments } = await getInventoryData(searchParams)
+  const { models, batches, types, departments } = await getInventoryData(searchParams)
 
   // Transformar datos para componentes
   const modelData = models.map(m => ({

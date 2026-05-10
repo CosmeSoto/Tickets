@@ -2,6 +2,16 @@ import { prisma } from '@/lib/prisma'
 import { ValidationService } from './validation-inventory.service'
 import { BatchCreationInput } from '../schemas/equipment-inventory.schema'
 import { BatchFilters, BatchMetrics } from '@/types/inventory/batch-inventory'
+import { Prisma } from '@prisma/client'
+
+/** Tipo de lote con relaciones y métricas calculadas */
+export type BatchWithMetrics = Prisma.equipment_batchesGetPayload<{
+  include: {
+    model: { include: { type: true } }
+    department: true
+    supplier: true
+  }
+}> & { metrics: BatchMetrics }
 
 export class BatchService {
   /**
@@ -158,13 +168,14 @@ export class BatchService {
   /**
    * Obtener todos los lotes con filtros
    */
-  static async getAll(filters?: BatchFilters) {
+  static async getAll(filters?: BatchFilters): Promise<BatchWithMetrics[]> {
     const where: any = {}
 
     if (filters?.modelId) where.modelId = filters.modelId
     if (filters?.supplierId) where.supplierId = filters.supplierId
     if (filters?.departmentId) where.departmentId = filters.departmentId
     if (filters?.status) where.status = filters.status
+    // typeId filtra a través de la relación model
     if (filters?.typeId) where.model = { typeId: filters.typeId }
 
     if (filters?.dateFrom || filters?.dateTo) {
@@ -176,17 +187,11 @@ export class BatchService {
     const batches = await prisma.equipment_batches.findMany({
       where,
       include: {
-        model: {
-          include: {
-            type: true,
-          },
-        },
+        model: { include: { type: true } },
         department: true,
         supplier: true,
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: { createdAt: 'desc' },
     })
 
     // Calcular métricas para cada lote
@@ -208,10 +213,7 @@ export class BatchService {
               : 0,
         }
 
-        return {
-          ...batch,
-          metrics,
-        }
+        return { ...batch, metrics }
       })
     )
 

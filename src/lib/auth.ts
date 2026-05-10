@@ -361,6 +361,9 @@ export const authOptions: NextAuthOptions = {
                 token.avatar = dbUser.avatar || user.image || undefined
                 token.canManageInventory = dbUser.canManageInventory ?? false
                 token.isSuperAdmin = (dbUser as any).isSuperAdmin ?? false
+                token.ticketsEnabled = dbUser.ticketsEnabled ?? true
+                token.inventoryEnabled = dbUser.inventoryEnabled ?? true
+                token.canRequestAssets = dbUser.canRequestAssets ?? false
                 token.isOAuth = true
               } else {
                 token.role = 'CLIENT'
@@ -576,5 +579,6 @@ export const authOptions: NextAuthOptions = {
     },
   },
   secret: process.env.NEXTAUTH_SECRET,
-  debug: process.env.NODE_ENV === 'development',
+  /** Evita ruido en consola; activar solo al depurar flujos de auth (`NEXTAUTH_DEBUG=true`). */
+  debug: process.env.NEXTAUTH_DEBUG === 'true',
 }

@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ModelSortClient } from '@/components/inventory/model/ModelSortClient'
+import { getHomePathForRole, loginPathWithReturnTo } from '@/lib/navigation/role-home-path'
 
 interface SearchParams {
   search?: string
@@ -67,7 +68,10 @@ function LoadingSkeleton() {
 
 async function ModelsContent({ searchParams }: { searchParams: SearchParams }) {
   const session = await getServerSession(authOptions)
-  if (!session?.user) redirect('/auth/signin')
+  if (!session?.user) redirect(loginPathWithReturnTo('/inventory/models'))
+  if (!session.user.inventoryEnabled && !session.user.canManageInventory) {
+    redirect(getHomePathForRole(session.user.role))
+  }
 
   const { models, types, departments } = await getModelsData(searchParams)
 

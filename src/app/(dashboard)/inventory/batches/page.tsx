@@ -10,6 +10,7 @@ import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
 import { BatchList } from '@/components/inventory/dashboard/BatchList'
 import { InventoryFiltersClient } from '@/components/inventory/filters/InventoryFiltersClient'
+import { getHomePathForRole, loginPathWithReturnTo } from '@/lib/navigation/role-home-path'
 
 interface SearchParams {
   search?: string
@@ -52,7 +53,10 @@ function LoadingSkeleton() {
 
 async function BatchesContent({ searchParams }: { searchParams: SearchParams }) {
   const session = await getServerSession(authOptions)
-  if (!session?.user) redirect('/auth/signin')
+  if (!session?.user) redirect(loginPathWithReturnTo('/inventory/batches'))
+  if (!session.user.inventoryEnabled && !session.user.canManageInventory) {
+    redirect(getHomePathForRole(session.user.role))
+  }
 
   const { batches, types, departments } = await getBatchesData(searchParams)
 
