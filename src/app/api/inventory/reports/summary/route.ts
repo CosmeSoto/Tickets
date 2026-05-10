@@ -131,7 +131,13 @@ export async function GET(request: NextRequest) {
     for (const [key, { count, value }] of equipByFamilyStatus) {
       const [familia, , estado] = key.split('||')
       if (!subtype || subtype === 'EQUIPMENT') {
-        rows.push({ familia, subtipo: 'Equipo', cantidad: count, valorTotal: formatCurrency(value), estado })
+        rows.push({
+          familia,
+          subtipo: 'Equipo',
+          cantidad: count,
+          valorTotal: formatCurrency(value),
+          estado,
+        })
       }
     }
 
@@ -150,7 +156,13 @@ export async function GET(request: NextRequest) {
     for (const [key, { count, value }] of consByFamilyStatus) {
       const [familia, , estado] = key.split('||')
       if (!subtype || subtype === 'MRO') {
-        rows.push({ familia, subtipo: 'Material MRO', cantidad: count, valorTotal: formatCurrency(value), estado })
+        rows.push({
+          familia,
+          subtipo: 'Consumible',
+          cantidad: count,
+          valorTotal: formatCurrency(value),
+          estado,
+        })
       }
     }
 
@@ -165,19 +177,25 @@ export async function GET(request: NextRequest) {
     for (const [key, { count, value }] of licByFamily) {
       const [familia] = key.split('||')
       if (!subtype || subtype === 'LICENSE') {
-        rows.push({ familia, subtipo: 'Licencia/Contrato', cantidad: count, valorTotal: formatCurrency(value), estado: 'Activo' })
+        rows.push({
+          familia,
+          subtipo: 'Licencia/Contrato',
+          cantidad: count,
+          valorTotal: formatCurrency(value),
+          estado: 'Activo',
+        })
       }
     }
 
     // ── Indicadores ejecutivos ────────────────────────────────────────────────
     const totalActivos = equipmentData.length + consumableData.length + licenseData.length
     const totalValor = [
-      ...equipmentData.map((e) => e.purchasePrice ?? 0),
-      ...consumableData.map((c) => (c.costPerUnit ?? 0) * c.currentStock),
-      ...licenseData.map((l) => l.cost ?? 0),
+      ...equipmentData.map(e => e.purchasePrice ?? 0),
+      ...consumableData.map(c => (c.costPerUnit ?? 0) * c.currentStock),
+      ...licenseData.map(l => l.cost ?? 0),
     ].reduce((a, b) => a + b, 0)
 
-    const equipRetired = equipmentData.filter((e) => e.status === 'RETIRED').length
+    const equipRetired = equipmentData.filter(e => e.status === 'RETIRED').length
     const equipActive = equipmentData.length - equipRetired
 
     const summary = [
@@ -213,7 +231,7 @@ export async function GET(request: NextRequest) {
 
     // ── Exportación ───────────────────────────────────────────────────────────
     if (format === 'csv') {
-      const csvRows = rows.map((r) => ({
+      const csvRows = rows.map(r => ({
         Familia: r.familia,
         Subtipo: r.subtipo,
         Cantidad: r.cantidad,
@@ -231,8 +249,19 @@ export async function GET(request: NextRequest) {
 
     if (format === 'pdf') {
       const headers = ['Familia', 'Subtipo', 'Cantidad', 'Valor Total', 'Estado']
-      const pdfRows = rows.map((r) => [r.familia, r.subtipo, String(r.cantidad), r.valorTotal, r.estado])
-      const pdfBuffer = await generateReportPDF('¿Qué tenemos? — Inventario Total', summary, headers, pdfRows)
+      const pdfRows = rows.map(r => [
+        r.familia,
+        r.subtipo,
+        String(r.cantidad),
+        r.valorTotal,
+        r.estado,
+      ])
+      const pdfBuffer = await generateReportPDF(
+        '¿Qué tenemos? — Inventario Total',
+        summary,
+        headers,
+        pdfRows
+      )
       return new NextResponse(pdfBuffer, {
         headers: {
           'Content-Type': 'application/pdf',

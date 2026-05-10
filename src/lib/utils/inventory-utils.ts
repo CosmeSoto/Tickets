@@ -66,7 +66,7 @@ const SUBTYPE_CONFIG: Record<string, { label: string; className: string }> = {
       'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100 dark:bg-blue-900 dark:text-blue-200 dark:border-blue-800',
   },
   MRO: {
-    label: 'Material MRO',
+    label: 'Consumible',
     className:
       'bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100 dark:bg-amber-900 dark:text-amber-200 dark:border-amber-800',
   },

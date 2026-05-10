@@ -16,7 +16,7 @@ const STEP_CONTENT = {
   },
   2: {
     title: 'Selecciona el tipo de activo',
-    description: 'Indica si es un equipo físico, una licencia/contrato o un material MRO.',
+    description: 'Indica si es un equipo físico, una licencia/contrato o un Consumible.',
   },
   3: {
     title: 'Completa la información del activo',

@@ -90,18 +90,18 @@ export function TypeAttributesInput({
         .filter((attr: TypeAttribute) => attr.isVisible)
         .sort((a: TypeAttribute, b: TypeAttribute) => a.order - b.order)
 
-      console.log('📋 Atributos cargados:', {
-        typeId,
-        assetType,
-        total: data.length,
-        visible: visibleAttributes.length,
-        attributes: visibleAttributes.map((a: TypeAttribute) => ({
-          name: a.attributeName,
-          label: a.attributeLabel,
-          type: a.attributeType,
-          required: a.isRequired,
-        })),
-      })
+      // console.log('📋 Atributos cargados:', {
+      //   typeId,
+      //   assetType,
+      //   total: data.length,
+      //   visible: visibleAttributes.length,
+      //   attributes: visibleAttributes.map((a: TypeAttribute) => ({
+      //     name: a.attributeName,
+      //     label: a.attributeLabel,
+      //     type: a.attributeType,
+      //     required: a.isRequired,
+      //   })),
+      // })
 
       setAttributes(visibleAttributes)
     } catch (error) {

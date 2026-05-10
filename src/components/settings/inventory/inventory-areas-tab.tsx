@@ -54,7 +54,7 @@ const ALL_SECTIONS: FormSection[] = [
 
 const SUBTYPE_LABELS: Record<AssetSubtype, string> = {
   EQUIPMENT: 'Equipo Físico',
-  MRO: 'Material MRO',
+  MRO: 'Consumible',
   LICENSE: 'Contrato / Licencia',
 }
 

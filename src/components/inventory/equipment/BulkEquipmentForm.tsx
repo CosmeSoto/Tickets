@@ -37,6 +37,7 @@ import { SubtypeSelector } from '@/components/inventory/subtype-selector'
 import { useInventoryFamilies } from '@/contexts/families-context'
 import { CreationBreadcrumb } from '@/components/inventory/shared/CreationBreadcrumb'
 import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
+import { BulkMROForm } from '@/components/inventory/equipment/BulkMROForm'
 import { AccessoriesSection } from '@/components/inventory/shared/AccessoriesSection'
 import { TypeAttributesInput } from '@/components/inventory/custom-fields/type-attributes-input'
 import { WarehouseInlineForm } from '@/components/inventory/asset-forms/WarehouseInlineForm'
@@ -118,6 +119,7 @@ export function BulkEquipmentForm({
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(null)
   const [selectedFamilyCode, setSelectedFamilyCode] = useState<string | null>(null)
+  const [selectedSubtype, setSelectedSubtype] = useState<AssetSubtype>('EQUIPMENT')
   const [familyConfig, setFamilyConfig] = useState<FamilyConfig | null>(null)
   const [loadingConfig, setLoadingConfig] = useState(false)
   const { families, loading: loadingFamilies } = useInventoryFamilies()
@@ -274,7 +276,10 @@ export function BulkEquipmentForm({
     }
   }
 
-  const handleSubtypeSelect = (_subtype: AssetSubtype) => setStep(3)
+  const handleSubtypeSelect = (subtype: AssetSubtype) => {
+    setSelectedSubtype(subtype)
+    setStep(3)
+  }
 
   // handleBack: si vino con defaultFamilyId, "cambiar familia" navega a /inventory/new
   // Si no vino con defaultFamilyId, retrocede al paso anterior internamente
@@ -557,6 +562,22 @@ export function BulkEquipmentForm({
   }
 
   // ── Paso 3: Formulario del lote ────────────────────────────────────────────
+  // Para MRO: formulario simplificado de consumibles en lote
+  if (step === 3 && selectedSubtype === 'MRO' && familyConfig) {
+    return (
+      <BulkMROForm
+        familyId={selectedFamilyId!}
+        familyConfig={familyConfig}
+        familyName={selectedFamily?.name}
+        familyColor={selectedFamily?.color ?? undefined}
+        onBack={handleBack}
+        onCancel={onCancel}
+        onSuccess={onSuccess}
+      />
+    )
+  }
+
+  // Para EQUIPMENT: formulario completo de lote de equipos
   return (
     <form onSubmit={(handleSubmit as any)(onSubmit)} className='space-y-6'>
       {/* Header con breadcrumb */}
@@ -567,7 +588,7 @@ export function BulkEquipmentForm({
             step={3}
             familyName={selectedFamily?.name}
             familyColor={selectedFamily?.color}
-            subtypeName='EQUIPMENT'
+            subtypeName={selectedSubtype}
           />
           <div className='flex items-center gap-3 mt-2'>
             <Button

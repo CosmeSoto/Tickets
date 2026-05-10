@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
     for (const c of consumables) {
       const dias = daysUntil(c.expirationDate) ?? 0
       rows.push({
-        tipo: 'Material MRO',
+        tipo: 'Consumible',
         nombre: c.name,
         codigo: c.id.slice(0, 8).toUpperCase(),
         familia: c.consumableType?.family?.name ?? '—',
@@ -200,9 +200,9 @@ export async function GET(request: NextRequest) {
     rows.sort((a, b) => a.diasRestantes - b.diasRestantes)
 
     // ── Indicadores ejecutivos ────────────────────────────────────────────────
-    const criticos = rows.filter((r) => r.urgencia === 'Crítico').length
-    const altos = rows.filter((r) => r.urgencia === 'Alto').length
-    const vencenEsteMes = rows.filter((r) => r.diasRestantes <= 30).length
+    const criticos = rows.filter(r => r.urgencia === 'Crítico').length
+    const altos = rows.filter(r => r.urgencia === 'Alto').length
+    const vencenEsteMes = rows.filter(r => r.diasRestantes <= 30).length
 
     const summary = [
       {
@@ -237,7 +237,7 @@ export async function GET(request: NextRequest) {
 
     // ── Exportación ───────────────────────────────────────────────────────────
     if (format === 'csv') {
-      const csvRows = rows.map((r) => ({
+      const csvRows = rows.map(r => ({
         Tipo: r.tipo,
         Nombre: r.nombre,
         Código: r.codigo,
@@ -256,8 +256,16 @@ export async function GET(request: NextRequest) {
     }
 
     if (format === 'pdf') {
-      const headers = ['Tipo', 'Nombre', 'Código', 'Familia', 'Fecha Vencimiento', 'Días', 'Urgencia']
-      const pdfRows = rows.map((r) => [
+      const headers = [
+        'Tipo',
+        'Nombre',
+        'Código',
+        'Familia',
+        'Fecha Vencimiento',
+        'Días',
+        'Urgencia',
+      ]
+      const pdfRows = rows.map(r => [
         r.tipo,
         r.nombre,
         r.codigo,

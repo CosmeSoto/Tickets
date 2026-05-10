@@ -13,7 +13,7 @@ interface CreationBreadcrumbProps {
 
 const SUBTYPE_LABELS: Record<string, string> = {
   EQUIPMENT: 'Equipo Físico',
-  MRO: 'Material MRO',
+  MRO: 'Consumible',
   LICENSE: 'Contrato / Licencia',
 }
 
