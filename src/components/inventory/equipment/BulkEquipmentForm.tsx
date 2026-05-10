@@ -55,7 +55,7 @@ import {
 } from '@/lib/inventory/family-config-types'
 
 export interface BulkEquipmentFormProps {
-  onSuccess?: (result: BulkCreateResult) => void
+  onSuccess?: (result: any) => void
   onCancel?: () => void
   prefillData?: Partial<z.infer<typeof bulkEquipmentInputSchema>>
   defaultFamilyId?: string
@@ -124,7 +124,7 @@ export function BulkEquipmentForm({
 
   // ── Estado del formulario ──────────────────────────────────────────────────
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [successResult, setSuccessResult] = useState<BulkCreateResult | null>(null)
+  const [successResult, setSuccessResult] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [equipmentTypes, setEquipmentTypes] = useState<EquipmentType[]>([])
   const [loadingTypes, setLoadingTypes] = useState(false)
@@ -360,23 +360,36 @@ export function BulkEquipmentForm({
               .split('\n')
               .filter((l: string) => l.trim())
         : undefined
-      const response = await fetch('/api/inventory/equipment/bulk', {
+      const response = await fetch('/api/inventory/batches', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...data,
+          // Identificación
+          modelId: data.modelId,
+          quantity: data.quantity,
+          codeMode: data.codeMode,
           manualCodes,
           serialNumbers,
           familyId: selectedFamilyId,
+          // Datos del equipo
+          brand: data.brand,
+          model: data.model,
+          typeId: data.typeId,
+          departmentId: data.departmentId || undefined,
+          condition: data.condition,
+          warehouseId: warehouseId || undefined,
+          accessories: accessories.length ? accessories : undefined,
+          customValues: customFieldValues.length ? customFieldValues : undefined,
+          notes: data.notes || undefined,
+          // Adquisición
+          acquisitionMode,
+          ownershipType: acquisitionMode,
           supplierId: supplierId || undefined,
           purchaseDate: purchaseDate || undefined,
           purchasePrice: purchasePrice ? parseFloat(purchasePrice) : undefined,
           invoiceNumber: invoiceNumber || undefined,
           purchaseOrderNumber: purchaseOrderNumber || undefined,
-          accessories: accessories.length ? accessories : undefined,
-          customValues: customFieldValues.length ? customFieldValues : undefined,
-          warehouseId: warehouseId || undefined,
-          acquisitionMode,
+          // Depreciación (solo FIXED_ASSET)
           depreciationMethod: acquisitionMode === 'FIXED_ASSET' ? depreciationMethod : undefined,
           usefulLifeYears:
             acquisitionMode === 'FIXED_ASSET' && usefulLifeYears
@@ -423,7 +436,9 @@ export function BulkEquipmentForm({
                   Equipos creados exitosamente
                 </h2>
                 <p className='text-sm text-green-700 dark:text-green-300 mt-1'>
-                  Se crearon {successResult.summary.total} equipos
+                  Se crearon {successResult.summary?.totalEquipment ?? successResult.summary?.total}{' '}
+                  equipos
+                  {successResult.batch?.batchCode && ` — Lote: ${successResult.batch.batchCode}`}
                 </p>
               </div>
               <div className='rounded-md bg-white dark:bg-green-900/30 p-4 space-y-2 text-sm'>

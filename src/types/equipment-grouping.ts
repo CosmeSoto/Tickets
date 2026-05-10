@@ -126,11 +126,12 @@ export interface BulkEquipmentInput {
 }
 
 /**
- * Result of bulk equipment creation
+ * Result of bulk equipment creation.
+ * Supports both the legacy format (created[]) and the new batch format (batch + equipment).
  */
 export interface BulkCreateResult {
-  /** Created equipment records */
-  created: Array<{
+  /** Created equipment records (legacy format from /api/inventory/equipment/bulk) */
+  created?: Array<{
     id: string
     code: string
     serialNumber: string
@@ -141,12 +142,36 @@ export interface BulkCreateResult {
     createdAt: Date
   }>
 
+  /** Batch record (new format from /api/inventory/batches) */
+  batch?: {
+    id: string
+    batchCode: string
+    description: string | null
+    quantity: number
+    totalPrice: number
+    createdAt: Date
+  }
+
+  /** Equipment records (new format from /api/inventory/batches) */
+  equipment?: Array<{
+    id: string
+    code: string
+    serialNumber: string
+    status: string
+    createdAt: Date
+  }>
+
   /** Summary of creation */
   summary: {
-    total: number
+    /** Legacy field */
+    total?: number
+    /** New field */
+    totalEquipment?: number
+    batchCode?: string
     firstCode: string
     lastCode: string
     message: string
+    totalPrice?: number
   }
 }
 

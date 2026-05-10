@@ -4,8 +4,8 @@
  */
 
 import prisma from '@/lib/prisma'
-import { EquipmentStatus, Prisma } from '@prisma/client'
-import { generateSequentialCodes } from './code-generator.service'
+import { EquipmentStatus } from '@prisma/client'
+import { generateSequentialCodes, validateManualCodes } from './code-generator.service'
 
 export interface CreateBatchInput {
   batchCode?: string
@@ -13,19 +13,35 @@ export interface CreateBatchInput {
   modelId: string
   quantity: number
   serialNumbers: string[]
-  supplierId: string
-  purchaseDate: Date
+  supplierId?: string
+  purchaseDate?: Date
   unitPrice: number
   invoiceNumber?: string
   purchaseOrderNumber?: string
-  warehouseId: string
+  warehouseId?: string
   receivedBy: string
   notes?: string
-  // Datos adicionales para los equipos
+  // Datos del equipo
+  brand?: string
+  model?: string
+  typeId?: string
+  departmentId?: string
   condition?: string
   ownershipType: string
   accessories?: string[]
+  customValues?: Array<{ fieldName: string; fieldValue: string }>
   photoUrl?: string
+  // Códigos
+  codeMode?: 'auto' | 'manual'
+  manualCodes?: string[]
+  // Depreciación
+  depreciationMethod?: string
+  usefulLifeYears?: number
+  residualValue?: number
+  totalUnits?: number
+  usedUnits?: number
+  // Familia
+  familyId?: string
 }
 
 export interface BatchCreateResult {
@@ -101,178 +117,175 @@ async function generateBatchCode(): Promise<string> {
  */
 export async function createBatch(input: CreateBatchInput): Promise<BatchCreateResult> {
   try {
-    // Validaciones
-    if (input.quantity !== input.serialNumbers.length) {
+    // ── Validaciones básicas ───────────────────────────────────────────────
+    const codeMode = input.codeMode || 'auto'
+
+    // Seriales: si se proporcionan deben coincidir con la cantidad
+    const serialNumbers = (input.serialNumbers || []).filter(s => s.trim().length > 0)
+    if (serialNumbers.length > 0 && serialNumbers.length !== input.quantity) {
       throw new Error(
-        `La cantidad (${input.quantity}) no coincide con el número de seriales proporcionados (${input.serialNumbers.length})`
+        `La cantidad (${input.quantity}) no coincide con el número de seriales proporcionados (${serialNumbers.length})`
       )
     }
 
-    // Verificar que no haya seriales duplicados en el input
-    const uniqueSerials = new Set(input.serialNumbers)
-    if (uniqueSerials.size !== input.serialNumbers.length) {
-      throw new Error('Hay números de serie duplicados en la lista')
+    // Verificar seriales duplicados en el input
+    if (serialNumbers.length > 0) {
+      const uniqueSerials = new Set(serialNumbers)
+      if (uniqueSerials.size !== serialNumbers.length) {
+        throw new Error('Hay números de serie duplicados en la lista')
+      }
+      // Verificar que los seriales no existan en la BD
+      const existingSerials = await prisma.equipment.findMany({
+        where: { serialNumber: { in: serialNumbers } },
+        select: { serialNumber: true },
+      })
+      if (existingSerials.length > 0) {
+        const duplicates = existingSerials.map(e => e.serialNumber).join(', ')
+        throw new Error(`Los siguientes números de serie ya existen: ${duplicates}`)
+      }
     }
 
-    // Verificar que los seriales no existan en la BD
-    const existingSerials = await prisma.equipment.findMany({
-      where: {
-        serialNumber: {
-          in: input.serialNumbers,
-        },
-      },
-      select: {
-        serialNumber: true,
-      },
-    })
-
-    if (existingSerials.length > 0) {
-      const duplicates = existingSerials.map(e => e.serialNumber).join(', ')
-      throw new Error(`Los siguientes números de serie ya existen: ${duplicates}`)
-    }
-
-    // Verificar que el modelo existe
+    // ── Obtener modelo ─────────────────────────────────────────────────────
     const model = await prisma.equipment_models.findUnique({
       where: { id: input.modelId },
-      include: {
-        type: {
-          include: {
-            family: true,
-          },
-        },
-      },
+      include: { type: { include: { family: true } } },
     })
+    if (!model) throw new Error('Modelo no encontrado')
+    if (!model.type.family) throw new Error('El tipo de equipo debe tener una familia asignada')
 
-    if (!model) {
-      throw new Error('Modelo no encontrado')
+    // ── Validar proveedor si se proporciona ────────────────────────────────
+    if (input.supplierId) {
+      const supplierExists = await prisma.suppliers.findUnique({ where: { id: input.supplierId } })
+      if (!supplierExists) throw new Error('Proveedor no encontrado')
     }
 
-    if (!model.type.family) {
-      throw new Error('El tipo de equipo debe tener una familia asignada')
+    // ── Validar bodega si se proporciona ───────────────────────────────────
+    if (input.warehouseId) {
+      const warehouseExists = await prisma.warehouses.findUnique({
+        where: { id: input.warehouseId },
+      })
+      if (!warehouseExists) throw new Error('Bodega no encontrada')
     }
 
-    // Verificar que el proveedor existe
-    const supplierExists = await prisma.suppliers.findUnique({
-      where: { id: input.supplierId },
-    })
+    // ── Generar o validar códigos ──────────────────────────────────────────
+    let codes: string[]
 
-    if (!supplierExists) {
-      throw new Error('Proveedor no encontrado')
+    if (codeMode === 'manual' && input.manualCodes && input.manualCodes.length > 0) {
+      codes = input.manualCodes
+      const validation = await validateManualCodes(codes)
+      if (!validation.valid) {
+        throw new Error(`Los siguientes códigos ya existen: ${validation.duplicates.join(', ')}`)
+      }
+    } else {
+      // Auto: generar códigos secuenciales
+      const familyCode = model.type.family.code
+      const typeCode = model.type.code
+      const year = new Date().getFullYear()
+      codes = await generateSequentialCodes(
+        input.quantity,
+        familyCode,
+        typeCode,
+        input.ownershipType,
+        year
+      )
     }
 
-    // Verificar que la bodega existe
-    const warehouseExists = await prisma.warehouses.findUnique({
-      where: { id: input.warehouseId },
-    })
-
-    if (!warehouseExists) {
-      throw new Error('Bodega no encontrada')
-    }
-
-    // Generar código de lote si no se proporciona
+    // ── Generar código de lote ─────────────────────────────────────────────
     const batchCode = input.batchCode || (await generateBatchCode())
+    const existingBatch = await prisma.equipment_batches.findUnique({ where: { batchCode } })
+    if (existingBatch) throw new Error(`El código de lote ${batchCode} ya existe`)
 
-    // Verificar que el código de lote no exista
-    const existingBatch = await prisma.equipment_batches.findUnique({
-      where: { batchCode },
-    })
-
-    if (existingBatch) {
-      throw new Error(`El código de lote ${batchCode} ya existe`)
-    }
-
-    // Generar códigos para los equipos
-    const familyCode = model.type.family.code
-    const typeCode = model.type.code
-    const year = new Date().getFullYear()
-
-    const codes = await generateSequentialCodes(
-      input.quantity,
-      familyCode,
-      typeCode,
-      input.ownershipType,
-      year
-    )
-
-    // Calcular precio total
     const totalPrice = input.unitPrice * input.quantity
 
-    // Crear lote y equipos en transacción
+    // ── Crear lote y equipos en transacción ───────────────────────────────
     const result = await prisma.$transaction(async tx => {
-      // Crear el lote
+      // 1. Crear el lote
       const batch = await tx.equipment_batches.create({
         data: {
           batchCode,
-          description: input.description,
+          description:
+            input.description || `Lote de ${input.quantity} ${model.brand} ${model.model}`,
           modelId: input.modelId,
           quantity: input.quantity,
-          supplierId: input.supplierId,
-          purchaseDate: input.purchaseDate,
+          supplierId: input.supplierId || model.type.family!.id, // fallback temporal
+          purchaseDate: input.purchaseDate || new Date(),
           unitPrice: input.unitPrice,
           totalPrice,
           invoiceNumber: input.invoiceNumber,
           purchaseOrderNumber: input.purchaseOrderNumber,
-          warehouseId: input.warehouseId,
+          warehouseId: input.warehouseId || '',
           status: 'received',
           receivedBy: input.receivedBy,
           receivedAt: new Date(),
           notes: input.notes,
+          // Campos del formulario unificado
+          customValues: input.customValues ? JSON.parse(JSON.stringify(input.customValues)) : null,
+          accessories: input.accessories || [],
+          condition: input.condition || 'GOOD',
+          propertyType: input.ownershipType,
+          departmentId: input.departmentId || null,
         },
       })
 
-      // Crear los equipos
-      const equipmentData = codes.map((code, index) => ({
-        code,
-        serialNumber: input.serialNumbers[index],
-        modelId: input.modelId,
-        batchId: batch.id,
-        typeId: model.typeId,
-        departmentId: model.type.family.departmentId,
-        status: EquipmentStatus.AVAILABLE,
-        condition: input.condition || 'GOOD',
-        ownershipType: input.ownershipType,
-        purchasePrice: input.unitPrice,
-        supplierId: input.supplierId,
-        purchaseDate: input.purchaseDate,
-        specifications: model.specifications || Prisma.JsonNull,
-        accessories: input.accessories || model.defaultAccessories || [],
-        photoUrl: input.photoUrl || model.modelPhotoUrl,
-        warehouseId: input.warehouseId,
-        // Campos deprecated (mantener por compatibilidad)
-        brand: model.brand,
-        model: model.model,
-      }))
-
-      await tx.equipment.createMany({
-        data: equipmentData,
+      // 2. Crear los equipos con todos los campos
+      const equipmentData = codes.map((code, index) => {
+        const qrCode = `EQ-${code}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+        return {
+          code,
+          serialNumber: serialNumbers.length > 0 ? serialNumbers[index] : '',
+          modelId: input.modelId,
+          batchId: batch.id,
+          typeId: input.typeId || model.typeId,
+          departmentId: input.departmentId || null,
+          status: EquipmentStatus.AVAILABLE,
+          condition: (input.condition || 'GOOD') as any,
+          ownershipType: input.ownershipType as any,
+          acquisitionMode: input.ownershipType as any,
+          purchasePrice: input.unitPrice || null,
+          supplierId: input.supplierId || null,
+          purchaseDate: input.purchaseDate || null,
+          invoiceNumber: input.invoiceNumber || null,
+          purchaseOrderNumber: input.purchaseOrderNumber || null,
+          accessories: input.accessories || model.defaultAccessories || [],
+          photoUrl: input.photoUrl || model.modelPhotoUrl || null,
+          warehouseId: input.warehouseId || null,
+          notes: input.notes || null,
+          // Depreciación
+          depreciationMethod:
+            input.ownershipType === 'FIXED_ASSET' && input.depreciationMethod
+              ? (input.depreciationMethod as any)
+              : null,
+          usefulLifeYears:
+            input.ownershipType === 'FIXED_ASSET' && input.usefulLifeYears
+              ? input.usefulLifeYears
+              : null,
+          residualValue:
+            input.ownershipType === 'FIXED_ASSET' && input.residualValue != null
+              ? input.residualValue
+              : 0,
+          totalUnits: input.totalUnits || null,
+          usedUnits: input.usedUnits || null,
+          // Campos requeridos
+          qrCode,
+          brand: model.brand,
+          model_old: model.model,
+          location: null,
+          physicalLocation: null,
+        }
       })
 
-      // Obtener los equipos creados
+      await tx.equipment.createMany({ data: equipmentData })
+
+      // 3. Obtener los equipos creados
       const createdEquipment = await tx.equipment.findMany({
-        where: {
-          code: {
-            in: codes,
-          },
-        },
-        select: {
-          id: true,
-          code: true,
-          serialNumber: true,
-          status: true,
-          createdAt: true,
-        },
-        orderBy: {
-          code: 'asc',
-        },
+        where: { code: { in: codes } },
+        select: { id: true, code: true, serialNumber: true, status: true, createdAt: true },
+        orderBy: { code: 'asc' },
       })
 
-      return {
-        batch,
-        equipment: createdEquipment,
-      }
+      return { batch, equipment: createdEquipment }
     })
 
-    // Preparar resultado
     const summary = {
       batchCode: result.batch.batchCode,
       totalEquipment: result.equipment.length,

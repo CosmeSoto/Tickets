@@ -16,29 +16,53 @@ import { canManageInventory } from '@/lib/inventory-access'
 import { invalidateCache } from '@/lib/api-cache'
 import { z } from 'zod'
 
-// Validation schema
+// Validation schema — acepta todos los campos del BulkEquipmentForm
 const createBatchSchema = z.object({
+  // Identificación del lote
   batchCode: z.string().max(50).optional(),
   description: z.string().optional(),
   modelId: z.string().uuid(),
   quantity: z.number().int().min(1).max(100),
-  serialNumbers: z.array(z.string().min(1)),
-  supplierId: z.string().uuid(),
+
+  // Códigos y seriales
+  codeMode: z.enum(['auto', 'manual']).default('auto'),
+  manualCodes: z.array(z.string().min(1)).optional(),
+  serialNumbers: z.array(z.string()).optional().default([]),
+
+  // Datos comunes del equipo
+  brand: z.string().min(1),
+  model: z.string().min(1),
+  typeId: z.string().uuid(),
+  departmentId: z.string().uuid().optional().or(z.literal('')),
+  condition: z.string().optional().default('GOOD'),
+  warehouseId: z.string().uuid().optional().or(z.literal('')),
+  accessories: z.array(z.string()).optional().default([]),
+  customValues: z.array(z.object({ fieldName: z.string(), fieldValue: z.string() })).optional(),
+  notes: z.string().optional(),
+  photoUrl: z.string().url().optional().or(z.literal('')),
+
+  // Adquisición
+  acquisitionMode: z.enum(['FIXED_ASSET', 'RENTAL', 'LOAN']).default('FIXED_ASSET'),
+  ownershipType: z.string().optional(), // alias de acquisitionMode para compatibilidad
+  supplierId: z.string().uuid().optional().or(z.literal('')),
   purchaseDate: z
     .string()
-    .datetime()
+    .optional()
     .or(z.date())
-    .transform(val => new Date(val)),
-  unitPrice: z.number().positive(),
+    .transform(val => (val ? new Date(val) : undefined)),
+  purchasePrice: z.number().positive().optional().or(z.literal(0)),
   invoiceNumber: z.string().max(100).optional(),
   purchaseOrderNumber: z.string().max(100).optional(),
-  warehouseId: z.string().uuid(),
-  receivedBy: z.string().uuid(),
-  notes: z.string().optional(),
-  condition: z.string().optional(),
-  ownershipType: z.string(),
-  accessories: z.array(z.string()).optional(),
-  photoUrl: z.string().url().optional(),
+
+  // Depreciación (solo FIXED_ASSET)
+  depreciationMethod: z.string().optional(),
+  usefulLifeYears: z.number().positive().optional(),
+  residualValue: z.number().min(0).optional(),
+  totalUnits: z.number().positive().optional(),
+  usedUnits: z.number().min(0).optional(),
+
+  // Familia (informativo)
+  familyId: z.string().uuid().optional(),
 })
 
 /**
@@ -124,7 +148,16 @@ export async function POST(request: NextRequest) {
 
     const data: CreateBatchInput = {
       ...validationResult.data,
-      receivedBy: session.user.id, // Override with current user
+      // acquisitionMode tiene prioridad sobre ownershipType legacy
+      ownershipType:
+        validationResult.data.acquisitionMode ||
+        validationResult.data.ownershipType ||
+        'FIXED_ASSET',
+      // unitPrice = purchasePrice del formulario nuevo
+      unitPrice: validationResult.data.purchasePrice || 0,
+      // serialNumbers puede ser vacío en el nuevo formulario
+      serialNumbers: validationResult.data.serialNumbers || [],
+      receivedBy: session.user.id,
     }
 
     const result = await createBatch(data)
