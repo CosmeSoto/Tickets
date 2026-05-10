@@ -16,3 +16,17 @@ export function getHomePathForRole(role: string | undefined): string {
 export function loginPathWithReturnTo(returnToPath: string): string {
   return `/login?callbackUrl=${encodeURIComponent(returnToPath)}`
 }
+
+/**
+ * Verifica si el usuario tiene acceso al módulo de inventario.
+ * - ADMIN: siempre tiene acceso (gestiona el sistema)
+ * - TECHNICIAN/CLIENT: necesita inventoryEnabled o canManageInventory
+ */
+export function canAccessInventory(user: {
+  role?: string
+  inventoryEnabled?: boolean
+  canManageInventory?: boolean
+}): boolean {
+  if (user.role === 'ADMIN') return true
+  return !!(user.inventoryEnabled || user.canManageInventory)
+}

@@ -13,7 +13,11 @@ import { BatchService } from '@/lib/services/batch-inventory.service'
 import { Skeleton } from '@/components/ui/skeleton'
 import { InventoryFiltersClient } from '@/components/inventory/filters/InventoryFiltersClient'
 import { prisma } from '@/lib/prisma'
-import { getHomePathForRole, loginPathWithReturnTo } from '@/lib/navigation/role-home-path'
+import {
+  getHomePathForRole,
+  loginPathWithReturnTo,
+  canAccessInventory,
+} from '@/lib/navigation/role-home-path'
 
 interface SearchParams {
   search?: string
@@ -66,7 +70,7 @@ async function InventoryContent({ searchParams }: { searchParams: SearchParams }
     redirect(loginPathWithReturnTo('/inventory'))
   }
 
-  if (!session.user.inventoryEnabled && !session.user.canManageInventory) {
+  if (!canAccessInventory(session.user)) {
     redirect(getHomePathForRole(session.user.role))
   }
 

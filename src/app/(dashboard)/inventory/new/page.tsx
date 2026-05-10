@@ -3,7 +3,11 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
-import { getHomePathForRole, loginPathWithReturnTo } from '@/lib/navigation/role-home-path'
+import {
+  getHomePathForRole,
+  loginPathWithReturnTo,
+  canAccessInventory,
+} from '@/lib/navigation/role-home-path'
 import { UnifiedEquipmentForm } from '@/components/inventory/unified-form/UnifiedEquipmentForm'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -88,7 +92,7 @@ async function FormContent() {
   }
 
   // Verificar permisos
-  if (!session.user.inventoryEnabled && !session.user.canManageInventory) {
+  if (!canAccessInventory(session.user)) {
     redirect(getHomePathForRole(session.user.role))
   }
 

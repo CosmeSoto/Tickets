@@ -13,7 +13,11 @@ import { ModelMetrics } from '@/components/inventory/model/ModelMetrics'
 import { AcquisitionTimeline } from '@/components/inventory/model/AcquisitionTimeline'
 import { ModelBatchComparison } from '@/components/inventory/model/ModelBatchComparison'
 import { ModelEquipmentTable } from '@/components/inventory/model/ModelEquipmentTable'
-import { getHomePathForRole, loginPathWithReturnTo } from '@/lib/navigation/role-home-path'
+import {
+  getHomePathForRole,
+  loginPathWithReturnTo,
+  canAccessInventory,
+} from '@/lib/navigation/role-home-path'
 
 function LoadingSkeleton() {
   return (
@@ -33,7 +37,7 @@ function LoadingSkeleton() {
 async function ModelDetailContent({ modelId }: { modelId: string }) {
   const session = await getServerSession(authOptions)
   if (!session?.user) redirect(loginPathWithReturnTo(`/inventory/models/${modelId}`))
-  if (!session.user.inventoryEnabled && !session.user.canManageInventory) {
+  if (!canAccessInventory(session.user)) {
     redirect(getHomePathForRole(session.user.role))
   }
 

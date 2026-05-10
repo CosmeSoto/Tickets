@@ -521,7 +521,12 @@ async function seedAdmin(deptAdminId: string): Promise<string> {
   const adminPassword = await bcrypt.hash('admin123', 12)
   const admin = await prisma.users.upsert({
     where: { email: 'internet.freecom@gmail.com' },
-    update: { isSuperAdmin: true },
+    update: {
+      isSuperAdmin: true,
+      inventoryEnabled: true,
+      canManageInventory: true,
+      ticketsEnabled: true,
+    },
     create: {
       id: randomUUID(),
       email: 'internet.freecom@gmail.com',
@@ -533,6 +538,9 @@ async function seedAdmin(deptAdminId: string): Promise<string> {
       isActive: true,
       isEmailVerified: true,
       isSuperAdmin: true,
+      inventoryEnabled: true,
+      canManageInventory: true,
+      ticketsEnabled: true,
       createdAt: now,
       updatedAt: now,
     },
