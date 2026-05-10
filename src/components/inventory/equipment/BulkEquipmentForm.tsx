@@ -30,12 +30,12 @@ import {
   ChevronUp,
 } from 'lucide-react'
 import { bulkEquipmentInputSchema } from '@/lib/validations/bulk-equipment'
-import type { BulkCreateResult } from '@/types/equipment-grouping'
 import { StockIndicatorBadge } from '@/components/inventory/equipment/StockIndicatorBadge'
 import { useActiveDepartments } from '@/contexts/departments-context'
 import { FamilySelector } from '@/components/inventory/family-selector'
 import { SubtypeSelector } from '@/components/inventory/subtype-selector'
 import { useInventoryFamilies } from '@/contexts/families-context'
+import { CreationBreadcrumb } from '@/components/inventory/shared/CreationBreadcrumb'
 import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
 import { AccessoriesSection } from '@/components/inventory/shared/AccessoriesSection'
 import { TypeAttributesInput } from '@/components/inventory/custom-fields/type-attributes-input'
@@ -121,6 +121,9 @@ export function BulkEquipmentForm({
   const [familyConfig, setFamilyConfig] = useState<FamilyConfig | null>(null)
   const [loadingConfig, setLoadingConfig] = useState(false)
   const { families, loading: loadingFamilies } = useInventoryFamilies()
+
+  // Datos de la familia seleccionada para el breadcrumb
+  const selectedFamily = families.find(f => f.id === selectedFamilyId)
 
   // ── Estado del formulario ──────────────────────────────────────────────────
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -262,7 +265,9 @@ export function BulkEquipmentForm({
         else if (fam?.code && DEFAULT_USEFUL_LIFE_YEARS[fam.code] > 0)
           setUsefulLifeYears(String(DEFAULT_USEFUL_LIFE_YEARS[fam.code]))
         const subtypes = config.allowedSubtypes ?? []
-        setStep(subtypes.length === 1 ? 3 : 2)
+        // En lotes, las licencias no aplican (son individuales por naturaleza)
+        const batchSubtypes = subtypes.filter(s => s !== 'LICENSE')
+        setStep(batchSubtypes.length <= 1 ? 3 : 2)
       }
     } finally {
       setLoadingConfig(false)
@@ -271,14 +276,31 @@ export function BulkEquipmentForm({
 
   const handleSubtypeSelect = (_subtype: AssetSubtype) => setStep(3)
 
+  // handleBack: si vino con defaultFamilyId, "cambiar familia" navega a /inventory/new
+  // Si no vino con defaultFamilyId, retrocede al paso anterior internamente
   const handleBack = () => {
-    if (familyConfig && (familyConfig.allowedSubtypes ?? []).length > 1) {
-      setStep(2)
-    } else {
-      setStep(1)
-      setSelectedFamilyId(null)
-      setSelectedFamilyCode(null)
-      setFamilyConfig(null)
+    if (step === 3) {
+      if (familyConfig && (familyConfig.allowedSubtypes ?? []).length > 1) {
+        setStep(2)
+      } else if (defaultFamilyId) {
+        // Vino con familia preseleccionada → volver a selección de modalidad
+        onCancel?.()
+      } else {
+        setStep(1)
+        setSelectedFamilyId(null)
+        setSelectedFamilyCode(null)
+        setFamilyConfig(null)
+      }
+    } else if (step === 2) {
+      if (defaultFamilyId) {
+        // Vino con familia preseleccionada → volver a selección de modalidad
+        onCancel?.()
+      } else {
+        setStep(1)
+        setSelectedFamilyId(null)
+        setSelectedFamilyCode(null)
+        setFamilyConfig(null)
+      }
     }
   }
 
@@ -476,20 +498,10 @@ export function BulkEquipmentForm({
   if (step === 1) {
     return (
       <div className='space-y-6'>
-        <div className='flex items-center gap-3'>
-          <Button
-            type='button'
-            variant='ghost'
-            size='sm'
-            onClick={() => router.back()}
-            className='h-8 w-8 p-0'
-          >
-            <ArrowLeft className='h-4 w-4' />
-          </Button>
-          <div>
-            <h1 className='text-2xl font-bold'>Nuevo Lote de Activos</h1>
-            <p className='text-sm text-muted-foreground'>Selecciona la familia para continuar</p>
-          </div>
+        <div className='space-y-1'>
+          <CreationBreadcrumb mode='bulk' step={1} />
+          <h1 className='text-2xl font-bold mt-2'>Nuevo Lote de Activos</h1>
+          <p className='text-sm text-muted-foreground'>Selecciona la familia para continuar</p>
         </div>
         {loadingFamilies ? (
           <div className='flex items-center justify-center h-32'>
@@ -514,23 +526,30 @@ export function BulkEquipmentForm({
   if (step === 2 && familyConfig) {
     return (
       <div className='space-y-6'>
-        <div className='flex items-center gap-3'>
+        <div className='flex items-start justify-between gap-4'>
+          <div className='space-y-1'>
+            <CreationBreadcrumb
+              mode='bulk'
+              step={2}
+              familyName={selectedFamily?.name}
+              familyColor={selectedFamily?.color}
+            />
+            <h1 className='text-2xl font-bold mt-2'>Nuevo Lote de Activos</h1>
+            <p className='text-sm text-muted-foreground'>Selecciona el tipo de activo a crear</p>
+          </div>
           <Button
             type='button'
             variant='ghost'
             size='sm'
             onClick={handleBack}
-            className='h-8 w-8 p-0'
+            className='text-muted-foreground hover:text-foreground shrink-0 mt-1'
           >
-            <ArrowLeft className='h-4 w-4' />
+            <ArrowLeft className='h-4 w-4 mr-1' />
+            Cambiar familia
           </Button>
-          <div>
-            <h1 className='text-2xl font-bold'>Nuevo Lote de Activos</h1>
-            <p className='text-sm text-muted-foreground'>Selecciona el tipo de activo a crear</p>
-          </div>
         </div>
         <SubtypeSelector
-          allowedSubtypes={familyConfig.allowedSubtypes}
+          allowedSubtypes={familyConfig.allowedSubtypes.filter(s => s !== 'LICENSE')}
           onSelect={handleSubtypeSelect}
         />
       </div>
@@ -540,16 +559,23 @@ export function BulkEquipmentForm({
   // ── Paso 3: Formulario del lote ────────────────────────────────────────────
   return (
     <form onSubmit={(handleSubmit as any)(onSubmit)} className='space-y-6'>
-      {/* Header */}
-      <div className='flex items-center justify-between'>
-        <div>
-          <div className='flex items-center gap-3 mb-2'>
+      {/* Header con breadcrumb */}
+      <div className='flex items-start justify-between gap-4'>
+        <div className='space-y-1 flex-1'>
+          <CreationBreadcrumb
+            mode='bulk'
+            step={3}
+            familyName={selectedFamily?.name}
+            familyColor={selectedFamily?.color}
+            subtypeName='EQUIPMENT'
+          />
+          <div className='flex items-center gap-3 mt-2'>
             <Button
               type='button'
               variant='ghost'
               size='sm'
               onClick={handleBack}
-              className='h-8 w-8 p-0'
+              className='h-8 w-8 p-0 shrink-0'
             >
               <ArrowLeft className='h-4 w-4' />
             </Button>

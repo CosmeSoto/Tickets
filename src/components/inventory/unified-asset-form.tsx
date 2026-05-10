@@ -1,22 +1,37 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { ArrowLeft } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { FamilySelector } from '@/components/inventory/family-selector'
 import { SubtypeSelector } from '@/components/inventory/subtype-selector'
+import { CreationBreadcrumb } from '@/components/inventory/shared/CreationBreadcrumb'
 import type { AssetSubtype, FamilyConfig } from '@/lib/inventory/family-config-types'
 import { EquipmentAssetForm } from '@/components/inventory/asset-forms/EquipmentAssetForm'
 import { MROAssetForm } from '@/components/inventory/asset-forms/MROAssetForm'
 import { LicenseAssetForm } from '@/components/inventory/asset-forms/LicenseAssetForm'
-import { useFamilyOptions } from '@/hooks/use-family-options'
+import { useInventoryFamilies } from '@/contexts/families-context'
 
 interface UnifiedAssetFormProps {
   onSuccess?: (asset: unknown) => void
   onCancel?: () => void
   defaultFamilyId?: string
+  onStepChange?: (step: 1 | 2 | 3) => void
 }
 
-export function UnifiedAssetForm({ onSuccess, onCancel, defaultFamilyId }: UnifiedAssetFormProps) {
+export function UnifiedAssetForm({
+  onSuccess,
+  onCancel,
+  defaultFamilyId,
+  onStepChange,
+}: UnifiedAssetFormProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1)
+
+  // Notificar al padre cuando cambia el paso
+  const goToStep = (s: 1 | 2 | 3) => {
+    setStep(s)
+    onStepChange?.(s)
+  }
   const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(defaultFamilyId ?? null)
   const [familyConfig, setFamilyConfig] = useState<FamilyConfig | null>(null)
   const [loadingConfig, setLoadingConfig] = useState(false)
@@ -25,10 +40,12 @@ export function UnifiedAssetForm({ onSuccess, onCancel, defaultFamilyId }: Unifi
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [maxFileSizeMB, setMaxFileSizeMB] = useState(10)
 
-  // Familias de inventario desde el contexto global (cache Redis, sin peticion extra) - memoizadas
-  const { families, loading: loadingFamilies } = useFamilyOptions()
+  // Familias desde contexto global
+  const { families, loading: loadingFamilies } = useInventoryFamilies()
 
-  // Suppress unused warning for onCancel — kept for API compatibility
+  // Datos de la familia seleccionada para mostrar en el breadcrumb
+  const selectedFamily = families.find(f => f.id === selectedFamilyId)
+
   void onCancel
 
   const initialized = useRef(false)
@@ -61,9 +78,9 @@ export function UnifiedAssetForm({ onSuccess, onCancel, defaultFamilyId }: Unifi
         const subtypes = config.allowedSubtypes ?? []
         if (subtypes.length === 1) {
           setSelectedSubtype(subtypes[0])
-          setStep(3)
+          goToStep(3)
         } else {
-          setStep(2)
+          goToStep(2)
         }
       }
     } finally {
@@ -73,14 +90,26 @@ export function UnifiedAssetForm({ onSuccess, onCancel, defaultFamilyId }: Unifi
 
   const handleSubtypeSelect = (subtype: AssetSubtype) => {
     setSelectedSubtype(subtype)
-    setStep(3)
+    goToStep(3)
   }
 
   const handleBack = () => {
-    if (familyConfig && (familyConfig.allowedSubtypes ?? []).length > 1) {
-      setStep(2)
-    } else {
-      setStep(1)
+    if (step === 3) {
+      if (familyConfig && (familyConfig.allowedSubtypes ?? []).length > 1) {
+        setSelectedSubtype(null)
+        goToStep(2)
+      } else if (defaultFamilyId) {
+        onCancel?.()
+      } else {
+        setSelectedSubtype(null)
+        goToStep(1)
+      }
+    } else if (step === 2) {
+      if (defaultFamilyId) {
+        onCancel?.()
+      } else {
+        goToStep(1)
+      }
     }
   }
 
@@ -88,7 +117,6 @@ export function UnifiedAssetForm({ onSuccess, onCancel, defaultFamilyId }: Unifi
     setSubmitting(true)
     setSubmitError(null)
     try {
-      // Separar archivos del payload JSON
       const attachments = (payload.attachments as File[] | undefined) ?? []
       const jsonPayload = { ...payload, subtype: selectedSubtype, familyId: selectedFamilyId }
       delete jsonPayload.attachments
@@ -106,19 +134,13 @@ export function UnifiedAssetForm({ onSuccess, onCancel, defaultFamilyId }: Unifi
 
       const asset = await res.json()
 
-      // Subir adjuntos si los hay (solo para EQUIPMENT)
-      // IMPORTANTE: esperar a que todos los archivos terminen de subirse
-      // antes de llamar onSuccess para evitar que la navegación cancele las subidas
       if (attachments.length > 0 && selectedSubtype === 'EQUIPMENT' && asset.id) {
         const uploadUrl = `/api/inventory/equipment/${asset.id}/attachments`
         await Promise.allSettled(
           attachments.map(async file => {
             const fd = new FormData()
             fd.append('file', file)
-            const uploadRes = await fetch(uploadUrl, { method: 'POST', body: fd })
-            if (!uploadRes.ok) {
-              console.warn(`No se pudo subir el archivo: ${file.name}`)
-            }
+            await fetch(uploadUrl, { method: 'POST', body: fd })
           })
         )
       }
@@ -132,11 +154,12 @@ export function UnifiedAssetForm({ onSuccess, onCancel, defaultFamilyId }: Unifi
   }
 
   return (
-    <div className='space-y-6'>
-      {/* Paso 1 */}
+    <div className='space-y-5'>
+      {/* ── Paso 1: Selección de familia ─────────────────────────────────── */}
       {step === 1 && (
         <div className='space-y-4'>
-          <p className='text-sm font-medium'>Selecciona una familia</p>
+          <CreationBreadcrumb mode='individual' step={1} />
+          <p className='text-sm font-medium text-foreground'>Selecciona una familia</p>
           {loadingFamilies ? (
             <p className='text-sm text-muted-foreground'>Cargando familias...</p>
           ) : (
@@ -153,17 +176,28 @@ export function UnifiedAssetForm({ onSuccess, onCancel, defaultFamilyId }: Unifi
         </div>
       )}
 
-      {/* Paso 2 */}
+      {/* ── Paso 2: Selección de subtipo ─────────────────────────────────── */}
       {step === 2 && familyConfig && (
         <div className='space-y-4'>
-          <button
-            type='button'
-            onClick={() => setStep(1)}
-            className='text-sm text-muted-foreground hover:text-foreground'
-          >
-            ← Cambiar familia
-          </button>
-          <p className='text-sm font-medium'>Selecciona el tipo de activo</p>
+          <div className='flex items-center justify-between'>
+            <CreationBreadcrumb
+              mode='individual'
+              step={2}
+              familyName={selectedFamily?.name}
+              familyColor={selectedFamily?.color}
+            />
+            <Button
+              type='button'
+              variant='ghost'
+              size='sm'
+              onClick={handleBack}
+              className='text-muted-foreground hover:text-foreground -mr-2'
+            >
+              <ArrowLeft className='h-4 w-4 mr-1' />
+              Cambiar familia
+            </Button>
+          </div>
+          <p className='text-sm font-medium text-foreground'>Selecciona el tipo de activo</p>
           <SubtypeSelector
             allowedSubtypes={familyConfig.allowedSubtypes}
             onSelect={handleSubtypeSelect}
@@ -171,13 +205,22 @@ export function UnifiedAssetForm({ onSuccess, onCancel, defaultFamilyId }: Unifi
         </div>
       )}
 
-      {/* Paso 3 */}
+      {/* ── Paso 3: Formulario ───────────────────────────────────────────── */}
       {step === 3 && selectedSubtype && familyConfig && (
-        <div>
+        <div className='space-y-4'>
+          {/* Breadcrumb con familia + tipo */}
+          <CreationBreadcrumb
+            mode='individual'
+            step={3}
+            familyName={selectedFamily?.name}
+            familyColor={selectedFamily?.color}
+            subtypeName={selectedSubtype}
+          />
+
           {selectedSubtype === 'EQUIPMENT' && (
             <EquipmentAssetForm
               familyId={selectedFamilyId!}
-              familyCode={families.find(f => f.id === selectedFamilyId)?.code}
+              familyCode={selectedFamily?.code}
               familyConfig={familyConfig}
               onSubmit={handleSubtypeSubmit}
               onBack={handleBack}
