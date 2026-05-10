@@ -6,7 +6,7 @@ import { useEffect } from 'react'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
 import { UnifiedAssetForm } from '@/components/inventory/unified-asset-form'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Loader2 } from 'lucide-react'
+import { ArrowLeft, Loader2 } from 'lucide-react'
 
 export default function NewEquipmentPage() {
   const { data: session, status } = useSession()
@@ -31,7 +31,15 @@ export default function NewEquipmentPage() {
 
   return (
     <RoleDashboardLayout title='Nuevo Activo' subtitle='Registra un nuevo activo en el inventario'>
-      <div className='max-w-4xl mx-auto'>
+      <div className='max-w-4xl mx-auto space-y-4'>
+        <button
+          type='button'
+          onClick={() => router.push('/inventory')}
+          className='flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors'
+        >
+          <ArrowLeft className='h-4 w-4' />
+          Inventario
+        </button>
         <Card>
           <CardHeader>
             <CardTitle>Información del Activo</CardTitle>

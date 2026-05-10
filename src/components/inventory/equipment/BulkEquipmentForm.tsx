@@ -1,16 +1,13 @@
 /**
  * BulkEquipmentForm
  *
- * Formulario moderno y compacto para crear múltiples equipos idénticos
- * - Diseño optimizado con header integrado
- * - Selectores visuales modernos (Combobox, SearchableSelect)
- * - Validación en tiempo real
- * - Layout de 2 columnas para aprovechar espacio
+ * Formulario para crear múltiples equipos idénticos en un lote.
+ * Flujo: Familia → Subtipo → Datos del lote (igual que el activo individual)
  */
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -29,6 +26,10 @@ import { bulkEquipmentInputSchema } from '@/lib/validations/bulk-equipment'
 import type { BulkCreateResult } from '@/types/equipment-grouping'
 import { StockIndicatorBadge } from '@/components/inventory/equipment/StockIndicatorBadge'
 import { useActiveDepartments } from '@/contexts/departments-context'
+import { FamilySelector } from '@/components/inventory/family-selector'
+import { SubtypeSelector } from '@/components/inventory/subtype-selector'
+import { useInventoryFamilies } from '@/contexts/families-context'
+import type { AssetSubtype, FamilyConfig } from '@/lib/inventory/family-config-types'
 
 export interface BulkEquipmentFormProps {
   onSuccess?: (result: BulkCreateResult) => void
@@ -47,13 +48,24 @@ interface EquipmentType {
 
 export function BulkEquipmentForm({ onSuccess, onCancel, prefillData }: BulkEquipmentFormProps) {
   const router = useRouter()
+
+  // ── Pasos: 1=familia, 2=subtipo, 3=formulario ──────────────────────────────
+  const [step, setStep] = useState<1 | 2 | 3>(1)
+  const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(null)
+  const [familyConfig, setFamilyConfig] = useState<FamilyConfig | null>(null)
+  const [loadingConfig, setLoadingConfig] = useState(false)
+  const [selectedSubtype, setSelectedSubtype] = useState<AssetSubtype | null>(null)
+
+  // Familias de inventario filtradas por rol (mismo origen que UnifiedAssetForm)
+  const { families, loading: loadingFamilies } = useInventoryFamilies()
+
+  // ── Estado del formulario ──────────────────────────────────────────────────
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [successResult, setSuccessResult] = useState<BulkCreateResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [equipmentTypes, setEquipmentTypes] = useState<EquipmentType[]>([])
-  const [loadingTypes, setLoadingTypes] = useState(true)
+  const [loadingTypes, setLoadingTypes] = useState(false)
 
-  // Departamentos desde contexto global
   const { departments: allDepartments } = useActiveDepartments()
 
   const {
@@ -84,47 +96,94 @@ export function BulkEquipmentForm({ onSuccess, onCancel, prefillData }: BulkEqui
   const selectedTypeId = watch('typeId')
   const selectedDepartmentId = watch('departmentId')
 
-  // Cargar tipos de equipo
+  // ── Paso 1: selección de familia ───────────────────────────────────────────
+  const handleFamilySelect = async (familyId: string) => {
+    setSelectedFamilyId(familyId)
+    // Limpiar campos dependientes de la familia anterior
+    setValue('typeId', '')
+    setValue('departmentId', '')
+    setLoadingConfig(true)
+    try {
+      const res = await fetch(`/api/inventory/family-config/${familyId}`)
+      if (res.ok) {
+        const json = await res.json()
+        const config: FamilyConfig = json.data ?? json
+        setFamilyConfig(config)
+        const subtypes = config.allowedSubtypes ?? []
+        if (subtypes.length === 1) {
+          setSelectedSubtype(subtypes[0])
+          setStep(3)
+        } else {
+          setStep(2)
+        }
+      }
+    } finally {
+      setLoadingConfig(false)
+    }
+  }
+
+  // ── Paso 2: selección de subtipo ───────────────────────────────────────────
+  const handleSubtypeSelect = (subtype: AssetSubtype) => {
+    setSelectedSubtype(subtype)
+    setStep(3)
+  }
+
+  const handleBack = () => {
+    if (familyConfig && (familyConfig.allowedSubtypes ?? []).length > 1) {
+      setStep(2)
+    } else {
+      setStep(1)
+      setSelectedFamilyId(null)
+      setFamilyConfig(null)
+    }
+    setSelectedSubtype(null)
+  }
+
+  // ── Cargar tipos de equipo filtrados por familia ───────────────────────────
   useEffect(() => {
+    if (!selectedFamilyId) return
+    setLoadingTypes(true)
     fetch('/api/admin/equipment-types')
       .then(r => r.json())
-      .then(types => setEquipmentTypes(types))
+      .then((types: EquipmentType[]) => {
+        // Filtrar por la familia seleccionada
+        const filtered = types.filter(t => t.family?.id === selectedFamilyId)
+        setEquipmentTypes(filtered)
+      })
       .catch(() => setEquipmentTypes([]))
       .finally(() => setLoadingTypes(false))
-  }, [])
+  }, [selectedFamilyId])
 
-  // Filtrar departamentos por familia del tipo seleccionado
-  const selectedTypeFamilyId = equipmentTypes.find(t => t.id === selectedTypeId)?.family?.id
-  const filteredDepartments = selectedTypeFamilyId
-    ? allDepartments.filter(d => d.familyId === selectedTypeFamilyId)
+  // Filtrar departamentos por familia
+  const filteredDepartments = selectedFamilyId
+    ? allDepartments.filter(d => d.familyId === selectedFamilyId)
     : allDepartments
 
   // Limpiar departamento si ya no pertenece a la familia
   useEffect(() => {
-    if (selectedTypeId && selectedDepartmentId) {
+    if (selectedDepartmentId) {
       const dept = allDepartments.find(d => d.id === selectedDepartmentId)
-      if (dept && selectedTypeFamilyId && dept.familyId !== selectedTypeFamilyId) {
+      if (dept && selectedFamilyId && dept.familyId !== selectedFamilyId) {
         setValue('departmentId', '')
       }
     }
-  }, [selectedTypeId, selectedTypeFamilyId, selectedDepartmentId, allDepartments, setValue])
+  }, [selectedFamilyId, selectedDepartmentId, allDepartments, setValue])
 
-  // Validar cantidad de códigos manuales
+  // ── Validaciones de cantidad ───────────────────────────────────────────────
   const manualCodesCount = manualCodesText
     ? manualCodesText.split('\n').filter(line => line.trim()).length
     : 0
   const manualCodesValid = codeMode === 'manual' ? manualCodesCount === quantity : true
 
-  // Validar cantidad de números de serie
   const serialNumbersCount = serialNumbersText
     ? serialNumbersText.split('\n').filter(line => line.trim()).length
     : 0
   const serialNumbersValid = serialNumbersCount === 0 || serialNumbersCount === quantity
 
+  // ── Submit ─────────────────────────────────────────────────────────────────
   const onSubmit = async (data: BulkEquipmentFormData) => {
     setIsSubmitting(true)
     setError(null)
-
     try {
       const manualCodes =
         data.codeMode === 'manual' && data.manualCodes
@@ -135,23 +194,14 @@ export function BulkEquipmentForm({ onSuccess, onCancel, prefillData }: BulkEqui
         ? data.serialNumbers.split('\n').filter(line => line.trim())
         : undefined
 
-      const payload = {
-        ...data,
-        manualCodes,
-        serialNumbers,
-      }
-
       const response = await fetch('/api/inventory/equipment/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...data, manualCodes, serialNumbers, familyId: selectedFamilyId }),
       })
 
       const result = await response.json()
-
-      if (!response.ok) {
-        throw new Error(result.message || 'Error al crear equipos por lote')
-      }
+      if (!response.ok) throw new Error(result.message || 'Error al crear equipos por lote')
 
       setSuccessResult(result)
       if (onSuccess) onSuccess(result)
@@ -162,7 +212,7 @@ export function BulkEquipmentForm({ onSuccess, onCancel, prefillData }: BulkEqui
     }
   }
 
-  // Pantalla de éxito
+  // ── Pantalla de éxito ──────────────────────────────────────────────────────
   if (successResult) {
     return (
       <div className='space-y-4'>
@@ -170,7 +220,6 @@ export function BulkEquipmentForm({ onSuccess, onCancel, prefillData }: BulkEqui
           <ArrowLeft className='mr-2 h-4 w-4' />
           Volver
         </Button>
-
         <div className='rounded-lg border border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800 p-6'>
           <div className='flex items-start gap-4'>
             <div className='rounded-full bg-green-100 dark:bg-green-900 p-3'>
@@ -185,7 +234,6 @@ export function BulkEquipmentForm({ onSuccess, onCancel, prefillData }: BulkEqui
                   Se crearon {successResult.summary.total} equipos idénticos
                 </p>
               </div>
-
               <div className='rounded-md bg-white dark:bg-green-900/30 p-4 space-y-2 text-sm'>
                 <p className='text-muted-foreground'>
                   <strong>Primer código:</strong> {successResult.summary.firstCode}
@@ -194,7 +242,6 @@ export function BulkEquipmentForm({ onSuccess, onCancel, prefillData }: BulkEqui
                   <strong>Último código:</strong> {successResult.summary.lastCode}
                 </p>
               </div>
-
               <div className='flex gap-2 pt-2'>
                 <Button onClick={() => router.push('/inventory/equipment')} className='flex-1'>
                   Ver inventario
@@ -204,6 +251,7 @@ export function BulkEquipmentForm({ onSuccess, onCancel, prefillData }: BulkEqui
                   onClick={() => {
                     setSuccessResult(null)
                     setError(null)
+                    setStep(1)
                   }}
                   className='flex-1'
                 >
@@ -217,9 +265,76 @@ export function BulkEquipmentForm({ onSuccess, onCancel, prefillData }: BulkEqui
     )
   }
 
+  // ── Paso 1: Selección de familia ───────────────────────────────────────────
+  if (step === 1) {
+    return (
+      <div className='space-y-6'>
+        <div className='flex items-center gap-3'>
+          <Button
+            type='button'
+            variant='ghost'
+            size='sm'
+            onClick={() => router.back()}
+            className='h-8 w-8 p-0'
+          >
+            <ArrowLeft className='h-4 w-4' />
+          </Button>
+          <div>
+            <h1 className='text-2xl font-bold'>Crear Equipos por Lote</h1>
+            <p className='text-sm text-muted-foreground'>Selecciona la familia del activo</p>
+          </div>
+        </div>
+
+        {loadingFamilies ? (
+          <div className='flex items-center justify-center h-32'>
+            <Loader2 className='h-6 w-6 animate-spin text-muted-foreground' />
+          </div>
+        ) : (
+          <FamilySelector
+            families={families}
+            selectedId={selectedFamilyId}
+            onSelect={handleFamilySelect}
+            disabled={loadingConfig}
+          />
+        )}
+        {loadingConfig && (
+          <p className='text-sm text-muted-foreground'>Cargando configuración...</p>
+        )}
+      </div>
+    )
+  }
+
+  // ── Paso 2: Selección de subtipo ───────────────────────────────────────────
+  if (step === 2 && familyConfig) {
+    return (
+      <div className='space-y-6'>
+        <div className='flex items-center gap-3'>
+          <Button
+            type='button'
+            variant='ghost'
+            size='sm'
+            onClick={handleBack}
+            className='h-8 w-8 p-0'
+          >
+            <ArrowLeft className='h-4 w-4' />
+          </Button>
+          <div>
+            <h1 className='text-2xl font-bold'>Crear Equipos por Lote</h1>
+            <p className='text-sm text-muted-foreground'>Selecciona el tipo de activo</p>
+          </div>
+        </div>
+        <SubtypeSelector
+          allowedSubtypes={familyConfig.allowedSubtypes}
+          onSelect={handleSubtypeSelect}
+        />
+      </div>
+    )
+  }
+
+  // ── Paso 3: Formulario del lote ────────────────────────────────────────────
   return (
     <form onSubmit={handleSubmit(onSubmit)} className='space-y-6'>
-      {/* Header integrado */}
+      {/* Header */}
       <div className='flex items-center justify-between'>
         <div>
           <div className='flex items-center gap-3 mb-2'>
@@ -227,7 +342,7 @@ export function BulkEquipmentForm({ onSuccess, onCancel, prefillData }: BulkEqui
               type='button'
               variant='ghost'
               size='sm'
-              onClick={() => router.back()}
+              onClick={handleBack}
               className='h-8 w-8 p-0'
             >
               <ArrowLeft className='h-4 w-4' />
@@ -246,7 +361,6 @@ export function BulkEquipmentForm({ onSuccess, onCancel, prefillData }: BulkEqui
         </div>
       </div>
 
-      {/* Error general */}
       {error && (
         <Alert variant='destructive'>
           <AlertCircle className='h-4 w-4' />
@@ -264,7 +378,6 @@ export function BulkEquipmentForm({ onSuccess, onCancel, prefillData }: BulkEqui
         </div>
 
         <div className='grid grid-cols-2 gap-4'>
-          {/* Cantidad */}
           <div className='space-y-1.5'>
             <Label htmlFor='quantity'>
               Cantidad <span className='text-destructive'>*</span>
@@ -281,7 +394,6 @@ export function BulkEquipmentForm({ onSuccess, onCancel, prefillData }: BulkEqui
             )}
           </div>
 
-          {/* Modo de códigos */}
           <div className='space-y-1.5'>
             <Label>
               Modo de códigos <span className='text-destructive'>*</span>
@@ -307,7 +419,6 @@ export function BulkEquipmentForm({ onSuccess, onCancel, prefillData }: BulkEqui
           </div>
         </div>
 
-        {/* Códigos manuales */}
         {codeMode === 'manual' && (
           <div className='space-y-1.5'>
             <Label htmlFor='manualCodes'>
@@ -315,7 +426,7 @@ export function BulkEquipmentForm({ onSuccess, onCancel, prefillData }: BulkEqui
             </Label>
             <Textarea
               id='manualCodes'
-              placeholder='LAP-001&#10;LAP-002&#10;LAP-003'
+              placeholder={'LAP-001\nLAP-002\nLAP-003'}
               rows={Math.min(quantity, 8)}
               {...register('manualCodes')}
               className='font-mono text-sm'
@@ -331,12 +442,11 @@ export function BulkEquipmentForm({ onSuccess, onCancel, prefillData }: BulkEqui
           </div>
         )}
 
-        {/* Números de serie */}
         <div className='space-y-1.5'>
           <Label htmlFor='serialNumbers'>Números de serie (opcional, uno por línea)</Label>
           <Textarea
             id='serialNumbers'
-            placeholder='SN123456&#10;SN789012'
+            placeholder={'SN123456\nSN789012'}
             rows={Math.min(quantity, 6)}
             {...register('serialNumbers')}
             className='font-mono text-sm'
@@ -354,7 +464,7 @@ export function BulkEquipmentForm({ onSuccess, onCancel, prefillData }: BulkEqui
         </div>
       </div>
 
-      {/* Sección: Datos del Equipo */}
+      {/* Sección: Datos Comunes del Equipo */}
       <div className='rounded-lg border bg-card p-5 space-y-4'>
         <div>
           <h3 className='font-semibold mb-1'>Datos Comunes del Equipo</h3>
@@ -364,7 +474,6 @@ export function BulkEquipmentForm({ onSuccess, onCancel, prefillData }: BulkEqui
         </div>
 
         <div className='grid grid-cols-2 gap-4'>
-          {/* Marca */}
           <div className='space-y-1.5'>
             <Label htmlFor='brand'>
               Marca <span className='text-destructive'>*</span>
@@ -373,7 +482,6 @@ export function BulkEquipmentForm({ onSuccess, onCancel, prefillData }: BulkEqui
             {errors.brand && <p className='text-xs text-destructive'>{errors.brand.message}</p>}
           </div>
 
-          {/* Modelo */}
           <div className='space-y-1.5'>
             <Label htmlFor='model'>
               Modelo <span className='text-destructive'>*</span>
@@ -382,7 +490,7 @@ export function BulkEquipmentForm({ onSuccess, onCancel, prefillData }: BulkEqui
             {errors.model && <p className='text-xs text-destructive'>{errors.model.message}</p>}
           </div>
 
-          {/* Tipo de equipo */}
+          {/* Tipo de equipo — filtrado por familia */}
           <div className='space-y-1.5 col-span-2'>
             <Label>
               Tipo de equipo <span className='text-destructive'>*</span>
@@ -394,10 +502,7 @@ export function BulkEquipmentForm({ onSuccess, onCancel, prefillData }: BulkEqui
             ) : (
               <Combobox
                 options={equipmentTypes.map(
-                  (type): ComboboxOption => ({
-                    value: type.id,
-                    label: type.name,
-                  })
+                  (type): ComboboxOption => ({ value: type.id, label: type.name })
                 )}
                 value={selectedTypeId || ''}
                 onValueChange={value => setValue('typeId', value, { shouldValidate: true })}
@@ -409,7 +514,6 @@ export function BulkEquipmentForm({ onSuccess, onCancel, prefillData }: BulkEqui
             {errors.typeId && <p className='text-xs text-destructive'>{errors.typeId.message}</p>}
           </div>
 
-          {/* Stock Indicator */}
           {watch('brand') && watch('model') && watch('typeId') && (
             <div className='col-span-2'>
               <StockIndicatorBadge
@@ -420,22 +524,19 @@ export function BulkEquipmentForm({ onSuccess, onCancel, prefillData }: BulkEqui
             </div>
           )}
 
-          {/* Departamento */}
+          {/* Departamento — filtrado por familia */}
           <div className='space-y-1.5 col-span-2'>
             <Label>
               Departamento <span className='text-destructive'>*</span>
             </Label>
             <SearchableSelect
               options={filteredDepartments.map(
-                (d): SearchableSelectOption => ({
-                  id: d.id,
-                  name: d.name,
-                })
+                (d): SearchableSelectOption => ({ id: d.id, name: d.name })
               )}
               value={selectedDepartmentId || ''}
               onChange={value => setValue('departmentId', value, { shouldValidate: true })}
               placeholder={
-                selectedTypeId && filteredDepartments.length === 0
+                filteredDepartments.length === 0
                   ? 'No hay departamentos para esta familia'
                   : 'Buscar departamento...'
               }
@@ -445,7 +546,6 @@ export function BulkEquipmentForm({ onSuccess, onCancel, prefillData }: BulkEqui
             )}
           </div>
 
-          {/* Condición */}
           <div className='space-y-1.5'>
             <Label>
               Condición <span className='text-destructive'>*</span>
@@ -462,7 +562,6 @@ export function BulkEquipmentForm({ onSuccess, onCancel, prefillData }: BulkEqui
             </SimpleSelect>
           </div>
 
-          {/* Tipo de propiedad */}
           <div className='space-y-1.5'>
             <Label>
               Tipo de propiedad <span className='text-destructive'>*</span>
@@ -471,13 +570,12 @@ export function BulkEquipmentForm({ onSuccess, onCancel, prefillData }: BulkEqui
               value={watch('ownershipType')}
               onChange={e => setValue('ownershipType', e.target.value as any)}
             >
-              <option value='FIXED_ASSET'>Activo Fijo</option>
-              <option value='RENTAL'>Alquiler</option>
-              <option value='LOAN'>Préstamo</option>
+              <option value='FIXED_ASSET'>Activo Fijo (Compra directa)</option>
+              <option value='RENTAL'>Arrendamiento</option>
+              <option value='LOAN'>Activo de Tercero (Préstamo)</option>
             </SimpleSelect>
           </div>
 
-          {/* Precio de compra */}
           <div className='space-y-1.5'>
             <Label htmlFor='purchasePrice'>Precio de compra (opcional)</Label>
             <Input
@@ -489,7 +587,6 @@ export function BulkEquipmentForm({ onSuccess, onCancel, prefillData }: BulkEqui
             />
           </div>
 
-          {/* Notas */}
           <div className='space-y-1.5 col-span-2'>
             <Label htmlFor='notes'>Notas (opcional)</Label>
             <Textarea
@@ -502,7 +599,7 @@ export function BulkEquipmentForm({ onSuccess, onCancel, prefillData }: BulkEqui
         </div>
       </div>
 
-      {/* Botones de acción */}
+      {/* Botones */}
       <div className='flex gap-3 pt-2'>
         {onCancel && (
           <Button type='button' variant='outline' onClick={onCancel} disabled={isSubmitting}>
