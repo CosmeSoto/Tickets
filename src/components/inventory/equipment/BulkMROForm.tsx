@@ -8,7 +8,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, CheckCircle2, AlertCircle, Package } from 'lucide-react'
+import { CheckCircle2, AlertCircle, Package } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -20,7 +20,7 @@ import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
 import { CatalogTypeInlineForm } from '@/components/inventory/asset-forms/CatalogTypeInlineForm'
 import { UnitOfMeasureInlineForm } from '@/components/inventory/asset-forms/UnitOfMeasureInlineForm'
 import { WarehouseInlineForm } from '@/components/inventory/asset-forms/WarehouseInlineForm'
-import { CreationBreadcrumb } from '@/components/inventory/shared/CreationBreadcrumb'
+import { StepHeader } from '@/components/inventory/shared/StepHeader'
 import type { FamilyConfig } from '@/lib/inventory/family-config-types'
 
 interface BulkMROFormProps {
@@ -177,31 +177,17 @@ export function BulkMROForm({
 
   return (
     <form onSubmit={handleSubmit} className='space-y-6'>
-      {/* Header */}
-      <div className='space-y-1'>
-        <CreationBreadcrumb
-          mode='bulk'
-          step={3}
-          familyName={familyName}
-          familyColor={familyColor}
-          subtypeName='MRO'
-        />
-        <div className='flex items-center gap-3 mt-2'>
-          <Button
-            type='button'
-            variant='ghost'
-            size='sm'
-            onClick={onBack}
-            className='h-8 w-8 p-0 shrink-0'
-          >
-            <ArrowLeft className='h-4 w-4' />
-          </Button>
-          <h1 className='text-2xl font-bold'>Nuevo Lote de Materiales</h1>
-        </div>
-        <p className='text-sm text-muted-foreground ml-11'>
-          Registra una entrada de stock de materiales MRO / consumibles
-        </p>
-      </div>
+      {/* Header estandarizado */}
+      <StepHeader
+        mode='bulk'
+        step={3}
+        description='Registra una entrada de stock de materiales MRO / consumibles.'
+        familyName={familyName}
+        familyColor={familyColor}
+        subtypeName='MRO'
+        backLabel='Cambiar tipo'
+        onBack={onBack}
+      />
 
       {error && (
         <Alert variant='destructive'>

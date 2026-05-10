@@ -1,11 +1,9 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { ArrowLeft } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { FamilySelector } from '@/components/inventory/family-selector'
 import { SubtypeSelector } from '@/components/inventory/subtype-selector'
-import { CreationBreadcrumb } from '@/components/inventory/shared/CreationBreadcrumb'
+import { StepHeader } from '@/components/inventory/shared/StepHeader'
 import type { AssetSubtype, FamilyConfig } from '@/lib/inventory/family-config-types'
 import { EquipmentAssetForm } from '@/components/inventory/asset-forms/EquipmentAssetForm'
 import { MROAssetForm } from '@/components/inventory/asset-forms/MROAssetForm'
@@ -118,7 +116,11 @@ export function UnifiedAssetForm({
     setSubmitError(null)
     try {
       const attachments = (payload.attachments as File[] | undefined) ?? []
-      const jsonPayload = { ...payload, subtype: selectedSubtype, familyId: selectedFamilyId }
+      const jsonPayload: Record<string, unknown> = {
+        ...payload,
+        subtype: selectedSubtype,
+        familyId: selectedFamilyId,
+      }
       delete jsonPayload.attachments
 
       const res = await fetch('/api/inventory/assets', {
@@ -158,8 +160,11 @@ export function UnifiedAssetForm({
       {/* ── Paso 1: Selección de familia ─────────────────────────────────── */}
       {step === 1 && (
         <div className='space-y-4'>
-          <CreationBreadcrumb mode='individual' step={1} />
-          <p className='text-sm font-medium text-foreground'>Selecciona una familia</p>
+          <StepHeader
+            mode='individual'
+            step={1}
+            description='Elige el área de la organización a la que pertenece este activo.'
+          />
           {loadingFamilies ? (
             <p className='text-sm text-muted-foreground'>Cargando familias...</p>
           ) : (
@@ -179,25 +184,15 @@ export function UnifiedAssetForm({
       {/* ── Paso 2: Selección de subtipo ─────────────────────────────────── */}
       {step === 2 && familyConfig && (
         <div className='space-y-4'>
-          <div className='flex items-center justify-between'>
-            <CreationBreadcrumb
-              mode='individual'
-              step={2}
-              familyName={selectedFamily?.name}
-              familyColor={selectedFamily?.color}
-            />
-            <Button
-              type='button'
-              variant='ghost'
-              size='sm'
-              onClick={handleBack}
-              className='text-muted-foreground hover:text-foreground -mr-2'
-            >
-              <ArrowLeft className='h-4 w-4 mr-1' />
-              Cambiar familia
-            </Button>
-          </div>
-          <p className='text-sm font-medium text-foreground'>Selecciona el tipo de activo</p>
+          <StepHeader
+            mode='individual'
+            step={2}
+            description='Indica si es un equipo físico, una licencia/contrato o un consumible.'
+            familyName={selectedFamily?.name}
+            familyColor={selectedFamily?.color}
+            backLabel='Cambiar familia'
+            onBack={handleBack}
+          />
           <SubtypeSelector
             allowedSubtypes={familyConfig.allowedSubtypes}
             onSelect={handleSubtypeSelect}
@@ -208,13 +203,15 @@ export function UnifiedAssetForm({
       {/* ── Paso 3: Formulario ───────────────────────────────────────────── */}
       {step === 3 && selectedSubtype && familyConfig && (
         <div className='space-y-4'>
-          {/* Breadcrumb con familia + tipo */}
-          <CreationBreadcrumb
+          <StepHeader
             mode='individual'
             step={3}
+            description='Rellena los datos del activo. Los campos marcados con * son obligatorios.'
             familyName={selectedFamily?.name}
             familyColor={selectedFamily?.color}
             subtypeName={selectedSubtype}
+            backLabel='Cambiar tipo'
+            onBack={handleBack}
           />
 
           {selectedSubtype === 'EQUIPMENT' && (

@@ -36,6 +36,7 @@ import { FamilySelector } from '@/components/inventory/family-selector'
 import { SubtypeSelector } from '@/components/inventory/subtype-selector'
 import { useInventoryFamilies } from '@/contexts/families-context'
 import { CreationBreadcrumb } from '@/components/inventory/shared/CreationBreadcrumb'
+import { StepHeader } from '@/components/inventory/shared/StepHeader'
 import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
 import { BulkMROForm } from '@/components/inventory/equipment/BulkMROForm'
 import { AccessoriesSection } from '@/components/inventory/shared/AccessoriesSection'
@@ -503,11 +504,11 @@ export function BulkEquipmentForm({
   if (step === 1) {
     return (
       <div className='space-y-6'>
-        <div className='space-y-1'>
-          <CreationBreadcrumb mode='bulk' step={1} />
-          <h1 className='text-2xl font-bold mt-2'>Nuevo Lote de Activos</h1>
-          <p className='text-sm text-muted-foreground'>Selecciona la familia para continuar</p>
-        </div>
+        <StepHeader
+          mode='bulk'
+          step={1}
+          description='Elige el área de la organización a la que pertenecen los activos del lote.'
+        />
         {loadingFamilies ? (
           <div className='flex items-center justify-center h-32'>
             <Loader2 className='h-6 w-6 animate-spin text-muted-foreground' />
@@ -531,28 +532,15 @@ export function BulkEquipmentForm({
   if (step === 2 && familyConfig) {
     return (
       <div className='space-y-6'>
-        <div className='flex items-start justify-between gap-4'>
-          <div className='space-y-1'>
-            <CreationBreadcrumb
-              mode='bulk'
-              step={2}
-              familyName={selectedFamily?.name}
-              familyColor={selectedFamily?.color}
-            />
-            <h1 className='text-2xl font-bold mt-2'>Nuevo Lote de Activos</h1>
-            <p className='text-sm text-muted-foreground'>Selecciona el tipo de activo a crear</p>
-          </div>
-          <Button
-            type='button'
-            variant='ghost'
-            size='sm'
-            onClick={handleBack}
-            className='text-muted-foreground hover:text-foreground shrink-0 mt-1'
-          >
-            <ArrowLeft className='h-4 w-4 mr-1' />
-            Cambiar familia
-          </Button>
-        </div>
+        <StepHeader
+          mode='bulk'
+          step={2}
+          description='Indica si el lote es de equipos físicos o materiales consumibles.'
+          familyName={selectedFamily?.name}
+          familyColor={selectedFamily?.color}
+          backLabel='Cambiar familia'
+          onBack={handleBack}
+        />
         <SubtypeSelector
           allowedSubtypes={familyConfig.allowedSubtypes.filter(s => s !== 'LICENSE')}
           onSelect={handleSubtypeSelect}
@@ -580,33 +568,21 @@ export function BulkEquipmentForm({
   // Para EQUIPMENT: formulario completo de lote de equipos
   return (
     <form onSubmit={(handleSubmit as any)(onSubmit)} className='space-y-6'>
-      {/* Header con breadcrumb */}
+      {/* Header estandarizado + contador de equipos */}
       <div className='flex items-start justify-between gap-4'>
-        <div className='space-y-1 flex-1'>
-          <CreationBreadcrumb
+        <div className='flex-1 min-w-0'>
+          <StepHeader
             mode='bulk'
             step={3}
+            description='Completa los datos comunes a todas las unidades del lote.'
             familyName={selectedFamily?.name}
             familyColor={selectedFamily?.color}
             subtypeName={selectedSubtype}
+            backLabel='Cambiar tipo'
+            onBack={handleBack}
           />
-          <div className='flex items-center gap-3 mt-2'>
-            <Button
-              type='button'
-              variant='ghost'
-              size='sm'
-              onClick={handleBack}
-              className='h-8 w-8 p-0 shrink-0'
-            >
-              <ArrowLeft className='h-4 w-4' />
-            </Button>
-            <h1 className='text-2xl font-bold'>Nuevo Lote de Activos</h1>
-          </div>
-          <p className='text-sm text-muted-foreground ml-11'>
-            Completa los datos para registrar múltiples activos en una sola operación
-          </p>
         </div>
-        <div className='text-right'>
+        <div className='text-right shrink-0'>
           <div className='text-3xl font-bold text-primary'>{quantity}</div>
           <div className='text-xs text-muted-foreground'>
             {quantity === 1 ? 'equipo' : 'equipos'}
