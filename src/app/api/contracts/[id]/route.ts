@@ -4,15 +4,15 @@ import { authOptions } from '@/lib/auth'
 import { ContractService } from '@/lib/services/contract-service'
 import { canManageInventory, canManageAsset, inventoryForbidden } from '@/lib/inventory-access'
 
-type Params = { params: { id: string } }
-
 // GET /api/contracts/[id]
-export async function GET(_req: NextRequest, { params }: Params) {
+export async function GET(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-  const hasAccess = session.user.role === 'ADMIN'
-    || await canManageInventory(session.user.id, session.user.role)
+  const params = await context.params
+
+  const hasAccess =
+    session.user.role === 'ADMIN' || (await canManageInventory(session.user.id, session.user.role))
   if (!hasAccess) return inventoryForbidden()
 
   const contract = await ContractService.getById(params.id)
@@ -21,7 +21,12 @@ export async function GET(_req: NextRequest, { params }: Params) {
   // Verificar acceso a la familia (excepto SuperAdmin)
   const isSuperAdmin = (session.user as any).isSuperAdmin === true
   if (!isSuperAdmin && contract.familyId) {
-    const allowed = await canManageAsset(session.user.id, session.user.role, isSuperAdmin, contract.familyId)
+    const allowed = await canManageAsset(
+      session.user.id,
+      session.user.role,
+      isSuperAdmin,
+      contract.familyId
+    )
     if (!allowed) return inventoryForbidden()
   }
 
@@ -29,11 +34,13 @@ export async function GET(_req: NextRequest, { params }: Params) {
 }
 
 // PUT /api/contracts/[id]
-export async function PUT(req: NextRequest, { params }: Params) {
+export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-  if (!await canManageInventory(session.user.id, session.user.role)) {
+  const params = await context.params
+
+  if (!(await canManageInventory(session.user.id, session.user.role))) {
     return inventoryForbidden()
   }
 
@@ -45,7 +52,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (!isSuperAdmin) {
     const contract = await ContractService.getById(params.id)
     if (contract?.familyId) {
-      const allowed = await canManageAsset(session.user.id, session.user.role, isSuperAdmin, contract.familyId)
+      const allowed = await canManageAsset(
+        session.user.id,
+        session.user.role,
+        isSuperAdmin,
+        contract.familyId
+      )
       if (!allowed) return inventoryForbidden()
     }
   }
@@ -69,12 +81,17 @@ export async function PUT(req: NextRequest, { params }: Params) {
 }
 
 // DELETE /api/contracts/[id] — ADMIN (SuperAdmin o Admin de la familia)
-export async function DELETE(_req: NextRequest, { params }: Params) {
+export async function DELETE(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
+  const params = await context.params
+
   if (session.user.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Solo administradores pueden eliminar contratos' }, { status: 403 })
+    return NextResponse.json(
+      { error: 'Solo administradores pueden eliminar contratos' },
+      { status: 403 }
+    )
   }
 
   // Admin normal: verificar que tenga acceso a la familia del contrato
@@ -82,7 +99,12 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   if (!isSuperAdmin) {
     const contract = await ContractService.getById(params.id)
     if (contract?.familyId) {
-      const allowed = await canManageAsset(session.user.id, session.user.role, isSuperAdmin, contract.familyId)
+      const allowed = await canManageAsset(
+        session.user.id,
+        session.user.role,
+        isSuperAdmin,
+        contract.familyId
+      )
       if (!allowed) return inventoryForbidden()
     }
   }

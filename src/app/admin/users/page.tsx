@@ -153,7 +153,7 @@ export default function AdminUsersPage() {
 
   // Funciones de manejo de modales
   const handleUserEdit = (user: UserData) => {
-    setUserDetailsModal({ isOpen: false, userId: '', userName: '' })
+    setUserDetailsModal({ isOpen: false, user: null })
     setEditingUser(user)
     setEditUserModalOpen(true)
   }
@@ -402,7 +402,7 @@ export default function AdminUsersPage() {
           if (userDetailsModal.user) handleUserDelete(userDetailsModal.user)
         }}
         canEdit={true}
-        canDelete={userDetailsModal.userId !== session?.user?.id}
+        canDelete={userDetailsModal.user?.id !== session?.user?.id}
       />
 
       {/* Diálogo de confirmación de eliminación */}

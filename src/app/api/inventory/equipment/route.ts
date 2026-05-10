@@ -1,135 +1,112 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { EquipmentService } from '@/lib/services/equipment.service'
-import {
-  createEquipmentSchema,
-  equipmentFiltersSchema,
-} from '@/lib/validations/inventory/equipment'
-import { ZodError } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { withCache, invalidateCache, buildCacheKey } from '@/lib/api-cache'
-import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
-import { applyEquipmentFamilyFilter, createUserContext } from '@/lib/middleware/family-filter'
+import { z } from 'zod'
 
-/**
- * GET /api/inventory/equipment
- * Lista equipos con filtros y paginación
- */
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
-
-    // Parsear query params
-    const searchParams = request.nextUrl.searchParams
-    const filters = {
-      search: searchParams.get('search') || undefined,
-      typeId: searchParams.getAll('typeId').length > 0 ? searchParams.getAll('typeId') : undefined,
-      status: searchParams.getAll('status').length > 0 ? searchParams.getAll('status') : undefined,
-      condition:
-        searchParams.getAll('condition').length > 0 ? searchParams.getAll('condition') : undefined,
-      assignedTo: searchParams.get('assignedTo') || undefined,
-      departmentId: searchParams.get('departmentId') || undefined,
-      familyId: searchParams.get('familyId') || undefined,
-      page: parseInt(searchParams.get('page') || '1'),
-      limit: parseInt(searchParams.get('limit') || '10'),
-    }
-
-    // Validar filtros
-    const validatedFilters = equipmentFiltersSchema.parse(filters)
-
-    // Aplicar filtro de familia según rol del usuario
-    const userContext = createUserContext(session)
-    const familyFilter = await applyEquipmentFamilyFilter(userContext)
-
-    // Caché 60s — se invalida en POST/PUT/DELETE
-    const cacheKey = buildCacheKey('inventory:equipment', {
-      uid: session.user.id,
-      role: session.user.role,
-      ...validatedFilters,
-    })
-
-    const result = await withCache(cacheKey, 60, () =>
-      EquipmentService.listEquipment(
-        validatedFilters,
-        validatedFilters.page,
-        validatedFilters.limit,
-        session.user.id,
-        session.user.role,
-        familyFilter
-      )
+const createEquipmentSchema = z.object({
+  code: z.string().min(1, 'El código es requerido'),
+  serialNumber: z.string().optional(),
+  modelId: z.string().min(1, 'El modelo es requerido'),
+  departmentId: z.string().optional(),
+  warehouseId: z.string().optional(),
+  physicalLocation: z.string().optional(),
+  condition: z.enum(['NEW', 'GOOD', 'FAIR', 'POOR']).optional(),
+  propertyType: z.enum(['FIXED_ASSET', 'RENTAL', 'LOAN']).optional(),
+  purchaseDate: z.string().optional(),
+  purchasePrice: z.number().optional(),
+  customValues: z.record(z.any()).optional(),
+  accessories: z
+    .array(
+      z.object({
+        name: z.string(),
+        quantity: z.number(),
+      })
     )
+    .optional(),
+  notes: z.string().optional(),
+})
 
-    return NextResponse.json(result)
-  } catch (error) {
-    console.error('Error en GET /api/inventory/equipment:', error)
-
-    if (error instanceof ZodError) {
-      return NextResponse.json({ error: 'Datos inválidos', details: error.errors }, { status: 400 })
-    }
-
-    return NextResponse.json({ error: 'Error al obtener equipos' }, { status: 500 })
-  }
-}
-
-/**
- * POST /api/inventory/equipment
- * Crea un nuevo equipo
- */
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-
     if (!session?.user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
-
-    // Verificar permiso de gestión de inventario
-    if (!(await canManageInventory(session.user.id, session.user.role))) {
-      return inventoryForbidden()
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
     const body = await request.json()
-
-    // Validar datos
     const validatedData = createEquipmentSchema.parse(body)
 
-    // Validar que el departamento exista y esté activo
-    const department = await prisma.departments.findUnique({
-      where: { id: validatedData.departmentId },
+    // Verificar que el código no exista
+    const existingCode = await prisma.equipment.findUnique({
+      where: { code: validatedData.code },
     })
 
-    if (!department) {
-      return NextResponse.json({ error: 'El departamento especificado no existe' }, { status: 400 })
+    if (existingCode) {
+      return NextResponse.json({ error: 'El código ya existe' }, { status: 400 })
     }
 
-    if (!department.isActive) {
-      return NextResponse.json(
-        { error: 'El departamento seleccionado no está activo' },
-        { status: 400 }
-      )
+    // Verificar número de serie si existe
+    if (validatedData.serialNumber) {
+      const existingSerial = await prisma.equipment.findFirst({
+        where: { serialNumber: validatedData.serialNumber },
+      })
+
+      if (existingSerial) {
+        return NextResponse.json({ error: 'El número de serie ya existe' }, { status: 400 })
+      }
     }
 
-    // Crear equipo
-    const equipment = await EquipmentService.createEquipment(validatedData, session.user.id)
+    // Obtener datos del modelo
+    const model = await prisma.equipment_models.findUnique({
+      where: { id: validatedData.modelId },
+      include: { type: true },
+    })
 
-    // Invalidar caché de equipos
-    await invalidateCache('inventory:equipment:*').catch(() => {})
+    if (!model) {
+      return NextResponse.json({ error: 'Modelo no encontrado' }, { status: 404 })
+    }
 
-    return NextResponse.json(equipment, { status: 201 })
+    // Crear el equipo
+    const qrCode = `EQ-${validatedData.code}-${Date.now()}`
+    const equipment = await prisma.equipment.create({
+      data: {
+        code: validatedData.code,
+        serialNumber: validatedData.serialNumber || '',
+        modelId: validatedData.modelId,
+        brand: model.brand,
+        model_old: model.model,
+        typeId: model.typeId,
+        departmentId: validatedData.departmentId,
+        warehouseId: validatedData.warehouseId,
+        location: validatedData.physicalLocation,
+        condition: (validatedData.condition || 'GOOD') as any,
+        ownershipType: (validatedData.propertyType || 'FIXED_ASSET') as any,
+        purchaseDate: validatedData.purchaseDate ? new Date(validatedData.purchaseDate) : null,
+        purchasePrice: validatedData.purchasePrice,
+        accessories: validatedData.accessories?.map(a => a.name) || [],
+        notes: validatedData.notes,
+        status: 'AVAILABLE' as any,
+        batchId: null,
+        qrCode,
+      },
+    })
+
+    return NextResponse.json(
+      {
+        success: true,
+        equipment: {
+          id: equipment.id,
+          code: equipment.code,
+        },
+      },
+      { status: 201 }
+    )
   } catch (error) {
-    console.error('Error en POST /api/inventory/equipment:', error)
+    console.error('Error creating equipment:', error)
 
-    if (error instanceof ZodError) {
+    if (error instanceof z.ZodError) {
       return NextResponse.json({ error: 'Datos inválidos', details: error.errors }, { status: 400 })
-    }
-
-    if (error instanceof Error && error.message.includes('Ya existe')) {
-      return NextResponse.json({ error: error.message }, { status: 409 })
     }
 
     return NextResponse.json({ error: 'Error al crear equipo' }, { status: 500 })

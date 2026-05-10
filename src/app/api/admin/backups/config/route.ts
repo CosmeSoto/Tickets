@@ -29,6 +29,7 @@ export async function GET() {
             'backupEmailNotifications',
             'backupVerifyIntegrity',
             'backupScheduleTime',
+            'backupCronScope',
           ],
         },
       },
@@ -69,6 +70,7 @@ export async function GET() {
           backupEmailNotifications: 'emailNotifications',
           backupVerifyIntegrity: 'verifyIntegrity',
           backupScheduleTime: 'scheduleTime',
+          backupCronScope: 'cronScope',
         }
 
         const mappedKey = keyMap[setting.key] || setting.key
@@ -92,6 +94,7 @@ export async function GET() {
       emailNotifications: [],
       verifyIntegrity: true,
       scheduleTime: '02:00',
+      cronScope: 'full',
     }
 
     // Informar al frontend si la clave de encriptación está configurada en el servidor.
@@ -131,6 +134,10 @@ export async function POST(request: NextRequest) {
       { key: 'backupEmailNotifications', value: JSON.stringify(config.emailNotifications || []) },
       { key: 'backupVerifyIntegrity', value: config.verifyIntegrity?.toString() || 'true' },
       { key: 'backupScheduleTime', value: config.scheduleTime || '02:00' },
+      {
+        key: 'backupCronScope',
+        value: config.cronScope === 'tickets' ? 'tickets' : 'full',
+      },
     ]
 
     // Actualizar o crear configuraciones

@@ -1,244 +1,117 @@
-/**
- * Página: Lista de Lotes
- * Muestra todos los lotes de equipos con filtros y búsqueda
- */
-
-'use client'
-
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Suspense } from 'react'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { redirect } from 'next/navigation'
+import { BatchService } from '@/lib/services/batch-inventory.service'
+import { prisma } from '@/lib/prisma'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { Plus, Search, Package, Calendar, DollarSign, Loader2 } from 'lucide-react'
+import { ArrowLeft, Plus } from 'lucide-react'
 import Link from 'next/link'
+import { Skeleton } from '@/components/ui/skeleton'
+import { BatchList } from '@/components/inventory/dashboard/BatchList'
+import { InventoryFiltersClient } from '@/components/inventory/filters/InventoryFiltersClient'
 
-interface Batch {
-  id: string
-  batchNumber: string
-  modelId: string
-  model?: {
-    brand: string
-    model: string
-    sku: string
-  }
-  quantity: number
-  supplierId?: string
-  supplier?: {
-    name: string
-  }
-  invoiceNumber?: string
-  purchasePrice?: number
-  purchaseDate?: string
-  status: string
-  createdAt: string
+interface SearchParams {
+  search?: string
+  typeId?: string
+  departmentId?: string
 }
 
-export default function BatchesListPage() {
-  const router = useRouter()
-  const [batches, setBatches] = useState<Batch[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
+async function getBatchesData(filters: SearchParams) {
+  const [batches, types, departments] = await Promise.all([
+    BatchService.getAll({
+      typeId: filters.typeId,
+      departmentId: filters.departmentId,
+    }),
+    prisma.equipment_types.findMany({ where: { isActive: true }, orderBy: { name: 'asc' } }),
+    prisma.departments.findMany({ where: { isActive: true }, orderBy: { name: 'asc' } }),
+  ])
 
-  useEffect(() => {
-    fetchBatches()
-  }, [])
+  // Filtrar por búsqueda de texto en marca/modelo
+  const filtered = filters.search
+    ? batches.filter(
+        b =>
+          b.model.brand.toLowerCase().includes(filters.search!.toLowerCase()) ||
+          b.model.model.toLowerCase().includes(filters.search!.toLowerCase()) ||
+          b.batchCode.toLowerCase().includes(filters.search!.toLowerCase())
+      )
+    : batches
 
-  const fetchBatches = async () => {
-    setIsLoading(true)
-    try {
-      const response = await fetch('/api/inventory/batches')
-      if (!response.ok) throw new Error('Error cargando lotes')
+  return { batches: filtered, types, departments }
+}
 
-      const data = await response.json()
-      setBatches(data.batches || [])
-    } catch (error) {
-      console.error('Error:', error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+function LoadingSkeleton() {
+  return (
+    <div className='space-y-4'>
+      {[...Array(5)].map((_, i) => (
+        <Skeleton key={i} className='h-20 w-full' />
+      ))}
+    </div>
+  )
+}
 
-  // Filtrar lotes
-  const filteredBatches = batches.filter(batch => {
-    const matchesSearch =
-      batch.batchNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      batch.model?.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      batch.model?.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      batch.invoiceNumber?.toLowerCase().includes(searchQuery.toLowerCase())
+async function BatchesContent({ searchParams }: { searchParams: SearchParams }) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) redirect('/auth/signin')
 
-    const matchesStatus = statusFilter === 'all' || batch.status === statusFilter
+  const { batches, types, departments } = await getBatchesData(searchParams)
 
-    return matchesSearch && matchesStatus
-  })
-
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, 'default' | 'success' | 'warning' | 'destructive'> = {
-      ACTIVE: 'success',
-      COMPLETED: 'default',
-      CANCELLED: 'destructive',
-    }
-
-    const labels: Record<string, string> = {
-      ACTIVE: 'Activo',
-      COMPLETED: 'Completado',
-      CANCELLED: 'Cancelado',
-    }
-
-    return <Badge variant={variants[status] || 'default'}>{labels[status] || status}</Badge>
-  }
+  const batchData = batches.map(b => ({
+    id: b.id,
+    batchCode: b.batchCode,
+    description: b.description,
+    modelBrand: b.model.brand,
+    modelName: b.model.model,
+    quantity: b.quantity,
+    supplierName: b.supplier?.name || '—',
+    purchaseDate: b.purchaseDate,
+    unitPrice: b.unitPrice,
+    totalPrice: b.totalPrice,
+    metrics: b.metrics,
+  }))
 
   return (
-    <div className='container mx-auto py-8 px-4'>
-      <div className='flex justify-between items-center mb-6'>
+    <div className='container mx-auto py-6 px-4'>
+      <Link href='/inventory'>
+        <Button variant='ghost' size='sm' className='flex items-center gap-2 mb-4 -ml-2'>
+          <ArrowLeft className='w-4 h-4' />
+          Volver al Inventario
+        </Button>
+      </Link>
+
+      <div className='flex items-center justify-between mb-6'>
         <div>
-          <h1 className='text-3xl font-bold'>Lotes de Equipos</h1>
-          <p className='text-gray-600 mt-1'>Gestiona los lotes de equipos recibidos</p>
+          <h1 className='text-2xl font-bold'>Lotes de Equipos</h1>
+          <p className='text-muted-foreground mt-1'>
+            {batches.length} lote{batches.length !== 1 ? 's' : ''} registrado
+            {batches.length !== 1 ? 's' : ''}
+          </p>
         </div>
-        <Link href='/inventory/batches/create'>
-          <Button>
-            <Plus className='mr-2 h-4 w-4' />
-            Crear Lote
+        <Link href='/inventory/new'>
+          <Button className='flex items-center gap-2'>
+            <Plus className='w-4 h-4' />
+            Nuevo Lote
           </Button>
         </Link>
       </div>
 
-      {/* Filtros */}
-      <Card className='mb-6'>
-        <CardContent className='pt-6'>
-          <div className='flex flex-col md:flex-row gap-4'>
-            {/* Búsqueda */}
-            <div className='flex-1'>
-              <div className='relative'>
-                <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400' />
-                <Input
-                  placeholder='Buscar por número de lote, modelo, factura...'
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  className='pl-10'
-                />
-              </div>
-            </div>
+      <InventoryFiltersClient
+        types={types.map(t => ({ id: t.id, name: t.name }))}
+        departments={departments.map(d => ({ id: d.id, name: d.name }))}
+        initialSearch={searchParams.search}
+        initialType={searchParams.typeId}
+        initialDepartment={searchParams.departmentId}
+      />
 
-            {/* Filtro de Estado */}
-            <div className='w-full md:w-48'>
-              <select
-                value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value)}
-                className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
-              >
-                <option value='all'>Todos los estados</option>
-                <option value='ACTIVE'>Activo</option>
-                <option value='COMPLETED'>Completado</option>
-                <option value='CANCELLED'>Cancelado</option>
-              </select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Lista de Lotes */}
-      {isLoading ? (
-        <div className='flex justify-center items-center py-12'>
-          <Loader2 className='h-8 w-8 animate-spin text-gray-400' />
-        </div>
-      ) : filteredBatches.length === 0 ? (
-        <Card>
-          <CardContent className='py-12 text-center'>
-            <Package className='h-12 w-12 text-gray-400 mx-auto mb-4' />
-            <p className='text-gray-600'>
-              {searchQuery || statusFilter !== 'all'
-                ? 'No se encontraron lotes con los filtros aplicados'
-                : 'No hay lotes registrados'}
-            </p>
-            {!searchQuery && statusFilter === 'all' && (
-              <Link href='/inventory/batches/create'>
-                <Button className='mt-4'>
-                  <Plus className='mr-2 h-4 w-4' />
-                  Crear Primer Lote
-                </Button>
-              </Link>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        <div className='grid gap-4'>
-          {filteredBatches.map(batch => (
-            <Card
-              key={batch.id}
-              className='hover:shadow-md transition-shadow cursor-pointer'
-              onClick={() => router.push(`/inventory/batches/${batch.id}`)}
-            >
-              <CardHeader>
-                <div className='flex justify-between items-start'>
-                  <div>
-                    <CardTitle className='text-lg'>Lote {batch.batchNumber}</CardTitle>
-                    <CardDescription>
-                      {batch.model?.brand} {batch.model?.model}
-                      {batch.model?.sku && ` (${batch.model.sku})`}
-                    </CardDescription>
-                  </div>
-                  {getStatusBadge(batch.status)}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className='grid grid-cols-2 md:grid-cols-4 gap-4 text-sm'>
-                  <div className='flex items-center gap-2'>
-                    <Package className='h-4 w-4 text-gray-400' />
-                    <div>
-                      <p className='text-gray-500'>Cantidad</p>
-                      <p className='font-semibold'>{batch.quantity} unidades</p>
-                    </div>
-                  </div>
-
-                  {batch.supplier && (
-                    <div>
-                      <p className='text-gray-500'>Proveedor</p>
-                      <p className='font-semibold'>{batch.supplier.name}</p>
-                    </div>
-                  )}
-
-                  {batch.invoiceNumber && (
-                    <div>
-                      <p className='text-gray-500'>Factura</p>
-                      <p className='font-semibold'>{batch.invoiceNumber}</p>
-                    </div>
-                  )}
-
-                  {batch.purchasePrice && (
-                    <div className='flex items-center gap-2'>
-                      <DollarSign className='h-4 w-4 text-gray-400' />
-                      <div>
-                        <p className='text-gray-500'>Precio Unitario</p>
-                        <p className='font-semibold'>${batch.purchasePrice.toLocaleString()}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className='flex items-center gap-2'>
-                    <Calendar className='h-4 w-4 text-gray-400' />
-                    <div>
-                      <p className='text-gray-500'>Fecha</p>
-                      <p className='font-semibold'>
-                        {new Date(batch.createdAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {/* Resumen */}
-      {!isLoading && filteredBatches.length > 0 && (
-        <div className='mt-6 text-center text-sm text-gray-600'>
-          Mostrando {filteredBatches.length} de {batches.length} lotes
-        </div>
-      )}
+      <BatchList batches={batchData} />
     </div>
+  )
+}
+
+export default function BatchesPage({ searchParams }: { searchParams: SearchParams }) {
+  return (
+    <Suspense fallback={<LoadingSkeleton />}>
+      <BatchesContent searchParams={searchParams} />
+    </Suspense>
   )
 }

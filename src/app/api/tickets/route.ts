@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
     const assigneeId = searchParams.get('assigneeId')
     const categoryId = searchParams.get('categoryId')
     const familyId = searchParams.get('familyId')
+    const clientIdParam = searchParams.get('clientId')
 
     // Construir filtros para Prisma
     const where: any = {}
@@ -51,6 +52,13 @@ export async function GET(request: NextRequest) {
       where.familyId = familyId
     }
 
+    if (session.user.role === 'ADMIN' && clientIdParam) {
+      where.clientId = clientIdParam
+    }
+
+    /** Fragmentos AND adicionales (búsqueda, alcance técnico) para no pisar `where.OR` de la búsqueda */
+    const andParts: any[] = []
+
     if (search) {
       const searchConditions: any[] = [
         { title: { contains: search, mode: 'insensitive' } },
@@ -58,24 +66,20 @@ export async function GET(request: NextRequest) {
         { users_tickets_clientIdTousers: { name: { contains: search, mode: 'insensitive' } } },
         { users_tickets_clientIdTousers: { email: { contains: search, mode: 'insensitive' } } },
       ]
-      // Búsqueda parcial por ticketCode si el patrón parece un código (contiene guión)
       if (search.includes('-')) {
         searchConditions.push({ ticketCode: { contains: search, mode: 'insensitive' } })
       }
-      where.OR = searchConditions
+      andParts.push({ OR: searchConditions })
     }
 
-    // Filtrar por rol del usuario
-    const viewMode = searchParams.get('viewMode') // 'assigned' | 'created' | null (all)
+    const viewMode = searchParams.get('viewMode')
 
     if (session.user.role === 'CLIENT') {
       where.clientId = session.user.id
     } else if (session.user.role === 'TECHNICIAN') {
       if (viewMode === 'created') {
-        // Modo "Mis Solicitudes": tickets donde el técnico es el solicitante
         where.clientId = session.user.id
       } else {
-        // Modo por defecto "Asignados": tickets de sus familias asignadas
         const techFamilies = await prisma.technician_family_assignments.findMany({
           where: { technicianId: session.user.id, isActive: true },
           select: { familyId: true },
@@ -83,18 +87,20 @@ export async function GET(request: NextRequest) {
         const techFamilyIds = techFamilies.map(a => a.familyId)
 
         if (techFamilyIds.length > 0) {
-          // Tickets asignados a él O sin asignar de sus familias
-          where.AND = [
-            { familyId: { in: techFamilyIds } },
-            {
-              OR: [{ assigneeId: session.user.id }, { assigneeId: null }],
-            },
-          ]
+          andParts.push({ familyId: { in: techFamilyIds } })
+          andParts.push({
+            OR: [{ assigneeId: session.user.id }, { assigneeId: null }],
+          })
         } else {
-          // Sin asignaciones de familia: solo sus tickets asignados
-          where.OR = [{ assigneeId: session.user.id }, { assigneeId: null }]
+          andParts.push({
+            OR: [{ assigneeId: session.user.id }, { assigneeId: null }],
+          })
         }
       }
+    }
+
+    if (andParts.length > 0) {
+      where.AND = andParts
     }
 
     // Obtener tickets con relaciones — select explícito para evitar traer campos pesados
@@ -104,7 +110,6 @@ export async function GET(request: NextRequest) {
         select: {
           id: true,
           title: true,
-          description: true,
           status: true,
           priority: true,
           ticketCode: true,
@@ -161,7 +166,15 @@ export async function GET(request: NextRequest) {
           hasNext: page * limit < total,
           hasPrev: page > 1,
         },
-        filters: { status, priority, search, assigneeId, categoryId, familyId },
+        filters: {
+          status,
+          priority,
+          search,
+          assigneeId,
+          categoryId,
+          familyId,
+          clientId: clientIdParam,
+        },
       },
     })
   } catch (error) {
@@ -351,6 +364,7 @@ export async function POST(request: NextRequest) {
       ...(ticketData.ticketCode &&
         session.user.role === 'ADMIN' && { ticketCode: ticketData.ticketCode }),
       isAdmin: session.user.role === 'ADMIN',
+      historyUserId: session.user.id,
     })) as any
 
     // ⭐ AUDITORÍA: Registrar creación de ticket

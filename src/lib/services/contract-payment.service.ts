@@ -479,13 +479,13 @@ export class ContractPaymentService {
     const admins = await this.getFamilyAdmins(contract.familyId)
 
     for (const admin of admins) {
-      await NotificationService.create({
+      await NotificationService.createNotification({
         userId: admin.id,
-        type: type === 'overdue' ? 'CONTRACT_PAYMENT_OVERDUE' : 'CONTRACT_PAYMENT_DUE',
+        type: 'INVENTORY',
         title,
         message,
-        priority,
         metadata: {
+          kind: type === 'overdue' ? 'CONTRACT_PAYMENT_OVERDUE' : 'CONTRACT_PAYMENT_DUE',
           paymentId: payment.id,
           contractId: contract.id,
           contractName: contract.name,
@@ -493,6 +493,7 @@ export class ContractPaymentService {
           currency: payment.currency,
           dueDate: payment.dueDate.toISOString(),
           daysUntilDue: type === 'overdue' ? -days : days,
+          priority,
         },
       })
     }
@@ -511,11 +512,20 @@ export class ContractPaymentService {
       })
     }
 
-    // Obtener admins de la familia
+    // Admins y técnicos con asignación activa a la familia
     const familyAdmins = await prisma.users.findMany({
       where: {
-        familyId,
-        role: { in: ['ADMIN', 'TECHNICIAN'] },
+        isActive: true,
+        OR: [
+          {
+            role: 'ADMIN',
+            adminFamilyAssignments: { some: { familyId, isActive: true } },
+          },
+          {
+            role: 'TECHNICIAN',
+            technicianFamilyAssignments: { some: { familyId, isActive: true } },
+          },
+        ],
       },
       select: { id: true, name: true, email: true },
     })

@@ -70,10 +70,13 @@ model backups {
   checksum   String?
   compressed Boolean  @default(false)
   encrypted  Boolean  @default(false)
+  /// null = respaldo completo de BD; "tickets" = solo datos del módulo de tickets (extensible a más módulos).
+  module     String?
   createdAt  DateTime @default(now())
 
   @@index([status, createdAt(sort: Desc)])
   @@index([type, status])
+  @@index([module, createdAt(sort: Desc)])
 }
 
 model categories {
@@ -127,6 +130,7 @@ model departments {
   updatedAt   DateTime
   categories  categories[]
   equipment   equipment[]
+  equipmentBatches equipment_batches[]  // Nueva relación con lotes
   family      families?           @relation(fields: [familyId], references: [id])
   licenses    software_licenses[]
   users       users[]
@@ -895,6 +899,15 @@ model equipment_batches {
   receiver            users    @relation("BatchReceiver", fields: [receivedBy], references: [id])
   receivedAt          DateTime @default(now()) @map("received_at")
   notes               String?
+  
+  // NUEVOS CAMPOS para formulario unificado
+  customValues        Json?    @map("custom_values")           // Valores de atributos personalizados del tipo
+  accessories         Json?                                     // Accesorios comunes [{name: "Mouse", quantity: 1}, ...]
+  condition           String?  @db.VarChar(20)                 // nuevo, bueno, regular, malo
+  propertyType        String?  @map("property_type") @db.VarChar(20)  // activo_fijo, alquiler, prestamo
+  departmentId        String?  @map("department_id")           // Departamento responsable del lote
+  department          departments? @relation(fields: [departmentId], references: [id])
+  
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
   
@@ -904,6 +917,8 @@ model equipment_batches {
   @@index([supplierId])
   @@index([warehouseId])
   @@index([purchaseDate])
+  @@index([departmentId])                                      // Nuevo índice
+  @@index([modelId, status, createdAt(sort: Desc)])           // Nuevo índice compuesto
   @@map("equipment_batches")
 }
 

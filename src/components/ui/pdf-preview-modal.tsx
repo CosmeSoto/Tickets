@@ -49,6 +49,7 @@ export function PdfPreviewModal({
         }
         // PDF disponible — mostrar iframe
         setLoadState('loaded')
+        return undefined
       })
       .catch(err => {
         if (err.name === 'AbortError') return
@@ -82,10 +83,11 @@ export function PdfPreviewModal({
   return (
     <div
       className='fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4'
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+      onClick={e => {
+        if (e.target === e.currentTarget) onClose()
+      }}
     >
       <div className='relative flex flex-col w-full max-w-5xl h-[90vh] bg-background rounded-xl shadow-2xl overflow-hidden'>
-
         {/* Header */}
         <div className='flex items-center justify-between gap-3 px-5 py-3 border-b bg-muted/40 shrink-0'>
           <div className='flex items-center gap-2 min-w-0'>
@@ -95,11 +97,21 @@ export function PdfPreviewModal({
           <div className='flex items-center gap-2 shrink-0'>
             {loadState === 'loaded' && (
               <>
-                <Button size='sm' variant='outline' onClick={handleOpenNewTab} className='h-8 text-xs'>
+                <Button
+                  size='sm'
+                  variant='outline'
+                  onClick={handleOpenNewTab}
+                  className='h-8 text-xs'
+                >
                   <ExternalLink className='h-3.5 w-3.5 mr-1.5' />
                   Abrir en pestaña
                 </Button>
-                <Button size='sm' variant='outline' onClick={handleDownload} className='h-8 text-xs'>
+                <Button
+                  size='sm'
+                  variant='outline'
+                  onClick={handleDownload}
+                  className='h-8 text-xs'
+                >
                   <Download className='h-3.5 w-3.5 mr-1.5' />
                   Descargar
                 </Button>
@@ -169,7 +181,8 @@ export function PdfPreviewModal({
               o{' '}
               <button onClick={handleDownload} className='underline font-medium'>
                 Descargar
-              </button>.
+              </button>
+              .
             </p>
           </div>
         )}

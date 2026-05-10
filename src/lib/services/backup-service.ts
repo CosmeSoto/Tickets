@@ -6,6 +6,12 @@ import { createHash, randomUUID } from 'crypto'
 import prisma from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { BackupCloudService, type CloudProvider } from './backup-cloud-service'
+import {
+  exportTicketsModuleData,
+  isBackupModuleId,
+  TICKETS_MODULE_RESTORE_ORDER,
+  type BackupModuleId,
+} from './backup-modules'
 
 const execAsync = promisify(exec)
 
@@ -19,6 +25,8 @@ export interface BackupInfo {
   checksum?: string
   compressed?: boolean
   encrypted?: boolean
+  /** null / undefined = respaldo completo de base de datos */
+  module?: string | null
 }
 
 export interface BackupStats {
@@ -36,14 +44,23 @@ export class BackupService {
   private static readonly MAX_BACKUP_SIZE = 1024 * 1024 * 1024 // 1GB
   private static readonly COMPRESSION_LEVEL = 6
 
-  static async createBackup(type: 'manual' | 'automatic' = 'manual'): Promise<BackupInfo> {
+  static async createBackup(
+    type: 'manual' | 'automatic' = 'manual',
+    options?: { module?: BackupModuleId | null }
+  ): Promise<BackupInfo> {
     // Validar entrada
     if (type !== 'manual' && type !== 'automatic') {
       throw new Error('Tipo de backup inválido. Debe ser "manual" o "automatic"')
     }
 
+    const moduleKey: BackupModuleId | null =
+      options?.module != null && isBackupModuleId(options.module) ? options.module : null
+
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-    const filename = `backup-${timestamp}.sql`
+    const isTicketsModule = moduleKey === 'tickets'
+    const filename = isTicketsModule
+      ? `backup-tickets-${timestamp}.json`
+      : `backup-${timestamp}.sql`
     const filepath = join(this.BACKUP_DIR, filename)
 
     // Verificar espacio en disco disponible
@@ -64,6 +81,7 @@ export class BackupService {
         size: 0,
         type,
         status: 'in_progress',
+        module: moduleKey,
         createdAt: new Date(),
       },
     })
@@ -100,9 +118,29 @@ export class BackupService {
         usePgDump = false
       }
 
-      console.log(`Iniciando backup: ${filename}`)
+      console.log(`Iniciando backup: ${filename}${moduleKey ? ` (módulo: ${moduleKey})` : ''}`)
 
-      if (usePgDump) {
+      if (isTicketsModule) {
+        const moduleData = await exportTicketsModuleData()
+        const totalRecords = Object.values(moduleData).reduce((s, rows) => s + rows.length, 0)
+        const payload = JSON.stringify(
+          {
+            metadata: {
+              version: '2.1',
+              module: 'tickets',
+              timestamp: new Date().toISOString(),
+              method: 'prisma-module',
+              tables: Object.keys(moduleData),
+              totalRecords,
+            },
+            data: moduleData,
+          },
+          null,
+          2
+        )
+        await writeFile(filepath, payload, 'utf-8')
+        console.log(`Backup módulo tickets: ${totalRecords} registros en total`)
+      } else if (usePgDump) {
         // Usar pg_dump si está disponible
         let command = `PGPASSWORD="${dbConfig.password}" pg_dump -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database}`
         command += ' --no-owner --no-privileges --clean --if-exists --verbose'
@@ -222,6 +260,7 @@ export class BackupService {
               filename,
               size: finalStats.size,
               type,
+              module: moduleKey,
               checksum: checksum || null,
             },
           },
@@ -240,6 +279,7 @@ export class BackupService {
         checksum,
         compressed,
         encrypted,
+        module: moduleKey,
       }
     } catch (error) {
       console.error('Error al crear backup:', error)
@@ -514,6 +554,7 @@ export class BackupService {
               'backupEmailNotifications',
               'backupVerifyIntegrity',
               'backupScheduleTime',
+              'backupCronScope',
             ],
           },
         },
@@ -551,6 +592,7 @@ export class BackupService {
         verifyIntegrity:
           raw.backupVerifyIntegrity !== undefined ? raw.backupVerifyIntegrity === 'true' : true,
         scheduleTime: raw.backupScheduleTime ?? '02:00',
+        cronScope: raw.backupCronScope === 'tickets' ? 'tickets' : 'full',
       }
     } catch (error) {
       console.error('Error loading backup config:', error)
@@ -567,8 +609,22 @@ export class BackupService {
         emailNotifications: [],
         verifyIntegrity: true,
         scheduleTime: '02:00',
+        cronScope: 'full' as const,
       }
     }
+  }
+
+  /** Ámbito del backup automático (cron): completo o solo módulo tickets. */
+  static async getBackupCronModule(): Promise<BackupModuleId | null> {
+    try {
+      const row = await prisma.system_settings.findUnique({ where: { key: 'backupCronScope' } })
+      if (row?.value === 'tickets' && isBackupModuleId('tickets')) {
+        return 'tickets'
+      }
+    } catch {
+      /* ignorar */
+    }
+    return null
   }
 
   private static async sendBackupNotification(type: 'success' | 'error', data: any) {
@@ -669,6 +725,7 @@ export class BackupService {
         checksum: backup.checksum ?? undefined,
         compressed: backup.compressed,
         encrypted: backup.encrypted,
+        module: backup.module ?? null,
       }))
     } catch (error) {
       console.error('Error al listar backups:', error)
@@ -984,6 +1041,16 @@ export class BackupService {
 
     console.log('Tablas a restaurar:', Object.keys(mappedData))
 
+    const backupModule = backupData.metadata?.module as string | undefined
+    if (backupModule === 'tickets') {
+      const scoped: Record<string, any[]> = {}
+      for (const key of TICKETS_MODULE_RESTORE_ORDER) {
+        scoped[key] = mappedData[key] ?? []
+      }
+      await this.restoreTicketsModuleFromJSON(scoped)
+      return
+    }
+
     // Orden de restauración respetando dependencias de FK
     const restoreOrder = [
       // Tablas base
@@ -1120,11 +1187,108 @@ export class BackupService {
     console.log('Restauración JSON completada exitosamente')
   }
 
+  /**
+   * Restaura solo filas del módulo tickets incluidas en el backup (no borra el resto de la BD).
+   */
+  private static async restoreTicketsModuleFromJSON(
+    mappedData: Record<string, any[]>
+  ): Promise<void> {
+    const tickets = mappedData.tickets ?? []
+    const ticketIds = tickets.map((t: any) => t.id).filter(Boolean)
+
+    await prisma.$transaction(
+      async tx => {
+        await tx.$executeRaw(Prisma.sql`SET session_replication_role = replica;`)
+
+        if (ticketIds.length > 0) {
+          await tx.notifications.deleteMany({ where: { ticketId: { in: ticketIds } } })
+
+          const plans = await tx.resolution_plans.findMany({
+            where: { ticketId: { in: ticketIds } },
+            select: { id: true },
+          })
+          const planIds = plans.map(p => p.id)
+          if (planIds.length > 0) {
+            await tx.resolution_tasks.deleteMany({ where: { planId: { in: planIds } } })
+          }
+          await tx.resolution_plans.deleteMany({ where: { ticketId: { in: ticketIds } } })
+
+          await tx.ticket_knowledge_articles.deleteMany({
+            where: { ticketId: { in: ticketIds } },
+          })
+
+          const articleRows = mappedData.knowledge_articles ?? []
+          const articleIds = articleRows.map((a: any) => a.id).filter(Boolean)
+          if (articleIds.length > 0) {
+            await tx.article_votes.deleteMany({ where: { articleId: { in: articleIds } } })
+            await tx.knowledge_articles.deleteMany({ where: { id: { in: articleIds } } })
+          }
+
+          await tx.ticket_ratings.deleteMany({ where: { ticketId: { in: ticketIds } } })
+          await tx.ticket_collaborators.deleteMany({ where: { ticketId: { in: ticketIds } } })
+          await tx.ticket_history.deleteMany({ where: { ticketId: { in: ticketIds } } })
+          await tx.attachments.deleteMany({ where: { ticketId: { in: ticketIds } } })
+          await tx.comments.deleteMany({ where: { ticketId: { in: ticketIds } } })
+          // Quitar vínculo ticket → artículo (FK opcional) por si hay filas fuera del backup exportado
+          await tx.knowledge_articles.updateMany({
+            where: { sourceTicketId: { in: ticketIds } },
+            data: { sourceTicketId: null },
+          })
+          // maintenance_records puede referenciar ticket sin onDelete: Cascade
+          await tx.maintenance_records.updateMany({
+            where: { ticketId: { in: ticketIds } },
+            data: { ticketId: null },
+          })
+          await tx.tickets.deleteMany({ where: { id: { in: ticketIds } } })
+        }
+
+        await tx.$executeRaw(Prisma.sql`SET session_replication_role = DEFAULT;`)
+
+        for (const tableName of TICKETS_MODULE_RESTORE_ORDER) {
+          const tableData = mappedData[tableName]
+          if (!tableData?.length) continue
+
+          console.log(`[módulo tickets] Restaurando ${tableData.length} registros → ${tableName}`)
+
+          try {
+            const processed = tableData.map((r: any) => this.processRecordForRestore(r))
+            await (tx as any)[tableName].createMany({ data: processed, skipDuplicates: true })
+          } catch {
+            console.warn(`createMany falló para ${tableName}, inserción individual...`)
+            for (let i = 0; i < tableData.length; i++) {
+              const processed = this.processRecordForRestore(tableData[i])
+              await (tx as any)[tableName].create({ data: processed })
+            }
+          }
+        }
+      },
+      { timeout: 600000 }
+    )
+
+    console.log('Restauración JSON módulo tickets completada')
+  }
+
   private static processRecordForRestore(record: any): any {
     const processed = { ...record }
 
     // Convertir campos de fecha de string a Date
-    const dateFields = ['createdAt', 'updatedAt', 'lastLogin', 'dueDate', 'resolvedAt']
+    const dateFields = [
+      'createdAt',
+      'updatedAt',
+      'lastLogin',
+      'dueDate',
+      'resolvedAt',
+      'closedAt',
+      'firstResponseAt',
+      'slaDeadline',
+      'startDate',
+      'targetDate',
+      'completedDate',
+      'completedAt',
+      'notifiedAt',
+      'expectedAt',
+      'actualAt',
+    ]
 
     for (const field of dateFields) {
       if (processed[field] && typeof processed[field] === 'string') {
@@ -1404,7 +1568,8 @@ export class BackupService {
       }
 
       if (shouldCreateBackup) {
-        await this.createBackup('automatic')
+        const cronMod = await this.getBackupCronModule()
+        await this.createBackup('automatic', cronMod ? { module: cronMod } : undefined)
         console.log('Backup automático creado exitosamente')
       }
     } catch (error) {

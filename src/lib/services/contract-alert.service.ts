@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma'
-import { InventoryNotificationService } from './inventory-notification.service'
+import { randomUUID } from 'crypto'
+import { NotificationService } from './notification-service'
 
 export class ContractAlertService {
   /**
@@ -22,7 +23,7 @@ export class ContractAlertService {
         endDate: { not: null },
       },
       include: {
-        supplier: { select: { name: true, contactEmail: true, contactPhone: true } },
+        supplier: { select: { name: true, email: true, phone: true } },
         family: { select: { id: true, name: true } },
         model: { select: { brand: true, model: true } },
         batch: { select: { batchCode: true } },
@@ -90,6 +91,7 @@ export class ContractAlertService {
     // Auditoría
     await prisma.audit_logs.create({
       data: {
+        id: randomUUID(),
         action: 'CONTRACT_ALERTS_CHECKED',
         entityType: 'contract',
         entityId: 'system',
@@ -126,25 +128,26 @@ ${contract.monthlyCost ? `- Costo mensual: $${contract.monthlyCost.toLocaleStrin
 ${contract.totalValue ? `- Valor total: $${contract.totalValue.toLocaleString()}` : ''}
 
 **Contacto del proveedor:**
-- Email: ${contract.supplier?.contactEmail || 'No disponible'}
-- Teléfono: ${contract.supplier?.contactPhone || 'No disponible'}
+- Email: ${contract.supplier?.email || 'No disponible'}
+- Teléfono: ${contract.supplier?.phone || 'No disponible'}
 
 Por favor, revise el contrato y considere su renovación.
     `.trim()
 
     // Enviar notificaciones
     for (const admin of admins) {
-      await InventoryNotificationService.create({
+      await NotificationService.createNotification({
         userId: admin.id,
-        type: 'CONTRACT_EXPIRING',
+        type: 'INVENTORY',
         title: `Contrato próximo a vencer (${actualDays} días)`,
         message,
-        priority: actualDays <= 15 ? 'HIGH' : 'MEDIUM',
         metadata: {
+          kind: 'CONTRACT_EXPIRING',
           contractId: contract.id,
           contractName: contract.name,
           daysUntilExpiry: actualDays,
           supplierId: contract.supplierId,
+          priority: actualDays <= 15 ? 'HIGH' : 'MEDIUM',
         },
       })
     }

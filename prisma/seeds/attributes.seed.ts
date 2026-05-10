@@ -46,15 +46,15 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
         order: 2,
         helpText: 'Ej: OptiPlex 7090',
       },
-      {
-        attributeName: 'numero_serie',
-        attributeLabel: 'Número de Serie',
-        attributeType: 'text',
-        isRequired: false,
-        isVisible: true,
-        order: 3,
-        helpText: 'Número de serie del fabricante',
-      },
+      // {
+      //   attributeName: 'numero_serie',
+      //   attributeLabel: 'Número de Serie',
+      //   attributeType: 'text',
+      //   isRequired: false,
+      //   isVisible: true,
+      //   order: 3,
+      //   helpText: 'Número de serie del fabricante',
+      // },
       {
         attributeName: 'procesador',
         attributeLabel: 'Procesador',
@@ -795,7 +795,9 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
           isRequired: attr.isRequired,
           isVisible: attr.isVisible,
           order: attr.order,
-          helpText: attr.helpText,
+          ...('helpText' in attr && (attr as { helpText?: string }).helpText !== undefined
+            ? { helpText: (attr as { helpText?: string }).helpText }
+            : {}),
           options: attr.options ? { options: attr.options } : undefined,
         },
         create: {
@@ -807,7 +809,9 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
           isRequired: attr.isRequired,
           isVisible: attr.isVisible,
           order: attr.order,
-          helpText: attr.helpText,
+          ...('helpText' in attr && (attr as { helpText?: string }).helpText !== undefined
+            ? { helpText: (attr as { helpText?: string }).helpText }
+            : {}),
           options: attr.options ? { options: attr.options } : undefined,
         },
       })

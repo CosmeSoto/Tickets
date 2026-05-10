@@ -4,10 +4,7 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { readFile, stat } from 'fs/promises'
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
 
@@ -16,7 +13,7 @@ export async function GET(
     }
 
     const backupId = (await params).id
-    
+
     if (!backupId) {
       return NextResponse.json({ error: 'ID de backup requerido' }, { status: 400 })
     }
@@ -37,12 +34,12 @@ export async function GET(
     try {
       // Verificar que el archivo existe y obtener información
       const fileStats = await stat(backup.filepath)
-      
+
       // Generar preview basado en el tipo de backup
       let preview
-      
+
       if (backup.filepath.endsWith('.json')) {
-        // Para backups JSON (método alternativo con Prisma)
+        // Para backups JSON (método alternativo con Prisma o módulo)
         preview = await generateJsonBackupPreview(backup.filepath)
       } else {
         // Para backups SQL (método tradicional con pg_dump)
@@ -51,9 +48,8 @@ export async function GET(
 
       return NextResponse.json({
         success: true,
-        data: preview
+        data: preview,
       })
-
     } catch (fileError) {
       console.error('Error accessing backup file:', fileError)
       return NextResponse.json(
@@ -61,12 +57,11 @@ export async function GET(
         { status: 404 }
       )
     }
-
   } catch (error) {
     console.error('Error generating backup preview:', error)
-    
+
     return NextResponse.json(
-      { 
+      {
         error: error instanceof Error ? error.message : 'Error al generar preview del backup',
       },
       { status: 500 }
@@ -78,35 +73,48 @@ async function generateJsonBackupPreview(filepath: string) {
   try {
     const content = await readFile(filepath, 'utf-8')
     const backupData = JSON.parse(content)
-    
-    const tables = []
+
+    const tables: Array<{ name: string; recordCount: number; size: string }> = []
     let totalRecords = 0
-    
-    // Analizar las tablas en el backup JSON
-    if (backupData.tables) {
-      for (const [tableName, tableData] of Object.entries(backupData.tables)) {
+
+    const payloadTables =
+      backupData.data && typeof backupData.data === 'object'
+        ? backupData.data
+        : backupData.tables && typeof backupData.tables === 'object'
+          ? backupData.tables
+          : null
+
+    if (payloadTables) {
+      for (const [tableName, tableData] of Object.entries(payloadTables)) {
         if (Array.isArray(tableData)) {
           const recordCount = tableData.length
           totalRecords += recordCount
-          
+
           tables.push({
             name: tableName,
             recordCount,
-            size: `${Math.round(JSON.stringify(tableData).length / 1024)} KB`
+            size: `${Math.max(1, Math.round(JSON.stringify(tableData).length / 1024))} KB`,
           })
         }
       }
     }
-    
+
+    const meta = backupData.metadata
+    const moduleLabel =
+      meta?.module === 'tickets'
+        ? 'Módulo tickets'
+        : meta?.module
+          ? `Módulo ${meta.module}`
+          : 'JSON (Prisma)'
+
     return {
       tables: tables.sort((a, b) => b.recordCount - a.recordCount),
       totalRecords,
-      totalSize: `${Math.round(JSON.stringify(backupData).length / 1024)} KB`,
-      databaseVersion: backupData.version || 'JSON Export',
-      createdAt: backupData.timestamp || new Date().toISOString(),
-      backupType: 'JSON (Prisma Export)'
+      totalSize: `${Math.max(1, Math.round(JSON.stringify(backupData).length / 1024))} KB`,
+      databaseVersion: meta?.version || backupData.version || 'JSON Export',
+      createdAt: meta?.timestamp || backupData.timestamp || new Date().toISOString(),
+      backupType: moduleLabel,
     }
-    
   } catch (error) {
     console.error('Error parsing JSON backup:', error)
     throw new Error('Error al analizar el backup JSON')
@@ -117,7 +125,7 @@ async function generateSqlBackupPreview(backup: any, fileStats: any) {
   try {
     // Para backups SQL, generar un preview basado en información conocida
     // y estadísticas de la base de datos actual
-    
+
     // Obtener estadísticas actuales de las tablas principales
     const tableStats = await Promise.allSettled([
       prisma.users.count(),
@@ -133,37 +141,37 @@ async function generateSqlBackupPreview(backup: any, fileStats: any) {
       {
         name: 'users',
         recordCount: tableStats[0].status === 'fulfilled' ? tableStats[0].value : 0,
-        size: 'Estimado'
+        size: 'Estimado',
       },
       {
         name: 'tickets',
         recordCount: tableStats[1].status === 'fulfilled' ? tableStats[1].value : 0,
-        size: 'Estimado'
+        size: 'Estimado',
       },
       {
         name: 'comments',
         recordCount: tableStats[2].status === 'fulfilled' ? tableStats[2].value : 0,
-        size: 'Estimado'
+        size: 'Estimado',
       },
       {
         name: 'categories',
         recordCount: tableStats[3].status === 'fulfilled' ? tableStats[3].value : 0,
-        size: 'Estimado'
+        size: 'Estimado',
       },
       {
         name: 'attachments',
         recordCount: tableStats[4].status === 'fulfilled' ? tableStats[4].value : 0,
-        size: 'Estimado'
+        size: 'Estimado',
       },
       {
         name: 'audit_logs',
         recordCount: tableStats[5].status === 'fulfilled' ? tableStats[5].value : 0,
-        size: 'Estimado'
+        size: 'Estimado',
       },
       {
         name: 'system_settings',
         recordCount: tableStats[6].status === 'fulfilled' ? tableStats[6].value : 0,
-        size: 'Estimado'
+        size: 'Estimado',
       },
     ].filter(table => table.recordCount > 0)
 
@@ -175,22 +183,19 @@ async function generateSqlBackupPreview(backup: any, fileStats: any) {
       totalSize: formatFileSize(fileStats.size),
       databaseVersion: 'PostgreSQL (SQL Dump)',
       createdAt: backup.createdAt,
-      backupType: 'SQL (pg_dump)'
+      backupType: 'SQL (pg_dump)',
     }
-    
   } catch (error) {
     console.error('Error generating SQL backup preview:', error)
-    
+
     // Fallback: preview básico
     return {
-      tables: [
-        { name: 'database_backup', recordCount: 1, size: 'Completo' }
-      ],
+      tables: [{ name: 'database_backup', recordCount: 1, size: 'Completo' }],
       totalRecords: 1,
       totalSize: formatFileSize(fileStats.size),
       databaseVersion: 'PostgreSQL',
       createdAt: backup.createdAt,
-      backupType: 'SQL (pg_dump)'
+      backupType: 'SQL (pg_dump)',
     }
   }
 }

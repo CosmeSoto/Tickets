@@ -2,21 +2,33 @@ import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { TicketEvents } from '@/lib/ticket-events'
+import prisma from '@/lib/prisma'
 
 /**
  * GET /api/tickets/[id]/events
  * Server-Sent Events: empuja actualizaciones del timeline en tiempo real.
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
   if (!session) {
     return new Response('Unauthorized', { status: 401 })
   }
 
   const { id: ticketId } = await params
+
+  const ticket = await prisma.tickets.findUnique({
+    where: { id: ticketId },
+    select: { id: true, clientId: true },
+  })
+
+  if (!ticket) {
+    return new Response('Not Found', { status: 404 })
+  }
+
+  if (session.user.role === 'CLIENT' && ticket.clientId !== session.user.id) {
+    return new Response('Forbidden', { status: 403 })
+  }
+
   const encoder = new TextEncoder()
 
   const stream = new ReadableStream({
@@ -25,10 +37,12 @@ export async function GET(
       controller.enqueue(encoder.encode('data: {"type":"connected"}\n\n'))
 
       // Suscribirse a eventos de este ticket
-      const unsubscribe = TicketEvents.subscribe(ticketId, (payload) => {
+      const unsubscribe = TicketEvents.subscribe(ticketId, payload => {
         try {
           controller.enqueue(encoder.encode(payload))
-        } catch { /* stream cerrado */ }
+        } catch {
+          /* stream cerrado */
+        }
       })
 
       // Heartbeat cada 25s para mantener la conexión viva
@@ -44,7 +58,11 @@ export async function GET(
       request.signal.addEventListener('abort', () => {
         clearInterval(heartbeat)
         unsubscribe()
-        try { controller.close() } catch { /* ya cerrado */ }
+        try {
+          controller.close()
+        } catch {
+          /* ya cerrado */
+        }
       })
     },
   })
@@ -53,7 +71,7 @@ export async function GET(
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache, no-transform',
-      'Connection': 'keep-alive',
+      Connection: 'keep-alive',
       'X-Accel-Buffering': 'no',
     },
   })

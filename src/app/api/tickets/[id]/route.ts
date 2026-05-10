@@ -11,6 +11,7 @@ import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit
 import { NotificationService } from '@/lib/services/notification-service'
 import { invalidateCache } from '@/lib/api-cache'
 import { translateFieldNames } from '@/lib/constants/ticket-labels'
+import { assertTechnicianActiveInFamily } from '@/lib/tickets/assignee-validation'
 
 // Helper: invalida caché de tickets y dashboard cuando un ticket cambia
 async function invalidateTicketCaches() {
@@ -549,34 +550,6 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
           void triggerTicketResolvedToAdminEmail(finalId)
         }
 
-        // ⭐ NUEVO: Disparar webhook de ticket cerrado
-        if (filteredUpdates.status === 'CLOSED') {
-          // ⭐ AUDITORÍA: Registrar cierre de ticket
-          await AuditServiceComplete.log({
-            action: AuditActionsComplete.TICKET_CLOSED,
-            entityType: 'ticket',
-            entityId: finalId,
-            userId: session.user.id,
-            details: {
-              ticketTitle: updatedTicket.title,
-              closedBy: session.user.name,
-            },
-            request: request,
-          })
-
-          await WebhookService.trigger(WebhookService.EVENTS.TICKET_CLOSED, {
-            ticketId: finalId,
-            closedBy: session.user.name,
-            ticket: {
-              id: updatedTicket.id,
-              title: updatedTicket.title,
-              closedAt: new Date(),
-            },
-          }).catch(err => {
-            console.error('[WEBHOOK] Error disparando evento TICKET_CLOSED:', err)
-          })
-        }
-
         // ⭐ NUEVO: Disparar webhook de ticket reabierto
         if (existingTicket.status === 'CLOSED' && filteredUpdates.status === 'OPEN') {
           await WebhookService.trigger(WebhookService.EVENTS.TICKET_REOPENED, {
@@ -757,6 +730,30 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
         existingTicket.assigneeId
       ) {
         processedUpdates.status = processedUpdates.status || 'OPEN'
+      }
+
+      let effectiveFamilyId: string | null = existingTicket.familyId
+      if (
+        processedUpdates.categoryId &&
+        processedUpdates.categoryId !== existingTicket.categoryId
+      ) {
+        const newCategory = await prisma.categories.findUnique({
+          where: { id: processedUpdates.categoryId },
+          include: { departments: { select: { familyId: true } } },
+        })
+        effectiveFamilyId = newCategory?.departments?.familyId ?? existingTicket.familyId ?? null
+      }
+
+      const finalAssigneeId =
+        processedUpdates.assigneeId !== undefined
+          ? processedUpdates.assigneeId
+          : existingTicket.assigneeId
+
+      try {
+        await assertTechnicianActiveInFamily(finalAssigneeId, effectiveFamilyId ?? undefined)
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Asignación inválida'
+        return NextResponse.json({ success: false, message }, { status: 400 })
       }
 
       const updatedTicket = await prisma.tickets.update({

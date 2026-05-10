@@ -8,8 +8,6 @@ import { join } from 'path'
 import { createAuditLog } from '@/lib/audit'
 import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
 
-type Params = { params: { id: string } }
-
 const UPLOAD_DIR = process.env.UPLOAD_DIR ?? join(process.cwd(), 'public', 'uploads')
 const DEFAULT_MAX_MB = 10
 
@@ -23,15 +21,20 @@ async function getMaxFileSizeMB(): Promise<number> {
 }
 
 // POST /api/contracts/[id]/attachments — subir adjunto
-export async function POST(req: NextRequest, { params }: Params) {
+export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-  if (!await canManageInventory(session.user.id, session.user.role)) {
+  const params = await context.params
+
+  if (!(await canManageInventory(session.user.id, session.user.role))) {
     return inventoryForbidden()
   }
 
-  const contract = await prisma.contracts.findUnique({ where: { id: params.id }, select: { id: true } })
+  const contract = await prisma.contracts.findUnique({
+    where: { id: params.id },
+    select: { id: true },
+  })
   if (!contract) return NextResponse.json({ error: 'Contrato no encontrado' }, { status: 404 })
 
   const maxMB = await getMaxFileSizeMB()
@@ -40,7 +43,10 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!file) return NextResponse.json({ error: 'No se recibió archivo' }, { status: 400 })
 
   if (file.size > maxMB * 1024 * 1024) {
-    return NextResponse.json({ error: `El archivo supera el límite de ${maxMB}MB configurado en el sistema` }, { status: 400 })
+    return NextResponse.json(
+      { error: `El archivo supera el límite de ${maxMB}MB configurado en el sistema` },
+      { status: 400 }
+    )
   }
 
   const ext = file.name.split('.').pop() ?? 'bin'
@@ -51,34 +57,36 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const attachment = await prisma.contract_attachments.create({
     data: {
-      id:           randomUUID(),
-      contractId:   params.id,
+      id: randomUUID(),
+      contractId: params.id,
       filename,
       originalName: file.name,
-      mimeType:     file.type,
-      size:         file.size,
-      path:         `/uploads/contracts/${params.id}/${filename}`,
-      uploadedBy:   session.user.id,
+      mimeType: file.type,
+      size: file.size,
+      path: `/uploads/contracts/${params.id}/${filename}`,
+      uploadedBy: session.user.id,
     },
   })
 
   await createAuditLog({
     entityType: 'contract',
-    entityId:   params.id,
-    action:     'contract_attachment_uploaded',
-    userId:     session.user.id,
-    changes:    { filename: file.name, size: file.size },
+    entityId: params.id,
+    action: 'contract_attachment_uploaded',
+    userId: session.user.id,
+    changes: { filename: file.name, size: file.size },
   })
 
   return NextResponse.json(attachment, { status: 201 })
 }
 
 // DELETE /api/contracts/[id]/attachments?attachmentId=xxx
-export async function DELETE(req: NextRequest, { params }: Params) {
+export async function DELETE(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-  if (!await canManageInventory(session.user.id, session.user.role)) {
+  const params = await context.params
+
+  if (!(await canManageInventory(session.user.id, session.user.role))) {
     return inventoryForbidden()
   }
 
@@ -94,10 +102,10 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
   await createAuditLog({
     entityType: 'contract',
-    entityId:   params.id,
-    action:     'contract_attachment_deleted',
-    userId:     session.user.id,
-    changes:    { filename: attachment.originalName },
+    entityId: params.id,
+    action: 'contract_attachment_deleted',
+    userId: session.user.id,
+    changes: { filename: attachment.originalName },
   })
 
   return NextResponse.json({ success: true })

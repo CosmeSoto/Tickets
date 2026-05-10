@@ -4,7 +4,7 @@
  */
 
 export type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
-export type Status = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED'
+export type Status = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | 'ON_HOLD'
 
 /**
  * Obtiene las clases de color para una prioridad
@@ -33,6 +33,8 @@ export const getStatusColor = (status: Status | string): string => {
       'bg-green-100 text-green-700 border border-green-200 dark:bg-green-500/20 dark:text-green-300 dark:border-green-500/40',
     CLOSED:
       'bg-muted text-muted-foreground border border-border dark:bg-muted/60 dark:text-muted-foreground',
+    ON_HOLD:
+      'bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-500/20 dark:text-amber-200 dark:border-amber-500/40',
   }
   return colors[status] || 'bg-muted text-muted-foreground border border-border'
 }
@@ -59,6 +61,7 @@ export const getStatusLabel = (status: Status | string): string => {
     IN_PROGRESS: 'En Progreso',
     RESOLVED: 'Resuelto',
     CLOSED: 'Cerrado',
+    ON_HOLD: 'En Espera',
   }
   return labels[status] || status
 }

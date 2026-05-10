@@ -27,6 +27,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useRouter } from 'next/navigation'
 import {
   AlertDialog,
@@ -67,6 +74,8 @@ export default function BackupsPage() {
     setShowCleanupDialog,
     deleting,
     cleaning,
+    manualBackupScope,
+    setManualBackupScope,
     refreshData,
     createBackup,
     deleteBackup,
@@ -107,10 +116,24 @@ export default function BackupsPage() {
           Limpiar Fallidos ({failedCount})
         </Button>
       )}
-      <Button onClick={createBackup} disabled={creating} size='sm'>
-        <Plus className={`h-4 w-4 mr-2 ${creating ? 'animate-spin' : ''}`} />
-        {creating ? 'Creando...' : 'Crear Backup'}
-      </Button>
+      <div className='flex items-center gap-2'>
+        <Select
+          value={manualBackupScope}
+          onValueChange={v => setManualBackupScope(v as 'full' | 'tickets')}
+        >
+          <SelectTrigger className='w-[200px] h-9 text-xs'>
+            <SelectValue placeholder='Ámbito' />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value='full'>Completo (BD)</SelectItem>
+            <SelectItem value='tickets'>Solo tickets (JSON)</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button onClick={createBackup} disabled={creating} size='sm'>
+          <Plus className={`h-4 w-4 mr-2 ${creating ? 'animate-spin' : ''}`} />
+          {creating ? 'Creando...' : 'Crear Backup'}
+        </Button>
+      </div>
     </div>
   )
 
@@ -239,6 +262,15 @@ export default function BackupsPage() {
                           <Badge variant='outline'>
                             {backup.type === 'manual' ? 'Manual' : 'Automático'}
                           </Badge>
+                          {backup.module === 'tickets' ? (
+                            <Badge variant='secondary' className='text-xs'>
+                              Módulo tickets
+                            </Badge>
+                          ) : (
+                            <Badge variant='outline' className='text-xs text-muted-foreground'>
+                              Completo
+                            </Badge>
+                          )}
                           <div className='flex items-center space-x-2'>
                             {backup.status === 'completed' && (
                               <Button

@@ -32,9 +32,11 @@
     "migrate:units": "tsx prisma/scripts/migrate-units-to-attributes.ts",
     "migrate:validate": "tsx prisma/scripts/validate-migration.ts",
     "db:seed": "tsx prisma/seed.ts",
+    "db:sync": "prisma migrate deploy && prisma generate",
     "db:reset": "npx prisma db push --force-reset && npm run db:seed",
     "migrate:audit": "tsx scripts/audit-inventory-data.ts",
     "migrate:assign-serials": "tsx scripts/assign-temp-serials.ts",
+    "verify:batch-migration": "tsx scripts/verify-batch-migration.ts",
     "prepare": "husky"
   },
   "dependencies": {

@@ -172,6 +172,8 @@ export function useTicketData() {
         assigneeId?: string
         categoryId?: string
         clientId?: string
+        familyId?: string
+        viewMode?: string
         search?: string
       } = {}
     ): Promise<{ data: Ticket[]; meta: any } | null> => {

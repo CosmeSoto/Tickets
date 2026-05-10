@@ -47,7 +47,7 @@ interface Ticket {
   id: string
   title: string
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
-  status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED'
+  status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | 'ON_HOLD'
   client: { id: string; name: string; email: string }
   assignee?: { id: string; name: string; email: string }
   category: { id: string; name: string; color: string }
@@ -73,6 +73,7 @@ const statusLabels = {
   IN_PROGRESS: 'En Progreso',
   RESOLVED: 'Resuelto',
   CLOSED: 'Cerrado',
+  ON_HOLD: 'En Espera',
 }
 
 const priorityLabels = {

@@ -195,21 +195,25 @@ export async function hasAccessToEquipment(
   // Obtener el equipo
   const equipment = await prisma.equipment.findUnique({
     where: { id: equipmentId },
-    select: { familyId: true },
+    select: { type: { select: { familyId: true } } },
   })
 
   if (!equipment) {
     return false
   }
 
+  const familyId = equipment.type?.familyId ?? null
+
   // Family Admin: verificar familia
   if (userRole === 'ADMIN' && !isSuperAdmin) {
-    return await hasAccessToFamily(userId, userRole, isSuperAdmin, equipment.familyId)
+    if (!familyId) return false
+    return await hasAccessToFamily(userId, userRole, isSuperAdmin, familyId)
   }
 
   // Technician: verificar familia
   if (userRole === 'TECHNICIAN') {
-    return await hasAccessToFamily(userId, userRole, isSuperAdmin, equipment.familyId)
+    if (!familyId) return false
+    return await hasAccessToFamily(userId, userRole, isSuperAdmin, familyId)
   }
 
   // Client: verificar asignación
@@ -218,7 +222,7 @@ export async function hasAccessToEquipment(
       where: {
         equipmentId,
         receiverId: userId,
-        status: 'ACTIVE',
+        isActive: true,
       },
     })
     return !!assignment
@@ -235,7 +239,7 @@ export async function hasAccessToEquipment(
 async function getUserFamilyIds(userId: string): Promise<string[]> {
   const assignments = await prisma.admin_family_assignments.findMany({
     where: {
-      userId,
+      adminId: userId,
       isActive: true,
     },
     select: { familyId: true },
@@ -250,7 +254,7 @@ async function getUserFamilyIds(userId: string): Promise<string[]> {
 async function getTechnicianFamilyIds(userId: string): Promise<string[]> {
   const assignments = await prisma.technician_family_assignments.findMany({
     where: {
-      userId,
+      technicianId: userId,
       isActive: true,
     },
     select: { familyId: true },
@@ -266,7 +270,7 @@ async function getClientAssignedEquipmentIds(userId: string): Promise<string[]> 
   const assignments = await prisma.equipment_assignments.findMany({
     where: {
       receiverId: userId,
-      status: 'ACTIVE',
+      isActive: true,
     },
     select: { equipmentId: true },
   })

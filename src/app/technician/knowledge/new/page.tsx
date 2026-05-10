@@ -26,6 +26,42 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
+type TicketArticleSuggestions = {
+  ticket: {
+    id: string
+    title: string
+    description: string
+    category?: { id: string } | null
+  }
+  existingArticle: { id: string; title: string } | null
+  suggestions: { title: string; content: string; tags: string[] }
+}
+
+async function getTicketSuggestions(ticketId: string): Promise<TicketArticleSuggestions | null> {
+  const res = await fetch(`/api/tickets/${ticketId}/create-article`)
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error || `Error ${res.status}`)
+  }
+  return res.json()
+}
+
+async function createFromTicket(
+  ticketId: string,
+  body: { title: string; summary?: string; content: string; tags: string[] }
+) {
+  const res = await fetch(`/api/tickets/${ticketId}/create-article`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new Error((data as { error?: string }).error || 'Error al crear artículo')
+  }
+  return (data as { article?: { id: string } }).article ?? null
+}
+
 function NewArticleContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -70,21 +106,17 @@ function NewArticleContent() {
       const data = await getTicketSuggestions(ticketId)
 
       if (data) {
-        // Verificar si ya existe un artículo
-        if (data.existingArticle) {
-          toast.warning(
-            `Ya existe un artículo creado desde este ticket: "${data.existingArticle.title}"`,
-            {
-              duration: 5000,
-              action: {
-                label: 'Ver artículo',
-                onClick: () => router.push(`/technician/knowledge/${data.existingArticle.id}`),
-              },
-            }
-          )
-          // Redirigir automáticamente después de 3 segundos
+        const existing = data.existingArticle
+        if (existing) {
+          toast.warning(`Ya existe un artículo creado desde este ticket: "${existing.title}"`, {
+            duration: 5000,
+            action: {
+              label: 'Ver artículo',
+              onClick: () => router.push(`/technician/knowledge/${existing.id}`),
+            },
+          })
           setTimeout(() => {
-            router.push(`/technician/knowledge/${data.existingArticle.id}`)
+            router.push(`/technician/knowledge/${existing.id}`)
           }, 3000)
           return
         }
@@ -158,29 +190,31 @@ function NewArticleContent() {
 
     setIsSaving(true)
 
-    let article
+    try {
+      let article: { id: string } | null = null
 
-    // Si viene desde un ticket, usar API específica
-    if (sourceTicketId) {
-      article = await createFromTicket(sourceTicketId, {
-        title,
-        summary: summary || undefined,
-        content,
-        tags,
-      })
-    } else {
-      toast.error('Los artículos solo pueden crearse desde tickets resueltos')
+      if (sourceTicketId) {
+        article = await createFromTicket(sourceTicketId, {
+          title,
+          summary: summary || undefined,
+          content,
+          tags,
+        })
+      } else {
+        toast.error('Los artículos solo pueden crearse desde tickets resueltos')
+        return
+      }
+
+      if (article) {
+        toast.success('Artículo creado exitosamente desde el ticket')
+        router.push(`/technician/knowledge/${article.id}`)
+      } else {
+        toast.error('Error al crear artículo')
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error al crear artículo')
+    } finally {
       setIsSaving(false)
-      return
-    }
-
-    setIsSaving(false)
-
-    if (article) {
-      toast.success('Artículo creado exitosamente desde el ticket')
-      router.push(`/technician/knowledge/${article.id}`)
-    } else {
-      toast.error('Error al crear artículo')
     }
   }
 
@@ -217,7 +251,7 @@ function NewArticleContent() {
 
           <Button
             onClick={handleSubmit}
-            disabled={isSaving || loading || loadingSuggestions || !sourceTicketId}
+            disabled={isSaving || loadingSuggestions || !sourceTicketId}
             size='sm'
           >
             {isSaving ? (

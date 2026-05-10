@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma'
-import { TicketStatus, TicketPriority, UserRole } from '@prisma/client'
+import { Prisma, TicketStatus, TicketPriority, UserRole } from '@prisma/client'
+import { assertTechnicianActiveInFamily } from '@/lib/tickets/assignee-validation'
 import { NotificationService } from './notification-service'
 import { ApplicationLogger } from '@/lib/logging'
 import { randomUUID } from 'crypto'
@@ -31,6 +32,8 @@ export interface CreateTicketData {
   assigneeId?: string
   ticketCode?: string
   isAdmin?: boolean
+  /** Usuario que registra la acción en ticket_history (p. ej. admin en nombre de un cliente). Por defecto clientId. */
+  historyUserId?: string
 }
 
 export interface UpdateTicketData {
@@ -50,12 +53,12 @@ export class TicketService {
   ) {
     const timer = ApplicationLogger.timer('get_tickets', {
       component: 'ticket-service',
-      metadata: { filters, pagination }
+      metadata: { filters, pagination },
     })
 
     try {
       ApplicationLogger.databaseOperationStart('findMany', 'tickets', {
-        metadata: { filters, pagination }
+        metadata: { filters, pagination },
       })
 
       const { page, limit } = pagination
@@ -93,9 +96,8 @@ export class TicketService {
         prisma.tickets.count({ where }),
       ])
 
-      timer.end()
       ApplicationLogger.databaseOperationComplete('findMany', 'tickets', 0, tickets.length, {
-        metadata: { total, pages: Math.ceil(total / limit) }
+        metadata: { total, pages: Math.ceil(total / limit) },
       })
 
       const result = {
@@ -107,7 +109,6 @@ export class TicketService {
 
       timer.end('Tickets retrieved successfully')
       return result
-
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error))
       ApplicationLogger.databaseOperationError('findMany', 'tickets', err)
@@ -120,8 +121,12 @@ export class TicketService {
     return prisma.tickets.findUnique({
       where: { id },
       include: {
-        users_tickets_clientIdTousers: { select: { id: true, name: true, email: true, departmentId: true } },
-        users_tickets_assigneeIdTousers: { select: { id: true, name: true, email: true, departmentId: true } },
+        users_tickets_clientIdTousers: {
+          select: { id: true, name: true, email: true, departmentId: true },
+        },
+        users_tickets_assigneeIdTousers: {
+          select: { id: true, name: true, email: true, departmentId: true },
+        },
         categories: {
           select: {
             id: true,
@@ -153,12 +158,12 @@ export class TicketService {
   static async createTicket(data: CreateTicketData) {
     const timer = ApplicationLogger.timer('create_ticket', {
       component: 'ticket-service',
-      metadata: { priority: data.priority, categoryId: data.categoryId }
+      metadata: { priority: data.priority, categoryId: data.categoryId },
     })
 
     try {
       ApplicationLogger.businessOperation('create_ticket', 'ticket', 'new', {
-        metadata: { title: data.title, priority: data.priority }
+        metadata: { title: data.title, priority: data.priority },
       })
 
       ApplicationLogger.databaseOperationStart('create', 'tickets')
@@ -208,7 +213,7 @@ export class TicketService {
       }
 
       // Extraer campos propios del servicio antes de pasar a Prisma
-      const { ticketCode: _tc, isAdmin: _ia, ...ticketData } = data
+      const { ticketCode: _tc, isAdmin: _ia, historyUserId: _hu, ...ticketData } = data
 
       const ticket = await prisma.tickets.create({
         data: {
@@ -235,8 +240,8 @@ export class TicketService {
           action: 'created',
           comment: 'Ticket creado',
           ticketId: ticket.id,
-          userId: data.clientId,
-          createdAt: new Date()
+          userId: data.historyUserId ?? data.clientId,
+          createdAt: new Date(),
         },
       })
 
@@ -245,12 +250,11 @@ export class TicketService {
 
       ApplicationLogger.businessOperation('ticket_created', 'ticket', ticket.id, {
         userId: data.clientId,
-        metadata: { title: ticket.title, priority: ticket.priority }
+        metadata: { title: ticket.title, priority: ticket.priority },
       })
 
       timer.end('Ticket created successfully')
       return ticket
-
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error))
       ApplicationLogger.databaseOperationError('create', 'tickets', err)
@@ -262,13 +266,13 @@ export class TicketService {
   static async updateTicket(id: string, data: UpdateTicketData, userId: string) {
     const timer = ApplicationLogger.timer('update_ticket', {
       component: 'ticket-service',
-      metadata: { ticketId: id, updates: Object.keys(data) }
+      metadata: { ticketId: id, updates: Object.keys(data) },
     })
 
     try {
       ApplicationLogger.businessOperation('update_ticket', 'ticket', id, {
         userId,
-        metadata: { updates: Object.keys(data) }
+        metadata: { updates: Object.keys(data) },
       })
 
       const currentTicket = await prisma.tickets.findUnique({ where: { id } })
@@ -286,22 +290,8 @@ export class TicketService {
         data.familyId = newCategory?.departments?.familyId ?? currentTicket.familyId ?? undefined
       }
 
-      // Validar que el assigneeId tenga technician_family_assignments activo para la familia del ticket
       const effectiveFamilyId = data.familyId ?? currentTicket.familyId
-      if (data.assigneeId && effectiveFamilyId) {
-        const assignment = await prisma.technician_family_assignments.findFirst({
-          where: {
-            technicianId: data.assigneeId,
-            familyId: effectiveFamilyId,
-            isActive: true,
-          },
-        })
-        if (!assignment) {
-          throw new Error(
-            'El técnico no tiene asignación activa para la familia de este ticket'
-          )
-        }
-      }
+      await assertTechnicianActiveInFamily(data.assigneeId, effectiveFamilyId ?? undefined)
 
       ApplicationLogger.databaseOperationStart('update', 'tickets')
 
@@ -325,24 +315,26 @@ export class TicketService {
       const newFamilyId = data.familyId
       if (newFamilyId && newFamilyId !== currentTicket.familyId && currentTicket.familyId) {
         await NotificationService.notifyFamilyChange(id, currentTicket.familyId, newFamilyId).catch(
-          (err) => console.error('[TicketService] notifyFamilyChange error:', err)
+          err => console.error('[TicketService] notifyFamilyChange error:', err)
         )
         // Registrar en audit_logs
-        await prisma.audit_logs.create({
-          data: {
-            id: randomUUID(),
-            action: 'TICKET_FAMILY_CHANGED',
-            entityType: 'ticket',
-            entityId: id,
-            userId,
-            details: {
-              oldFamilyId: currentTicket.familyId,
-              newFamilyId,
-              familyId: newFamilyId,
+        await prisma.audit_logs
+          .create({
+            data: {
+              id: randomUUID(),
+              action: 'TICKET_FAMILY_CHANGED',
+              entityType: 'ticket',
+              entityId: id,
+              userId,
+              details: {
+                oldFamilyId: currentTicket.familyId,
+                newFamilyId,
+                familyId: newFamilyId,
+              },
+              createdAt: new Date(),
             },
-            createdAt: new Date(),
-          },
-        }).catch((err) => console.error('[TicketService] audit_log family change error:', err))
+          })
+          .catch(err => console.error('[TicketService] audit_log family change error:', err))
       }
 
       // Crear entradas en el historial para cada cambio
@@ -357,15 +349,15 @@ export class TicketService {
           comment: `Estado cambiado de ${currentTicket.status} a ${data.status}`,
           ticketId: id,
           userId,
-          createdAt: new Date()
+          createdAt: new Date(),
         })
 
         ApplicationLogger.businessOperation('ticket_status_changed', 'ticket', id, {
           userId,
-          metadata: { 
-            oldStatus: currentTicket.status, 
-            newStatus: data.status 
-          }
+          metadata: {
+            oldStatus: currentTicket.status,
+            newStatus: data.status,
+          },
         })
 
         // Las notificaciones de cambio de estado se generan automáticamente
@@ -382,15 +374,15 @@ export class TicketService {
           comment: 'Ticket asignado',
           ticketId: id,
           userId,
-          createdAt: new Date()
+          createdAt: new Date(),
         })
 
         ApplicationLogger.businessOperation('ticket_assigned', 'ticket', id, {
           userId,
-          metadata: { 
-            oldAssignee: currentTicket.assigneeId, 
-            newAssignee: data.assigneeId 
-          }
+          metadata: {
+            oldAssignee: currentTicket.assigneeId,
+            newAssignee: data.assigneeId,
+          },
         })
 
         // Las notificaciones de asignación se generan automáticamente
@@ -407,15 +399,15 @@ export class TicketService {
           comment: `Prioridad cambiada de ${currentTicket.priority} a ${data.priority}`,
           ticketId: id,
           userId,
-          createdAt: new Date()
+          createdAt: new Date(),
         })
 
         ApplicationLogger.businessOperation('ticket_priority_changed', 'ticket', id, {
           userId,
-          metadata: { 
-            oldPriority: currentTicket.priority, 
-            newPriority: data.priority 
-          }
+          metadata: {
+            oldPriority: currentTicket.priority,
+            newPriority: data.priority,
+          },
         })
       }
 
@@ -425,11 +417,10 @@ export class TicketService {
 
       timer.end('Ticket updated successfully')
       return ticket
-
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error))
-      ApplicationLogger.databaseOperationError('update', 'tickets', err, { 
-        metadata: { ticketId: id } 
+      ApplicationLogger.databaseOperationError('update', 'tickets', err, {
+        metadata: { ticketId: id },
       })
       timer.end('Failed to update ticket')
       throw error
@@ -483,27 +474,33 @@ export class TicketService {
       }),
     ])
 
-    // Calcular tiempo promedio de resolución
-    const resolvedTicketsWithTime = await prisma.tickets.findMany({
-      where: {
-        ...baseWhere,
-        status: 'RESOLVED',
-        resolvedAt: { not: null },
-      },
-      select: {
-        createdAt: true,
-        resolvedAt: true,
-      },
-    })
+    const roleFilter =
+      role === 'CLIENT' && userId
+        ? Prisma.sql`AND "clientId" = ${userId}`
+        : role === 'TECHNICIAN' && userId
+          ? Prisma.sql`AND "assigneeId" = ${userId}`
+          : Prisma.empty
+
+    const avgRows = await prisma.$queryRaw<Array<{ avg_minutes: unknown }>>(
+      Prisma.sql`
+        SELECT (AVG(EXTRACT(EPOCH FROM ("resolvedAt" - "createdAt"))) / 60.0)::float AS avg_minutes
+        FROM tickets
+        WHERE "resolvedAt" IS NOT NULL
+          AND "status"::text = 'RESOLVED'
+          ${roleFilter}
+      `
+    )
+
+    const rawAvg = avgRows[0]?.avg_minutes
+    const avgMinutes =
+      typeof rawAvg === 'number' && !Number.isNaN(rawAvg)
+        ? rawAvg
+        : typeof rawAvg === 'string'
+          ? parseFloat(rawAvg)
+          : 0
 
     let avgResolutionTime = '0h'
-    if (resolvedTicketsWithTime.length > 0) {
-      const totalMinutes = resolvedTicketsWithTime.reduce((acc, ticket) => {
-        const diff = new Date(ticket.resolvedAt!).getTime() - new Date(ticket.createdAt).getTime()
-        return acc + diff / (1000 * 60) // convertir a minutos
-      }, 0)
-
-      const avgMinutes = totalMinutes / resolvedTicketsWithTime.length
+    if (avgMinutes > 0) {
       const hours = Math.floor(avgMinutes / 60)
       const minutes = Math.floor(avgMinutes % 60)
       avgResolutionTime = hours > 0 ? `${hours}h ${minutes}min` : `${minutes}min`

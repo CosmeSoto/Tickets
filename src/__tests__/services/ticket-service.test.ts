@@ -9,6 +9,7 @@ jest.mock('@/lib/prisma', () => {
       delete: jest.fn(),
       count: jest.fn(),
     },
+    $queryRaw: jest.fn(),
     users: {
       findUnique: jest.fn(),
     },
@@ -22,6 +23,9 @@ jest.mock('@/lib/prisma', () => {
     },
     technician_family_assignments: {
       findFirst: jest.fn(),
+    },
+    ticket_family_config: {
+      findFirst: jest.fn().mockResolvedValue(null),
     },
     audit_logs: {
       create: jest.fn(),
@@ -58,11 +62,15 @@ jest.mock('@/lib/services/ticket-family-config.service', () => ({
   },
 }))
 
+jest.mock('@/lib/tickets/assignee-validation', () => ({
+  assertTechnicianActiveInFamily: jest.fn().mockResolvedValue(undefined),
+}))
+
 // Mock logging middleware to avoid Next.js dependencies
 jest.mock('@/lib/logging', () => ({
   ApplicationLogger: {
     timer: jest.fn(() => ({
-      end: jest.fn()
+      end: jest.fn(),
     })),
     businessOperation: jest.fn(),
     systemHealth: jest.fn(),
@@ -71,17 +79,17 @@ jest.mock('@/lib/logging', () => ({
     databaseOperation: jest.fn(),
     databaseOperationStart: jest.fn(),
     databaseOperationEnd: jest.fn(),
-    databaseOperationComplete: jest.fn()
+    databaseOperationComplete: jest.fn(),
   },
   ApiLoggingMiddleware: {
     logRequest: jest.fn(),
-    logResponse: jest.fn()
-  }
+    logResponse: jest.fn(),
+  },
 }))
 
 import { TicketService } from '@/lib/services/ticket-service'
 import prisma from '@/lib/prisma'
-import { TicketStatus, TicketPriority } from '@prisma/client'
+import { TicketStatus, TicketPriority, UserRole } from '@prisma/client'
 
 const mockPrisma = prisma as any
 
@@ -226,7 +234,52 @@ describe('TicketService', () => {
       const result = await TicketService.createTicket(createData)
 
       expect(mockPrisma.tickets.create).toHaveBeenCalled()
+      expect(mockPrisma.ticket_history.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ userId: '1' }),
+        })
+      )
       expect(result).toEqual(mockCreatedTicket)
+    })
+
+    it('uses historyUserId for ticket_history when provided', async () => {
+      const mockCreatedTicket = {
+        id: '2',
+        ...createData,
+        status: TicketStatus.OPEN,
+        assigneeId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+
+      mockPrisma.categories.findUnique.mockResolvedValue({
+        id: '1',
+        name: 'Test Category',
+        departments: { familyId: null },
+      })
+
+      mockPrisma.tickets.create.mockResolvedValue(mockCreatedTicket)
+      mockPrisma.ticket_history.create.mockResolvedValue({})
+
+      await TicketService.createTicket({ ...createData, historyUserId: 'admin-99' })
+
+      expect(mockPrisma.ticket_history.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ userId: 'admin-99' }),
+        })
+      )
+    })
+  })
+
+  describe('getTicketStats', () => {
+    it('uses $queryRaw for average resolution time', async () => {
+      mockPrisma.tickets.count.mockResolvedValue(0)
+      mockPrisma.$queryRaw.mockResolvedValue([{ avg_minutes: 90 }])
+
+      const stats = await TicketService.getTicketStats('u1', UserRole.CLIENT)
+
+      expect(mockPrisma.$queryRaw).toHaveBeenCalled()
+      expect(stats.avgResolutionTime).toBe('1h 30min')
     })
   })
 })

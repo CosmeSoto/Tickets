@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { BackupService } from '@/lib/services/backup-service'
+import { isBackupModuleId, type BackupModuleId } from '@/lib/services/backup-modules'
 
 export async function GET() {
   try {
@@ -28,15 +29,35 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { type = 'manual' } = body
+    const { type = 'manual', module: rawModule } = body
 
-    const backup = await BackupService.createBackup(type)
+    let moduleOpt: BackupModuleId | undefined
+    if (rawModule === undefined || rawModule === null || rawModule === '') {
+      moduleOpt = undefined
+    } else if (isBackupModuleId(rawModule)) {
+      moduleOpt = rawModule
+    } else {
+      return NextResponse.json(
+        { error: `Módulo de backup no soportado: ${String(rawModule)}` },
+        { status: 400 }
+      )
+    }
+
+    const backup = await BackupService.createBackup(
+      type,
+      moduleOpt ? { module: moduleOpt } : undefined
+    )
     return NextResponse.json(backup)
   } catch (error) {
     console.error('Error al crear backup:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Error al crear backup' },
-      { status: 500 }
-    )
+    const raw = error instanceof Error ? error.message : String(error)
+    let message = raw || 'Error al crear backup'
+    if (
+      /column\s+[`"]?module[`"]?|Unknown column|does not exist/i.test(raw) &&
+      /backup/i.test(raw)
+    ) {
+      message = `${message} — Si acabas de actualizar el código, ejecuta las migraciones de Prisma en el servidor (columna backups.module).`
+    }
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

@@ -40,6 +40,8 @@ interface BackupConfig {
   emailNotifications: string[]
   verifyIntegrity: boolean
   scheduleTime: string
+  /** Qué genera el cron automático: base completa o solo módulo tickets */
+  cronScope: 'full' | 'tickets'
   /** Solo lectura — indica si BACKUP_ENCRYPTION_KEY está configurada en el servidor */
   encryptionKeyConfigured?: boolean
 }
@@ -61,6 +63,7 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
     emailNotifications: [],
     verifyIntegrity: true,
     scheduleTime: '02:00',
+    cronScope: 'full',
   })
 
   const [loading, setLoading] = useState(false)
@@ -131,15 +134,25 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
         return
       }
 
-      // Abrir ventana de autorización OAuth
-      if (data.authUrl) {
-        window.open(data.authUrl, '_blank', 'width=600,height=700,scrollbars=yes')
+      if (data.oauthConfigured === false || !data.authUrl) {
         toast({
-          title: 'Autorización iniciada',
+          title: 'OAuth no configurado',
           description:
-            'Completa la autorización en la ventana que se abrió. Luego recarga esta página.',
+            provider === 'google-drive'
+              ? 'Configura y habilita Google en Configuración del sistema → OAuth antes de conectar Drive para backups.'
+              : 'Configura y habilita Microsoft (Azure AD) en Configuración del sistema → OAuth antes de conectar OneDrive para backups.',
+          variant: 'destructive',
         })
+        return
       }
+
+      // Abrir ventana de autorización OAuth
+      window.open(data.authUrl, '_blank', 'width=600,height=700,scrollbars=yes')
+      toast({
+        title: 'Autorización iniciada',
+        description:
+          'Completa la autorización en la ventana que se abrió. Luego recarga esta página.',
+      })
     } catch {
       toast({ title: 'Error de conexión', variant: 'destructive' })
     } finally {
@@ -212,6 +225,7 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
       emailNotifications: [],
       verifyIntegrity: true,
       scheduleTime: '02:00',
+      cronScope: 'full',
     })
   }
 
@@ -323,6 +337,29 @@ export function BackupConfiguration({ onConfigChange }: BackupConfigurationProps
               />
               <p className='text-xs text-muted-foreground'>
                 Hora en la que se ejecutarán los backups automáticos
+              </p>
+            </div>
+
+            <div className='space-y-2'>
+              <Label className='text-sm font-medium'>Ámbito del backup automático (cron)</Label>
+              <Select
+                value={config.cronScope}
+                onValueChange={value => updateConfig('cronScope', value as 'full' | 'tickets')}
+                disabled={!config.enabled}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder='Seleccionar ámbito' />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='full'>
+                    Base de datos completa (pg_dump o export Prisma)
+                  </SelectItem>
+                  <SelectItem value='tickets'>Solo módulo tickets (JSON, más liviano)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className='text-xs text-muted-foreground'>
+                Los backups manuales desde el panel pueden elegirse aparte. Aquí solo aplica al job
+                automático programado.
               </p>
             </div>
 

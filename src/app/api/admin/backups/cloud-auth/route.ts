@@ -41,19 +41,19 @@ export async function GET(request: NextRequest) {
   const existing = await prisma.system_settings.findUnique({ where: { key: tokenKey } })
 
   if (existing?.value) {
-    return NextResponse.json({ authorized: true, provider })
+    return NextResponse.json({ authorized: true, oauthConfigured: true, provider })
   }
 
-  // Generar URL de autorización
+  // Generar URL de autorización (200 siempre para lecturas de estado: evita ruido 400 en consola del navegador)
   if (provider === 'google-drive') {
     const creds = await getOAuthCredentials('google')
     if (!creds) {
-      return NextResponse.json(
-        {
-          error: 'Google OAuth no está configurado. Ve a Configuración → OAuth primero.',
-        },
-        { status: 400 }
-      )
+      return NextResponse.json({
+        authorized: false,
+        oauthConfigured: false,
+        authUrl: null,
+        provider,
+      })
     }
 
     const params = new URLSearchParams({
@@ -68,19 +68,21 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       authorized: false,
+      oauthConfigured: true,
       authUrl: `https://accounts.google.com/o/oauth2/v2/auth?${params}`,
+      provider,
     })
   }
 
   // OneDrive
   const creds = await getOAuthCredentials('azure-ad')
   if (!creds) {
-    return NextResponse.json(
-      {
-        error: 'Microsoft OAuth no está configurado. Ve a Configuración → OAuth primero.',
-      },
-      { status: 400 }
-    )
+    return NextResponse.json({
+      authorized: false,
+      oauthConfigured: false,
+      authUrl: null,
+      provider,
+    })
   }
 
   const tenant = creds.tenantId ?? 'common'
@@ -94,7 +96,9 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     authorized: false,
+    oauthConfigured: true,
     authUrl: `https://login.microsoftonline.com/${tenant}/oauth2/v2.0/authorize?${params}`,
+    provider,
   })
 }
 

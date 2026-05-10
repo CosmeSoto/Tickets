@@ -21,6 +21,8 @@ export interface BackupInfo {
   status: 'completed' | 'failed' | 'in_progress'
   compressed?: boolean
   encrypted?: boolean
+  /** null = backup completo */
+  module?: string | null
 }
 
 export interface BackupStats {
@@ -96,6 +98,8 @@ export function useBackups() {
   const [showCleanupDialog, setShowCleanupDialog] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [cleaning, setCleaning] = useState(false)
+  /** Ámbito del próximo backup manual (completo vs módulo tickets) */
+  const [manualBackupScope, setManualBackupScope] = useState<'full' | 'tickets'>('full')
 
   // ── Auth check ──
   useEffect(() => {
@@ -178,17 +182,26 @@ export function useBackups() {
       const response = await fetch('/api/admin/backups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'manual' }),
+        body: JSON.stringify({
+          type: 'manual',
+          ...(manualBackupScope === 'tickets' ? { module: 'tickets' } : {}),
+        }),
       })
       if (response.ok) {
         toast({ title: 'Éxito', description: 'Backup creado correctamente' })
         loadBackups(false)
         loadStats()
       } else {
-        const error = await response.json()
+        let message = 'Error al crear backup'
+        try {
+          const error = await response.json()
+          message = error.error || message
+        } catch {
+          /* cuerpo no JSON */
+        }
         toast({
-          title: 'Error',
-          description: error.error || 'Error al crear backup',
+          title: 'Error al crear backup',
+          description: message,
           variant: 'destructive',
         })
       }
@@ -197,7 +210,7 @@ export function useBackups() {
     } finally {
       setCreating(false)
     }
-  }, [toast, loadBackups, loadStats])
+  }, [toast, loadBackups, loadStats, manualBackupScope])
 
   // ── Delete backup ──
   const deleteBackup = useCallback(async () => {
@@ -342,6 +355,8 @@ export function useBackups() {
     setShowCleanupDialog,
     deleting,
     cleaning,
+    manualBackupScope,
+    setManualBackupScope,
 
     // Actions
     refreshData,

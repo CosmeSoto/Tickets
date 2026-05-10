@@ -80,9 +80,13 @@ export class BackupScheduler {
         }
       }
 
-      // 5. Crear el backup automático
+      // 5. Crear el backup automático (completo o módulo tickets según backupCronScope)
       console.log('[BACKUP SCHEDULER] Creando backup automático...')
-      const backup = await BackupService.createBackup('automatic')
+      const cronMod = await BackupService.getBackupCronModule()
+      const backup = await BackupService.createBackup(
+        'automatic',
+        cronMod ? { module: cronMod } : undefined
+      )
 
       console.log(
         `[BACKUP SCHEDULER] Backup automático creado: ${backup.filename} (${BackupService.formatFileSize(backup.size)})`
