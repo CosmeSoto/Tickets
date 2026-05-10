@@ -508,7 +508,7 @@ export function BulkEquipmentForm({
           mode='bulk'
           step={1}
           description='Elige el área de la organización a la que pertenecen los activos del lote.'
-        />
+        />{' '}
         {loadingFamilies ? (
           <div className='flex items-center justify-center h-32'>
             <Loader2 className='h-6 w-6 animate-spin text-muted-foreground' />

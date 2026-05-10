@@ -164,7 +164,7 @@ export function UnifiedAssetForm({
             mode='individual'
             step={1}
             description='Elige el área de la organización a la que pertenece este activo.'
-          />
+          />{' '}
           {loadingFamilies ? (
             <p className='text-sm text-muted-foreground'>Cargando familias...</p>
           ) : (
