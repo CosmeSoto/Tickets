@@ -166,7 +166,8 @@ export class BatchService {
   }
 
   /**
-   * Obtener todos los lotes con filtros
+   * Obtener todos los lotes con filtros.
+   * Usa una sola query agregada para las métricas — sin N+1.
    */
   static async getAll(filters?: BatchFilters): Promise<BatchWithMetrics[]> {
     const where: any = {}
@@ -175,7 +176,6 @@ export class BatchService {
     if (filters?.supplierId) where.supplierId = filters.supplierId
     if (filters?.departmentId) where.departmentId = filters.departmentId
     if (filters?.status) where.status = filters.status
-    // typeId filtra a través de la relación model
     if (filters?.typeId) where.model = { typeId: filters.typeId }
 
     if (filters?.dateFrom || filters?.dateTo) {
@@ -184,6 +184,7 @@ export class BatchService {
       if (filters.dateTo) where.purchaseDate.lte = filters.dateTo
     }
 
+    // 1 query: lotes con relaciones
     const batches = await prisma.equipment_batches.findMany({
       where,
       include: {
@@ -194,30 +195,53 @@ export class BatchService {
       orderBy: { createdAt: 'desc' },
     })
 
-    // Calcular métricas para cada lote
-    const batchesWithMetrics = await Promise.all(
-      batches.map(async batch => {
-        const equipment = await prisma.equipment.findMany({
-          where: { batchId: batch.id },
+    if (batches.length === 0) return []
+
+    const batchIds = batches.map(b => b.id)
+
+    // 1 query agregada: conteo por batchId + status (en lugar de N queries)
+    const statusCounts = await prisma.equipment.groupBy({
+      by: ['batchId', 'status'],
+      where: { batchId: { in: batchIds } },
+      _count: { id: true },
+    })
+
+    // Construir mapa batchId → métricas
+    const metricsMap = new Map<string, BatchMetrics>()
+
+    for (const row of statusCounts) {
+      if (!row.batchId) continue
+      if (!metricsMap.has(row.batchId)) {
+        metricsMap.set(row.batchId, {
+          total: 0,
+          available: 0,
+          assigned: 0,
+          maintenance: 0,
+          retired: 0,
+          utilizationRate: 0,
         })
+      }
+      const m = metricsMap.get(row.batchId)!
+      const count = row._count.id
+      m.total += count
+      if (row.status === 'AVAILABLE') m.available = count
+      if (row.status === 'ASSIGNED') m.assigned = count
+      if (row.status === 'MAINTENANCE') m.maintenance = count
+      if (row.status === 'RETIRED') m.retired = count
+    }
 
-        const metrics: BatchMetrics = {
-          total: equipment.length,
-          available: equipment.filter(e => e.status === 'AVAILABLE').length,
-          assigned: equipment.filter(e => e.status === 'ASSIGNED').length,
-          maintenance: equipment.filter(e => e.status === 'MAINTENANCE').length,
-          retired: equipment.filter(e => e.status === 'RETIRED').length,
-          utilizationRate:
-            equipment.length > 0
-              ? (equipment.filter(e => e.status === 'ASSIGNED').length / equipment.length) * 100
-              : 0,
-        }
-
-        return { ...batch, metrics }
-      })
-    )
-
-    return batchesWithMetrics
+    return batches.map(batch => {
+      const metrics = metricsMap.get(batch.id) ?? {
+        total: 0,
+        available: 0,
+        assigned: 0,
+        maintenance: 0,
+        retired: 0,
+        utilizationRate: 0,
+      }
+      metrics.utilizationRate = metrics.total > 0 ? (metrics.assigned / metrics.total) * 100 : 0
+      return { ...batch, metrics }
+    })
   }
 
   /**
