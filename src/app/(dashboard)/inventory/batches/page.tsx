@@ -32,7 +32,6 @@ async function getBatchesData(filters: SearchParams) {
     prisma.departments.findMany({ where: { isActive: true }, orderBy: { name: 'asc' } }),
   ])
 
-  // Filtrar por búsqueda de texto en marca/modelo
   const filtered = filters.search
     ? batches.filter(
         b =>
@@ -95,7 +94,7 @@ async function BatchesContent({ searchParams }: { searchParams: SearchParams }) 
             {batches.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <Link href='/inventory/new'>
+        <Link href='/inventory/equipment/bulk/new'>
           <Button className='flex items-center gap-2'>
             <Plus className='w-4 h-4' />
             Nuevo Lote
@@ -116,10 +115,16 @@ async function BatchesContent({ searchParams }: { searchParams: SearchParams }) 
   )
 }
 
-export default function BatchesPage({ searchParams }: { searchParams: SearchParams }) {
+// Next.js 16: searchParams es una Promise en Server Components
+export default async function BatchesPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>
+}) {
+  const params = await searchParams
   return (
     <Suspense fallback={<LoadingSkeleton />}>
-      <BatchesContent searchParams={searchParams} />
+      <BatchesContent searchParams={params} />
     </Suspense>
   )
 }

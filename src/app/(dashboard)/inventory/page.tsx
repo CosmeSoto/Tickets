@@ -1,153 +1,165 @@
-import { Suspense } from 'react'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { redirect } from 'next/navigation'
+'use client'
+
+import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
+import { useEffect, Suspense, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { ModuleLayout } from '@/components/common/layout/module-layout'
+import { UnifiedInventoryList } from '@/components/inventory/unified-inventory-list'
 import { Button } from '@/components/ui/button'
-import { Plus } from 'lucide-react'
-import Link from 'next/link'
-import { InventoryTabs } from '@/components/inventory/dashboard/InventoryTabs'
-import { ModelCards } from '@/components/inventory/dashboard/ModelCards'
-import { BatchList } from '@/components/inventory/dashboard/BatchList'
-import { ModelAggregationService } from '@/lib/services/model-aggregation.service'
-import { BatchService } from '@/lib/services/batch-inventory.service'
-import { Skeleton } from '@/components/ui/skeleton'
-import { InventoryFiltersClient } from '@/components/inventory/filters/InventoryFiltersClient'
-import { prisma } from '@/lib/prisma'
 import {
-  getHomePathForRole,
-  loginPathWithReturnTo,
-  canAccessInventory,
-} from '@/lib/navigation/role-home-path'
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Plus, Package, User, Upload, Layers } from 'lucide-react'
+import Link from 'next/link'
+import { EquipmentImportModal } from '@/components/inventory/equipment-import-modal'
 
-interface SearchParams {
-  search?: string
-  typeId?: string
-  departmentId?: string
-  status?: string
-}
+function InventoryContent() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const [importOpen, setImportOpen] = useState(false)
 
-async function getInventoryData(filters: SearchParams) {
-  const [models, batches, types, departments] = await Promise.all([
-    ModelAggregationService.getAllModels({
-      search: filters.search,
-      typeId: filters.typeId,
-      departmentId: filters.departmentId,
-    }),
-    BatchService.getAll({
-      typeId: filters.typeId,
-      departmentId: filters.departmentId,
-    }),
-    prisma.equipment_types.findMany({
-      where: { isActive: true },
-      orderBy: { name: 'asc' },
-    }),
-    prisma.departments.findMany({
-      where: { isActive: true },
-      orderBy: { name: 'asc' },
-    }),
-  ])
+  const familyId = searchParams.get('familyId') ?? undefined
+  const tab = searchParams.get('tab') ?? 'family'
 
-  return { models, batches, types, departments }
-}
+  const role = session?.user?.role
+  const isClient = role === 'CLIENT'
+  const canManageInventory = (session?.user as any)?.canManageInventory === true
+  const isManager = canManageInventory
+  const isClientOnly = isClient && !canManageInventory
+  const isAdmin = role === 'ADMIN'
 
-function LoadingSkeleton() {
-  return (
-    <div className='space-y-6'>
-      <Skeleton className='h-12 w-full' />
-      <div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
-        <Skeleton className='h-64' />
-        <Skeleton className='h-64' />
-        <Skeleton className='h-64' />
-      </div>
-    </div>
-  )
-}
+  useEffect(() => {
+    if (status === 'unauthenticated') router.push('/login')
+  }, [status, router])
 
-async function InventoryContent({ searchParams }: { searchParams: SearchParams }) {
-  const session = await getServerSession(authOptions)
-
-  if (!session?.user) {
-    redirect(loginPathWithReturnTo('/inventory'))
+  if (status === 'loading') {
+    return (
+      <ModuleLayout title='Cargando...' loading={true}>
+        <div />
+      </ModuleLayout>
+    )
   }
 
-  if (!canAccessInventory(session.user)) {
-    redirect(getHomePathForRole(session.user.role))
+  if (!session?.user) return null
+
+  const canCreate = role === 'ADMIN' || role === 'TECHNICIAN' || canManageInventory
+  const title = isClientOnly ? 'Mis Activos' : 'Inventario'
+  const subtitle = isClientOnly
+    ? 'Activos asignados a tu cuenta'
+    : 'Equipos, licencias y materiales de tu organización'
+
+  const setTab = (t: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('tab', t)
+    if (t === 'mine') params.delete('familyId')
+    router.push(`/inventory?${params.toString()}`)
   }
 
-  const { models, batches, types, departments } = await getInventoryData(searchParams)
-
-  // Transformar datos para componentes
-  const modelData = models.map(m => ({
-    modelId: m.modelId,
-    brand: m.brand,
-    model: m.model,
-    typeName: m.typeName,
-    total: m.total,
-    available: m.available,
-    assigned: m.assigned,
-    maintenance: m.maintenance,
-    retired: m.retired,
-    batchCount: m.batchCount,
-    individualCount: m.individualCount,
-  }))
-
-  const batchData = batches.map(b => ({
-    id: b.id,
-    batchCode: b.batchCode,
-    description: b.description,
-    modelBrand: b.model.brand,
-    modelName: b.model.model,
-    quantity: b.quantity,
-    supplierName: b.supplier?.name ?? '—',
-    purchaseDate: b.purchaseDate,
-    unitPrice: b.unitPrice,
-    totalPrice: b.totalPrice,
-    metrics: b.metrics,
-  }))
+  if (isClientOnly) {
+    return (
+      <ModuleLayout title={title} subtitle={subtitle}>
+        <UnifiedInventoryList personalOnly={true} />
+      </ModuleLayout>
+    )
+  }
 
   return (
-    <div className='container mx-auto py-6 px-4'>
-      <div className='flex items-center justify-between mb-6'>
-        <div>
-          <h1 className='text-3xl font-bold'>Inventario</h1>
-          <p className='text-gray-600 mt-2'>
-            Gestiona tus activos por modelo, lote o vista completa
-          </p>
-        </div>
-        <Link href='/inventory/new'>
-          <Button className='flex items-center gap-2'>
-            <Plus className='w-4 h-4' />
-            Crear Activos
-          </Button>
-        </Link>
-      </div>
-
-      <InventoryFiltersClient
-        types={types.map(t => ({ id: t.id, name: t.name }))}
-        departments={departments.map(d => ({ id: d.id, name: d.name }))}
-        initialSearch={searchParams.search}
-        initialType={searchParams.typeId}
-        initialDepartment={searchParams.departmentId}
-        initialStatus={searchParams.status}
-      />
-
-      <InventoryTabs
-        modelView={<ModelCards models={modelData} />}
-        batchView={<BatchList batches={batchData} />}
-        allView={
-          <div className='text-center py-12'>
-            <p className='text-muted-foreground'>Vista de tabla completa - En desarrollo</p>
-          </div>
+    <>
+      <ModuleLayout
+        title={title}
+        subtitle={subtitle}
+        headerActions={
+          canCreate && tab !== 'mine' ? (
+            <div className='flex items-center gap-2'>
+              {isAdmin && (
+                <Button size='sm' variant='outline' onClick={() => setImportOpen(true)}>
+                  <Upload className='mr-2 h-4 w-4' />
+                  Importar
+                </Button>
+              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size='sm'>
+                    <Plus className='mr-2 h-4 w-4' />
+                    Nuevo Activo
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align='end'>
+                  <DropdownMenuItem asChild>
+                    <Link href='/inventory/equipment/new' className='cursor-pointer'>
+                      <Package className='mr-2 h-4 w-4' />
+                      Activo Individual
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href='/inventory/equipment/bulk/new' className='cursor-pointer'>
+                      <Layers className='mr-2 h-4 w-4' />
+                      Lote de Activos
+                    </Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          ) : undefined
         }
-      />
-    </div>
+      >
+        {isManager && (
+          <div className='flex gap-1 p-1 bg-muted rounded-lg w-fit mb-4'>
+            <button
+              onClick={() => setTab('family')}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                tab !== 'mine'
+                  ? 'bg-background shadow-sm text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Package className='h-4 w-4' />
+              Inventario de Familias
+            </button>
+            <button
+              onClick={() => setTab('mine')}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                tab === 'mine'
+                  ? 'bg-background shadow-sm text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <User className='h-4 w-4' />
+              Mis Equipos
+            </button>
+          </div>
+        )}
+        <UnifiedInventoryList
+          initialFamilyId={tab !== 'mine' ? familyId : undefined}
+          personalOnly={tab === 'mine'}
+          showDashboard={tab !== 'mine'}
+        />
+      </ModuleLayout>
+
+      {isAdmin && (
+        <EquipmentImportModal
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          onSuccess={() => {
+            setImportOpen(false)
+            // Forzar recarga de la lista
+            router.refresh()
+          }}
+          familyId={familyId}
+        />
+      )}
+    </>
   )
 }
-
-export default function InventoryPage({ searchParams }: { searchParams: SearchParams }) {
+export default function InventoryPage() {
   return (
-    <Suspense fallback={<LoadingSkeleton />}>
-      <InventoryContent searchParams={searchParams} />
+    <Suspense>
+      <InventoryContent />
     </Suspense>
   )
 }

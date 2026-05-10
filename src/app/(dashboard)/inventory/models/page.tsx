@@ -143,10 +143,15 @@ async function ModelsContent({ searchParams }: { searchParams: SearchParams }) {
   )
 }
 
-export default function ModelsPage({ searchParams }: { searchParams: SearchParams }) {
+export default async function ModelsPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>
+}) {
+  const params = await searchParams
   return (
     <Suspense fallback={<LoadingSkeleton />}>
-      <ModelsContent searchParams={searchParams} />
+      <ModelsContent searchParams={params} />
     </Suspense>
   )
 }
