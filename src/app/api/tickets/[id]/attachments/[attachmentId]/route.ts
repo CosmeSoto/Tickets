@@ -22,8 +22,8 @@ export async function GET(
     const attachment = await prisma.attachments.findFirst({
       where: {
         id: attachmentId,
-        ticketId: ticketId
-      }
+        ticketId: ticketId,
+      },
     })
 
     if (!attachment) {
@@ -35,8 +35,8 @@ export async function GET(
       where: { id: ticketId },
       select: {
         clientId: true,
-        assigneeId: true
-      }
+        assigneeId: true,
+      },
     })
 
     if (!ticket) {
@@ -49,14 +49,29 @@ export async function GET(
       ticket.assigneeId === session.user.id
 
     if (!isAuthorized) {
-      return NextResponse.json({ error: 'No tienes permiso para acceder a este archivo' }, { status: 403 })
+      // Verificar si es colaborador del ticket
+      const isCollaborator = await prisma.ticket_collaborators
+        .findUnique({
+          where: { ticketId_collaboratorId: { ticketId, collaboratorId: session.user.id } },
+        })
+        .catch(() => null)
+
+      if (!isCollaborator) {
+        return NextResponse.json(
+          { error: 'No tienes permiso para acceder a este archivo' },
+          { status: 403 }
+        )
+      }
     }
 
     // Obtener el archivo del servicio
     const fileData = await FileService.getFile(attachmentId)
 
     if (!fileData) {
-      return NextResponse.json({ error: 'Archivo no encontrado en el almacenamiento' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'Archivo no encontrado en el almacenamiento' },
+        { status: 404 }
+      )
     }
 
     // Determinar Content-Disposition según el modo
@@ -92,8 +107,8 @@ export async function DELETE(
     const attachment = await prisma.attachments.findFirst({
       where: {
         id: attachmentId,
-        ticketId: ticketId
-      }
+        ticketId: ticketId,
+      },
     })
 
     if (!attachment) {
@@ -101,12 +116,13 @@ export async function DELETE(
     }
 
     // Solo el creador del archivo o un admin pueden eliminarlo
-    const isAuthorized =
-      session.user.role === 'ADMIN' ||
-      attachment.uploadedBy === session.user.id
+    const isAuthorized = session.user.role === 'ADMIN' || attachment.uploadedBy === session.user.id
 
     if (!isAuthorized) {
-      return NextResponse.json({ error: 'No tienes permiso para eliminar este archivo' }, { status: 403 })
+      return NextResponse.json(
+        { error: 'No tienes permiso para eliminar este archivo' },
+        { status: 403 }
+      )
     }
 
     // Eliminar el archivo

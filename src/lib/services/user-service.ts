@@ -290,6 +290,29 @@ export class UserService {
         })
       }
 
+      // Si es técnico y tiene departamento, asignar automáticamente la familia del departamento
+      if (data.role === 'TECHNICIAN' && (data.departmentId || data.department)) {
+        const deptId = data.departmentId || data.department
+        const dept = await tx.departments.findUnique({
+          where: { id: deptId! },
+          select: { familyId: true },
+        })
+        if (dept?.familyId) {
+          await tx.technician_family_assignments.upsert({
+            where: { technicianId_familyId: { technicianId: user.id, familyId: dept.familyId } },
+            create: {
+              id: randomUUID(),
+              technicianId: user.id,
+              familyId: dept.familyId,
+              isActive: true,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+            update: { isActive: true, updatedAt: new Date() },
+          })
+        }
+      }
+
       // Crear user_settings por defecto (garantiza que las notificaciones estén habilitadas)
       await tx.user_settings.create({
         data: {
@@ -424,6 +447,30 @@ export class UserService {
               createdAt: new Date(),
               updatedAt: new Date(),
             })),
+          })
+        }
+      }
+
+      // Si es técnico y cambió el departamento, asignar automáticamente la familia del nuevo departamento
+      const effectiveRole = data.role ?? user.role
+      const newDeptId = updateData.departmentId
+      if (effectiveRole === 'TECHNICIAN' && newDeptId) {
+        const dept = await tx.departments.findUnique({
+          where: { id: newDeptId },
+          select: { familyId: true },
+        })
+        if (dept?.familyId) {
+          await tx.technician_family_assignments.upsert({
+            where: { technicianId_familyId: { technicianId: id, familyId: dept.familyId } },
+            create: {
+              id: randomUUID(),
+              technicianId: id,
+              familyId: dept.familyId,
+              isActive: true,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+            update: { isActive: true, updatedAt: new Date() },
           })
         }
       }

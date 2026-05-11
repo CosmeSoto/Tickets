@@ -69,11 +69,18 @@ export function UsersProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     mountedRef.current = true
-    return () => { mountedRef.current = false }
+    return () => {
+      mountedRef.current = false
+    }
   }, [])
 
   const load = useCallback(async () => {
     if (status !== 'authenticated' || !session?.user) return
+    // Clientes no tienen acceso a la lista de usuarios — evitar el 403
+    if (session.user.role === 'CLIENT') {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     try {
       // Cargar todos los usuarios activos de una vez
@@ -87,17 +94,17 @@ export function UsersProvider({ children }: { children: React.ReactNode }) {
     } finally {
       if (mountedRef.current) setLoading(false)
     }
-  }, [status, session?.user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [status, session?.user?.id, session?.user?.role]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     load()
   }, [load])
 
   // Filtros derivados en memoria (sin peticiones adicionales)
-  const technicians = users.filter((u) => u.role === 'TECHNICIAN')
-  const admins = users.filter((u) => u.role === 'ADMIN' && !u.isSuperAdmin)
-  const managers = users.filter((u) => u.canManageInventory === true)
-  const clients = users.filter((u) => u.role === 'CLIENT')
+  const technicians = users.filter(u => u.role === 'TECHNICIAN')
+  const admins = users.filter(u => u.role === 'ADMIN' && !u.isSuperAdmin)
+  const managers = users.filter(u => u.canManageInventory === true)
+  const clients = users.filter(u => u.role === 'CLIENT')
 
   return (
     <UsersContext.Provider

@@ -9,25 +9,22 @@ import { invalidateCache } from '@/lib/api-cache'
 // Transiciones válidas por rol
 const TRANSITIONS: Record<string, Record<string, string[]>> = {
   TECHNICIAN: {
-    OPEN:        ['IN_PROGRESS'],
+    OPEN: ['IN_PROGRESS'],
     IN_PROGRESS: ['RESOLVED', 'ON_HOLD'],
-    ON_HOLD:     ['IN_PROGRESS'],
-    RESOLVED:    ['IN_PROGRESS'], // puede reabrir
-    CLOSED:      [],              // solo lectura
+    ON_HOLD: ['IN_PROGRESS'],
+    RESOLVED: ['IN_PROGRESS'], // puede reabrir
+    CLOSED: [], // solo lectura
   },
   ADMIN: {
-    OPEN:        ['IN_PROGRESS', 'RESOLVED', 'CLOSED', 'ON_HOLD'],
+    OPEN: ['IN_PROGRESS', 'RESOLVED', 'CLOSED', 'ON_HOLD'],
     IN_PROGRESS: ['OPEN', 'RESOLVED', 'CLOSED', 'ON_HOLD'],
-    ON_HOLD:     ['OPEN', 'IN_PROGRESS', 'RESOLVED'],
-    RESOLVED:    ['IN_PROGRESS', 'CLOSED'],
-    CLOSED:      ['RESOLVED'],
+    ON_HOLD: ['OPEN', 'IN_PROGRESS', 'RESOLVED'],
+    RESOLVED: ['IN_PROGRESS', 'CLOSED'],
+    CLOSED: ['RESOLVED'],
   },
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
@@ -40,10 +37,7 @@ export async function PATCH(
 
     const validStatuses = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'ON_HOLD']
     if (!newStatus || !validStatuses.includes(newStatus)) {
-      return NextResponse.json(
-        { success: false, message: 'Estado inválido' },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, message: 'Estado inválido' }, { status: 400 })
     }
 
     // Obtener ticket actual
@@ -69,22 +63,27 @@ export async function PATCH(
 
     // Colaboradores: pueden cambiar a IN_PROGRESS/ON_HOLD pero NO cerrar ni resolver
     if (role === 'TECHNICIAN' && ticket.assigneeId !== session.user.id) {
-      const isCollaborator = await prisma.ticket_collaborators.findUnique({
-        where: { ticketId_collaboratorId: { ticketId, collaboratorId: session.user.id } },
-      })
-      if (!isCollaborator) {
-        return NextResponse.json(
-          { success: false, message: 'No tienes permiso para cambiar el estado de este ticket' },
-          { status: 403 }
-        )
-      }
-      // Colaborador: solo puede poner en progreso o en espera, no resolver ni cerrar
-      const collaboratorAllowed = ['IN_PROGRESS', 'ON_HOLD']
-      if (!collaboratorAllowed.includes(newStatus)) {
-        return NextResponse.json(
-          { success: false, message: 'Los colaboradores no pueden resolver ni cerrar tickets' },
-          { status: 403 }
-        )
+      // Si el ticket no tiene assignee, el técnico puede tomarlo (auto-asignarse al cambiar a IN_PROGRESS)
+      if (ticket.assigneeId === null && newStatus === 'IN_PROGRESS') {
+        // Permitir: el técnico se auto-asigna al tomar el ticket
+      } else {
+        const isCollaborator = await prisma.ticket_collaborators.findUnique({
+          where: { ticketId_collaboratorId: { ticketId, collaboratorId: session.user.id } },
+        })
+        if (!isCollaborator) {
+          return NextResponse.json(
+            { success: false, message: 'No tienes permiso para cambiar el estado de este ticket' },
+            { status: 403 }
+          )
+        }
+        // Colaborador: solo puede poner en progreso o en espera, no resolver ni cerrar
+        const collaboratorAllowed = ['IN_PROGRESS', 'ON_HOLD']
+        if (!collaboratorAllowed.includes(newStatus)) {
+          return NextResponse.json(
+            { success: false, message: 'Los colaboradores no pueden resolver ni cerrar tickets' },
+            { status: 403 }
+          )
+        }
       }
     }
 
@@ -105,7 +104,11 @@ export async function PATCH(
       updatedAt: new Date(),
     }
     if (newStatus === 'RESOLVED') updateData.resolvedAt = new Date()
-    if (newStatus === 'CLOSED')   updateData.closedAt   = new Date()
+    if (newStatus === 'CLOSED') updateData.closedAt = new Date()
+    // Auto-asignar al técnico si el ticket no tenía assignee y lo está tomando
+    if (role === 'TECHNICIAN' && ticket.assigneeId === null && newStatus === 'IN_PROGRESS') {
+      updateData.assigneeId = session.user.id
+    }
 
     // Actualizar ticket en BD
     const updatedTicket = await prisma.tickets.update({
@@ -161,7 +164,12 @@ export async function PATCH(
     }
 
     // Invalidar caché de tickets y dashboard
-    await invalidateCache(['tickets:role=ADMIN*', 'tickets:role=TECHNICIAN*', 'tickets:role=CLIENT*', 'dashboard:*']).catch(() => {})
+    await invalidateCache([
+      'tickets:role=ADMIN*',
+      'tickets:role=TECHNICIAN*',
+      'tickets:role=CLIENT*',
+      'dashboard:*',
+    ]).catch(() => {})
 
     return NextResponse.json({
       success: true,

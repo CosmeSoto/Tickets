@@ -43,9 +43,13 @@ export default function EditTicketPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [familyTechnicians, setFamilyTechnicians] = useState<any[] | null>(null)
 
   // ✅ Técnicos desde contexto global — sin petición extra
   const { technicians } = useTechnicians()
+
+  // Técnicos filtrados por familia del ticket (se carga tras obtener el ticket)
+  const displayTechnicians = familyTechnicians ?? technicians
 
   // Form data
   const [formData, setFormData] = useState({
@@ -96,6 +100,15 @@ export default function EditTicketPage() {
           categoryId: ticketData.category.id,
           assigneeId: ticketData.assignee?.id || '',
         })
+        // Cargar técnicos filtrados por familia si el ticket tiene una
+        if (ticketData.familyId) {
+          fetch(`/api/users?role=TECHNICIAN&isActive=true&familyId=${ticketData.familyId}`)
+            .then(r => r.json())
+            .then(d => {
+              if (d.data) setFamilyTechnicians(d.data)
+            })
+            .catch(() => {})
+        }
       } else {
         throw new Error(data.message || 'Error al cargar el ticket')
       }
@@ -139,10 +152,6 @@ export default function EditTicketPage() {
         body: JSON.stringify(formData),
       })
 
-      if (!response.ok) {
-        throw new Error('Error al actualizar el ticket')
-      }
-
       const data = await response.json()
 
       if (data.success) {
@@ -158,7 +167,7 @@ export default function EditTicketPage() {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
       toast({
         variant: 'destructive',
-        title: 'Error',
+        title: 'Error al guardar',
         description: errorMessage,
       })
     } finally {
@@ -328,7 +337,7 @@ export default function EditTicketPage() {
             <div>
               <Label>Técnico Asignado</Label>
               <TechnicianSearchSelector
-                technicians={technicians as any}
+                technicians={displayTechnicians as any}
                 value={formData.assigneeId}
                 onChange={assigneeId =>
                   setFormData(prev => ({ ...prev, assigneeId: assigneeId || '' }))

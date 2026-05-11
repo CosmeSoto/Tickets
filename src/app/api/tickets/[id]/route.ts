@@ -749,11 +749,14 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
           ? processedUpdates.assigneeId
           : existingTicket.assigneeId
 
-      try {
-        await assertTechnicianActiveInFamily(finalAssigneeId, effectiveFamilyId ?? undefined)
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Asignación inválida'
-        return NextResponse.json({ success: false, message }, { status: 400 })
+      // Solo validar la asignación de familia si el assigneeId está siendo modificado
+      if ('assigneeId' in processedUpdates && processedUpdates.assigneeId !== null) {
+        try {
+          await assertTechnicianActiveInFamily(finalAssigneeId, effectiveFamilyId ?? undefined)
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Asignación inválida'
+          return NextResponse.json({ success: false, message }, { status: 400 })
+        }
       }
 
       const updatedTicket = await prisma.tickets.update({

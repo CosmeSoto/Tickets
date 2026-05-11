@@ -8,12 +8,13 @@ import {
   User,
   Tag,
   AlertCircle,
-  Save,
   BookOpen,
   Lightbulb,
   Star,
   CheckCircle,
   MapPin,
+  ChevronRight,
+  Loader2,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -28,13 +29,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import {
   useTicketData,
@@ -44,6 +38,55 @@ import {
   formatDate,
   getTicketDisplayCode,
 } from '@/hooks/use-ticket-data'
+
+// Colores y etiquetas por estado
+const STATUS_CONFIG: Record<string, { label: string; dot: string; card: string; btn: string }> = {
+  OPEN: {
+    label: 'Abierto',
+    dot: 'bg-orange-500',
+    card: 'border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950',
+    btn: 'bg-orange-500 hover:bg-orange-600 text-white',
+  },
+  IN_PROGRESS: {
+    label: 'En Progreso',
+    dot: 'bg-yellow-500',
+    card: 'border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950',
+    btn: 'bg-yellow-500 hover:bg-yellow-600 text-white',
+  },
+  RESOLVED: {
+    label: 'Resuelto',
+    dot: 'bg-green-500',
+    card: 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950',
+    btn: 'bg-green-600 hover:bg-green-700 text-white',
+  },
+  ON_HOLD: {
+    label: 'En Espera',
+    dot: 'bg-purple-500',
+    card: 'border-purple-200 bg-purple-50 dark:border-purple-800 dark:bg-purple-950',
+    btn: 'bg-purple-500 hover:bg-purple-600 text-white',
+  },
+  CLOSED: {
+    label: 'Cerrado',
+    dot: 'bg-gray-500',
+    card: 'border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950',
+    btn: 'bg-gray-500 hover:bg-gray-600 text-white',
+  },
+}
+
+// Transiciones permitidas para técnico asignado
+const TECH_TRANSITIONS: Record<
+  string,
+  { value: Ticket['status']; label: string; primary?: boolean }[]
+> = {
+  OPEN: [{ value: 'IN_PROGRESS', label: 'Tomar ticket', primary: true }],
+  IN_PROGRESS: [
+    { value: 'RESOLVED', label: 'Marcar resuelto', primary: true },
+    { value: 'ON_HOLD', label: 'Poner en espera' },
+  ],
+  ON_HOLD: [{ value: 'IN_PROGRESS', label: 'Reanudar', primary: true }],
+  RESOLVED: [{ value: 'IN_PROGRESS', label: 'Reabrir', primary: false }],
+  CLOSED: [],
+}
 
 export default function TechnicianTicketDetailPage() {
   const params = useParams()
@@ -56,17 +99,16 @@ export default function TechnicianTicketDetailPage() {
 
   const [ticket, setTicket] = useState<Ticket | null>(null)
   const [loading, setLoading] = useState(true)
-  const [updating, setUpdating] = useState(false)
-  const [newStatus, setNewStatus] = useState<Ticket['status']>('OPEN')
+  const [updating, setUpdating] = useState<string | null>(null) // guarda el status que se está aplicando
   const [timelineKey, setTimelineKey] = useState(0)
   const [fileKey, setFileKey] = useState(0)
 
-  // Solo puede crear artículo quien resolvió el ticket (assignee), no el solicitante
   const isAssignedResolver = ticket?.assignee?.id === session?.user?.id
+  const isUnassigned = !ticket?.assignee
+  const canAct = isAssignedResolver || isUnassigned // puede actuar si es el asignado o si no hay asignado
   const canCreateArticle =
     isAssignedResolver && (ticket?.status === 'RESOLVED' || ticket?.status === 'CLOSED')
   const hasArticle = !!ticket?.knowledgeArticleId
-  // El técnico es el solicitante de este ticket (lo creó para sí mismo)
   const isRequester = ticket?.client?.id === session?.user?.id
   const canRate = isRequester && (ticket?.status === 'RESOLVED' || ticket?.status === 'CLOSED')
 
@@ -83,10 +125,8 @@ export default function TechnicianTicketDetailPage() {
     if (ticketId) loadTicket()
   }, [session, authStatus, ticketId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Polling para detectar cambios (cliente calificó → CLOSED)
   useEffect(() => {
     if (!ticketId || loading) return
-    // Polling cada 30s — el SSE notifica cambios en tiempo real
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`/api/tickets/${ticketId}`)
@@ -96,7 +136,6 @@ export default function TechnicianTicketDetailPage() {
         setTicket(prev => {
           if (!prev || (prev.status === data.status && prev.updatedAt === data.updatedAt))
             return prev
-          setNewStatus(data.status)
           return data
         })
       } catch {}
@@ -107,16 +146,13 @@ export default function TechnicianTicketDetailPage() {
   const loadTicket = async () => {
     setLoading(true)
     const data = await getTicket(ticketId)
-    if (data) {
-      setTicket(data)
-      setNewStatus(data.status)
-    }
+    if (data) setTicket(data)
     setLoading(false)
   }
 
-  const handleStatusUpdate = async () => {
-    if (!ticket || newStatus === ticket.status) return
-    setUpdating(true)
+  const handleStatusChange = async (newStatus: Ticket['status']) => {
+    if (!ticket) return
+    setUpdating(newStatus)
     try {
       const res = await fetch(`/api/tickets/${ticket.id}/status`, {
         method: 'PATCH',
@@ -125,46 +161,26 @@ export default function TechnicianTicketDetailPage() {
       })
       const data = await res.json()
       if (!res.ok || !data.success) throw new Error(data.message)
-      setTicket(prev =>
-        prev
-          ? {
-              ...prev,
-              status: newStatus,
-              updatedAt: data.data.updatedAt,
-              resolvedAt: data.data.resolvedAt ?? prev.resolvedAt,
-            }
-          : prev
-      )
+      // Recargar para obtener el estado actualizado (incluyendo posible auto-asignación)
+      await loadTicket()
       setTimelineKey(k => k + 1)
-      toast({ title: 'Estado actualizado', description: `Ahora: ${getStatusLabel(newStatus)}` })
+      const cfg = STATUS_CONFIG[newStatus]
+      toast({ title: 'Estado actualizado', description: `Ahora: ${cfg?.label ?? newStatus}` })
     } catch (err) {
       toast({
-        title: 'Error',
+        title: 'Error al actualizar estado',
         description: err instanceof Error ? err.message : 'Intenta nuevamente',
         variant: 'destructive',
       })
     } finally {
-      setUpdating(false)
+      setUpdating(null)
     }
   }
 
-  const getStatusLabel = (s: string) => TICKET_STATUSES.find(x => x.value === s)?.label ?? s
   const getStatusConfig = (s: string) =>
     TICKET_STATUSES.find(x => x.value === s) ?? TICKET_STATUSES[0]
   const getPriorityConfig = (p: string) =>
     TICKET_PRIORITIES.find(x => x.value === p) ?? TICKET_PRIORITIES[0]
-
-  const availableStatuses = (): Ticket['status'][] => {
-    if (!ticket) return []
-    const map: Record<string, Ticket['status'][]> = {
-      OPEN: ['OPEN', 'IN_PROGRESS'],
-      IN_PROGRESS: ['IN_PROGRESS', 'RESOLVED', 'ON_HOLD'],
-      ON_HOLD: ['ON_HOLD', 'IN_PROGRESS'],
-      RESOLVED: ['RESOLVED', 'IN_PROGRESS'],
-      CLOSED: ['CLOSED'],
-    }
-    return map[ticket.status] ?? [ticket.status]
-  }
 
   if (authStatus === 'loading' || loading) {
     return (
@@ -201,6 +217,9 @@ export default function TechnicianTicketDetailPage() {
 
   const statusConfig = getStatusConfig(ticket.status)
   const priorityConfig = getPriorityConfig(ticket.priority)
+  const currentStatusCfg = STATUS_CONFIG[ticket.status]
+  const transitions =
+    canAct && ticket.status !== 'CLOSED' ? (TECH_TRANSITIONS[ticket.status] ?? []) : []
 
   return (
     <TicketDetailLayout
@@ -233,7 +252,7 @@ export default function TechnicianTicketDetailPage() {
       }
     >
       <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
-        {/* Columna principal */}
+        {/* ── Columna principal ── */}
         <div className='lg:col-span-2 space-y-4'>
           {/* Descripción */}
           <Card>
@@ -253,7 +272,7 @@ export default function TechnicianTicketDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Banners de estado */}
+          {/* Banner: resuelto esperando calificación */}
           {ticket.status === 'RESOLVED' && !isRequester && (
             <Card className='border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950'>
               <CardContent className='pt-5 flex items-start gap-3'>
@@ -269,13 +288,14 @@ export default function TechnicianTicketDetailPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* Banner: cerrado */}
           {ticket.status === 'CLOSED' && (
             <Card className='border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950'>
               <CardContent className='pt-5 flex items-start gap-3'>
                 <CheckCircle className='h-5 w-5 text-green-600 shrink-0 mt-0.5' />
                 <div>
                   <p className='font-medium text-green-900 dark:text-green-100'>Ticket cerrado</p>
-                  {/* Solo el resolutor puede promover a artículo */}
                   {isAssignedResolver && !hasArticle && (
                     <Button
                       variant='outline'
@@ -294,7 +314,7 @@ export default function TechnicianTicketDetailPage() {
             </Card>
           )}
 
-          {/* Calificación — visible cuando el técnico es el solicitante y el ticket está resuelto/cerrado */}
+          {/* Calificación cuando el técnico es el solicitante */}
           {isRequester && (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') && (
             <TicketRatingSystem
               ticketId={ticket.id}
@@ -305,16 +325,10 @@ export default function TechnicianTicketDetailPage() {
             />
           )}
 
-          {/* Tabs */}
+          {/* Tabs — sin el tab de Estado */}
           <Tabs defaultValue='timeline'>
-            <TabsList
-              className={`grid w-full ${!isRequester && ticket.status !== 'CLOSED' ? 'grid-cols-4' : 'grid-cols-3'}`}
-            >
+            <TabsList className='grid w-full grid-cols-3'>
               <TabsTrigger value='timeline'>Historial</TabsTrigger>
-              {/* Tab Estado: solo para el resolutor asignado, no para el solicitante, no cuando está cerrado */}
-              {!isRequester && ticket.status !== 'CLOSED' && (
-                <TabsTrigger value='status'>Estado</TabsTrigger>
-              )}
               <TabsTrigger value='resolution'>Plan</TabsTrigger>
               <TabsTrigger value='files'>Archivos</TabsTrigger>
             </TabsList>
@@ -327,72 +341,6 @@ export default function TechnicianTicketDetailPage() {
                 refreshKey={timelineKey}
                 onCommentAdded={() => setFileKey(k => k + 1)}
               />
-            </TabsContent>
-
-            <TabsContent value='status' className='space-y-4'>
-              {ticket.status !== 'CLOSED' && !isRequester ? (
-                <Card>
-                  <CardHeader className='pb-2'>
-                    <CardTitle className='text-sm font-semibold flex items-center gap-1.5'>
-                      <Clock className='h-3.5 w-3.5' />
-                      Actualizar Estado
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className='space-y-3'>
-                    <div className='flex gap-3'>
-                      <Select
-                        value={newStatus}
-                        onValueChange={v => setNewStatus(v as Ticket['status'])}
-                      >
-                        <SelectTrigger className='flex-1'>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableStatuses().map(s => (
-                            <SelectItem key={s} value={s}>
-                              <div className='flex items-center gap-2'>
-                                <div
-                                  className={`w-2.5 h-2.5 rounded-full ${
-                                    s === 'OPEN'
-                                      ? 'bg-orange-500'
-                                      : s === 'IN_PROGRESS'
-                                        ? 'bg-yellow-500'
-                                        : s === 'RESOLVED'
-                                          ? 'bg-green-500'
-                                          : s === 'ON_HOLD'
-                                            ? 'bg-purple-500'
-                                            : 'bg-gray-500'
-                                  }`}
-                                />
-                                {getStatusLabel(s)}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        onClick={handleStatusUpdate}
-                        disabled={updating || newStatus === ticket.status}
-                      >
-                        <Save className='h-4 w-4 mr-2' />
-                        {updating ? 'Guardando...' : 'Actualizar'}
-                      </Button>
-                    </div>
-                    {newStatus !== ticket.status && (
-                      <p className='text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded p-2'>
-                        Cambiará de <strong>{statusConfig.label}</strong> a{' '}
-                        <strong>{getStatusLabel(newStatus)}</strong>
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              ) : (
-                <p className='text-sm text-muted-foreground text-center py-8'>
-                  {isRequester
-                    ? 'Eres el solicitante de este ticket. El técnico asignado gestiona el estado.'
-                    : 'El ticket está cerrado y no puede cambiar de estado.'}
-                </p>
-              )}
             </TabsContent>
 
             <TabsContent value='resolution' className='space-y-4'>
@@ -416,8 +364,62 @@ export default function TechnicianTicketDetailPage() {
           </Tabs>
         </div>
 
-        {/* Sidebar */}
+        {/* ── Sidebar ── */}
         <div className='space-y-4'>
+          {/* ── CONTROL DE ESTADO — siempre visible ── */}
+          {ticket.status !== 'CLOSED' && !isRequester && (
+            <Card className={`border-2 ${currentStatusCfg?.card ?? ''}`}>
+              <CardHeader className='pb-2 pt-4 px-4'>
+                <CardTitle className='text-sm font-semibold flex items-center gap-2'>
+                  <span
+                    className={`inline-block w-2.5 h-2.5 rounded-full ${currentStatusCfg?.dot}`}
+                  />
+                  Estado actual: {currentStatusCfg?.label ?? ticket.status}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className='px-4 pb-4 space-y-2'>
+                {transitions.length > 0 ? (
+                  transitions.map(t => (
+                    <button
+                      key={t.value}
+                      onClick={() => handleStatusChange(t.value)}
+                      disabled={!!updating}
+                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all disabled:opacity-60 disabled:cursor-not-allowed
+                        ${
+                          t.primary
+                            ? (STATUS_CONFIG[t.value]?.btn ??
+                              'bg-primary text-primary-foreground hover:bg-primary/90')
+                            : 'border border-border bg-background hover:bg-muted text-foreground'
+                        }`}
+                    >
+                      <span className='flex items-center gap-2'>
+                        {updating === t.value ? (
+                          <Loader2 className='h-3.5 w-3.5 animate-spin' />
+                        ) : (
+                          <span className={`w-2 h-2 rounded-full ${STATUS_CONFIG[t.value]?.dot}`} />
+                        )}
+                        {t.label}
+                      </span>
+                      <ChevronRight className='h-3.5 w-3.5 opacity-50' />
+                    </button>
+                  ))
+                ) : (
+                  <p className='text-xs text-muted-foreground text-center py-1'>
+                    {isRequester
+                      ? 'Eres el solicitante de este ticket.'
+                      : 'No hay acciones disponibles.'}
+                  </p>
+                )}
+                {!canAct && !isRequester && (
+                  <p className='text-xs text-muted-foreground bg-muted rounded p-2 text-center'>
+                    Solo el técnico asignado puede cambiar el estado.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Detalles */}
           <Card>
             <CardHeader className='pb-2'>
               <CardTitle className='text-sm font-semibold'>Detalles</CardTitle>

@@ -202,9 +202,13 @@ export function useCategories(options: UseCategoriesOptions = {}) {
       formHook.handleEdit(category)
       // Recargar departamentos, padres y técnicos filtrados por la familia de la categoría
       const familyId = category.departments?.familyId ?? category.department?.familyId ?? null
+      // IDs de técnicos ya asignados a esta categoría (para asegurar que aparezcan en la lista)
+      const assignedTechIds = (category.technician_assignments ?? []).map(
+        (a: any) => a.technicianId
+      )
       dataHook.loadDepartments(familyId)
       dataHook.loadAvailableParents(category.id, familyId ?? undefined)
-      dataHook.loadAvailableTechnicians(familyId ?? undefined)
+      dataHook.loadAvailableTechnicians(familyId ?? undefined, assignedTechIds)
     },
     [formHook, dataHook]
   )

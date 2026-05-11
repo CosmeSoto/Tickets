@@ -139,9 +139,9 @@ export function useCategoriesData(options: UseCategoriesDataOptions = {}) {
     [getCacheKey, getFromCache, setToCache, toast]
   ) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Cargar técnicos (opcionalmente filtrados por familia)
+  // Cargar técnicos (opcionalmente filtrados por familia, siempre incluye los ya asignados)
   const loadAvailableTechnicians = useCallback(
-    async (familyId?: string) => {
+    async (familyId?: string, alreadyAssignedIds?: string[]) => {
       const cacheKey = getCacheKey('/api/users', {
         role: 'TECHNICIAN',
         isActive: true,
@@ -149,6 +149,28 @@ export function useCategoriesData(options: UseCategoriesDataOptions = {}) {
       })
       const cached = getFromCache<any[]>(cacheKey)
       if (cached) {
+        // Si hay técnicos ya asignados que no están en caché, cargarlos igual
+        if (alreadyAssignedIds && alreadyAssignedIds.length > 0) {
+          const missingIds = alreadyAssignedIds.filter(id => !cached.find((t: any) => t.id === id))
+          if (missingIds.length > 0) {
+            // Cargar sin filtro de familia para obtener los técnicos asignados
+            try {
+              const allRes = await fetch(`/api/users?role=TECHNICIAN&isActive=true`)
+              if (allRes.ok) {
+                const allData = await allRes.json()
+                if (allData.success && Array.isArray(allData.data)) {
+                  const missing = allData.data.filter((t: any) => missingIds.includes(t.id))
+                  const merged = [
+                    ...cached,
+                    ...missing.filter((t: any) => !cached.find((c: any) => c.id === t.id)),
+                  ]
+                  setAvailableTechnicians(merged)
+                  return
+                }
+              }
+            } catch {}
+          }
+        }
         setAvailableTechnicians(cached)
         return
       }
@@ -160,8 +182,27 @@ export function useCategoriesData(options: UseCategoriesDataOptions = {}) {
         if (response.ok) {
           const data = await response.json()
           if (data.success && Array.isArray(data.data)) {
-            setAvailableTechnicians(data.data)
-            setToCache(cacheKey, data.data)
+            let technicians = data.data
+
+            // Si hay técnicos ya asignados que no están en la lista filtrada, cargarlos también
+            if (alreadyAssignedIds && alreadyAssignedIds.length > 0) {
+              const missingIds = alreadyAssignedIds.filter(
+                id => !technicians.find((t: any) => t.id === id)
+              )
+              if (missingIds.length > 0) {
+                const allRes = await fetch(`/api/users?role=TECHNICIAN&isActive=true`)
+                if (allRes.ok) {
+                  const allData = await allRes.json()
+                  if (allData.success && Array.isArray(allData.data)) {
+                    const missing = allData.data.filter((t: any) => missingIds.includes(t.id))
+                    technicians = [...technicians, ...missing]
+                  }
+                }
+              }
+            }
+
+            setAvailableTechnicians(technicians)
+            setToCache(cacheKey, data.data) // Cachear solo los filtrados por familia
           }
         }
       } catch (error) {

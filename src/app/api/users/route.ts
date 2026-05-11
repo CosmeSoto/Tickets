@@ -68,18 +68,31 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Filtrar técnicos por familia: solo los que tienen asignación activa a esa familia
+    // Filtrar técnicos por familia: los que tienen asignación activa O cuyo departamento pertenece a esa familia
     if (familyId) {
-      where.technicianFamilyAssignments = {
-        some: { familyId, isActive: true },
-      }
+      where.AND = [
+        ...(where.AND ?? []),
+        {
+          OR: [
+            // Asignación explícita en technician_family_assignments
+            { technicianFamilyAssignments: { some: { familyId, isActive: true } } },
+            // Técnico cuyo departamento pertenece a la familia (asignación nativa)
+            { departments: { familyId } },
+          ],
+        },
+      ]
     }
 
     // Búsqueda por nombre o email
     if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } },
+      where.AND = [
+        ...(where.AND ?? []),
+        {
+          OR: [
+            { name: { contains: search, mode: 'insensitive' } },
+            { email: { contains: search, mode: 'insensitive' } },
+          ],
+        },
       ]
     }
 
