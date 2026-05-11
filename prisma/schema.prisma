@@ -912,6 +912,7 @@ model equipment_batches {
   updatedAt           DateTime @updatedAt @map("updated_at")
   
   contracts           contracts[] @relation("ContractBatch")
+  equipment           equipment[]
   
   @@index([modelId, status])
   @@index([supplierId])
@@ -933,6 +934,7 @@ model equipment {
   
   // NUEVO: Referencia al lote (opcional)
   batchId               String?                 @map("batch_id")
+  batch                 equipment_batches?      @relation(fields: [batchId], references: [id])
   
   // DEPRECATED: Mantener por compatibilidad (3 meses)
   brand                 String

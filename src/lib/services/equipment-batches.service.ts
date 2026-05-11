@@ -4,7 +4,7 @@
  */
 
 import prisma from '@/lib/prisma'
-import { EquipmentStatus } from '@prisma/client'
+import { EquipmentStatus, Prisma } from '@prisma/client'
 import { generateSequentialCodes, validateManualCodes } from './code-generator.service'
 
 export interface CreateBatchInput {
@@ -463,38 +463,81 @@ export async function listBatches(params: {
               brand: true,
               model: true,
               sku: true,
+              type: { select: { id: true, name: true, familyId: true } },
             },
           },
-          supplier: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-          warehouse: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
+          supplier: { select: { id: true, name: true } },
+          warehouse: { select: { id: true, name: true } },
         },
-        orderBy: {
-          purchaseDate: 'desc',
-        },
+        orderBy: { purchaseDate: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
       }),
       prisma.equipment_batches.count({ where }),
     ])
 
+    if (batches.length === 0) {
+      return { batches: [], pagination: { page, limit, total: 0, totalPages: 0 } }
+    }
+
+    // Calcular métricas en tiempo real con una sola query groupBy (sin N+1)
+    const batchIds = batches.map(b => b.id)
+    const statusCounts = await prisma.equipment.groupBy({
+      by: ['batchId', 'status'],
+      where: { batchId: { in: batchIds } },
+      _count: { id: true },
+    })
+
+    // Construir mapa batchId → métricas
+    const metricsMap = new Map<
+      string,
+      {
+        total: number
+        available: number
+        assigned: number
+        maintenance: number
+        retired: number
+      }
+    >()
+    for (const row of statusCounts) {
+      if (!row.batchId) continue
+      if (!metricsMap.has(row.batchId)) {
+        metricsMap.set(row.batchId, {
+          total: 0,
+          available: 0,
+          assigned: 0,
+          maintenance: 0,
+          retired: 0,
+        })
+      }
+      const m = metricsMap.get(row.batchId)!
+      m.total += row._count.id
+      if (row.status === 'AVAILABLE') m.available = row._count.id
+      if (row.status === 'ASSIGNED') m.assigned = row._count.id
+      if (row.status === 'MAINTENANCE') m.maintenance = row._count.id
+      if (row.status === 'RETIRED') m.retired = row._count.id
+    }
+
+    const batchesWithMetrics = batches.map(batch => {
+      const m = metricsMap.get(batch.id) ?? {
+        total: 0,
+        available: 0,
+        assigned: 0,
+        maintenance: 0,
+        retired: 0,
+      }
+      return {
+        ...batch,
+        metrics: {
+          ...m,
+          utilizationRate: m.total > 0 ? (m.assigned / m.total) * 100 : 0,
+        },
+      }
+    })
+
     return {
-      batches,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      batches: batchesWithMetrics,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     }
   } catch (error: any) {
     console.error('Error listando lotes:', error)
