@@ -7,12 +7,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import prisma from '@/lib/prisma'
 import {
   createBatch,
   listBatches,
   type CreateBatchInput,
 } from '@/lib/services/equipment-batches.service'
-import { canManageInventory } from '@/lib/inventory-access'
 import { invalidateCache } from '@/lib/api-cache'
 import { z } from 'zod'
 
@@ -67,21 +67,51 @@ const createBatchSchema = z.object({
 
 /**
  * GET /api/inventory/batches
- * List equipment batches with pagination and filters
+ * List equipment batches with pagination and filters.
+ * Filtra por familia según el rol:
+ * - SuperAdmin: todos los lotes
+ * - Admin normal: lotes de sus familias asignadas
+ * - Gestor (canManageInventory): lotes de sus familias en inventory_manager_families
  */
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // Check inventory access
-    const hasAccess = await canManageInventory(session.user.id)
-    if (!hasAccess) {
+    const role = session.user.role
+    const userId = session.user.id
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    const userCanManageInventory = (session.user as any).canManageInventory === true
+
+    // Solo ADMIN y gestores pueden ver lotes
+    if (role !== 'ADMIN' && !userCanManageInventory) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
     }
+
+    // Determinar familias accesibles según rol
+    let allowedFamilyIds: string[] | null = null // null = sin restricción (superadmin)
+
+    if (role === 'ADMIN' && !isSuperAdmin) {
+      // Admin normal: solo sus familias asignadas
+      const assignments = await prisma.admin_family_assignments.findMany({
+        where: { adminId: userId, isActive: true },
+        select: { familyId: true },
+      })
+      if (assignments.length > 0) {
+        allowedFamilyIds = assignments.map(a => a.familyId)
+      }
+      // Sin asignaciones → acceso total (admin legacy)
+    } else if (role !== 'ADMIN' && userCanManageInventory) {
+      // Gestor: solo sus familias de inventario
+      const assignments = await prisma.inventory_manager_families.findMany({
+        where: { managerId: userId },
+        select: { familyId: true },
+      })
+      allowedFamilyIds = assignments.map(a => a.familyId)
+    }
+    // SuperAdmin → allowedFamilyIds = null (sin restricción)
 
     // Parse query params
     const searchParams = request.nextUrl.searchParams
@@ -105,6 +135,7 @@ export async function GET(request: NextRequest) {
       status,
       startDate,
       endDate,
+      allowedFamilyIds: allowedFamilyIds ?? undefined,
     })
 
     return NextResponse.json(result)

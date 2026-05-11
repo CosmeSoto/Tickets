@@ -424,6 +424,8 @@ export async function listBatches(params: {
   status?: string
   startDate?: Date
   endDate?: Date
+  /** Si se pasa, filtra solo lotes cuyo tipo de equipo pertenece a esas familias */
+  allowedFamilyIds?: string[]
 }) {
   try {
     const {
@@ -435,6 +437,7 @@ export async function listBatches(params: {
       status,
       startDate,
       endDate,
+      allowedFamilyIds,
     } = params
 
     const where: Prisma.equipment_batchesWhereInput = {
@@ -442,12 +445,11 @@ export async function listBatches(params: {
       ...(supplierId && { supplierId }),
       ...(warehouseId && { warehouseId }),
       ...(status && { status }),
-      ...(startDate &&
-        endDate && {
-          purchaseDate: {
-            gte: startDate,
-            lte: endDate,
-          },
+      ...(startDate && endDate && { purchaseDate: { gte: startDate, lte: endDate } }),
+      // Filtro por familias permitidas — a través del modelo → tipo → familia
+      ...(allowedFamilyIds &&
+        allowedFamilyIds.length > 0 && {
+          model: { type: { familyId: { in: allowedFamilyIds } } },
         }),
     }
 

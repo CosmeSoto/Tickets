@@ -6,8 +6,9 @@ import { useEffect, Suspense, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { UnifiedInventoryList } from '@/components/inventory/unified-inventory-list'
+import { BatchesTab } from '@/components/inventory/dashboard/BatchesTab'
 import { Button } from '@/components/ui/button'
-import { Plus, Package, User, Upload } from 'lucide-react'
+import { Plus, Package, User, Upload, Layers } from 'lucide-react'
 import Link from 'next/link'
 import { EquipmentImportModal } from '@/components/inventory/equipment-import-modal'
 
@@ -26,6 +27,8 @@ function InventoryContent() {
   const isManager = canManageInventory
   const isClientOnly = isClient && !canManageInventory
   const isAdmin = role === 'ADMIN'
+  // Lotes visibles para ADMIN y gestores (no para clientes sin permisos)
+  const canSeeBatches = isAdmin || canManageInventory
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login')
@@ -86,19 +89,33 @@ function InventoryContent() {
           ) : undefined
         }
       >
-        {isManager && (
+        {/* Tabs: Inventario / Lotes / Mis Equipos — para ADMIN y gestores */}
+        {(isAdmin || isManager) && (
           <div className='flex gap-1 p-1 bg-muted rounded-lg w-fit mb-4'>
             <button
               onClick={() => setTab('family')}
               className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                tab !== 'mine'
+                tab !== 'mine' && tab !== 'batches'
                   ? 'bg-background shadow-sm text-foreground'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               <Package className='h-4 w-4' />
-              Inventario de Familias
+              Inventario
             </button>
+            {canSeeBatches && (
+              <button
+                onClick={() => setTab('batches')}
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  tab === 'batches'
+                    ? 'bg-background shadow-sm text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Layers className='h-4 w-4' />
+                Lotes
+              </button>
+            )}
             <button
               onClick={() => setTab('mine')}
               className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
@@ -112,11 +129,17 @@ function InventoryContent() {
             </button>
           </div>
         )}
-        <UnifiedInventoryList
-          initialFamilyId={tab !== 'mine' ? familyId : undefined}
-          personalOnly={tab === 'mine'}
-          showDashboard={tab !== 'mine'}
-        />
+
+        {/* Tab: Lotes — visible para ADMIN y gestores */}
+        {tab === 'batches' && canSeeBatches ? (
+          <BatchesTab canCreate={isAdmin || canManageInventory} />
+        ) : (
+          <UnifiedInventoryList
+            initialFamilyId={tab !== 'mine' ? familyId : undefined}
+            personalOnly={tab === 'mine'}
+            showDashboard={tab !== 'mine' && tab !== 'batches'}
+          />
+        )}
       </ModuleLayout>
 
       {isAdmin && (
