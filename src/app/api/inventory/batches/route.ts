@@ -13,6 +13,7 @@ import {
   listBatches,
   type CreateBatchInput,
 } from '@/lib/services/equipment-batches.service'
+import { canManageInventory } from '@/lib/inventory-access'
 import { invalidateCache } from '@/lib/api-cache'
 import { z } from 'zod'
 
@@ -158,7 +159,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check inventory access
-    const hasAccess = await canManageInventory(session.user.id)
+    const hasAccess = await canManageInventory(session.user.id, session.user.role)
     if (!hasAccess) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
     }

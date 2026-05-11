@@ -30,13 +30,13 @@ export const bulkEquipmentInputSchema = z
     // Common equipment data
     modelId: z.string().uuid('ID de modelo inválido'),
 
-    brand: z.string().min(1, 'La marca es requerida').max(100, 'La marca es muy larga'),
+    brand: z.string().max(100).optional().or(z.literal('')),
 
-    model: z.string().min(1, 'El modelo es requerido').max(100, 'El modelo es muy largo'),
+    model: z.string().max(100).optional().or(z.literal('')),
 
-    typeId: z.string().uuid('ID de tipo inválido'),
+    typeId: z.string().uuid('ID de tipo inválido').optional().or(z.literal('')),
 
-    departmentId: z.string().uuid('ID de departamento inválido'),
+    departmentId: z.string().uuid('ID de departamento inválido').optional().or(z.literal('')),
 
     condition: z.nativeEnum(EquipmentCondition, {
       errorMap: () => ({ message: 'Condición inválida' }),

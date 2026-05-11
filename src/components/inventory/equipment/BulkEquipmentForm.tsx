@@ -15,7 +15,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { Combobox, type ComboboxOption } from '@/components/ui/combobox'
 import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select'
 import { SimpleSelect } from '@/components/ui/simple-select'
 import { InlineCreateSelect } from '@/components/ui/inline-create-select'
@@ -35,13 +34,13 @@ import { useActiveDepartments } from '@/contexts/departments-context'
 import { FamilySelector } from '@/components/inventory/family-selector'
 import { SubtypeSelector } from '@/components/inventory/subtype-selector'
 import { useInventoryFamilies } from '@/contexts/families-context'
-import { CreationBreadcrumb } from '@/components/inventory/shared/CreationBreadcrumb'
 import { StepHeader } from '@/components/inventory/shared/StepHeader'
 import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
 import { BulkMROForm } from '@/components/inventory/equipment/BulkMROForm'
 import { AccessoriesSection } from '@/components/inventory/shared/AccessoriesSection'
 import { TypeAttributesInput } from '@/components/inventory/custom-fields/type-attributes-input'
 import { WarehouseInlineForm } from '@/components/inventory/asset-forms/WarehouseInlineForm'
+import { ModelSelector } from '@/components/inventory/models/ModelSelector'
 import {
   calculateDepreciation,
   familySupportsDepreciation,
@@ -61,13 +60,6 @@ export interface BulkEquipmentFormProps {
   onCancel?: () => void
   prefillData?: Partial<z.infer<typeof bulkEquipmentInputSchema>>
   defaultFamilyId?: string
-}
-
-interface EquipmentType {
-  id: string
-  code: string
-  name: string
-  family?: { id: string; name: string } | null
 }
 
 interface FamilyDepreciationConfig {
@@ -132,8 +124,6 @@ export function BulkEquipmentForm({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [successResult, setSuccessResult] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
-  const [equipmentTypes, setEquipmentTypes] = useState<EquipmentType[]>([])
-  const [loadingTypes, setLoadingTypes] = useState(false)
   const [warehouses, setWarehouses] = useState<
     { id: string; name: string; description?: string }[]
   >([])
@@ -150,6 +140,9 @@ export function BulkEquipmentForm({
     Array<{ fieldName: string; fieldValue: string }>
   >([])
   const [warehouseId, setWarehouseId] = useState('')
+  // Modelo seleccionado del catálogo
+  const [selectedModelId, setSelectedModelId] = useState('')
+  const [selectedModelData, setSelectedModelData] = useState<any>(null)
   // Depreciación
   const [depreciationMethod, setDepreciationMethod] = useState('LINEAR')
   const [usefulLifeYears, setUsefulLifeYears] = useState('')
@@ -317,19 +310,6 @@ export function BulkEquipmentForm({
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Cargar tipos de equipo filtrados por familia ───────────────────────────
-  useEffect(() => {
-    if (!selectedFamilyId) return
-    setLoadingTypes(true)
-    fetch('/api/admin/equipment-types')
-      .then(r => r.json())
-      .then((types: EquipmentType[]) =>
-        setEquipmentTypes(types.filter(t => t.family?.id === selectedFamilyId))
-      )
-      .catch(() => setEquipmentTypes([]))
-      .finally(() => setLoadingTypes(false))
-  }, [selectedFamilyId])
-
   // ── Cargar bodegas filtradas por familia ───────────────────────────────────
   useEffect(() => {
     if (!selectedFamilyId) return
@@ -370,6 +350,10 @@ export function BulkEquipmentForm({
 
   // ── Submit ─────────────────────────────────────────────────────────────────
   const onSubmit = async (data: any) => {
+    if (!selectedModelId) {
+      setError('Debes seleccionar un modelo del catálogo')
+      return
+    }
     setIsSubmitting(true)
     setError(null)
     try {
@@ -393,16 +377,16 @@ export function BulkEquipmentForm({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           // Identificación
-          modelId: data.modelId,
+          modelId: selectedModelId,
           quantity: data.quantity,
           codeMode: data.codeMode,
           manualCodes,
           serialNumbers,
           familyId: selectedFamilyId,
-          // Datos del equipo
-          brand: data.brand,
-          model: data.model,
-          typeId: data.typeId,
+          // Datos del equipo (del modelo seleccionado)
+          brand: selectedModelData?.brand || data.brand,
+          model: selectedModelData?.model || data.model,
+          typeId: selectedModelData?.type?.id || data.typeId,
           departmentId: data.departmentId || undefined,
           condition: data.condition,
           warehouseId: warehouseId || undefined,
@@ -698,52 +682,57 @@ export function BulkEquipmentForm({
           </p>
         </div>
 
-        {/* Marca / Modelo */}
-        <div className='grid grid-cols-2 gap-4'>
-          <div className='space-y-1.5'>
-            <Label htmlFor='brand'>
-              Marca <span className='text-destructive'>*</span>
-            </Label>
-            <Input id='brand' placeholder='Dell' {...register('brand')} />
-            {errors.brand && <p className='text-xs text-destructive'>{errors.brand.message}</p>}
-          </div>
-          <div className='space-y-1.5'>
-            <Label htmlFor='model'>
-              Modelo <span className='text-destructive'>*</span>
-            </Label>
-            <Input id='model' placeholder='Latitude 5420' {...register('model')} />
-            {errors.model && <p className='text-xs text-destructive'>{errors.model.message}</p>}
-          </div>
-        </div>
-
-        {/* Tipo de equipo — filtrado por familia */}
+        {/* Selector de modelo del catálogo */}
         <div className='space-y-1.5'>
           <Label>
-            Tipo de equipo <span className='text-destructive'>*</span>
+            Modelo del catálogo <span className='text-destructive'>*</span>
           </Label>
-          {loadingTypes ? (
-            <div className='flex items-center justify-center h-10 border rounded-md'>
-              <Loader2 className='h-4 w-4 animate-spin text-muted-foreground' />
-            </div>
-          ) : (
-            <Combobox
-              options={equipmentTypes.map((t): ComboboxOption => ({ value: t.id, label: t.name }))}
-              value={selectedTypeId || ''}
-              onValueChange={v => setValue('typeId', v, { shouldValidate: true })}
-              placeholder='Buscar tipo de equipo...'
-              searchPlaceholder='Escriba para buscar...'
-              emptyText='No se encontró el tipo'
-            />
+          <ModelSelector
+            value={selectedModelId}
+            onValueChange={(modelId, model) => {
+              setSelectedModelId(modelId)
+              setSelectedModelData(model)
+              if (model) {
+                setValue('brand', model.brand)
+                setValue('model', model.model)
+                setValue('typeId', model.type.id, { shouldValidate: true })
+                if (model.standardPrice && !purchasePrice) {
+                  setPurchasePrice(String(model.standardPrice))
+                }
+              }
+            }}
+            placeholder='Buscar por marca, modelo o SKU...'
+          />
+          {!selectedModelId && (
+            <p className='text-xs text-muted-foreground'>
+              Busca el modelo en el catálogo. Si no existe, créalo primero en{' '}
+              <a href='/inventory/models' className='text-primary hover:underline' target='_blank'>
+                Modelos
+              </a>
+              .
+            </p>
           )}
-          {errors.typeId && <p className='text-xs text-destructive'>{errors.typeId.message}</p>}
+          {selectedModelData && (
+            <div className='rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground'>
+              <span className='font-medium text-foreground'>
+                {selectedModelData.brand} {selectedModelData.model}
+              </span>
+              {selectedModelData.type && (
+                <span className='ml-2'>· {selectedModelData.type.name}</span>
+              )}
+              {selectedModelData.sku && (
+                <span className='ml-2'>· SKU: {selectedModelData.sku}</span>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Atributos dinámicos por tipo — igual que en activo individual */}
-        {selectedTypeId && (
+        {/* Atributos dinámicos por tipo — se activan al seleccionar modelo */}
+        {(selectedModelData?.type?.id || selectedTypeId) && (
           <div className='space-y-2'>
             <Label className='text-sm font-medium'>Atributos del Tipo</Label>
             <TypeAttributesInput
-              typeId={selectedTypeId}
+              typeId={selectedModelData?.type?.id || selectedTypeId}
               assetType='equipment'
               values={customFieldValues}
               onChange={setCustomFieldValues}
@@ -752,11 +741,11 @@ export function BulkEquipmentForm({
         )}
 
         {/* Stock indicator */}
-        {watch('brand') && watch('model') && selectedTypeId && (
+        {selectedModelId && selectedModelData && (
           <StockIndicatorBadge
-            brand={watch('brand')}
-            model={watch('model')}
-            typeId={selectedTypeId}
+            brand={selectedModelData.brand}
+            model={selectedModelData.model}
+            typeId={selectedModelData.type?.id || selectedTypeId || ''}
           />
         )}
 
@@ -1083,7 +1072,7 @@ export function BulkEquipmentForm({
         )}
         <Button
           type='submit'
-          disabled={isSubmitting || !manualCodesValid || !serialNumbersValid}
+          disabled={isSubmitting || !manualCodesValid || !serialNumbersValid || !selectedModelId}
           className='flex-1'
         >
           {isSubmitting ? (
