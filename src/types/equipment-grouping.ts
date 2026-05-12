@@ -109,10 +109,12 @@ export interface BulkEquipmentInput {
 
   // Common equipment data
   modelId: string // NUEVO: Referencia al modelo
-  brand: string // DEPRECATED: Mantener por compatibilidad
-  model: string // DEPRECATED: Mantener por compatibilidad
-  typeId: string
-  departmentId: string
+  /** DEPRECATED: se rellenan desde el modelo si faltan */
+  brand?: string
+  /** DEPRECATED: columna legacy `model` en BD (`model_old`) */
+  model?: string
+  typeId?: string
+  departmentId?: string
   condition: EquipmentCondition
   ownershipType: OwnershipType
   purchasePrice?: number

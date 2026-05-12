@@ -152,6 +152,8 @@ export function EquipmentList({
               MAINTENANCE: 'Mantenimiento',
               DAMAGED: 'Dañado',
               RETIRED: 'Retirado',
+              FOR_SALE: 'En venta',
+              SOLD: 'Vendido',
             }) as Record<string, string>
           )[v] ?? v,
       },
@@ -298,10 +300,20 @@ export function EquipmentList({
       {enableBulkActions && (
         <BulkActionsToolbar
           selectedCount={selection.getSelectedCount()}
+          selectedEquipment={equipment
+            .filter(e => selection.getSelectedIds().includes(e.id))
+            .map(e => ({
+              id: e.id,
+              code: e.code,
+              serialNumber: e.serialNumber,
+              brand: e.brand,
+              model: e.model,
+            }))}
           onForSale={handleBulkForSale}
           onMaintenance={handleBulkMaintenance}
           onDecommission={handleBulkDecommission}
           onClearSelection={selection.deselectAll}
+          onSuccess={loadEquipment}
         />
       )}
     </div>

@@ -9,8 +9,9 @@ import { ZodError } from 'zod'
  * GET /api/inventory/asset-requests/[id]
  * Obtiene el detalle completo de una solicitud
  */
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id: requestId } = await params
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
@@ -24,8 +25,6 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
         { status: 403 }
       )
     }
-
-    const requestId = params.id
 
     // Obtener detalle (el servicio verifica acceso automáticamente)
     const detail = await AssetRequestService.getRequestDetail(
@@ -53,8 +52,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
  * PATCH /api/inventory/asset-requests/[id]
  * Cambia el estado de una solicitud (endpoint unificado para todas las transiciones)
  */
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id: requestId } = await params
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
@@ -68,8 +68,6 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         { status: 403 }
       )
     }
-
-    const requestId = params.id
 
     // Parsear y validar body
     const body = await request.json()

@@ -9,8 +9,9 @@ import { ZodError } from 'zod'
  * POST /api/inventory/asset-requests/[id]/comments
  * Agrega un comentario interno a una solicitud
  */
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id: requestId } = await params
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
@@ -24,8 +25,6 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         { status: 403 }
       )
     }
-
-    const requestId = params.id
 
     // Parsear y validar body
     const body = await request.json()

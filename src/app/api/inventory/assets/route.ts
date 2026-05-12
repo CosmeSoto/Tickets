@@ -46,12 +46,17 @@ export async function GET(req: NextRequest) {
   if (personalOnly) {
     const items = await prisma.equipment.findMany({
       where: { id: { in: personalEquipmentIds } },
-      include: { type: { include: { family: true } } },
+      include: {
+        type: { include: { family: true } },
+        model: { select: { brand: true, model: true } },
+      },
       orderBy: { createdAt: 'desc' },
     })
     const mapped = items.map(item => ({
       id: item.id,
-      name: `${item.brand} ${item.model}`,
+      name: item.model
+        ? `${item.model.brand} ${item.model.model}`
+        : `${item.brand} ${item.model_old}`,
       subtype: 'EQUIPMENT' as const,
       familyId: item.type?.familyId ?? '',
       family: {
@@ -152,7 +157,10 @@ export async function GET(req: NextRequest) {
       ? Promise.resolve([])
       : prisma.equipment.findMany({
           where: buildEquipmentWhere(),
-          include: { type: { include: { family: true } } },
+          include: {
+            type: { include: { family: true } },
+            model: { select: { brand: true, model: true } },
+          },
           orderBy: { createdAt: 'desc' },
           take: dbLimit,
         }),
@@ -197,7 +205,9 @@ export async function GET(req: NextRequest) {
 
   const mappedEquipment: UnifiedAsset[] = equipmentItems.map(item => ({
     id: item.id,
-    name: `${item.brand} ${item.model}`,
+    name: item.model
+      ? `${item.model.brand} ${item.model.model}`
+      : `${item.brand} ${item.model_old}`,
     subtype: 'EQUIPMENT' as const,
     familyId: item.type.familyId ?? '',
     family: {

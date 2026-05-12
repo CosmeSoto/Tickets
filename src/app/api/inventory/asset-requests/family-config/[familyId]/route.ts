@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -9,19 +10,21 @@ import { ZodError } from 'zod'
 
 /**
  * GET /api/inventory/asset-requests/family-config/[familyId]
- * Obtiene la configuración del módulo para una familia
+ * Obtiene la configuraci?n del m?dulo para una familia
  */
-export async function GET(request: NextRequest, { params }: { params: { familyId: string } }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ familyId: string }> }
+) {
   try {
+    const { familyId } = await params
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    const familyId = params.familyId
-
-    // Leer configuración desde system_settings
+    // Leer configuraci?n desde system_settings
     const enabled = await getSetting(
       `asset_requests_enabled_${familyId}`,
       600, // TTL 10 min
@@ -34,32 +37,34 @@ export async function GET(request: NextRequest, { params }: { params: { familyId
     })
   } catch (error) {
     console.error('[API] Error getting family config:', error)
-    return NextResponse.json({ error: 'Error al obtener la configuración' }, { status: 500 })
+    return NextResponse.json({ error: 'Error al obtener la configuraci?n' }, { status: 500 })
   }
 }
 
 /**
  * PUT /api/inventory/asset-requests/family-config/[familyId]
- * Actualiza la configuración del módulo para una familia
- * Solo Super Admin puede modificar esta configuración
+ * Actualiza la configuraci?n del m?dulo para una familia
+ * Solo Super Admin puede modificar esta configuraci?n
  */
-export async function PUT(request: NextRequest, { params }: { params: { familyId: string } }) {
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ familyId: string }> }
+) {
   try {
+    const { familyId } = await params
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    // Solo Super Admin puede modificar la configuración
+    // Solo Super Admin puede modificar la configuraci?n
     if (session.user.role !== 'ADMIN' || !session.user.isSuperAdmin) {
       return NextResponse.json(
-        { error: 'Solo el Super Admin puede modificar esta configuración' },
+        { error: 'Solo el Super Admin puede modificar esta configuraci?n' },
         { status: 403 }
       )
     }
-
-    const familyId = params.familyId
 
     // Parsear y validar body
     const body = await request.json()
@@ -83,12 +88,14 @@ export async function PUT(request: NextRequest, { params }: { params: { familyId
         updatedAt: new Date(),
       },
       create: {
+        id: randomUUID(),
         key: `asset_requests_enabled_${familyId}`,
         value: validatedData.assetRequestsEnabled ? 'true' : 'false',
+        updatedAt: new Date(),
       },
     })
 
-    // Invalidar caché de configuración
+    // Invalidar cach? de configuraci?n
     await invalidateSettings(`asset_requests_enabled_${familyId}`)
 
     // Registrar en audit_logs
@@ -115,7 +122,7 @@ export async function PUT(request: NextRequest, { params }: { params: { familyId
   } catch (error) {
     console.error('[API] Error updating family config:', error)
 
-    // Errores de validación Zod
+    // Errores de validaci?n Zod
     if (error instanceof ZodError) {
       return NextResponse.json(
         {
@@ -126,6 +133,6 @@ export async function PUT(request: NextRequest, { params }: { params: { familyId
       )
     }
 
-    return NextResponse.json({ error: 'Error al actualizar la configuración' }, { status: 500 })
+    return NextResponse.json({ error: 'Error al actualizar la configuraci?n' }, { status: 500 })
   }
 }

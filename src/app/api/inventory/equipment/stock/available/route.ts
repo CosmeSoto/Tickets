@@ -11,10 +11,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { createModuleCache } from '@/lib/api-cache'
-
-// Cache con TTL 30s - balance entre frescura y rendimiento
-const cache = createModuleCache('equipment-stock-available', 30)
+import { withCache, buildCacheKey } from '@/lib/api-cache'
 
 /**
  * GET /api/inventory/equipment/stock/available?typeId={typeId}
@@ -46,17 +43,18 @@ export async function GET(request: NextRequest) {
     }
 
     // Usar caché para reducir consultas repetidas
-    return cache.get({ key: `available:${typeId}` }, async () => {
-      // Contar equipos disponibles del tipo especificado
+    const cacheKey = buildCacheKey('equipment-stock-available', { typeId })
+    const { available } = await withCache(cacheKey, 30, async () => {
       const available = await prisma.equipment.count({
         where: {
           typeId,
           status: 'AVAILABLE',
         },
       })
-
-      return NextResponse.json({ available })
+      return { available }
     })
+
+    return NextResponse.json({ available })
   } catch (error) {
     console.error('[API] Error fetching available stock:', error)
     return NextResponse.json({ error: 'Error al consultar stock disponible' }, { status: 500 })

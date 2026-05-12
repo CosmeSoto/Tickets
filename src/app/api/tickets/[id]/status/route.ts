@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma'
 import { NotificationService } from '@/lib/services/notification-service'
 import { randomUUID } from 'crypto'
 import { invalidateCache } from '@/lib/api-cache'
+import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 
 // Transiciones válidas por rol
 const TRANSITIONS: Record<string, Record<string, string[]>> = {
@@ -51,51 +52,67 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     const role = session.user.role
+    const isSuperAdmin = (session.user as any).isSuperAdmin ?? false
     const currentStatus = ticket.status
 
-    // Verificar permisos de transición
-    if (role === 'CLIENT') {
-      return NextResponse.json(
-        { success: false, message: 'Los clientes no pueden cambiar el estado del ticket' },
-        { status: 403 }
-      )
-    }
+    // SUPER ADMIN: NO TIENE RESTRICCIONES DE NINGÚN TIPO
+    if (isSuperAdmin) {
+      // Permitir cualquier cambio de estado sin validaciones adicionales
+    } else {
+      // Verificar permisos de transición para roles normales
+      if (role === 'CLIENT') {
+        return NextResponse.json(
+          { success: false, message: 'Los clientes no pueden cambiar el estado del ticket' },
+          { status: 403 }
+        )
+      }
 
-    // Colaboradores: pueden cambiar a IN_PROGRESS/ON_HOLD pero NO cerrar ni resolver
-    if (role === 'TECHNICIAN' && ticket.assigneeId !== session.user.id) {
-      // Si el ticket no tiene assignee, el técnico puede tomarlo (auto-asignarse al cambiar a IN_PROGRESS)
-      if (ticket.assigneeId === null && newStatus === 'IN_PROGRESS') {
-        // Permitir: el técnico se auto-asigna al tomar el ticket
-      } else {
-        const isCollaborator = await prisma.ticket_collaborators.findUnique({
-          where: { ticketId_collaboratorId: { ticketId, collaboratorId: session.user.id } },
-        })
-        if (!isCollaborator) {
-          return NextResponse.json(
-            { success: false, message: 'No tienes permiso para cambiar el estado de este ticket' },
-            { status: 403 }
-          )
-        }
-        // Colaborador: solo puede poner en progreso o en espera, no resolver ni cerrar
-        const collaboratorAllowed = ['IN_PROGRESS', 'ON_HOLD']
-        if (!collaboratorAllowed.includes(newStatus)) {
-          return NextResponse.json(
-            { success: false, message: 'Los colaboradores no pueden resolver ni cerrar tickets' },
-            { status: 403 }
-          )
+      // Colaboradores: pueden cambiar a IN_PROGRESS/ON_HOLD pero NO cerrar ni resolver
+      if (role === 'TECHNICIAN' && ticket.assigneeId !== session.user.id) {
+        // Si el ticket no tiene assignee, el técnico puede tomarlo (auto-asignarse al cambiar a IN_PROGRESS)
+        if (ticket.assigneeId === null && newStatus === 'IN_PROGRESS') {
+          // Permitir: el técnico se auto-asigna al tomar el ticket
+        } else {
+          const isCollaborator = await prisma.ticket_collaborators.findUnique({
+            where: { ticketId_collaboratorId: { ticketId, collaboratorId: session.user.id } },
+          })
+          if (!isCollaborator) {
+            return NextResponse.json(
+              {
+                success: false,
+                message: 'No tienes permiso para cambiar el estado de este ticket',
+              },
+              { status: 403 }
+            )
+          }
+          // Colaborador: solo puede poner en progreso o en espera, no resolver ni cerrar
+          const collaboratorAllowed = ['IN_PROGRESS', 'ON_HOLD']
+          if (!collaboratorAllowed.includes(newStatus)) {
+            return NextResponse.json(
+              { success: false, message: 'Los colaboradores no pueden resolver ni cerrar tickets' },
+              { status: 403 }
+            )
+          }
         }
       }
-    }
 
-    const allowed = TRANSITIONS[role]?.[currentStatus] ?? []
-    if (!allowed.includes(newStatus)) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: `Transición no permitida: ${currentStatus} → ${newStatus}`,
-        },
-        { status: 400 }
-      )
+      // Si es admin, permitir todas las transiciones según TRANSITIONS[ADMIN]
+      let allowed: string[]
+      if (role === 'ADMIN') {
+        allowed = TRANSITIONS['ADMIN']?.[currentStatus] ?? []
+      } else {
+        allowed = TRANSITIONS[role]?.[currentStatus] ?? []
+      }
+
+      if (!allowed.includes(newStatus)) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Transición no permitida: ${currentStatus} → ${newStatus}`,
+          },
+          { status: 400 }
+        )
+      }
     }
 
     // Construir datos de actualización
@@ -136,24 +153,49 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       },
     })
 
-    // Notificar al cliente cuando el técnico marca como RESOLVED
+    // AUDITORÍA COMPLETA: Registrar cambio de estado (para SUPER ADMIN y demás roles)
+    await AuditServiceComplete.log({
+      action: AuditActionsComplete.TICKET_STATUS_CHANGED,
+      entityType: 'ticket',
+      entityId: ticketId,
+      userId: session.user.id,
+      details: {
+        ticketTitle: ticket.title,
+        userName: session.user.name,
+        userRole: session.user.role,
+        isSuperAdmin: isSuperAdmin,
+      },
+      oldValues: { status: currentStatus },
+      newValues: { status: newStatus },
+      request: request,
+    }).catch(err => console.error('[AUDIT] Error registrando cambio de estado:', err))
+
+    // Notificar al cliente cuando el técnico o SUPER ADMIN marca como RESOLVED
     if (newStatus === 'RESOLVED' && ticket.clientId) {
       await NotificationService.notifyTicketResolved(ticketId).catch(() => {})
     }
 
-    // Notificar al técnico cuando admin cierra el ticket directamente
-    if (newStatus === 'CLOSED' && ticket.assigneeId && session.user.role === 'ADMIN') {
+    // Notificar al técnico cuando ADMIN o SUPER ADMIN cierra el ticket directamente
+    if (
+      newStatus === 'CLOSED' &&
+      ticket.assigneeId &&
+      (session.user.role === 'ADMIN' || isSuperAdmin)
+    ) {
       await NotificationService.push({
         userId: ticket.assigneeId,
         type: 'INFO',
         title: 'Ticket cerrado',
-        message: `El ticket "${ticket.title}" ha sido cerrado por el administrador`,
+        message: `El ticket "${ticket.title}" ha sido cerrado por ${isSuperAdmin ? 'el Super Admin' : 'el administrador'}`,
         ticketId,
       }).catch(() => {})
     }
 
-    // Notificar al cliente cuando admin cierra directamente (sin calificación)
-    if (newStatus === 'CLOSED' && ticket.clientId && session.user.role === 'ADMIN') {
+    // Notificar al cliente cuando ADMIN o SUPER ADMIN cierra directamente (sin calificación)
+    if (
+      newStatus === 'CLOSED' &&
+      ticket.clientId &&
+      (session.user.role === 'ADMIN' || isSuperAdmin)
+    ) {
       await NotificationService.push({
         userId: ticket.clientId,
         type: 'SUCCESS',

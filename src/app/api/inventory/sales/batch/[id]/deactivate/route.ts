@@ -7,8 +7,9 @@ import { SalesManagerService } from '@/lib/services/sales-manager.service'
  * POST /api/inventory/sales/batch/[id]/deactivate
  * Desactiva lote completo de venta
  */
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
 
     const result = await SalesManagerService.deactivateBatchFromSale({
-      batchId: params.id,
+      batchId: id,
       reason,
       userId: session.user.id,
     })

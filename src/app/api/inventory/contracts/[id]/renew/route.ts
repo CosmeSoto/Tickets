@@ -7,8 +7,9 @@ import { ContractService } from '@/lib/services/contract-service'
  * POST /api/inventory/contracts/[id]/renew
  * Renueva un contrato existente creando uno nuevo vinculado
  */
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     // Renovar contrato
     const renewedContract = await ContractService.renewContract({
-      contractId: params.id,
+      contractId: id,
       newStartDate: startDate,
       newEndDate: endDate,
       updateTerms,

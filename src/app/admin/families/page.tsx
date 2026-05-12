@@ -292,15 +292,15 @@ export default function FamiliesPage() {
               Familias ({filteredFamilies.length}
               {filteredFamilies.length !== families.length ? ` de ${families.length}` : ''})
             </CardTitle>
-            <div className='flex items-center gap-2 flex-wrap'>
+            <div className='flex items-center gap-2 flex-wrap w-full sm:w-auto min-w-0'>
               {/* Search */}
-              <div className='relative'>
+              <div className='relative flex-1 min-w-0 sm:flex-initial sm:w-52'>
                 <Search className='absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground' />
                 <Input
                   placeholder='Buscar por nombre o código...'
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  className='pl-8 h-8 w-52 text-sm'
+                  className='pl-8 h-8 w-full text-sm'
                 />
                 {search && (
                   <button
@@ -329,182 +329,184 @@ export default function FamiliesPage() {
           </div>
         </CardHeader>
         <CardContent className='p-0'>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <SortableTableHead
-                  sortKey='name'
-                  currentSort={getSortIcon('name')}
-                  onSort={requestSort}
-                >
-                  Familia
-                </SortableTableHead>
-                <SortableTableHead
-                  sortKey='isActive'
-                  currentSort={getSortIcon('isActive')}
-                  onSort={requestSort}
-                >
-                  Estado
-                </SortableTableHead>
-                <TableHead className='text-center'>Depts</TableHead>
-                <TableHead className='text-center'>Tickets</TableHead>
-                <TableHead className='text-center'>Inventario</TableHead>
-                <TableHead className='text-center'>Técnicos</TableHead>
-                <TableHead className='text-center'>Managers</TableHead>
-                <TableHead className='text-right'>Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {families.length === 0 && !loading ? (
+          <div className='overflow-x-auto -mx-px'>
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={8} className='text-center py-12 text-muted-foreground'>
-                    <Layers className='h-10 w-10 mx-auto mb-3 opacity-30' />
-                    <p>No hay familias registradas</p>
-                    <Button className='mt-3' onClick={openCreateDialog}>
-                      <Plus className='h-4 w-4 mr-2' />
-                      Crear primera familia
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ) : filteredFamilies.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className='text-center py-12 text-muted-foreground'>
-                    <Search className='h-8 w-8 mx-auto mb-2 opacity-30' />
-                    <p className='text-sm'>Sin resultados para la búsqueda</p>
-                    <Button
-                      variant='ghost'
-                      size='sm'
-                      className='mt-2'
-                      onClick={() => {
-                        setSearch('')
-                        setFilterStatus('all')
-                      }}
-                    >
-                      Limpiar filtros
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                sortedFamilies.map(family => (
-                  <TableRow
-                    key={family.id}
-                    className='cursor-pointer hover:bg-muted/50'
-                    onClick={() => router.push(`/admin/families/${family.id}`)}
+                  <SortableTableHead
+                    sortKey='name'
+                    currentSort={getSortIcon('name')}
+                    onSort={requestSort}
                   >
-                    <TableCell>
-                      <div className='flex items-center gap-3'>
-                        <div
-                          className='w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0'
-                          style={{ backgroundColor: family.color || '#6B7280' }}
-                        >
-                          <FamilyIcon
-                            icon={family.icon}
-                            color={family.color}
-                            code={family.code}
-                            className='w-4 h-4'
-                          />
-                        </div>
-                        <div>
-                          <p className='font-medium'>{family.name}</p>
-                          <Badge variant='outline' className='text-xs mt-0.5'>
-                            {family.code}
-                          </Badge>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={family.isActive ? 'default' : 'secondary'}>
-                        {family.isActive ? 'Activo' : 'Inactivo'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className='text-center'>
-                      <div className='flex items-center justify-center gap-1 text-sm'>
-                        <Building className='h-3.5 w-3.5 text-muted-foreground' />
-                        {family._count?.departments ?? 0}
-                      </div>
-                    </TableCell>
-                    <TableCell className='text-center'>
-                      <Badge
-                        variant={
-                          family.ticketFamilyConfig?.ticketsEnabled ? 'default' : 'secondary'
-                        }
-                        className='text-xs'
-                      >
-                        <Ticket className='h-3 w-3 mr-1' />
-                        {family.ticketFamilyConfig?.ticketsEnabled ? 'Sí' : 'No'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className='text-center'>
-                      <Badge variant='outline' className='text-xs'>
-                        <Package className='h-3 w-3 mr-1' />
-                        {family.formConfig?.inventoryEnabled !== false ? 'Sí' : 'No'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className='text-center'>
-                      <div className='flex items-center justify-center gap-1 text-sm'>
-                        <Users className='h-3.5 w-3.5 text-muted-foreground' />
-                        {family._count?.technicianFamilyAssignments ?? 0}
-                      </div>
-                    </TableCell>
-                    <TableCell className='text-center'>
-                      <div className='flex items-center justify-center gap-1 text-sm'>
-                        <Users className='h-3.5 w-3.5 text-muted-foreground' />
-                        {family._count?.managerFamilies ?? 0}
-                      </div>
-                    </TableCell>
-                    <TableCell className='text-right'>
-                      <div
-                        className='flex items-center justify-end gap-1'
-                        onClick={e => e.stopPropagation()}
-                      >
-                        <Button
-                          variant='ghost'
-                          size='sm'
-                          className='h-8 w-8 p-0'
-                          onClick={() => openEditDialog(family)}
-                          title='Editar familia'
-                        >
-                          <Edit className='h-4 w-4' />
-                        </Button>
-                        <Button
-                          variant='ghost'
-                          size='sm'
-                          className='h-8 w-8 p-0'
-                          onClick={() => handleToggleActive(family)}
-                          disabled={toggling === family.id}
-                          title={family.isActive ? 'Desactivar' : 'Activar'}
-                        >
-                          {family.isActive ? (
-                            <ToggleRight className='h-4 w-4 text-primary' />
-                          ) : (
-                            <ToggleLeft className='h-4 w-4 text-muted-foreground' />
-                          )}
-                        </Button>
-                        <Button
-                          variant='ghost'
-                          size='sm'
-                          className='h-8 w-8 p-0 text-destructive hover:text-destructive'
-                          onClick={() => openDeleteDialog(family)}
-                          title='Eliminar familia'
-                        >
-                          <Trash2 className='h-4 w-4' />
-                        </Button>
-                        <Button
-                          variant='ghost'
-                          size='sm'
-                          className='h-8 w-8 p-0'
-                          onClick={() => router.push(`/admin/families/${family.id}`)}
-                          title='Ver detalle'
-                        >
-                          <ChevronRight className='h-4 w-4' />
-                        </Button>
-                      </div>
+                    Familia
+                  </SortableTableHead>
+                  <SortableTableHead
+                    sortKey='isActive'
+                    currentSort={getSortIcon('isActive')}
+                    onSort={requestSort}
+                  >
+                    Estado
+                  </SortableTableHead>
+                  <TableHead className='text-center'>Depts</TableHead>
+                  <TableHead className='text-center'>Tickets</TableHead>
+                  <TableHead className='text-center'>Inventario</TableHead>
+                  <TableHead className='text-center'>Técnicos</TableHead>
+                  <TableHead className='text-center'>Managers</TableHead>
+                  <TableHead className='text-right'>Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {families.length === 0 && !loading ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className='text-center py-12 text-muted-foreground'>
+                      <Layers className='h-10 w-10 mx-auto mb-3 opacity-30' />
+                      <p>No hay familias registradas</p>
+                      <Button className='mt-3' onClick={openCreateDialog}>
+                        <Plus className='h-4 w-4 mr-2' />
+                        Crear primera familia
+                      </Button>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : filteredFamilies.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className='text-center py-12 text-muted-foreground'>
+                      <Search className='h-8 w-8 mx-auto mb-2 opacity-30' />
+                      <p className='text-sm'>Sin resultados para la búsqueda</p>
+                      <Button
+                        variant='ghost'
+                        size='sm'
+                        className='mt-2'
+                        onClick={() => {
+                          setSearch('')
+                          setFilterStatus('all')
+                        }}
+                      >
+                        Limpiar filtros
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  sortedFamilies.map(family => (
+                    <TableRow
+                      key={family.id}
+                      className='cursor-pointer hover:bg-muted/50'
+                      onClick={() => router.push(`/admin/families/${family.id}`)}
+                    >
+                      <TableCell>
+                        <div className='flex items-center gap-3'>
+                          <div
+                            className='w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0'
+                            style={{ backgroundColor: family.color || '#6B7280' }}
+                          >
+                            <FamilyIcon
+                              icon={family.icon}
+                              color={family.color}
+                              code={family.code}
+                              className='w-4 h-4'
+                            />
+                          </div>
+                          <div>
+                            <p className='font-medium'>{family.name}</p>
+                            <Badge variant='outline' className='text-xs mt-0.5'>
+                              {family.code}
+                            </Badge>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={family.isActive ? 'default' : 'secondary'}>
+                          {family.isActive ? 'Activo' : 'Inactivo'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className='text-center'>
+                        <div className='flex items-center justify-center gap-1 text-sm'>
+                          <Building className='h-3.5 w-3.5 text-muted-foreground' />
+                          {family._count?.departments ?? 0}
+                        </div>
+                      </TableCell>
+                      <TableCell className='text-center'>
+                        <Badge
+                          variant={
+                            family.ticketFamilyConfig?.ticketsEnabled ? 'default' : 'secondary'
+                          }
+                          className='text-xs'
+                        >
+                          <Ticket className='h-3 w-3 mr-1' />
+                          {family.ticketFamilyConfig?.ticketsEnabled ? 'Sí' : 'No'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className='text-center'>
+                        <Badge variant='outline' className='text-xs'>
+                          <Package className='h-3 w-3 mr-1' />
+                          {family.formConfig?.inventoryEnabled !== false ? 'Sí' : 'No'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className='text-center'>
+                        <div className='flex items-center justify-center gap-1 text-sm'>
+                          <Users className='h-3.5 w-3.5 text-muted-foreground' />
+                          {family._count?.technicianFamilyAssignments ?? 0}
+                        </div>
+                      </TableCell>
+                      <TableCell className='text-center'>
+                        <div className='flex items-center justify-center gap-1 text-sm'>
+                          <Users className='h-3.5 w-3.5 text-muted-foreground' />
+                          {family._count?.managerFamilies ?? 0}
+                        </div>
+                      </TableCell>
+                      <TableCell className='text-right'>
+                        <div
+                          className='flex items-center justify-end gap-1'
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <Button
+                            variant='ghost'
+                            size='sm'
+                            className='h-10 w-10 sm:h-8 sm:w-8 p-0 touch-manipulation'
+                            onClick={() => openEditDialog(family)}
+                            title='Editar familia'
+                          >
+                            <Edit className='h-4 w-4' />
+                          </Button>
+                          <Button
+                            variant='ghost'
+                            size='sm'
+                            className='h-10 w-10 sm:h-8 sm:w-8 p-0 touch-manipulation'
+                            onClick={() => handleToggleActive(family)}
+                            disabled={toggling === family.id}
+                            title={family.isActive ? 'Desactivar' : 'Activar'}
+                          >
+                            {family.isActive ? (
+                              <ToggleRight className='h-4 w-4 text-primary' />
+                            ) : (
+                              <ToggleLeft className='h-4 w-4 text-muted-foreground' />
+                            )}
+                          </Button>
+                          <Button
+                            variant='ghost'
+                            size='sm'
+                            className='h-10 w-10 sm:h-8 sm:w-8 p-0 text-destructive hover:text-destructive touch-manipulation'
+                            onClick={() => openDeleteDialog(family)}
+                            title='Eliminar familia'
+                          >
+                            <Trash2 className='h-4 w-4' />
+                          </Button>
+                          <Button
+                            variant='ghost'
+                            size='sm'
+                            className='h-10 w-10 sm:h-8 sm:w-8 p-0 touch-manipulation'
+                            onClick={() => router.push(`/admin/families/${family.id}`)}
+                            title='Ver detalle'
+                          >
+                            <ChevronRight className='h-4 w-4' />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 

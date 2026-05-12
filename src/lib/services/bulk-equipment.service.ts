@@ -48,9 +48,25 @@ export async function createBulkEquipment(input: BulkEquipmentInput): Promise<Bu
   // 1. Validar input con Zod
   const validatedInput = bulkEquipmentInputSchema.parse(input)
 
+  const equipmentModel = await prisma.equipment_models.findUnique({
+    where: { id: validatedInput.modelId },
+    select: { brand: true, model: true, typeId: true },
+  })
+
+  if (!equipmentModel) {
+    throw new Error('Modelo de equipo no encontrado')
+  }
+
+  const resolvedTypeId =
+    validatedInput.typeId && validatedInput.typeId !== ''
+      ? validatedInput.typeId
+      : equipmentModel.typeId
+  const brand = (validatedInput.brand?.trim() || equipmentModel.brand).trim()
+  const modelOld = (validatedInput.model?.trim() || equipmentModel.model).trim()
+
   // 2. Obtener información del tipo de equipo para generar códigos
   const equipmentType = await prisma.equipment_types.findUnique({
-    where: { id: validatedInput.typeId },
+    where: { id: resolvedTypeId },
     include: {
       family: true,
     },
@@ -103,8 +119,11 @@ export async function createBulkEquipment(input: BulkEquipmentInput): Promise<Bu
         code,
         serialNumber: hasSerialNumbers ? serialNumbers[index] : '',
         modelId: validatedInput.modelId,
-        typeId: validatedInput.typeId,
-        departmentId: validatedInput.departmentId,
+        typeId: resolvedTypeId,
+        departmentId:
+          validatedInput.departmentId && validatedInput.departmentId !== ''
+            ? validatedInput.departmentId
+            : null,
         status: EquipmentStatus.AVAILABLE,
         condition: validatedInput.condition,
         ownershipType: validatedInput.ownershipType,
@@ -120,8 +139,8 @@ export async function createBulkEquipment(input: BulkEquipmentInput): Promise<Bu
         physicalLocation: null,
         saleListingPrice: null,
         // Campos deprecated (mantener por compatibilidad)
-        brand: validatedInput.brand,
-        model: validatedInput.model,
+        brand,
+        model_old: modelOld,
       }))
 
       // Crear todos los equipos
@@ -150,7 +169,7 @@ export async function createBulkEquipment(input: BulkEquipmentInput): Promise<Bu
       code: eq.code,
       serialNumber: eq.serialNumber,
       brand: eq.brand,
-      model: eq.model,
+      model: eq.model_old,
       status: eq.status,
       condition: eq.condition,
       createdAt: eq.createdAt,
@@ -232,9 +251,8 @@ export async function getStockInfo(brand: string, model: string, typeId: string)
   try {
     const equipment = await prisma.equipment.findMany({
       where: {
-        brand,
-        model,
         typeId,
+        OR: [{ model: { brand, model } }, { AND: [{ brand }, { model_old: model }] }],
       },
       select: {
         status: true,

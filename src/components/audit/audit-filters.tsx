@@ -150,16 +150,33 @@ export function AuditFiltersComponent({
           {/* Exportar y Acciones */}
           <div className='space-y-2 lg:col-span-2'>
             <label className='text-sm font-medium'>Exportar y Acciones</label>
-            <div className='grid grid-cols-3 gap-2'>
-              <Button onClick={onExportCSV} variant='outline' size='sm' disabled={loading}>
+            <div className='flex flex-wrap gap-2'>
+              <Button
+                onClick={onExportCSV}
+                variant='outline'
+                size='sm'
+                disabled={loading}
+                className='min-h-9 flex-1 min-w-[calc(50%-0.25rem)] sm:min-w-0 sm:flex-initial'
+              >
                 <Download className='h-4 w-4 mr-1' />
                 CSV
               </Button>
-              <Button onClick={onExportJSON} variant='outline' size='sm' disabled={loading}>
+              <Button
+                onClick={onExportJSON}
+                variant='outline'
+                size='sm'
+                disabled={loading}
+                className='min-h-9 flex-1 min-w-[calc(50%-0.25rem)] sm:min-w-0 sm:flex-initial'
+              >
                 <Download className='h-4 w-4 mr-1' />
                 JSON
               </Button>
-              <Button onClick={onClearFilters} variant='outline' size='sm'>
+              <Button
+                onClick={onClearFilters}
+                variant='outline'
+                size='sm'
+                className='min-h-9 w-full sm:w-auto'
+              >
                 Limpiar
               </Button>
             </div>
@@ -170,7 +187,7 @@ export function AuditFiltersComponent({
         {/* Información de filtros activos */}
         {hasActiveFilters && (
           <div className='mt-4 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg'>
-            <div className='text-sm text-blue-800 dark:text-blue-200'>
+            <div className='text-sm text-blue-800 dark:text-blue-200 break-words'>
               <strong>Filtros activos:</strong>
               {filters.search && ` Búsqueda: "${filters.search}"`}
               {filters.entityType !== 'all' && ` | Módulo: ${filters.entityType}`}

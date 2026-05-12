@@ -12,10 +12,23 @@ import { z } from 'zod'
 
 const supplierTypeSchema = z.object({
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(100),
+  /** Código único; si se omite se genera a partir del nombre */
+  code: z.string().min(1).max(50).optional(),
   description: z.string().optional(),
   familyId: z.string().uuid('ID de familia inválido').optional().nullable(),
   isActive: z.boolean().default(true),
 })
+
+function supplierTypeCodeFromName(name: string): string {
+  const base = name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .toUpperCase()
+    .slice(0, 40)
+  return base || 'SUPPLIER_TYPE'
+}
 
 /**
  * GET - Obtener todos los tipos de proveedor
@@ -135,9 +148,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    let code = (
+      validation.data.code?.trim() || supplierTypeCodeFromName(validation.data.name)
+    ).slice(0, 50)
+    let suffix = 0
+    while (await prisma.supplier_types.findUnique({ where: { code } })) {
+      suffix++
+      code = `${supplierTypeCodeFromName(validation.data.name).slice(0, 40)}_${suffix}`.slice(0, 50)
+    }
+
     // Crear tipo de proveedor
     const supplierType = await prisma.supplier_types.create({
       data: {
+        code,
         name: validation.data.name,
         description: validation.data.description || null,
         familyId: validation.data.familyId || null,

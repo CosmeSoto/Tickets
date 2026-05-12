@@ -14,8 +14,9 @@ import { withCache, buildCacheKey } from '@/lib/api-cache'
  * GET /api/inventory/models/[id]/stock
  * Get equipment model with stock information (cached)
  */
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
@@ -23,16 +24,16 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     }
 
     // Check inventory access
-    const hasAccess = await canManageInventory(session.user.id)
+    const hasAccess = await canManageInventory(session.user.id, session.user.role)
     if (!hasAccess) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
     }
 
-    const cacheKey = buildCacheKey('model:stock', { id: params.id })
+    const cacheKey = buildCacheKey('model:stock', { id })
 
     // Get data with cache
     const modelWithStock = await withCache(cacheKey, 30, async () => {
-      return await getModelWithStock(params.id)
+      return await getModelWithStock(id)
     })
 
     return NextResponse.json(modelWithStock, {

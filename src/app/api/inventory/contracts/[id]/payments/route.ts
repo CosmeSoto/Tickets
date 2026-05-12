@@ -7,8 +7,9 @@ import { ContractPaymentService } from '@/lib/services/contract-payment.service'
  * GET /api/inventory/contracts/[id]/payments
  * Obtiene todos los pagos de un contrato
  */
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const pageSize = parseInt(searchParams.get('pageSize') || '50')
 
     const result = await ContractPaymentService.list({
-      contractId: params.id,
+      contractId: id,
       status: status as any,
       page,
       pageSize,
@@ -37,8 +38,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
  * POST /api/inventory/contracts/[id]/payments
  * Crea un nuevo pago para el contrato
  */
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
@@ -57,7 +59,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
 
     const payment = await ContractPaymentService.create({
-      contractId: params.id,
+      contractId: id,
       amount,
       currency,
       dueDate: new Date(dueDate),

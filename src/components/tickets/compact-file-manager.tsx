@@ -345,14 +345,24 @@ export function CompactFileManager({
                 </button>
               </p>
               {showCamera && (
-                <button
-                  type='button'
-                  onClick={openCamera}
-                  className='mt-2 inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium'
-                >
-                  <Camera className='h-3.5 w-3.5' />
-                  Tomar foto con la cámara
-                </button>
+                <div className='mt-2 flex flex-col sm:flex-row gap-2 justify-center'>
+                  <button
+                    type='button'
+                    onClick={() => openCamera('environment')}
+                    className='inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium'
+                  >
+                    <Camera className='h-3.5 w-3.5' />
+                    Cámara trasera
+                  </button>
+                  <button
+                    type='button'
+                    onClick={() => openCamera('user')}
+                    className='inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium'
+                  >
+                    <Camera className='h-3.5 w-3.5' />
+                    Cámara frontal
+                  </button>
+                </div>
               )}
               <p className='text-xs text-gray-500 mt-1'>
                 Imágenes, PDF, Office • Máx {maxFileSize}MB

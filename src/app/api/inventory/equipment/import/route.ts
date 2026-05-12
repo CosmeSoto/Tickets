@@ -316,11 +316,11 @@ export async function POST(request: NextRequest) {
       } else {
         // Gestor de inventario
         const managerFamilies = await prisma.inventory_manager_families.findMany({
-          where: { manager_id: session.user.id },
-          select: { family_id: true },
+          where: { managerId: session.user.id },
+          select: { familyId: true },
         })
         if (managerFamilies.length > 0) {
-          allowedFamilyIds = new Set(managerFamilies.map(m => m.family_id))
+          allowedFamilyIds = new Set(managerFamilies.map(m => m.familyId))
         }
       }
     }

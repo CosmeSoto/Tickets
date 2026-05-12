@@ -144,7 +144,9 @@ export function ForSaleEquipmentTable({
                   <TableCell>{eq.model ? `${eq.model.brand} ${eq.model.model}` : '-'}</TableCell>
                   <TableCell>
                     {eq.family ? (
-                      <FamilyBadge name={eq.family.name} color={eq.family.color || undefined} />
+                      <FamilyBadge
+                        family={{ name: eq.family.name, color: eq.family.color ?? null }}
+                      />
                     ) : (
                       '-'
                     )}

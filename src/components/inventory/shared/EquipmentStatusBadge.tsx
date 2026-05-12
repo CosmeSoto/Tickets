@@ -7,8 +7,9 @@ const STATUS_CONFIG: Record<string, { label: string; variant: BadgeVariant }> = 
   ASSIGNED: { label: 'Asignado', variant: 'secondary' },
   MAINTENANCE: { label: 'Mantenimiento', variant: 'outline' },
   RETIRED: { label: 'Retirado', variant: 'destructive' },
-  MAINTENANCE: { label: 'Mantenimiento', variant: 'outline' },
   DAMAGED: { label: 'Dañado', variant: 'destructive' },
+  FOR_SALE: { label: 'En venta', variant: 'outline' },
+  SOLD: { label: 'Vendido', variant: 'secondary' },
 }
 
 interface EquipmentStatusBadgeProps {

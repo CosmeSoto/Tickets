@@ -34,14 +34,16 @@ export function AuditTable({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className='flex items-center justify-between'>
-          <div className='flex items-center gap-2'>
-            <Activity className='h-5 w-5' />
-            Logs de Auditoría
+        <CardTitle className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+          <div className='flex items-center gap-2 min-w-0'>
+            <Activity className='h-5 w-5 flex-shrink-0' />
+            <span className='truncate'>Logs de Auditoría</span>
           </div>
-          <div className='flex items-center gap-2 text-sm text-muted-foreground'>
-            <Clock className='h-4 w-4' />
-            Mostrando {logs.length} de {pagination.total} registros
+          <div className='flex items-center gap-2 text-sm text-muted-foreground flex-shrink-0'>
+            <Clock className='h-4 w-4 flex-shrink-0' />
+            <span className='whitespace-normal sm:whitespace-nowrap'>
+              Mostrando {logs.length} de {pagination.total} registros
+            </span>
           </div>
         </CardTitle>
         <CardDescription>

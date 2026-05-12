@@ -22,8 +22,9 @@ import { ZodError } from 'zod'
  *   equipmentIds: string[] - IDs de equipos a asignar (debe coincidir con quantity)
  * }
  */
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id: requestId } = await params
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
@@ -37,8 +38,6 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         { status: 403 }
       )
     }
-
-    const requestId = params.id
 
     // Parsear y validar body
     const body = await request.json()

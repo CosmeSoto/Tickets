@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Check inventory access
-    const hasAccess = await canManageInventory(session.user.id)
+    const hasAccess = await canManageInventory(session.user.id, session.user.role)
     if (!hasAccess) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
     }
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check inventory access
-    const hasAccess = await canManageInventory(session.user.id)
+    const hasAccess = await canManageInventory(session.user.id, session.user.role)
     if (!hasAccess) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
     }

@@ -5,6 +5,14 @@ import { MaintenanceService } from '@/lib/services/maintenance.service'
 import prisma from '@/lib/prisma'
 import { notifyUser, notifyMany } from '@/lib/api/notify'
 
+function equipmentDisplayLabel(eq: {
+  brand: string
+  model_old: string
+  model: { brand: string; model: string } | null
+}) {
+  return eq.model ? `${eq.model.brand} ${eq.model.model}` : `${eq.brand} ${eq.model_old}`
+}
+
 /**
  * GET /api/inventory/maintenance
  * - ADMIN/TECHNICIAN: todos los mantenimientos (con filtros opcionales)
@@ -39,10 +47,7 @@ export async function GET(request: NextRequest) {
         select: { equipmentId: true },
       })
       const myEquipmentIds = myAssignments.map(a => a.equipmentId)
-      where.OR = [
-        { equipmentId: { in: myEquipmentIds } },
-        { requestedById: session.user.id },
-      ]
+      where.OR = [{ equipmentId: { in: myEquipmentIds } }, { requestedById: session.user.id }]
     }
 
     const records = await prisma.maintenance_records.findMany({
@@ -51,7 +56,15 @@ export async function GET(request: NextRequest) {
       take: 200, // cap razonable — si necesitan más, usar paginación
       include: {
         equipment: {
-          select: { id: true, code: true, brand: true, model: true, status: true, type: { select: { name: true } } },
+          select: {
+            id: true,
+            code: true,
+            brand: true,
+            model_old: true,
+            status: true,
+            model: { select: { brand: true, model: true } },
+            type: { select: { name: true } },
+          },
         },
         technician: { select: { id: true, name: true } },
         requestedBy: { select: { id: true, name: true } },
@@ -93,6 +106,7 @@ export async function POST(request: NextRequest) {
     const equipment = await prisma.equipment.findUnique({
       where: { id: equipmentId },
       include: {
+        model: { select: { brand: true, model: true } },
         assignments: {
           where: { isActive: true },
           include: { receiver: { select: { id: true, name: true, email: true } } },
@@ -128,7 +142,7 @@ export async function POST(request: NextRequest) {
         select: { id: true },
       })
 
-      const equipmentLabel = `${equipment.code} (${equipment.brand} ${equipment.model})`
+      const equipmentLabel = `${equipment.code} (${equipmentDisplayLabel(equipment)})`
       const requesterName = session.user.name || session.user.email
 
       await notifyMany(
@@ -158,9 +172,12 @@ export async function POST(request: NextRequest) {
         const receiver = activeAssignment.receiver
         const maintenanceTypeLabel = type === 'PREVENTIVE' ? 'preventivo' : 'correctivo'
         const formattedDate = new Date(scheduledDate).toLocaleDateString('es-ES', {
-          weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
         })
-        const equipmentLabel = `${equipment.code} (${equipment.brand} ${equipment.model})`
+        const equipmentLabel = `${equipment.code} (${equipmentDisplayLabel(equipment)})`
 
         await notifyUser(
           receiver.id,

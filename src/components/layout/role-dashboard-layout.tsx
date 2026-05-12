@@ -75,7 +75,6 @@ const navigationByRole: Record<string, NavItem[]> = {
       icon: Ticket,
       children: [
         { name: 'Todos los Tickets', href: '/admin/tickets', icon: Ticket },
-        { name: 'Crear Ticket', href: '/admin/tickets/create', icon: FileText },
         { name: 'Reportes', href: '/admin/reports', icon: BarChart3 },
         { name: 'Categorías', href: '/admin/categories', icon: FolderTree },
         { name: 'Base de Conocimientos', href: '/admin/knowledge', icon: BookOpen },

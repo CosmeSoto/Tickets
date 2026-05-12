@@ -14,8 +14,9 @@ import { canManageInventory } from '@/lib/inventory-access'
  * GET /api/inventory/batches/[id]
  * Get equipment batch by ID with details
  */
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
@@ -23,13 +24,13 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     }
 
     // Check inventory access
-    const hasAccess = await canManageInventory(session.user.id)
+    const hasAccess = await canManageInventory(session.user.id, session.user.role)
     if (!hasAccess) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
     }
 
-    const batch = await getBatchById(params.id)
-    const equipment = await getBatchEquipment(params.id)
+    const batch = await getBatchById(id)
+    const equipment = await getBatchEquipment(id)
 
     return NextResponse.json({
       ...batch,

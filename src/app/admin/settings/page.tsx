@@ -64,12 +64,16 @@ interface SystemSettings {
   backupRetention: number
 }
 
+const SETTINGS_PAGE_SUBTITLE = 'Administra la configuración global del sistema de tickets'
+
 function SettingsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [settings, setSettings] = useState<SystemSettings | null>(null)
   const [loading, setLoading] = useState(false)
+  /** Evita un frame de “error” antes del primer fetch cuando ya hay sesión admin */
+  const [initialFetchDone, setInitialFetchDone] = useState(false)
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'general')
   const { toast } = useToast()
@@ -110,6 +114,7 @@ function SettingsPage() {
       })
     } finally {
       setLoading(false)
+      setInitialFetchDone(true)
     }
   }
 
@@ -205,14 +210,11 @@ function SettingsPage() {
     }
   }
 
-  if (status === 'loading' || loading) {
+  if (status === 'loading') {
     return (
-      <div className='flex items-center justify-center h-64'>
-        <div className='text-center'>
-          <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto'></div>
-          <p className='mt-2 text-muted-foreground'>Cargando configuración...</p>
-        </div>
-      </div>
+      <ModuleLayout title='Configuración del Sistema' subtitle={SETTINGS_PAGE_SUBTITLE} loading>
+        {null}
+      </ModuleLayout>
     )
   }
 
@@ -222,23 +224,29 @@ function SettingsPage() {
 
   const isSuperAdmin = (session.user as any).isSuperAdmin === true
 
+  if (!settings && (!initialFetchDone || loading)) {
+    return (
+      <ModuleLayout title='Configuración del Sistema' subtitle={SETTINGS_PAGE_SUBTITLE} loading>
+        {null}
+      </ModuleLayout>
+    )
+  }
+
   if (!settings) {
     return (
-      <div className='flex items-center justify-center h-64'>
-        <div className='text-center'>
-          <AlertTriangle className='h-8 w-8 text-red-500 mx-auto mb-2' />
-          <p className='text-muted-foreground'>Error al cargar la configuración</p>
-          <Button onClick={loadSettings} className='mt-2'>
-            <RefreshCw className='h-4 w-4 mr-2' />
-            Reintentar
-          </Button>
-        </div>
-      </div>
+      <ModuleLayout
+        title='Configuración del Sistema'
+        subtitle={SETTINGS_PAGE_SUBTITLE}
+        error='No se pudo cargar la configuración. Comprueba tu conexión o permisos.'
+        onRetry={loadSettings}
+      >
+        {null}
+      </ModuleLayout>
     )
   }
 
   const headerActions = (
-    <div className='flex items-center space-x-2'>
+    <div className='flex flex-wrap items-center gap-2'>
       <Button variant='outline' onClick={loadSettings} disabled={loading}>
         <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
         Recargar
@@ -256,7 +264,7 @@ function SettingsPage() {
   return (
     <ModuleLayout
       title='Configuración del Sistema'
-      subtitle='Administra la configuración global del sistema de tickets'
+      subtitle={SETTINGS_PAGE_SUBTITLE}
       headerActions={headerActions}
     >
       <Tabs
@@ -710,15 +718,18 @@ function SettingsPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className='flex items-center justify-between p-4 bg-muted border border-border rounded-lg'>
-                    <div>
+                  <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between p-4 bg-muted border border-border rounded-lg'>
+                    <div className='min-w-0'>
                       <h4 className='font-medium text-foreground'>Sistema de Backups</h4>
                       <p className='text-sm text-muted-foreground mt-1'>
                         Accede al módulo completo de gestión de backups con configuración avanzada,
                         monitoreo en tiempo real y herramientas de restauración.
                       </p>
                     </div>
-                    <Button onClick={() => router.push('/admin/backups')}>
+                    <Button
+                      className='w-full sm:w-auto flex-shrink-0'
+                      onClick={() => router.push('/admin/backups')}
+                    >
                       <Database className='h-4 w-4 mr-2' />
                       Ir a Backups
                     </Button>

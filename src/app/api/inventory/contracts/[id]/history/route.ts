@@ -8,14 +8,15 @@ import { ContractService } from '@/lib/services/contract-service'
  * Obtiene el historial completo de renovaciones de un contrato
  * Retorna la cadena completa desde el contrato original hasta el más reciente
  */
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const history = await ContractService.getRenewalHistory(params.id)
+    const history = await ContractService.getRenewalHistory(id)
 
     return NextResponse.json({
       success: true,

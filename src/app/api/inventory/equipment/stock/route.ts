@@ -56,12 +56,11 @@ export async function GET(request: NextRequest) {
     const cacheKey = buildCacheKey('inventory:equipment:stock', { brand, model, typeId })
 
     const stockInfo = await withCache(cacheKey, 30, async () => {
-      // 5. Consultar equipos que coincidan con brand, model, typeId
+      // 5. Consultar equipos que coincidan con brand, model, typeId (catálogo o legacy)
       const equipment = await prisma.equipment.findMany({
         where: {
-          brand,
-          model,
           typeId,
+          OR: [{ model: { brand, model } }, { AND: [{ brand }, { model_old: model }] }],
         },
         select: {
           status: true,

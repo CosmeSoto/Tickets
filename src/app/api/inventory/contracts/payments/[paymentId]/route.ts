@@ -7,14 +7,18 @@ import { ContractPaymentService } from '@/lib/services/contract-payment.service'
  * GET /api/inventory/contracts/payments/[paymentId]
  * Obtiene un pago específico
  */
-export async function GET(request: NextRequest, { params }: { params: { paymentId: string } }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ paymentId: string }> }
+) {
   try {
+    const { paymentId } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const payment = await ContractPaymentService.getById(params.paymentId)
+    const payment = await ContractPaymentService.getById(paymentId)
 
     if (!payment) {
       return NextResponse.json({ error: 'Pago no encontrado' }, { status: 404 })
@@ -31,8 +35,12 @@ export async function GET(request: NextRequest, { params }: { params: { paymentI
  * PATCH /api/inventory/contracts/payments/[paymentId]
  * Actualiza un pago
  */
-export async function PATCH(request: NextRequest, { params }: { params: { paymentId: string } }) {
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ paymentId: string }> }
+) {
   try {
+    const { paymentId } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
@@ -50,11 +58,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { paymen
     if (referenceNumber !== undefined) updateData.referenceNumber = referenceNumber
     if (notes !== undefined) updateData.notes = notes
 
-    const payment = await ContractPaymentService.update(
-      params.paymentId,
-      updateData,
-      session.user.id
-    )
+    const payment = await ContractPaymentService.update(paymentId, updateData, session.user.id)
 
     return NextResponse.json(payment)
   } catch (error) {
@@ -70,14 +74,18 @@ export async function PATCH(request: NextRequest, { params }: { params: { paymen
  * DELETE /api/inventory/contracts/payments/[paymentId]
  * Elimina un pago
  */
-export async function DELETE(request: NextRequest, { params }: { params: { paymentId: string } }) {
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ paymentId: string }> }
+) {
   try {
+    const { paymentId } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    await ContractPaymentService.delete(params.paymentId, session.user.id)
+    await ContractPaymentService.delete(paymentId, session.user.id)
 
     return NextResponse.json({ success: true })
   } catch (error) {

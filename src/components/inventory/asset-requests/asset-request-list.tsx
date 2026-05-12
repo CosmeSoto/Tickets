@@ -90,7 +90,7 @@ export function AssetRequestList({
                   </TableCell>
                   <TableCell className='max-w-xs truncate'>{request.description}</TableCell>
                   <TableCell>
-                    <FamilyBadge name={request.familyName} />
+                    <FamilyBadge family={{ name: request.familyName }} />
                   </TableCell>
                   <TableCell>{request.requesterName}</TableCell>
                   <TableCell>

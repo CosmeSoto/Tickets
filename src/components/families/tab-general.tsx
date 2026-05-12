@@ -267,12 +267,17 @@ export function TabGeneral({
       {/* Basic data form */}
       <Card>
         <CardHeader className='pb-3'>
-          <div className='flex items-center justify-between'>
-            <div>
+          <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+            <div className='min-w-0'>
               <CardTitle className='text-base'>Datos básicos</CardTitle>
               <CardDescription>Información principal de la familia</CardDescription>
             </div>
-            <Button onClick={handleSave} disabled={saving} size='sm'>
+            <Button
+              onClick={handleSave}
+              disabled={saving}
+              size='sm'
+              className='w-full sm:w-auto shrink-0'
+            >
               {saving ? (
                 <RefreshCw className='h-4 w-4 animate-spin' />
               ) : (
@@ -442,15 +447,15 @@ export function TabGeneral({
       {/* Departments */}
       <Card>
         <CardHeader>
-          <div className='flex items-center justify-between'>
-            <div>
+          <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+            <div className='min-w-0'>
               <CardTitle className='flex items-center gap-2 text-base'>
-                <Building className='h-4 w-4' />
+                <Building className='h-4 w-4 shrink-0' />
                 Departamentos ({departments.length})
               </CardTitle>
               <CardDescription>Departamentos que pertenecen a esta familia</CardDescription>
             </div>
-            <Button size='sm' onClick={openCreateDept}>
+            <Button size='sm' onClick={openCreateDept} className='w-full sm:w-auto shrink-0'>
               <Plus className='h-4 w-4 mr-2' />
               Nuevo departamento
             </Button>
@@ -471,7 +476,7 @@ export function TabGeneral({
               {departments.map(dept => (
                 <div
                   key={dept.id}
-                  className='flex items-center justify-between px-6 py-3 hover:bg-muted/50 cursor-pointer transition-colors'
+                  className='flex items-center justify-between gap-2 px-3 sm:px-6 py-3 min-h-[52px] hover:bg-muted/50 cursor-pointer transition-colors'
                   onClick={e => openEditDept(dept, e)}
                   role='button'
                   tabIndex={0}
@@ -504,7 +509,7 @@ export function TabGeneral({
                     <Button
                       variant='ghost'
                       size='sm'
-                      className='h-7 w-7 p-0 text-muted-foreground hover:text-foreground'
+                      className='h-10 w-10 sm:h-8 sm:w-8 p-0 text-muted-foreground hover:text-foreground touch-manipulation'
                       onClick={e => {
                         e.stopPropagation()
                         handleToggleDept(dept)
@@ -513,15 +518,15 @@ export function TabGeneral({
                       title={dept.isActive ? 'Desactivar' : 'Activar'}
                     >
                       {dept.isActive ? (
-                        <ToggleRight className='h-3.5 w-3.5 text-primary' />
+                        <ToggleRight className='h-4 w-4 sm:h-3.5 sm:w-3.5 text-primary' />
                       ) : (
-                        <ToggleLeft className='h-3.5 w-3.5' />
+                        <ToggleLeft className='h-4 w-4 sm:h-3.5 sm:w-3.5' />
                       )}
                     </Button>
                     <Button
                       variant='ghost'
                       size='sm'
-                      className='h-7 w-7 p-0 text-muted-foreground hover:text-destructive'
+                      className='h-10 w-10 sm:h-8 sm:w-8 p-0 text-muted-foreground hover:text-destructive touch-manipulation'
                       onClick={e => {
                         e.stopPropagation()
                         setDeletingDept(dept)
@@ -529,7 +534,7 @@ export function TabGeneral({
                       }}
                       title='Eliminar'
                     >
-                      <Trash2 className='h-3.5 w-3.5' />
+                      <Trash2 className='h-4 w-4 sm:h-3.5 sm:w-3.5' />
                     </Button>
                     <ChevronRight className='h-4 w-4 text-muted-foreground' />
                   </div>

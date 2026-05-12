@@ -12,7 +12,6 @@
 
 'use client'
 
-import { Loader2 } from 'lucide-react'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { useToast } from '@/hooks/use-toast'
 import { useAudit } from '@/hooks/use-audit'
@@ -55,15 +54,16 @@ export default function AuditPage() {
     handleExportJSON,
   } = useAudit()
 
-  // ── Loading state ──
+  // ── Loading state (sesión) ──
   if (status === 'loading') {
     return (
-      <div className='flex items-center justify-center h-64'>
-        <div className='text-center'>
-          <Loader2 className='animate-spin h-8 w-8 text-primary mx-auto' />
-          <p className='mt-2 text-muted-foreground'>Cargando...</p>
-        </div>
-      </div>
+      <ModuleLayout
+        title='Sistema de Auditoría'
+        subtitle='Monitoreo y logs de actividad del sistema'
+        loading
+      >
+        {null}
+      </ModuleLayout>
     )
   }
 

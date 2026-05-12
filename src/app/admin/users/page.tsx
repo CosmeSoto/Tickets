@@ -39,6 +39,18 @@ export default function AdminUsersPage() {
 
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
 
+  // Vista tarjetas por defecto en viewport estrecho (mejor usabilidad táctil)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mq = window.matchMedia('(max-width: 639px)')
+    const apply = () => {
+      if (mq.matches) setViewMode('cards')
+    }
+    apply()
+    mq.addEventListener('change', apply)
+    return () => mq.removeEventListener('change', apply)
+  }, [])
+
   // ✅ Departamentos desde contexto global — sin petición extra
   const { departments } = useActiveDepartments()
 

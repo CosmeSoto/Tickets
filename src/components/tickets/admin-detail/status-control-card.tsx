@@ -28,15 +28,34 @@ interface StatusControlCardProps {
 
 const getStatusLabel = (s: string) => TICKET_STATUSES.find(x => x.value === s)?.label ?? s
 
-const availableStatuses = (ticket: Ticket): Ticket['status'][] => {
-  const map: Record<string, Ticket['status'][]> = {
+const availableStatuses = (ticket: Ticket, isSuperAdmin: boolean): Ticket['status'][] => {
+  if (isSuperAdmin) {
+    // SUPER ADMIN: TODOS LOS ESTADOS DISPONIBLES, SIN RESTRICCIONES
+    return ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'ON_HOLD']
+  }
+
+  const adminTransitions: Record<string, Ticket['status'][]> = {
+    OPEN: ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'ON_HOLD'],
+    IN_PROGRESS: ['IN_PROGRESS', 'OPEN', 'RESOLVED', 'CLOSED', 'ON_HOLD'],
+    ON_HOLD: ['ON_HOLD', 'OPEN', 'IN_PROGRESS', 'RESOLVED'],
+    RESOLVED: ['RESOLVED', 'IN_PROGRESS', 'CLOSED'],
+    CLOSED: ['CLOSED', 'RESOLVED'],
+  }
+
+  const techTransitions: Record<string, Ticket['status'][]> = {
     OPEN: ['OPEN', 'IN_PROGRESS'],
     IN_PROGRESS: ['IN_PROGRESS', 'RESOLVED', 'ON_HOLD'],
     ON_HOLD: ['ON_HOLD', 'IN_PROGRESS'],
     RESOLVED: ['RESOLVED', 'IN_PROGRESS'],
     CLOSED: ['CLOSED'],
   }
-  return map[ticket.status] ?? [ticket.status]
+
+  // Verificar si es ADMIN normal (no super admin)
+  if (adminTransitions[ticket.status]) {
+    return adminTransitions[ticket.status]
+  }
+
+  return techTransitions[ticket.status] ?? [ticket.status]
 }
 
 export function StatusControlCard({
@@ -83,7 +102,7 @@ export function StatusControlCard({
         </CardTitle>
       </CardHeader>
       <CardContent className='px-4 pb-4 space-y-2'>
-        {availableStatuses(ticket)
+        {availableStatuses(ticket, isSuperAdmin)
           .filter(s => s !== ticket.status)
           .map(s => {
             const isPrimary = s === 'RESOLVED' || (ticket.status === 'OPEN' && s === 'IN_PROGRESS')

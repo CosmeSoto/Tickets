@@ -7,8 +7,12 @@ import { ContractPaymentService } from '@/lib/services/contract-payment.service'
  * POST /api/inventory/contracts/payments/[paymentId]/mark-paid
  * Marca un pago como pagado
  */
-export async function POST(request: NextRequest, { params }: { params: { paymentId: string } }) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ paymentId: string }> }
+) {
   try {
+    const { paymentId } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
@@ -22,7 +26,7 @@ export async function POST(request: NextRequest, { params }: { params: { payment
     }
 
     const payment = await ContractPaymentService.markAsPaid(
-      params.paymentId,
+      paymentId,
       {
         paidDate: new Date(paidDate),
         paymentMethod,

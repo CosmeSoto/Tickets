@@ -156,14 +156,14 @@ export function LandingPageCMSTab({ isSuperAdmin = false }: { isSuperAdmin?: boo
   return (
     <div className='space-y-6'>
       {/* Header con acciones */}
-      <div className='flex items-center justify-between'>
-        <div>
+      <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+        <div className='min-w-0'>
           <h3 className='text-lg font-medium'>Gestión de Página Pública</h3>
           <p className='text-sm text-muted-foreground'>
             Personaliza el contenido de la página de inicio
           </p>
         </div>
-        <div className='flex items-center space-x-2'>
+        <div className='flex flex-wrap items-center gap-2 sm:justify-end flex-shrink-0'>
           <Button
             variant='outline'
             size='sm'
@@ -216,7 +216,7 @@ export function LandingPageCMSTab({ isSuperAdmin = false }: { isSuperAdmin?: boo
           </div>
 
           <div className='space-y-4'>
-            <div className='grid grid-cols-2 gap-4'>
+            <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
               <div className='space-y-2'>
                 <Label htmlFor='heroCtaPrimary'>Texto Botón Principal</Label>
                 <Input
@@ -246,7 +246,7 @@ export function LandingPageCMSTab({ isSuperAdmin = false }: { isSuperAdmin?: boo
               </div>
             </div>
 
-            <div className='grid grid-cols-2 gap-4'>
+            <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
               <div className='space-y-2'>
                 <Label htmlFor='heroCtaSecondary'>Texto Botón Secundario</Label>
                 <Input

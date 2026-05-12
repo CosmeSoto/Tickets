@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Verificar permisos
-    const hasPermission = await canManageInventory(session.user.id)
+    const hasPermission = await canManageInventory(session.user.id, session.user.role)
 
     if (!hasPermission) {
       return NextResponse.json(

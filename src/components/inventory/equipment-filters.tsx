@@ -35,6 +35,8 @@ const EQUIPMENT_STATUS_LABELS: Record<EquipmentStatus, string> = {
   MAINTENANCE: 'Mantenimiento',
   DAMAGED: 'Dañado',
   RETIRED: 'Retirado',
+  FOR_SALE: 'En venta',
+  SOLD: 'Vendido',
 }
 
 const EQUIPMENT_CONDITION_LABELS: Record<EquipmentCondition, string> = {

@@ -106,7 +106,7 @@ function InventorySettingsContent() {
           <InventoryGlobalTab
             globalRules={globalRules}
             savingGlobal={savingGlobal}
-            families={families}
+            families={families.map(f => ({ ...f, color: f.color ?? null }))}
             onSetGlobal={setGlobal}
             onSave={handleSaveGlobal}
           />

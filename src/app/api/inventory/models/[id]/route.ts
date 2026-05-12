@@ -34,8 +34,9 @@ const updateModelSchema = z.object({
  * GET /api/inventory/models/[id]
  * Get equipment model by ID
  */
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
@@ -43,12 +44,12 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     }
 
     // Check inventory access
-    const hasAccess = await canManageInventory(session.user.id)
+    const hasAccess = await canManageInventory(session.user.id, session.user.role)
     if (!hasAccess) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
     }
 
-    const model = await getModelById(params.id)
+    const model = await getModelById(id)
 
     return NextResponse.json(model)
   } catch (error: any) {
@@ -66,8 +67,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
  * PUT /api/inventory/models/[id]
  * Update equipment model
  */
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
@@ -75,7 +77,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     }
 
     // Check inventory access
-    const hasAccess = await canManageInventory(session.user.id)
+    const hasAccess = await canManageInventory(session.user.id, session.user.role)
     if (!hasAccess) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
     }
@@ -96,7 +98,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
     const data: UpdateModelInput = validationResult.data
 
-    const model = await updateModel(params.id, data)
+    const model = await updateModel(id, data)
 
     return NextResponse.json(model)
   } catch (error: any) {
@@ -117,8 +119,12 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
  * DELETE /api/inventory/models/[id]
  * Delete equipment model (soft delete)
  */
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
@@ -126,12 +132,12 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     }
 
     // Check inventory access
-    const hasAccess = await canManageInventory(session.user.id)
+    const hasAccess = await canManageInventory(session.user.id, session.user.role)
     if (!hasAccess) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
     }
 
-    await deleteModel(params.id)
+    await deleteModel(id)
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

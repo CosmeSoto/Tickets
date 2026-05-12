@@ -76,7 +76,7 @@ export function AssetRequestDetail({ request }: AssetRequestDetailProps) {
             </div>
             <div className='space-y-1'>
               <p className='text-sm text-muted-foreground'>Familia</p>
-              <FamilyBadge name={request.familyName} />
+              <FamilyBadge family={{ name: request.familyName }} />
             </div>
             <div className='space-y-1'>
               <p className='text-sm text-muted-foreground'>Solicitante</p>

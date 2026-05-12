@@ -9,11 +9,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { randomUUID } from 'crypto'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { z } from 'zod'
-import { EquipmentStatus } from '@prisma/client'
+import { EquipmentStatus, MaintenanceStatus, MaintenanceType } from '@prisma/client'
 
 // Schema de validación para acciones masivas
 const bulkActionSchema = z.object({
@@ -40,8 +41,6 @@ const bulkActionSchema = z.object({
   // Notas generales (opcional)
   notes: z.string().max(2000).optional(),
 })
-
-type BulkActionInput = z.infer<typeof bulkActionSchema>
 
 /**
  * POST /api/inventory/equipment/bulk-actions
@@ -168,14 +167,20 @@ export async function POST(request: NextRequest) {
           updatedCount = maintenanceResult.count
 
           // Crear registros de mantenimiento
+          const maintenanceType =
+            validatedData.maintenanceType === 'PREVENTIVE' ||
+            validatedData.maintenanceType === 'CORRECTIVE'
+              ? (validatedData.maintenanceType as MaintenanceType)
+              : MaintenanceType.CORRECTIVE
+
           await tx.maintenance_records.createMany({
             data: validatedData.equipmentIds.map(equipmentId => ({
               equipmentId,
-              type: validatedData.maintenanceType!,
+              type: maintenanceType,
               description: validatedData.maintenanceNotes || 'Mantenimiento masivo',
-              status: 'PENDING',
-              scheduledDate: new Date(),
-              performedById: session.user.id,
+              status: MaintenanceStatus.SCHEDULED,
+              date: new Date(),
+              technicianId: session.user.id,
             })),
           })
           break
@@ -198,6 +203,7 @@ export async function POST(request: NextRequest) {
           // Crear registros de auditoría para baja
           await tx.audit_logs.createMany({
             data: validatedData.equipmentIds.map(equipmentId => ({
+              id: randomUUID(),
               userId: session.user.id,
               action: 'DECOMMISSION',
               entityType: 'equipment',

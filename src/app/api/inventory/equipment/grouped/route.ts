@@ -9,8 +9,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import { canManageInventory } from '@/lib/inventory-access'
-import { withCache, buildCacheKey, invalidateCache } from '@/lib/api-cache'
+import { withCache, buildCacheKey } from '@/lib/api-cache'
 import type { GroupedInventoryRow, EquipmentSummary } from '@/types/equipment-grouping'
 
 export const dynamic = 'force-dynamic'
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 2. Verificar permisos
-    const hasPermission = await canManageInventory(session.user.id)
+    const hasPermission = await canManageInventory(session.user.id, session.user.role)
 
     if (!hasPermission) {
       return NextResponse.json(
@@ -70,35 +71,32 @@ export async function GET(request: NextRequest) {
 
     // 5. Usar withCache para obtener o generar datos
     const response = await withCache(cacheKey, 30, async () => {
-      // 6. Construir filtros
-      const where: any = {}
-
-      // Filtro de búsqueda
+      const andParts: Prisma.equipmentWhereInput[] = []
+      if (typeId) andParts.push({ typeId })
+      if (familyId) andParts.push({ type: { familyId } })
       if (search) {
-        where.OR = [
-          { brand: { contains: search, mode: 'insensitive' } },
-          { model: { contains: search, mode: 'insensitive' } },
-          { type: { name: { contains: search, mode: 'insensitive' } } },
-        ]
+        andParts.push({
+          OR: [
+            { brand: { contains: search, mode: 'insensitive' } },
+            { model_old: { contains: search, mode: 'insensitive' } },
+            {
+              model: {
+                OR: [
+                  { brand: { contains: search, mode: 'insensitive' } },
+                  { model: { contains: search, mode: 'insensitive' } },
+                ],
+              },
+            },
+            { type: { name: { contains: search, mode: 'insensitive' } } },
+          ],
+        })
       }
+      const where: Prisma.equipmentWhereInput = andParts.length > 0 ? { AND: andParts } : {}
 
-      // Filtro por tipo
-      if (typeId) {
-        where.typeId = typeId
-      }
-
-      // Filtro por familia (a través de type)
-      if (familyId) {
-        where.type = {
-          ...where.type,
-          familyId,
-        }
-      }
-
-      // 7. Consultar equipos con filtros
       const equipment = await prisma.equipment.findMany({
         where,
         include: {
+          model: { select: { id: true, brand: true, model: true } },
           type: {
             include: {
               family: true,
@@ -106,7 +104,7 @@ export async function GET(request: NextRequest) {
           },
           assignments: {
             where: {
-              status: 'ACTIVE',
+              isActive: true,
             },
             include: {
               receiver: {
@@ -120,22 +118,21 @@ export async function GET(request: NextRequest) {
             take: 1,
           },
         },
-        orderBy: [{ brand: 'asc' }, { model: 'asc' }],
+        orderBy: [{ brand: 'asc' }, { model_old: 'asc' }],
       })
 
-      // 8. Agrupar equipos por modelo
       const groupsMap = new Map<string, GroupedInventoryRow>()
 
       for (const eq of equipment) {
-        // Generar groupId basado en criterios de agrupación
-        const groupId = `${eq.brand}|${eq.model}|${eq.typeId}`
+        const brand = eq.model?.brand ?? eq.brand
+        const modelName = eq.model?.model ?? eq.model_old
+        const groupId = `${brand}|${modelName}|${eq.typeId}`
 
         if (!groupsMap.has(groupId)) {
-          // Crear nuevo grupo
           groupsMap.set(groupId, {
             groupId,
-            brand: eq.brand,
-            model: eq.model,
+            brand,
+            model: modelName,
             type: {
               id: eq.type.id,
               name: eq.type.name,
@@ -162,7 +159,6 @@ export async function GET(request: NextRequest) {
 
         const group = groupsMap.get(groupId)!
 
-        // Incrementar contadores
         group.total++
 
         switch (eq.status) {
@@ -186,7 +182,6 @@ export async function GET(request: NextRequest) {
             break
         }
 
-        // Agregar unidad al grupo
         const unit: EquipmentSummary = {
           id: eq.id,
           code: eq.code,
@@ -210,7 +205,6 @@ export async function GET(request: NextRequest) {
         group.units.push(unit)
       }
 
-      // 9. Convertir a array y aplicar paginación
       const allGroups = Array.from(groupsMap.values())
       const total = allGroups.length
       const totalPages = Math.ceil(total / limit)
@@ -218,7 +212,6 @@ export async function GET(request: NextRequest) {
       const endIndex = startIndex + limit
       const paginatedGroups = allGroups.slice(startIndex, endIndex)
 
-      // 10. Preparar y retornar respuesta
       return {
         groups: paginatedGroups,
         pagination: {

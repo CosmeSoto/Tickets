@@ -8,8 +8,9 @@ import { prisma } from '@/lib/prisma'
  * POST /api/inventory/contracts/[id]/payments/generate
  * Genera pagos programados automáticamente según el ciclo de facturación del contrato
  */
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
@@ -17,7 +18,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     // Obtener contrato
     const contract = await prisma.contracts.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: {
         id: true,
         name: true,
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     // Generar pagos
     const payments = await ContractPaymentService.generateScheduledPayments({
-      contractId: params.id,
+      contractId: id,
       startDate: contract.startDate,
       endDate: contract.endDate,
       billingCycle: contract.billingCycle,

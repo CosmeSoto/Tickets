@@ -41,7 +41,7 @@ interface FileInputWithCameraProps {
   /** Render prop: recibe funciones para abrir cada input y si mostrar cámara */
   children: (props: {
     openFile: () => void
-    openCamera: () => void
+    openCamera: (facingMode?: 'user' | 'environment') => void
     showCamera: boolean
   }) => React.ReactNode
 }
@@ -54,41 +54,63 @@ export function FileInputWithCamera({
   children,
 }: FileInputWithCameraProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const cameraEnvRef = useRef<HTMLInputElement>(null)
+  const cameraUserRef = useRef<HTMLInputElement>(null)
   const { showCameraOption } = useFileCapture()
 
   const openFile = () => fileInputRef.current?.click()
-  const openCamera = () => cameraInputRef.current?.click()
+  const openCamera = (facingMode: 'user' | 'environment' = 'environment') => {
+    if (facingMode === 'user') {
+      cameraUserRef.current?.click()
+    } else {
+      cameraEnvRef.current?.click()
+    }
+  }
 
   return (
     <>
       {/* Input normal — galería / explorador de archivos */}
       <input
         ref={fileInputRef}
-        type="file"
+        type='file'
         accept={accept}
         multiple={multiple}
-        onChange={(e) => {
+        onChange={e => {
           onChange(e)
-          // Reset para permitir seleccionar el mismo archivo de nuevo
           if (fileInputRef.current) fileInputRef.current.value = ''
         }}
-        className="hidden"
+        className='hidden'
       />
 
-      {/* Input de cámara — solo se renderiza en móvil con cámara */}
+      {/* Input de cámara trasera — solo se renderiza en móvil con cámara */}
       {showCameraOption && (
         <input
-          ref={cameraInputRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
+          ref={cameraEnvRef}
+          type='file'
+          accept='image/*'
+          capture='environment'
           multiple={multiple}
-          onChange={(e) => {
+          onChange={e => {
             ;(onCameraChange ?? onChange)(e)
-            if (cameraInputRef.current) cameraInputRef.current.value = ''
+            if (cameraEnvRef.current) cameraEnvRef.current.value = ''
           }}
-          className="hidden"
+          className='hidden'
+        />
+      )}
+
+      {/* Input de cámara frontal — solo se renderiza en móvil con cámara */}
+      {showCameraOption && (
+        <input
+          ref={cameraUserRef}
+          type='file'
+          accept='image/*'
+          capture='user'
+          multiple={multiple}
+          onChange={e => {
+            ;(onCameraChange ?? onChange)(e)
+            if (cameraUserRef.current) cameraUserRef.current.value = ''
+          }}
+          className='hidden'
         />
       )}
 

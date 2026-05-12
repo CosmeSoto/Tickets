@@ -18,8 +18,9 @@ const updateStatusSchema = z.object({
  * PUT /api/inventory/batches/[id]/status
  * Update equipment batch status
  */
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
@@ -27,7 +28,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     }
 
     // Check inventory access
-    const hasAccess = await canManageInventory(session.user.id)
+    const hasAccess = await canManageInventory(session.user.id, session.user.role)
     if (!hasAccess) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
     }
@@ -46,7 +47,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       )
     }
 
-    const batch = await updateBatchStatus(params.id, validationResult.data.status)
+    const batch = await updateBatchStatus(id, validationResult.data.status)
 
     return NextResponse.json(batch)
   } catch (error: any) {

@@ -67,7 +67,10 @@ export async function GET(
  * Edita una familia de inventario.
  * Solo ADMIN.
  */
-export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ familyId: string }> }
+) {
   try {
     const session = await getServerSession(authOptions)
 
@@ -82,9 +85,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       )
     }
 
-    const { id } = await params
+    const { familyId } = await params
 
-    const existing = await prisma.families.findUnique({ where: { id } })
+    const existing = await prisma.families.findUnique({ where: { id: familyId } })
     if (!existing) {
       return NextResponse.json({ error: 'Familia no encontrada' }, { status: 404 })
     }
@@ -93,7 +96,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const { name, icon, color, order, description } = body
 
     const family = await prisma.families.update({
-      where: { id },
+      where: { id: familyId },
       data: {
         ...(name !== undefined && { name: String(name).trim() }),
         ...(icon !== undefined && { icon }),
@@ -133,7 +136,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
  */
 export async function PATCH(
   _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ familyId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -149,15 +152,15 @@ export async function PATCH(
       )
     }
 
-    const { id } = await params
+    const { familyId } = await params
 
-    const existing = await prisma.families.findUnique({ where: { id } })
+    const existing = await prisma.families.findUnique({ where: { id: familyId } })
     if (!existing) {
       return NextResponse.json({ error: 'Familia no encontrada' }, { status: 404 })
     }
 
     const family = await prisma.families.update({
-      where: { id },
+      where: { id: familyId },
       data: { isActive: !existing.isActive },
     })
 
@@ -187,7 +190,7 @@ export async function PATCH(
  */
 export async function DELETE(
   _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ familyId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -203,17 +206,17 @@ export async function DELETE(
       )
     }
 
-    const { id } = await params
+    const { familyId } = await params
 
-    const existing = await prisma.families.findUnique({ where: { id } })
+    const existing = await prisma.families.findUnique({ where: { id: familyId } })
     if (!existing) {
       return NextResponse.json({ error: 'Familia no encontrada' }, { status: 404 })
     }
 
     const [equipmentCount, consumableCount, licenseCount] = await Promise.all([
-      prisma.equipment_types.count({ where: { familyId: id } }),
-      prisma.consumable_types.count({ where: { familyId: id } }),
-      prisma.license_types.count({ where: { familyId: id } }),
+      prisma.equipment_types.count({ where: { familyId } }),
+      prisma.consumable_types.count({ where: { familyId } }),
+      prisma.license_types.count({ where: { familyId } }),
     ])
 
     if (equipmentCount + consumableCount + licenseCount > 0) {
@@ -226,7 +229,7 @@ export async function DELETE(
       )
     }
 
-    await prisma.families.delete({ where: { id } })
+    await prisma.families.delete({ where: { id: familyId } })
 
     await prisma.audit_logs
       .create({
@@ -234,7 +237,7 @@ export async function DELETE(
           id: randomUUID(),
           action: 'DELETE',
           entityType: 'inventory_family',
-          entityId: id,
+          entityId: familyId,
           userId: session.user.id,
           details: { name: existing.name },
         },

@@ -174,8 +174,22 @@ export default function HomePage() {
           </div>
 
           <h1 className='text-4xl sm:text-5xl md:text-6xl font-bold mb-6 text-foreground leading-tight'>
-            {d.heroTitle.split(' ').slice(0, -1).join(' ')}{' '}
-            <span className='text-primary'>{d.heroTitle.split(' ').slice(-1)}</span>
+            {(() => {
+              const words = d.heroTitle.trim().split(/\s+/).filter(Boolean)
+              if (words.length === 0) {
+                return <span className='text-primary'>Soporte</span>
+              }
+              if (words.length === 1) {
+                return <span className='text-primary'>{words[0]}</span>
+              }
+              const rest = words.slice(0, -1).join(' ')
+              const last = words[words.length - 1]
+              return (
+                <>
+                  {rest} <span className='text-primary'>{last}</span>
+                </>
+              )
+            })()}
           </h1>
           <p className='text-lg sm:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto leading-relaxed'>
             {d.heroSubtitle}

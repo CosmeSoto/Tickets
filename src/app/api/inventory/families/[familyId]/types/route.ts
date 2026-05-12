@@ -9,7 +9,10 @@ import { canManageInventory } from '@/lib/inventory-access'
  * Retorna los tipos de equipo, consumible y licencia activos de una familia.
  * Requiere sesión activa con canManageInventory o rol ADMIN.
  */
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ familyId: string }> }
+) {
   try {
     const session = await getServerSession(authOptions)
 
@@ -28,10 +31,10 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       )
     }
 
-    const { id } = await params
+    const { familyId } = await params
 
     const family = await prisma.families.findUnique({
-      where: { id },
+      where: { id: familyId },
     })
 
     if (!family) {
@@ -40,15 +43,15 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
     const [equipmentTypes, consumableTypes, licenseTypes] = await Promise.all([
       prisma.equipment_types.findMany({
-        where: { familyId: id, isActive: true },
+        where: { familyId, isActive: true },
         orderBy: { name: 'asc' },
       }),
       prisma.consumable_types.findMany({
-        where: { familyId: id, isActive: true },
+        where: { familyId, isActive: true },
         orderBy: { name: 'asc' },
       }),
       prisma.license_types.findMany({
-        where: { familyId: id, isActive: true },
+        where: { familyId, isActive: true },
         orderBy: { name: 'asc' },
       }),
     ])
