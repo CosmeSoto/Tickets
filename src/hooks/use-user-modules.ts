@@ -18,6 +18,12 @@ interface UserModules {
 
 const DEFAULT: UserModules = { tickets: false, inventory: false, patrols: false, families: [] }
 
+/** Caché en memoria: cada página remontaba RoleDashboardLayout y repetía GET /api/user/modules. */
+const MODULES_MEMORY_TTL_MS = 120_000
+
+type ModulesMemoryEntry = { userId: string; data: UserModules; at: number }
+let modulesMemoryCache: ModulesMemoryEntry | null = null
+
 export function useUserModules() {
   const { data: session, status } = useSession()
   const [modules, setModules] = useState<UserModules>(DEFAULT)
@@ -26,7 +32,29 @@ export function useUserModules() {
 
   const load = useCallback(
     async (bypassCache = false) => {
-      if (status !== 'authenticated' || !userId) return
+      if (status === 'unauthenticated') {
+        modulesMemoryCache = null
+        setModules(DEFAULT)
+        setLoading(false)
+        return
+      }
+      if (status !== 'authenticated' || !userId) {
+        return
+      }
+
+      const now = Date.now()
+      const memHit =
+        !bypassCache &&
+        modulesMemoryCache &&
+        modulesMemoryCache.userId === userId &&
+        now - modulesMemoryCache.at < MODULES_MEMORY_TTL_MS
+
+      if (memHit) {
+        setModules(modulesMemoryCache.data)
+        setLoading(false)
+        return
+      }
+
       try {
         const url = bypassCache ? `/api/user/modules?_t=${Date.now()}` : '/api/user/modules'
         const res = await fetch(url, {
@@ -35,6 +63,7 @@ export function useUserModules() {
         if (res.ok) {
           const data = await res.json()
           setModules(data)
+          modulesMemoryCache = { userId, data, at: Date.now() }
         }
       } catch {
         setModules(DEFAULT)
@@ -51,8 +80,14 @@ export function useUserModules() {
 
   // Recargar con bypass de cache cuando cambian permisos/módulos
   useEffect(() => {
-    const reloadFresh = () => load(true) // bypass cache
-    const reloadNormal = () => load(false)
+    const reloadFresh = () => {
+      modulesMemoryCache = null
+      load(true)
+    }
+    const reloadNormal = () => {
+      modulesMemoryCache = null
+      load(false)
+    }
 
     window.addEventListener('settings-updated', reloadNormal)
     window.addEventListener('modules-updated', reloadFresh) // bypass — cambio explícito de módulos

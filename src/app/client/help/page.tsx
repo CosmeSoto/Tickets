@@ -3,7 +3,7 @@
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { useSyncDashboardPageMeta } from '@/contexts/dashboard-shell-context'
 import { BackToTickets } from '@/components/tickets/back-to-tickets'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -137,215 +137,211 @@ export default function ClientHelpPage() {
     setExpandedFaq(expandedFaq === id ? null : id)
   }
 
+  useSyncDashboardPageMeta({
+    title: 'Centro de Ayuda',
+    subtitle: 'Encuentra respuestas y recursos útiles',
+  })
+
   return (
-    <RoleDashboardLayout title='Centro de Ayuda' subtitle='Encuentra respuestas y recursos útiles'>
-      <div className='max-w-6xl mx-auto space-y-6'>
-        <BackToTickets />
-        {/* Search Bar */}
-        <Card>
-          <CardContent className='p-6'>
-            <div className='relative'>
-              <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground' />
-              <Input
-                placeholder='Buscar en preguntas frecuentes...'
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className='pl-10 h-12 text-base'
-              />
-            </div>
-          </CardContent>
+    <div className='max-w-6xl mx-auto space-y-6'>
+      <BackToTickets />
+      {/* Search Bar */}
+      <Card>
+        <CardContent className='p-6'>
+          <div className='relative'>
+            <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground' />
+            <Input
+              placeholder='Buscar en preguntas frecuentes...'
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className='pl-10 h-12 text-base'
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Quick Actions */}
+      <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+        <Card className='hover:shadow-md transition-shadow cursor-pointer'>
+          <Link href='/client/tickets/create'>
+            <CardContent className='p-6'>
+              <div className='flex items-start space-x-4'>
+                <div className='p-3 bg-blue-100 rounded-lg'>
+                  <MessageSquare className='h-6 w-6 text-blue-600' />
+                </div>
+                <div>
+                  <h3 className='font-semibold text-foreground mb-1'>Crear Ticket</h3>
+                  <p className='text-sm text-muted-foreground'>
+                    ¿No encuentras la respuesta? Contacta con soporte
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Link>
         </Card>
 
-        {/* Quick Actions */}
-        <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-          <Card className='hover:shadow-md transition-shadow cursor-pointer'>
-            <Link href='/client/tickets/create'>
-              <CardContent className='p-6'>
-                <div className='flex items-start space-x-4'>
-                  <div className='p-3 bg-blue-100 rounded-lg'>
-                    <MessageSquare className='h-6 w-6 text-blue-600' />
-                  </div>
-                  <div>
-                    <h3 className='font-semibold text-foreground mb-1'>Crear Ticket</h3>
-                    <p className='text-sm text-muted-foreground'>
-                      ¿No encuentras la respuesta? Contacta con soporte
-                    </p>
-                  </div>
+        <Card className='hover:shadow-md transition-shadow cursor-pointer'>
+          <Link href='/client/tickets'>
+            <CardContent className='p-6'>
+              <div className='flex items-start space-x-4'>
+                <div className='p-3 bg-purple-100 rounded-lg'>
+                  <FileText className='h-6 w-6 text-purple-600' />
                 </div>
-              </CardContent>
-            </Link>
+                <div>
+                  <h3 className='font-semibold text-foreground mb-1'>Mis Tickets</h3>
+                  <p className='text-sm text-muted-foreground'>Ver el estado de tus solicitudes</p>
+                </div>
+              </div>
+            </CardContent>
+          </Link>
+        </Card>
+
+        <Card className='hover:shadow-md transition-shadow cursor-pointer'>
+          <Link href='/settings'>
+            <CardContent className='p-6'>
+              <div className='flex items-start space-x-4'>
+                <div className='p-3 bg-green-100 rounded-lg'>
+                  <HelpCircle className='h-6 w-6 text-green-600' />
+                </div>
+                <div>
+                  <h3 className='font-semibold text-foreground mb-1'>Configuración</h3>
+                  <p className='text-sm text-muted-foreground'>
+                    Personaliza tu cuenta y notificaciones
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Link>
+        </Card>
+      </div>
+
+      <div className='grid grid-cols-1 lg:grid-cols-4 gap-6'>
+        {/* Categories Sidebar */}
+        <div className='lg:col-span-1'>
+          <Card>
+            <CardHeader>
+              <CardTitle className='text-base'>Categorías</CardTitle>
+            </CardHeader>
+            <CardContent className='space-y-2'>
+              <Button
+                variant={selectedCategory === null ? 'default' : 'ghost'}
+                className='w-full justify-start h-auto py-2'
+                onClick={() => setSelectedCategory(null)}
+              >
+                <HelpCircle className='h-4 w-4 mr-2 shrink-0' />
+                <span className='flex-1 text-left'>Todas</span>
+                <Badge variant='secondary' className='ml-2 shrink-0'>
+                  {faqs.length}
+                </Badge>
+              </Button>
+              {categories.map(category => {
+                const count = faqs.filter(faq => faq.category === category).length
+                const Icon =
+                  category === 'Primeros Pasos'
+                    ? Zap
+                    : category === 'Gestión de Tickets'
+                      ? FileText
+                      : HelpCircle
+                return (
+                  <Button
+                    key={category}
+                    variant={selectedCategory === category ? 'default' : 'ghost'}
+                    className='w-full justify-start h-auto py-2 whitespace-normal'
+                    onClick={() => setSelectedCategory(category)}
+                  >
+                    <Icon className='h-4 w-4 mr-2 shrink-0 mt-0.5' />
+                    <span className='flex-1 text-left break-words'>{category}</span>
+                    <Badge variant='secondary' className='ml-2 shrink-0'>
+                      {count}
+                    </Badge>
+                  </Button>
+                )
+              })}
+            </CardContent>
           </Card>
 
-          <Card className='hover:shadow-md transition-shadow cursor-pointer'>
-            <Link href='/client/tickets'>
-              <CardContent className='p-6'>
-                <div className='flex items-start space-x-4'>
-                  <div className='p-3 bg-purple-100 rounded-lg'>
-                    <FileText className='h-6 w-6 text-purple-600' />
-                  </div>
-                  <div>
-                    <h3 className='font-semibold text-foreground mb-1'>Mis Tickets</h3>
-                    <p className='text-sm text-muted-foreground'>
-                      Ver el estado de tus solicitudes
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Link>
-          </Card>
-
-          <Card className='hover:shadow-md transition-shadow cursor-pointer'>
-            <Link href='/settings'>
-              <CardContent className='p-6'>
-                <div className='flex items-start space-x-4'>
-                  <div className='p-3 bg-green-100 rounded-lg'>
-                    <HelpCircle className='h-6 w-6 text-green-600' />
-                  </div>
-                  <div>
-                    <h3 className='font-semibold text-foreground mb-1'>Configuración</h3>
-                    <p className='text-sm text-muted-foreground'>
-                      Personaliza tu cuenta y notificaciones
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Link>
+          {/* Contact Card */}
+          <Card className='mt-6'>
+            <CardHeader>
+              <CardTitle className='text-base'>¿Necesitas más ayuda?</CardTitle>
+            </CardHeader>
+            <CardContent className='space-y-3'>
+              <p className='text-sm text-muted-foreground mb-4'>
+                Si no encuentras la respuesta que buscas, nuestro equipo de soporte está listo para
+                ayudarte.
+              </p>
+              <Button className='w-full' asChild>
+                <Link href='/client/tickets/create'>
+                  <MessageSquare className='h-4 w-4 mr-2' />
+                  Contactar Soporte
+                </Link>
+              </Button>
+            </CardContent>
           </Card>
         </div>
 
-        <div className='grid grid-cols-1 lg:grid-cols-4 gap-6'>
-          {/* Categories Sidebar */}
-          <div className='lg:col-span-1'>
-            <Card>
-              <CardHeader>
-                <CardTitle className='text-base'>Categorías</CardTitle>
-              </CardHeader>
-              <CardContent className='space-y-2'>
-                <Button
-                  variant={selectedCategory === null ? 'default' : 'ghost'}
-                  className='w-full justify-start h-auto py-2'
-                  onClick={() => setSelectedCategory(null)}
-                >
-                  <HelpCircle className='h-4 w-4 mr-2 shrink-0' />
-                  <span className='flex-1 text-left'>Todas</span>
-                  <Badge variant='secondary' className='ml-2 shrink-0'>
-                    {faqs.length}
-                  </Badge>
-                </Button>
-                {categories.map(category => {
-                  const count = faqs.filter(faq => faq.category === category).length
-                  const Icon =
-                    category === 'Primeros Pasos'
-                      ? Zap
-                      : category === 'Gestión de Tickets'
-                        ? FileText
-                        : HelpCircle
-                  return (
-                    <Button
-                      key={category}
-                      variant={selectedCategory === category ? 'default' : 'ghost'}
-                      className='w-full justify-start h-auto py-2 whitespace-normal'
-                      onClick={() => setSelectedCategory(category)}
-                    >
-                      <Icon className='h-4 w-4 mr-2 shrink-0 mt-0.5' />
-                      <span className='flex-1 text-left break-words'>{category}</span>
-                      <Badge variant='secondary' className='ml-2 shrink-0'>
-                        {count}
-                      </Badge>
-                    </Button>
-                  )
-                })}
-              </CardContent>
-            </Card>
-
-            {/* Contact Card */}
-            <Card className='mt-6'>
-              <CardHeader>
-                <CardTitle className='text-base'>¿Necesitas más ayuda?</CardTitle>
-              </CardHeader>
-              <CardContent className='space-y-3'>
-                <p className='text-sm text-muted-foreground mb-4'>
-                  Si no encuentras la respuesta que buscas, nuestro equipo de soporte está listo
-                  para ayudarte.
-                </p>
-                <Button className='w-full' asChild>
-                  <Link href='/client/tickets/create'>
-                    <MessageSquare className='h-4 w-4 mr-2' />
-                    Contactar Soporte
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* FAQs List */}
-          <div className='lg:col-span-3'>
-            <Card>
-              <CardHeader>
-                <CardTitle>Preguntas Frecuentes</CardTitle>
-                <CardDescription>
-                  {filteredFaqs.length} pregunta{filteredFaqs.length !== 1 ? 's' : ''}{' '}
-                  {searchQuery && `encontrada${filteredFaqs.length !== 1 ? 's' : ''}`}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {filteredFaqs.length === 0 ? (
-                  <div className='text-center py-12'>
-                    <HelpCircle className='h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50' />
-                    <h3 className='text-lg font-semibold text-foreground mb-2'>
-                      No se encontraron resultados
-                    </h3>
-                    <p className='text-muted-foreground mb-4'>
-                      Intenta con otros términos de búsqueda o explora todas las categorías
-                    </p>
-                    <Button onClick={() => setSearchQuery('')}>Ver todas las preguntas</Button>
-                  </div>
-                ) : (
-                  <div className='space-y-3'>
-                    {filteredFaqs.map(faq => {
-                      const Icon = faq.icon
-                      return (
-                        <div
-                          key={faq.id}
-                          className='border border-border rounded-lg overflow-hidden'
+        {/* FAQs List */}
+        <div className='lg:col-span-3'>
+          <Card>
+            <CardHeader>
+              <CardTitle>Preguntas Frecuentes</CardTitle>
+              <CardDescription>
+                {filteredFaqs.length} pregunta{filteredFaqs.length !== 1 ? 's' : ''}{' '}
+                {searchQuery && `encontrada${filteredFaqs.length !== 1 ? 's' : ''}`}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {filteredFaqs.length === 0 ? (
+                <div className='text-center py-12'>
+                  <HelpCircle className='h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50' />
+                  <h3 className='text-lg font-semibold text-foreground mb-2'>
+                    No se encontraron resultados
+                  </h3>
+                  <p className='text-muted-foreground mb-4'>
+                    Intenta con otros términos de búsqueda o explora todas las categorías
+                  </p>
+                  <Button onClick={() => setSearchQuery('')}>Ver todas las preguntas</Button>
+                </div>
+              ) : (
+                <div className='space-y-3'>
+                  {filteredFaqs.map(faq => {
+                    const Icon = faq.icon
+                    return (
+                      <div key={faq.id} className='border border-border rounded-lg overflow-hidden'>
+                        <button
+                          onClick={() => toggleFaq(faq.id)}
+                          className='w-full p-4 flex items-center justify-between hover:bg-muted transition-colors'
                         >
-                          <button
-                            onClick={() => toggleFaq(faq.id)}
-                            className='w-full p-4 flex items-center justify-between hover:bg-muted transition-colors'
-                          >
-                            <div className='flex items-start space-x-3 text-left'>
-                              <Icon className='h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0' />
-                              <div>
-                                <h3 className='font-semibold text-foreground'>{faq.question}</h3>
-                                <Badge variant='secondary' className='mt-2 text-xs'>
-                                  {faq.category}
-                                </Badge>
-                              </div>
+                          <div className='flex items-start space-x-3 text-left'>
+                            <Icon className='h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0' />
+                            <div>
+                              <h3 className='font-semibold text-foreground'>{faq.question}</h3>
+                              <Badge variant='secondary' className='mt-2 text-xs'>
+                                {faq.category}
+                              </Badge>
                             </div>
-                            {expandedFaq === faq.id ? (
-                              <ChevronUp className='h-5 w-5 text-muted-foreground flex-shrink-0' />
-                            ) : (
-                              <ChevronDown className='h-5 w-5 text-muted-foreground flex-shrink-0' />
-                            )}
-                          </button>
-
-                          {expandedFaq === faq.id && (
-                            <div className='p-4 pt-0 border-t bg-muted/50'>
-                              <p className='text-sm text-foreground leading-relaxed'>
-                                {faq.answer}
-                              </p>
-                            </div>
+                          </div>
+                          {expandedFaq === faq.id ? (
+                            <ChevronUp className='h-5 w-5 text-muted-foreground flex-shrink-0' />
+                          ) : (
+                            <ChevronDown className='h-5 w-5 text-muted-foreground flex-shrink-0' />
                           )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                        </button>
+
+                        {expandedFaq === faq.id && (
+                          <div className='p-4 pt-0 border-t bg-muted/50'>
+                            <p className='text-sm text-foreground leading-relaxed'>{faq.answer}</p>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
-    </RoleDashboardLayout>
+    </div>
   )
 }

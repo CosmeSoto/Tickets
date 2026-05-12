@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
+import { useSyncDashboardPageMeta } from '@/contexts/dashboard-shell-context'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -136,29 +137,31 @@ export default function AdminAssetRequestsPage() {
     setPage(1)
   }
 
+  const refreshHeader = useMemo(
+    () => (
+      <Button
+        onClick={() => {
+          loadRequests()
+          loadStats()
+        }}
+        variant='outline'
+        disabled={isLoading}
+      >
+        <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+        Actualizar
+      </Button>
+    ),
+    [isLoading]
+  )
+
+  useSyncDashboardPageMeta({
+    title: 'Gestión de Solicitudes de Activos',
+    subtitle: 'Administra todas las solicitudes de equipos, licencias y mantenimiento',
+    headerActions: refreshHeader,
+  })
+
   return (
     <div className='container mx-auto py-6 space-y-6'>
-      {/* Header */}
-      <div className='flex items-center justify-between'>
-        <div>
-          <h1 className='text-3xl font-bold'>Gestión de Solicitudes de Activos</h1>
-          <p className='text-muted-foreground'>
-            Administra todas las solicitudes de equipos, licencias y mantenimiento
-          </p>
-        </div>
-        <Button
-          onClick={() => {
-            loadRequests()
-            loadStats()
-          }}
-          variant='outline'
-          disabled={isLoading}
-        >
-          <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-          Actualizar
-        </Button>
-      </div>
-
       {/* Estadísticas */}
       <div className='grid gap-4 md:grid-cols-5'>
         <Card>

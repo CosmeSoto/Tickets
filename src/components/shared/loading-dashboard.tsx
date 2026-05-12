@@ -3,6 +3,8 @@
  * Muestra un spinner mientras se cargan los datos
  */
 
+'use client'
+
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
 import { Loader2 } from 'lucide-react'
 
@@ -10,19 +12,30 @@ interface LoadingDashboardProps {
   title?: string
   subtitle?: string
   message?: string
+  /** Si true, no envuelve RoleDashboardLayout (shell ya provisto por DashboardShellProvider). */
+  embedded?: boolean
 }
 
 export function LoadingDashboard({
   title = 'Dashboard',
   subtitle = 'Cargando datos...',
   message = 'Por favor espera mientras cargamos tu información',
+  embedded = false,
 }: LoadingDashboardProps) {
+  const inner = (
+    <div className='flex flex-col items-center justify-center h-64 space-y-4'>
+      <Loader2 className='h-12 w-12 animate-spin text-primary' />
+      <p className='text-sm text-muted-foreground'>{message}</p>
+    </div>
+  )
+
+  if (embedded) {
+    return inner
+  }
+
   return (
     <RoleDashboardLayout title={title} subtitle={subtitle}>
-      <div className='flex flex-col items-center justify-center h-64 space-y-4'>
-        <Loader2 className='h-12 w-12 animate-spin text-primary' />
-        <p className='text-sm text-muted-foreground'>{message}</p>
-      </div>
+      {inner}
     </RoleDashboardLayout>
   )
 }

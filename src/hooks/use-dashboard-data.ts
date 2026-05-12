@@ -7,6 +7,10 @@
 
 import { useState, useEffect, useCallback } from 'react'
 
+/** El endpoint de stats puede ser pesado en cold start; 10s provocaba aborts falsos. */
+const DASHBOARD_FETCH_TIMEOUT_MS = 30_000
+const DASHBOARD_SINGLE_FETCH_TIMEOUT_MS = 25_000
+
 type Role = 'ADMIN' | 'TECHNICIAN' | 'CLIENT'
 
 interface DashboardStats {
@@ -118,11 +122,11 @@ export function useDashboardData(role: Role): UseDashboardDataReturn {
     setIsLoading(true)
     setError(null)
 
-    try {
-      // Cargar estadísticas y tickets en paralelo con timeout
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10s timeout
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), DASHBOARD_FETCH_TIMEOUT_MS)
 
+    try {
+      // Cargar estadísticas y tickets en paralelo con timeout compartido
       const [statsResponse, ticketsResponse] = await Promise.all([
         fetch(`/api/dashboard/stats?role=${role}`, {
           signal: controller.signal,
@@ -137,8 +141,6 @@ export function useDashboardData(role: Role): UseDashboardDataReturn {
           },
         }),
       ])
-
-      clearTimeout(timeoutId)
 
       // Procesar estadísticas
       if (statsResponse.ok) {
@@ -184,6 +186,7 @@ export function useDashboardData(role: Role): UseDashboardDataReturn {
         console.error('Dashboard data error:', err)
       }
     } finally {
+      clearTimeout(timeoutId)
       setIsLoading(false)
     }
   }, [role])
@@ -237,18 +240,16 @@ export function useDashboardStats(role: Role) {
     setIsLoading(true)
     setError(null)
 
-    try {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 5000)
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), DASHBOARD_SINGLE_FETCH_TIMEOUT_MS)
 
+    try {
       const response = await fetch(`/api/dashboard/stats?role=${role}`, {
         signal: controller.signal,
         headers: {
           'Cache-Control': 'max-age=60',
         },
       })
-
-      clearTimeout(timeoutId)
 
       if (response.ok) {
         const data = await response.json()
@@ -264,6 +265,7 @@ export function useDashboardStats(role: Role) {
         setError(errorMessage)
       }
     } finally {
+      clearTimeout(timeoutId)
       setIsLoading(false)
     }
   }, [role])
@@ -310,18 +312,16 @@ export function useDashboardTickets(role: Role, limit: number = 5) {
     setIsLoading(true)
     setError(null)
 
-    try {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 5000)
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), DASHBOARD_SINGLE_FETCH_TIMEOUT_MS)
 
+    try {
       const response = await fetch(`/api/dashboard/tickets?role=${role}&limit=${limit}`, {
         signal: controller.signal,
         headers: {
           'Cache-Control': 'max-age=30',
         },
       })
-
-      clearTimeout(timeoutId)
 
       if (response.ok) {
         const data = await response.json()
@@ -344,6 +344,7 @@ export function useDashboardTickets(role: Role, limit: number = 5) {
       }
       setTickets([])
     } finally {
+      clearTimeout(timeoutId)
       setIsLoading(false)
     }
   }, [role, limit])

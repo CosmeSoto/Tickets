@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSyncDashboardPageMeta } from '@/contexts/dashboard-shell-context'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -89,6 +90,15 @@ export default function AdminAssetRequestDetailPage({ params }: { params: { id: 
   const canApprove = request && (request.status === 'PENDING' || request.status === 'UNDER_REVIEW')
   const canReject = request && (request.status === 'PENDING' || request.status === 'UNDER_REVIEW')
 
+  useSyncDashboardPageMeta({
+    title: request ? `Solicitud ${request.code}` : 'Revisar solicitud',
+    subtitle: request
+      ? `${request.familyName} · ${request.status}`
+      : isLoading
+        ? 'Cargando…'
+        : 'Detalle de solicitud de activo',
+  })
+
   if (isLoading) {
     return (
       <div className='container mx-auto py-6'>
@@ -122,10 +132,6 @@ export default function AdminAssetRequestDetailPage({ params }: { params: { id: 
               <ArrowLeft className='h-4 w-4' />
             </Button>
           </Link>
-          <div>
-            <h1 className='text-3xl font-bold'>Revisar Solicitud</h1>
-            <p className='text-muted-foreground'>Gestiona la solicitud de activo</p>
-          </div>
         </div>
         <div className='flex gap-2'>
           <Button onClick={loadRequest} variant='outline' disabled={isLoading}>

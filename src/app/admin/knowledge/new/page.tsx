@@ -1,6 +1,7 @@
 'use client'
 
 import { Suspense, useEffect, useState, useRef } from 'react'
+import { useSyncDashboardPageMeta } from '@/contexts/dashboard-shell-context'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useKnowledge } from '@/hooks/use-knowledge'
@@ -52,6 +53,16 @@ function NewArticleContent() {
   useEffect(() => {
     loadCategories()
   }, [loadCategories])
+
+  const shellSubtitle =
+    sourceTicketId !== null
+      ? `Creando desde ticket · ${sourceTicketId}`
+      : 'Redacta y publica contenido'
+
+  useSyncDashboardPageMeta({
+    title: 'Nuevo artículo',
+    subtitle: shellSubtitle,
+  })
 
   // Cargar datos del ticket si viene desde un ticket
   useEffect(() => {

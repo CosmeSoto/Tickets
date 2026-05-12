@@ -6,6 +6,7 @@
 
 'use client'
 
+import { useMemo } from 'react'
 import {
   Database,
   Download,
@@ -22,7 +23,7 @@ import {
   Shield,
   ArrowLeft,
 } from 'lucide-react'
-import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
+import { useSyncDashboardPageMeta } from '@/contexts/dashboard-shell-context'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -85,6 +86,78 @@ export default function BackupsPage() {
     loadStats,
   } = useBackups()
 
+  const subtitleLink = useMemo(
+    () => (
+      <button
+        type='button'
+        onClick={() => router.push('/admin/settings')}
+        className='flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors'
+      >
+        <ArrowLeft className='h-3 w-3' />
+        Configuración del sistema
+      </button>
+    ),
+    [router]
+  )
+
+  const headerActionsMemo = useMemo(
+    () => (
+      <div className='flex items-center space-x-3'>
+        <Button variant='outline' onClick={refreshData} disabled={loading} size='sm'>
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          Actualizar
+        </Button>
+        {failedCount > 0 && (
+          <Button
+            variant='outline'
+            onClick={cleanupFailedBackups}
+            disabled={loading}
+            size='sm'
+            className='text-destructive hover:text-destructive hover:bg-destructive/10'
+          >
+            <Trash2 className='h-4 w-4 mr-2' />
+            Limpiar Fallidos ({failedCount})
+          </Button>
+        )}
+        <div className='flex items-center gap-2'>
+          <Select
+            value={manualBackupScope}
+            onValueChange={v => setManualBackupScope(v as 'full' | 'tickets')}
+          >
+            <SelectTrigger className='w-[200px] h-9 text-xs'>
+              <SelectValue placeholder='Ámbito' />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value='full'>Completo (BD)</SelectItem>
+              <SelectItem value='tickets'>Solo tickets (JSON)</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button onClick={createBackup} disabled={creating} size='sm'>
+            <Plus className={`h-4 w-4 mr-2 ${creating ? 'animate-spin' : ''}`} />
+            {creating ? 'Creando...' : 'Crear Backup'}
+          </Button>
+        </div>
+      </div>
+    ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      loading,
+      creating,
+      failedCount,
+      manualBackupScope,
+      refreshData,
+      cleanupFailedBackups,
+      createBackup,
+      setManualBackupScope,
+    ]
+  )
+
+  useSyncDashboardPageMeta({
+    title: 'Sistema de Backups',
+    subtitle: subtitleLink,
+    headerActions: headerActionsMemo,
+  })
+
   if (status === 'loading') {
     return (
       <div className='flex items-center justify-center h-64'>
@@ -98,59 +171,8 @@ export default function BackupsPage() {
 
   if (!session || session.user.role !== 'ADMIN') return null
 
-  const headerActions = (
-    <div className='flex items-center space-x-3'>
-      <Button variant='outline' onClick={refreshData} disabled={loading} size='sm'>
-        <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-        Actualizar
-      </Button>
-      {failedCount > 0 && (
-        <Button
-          variant='outline'
-          onClick={cleanupFailedBackups}
-          disabled={loading}
-          size='sm'
-          className='text-destructive hover:text-destructive hover:bg-destructive/10'
-        >
-          <Trash2 className='h-4 w-4 mr-2' />
-          Limpiar Fallidos ({failedCount})
-        </Button>
-      )}
-      <div className='flex items-center gap-2'>
-        <Select
-          value={manualBackupScope}
-          onValueChange={v => setManualBackupScope(v as 'full' | 'tickets')}
-        >
-          <SelectTrigger className='w-[200px] h-9 text-xs'>
-            <SelectValue placeholder='Ámbito' />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value='full'>Completo (BD)</SelectItem>
-            <SelectItem value='tickets'>Solo tickets (JSON)</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button onClick={createBackup} disabled={creating} size='sm'>
-          <Plus className={`h-4 w-4 mr-2 ${creating ? 'animate-spin' : ''}`} />
-          {creating ? 'Creando...' : 'Crear Backup'}
-        </Button>
-      </div>
-    </div>
-  )
-
   return (
-    <RoleDashboardLayout
-      title='Sistema de Backups'
-      subtitle={
-        <button
-          onClick={() => router.push('/admin/settings')}
-          className='flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors'
-        >
-          <ArrowLeft className='h-3 w-3' />
-          Configuración del sistema
-        </button>
-      }
-      headerActions={headerActions}
-    >
+    <>
       <div className='space-y-6'>
         <Tabs value={activeTab} onValueChange={setActiveTab} className='space-y-6'>
           <TabsList className='grid w-full grid-cols-5 bg-muted'>
@@ -482,6 +504,6 @@ export default function BackupsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </RoleDashboardLayout>
+    </>
   )
 }

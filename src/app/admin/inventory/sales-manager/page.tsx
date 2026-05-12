@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
+import { useSyncDashboardPageMeta } from '@/contexts/dashboard-shell-context'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
@@ -129,6 +130,22 @@ export default function SalesManagerPage() {
     loadData()
   }
 
+  const refreshHeader = useMemo(
+    () => (
+      <Button onClick={loadData} disabled={isLoading} variant='outline'>
+        <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+        Actualizar
+      </Button>
+    ),
+    [isLoading]
+  )
+
+  useSyncDashboardPageMeta({
+    title: 'Gestor de Ventas',
+    subtitle: 'Administra equipos disponibles y en venta pública',
+    headerActions: refreshHeader,
+  })
+
   // Filtrar equipos
   const filteredAvailable = availableEquipment.filter(eq => {
     if (!searchAvailable) return true
@@ -154,18 +171,6 @@ export default function SalesManagerPage() {
 
   return (
     <div className='container mx-auto py-6 space-y-6'>
-      {/* Header */}
-      <div className='flex items-center justify-between'>
-        <div>
-          <h1 className='text-3xl font-bold'>Gestor de Ventas</h1>
-          <p className='text-muted-foreground'>Administra equipos disponibles y en venta pública</p>
-        </div>
-        <Button onClick={loadData} disabled={isLoading} variant='outline'>
-          <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-          Actualizar
-        </Button>
-      </div>
-
       {/* Stats */}
       {stats && <SalesStatsCards stats={stats} />}
 

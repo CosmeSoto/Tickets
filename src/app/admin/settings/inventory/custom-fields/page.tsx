@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { useSyncDashboardPageMeta } from '@/contexts/dashboard-shell-context'
 import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Loader2, Plus, Settings } from 'lucide-react'
+import { Loader2, Settings } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { CustomFieldsManager } from '@/components/inventory/custom-fields/custom-fields-manager'
 import {
@@ -61,6 +62,21 @@ export default function CustomFieldsPage() {
     }
   }
 
+  const shellHeaderActions = useMemo(
+    () => (
+      <Button variant='outline' size='icon' type='button'>
+        <Settings className='h-4 w-4' />
+      </Button>
+    ),
+    []
+  )
+
+  useSyncDashboardPageMeta({
+    title: 'Campos Personalizados',
+    subtitle: 'Gestiona los atributos personalizados para cada familia de inventario',
+    headerActions: session?.user?.role === 'ADMIN' ? shellHeaderActions : undefined,
+  })
+
   if (status === 'loading' || loading) {
     return (
       <div className='flex items-center justify-center min-h-screen'>
@@ -84,20 +100,6 @@ export default function CustomFieldsPage() {
 
   return (
     <div className='container mx-auto py-8 space-y-6'>
-      {/* Header */}
-      <div className='flex items-center justify-between'>
-        <div>
-          <h1 className='text-3xl font-bold tracking-tight'>Campos Personalizados</h1>
-          <p className='text-muted-foreground mt-2'>
-            Gestiona los atributos personalizados para cada familia de inventario
-          </p>
-        </div>
-        <Button variant='outline' size='icon'>
-          <Settings className='h-4 w-4' />
-        </Button>
-      </div>
-
-      {/* Selector de Familia */}
       <Card>
         <CardHeader>
           <CardTitle>Seleccionar Familia</CardTitle>
