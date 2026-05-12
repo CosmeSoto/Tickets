@@ -148,7 +148,7 @@ export async function createBulkEquipment(input: BulkEquipmentInput): Promise<Bu
         qrCode: QRCodeService.generateUniqueQRId('EQ'),
         // Campos deprecated (mantener por compatibilidad)
         brand,
-        model_old: modelOld,
+        model: modelOld,
       }))
 
       // Crear todos los equipos
@@ -177,7 +177,7 @@ export async function createBulkEquipment(input: BulkEquipmentInput): Promise<Bu
       code: eq.code,
       serialNumber: eq.serialNumber,
       brand: eq.brand,
-      model: eq.model_old,
+      model: eq.model,
       status: eq.status,
       condition: eq.condition,
       createdAt: eq.createdAt,
@@ -260,7 +260,7 @@ export async function getStockInfo(brand: string, model: string, typeId: string)
     const equipment = await prisma.equipment.findMany({
       where: {
         typeId,
-        OR: [{ model: { brand, model } }, { AND: [{ brand }, { model_old: model }] }],
+        OR: [{ model: { brand, model } }, { AND: [{ brand }, { model: model }] }],
       },
       select: {
         status: true,

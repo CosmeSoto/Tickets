@@ -54,7 +54,7 @@ export class RentalAlertService {
       const admins = await this.getFamilyAdmins(equipment.type.family?.id ?? null)
 
       // Información del equipo
-      const equipmentInfo = `${equipment.model?.brand || equipment.brand} ${equipment.model?.model || equipment.model_old} (${equipment.code})`
+      const equipmentInfo = `${equipment.model?.brand || equipment.brand} ${equipment.model?.model || equipment.model} (${equipment.code})`
       const assignedTo = equipment.assignments[0]?.receiver?.name || 'Sin asignar'
 
       // Enviar notificación a cada administrador

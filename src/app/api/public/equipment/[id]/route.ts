@@ -166,7 +166,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       brand: equipment.brand,
       model: equipment.model
         ? [equipment.model.brand, equipment.model.model].filter(Boolean).join(' ')
-        : equipment.model_old,
+        : equipment.model,
       typeName: equipment.type.name,
       typeIcon: equipment.type.icon,
       status: equipment.status,

@@ -272,7 +272,7 @@ describe(
             code: testCode,
             serialNumber: 'TEST123',
             brand: 'Test Brand',
-            model_old: 'Test Model',
+            model: 'Test Model',
             modelId,
             typeId: type.id,
             departmentId: (await prisma.departments.findFirst())!.id,

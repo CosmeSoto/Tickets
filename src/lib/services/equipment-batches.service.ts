@@ -274,7 +274,7 @@ export async function createBatch(input: CreateBatchInput): Promise<BatchCreateR
           // Campos requeridos
           qrCode,
           brand: model.brand,
-          model_old: model.model,
+          model: model.model,
           location: null,
           physicalLocation: null,
         }

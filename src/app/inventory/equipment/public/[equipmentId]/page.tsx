@@ -85,7 +85,7 @@ export default async function EquipmentPublicPage({ params }: PageProps) {
   }
 
   const displayBrand = equipment.model?.brand ?? equipment.brand
-  const displayModel = equipment.model?.model ?? equipment.model_old
+  const displayModel = equipment.model?.model ?? equipment.model
   const catalogLabel = `${displayBrand} ${displayModel}`.trim()
 
   // Registrar escaneo en audit_logs (fire-and-forget, no bloquea el render)

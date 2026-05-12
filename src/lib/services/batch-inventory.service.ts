@@ -89,7 +89,7 @@ export class BatchService {
               serialNumber: item.serialNumber || '',
               modelId: commonData.modelId,
               brand: model.brand,
-              model_old: model.model,
+              model: model.model,
               typeId: model.typeId,
               batchId: batch.id,
               departmentId: commonData.departmentId,

@@ -62,7 +62,7 @@ export class ModelAggregationService {
     if (filters?.search) {
       where.OR = [
         { brand: { contains: filters.search, mode: 'insensitive' } },
-        { model_old: { contains: filters.search, mode: 'insensitive' } },
+        { model: { contains: filters.search, mode: 'insensitive' } },
       ]
     }
 
@@ -234,7 +234,7 @@ export class ModelAggregationService {
     return {
       modelId,
       brand: first.brand,
-      model: first.model_old,
+      model: first.model,
       typeId: first.typeId,
       typeName: first.type?.name ?? 'Sin tipo',
       total,

@@ -54,9 +54,7 @@ export async function GET(req: NextRequest) {
     })
     const mapped = items.map(item => ({
       id: item.id,
-      name: item.model
-        ? `${item.model.brand} ${item.model.model}`
-        : `${item.brand} ${item.model_old}`,
+      name: item.model ? `${item.model.brand} ${item.model.model}` : `${item.brand} ${item.model}`,
       subtype: 'EQUIPMENT' as const,
       familyId: item.type?.familyId ?? '',
       family: {
@@ -205,9 +203,7 @@ export async function GET(req: NextRequest) {
 
   const mappedEquipment: UnifiedAsset[] = equipmentItems.map(item => ({
     id: item.id,
-    name: item.model
-      ? `${item.model.brand} ${item.model.model}`
-      : `${item.brand} ${item.model_old}`,
+    name: item.model ? `${item.model.brand} ${item.model.model}` : `${item.brand} ${item.model}`,
     subtype: 'EQUIPMENT' as const,
     familyId: item.type.familyId ?? '',
     family: {

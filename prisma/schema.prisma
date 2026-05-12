@@ -945,7 +945,7 @@ model equipment {
   
   // DEPRECATED: Mantener por compatibilidad (3 meses)
   brand                 String
-  model_old             String                  @map("model")
+  model             String                  @map("model")
   
   typeId                String                  @map("type_id")
   departmentId          String?                 @map("department_id")

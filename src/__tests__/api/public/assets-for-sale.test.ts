@@ -20,7 +20,7 @@ function baseEquipmentRow(overrides: Record<string, unknown> = {}) {
     code: 'TEST-001',
     serialNumber: 'SN1',
     brand: 'Dell',
-    model_old: 'Latitude',
+    model: 'Latitude',
     model: { id: 'm1', brand: 'Dell', model: 'Latitude 5420' },
     condition: 'GOOD',
     photoUrl: 'https://example.com/p.jpg',

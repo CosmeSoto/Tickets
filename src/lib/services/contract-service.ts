@@ -48,7 +48,7 @@ const CONTRACT_INCLUDE = {
   lines: {
     orderBy: { order: 'asc' as const },
     include: {
-      equipment: { select: { id: true, code: true, brand: true, model_old: true } },
+      equipment: { select: { id: true, code: true, brand: true, model: true } },
       license: { select: { id: true, name: true } },
     },
   },
