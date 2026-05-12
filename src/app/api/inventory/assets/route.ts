@@ -54,7 +54,9 @@ export async function GET(req: NextRequest) {
     })
     const mapped = items.map(item => ({
       id: item.id,
-      name: item.model ? `${item.model.brand} ${item.model.model}` : `${item.brand} ${item.model}`,
+      name: item.model
+        ? `${item.model.brand} ${item.model.model}`
+        : `${item.brand} ${item.modelDeprecated}`,
       subtype: 'EQUIPMENT' as const,
       familyId: item.type?.familyId ?? '',
       family: {
@@ -203,21 +205,9 @@ export async function GET(req: NextRequest) {
 
   const mappedEquipment: UnifiedAsset[] = equipmentItems.map(item => ({
     id: item.id,
-    name: item.model ? `${item.model.brand} ${item.model.model}` : `${item.brand} ${item.model}`,
-    subtype: 'EQUIPMENT' as const,
-    familyId: item.type.familyId ?? '',
-    family: {
-      name: item.type.family?.name ?? '',
-      icon: item.type.family?.icon ?? null,
-      color: item.type.family?.color ?? null,
-    },
-    status: item.status,
-    code: item.code,
-    acquisitionMode: item.acquisitionMode ?? item.ownershipType ?? undefined,
-    createdAt: item.createdAt.toISOString(),
-  }))
-
-  const mappedConsumables: UnifiedAsset[] = consumableItems.map(item => ({
+    name: item.model
+      ? `${item.model.brand} ${item.model.model}`
+      : `${item.brand} ${item.modelDeprecated}`,
     id: item.id,
     name: item.name,
     subtype: 'MRO' as const,
@@ -466,7 +456,7 @@ export async function POST(req: NextRequest) {
           code: resolvedCode,
           serialNumber: serialNumber ?? '',
           brand: brand ?? '',
-          model: model ?? '',
+          modelDeprecated: model ?? '',
           typeId: typeId ?? '',
           departmentId: resolvedDepartmentId,
           status: (status as any) ?? 'AVAILABLE',

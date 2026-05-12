@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
         serialNumber: validatedData.serialNumber || '',
         modelId: validatedData.modelId,
         brand: model.brand,
-        model: model.model,
+        modelDeprecated: model.model,
         typeId: model.typeId,
         departmentId: validatedData.departmentId,
         warehouseId: validatedData.warehouseId,

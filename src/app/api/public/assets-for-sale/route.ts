@@ -120,7 +120,9 @@ export async function GET(request?: NextRequest) {
         code: eq.code,
         serialNumber: eq.serialNumber,
         brand: eq.brand,
-        model: eq.model ? [eq.model.brand, eq.model.model].filter(Boolean).join(' ') : eq.model,
+        model: eq.model
+          ? [eq.model.brand, eq.model.model].filter(Boolean).join(' ')
+          : eq.modelDeprecated,
         type: {
           id: eq.type.id,
           name: eq.type.name,

@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
         andParts.push({
           OR: [
             { brand: { contains: search, mode: 'insensitive' } },
-            { model: { contains: search, mode: 'insensitive' } },
+            { modelDeprecated: { contains: search, mode: 'insensitive' } },
             {
               model: {
                 OR: [
@@ -118,14 +118,14 @@ export async function GET(request: NextRequest) {
             take: 1,
           },
         },
-        orderBy: [{ brand: 'asc' }, { model: 'asc' }],
+        orderBy: [{ brand: 'asc' }, { modelDeprecated: 'asc' }],
       })
 
       const groupsMap = new Map<string, GroupedInventoryRow>()
 
       for (const eq of equipment) {
         const brand = eq.model?.brand ?? eq.brand
-        const modelName = eq.model?.model ?? eq.model
+        const modelName = eq.model?.model ?? eq.modelDeprecated
         const groupId = `${brand}|${modelName}|${eq.typeId}`
 
         if (!groupsMap.has(groupId)) {

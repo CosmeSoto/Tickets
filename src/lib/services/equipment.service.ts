@@ -39,9 +39,7 @@ export class EquipmentService {
           code: data.code,
           serialNumber: data.serialNumber,
           brand: data.brand,
-          model: data.model,
-          typeId: data.typeId,
-          status: (data.status || 'AVAILABLE') as any,
+          modelDeprecated: data.model,
           condition: data.condition as any,
           ownershipType: data.ownershipType as any,
           purchaseDate: data.purchaseDate
@@ -74,12 +72,12 @@ export class EquipmentService {
             code: equipment.code,
             typeId: equipment.typeId,
             brand: equipment.brand,
-            model: equipment.model,
+            model: equipment.modelDeprecated,
           },
         },
       })
 
-      return equipment as unknown as Equipment
+      return equipment
     } catch (error) {
       console.error('Error creando equipo:', error)
       throw error
@@ -194,7 +192,7 @@ export class EquipmentService {
           { code: { contains: q, mode: 'insensitive' } },
           { serialNumber: { contains: q, mode: 'insensitive' } },
           { brand: { contains: q, mode: 'insensitive' } },
-          { model: { contains: q, mode: 'insensitive' } },
+          { modelDeprecated: { contains: q, mode: 'insensitive' } },
           {
             model: {
               OR: [
@@ -296,7 +294,7 @@ export class EquipmentService {
         data: {
           ...(data.serialNumber && { serialNumber: data.serialNumber }),
           ...(data.brand && { brand: data.brand }),
-          ...(data.model && { model: data.model }),
+          ...(data.model && { modelDeprecated: data.model }),
           ...(data.typeId && { typeId: data.typeId }),
           ...(data.status && { status: data.status as any }),
           ...(data.condition && { condition: data.condition as any }),
@@ -459,8 +457,7 @@ export class EquipmentService {
         code: equipment.code,
         serialNumber: equipment.serialNumber,
         brand: equipment.brand,
-        model: equipment.model,
-        typeId: equipment.typeId,
+        model: equipment.modelDeprecated,
       }
 
       await prisma.$transaction(async tx => {

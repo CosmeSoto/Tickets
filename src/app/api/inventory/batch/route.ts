@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
             serialNumber: item.serialNumber || '',
             modelId: commonData.modelId,
             brand: model.brand,
-            model: model.model,
+            modelDeprecated: model.model,
             typeId: model.typeId,
             batchId: batch.id,
             departmentId: commonData.departmentId,

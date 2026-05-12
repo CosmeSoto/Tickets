@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
       const equipment = await prisma.equipment.findMany({
         where: {
           typeId,
-          OR: [{ model: { brand, model } }, { AND: [{ brand }, { model: model }] }],
+          OR: [{ model: { brand, model } }, { AND: [{ brand }, { modelDeprecated: model }] }],
         },
         select: {
           status: true,

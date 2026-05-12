@@ -7,10 +7,10 @@ import { notifyUser, notifyMany } from '@/lib/api/notify'
 
 function equipmentDisplayLabel(eq: {
   brand: string
-  model: string
+  modelDeprecated: string
   model: { brand: string; model: string } | null
 }) {
-  return eq.model ? `${eq.model.brand} ${eq.model.model}` : `${eq.brand} ${eq.model}`
+  return eq.model ? `${eq.model.brand} ${eq.model.model}` : `${eq.brand} ${eq.modelDeprecated}`
 }
 
 /**
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
             id: true,
             code: true,
             brand: true,
-            model: true,
+            modelDeprecated: true,
             status: true,
             model: { select: { brand: true, model: true } },
             type: { select: { name: true } },

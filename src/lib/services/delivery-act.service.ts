@@ -14,9 +14,12 @@ export class DeliveryActService {
    * Genera el PDF de un acta con lógica de reintentos
    * @private
    */
-  private static async generatePDFWithRetry(actId: string, maxRetries: number = 3): Promise<string | null> {
+  private static async generatePDFWithRetry(
+    actId: string,
+    maxRetries: number = 3
+  ): Promise<string | null> {
     let lastError: Error | null = null
-    
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         console.log(`Generando PDF para acta ${actId}, intento ${attempt}/${maxRetries}`)
@@ -26,14 +29,14 @@ export class DeliveryActService {
       } catch (error) {
         lastError = error as Error
         console.error(`Error en intento ${attempt}/${maxRetries} generando PDF:`, error)
-        
+
         // Si no es el último intento, esperar antes de reintentar
         if (attempt < maxRetries) {
           await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
         }
       }
     }
-    
+
     // Si llegamos aquí, todos los intentos fallaron
     console.error(`Falló la generación de PDF después de ${maxRetries} intentos:`, lastError)
     return null
@@ -59,11 +62,11 @@ export class DeliveryActService {
                 take: 1,
               },
               department: { include: { family: true } },
-            }
+            },
           },
           receiver: { include: { departments: true } },
           deliverer: { include: { departments: true } },
-        }
+        },
       })
 
       if (!assignment) {
@@ -85,14 +88,14 @@ export class DeliveryActService {
       const firstAttachment = eq.attachments?.[0]
       const equipmentImagePath = firstAttachment
         ? `/api/uploads/equipment/${eq.id}/${firstAttachment.filename}`
-        : (eq.photoUrl || null)
+        : eq.photoUrl || null
 
       const equipmentSnapshot = {
         id: eq.id,
         code: eq.code,
         serialNumber: eq.serialNumber,
         brand: eq.brand,
-        model: eq.model,
+        model: eq.model?.model || eq.modelDeprecated,
         type: eq.typeId,
         typeName: eq.type?.name || '',
         condition: eq.condition,
@@ -152,9 +155,9 @@ export class DeliveryActService {
               equipment: true,
               receiver: true,
               deliverer: true,
-            }
-          }
-        }
+            },
+          },
+        },
       })
 
       // Registrar en auditoría
@@ -167,14 +170,14 @@ export class DeliveryActService {
           userId: assignment.delivererId,
           details: {
             folio,
-            equipo: `${assignment.equipment.code} — ${assignment.equipment.brand} ${assignment.equipment.model}`,
+            equipo: `${assignment.equipment.code} — ${assignment.equipment.brand} ${assignment.equipment.model?.model || assignment.equipment.modelDeprecated}`,
             numeroSerie: assignment.equipment.serialNumber,
             entregadoPor: `${assignment.deliverer.name} (${assignment.deliverer.email})`,
             recibidoPor: `${assignment.receiver.name} (${assignment.receiver.email})`,
             tipoAsignacion: assignment.assignmentType,
             expira: expirationDate.toLocaleDateString('es-ES'),
-          }
-        }
+          },
+        },
       })
 
       // Enviar notificación de acta creada (asíncrono)
@@ -203,9 +206,9 @@ export class DeliveryActService {
               equipment: true,
               receiver: true,
               deliverer: true,
-            }
-          }
-        }
+            },
+          },
+        },
       })
 
       return act as DeliveryAct | null
@@ -228,9 +231,9 @@ export class DeliveryActService {
               equipment: true,
               receiver: true,
               deliverer: true,
-            }
-          }
-        }
+            },
+          },
+        },
       })
 
       return act as DeliveryAct | null
@@ -291,12 +294,12 @@ export class DeliveryActService {
               equipment: true,
               receiver: true,
               deliverer: true,
-            }
-          }
-        }
+            },
+          },
+        },
       })
 
-      const equipoLabel = `${(act as any).assignment?.equipment?.code} — ${(act as any).assignment?.equipment?.brand} ${(act as any).assignment?.equipment?.model}`
+      const equipoLabel = `${(act as any).assignment?.equipment?.code} — ${(act as any).assignment?.equipment?.brand} ${(act as any).assignment?.equipment?.model?.model || (act as any).assignment?.equipment?.modelDeprecated}`
 
       // Registrar en auditoría con información completa y legible
       await prisma.audit_logs.create({
@@ -315,8 +318,8 @@ export class DeliveryActService {
             ipOrigen: signature.ipAddress,
             fechaAceptacion: signature.timestamp.toLocaleString('es-ES'),
             descripcion: `${act.receiverInfo.name} aceptó y firmó el acta de entrega del equipo ${(act as any).assignment?.equipment?.code}. La entrega queda registrada oficialmente.`,
-          }
-        }
+          },
+        },
       })
 
       // ── Notificaciones INMEDIATAS al aceptar (no esperan el PDF) ──────────
@@ -341,11 +344,7 @@ export class DeliveryActService {
    * Rechaza un acta de entrega
    * Cancela la asignación asociada
    */
-  static async rejectAct(
-    actId: string,
-    reason: string,
-    userId: string
-  ): Promise<DeliveryAct> {
+  static async rejectAct(actId: string, reason: string, userId: string): Promise<DeliveryAct> {
     try {
       const act = await this.getActById(actId)
 
@@ -358,7 +357,7 @@ export class DeliveryActService {
       }
 
       // Actualizar acta y cancelar asignación en transacción
-      const updated = await prisma.$transaction(async (tx) => {
+      const updated = await prisma.$transaction(async tx => {
         // Actualizar acta
         const updatedAct = await tx.delivery_acts.update({
           where: { id: actId },
@@ -373,9 +372,9 @@ export class DeliveryActService {
                 equipment: true,
                 receiver: true,
                 deliverer: true,
-              }
-            }
-          }
+              },
+            },
+          },
         })
 
         // Marcar asignación como inactiva
@@ -384,13 +383,13 @@ export class DeliveryActService {
           data: {
             isActive: false,
             actualEndDate: new Date(),
-          }
+          },
         })
 
         // Restaurar estado del equipo a AVAILABLE
         await tx.equipment.update({
           where: { id: act.assignment.equipmentId },
-          data: { status: 'AVAILABLE' }
+          data: { status: 'AVAILABLE' },
         })
 
         // Registrar en auditoría
@@ -403,14 +402,14 @@ export class DeliveryActService {
             userId: userId,
             details: {
               folio: act.folio,
-              equipo: `${act.assignment?.equipment?.code} — ${act.assignment?.equipment?.brand} ${act.assignment?.equipment?.model}`,
+              equipo: `${act.assignment?.equipment?.code} — ${act.assignment?.equipment?.brand} ${act.assignment?.equipment?.model?.model || act.assignment?.equipment?.modelDeprecated}`,
               rechazadoPor: `${act.receiverInfo.name} (${act.receiverInfo.email})`,
               entregadoPor: `${act.delivererInfo.name} (${act.delivererInfo.email})`,
               motivoRechazo: reason,
               equipoRestauradoA: 'Disponible en bodega',
               descripcion: `${act.receiverInfo.name} rechazó el acta de entrega del equipo ${act.assignment?.equipment?.code}. El equipo fue devuelto a bodega y la asignación fue cancelada.`,
-            }
-          }
+            },
+          },
         })
 
         return updatedAct
@@ -449,12 +448,12 @@ export class DeliveryActService {
         where: {
           status: 'PENDING',
           expirationDate: {
-            lt: new Date()
-          }
+            lt: new Date(),
+          },
         },
         data: {
-          status: 'EXPIRED'
-        }
+          status: 'EXPIRED',
+        },
       })
 
       return result.count
@@ -478,8 +477,8 @@ export class DeliveryActService {
           status: 'PENDING',
           expirationDate: {
             lte: targetDate,
-            gte: new Date()
-          }
+            gte: new Date(),
+          },
         },
         include: {
           assignment: {
@@ -487,9 +486,9 @@ export class DeliveryActService {
               equipment: true,
               receiver: true,
               deliverer: true,
-            }
-          }
-        }
+            },
+          },
+        },
       })
 
       return acts as DeliveryAct[]
@@ -503,7 +502,12 @@ export class DeliveryActService {
    * Verifica la autenticidad de un acta usando el hash
    */
   static verifyActAuthenticity(act: DeliveryAct): boolean {
-    if (!act.verificationHash || !act.signatureTimestamp || !act.signatureIp || !act.signatureUserAgent) {
+    if (
+      !act.verificationHash ||
+      !act.signatureTimestamp ||
+      !act.signatureIp ||
+      !act.signatureUserAgent
+    ) {
       return false
     }
 

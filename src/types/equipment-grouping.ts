@@ -111,7 +111,7 @@ export interface BulkEquipmentInput {
   modelId: string // NUEVO: Referencia al modelo
   /** DEPRECATED: se rellenan desde el modelo si faltan */
   brand?: string
-  /** DEPRECATED: columna legacy `model` en BD (`model`) */
+  /** DEPRECATED: columna legacy `modelDeprecated` en BD (`model`) */
   model?: string
   typeId?: string
   departmentId?: string

@@ -14,25 +14,30 @@ export class ReturnActService {
    * Genera el PDF de un acta de devolución con lógica de reintentos
    * @private
    */
-  private static async generatePDFWithRetry(actId: string, maxRetries: number = 3): Promise<string | null> {
+  private static async generatePDFWithRetry(
+    actId: string,
+    maxRetries: number = 3
+  ): Promise<string | null> {
     let lastError: Error | null = null
-    
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`Generando PDF para acta de devolución ${actId}, intento ${attempt}/${maxRetries}`)
+        console.log(
+          `Generando PDF para acta de devolución ${actId}, intento ${attempt}/${maxRetries}`
+        )
         const pdfPath = await PDFGeneratorService.generateReturnActPDF(actId)
         console.log(`PDF generado exitosamente: ${pdfPath}`)
         return pdfPath
       } catch (error) {
         lastError = error as Error
         console.error(`Error en intento ${attempt}/${maxRetries} generando PDF:`, error)
-        
+
         if (attempt < maxRetries) {
           await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
         }
       }
     }
-    
+
     console.error(`Falló la generación de PDF después de ${maxRetries} intentos:`, lastError)
     return null
   }
@@ -50,7 +55,7 @@ export class ReturnActService {
           receiver: true,
           deliverer: true,
           deliveryAct: true,
-        }
+        },
       })
 
       if (!assignment) {
@@ -84,7 +89,7 @@ export class ReturnActService {
         code: assignment.equipment.code,
         serialNumber: assignment.equipment.serialNumber,
         brand: assignment.equipment.brand,
-        model: assignment.equipment.model,
+        model: assignment.equipment.model?.model || assignment.equipment.modelDeprecated,
         type: (assignment.equipment as any).type,
         condition: data.returnCondition,
         specifications: assignment.equipment.specifications,
@@ -133,10 +138,10 @@ export class ReturnActService {
               equipment: true,
               receiver: true,
               deliverer: true,
-            }
+            },
           },
           deliveryAct: true,
-        }
+        },
       })
 
       // Registrar en auditoría
@@ -151,8 +156,8 @@ export class ReturnActService {
             folio,
             assignmentId: data.assignmentId,
             returnCondition: data.returnCondition,
-          }
-        }
+          },
+        },
       })
 
       console.log(`Acta de devolución ${folio} creada exitosamente`)
@@ -176,10 +181,10 @@ export class ReturnActService {
               equipment: true,
               receiver: true,
               deliverer: true,
-            }
+            },
           },
           deliveryAct: true,
-        }
+        },
       })
 
       return act as ReturnAct | null
@@ -202,10 +207,10 @@ export class ReturnActService {
               equipment: true,
               receiver: true,
               deliverer: true,
-            }
+            },
           },
           deliveryAct: true,
-        }
+        },
       })
 
       return act as ReturnAct | null
@@ -219,11 +224,7 @@ export class ReturnActService {
    * Acepta un acta de devolución
    * Completa la asignación y actualiza el estado del equipo
    */
-  static async acceptAct(
-    actId: string,
-    ipAddress: string,
-    userAgent: string
-  ): Promise<ReturnAct> {
+  static async acceptAct(actId: string, ipAddress: string, userAgent: string): Promise<ReturnAct> {
     try {
       const act = await this.getActById(actId)
 
@@ -281,7 +282,7 @@ export class ReturnActService {
       }
 
       // Actualizar acta, asignación y equipo en transacción
-      const updated = await prisma.$transaction(async (tx) => {
+      const updated = await prisma.$transaction(async tx => {
         // Actualizar acta
         const updatedAct = await (tx.return_acts.update as any)({
           where: { id: actId },
@@ -299,10 +300,10 @@ export class ReturnActService {
                 equipment: true,
                 receiver: true,
                 deliverer: true,
-              }
+              },
             },
             deliveryAct: true,
-          }
+          },
         })
 
         // Completar asignación
@@ -311,7 +312,7 @@ export class ReturnActService {
           data: {
             isActive: false,
             actualEndDate: act.returnDate,
-          }
+          },
         })
 
         // Actualizar estado y condición del equipo
@@ -320,7 +321,7 @@ export class ReturnActService {
           data: {
             status: newEquipmentStatus,
             condition: newEquipmentCondition,
-          }
+          },
         })
 
         // Registrar en auditoría
@@ -337,8 +338,8 @@ export class ReturnActService {
               ipAddress: signature.ipAddress,
               newEquipmentStatus,
               newEquipmentCondition,
-            }
-          }
+            },
+          },
         })
 
         return updatedAct
@@ -360,11 +361,7 @@ export class ReturnActService {
   /**
    * Rechaza un acta de devolución
    */
-  static async rejectAct(
-    actId: string,
-    reason: string,
-    userId: string
-  ): Promise<ReturnAct> {
+  static async rejectAct(actId: string, reason: string, userId: string): Promise<ReturnAct> {
     try {
       const act = await this.getActById(actId)
 
@@ -390,10 +387,10 @@ export class ReturnActService {
               equipment: true,
               receiver: true,
               deliverer: true,
-            }
+            },
           },
           deliveryAct: true,
-        }
+        },
       })
 
       // Registrar en auditoría
@@ -407,8 +404,8 @@ export class ReturnActService {
           details: {
             folio: act.folio,
             reason,
-          }
-        }
+          },
+        },
       })
 
       console.log(`Acta de devolución ${act.folio} rechazada`)
@@ -433,7 +430,12 @@ export class ReturnActService {
    * Verifica la autenticidad de un acta usando el hash
    */
   static verifyActAuthenticity(act: ReturnAct): boolean {
-    if (!act.verificationHash || !act.signatureTimestamp || !act.signatureIp || !act.signatureUserAgent) {
+    if (
+      !act.verificationHash ||
+      !act.signatureTimestamp ||
+      !act.signatureIp ||
+      !act.signatureUserAgent
+    ) {
       return false
     }
 
