@@ -334,158 +334,159 @@ function SaleFormModal({ equipment, open, onClose, onSuccess }: SaleFormModalPro
         if (!open) handleClose()
       }}
     >
-      <DialogContent className='max-w-lg max-h-[90vh] overflow-y-auto'>
+      <DialogContent className='max-w-lg max-h-[90vh]'>
         <DialogHeader>
           <DialogTitle className='flex items-center gap-2'>
             <ShoppingCart className='h-5 w-5 text-primary' />
             Registrar venta
           </DialogTitle>
         </DialogHeader>
-
-        {/* Equipment info (read-only) */}
-        <div className='rounded-lg border bg-muted/30 px-4 py-3 space-y-1 text-sm'>
-          <p className='font-medium text-foreground'>
-            {equipment.brand} {equipment.model}
-          </p>
-          <p className='text-muted-foreground'>
-            <span className='font-mono'>{equipment.code}</span>
-            {' · '}
-            {equipment.type.name}
-            {equipment.type.family ? ` · ${equipment.type.family.name}` : ''}
-          </p>
-          {equipment.saleListingPrice != null && (
-            <p className='text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1'>
-              <Tag className='h-3 w-3' />
-              Precio de lista: {formatCurrency(equipment.saleListingPrice)}
+        <div className='overflow-y-auto max-h-[calc(90vh-80px)]'>
+          {/* Equipment info (read-only) */}
+          <div className='rounded-lg border bg-muted/30 px-4 py-3 space-y-1 text-sm'>
+            <p className='font-medium text-foreground'>
+              {equipment.brand} {equipment.model}
             </p>
-          )}
+            <p className='text-muted-foreground'>
+              <span className='font-mono'>{equipment.code}</span>
+              {' · '}
+              {equipment.type.name}
+              {equipment.type.family ? ` · ${equipment.type.family.name}` : ''}
+            </p>
+            {equipment.saleListingPrice != null && (
+              <p className='text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1'>
+                <Tag className='h-3 w-3' />
+                Precio de lista: {formatCurrency(equipment.saleListingPrice)}
+              </p>
+            )}
+          </div>
+
+          <form onSubmit={handleSubmit} className='space-y-4'>
+            {/* Buyer info */}
+            <div className='space-y-3'>
+              <p className='text-xs font-semibold text-muted-foreground uppercase tracking-wide'>
+                Datos del comprador
+              </p>
+              <div className='space-y-1'>
+                <Label htmlFor='buyerName'>
+                  Nombre del comprador <span className='text-destructive'>*</span>
+                </Label>
+                <Input
+                  id='buyerName'
+                  value={buyerName}
+                  onChange={e => setBuyerName(e.target.value)}
+                  placeholder='Nombre completo'
+                  required
+                />
+              </div>
+              <div className='grid grid-cols-2 gap-3'>
+                <div className='space-y-1'>
+                  <Label htmlFor='buyerCompany'>Empresa</Label>
+                  <Input
+                    id='buyerCompany'
+                    value={buyerCompany}
+                    onChange={e => setBuyerCompany(e.target.value)}
+                    placeholder='Empresa (opcional)'
+                  />
+                </div>
+                <div className='space-y-1'>
+                  <Label htmlFor='buyerIdNumber'>RUC / Cédula</Label>
+                  <Input
+                    id='buyerIdNumber'
+                    value={buyerIdNumber}
+                    onChange={e => setBuyerIdNumber(e.target.value)}
+                    placeholder='Identificación (opcional)'
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Sale details */}
+            <div className='space-y-3'>
+              <p className='text-xs font-semibold text-muted-foreground uppercase tracking-wide'>
+                Detalles de la venta
+              </p>
+              <div className='grid grid-cols-2 gap-3'>
+                <div className='space-y-1'>
+                  <Label htmlFor='salePrice'>
+                    Precio de venta (USD) <span className='text-destructive'>*</span>
+                  </Label>
+                  <Input
+                    id='salePrice'
+                    type='number'
+                    step='0.01'
+                    min='0.01'
+                    value={salePrice}
+                    onChange={e => setSalePrice(e.target.value)}
+                    placeholder='0.00'
+                    required
+                  />
+                </div>
+                <div className='space-y-1'>
+                  <Label htmlFor='saleDate'>
+                    Fecha de venta <span className='text-destructive'>*</span>
+                  </Label>
+                  <Input
+                    id='saleDate'
+                    type='date'
+                    value={saleDate}
+                    onChange={e => setSaleDate(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+              <div className='space-y-1'>
+                <Label htmlFor='paymentMethod'>Forma de pago</Label>
+                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                  <SelectTrigger id='paymentMethod'>
+                    <SelectValue placeholder='Seleccionar (opcional)' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_METHOD_OPTIONS.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className='space-y-1'>
+                <Label htmlFor='accessories'>
+                  Accesorios incluidos{' '}
+                  <span className='text-xs font-normal text-muted-foreground'>
+                    (separados por coma)
+                  </span>
+                </Label>
+                <Input
+                  id='accessories'
+                  value={accessoriesInput}
+                  onChange={e => setAccessoriesInput(e.target.value)}
+                  placeholder='Ej: Cargador, Funda, Mouse'
+                />
+              </div>
+              <div className='space-y-1'>
+                <Label htmlFor='notes'>Notas</Label>
+                <Textarea
+                  id='notes'
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  placeholder='Observaciones adicionales (opcional)'
+                  rows={2}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button type='button' variant='outline' onClick={handleClose} disabled={submitting}>
+                Cancelar
+              </Button>
+              <Button type='submit' disabled={submitting}>
+                {submitting && <Loader2 className='h-4 w-4 mr-2 animate-spin' />}
+                Registrar venta
+              </Button>
+            </DialogFooter>
+          </form>
         </div>
-
-        <form onSubmit={handleSubmit} className='space-y-4'>
-          {/* Buyer info */}
-          <div className='space-y-3'>
-            <p className='text-xs font-semibold text-muted-foreground uppercase tracking-wide'>
-              Datos del comprador
-            </p>
-            <div className='space-y-1'>
-              <Label htmlFor='buyerName'>
-                Nombre del comprador <span className='text-destructive'>*</span>
-              </Label>
-              <Input
-                id='buyerName'
-                value={buyerName}
-                onChange={e => setBuyerName(e.target.value)}
-                placeholder='Nombre completo'
-                required
-              />
-            </div>
-            <div className='grid grid-cols-2 gap-3'>
-              <div className='space-y-1'>
-                <Label htmlFor='buyerCompany'>Empresa</Label>
-                <Input
-                  id='buyerCompany'
-                  value={buyerCompany}
-                  onChange={e => setBuyerCompany(e.target.value)}
-                  placeholder='Empresa (opcional)'
-                />
-              </div>
-              <div className='space-y-1'>
-                <Label htmlFor='buyerIdNumber'>RUC / Cédula</Label>
-                <Input
-                  id='buyerIdNumber'
-                  value={buyerIdNumber}
-                  onChange={e => setBuyerIdNumber(e.target.value)}
-                  placeholder='Identificación (opcional)'
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Sale details */}
-          <div className='space-y-3'>
-            <p className='text-xs font-semibold text-muted-foreground uppercase tracking-wide'>
-              Detalles de la venta
-            </p>
-            <div className='grid grid-cols-2 gap-3'>
-              <div className='space-y-1'>
-                <Label htmlFor='salePrice'>
-                  Precio de venta (USD) <span className='text-destructive'>*</span>
-                </Label>
-                <Input
-                  id='salePrice'
-                  type='number'
-                  step='0.01'
-                  min='0.01'
-                  value={salePrice}
-                  onChange={e => setSalePrice(e.target.value)}
-                  placeholder='0.00'
-                  required
-                />
-              </div>
-              <div className='space-y-1'>
-                <Label htmlFor='saleDate'>
-                  Fecha de venta <span className='text-destructive'>*</span>
-                </Label>
-                <Input
-                  id='saleDate'
-                  type='date'
-                  value={saleDate}
-                  onChange={e => setSaleDate(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-            <div className='space-y-1'>
-              <Label htmlFor='paymentMethod'>Forma de pago</Label>
-              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                <SelectTrigger id='paymentMethod'>
-                  <SelectValue placeholder='Seleccionar (opcional)' />
-                </SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_METHOD_OPTIONS.map(opt => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className='space-y-1'>
-              <Label htmlFor='accessories'>
-                Accesorios incluidos{' '}
-                <span className='text-xs font-normal text-muted-foreground'>
-                  (separados por coma)
-                </span>
-              </Label>
-              <Input
-                id='accessories'
-                value={accessoriesInput}
-                onChange={e => setAccessoriesInput(e.target.value)}
-                placeholder='Ej: Cargador, Funda, Mouse'
-              />
-            </div>
-            <div className='space-y-1'>
-              <Label htmlFor='notes'>Notas</Label>
-              <Textarea
-                id='notes'
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-                placeholder='Observaciones adicionales (opcional)'
-                rows={2}
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button type='button' variant='outline' onClick={handleClose} disabled={submitting}>
-              Cancelar
-            </Button>
-            <Button type='submit' disabled={submitting}>
-              {submitting && <Loader2 className='h-4 w-4 mr-2 animate-spin' />}
-              Registrar venta
-            </Button>
-          </DialogFooter>
-        </form>
       </DialogContent>
     </Dialog>
   )
@@ -546,7 +547,11 @@ export default function ForSalePage() {
     )
   })
 
-  const { sortedData: sorted, requestSort, getSortIcon } = useTableSort(filtered, { key: 'updatedAt', direction: 'desc' })
+  const {
+    sortedData: sorted,
+    requestSort,
+    getSortIcon,
+  } = useTableSort(filtered, { key: 'updatedAt', direction: 'desc' })
 
   // Export
   const { exportCSV, exportExcel, exportPDF, exporting } = useExport({

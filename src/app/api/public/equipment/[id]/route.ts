@@ -13,7 +13,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const equipment = await prisma.equipment.findUnique({
       where: { id },
       include: {
-        type: { select: { name: true, icon: true } },
+        model: { select: { id: true, brand: true, model: true } },
+        type: { select: { name: true, icon: true, code: true } },
         department: { select: { name: true } },
         warehouse: { select: { name: true } },
         assignments: {
@@ -24,7 +25,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
             receiver: {
               select: {
                 name: true,
-                department: { select: { name: true } },
+                departments: { select: { name: true } },
               },
             },
             deliverer: { select: { name: true } },
@@ -124,7 +125,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const assignmentInfo = activeAssignment
       ? {
           receiverName: activeAssignment.receiver.name,
-          receiverDepartment: (activeAssignment.receiver as any).department?.name ?? null,
+          receiverDepartment: activeAssignment.receiver.departments?.name ?? null,
           deliveredBy: activeAssignment.deliverer.name,
           startDate: activeAssignment.startDate,
           endDate: activeAssignment.endDate ?? null,
@@ -163,7 +164,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       code: equipment.code,
       serialNumber: equipment.serialNumber,
       brand: equipment.brand,
-      model: equipment.model,
+      model: equipment.model
+        ? [equipment.model.brand, equipment.model.model].filter(Boolean).join(' ')
+        : equipment.model_old,
       typeName: equipment.type.name,
       typeIcon: equipment.type.icon,
       status: equipment.status,
@@ -180,7 +183,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       departmentName: equipment.department?.name ?? null,
       // Accesorios y especificaciones
       accessories: equipment.accessories ?? [],
-      specifications: (equipment.specifications as Record<string, string> | null) ?? null,
+      specifications: null,
       // Notas
       notes: equipment.notes ?? null,
       // Foto: primero adjunto, luego campo legacy

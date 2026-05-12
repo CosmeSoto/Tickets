@@ -15,7 +15,7 @@ interface AuditResult {
   status: 'OK' | 'WARNING' | 'ERROR'
   count: number
   message: string
-  details?: any[]
+  details?: unknown
 }
 
 const results: AuditResult[] = []
@@ -229,7 +229,7 @@ function printResults() {
     const icon = result.status === 'OK' ? '✅' : result.status === 'WARNING' ? '⚠️' : '❌'
     console.log(`\n${icon} [${result.category}] ${result.message}`)
 
-    if (result.details && result.details.length > 0) {
+    if (result.details && Array.isArray(result.details) && result.details.length > 0) {
       console.log('   Detalles:')
       console.log('   ' + JSON.stringify(result.details, null, 2).split('\n').join('\n   '))
     }

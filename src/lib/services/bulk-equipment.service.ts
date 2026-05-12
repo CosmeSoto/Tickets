@@ -6,9 +6,16 @@
 
 import prisma from '@/lib/prisma'
 import { generateSequentialCodes, validateManualCodes } from './code-generator.service'
+import { QRCodeService } from './qr-code.service'
 import { bulkEquipmentInputSchema } from '../validations/bulk-equipment'
 import type { BulkEquipmentInput, BulkCreateResult } from '@/types/equipment-grouping'
-import { EquipmentStatus, Prisma } from '@prisma/client'
+import { EquipmentStatus, Prisma, type OwnershipType } from '@prisma/client'
+
+function ownershipToCodeMode(o: OwnershipType): 'OWNED' | 'LEASED' | 'RENTED' | 'DONATED' {
+  if (o === 'FIXED_ASSET') return 'OWNED'
+  if (o === 'RENTAL') return 'RENTED'
+  return 'LEASED'
+}
 
 /**
  * Crea múltiples equipos idénticos en una sola operación
@@ -93,7 +100,7 @@ export async function createBulkEquipment(input: BulkEquipmentInput): Promise<Bu
       validatedInput.quantity,
       familyCode,
       typeCode,
-      validatedInput.ownershipType,
+      ownershipToCodeMode(validatedInput.ownershipType),
       year
     )
   } else {
@@ -138,6 +145,7 @@ export async function createBulkEquipment(input: BulkEquipmentInput): Promise<Bu
         location: null,
         physicalLocation: null,
         saleListingPrice: null,
+        qrCode: QRCodeService.generateUniqueQRId('EQ'),
         // Campos deprecated (mantener por compatibilidad)
         brand,
         model_old: modelOld,

@@ -6,16 +6,17 @@ import { useSession } from 'next-auth/react'
 interface UserModules {
   tickets: boolean
   inventory: boolean
+  patrols: boolean
   families: Array<{
     id: string
     name: string
     code: string
     color?: string | null
-    modules: { tickets: boolean; inventory: boolean }
+    modules: { tickets: boolean; inventory: boolean; patrols: boolean }
   }>
 }
 
-const DEFAULT: UserModules = { tickets: false, inventory: false, families: [] }
+const DEFAULT: UserModules = { tickets: false, inventory: false, patrols: false, families: [] }
 
 export function useUserModules() {
   const { data: session, status } = useSession()

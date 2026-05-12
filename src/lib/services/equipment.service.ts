@@ -74,12 +74,12 @@ export class EquipmentService {
             code: equipment.code,
             typeId: equipment.typeId,
             brand: equipment.brand,
-            model: equipment.model,
+            model: equipment.model_old,
           },
         },
       })
 
-      return equipment as Equipment
+      return equipment as unknown as Equipment
     } catch (error) {
       console.error('Error creando equipo:', error)
       throw error
@@ -96,7 +96,7 @@ export class EquipmentService {
         include: { type: true },
       })
 
-      return equipment as Equipment | null
+      return equipment as unknown as Equipment | null
     } catch (error) {
       console.error('Error obteniendo equipo:', error)
       throw error
@@ -189,11 +189,20 @@ export class EquipmentService {
 
       // Búsqueda de texto
       if (filters.search) {
+        const q = filters.search
         where.OR = [
-          { code: { contains: filters.search, mode: 'insensitive' } },
-          { serialNumber: { contains: filters.search, mode: 'insensitive' } },
-          { brand: { contains: filters.search, mode: 'insensitive' } },
-          { model: { contains: filters.search, mode: 'insensitive' } },
+          { code: { contains: q, mode: 'insensitive' } },
+          { serialNumber: { contains: q, mode: 'insensitive' } },
+          { brand: { contains: q, mode: 'insensitive' } },
+          { model_old: { contains: q, mode: 'insensitive' } },
+          {
+            model: {
+              OR: [
+                { brand: { contains: q, mode: 'insensitive' } },
+                { model: { contains: q, mode: 'insensitive' } },
+              ],
+            },
+          },
         ]
       }
 
@@ -247,7 +256,7 @@ export class EquipmentService {
       ])
 
       return {
-        equipment: equipment as Equipment[],
+        equipment: equipment as unknown as Equipment[],
         total,
         page,
         limit,
@@ -287,7 +296,7 @@ export class EquipmentService {
         data: {
           ...(data.serialNumber && { serialNumber: data.serialNumber }),
           ...(data.brand && { brand: data.brand }),
-          ...(data.model && { model: data.model }),
+          ...(data.model && { model_old: data.model }),
           ...(data.typeId && { typeId: data.typeId }),
           ...(data.status && { status: data.status as any }),
           ...(data.condition && { condition: data.condition as any }),
@@ -321,7 +330,7 @@ export class EquipmentService {
           ...((data as any).depreciationMethod !== undefined && {
             depreciationMethod: (data as any).depreciationMethod || null,
           }),
-        },
+        } as Prisma.equipmentUpdateInput,
       })
 
       // Registrar en auditoría con cambios legibles
@@ -364,7 +373,7 @@ export class EquipmentService {
         },
       })
 
-      return updated as Equipment
+      return updated as unknown as Equipment
     } catch (error) {
       console.error('Error actualizando equipo:', error)
       throw error
@@ -450,7 +459,7 @@ export class EquipmentService {
         code: equipment.code,
         serialNumber: equipment.serialNumber,
         brand: equipment.brand,
-        model: equipment.model,
+        model_old: equipment.model_old,
         typeId: equipment.typeId,
       }
 

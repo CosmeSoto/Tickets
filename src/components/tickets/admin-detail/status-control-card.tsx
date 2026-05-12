@@ -146,11 +146,12 @@ export function StatusControlCard({
               </button>
             )
           })}
-        {availableStatuses(ticket).includes('RESOLVED') && ticket.status !== 'RESOLVED' && (
-          <p className='text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mt-1'>
-            Al marcar como Resuelto, el solicitante recibirá una notificación para calificar.
-          </p>
-        )}
+        {availableStatuses(ticket, isSuperAdmin).includes('RESOLVED') &&
+          ticket.status !== 'RESOLVED' && (
+            <p className='text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mt-1'>
+              Al marcar como Resuelto, el solicitante recibirá una notificación para calificar.
+            </p>
+          )}
         {isSuperAdmin && ticket.status !== 'OPEN' && (
           <AlertDialog>
             <AlertDialogTrigger asChild>

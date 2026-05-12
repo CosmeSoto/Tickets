@@ -134,7 +134,7 @@ export function CreateByModelDialog({ open, onClose, onCreated }: CreateByModelD
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className='max-w-2xl max-h-[90vh] overflow-y-auto'>
+      <DialogContent className='max-w-2xl max-h-[90vh]'>
         <DialogHeader>
           <DialogTitle>Crear Mantenimiento por Modelo</DialogTitle>
           <DialogDescription>
@@ -142,7 +142,7 @@ export function CreateByModelDialog({ open, onClose, onCreated }: CreateByModelD
           </DialogDescription>
         </DialogHeader>
 
-        <div className='space-y-4'>
+        <div className='space-y-4 overflow-y-auto max-h-[calc(90vh-120px)]'>
           {/* Modelo */}
           <div className='space-y-2'>
             <Label>
@@ -185,7 +185,7 @@ export function CreateByModelDialog({ open, onClose, onCreated }: CreateByModelD
             <Label>
               Fecha Programada <span className='text-destructive'>*</span>
             </Label>
-            <DatePicker value={scheduledDate} onChange={setScheduledDate} />
+            <DatePicker date={scheduledDate} onDateChange={d => d && setScheduledDate(d)} />
           </div>
 
           {/* Técnico */}

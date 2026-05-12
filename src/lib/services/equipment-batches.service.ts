@@ -7,6 +7,12 @@ import prisma from '@/lib/prisma'
 import { EquipmentStatus, Prisma } from '@prisma/client'
 import { generateSequentialCodes, validateManualCodes } from './code-generator.service'
 
+function ownershipToCodeMode(o: string): 'OWNED' | 'LEASED' | 'RENTED' | 'DONATED' {
+  if (o === 'FIXED_ASSET') return 'OWNED'
+  if (o === 'RENTAL') return 'RENTED'
+  return 'LEASED'
+}
+
 export interface CreateBatchInput {
   batchCode?: string
   description?: string
@@ -51,13 +57,13 @@ export interface BatchCreateResult {
     description: string | null
     modelId: string
     quantity: number
-    supplierId: string
+    supplierId: string | null
     purchaseDate: Date
     unitPrice: number
     totalPrice: number
     invoiceNumber: string | null
     purchaseOrderNumber: string | null
-    warehouseId: string
+    warehouseId: string | null
     status: string
     receivedBy: string
     receivedAt: Date
@@ -185,7 +191,7 @@ export async function createBatch(input: CreateBatchInput): Promise<BatchCreateR
         input.quantity,
         familyCode,
         typeCode,
-        input.ownershipType,
+        ownershipToCodeMode(input.ownershipType),
         year
       )
     }

@@ -261,17 +261,25 @@ describe(
         // Crear un equipo con un código específico
         const testCode = 'TEST-LAP-OWN-2024-00001'
 
+        const type = await prisma.equipment_types.findFirst({ include: { models: { take: 1 } } })
+        if (!type?.models[0]) {
+          throw new Error('Se requiere al menos un equipment_model en BD para esta prueba')
+        }
+        const modelId = type.models[0].id
+
         await prisma.equipment.create({
           data: {
             code: testCode,
             serialNumber: 'TEST123',
             brand: 'Test Brand',
-            model: 'Test Model',
-            typeId: (await prisma.equipment_types.findFirst())!.id,
+            model_old: 'Test Model',
+            modelId,
+            typeId: type.id,
             departmentId: (await prisma.departments.findFirst())!.id,
             status: 'AVAILABLE',
             condition: 'GOOD',
-            ownershipType: 'OWNED',
+            ownershipType: 'FIXED_ASSET',
+            qrCode: `EQ-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           },
         })
 

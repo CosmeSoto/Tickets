@@ -133,7 +133,7 @@ export function BulkDecommissionModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className='max-w-4xl max-h-[90vh] overflow-y-auto'>
+      <DialogContent className='max-w-4xl max-h-[90vh]'>
         <DialogHeader>
           <DialogTitle>Dar de Baja Equipos</DialogTitle>
           <DialogDescription>
@@ -141,7 +141,7 @@ export function BulkDecommissionModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className='space-y-6'>
+        <div className='space-y-6 overflow-y-auto max-h-[calc(90vh-120px)]'>
           {/* Advertencia */}
           <Alert variant='destructive'>
             <AlertTriangle className='h-4 w-4' />

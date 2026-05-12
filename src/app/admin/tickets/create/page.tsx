@@ -602,7 +602,7 @@ export default function CreateTicketPage() {
                                       type='button'
                                       variant='outline'
                                       size='sm'
-                                      onClick={openCamera}
+                                      onClick={() => openCamera()}
                                     >
                                       <Camera className='h-4 w-4 mr-2' />
                                       Tomar foto

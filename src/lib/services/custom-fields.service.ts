@@ -4,7 +4,7 @@
  * @deprecated Este servicio usa el sistema legacy de custom fields por familia.
  * Para nuevos desarrollos, usa los servicios específicos por tipo:
  * - EquipmentAttributesService
- * - LicenseAttributesService  
+ * - LicenseAttributesService
  * - ConsumableAttributesService
  *
  * Este servicio seguirá funcionando hasta el 2026-06-08 para compatibilidad.
@@ -217,7 +217,10 @@ export class CustomFieldsService {
       throw new Error('Equipo no encontrado')
     }
 
-    const familyId = equipment.type.family.id
+    const familyId = equipment.type.family?.id
+    if (!familyId) {
+      throw new Error('El tipo de equipo no tiene familia asignada')
+    }
 
     // Verificar que el campo existe para la familia
     const field = await prisma.family_custom_fields.findUnique({
@@ -271,7 +274,7 @@ export class CustomFieldsService {
 
   /**
    * Obtiene los valores personalizados de un equipo con sus definiciones
-   * 
+   *
    * ACTUALIZADO: Ahora lee de las nuevas tablas de atributos por tipo
    * Mantiene compatibilidad con custom fields legacy
    */
@@ -284,13 +287,13 @@ export class CustomFieldsService {
     // Obtener el equipo con su familia y tipo
     const equipment = await prisma.equipment.findUnique({
       where: { id: equipmentId },
-      include: { 
-        type: { 
-          include: { 
+      include: {
+        type: {
+          include: {
             family: true,
             attributes: true, // Nuevos atributos por tipo
-          } 
-        } 
+          },
+        },
       },
     })
 
@@ -298,12 +301,14 @@ export class CustomFieldsService {
       throw new Error('Equipo no encontrado')
     }
 
-    const familyId = equipment.type.family.id
-    const equipmentTypeId = equipment.type.id
+    const familyId = equipment.type.family?.id
+    if (!familyId) {
+      throw new Error('El tipo de equipo no tiene familia asignada')
+    }
 
     // PRIORIDAD 1: Intentar obtener atributos del nuevo sistema (por tipo)
     let fields: CustomField[] = []
-    
+
     if (equipment.type.attributes && equipment.type.attributes.length > 0) {
       // Convertir atributos de tipo a formato CustomField
       fields = equipment.type.attributes

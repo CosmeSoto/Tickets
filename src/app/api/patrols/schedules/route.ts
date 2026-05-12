@@ -1,0 +1,218 @@
+/**
+ * GET  /api/patrols/schedules?familyId=  — Lista schedules
+ * POST /api/patrols/schedules             — Crea schedule y genera patrullas
+ */
+
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { z } from 'zod'
+import prisma from '@/lib/prisma'
+import { PatrolSchedulerService } from '@/lib/services/patrol-scheduler.service'
+import { NotificationService } from '@/lib/services/notification-service'
+import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
+import { NotificationType } from '@prisma/client'
+import { randomUUID } from 'crypto'
+
+const createScheduleSchema = z.object({
+  familyId: z.string().uuid(),
+  routeId: z.string().uuid(),
+  guardId: z.string().uuid(),
+  scheduledStart: z.string().datetime(),
+  scheduledEnd: z.string().datetime(),
+  recurrence: z.enum(['NONE', 'DAILY', 'WEEKLY', 'CUSTOM']).default('NONE'),
+  recurrenceDays: z.array(z.number().int().min(0).max(6)).default([]),
+})
+
+// ── GET ───────────────────────────────────────────────────────────────────────
+
+export async function GET(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+    const { searchParams } = new URL(request.url)
+    const familyId = searchParams.get('familyId')
+    const guardId = searchParams.get('guardId')
+    const routeId = searchParams.get('routeId')
+    const page = Math.max(1, parseInt(searchParams.get('page') ?? '1'))
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') ?? '25')))
+    const includeInactive = searchParams.get('includeInactive') === 'true'
+
+    const where = {
+      ...(familyId ? { familyId } : {}),
+      ...(guardId ? { guardId } : {}),
+      ...(routeId ? { routeId } : {}),
+      ...(includeInactive ? {} : { isActive: true }),
+    }
+
+    const [schedules, total] = await Promise.all([
+      prisma.patrol_schedules.findMany({
+        where,
+        select: {
+          id: true,
+          familyId: true,
+          routeId: true,
+          guardId: true,
+          scheduledStart: true,
+          scheduledEnd: true,
+          recurrence: true,
+          recurrenceDays: true,
+          isActive: true,
+          createdAt: true,
+          route: { select: { id: true, name: true } },
+          guard: { select: { id: true, name: true, email: true } },
+        },
+        orderBy: { scheduledStart: 'asc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.patrol_schedules.count({ where }),
+    ])
+
+    return NextResponse.json({
+      success: true,
+      data: schedules,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+        hasNext: page * limit < total,
+        hasPrev: page > 1,
+      },
+    })
+  } catch (error) {
+    console.error('[patrol/schedules] GET:', error)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+  }
+}
+
+// ── POST ──────────────────────────────────────────────────────────────────────
+
+export async function POST(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+    if (!['ADMIN', 'TECHNICIAN'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+    }
+
+    const user = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: { patrolsEnabled: true },
+    })
+    if (!user?.patrolsEnabled) {
+      return NextResponse.json({ error: 'Módulo de patrullas no habilitado' }, { status: 403 })
+    }
+
+    const body = await request.json()
+    const data = createScheduleSchema.parse(body)
+
+    const start = new Date(data.scheduledStart)
+    const end = new Date(data.scheduledEnd)
+
+    // Validar que scheduledEnd > scheduledStart
+    if (end <= start) {
+      return NextResponse.json(
+        { error: 'La hora de fin debe ser posterior a la hora de inicio' },
+        { status: 422 }
+      )
+    }
+
+    // Validar que el guardia tiene patrolsEnabled
+    const guard = await prisma.users.findUnique({
+      where: { id: data.guardId },
+      select: { id: true, name: true, patrolsEnabled: true },
+    })
+    if (!guard) return NextResponse.json({ error: 'Guardia no encontrado' }, { status: 404 })
+    if (!guard.patrolsEnabled) {
+      return NextResponse.json(
+        { error: 'El usuario seleccionado no tiene el módulo de patrullas habilitado' },
+        { status: 422 }
+      )
+    }
+
+    // Validar que la ruta existe y está activa
+    const route = await prisma.patrol_routes.findUnique({
+      where: { id: data.routeId },
+      select: { id: true, name: true, isActive: true },
+    })
+    if (!route) return NextResponse.json({ error: 'Ruta no encontrada' }, { status: 404 })
+    if (!route.isActive) {
+      return NextResponse.json({ error: 'La ruta está desactivada' }, { status: 422 })
+    }
+
+    // Verificar solapamiento de patrullas para el mismo guardia/familia
+    const overlap = await prisma.patrols.findFirst({
+      where: {
+        guardId: data.guardId,
+        familyId: data.familyId,
+        status: { in: ['PENDING', 'IN_PROGRESS'] },
+        scheduledStart: { lt: end },
+        scheduledEnd: { gt: start },
+      },
+    })
+    if (overlap) {
+      return NextResponse.json(
+        {
+          error: 'El guardia ya tiene una patrulla programada en ese horario',
+          code: 'SCHEDULE_OVERLAP',
+        },
+        { status: 409 }
+      )
+    }
+
+    // Crear schedule
+    const schedule = await prisma.patrol_schedules.create({
+      data: {
+        id: randomUUID(),
+        familyId: data.familyId,
+        routeId: data.routeId,
+        guardId: data.guardId,
+        scheduledStart: start,
+        scheduledEnd: end,
+        recurrence: data.recurrence,
+        recurrenceDays: data.recurrenceDays,
+      },
+    })
+
+    // Generar patrullas para el horizonte de 30 días
+    const generatedCount = await PatrolSchedulerService.generatePatrols(schedule.id)
+
+    // Notificar al guardia
+    await NotificationService.push({
+      userId: data.guardId,
+      type: NotificationType.PATROL_ASSIGNED,
+      title: 'Nueva ronda asignada',
+      message: `Se te ha asignado la ruta "${route.name}" programada para ${start.toLocaleString('es-EC', { timeZone: 'America/Guayaquil' })}.`,
+      metadata: { scheduleId: schedule.id, routeId: data.routeId, familyId: data.familyId },
+    })
+
+    await AuditServiceComplete.log({
+      action: 'PATROL_SCHEDULE_CREATED',
+      entityType: 'patrol',
+      entityId: schedule.id,
+      userId: session.user.id,
+      newValues: {
+        routeId: data.routeId,
+        guardId: data.guardId,
+        recurrence: data.recurrence,
+        generatedPatrols: generatedCount,
+      },
+      request,
+    })
+
+    return NextResponse.json(
+      { success: true, data: { id: schedule.id }, generatedPatrols: generatedCount },
+      { status: 201 }
+    )
+  } catch (error) {
+    console.error('[patrol/schedules] POST:', error)
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: 'Datos inválidos', details: error.errors }, { status: 400 })
+    }
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+  }
+}

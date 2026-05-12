@@ -226,7 +226,7 @@ export function CustomFieldsManager({ familyId }: CustomFieldsManagerProps) {
             <strong>atributos por tipo</strong>. Eliminación: <strong>8 junio 2026</strong>.
           </p>
           <p className='text-sm'>
-            <strong>Nueva ubicación:</strong> Tab "Catálogos" en esta misma página.
+            <strong>Nueva ubicación:</strong> Tab &quot;Catálogos&quot; en esta misma página.
           </p>
           <p className='text-xs text-amber-600 dark:text-amber-400'>
             Migración automática. No requiere acción manual.
@@ -496,7 +496,7 @@ export function CustomFieldsManager({ familyId }: CustomFieldsManagerProps) {
       )}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className='max-w-2xl max-h-[90vh] overflow-y-auto sm:max-w-[90vw] md:max-w-2xl'>
+        <DialogContent className='max-w-2xl max-h-[90vh] sm:max-w-[90vw] md:max-w-2xl'>
           <DialogHeader>
             <DialogTitle>
               {editingField ? 'Editar Campo Personalizado' : 'Nuevo Campo Personalizado'}
@@ -507,15 +507,21 @@ export function CustomFieldsManager({ familyId }: CustomFieldsManagerProps) {
                 : 'Crea un nuevo campo personalizado para esta familia'}
             </DialogDescription>
           </DialogHeader>
-          <CustomFieldForm
-            initialData={editingField || undefined}
-            onSubmit={editingField ? handleUpdate : handleCreate}
-            onCancel={() => {
-              setIsDialogOpen(false)
-              setEditingField(null)
-            }}
-            isEdit={!!editingField}
-          />
+          <div className='overflow-y-auto max-h-[calc(90vh-120px)]'>
+            <CustomFieldForm
+              initialData={
+                editingField
+                  ? { ...editingField, helpText: editingField.helpText ?? undefined }
+                  : undefined
+              }
+              onSubmit={editingField ? handleUpdate : handleCreate}
+              onCancel={() => {
+                setIsDialogOpen(false)
+                setEditingField(null)
+              }}
+              isEdit={!!editingField}
+            />
+          </div>
         </DialogContent>
       </Dialog>
     </div>

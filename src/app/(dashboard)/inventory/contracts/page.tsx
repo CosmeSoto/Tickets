@@ -196,7 +196,11 @@ export default function ContractsPage() {
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
   const canManage = isAdmin || (session?.user as any)?.canManageInventory
 
-  const { sortedData: sortedContracts, requestSort, getSortIcon } = useTableSort(contracts, { key: 'name', direction: 'asc' })
+  const {
+    sortedData: sortedContracts,
+    requestSort,
+    getSortIcon,
+  } = useTableSort(contracts, { key: 'name', direction: 'asc' })
 
   // Helper para renderizar iconos de ordenamiento
   const renderSortIcon = (key: string) => {
@@ -497,22 +501,24 @@ export default function ContractsPage() {
           }
         }}
       >
-        <DialogContent className='max-w-3xl max-h-[90vh] overflow-y-auto'>
+        <DialogContent className='max-w-3xl max-h-[90vh]'>
           <DialogHeader>
             <DialogTitle>{editingContract ? 'Editar contrato' : 'Nuevo contrato'}</DialogTitle>
           </DialogHeader>
-          <ContractForm
-            contract={editingContract}
-            onSuccess={() => {
-              setFormOpen(false)
-              setEditingContract(null)
-              reload()
-            }}
-            onCancel={() => {
-              setFormOpen(false)
-              setEditingContract(null)
-            }}
-          />
+          <div className='overflow-y-auto max-h-[calc(90vh-80px)]'>
+            <ContractForm
+              contract={editingContract}
+              onSuccess={() => {
+                setFormOpen(false)
+                setEditingContract(null)
+                reload()
+              }}
+              onCancel={() => {
+                setFormOpen(false)
+                setEditingContract(null)
+              }}
+            />
+          </div>
         </DialogContent>
       </Dialog>
 

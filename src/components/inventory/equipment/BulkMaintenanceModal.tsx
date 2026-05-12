@@ -122,7 +122,7 @@ export function BulkMaintenanceModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className='max-w-4xl max-h-[90vh] overflow-y-auto'>
+      <DialogContent className='max-w-4xl max-h-[90vh]'>
         <DialogHeader>
           <DialogTitle>Enviar Equipos a Mantenimiento</DialogTitle>
           <DialogDescription>
@@ -130,7 +130,7 @@ export function BulkMaintenanceModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className='space-y-6'>
+        <div className='space-y-6 overflow-y-auto max-h-[calc(90vh-120px)]'>
           {/* Tipo de Mantenimiento */}
           <div className='space-y-2'>
             <Label htmlFor='maintenanceType'>

@@ -156,7 +156,7 @@ export function LicenseAttachments({ licenseId, canManage }: LicenseAttachmentsP
                     <Button
                       size='sm'
                       variant='outline'
-                      onClick={openCamera}
+                      onClick={() => openCamera()}
                       disabled={uploading}
                       title='Tomar foto'
                     >

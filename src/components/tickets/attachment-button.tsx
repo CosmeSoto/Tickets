@@ -67,37 +67,34 @@ export function AttachmentButton({
   }
 
   return (
-    <FileInputWithCamera
-      accept={ACCEPT}
-      onChange={handleChange}
-    >
+    <FileInputWithCamera accept={ACCEPT} onChange={handleChange}>
       {({ openFile, openCamera, showCamera }) => (
-        <div className="flex items-center gap-1">
+        <div className='flex items-center gap-1'>
           <Button
-            variant="ghost"
+            variant='ghost'
             size={size}
             onClick={openFile}
             disabled={disabled || uploading}
-            className="h-8 w-8 p-0"
-            title="Adjuntar archivo"
+            className='h-8 w-8 p-0'
+            title='Adjuntar archivo'
           >
             {uploading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className='h-4 w-4 animate-spin' />
             ) : (
-              <Paperclip className="h-4 w-4" />
+              <Paperclip className='h-4 w-4' />
             )}
           </Button>
 
           {showCamera && (
             <Button
-              variant="ghost"
+              variant='ghost'
               size={size}
-              onClick={openCamera}
+              onClick={() => openCamera()}
               disabled={disabled || uploading}
-              className="h-8 w-8 p-0"
-              title="Tomar foto"
+              className='h-8 w-8 p-0'
+              title='Tomar foto'
             >
-              <Camera className="h-4 w-4" />
+              <Camera className='h-4 w-4' />
             </Button>
           )}
         </div>

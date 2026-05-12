@@ -40,7 +40,7 @@ const modelFormSchema = z.object({
   defaultAccessories: z.string().optional(),
   standardPrice: z.string().optional(),
   modelPhotoUrl: z.string().url('URL inválida').optional().or(z.literal('')),
-  isActive: z.boolean().default(true),
+  isActive: z.boolean(),
 })
 
 type ModelFormValues = z.infer<typeof modelFormSchema>

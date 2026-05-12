@@ -7,7 +7,7 @@
  * - Mantenimiento: frecuencia_mantenimiento, ultima_revision
  */
 
-import { PrismaClient } from '@prisma/client'
+import { Prisma, PrismaClient } from '@prisma/client'
 
 export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<string, string>) {
   console.log('🎨 Creando campos personalizados...')
@@ -202,7 +202,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           fieldName: 'garantia_hasta',
           fieldLabel: 'Garantía Hasta',
           fieldType: 'date',
-          fieldOptions: null,
+          fieldOptions: Prisma.DbNull,
           isRequired: false,
           order: 14,
           helpText: 'Fecha de vencimiento de la garantía',
@@ -395,7 +395,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           fieldName: 'ultima_revision',
           fieldLabel: 'Última Revisión',
           fieldType: 'date',
-          fieldOptions: null,
+          fieldOptions: Prisma.DbNull,
           isRequired: false,
           order: 2,
           helpText: 'Fecha de la última revisión o mantenimiento',
@@ -405,7 +405,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           fieldName: 'proxima_revision',
           fieldLabel: 'Próxima Revisión',
           fieldType: 'date',
-          fieldOptions: null,
+          fieldOptions: Prisma.DbNull,
           isRequired: false,
           order: 3,
           helpText: 'Fecha programada para la próxima revisión',
@@ -501,7 +501,7 @@ export async function seedCustomFields(prisma: PrismaClient, familyMap: Map<stri
           fieldName: 'vision_nocturna',
           fieldLabel: 'Visión Nocturna',
           fieldType: 'boolean',
-          fieldOptions: null,
+          fieldOptions: Prisma.DbNull,
           isRequired: false,
           order: 6,
           helpText: 'Indica si tiene visión nocturna infrarroja',

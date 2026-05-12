@@ -86,40 +86,14 @@ describe('PublicEquipmentCard', () => {
     expect(loginLink).toHaveAttribute('href', '/login')
   })
 
-  it('expands to show specifications when toggle is clicked', () => {
-    const onToggleExpand = jest.fn()
-    render(<PublicEquipmentCard item={mockItem} onToggleExpand={onToggleExpand} />)
+  it('calls onViewDetails when "Ver detalles" is clicked', () => {
+    const onViewDetails = jest.fn()
+    render(<PublicEquipmentCard item={mockItem} onViewDetails={onViewDetails} />)
 
     const expandButton = screen.getByRole('button', { name: /Ver detalles/i })
     fireEvent.click(expandButton)
 
-    expect(onToggleExpand).toHaveBeenCalledTimes(1)
-  })
-
-  it('shows specifications in expanded mode', () => {
-    render(<PublicEquipmentCard item={mockItem} expanded={true} />)
-
-    expect(screen.getByText('Especificaciones')).toBeInTheDocument()
-    expect(screen.getByText('Procesador:')).toBeInTheDocument()
-    expect(screen.getByText('Intel Core i5')).toBeInTheDocument()
-    expect(screen.getByText('RAM:')).toBeInTheDocument()
-    expect(screen.getByText('16GB')).toBeInTheDocument()
-  })
-
-  it('shows accessories in expanded mode', () => {
-    render(<PublicEquipmentCard item={mockItem} expanded={true} />)
-
-    expect(screen.getByText('Accesorios incluidos')).toBeInTheDocument()
-    expect(screen.getByText('Cargador')).toBeInTheDocument()
-    expect(screen.getByText('Mouse')).toBeInTheDocument()
-    expect(screen.getByText('Maletín')).toBeInTheDocument()
-  })
-
-  it('shows notes in expanded mode', () => {
-    render(<PublicEquipmentCard item={mockItem} expanded={true} />)
-
-    expect(screen.getByText('Observaciones')).toBeInTheDocument()
-    expect(screen.getByText('Equipo en excelente estado, poco uso.')).toBeInTheDocument()
+    expect(onViewDetails).toHaveBeenCalledTimes(1)
   })
 
   it('does not show expand button when no expandable content', () => {
@@ -129,7 +103,13 @@ describe('PublicEquipmentCard', () => {
       accessories: null,
       notes: null,
     }
-    render(<PublicEquipmentCard item={itemWithoutDetails} onToggleExpand={jest.fn()} />)
+    render(<PublicEquipmentCard item={itemWithoutDetails} onViewDetails={jest.fn()} />)
+
+    expect(screen.queryByRole('button', { name: /Ver detalles/i })).not.toBeInTheDocument()
+  })
+
+  it('does not show expand button when onViewDetails is omitted even if there are details', () => {
+    render(<PublicEquipmentCard item={mockItem} />)
 
     expect(screen.queryByRole('button', { name: /Ver detalles/i })).not.toBeInTheDocument()
   })
@@ -138,7 +118,6 @@ describe('PublicEquipmentCard', () => {
     const itemWithoutPhoto = { ...mockItem, photoUrl: null }
     const { container } = render(<PublicEquipmentCard item={itemWithoutPhoto} />)
 
-    // Check for the Package icon (placeholder)
     const packageIcon = container.querySelector('svg')
     expect(packageIcon).toBeInTheDocument()
   })

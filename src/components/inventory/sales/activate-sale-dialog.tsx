@@ -34,7 +34,7 @@ import { toast } from 'sonner'
 
 const formSchema = z.object({
   salePrice: z.coerce.number().min(0.01, 'El precio debe ser mayor a 0'),
-  saleCurrency: z.string().default('USD'),
+  saleCurrency: z.string().min(1),
   saleNotes: z.string().optional(),
 })
 

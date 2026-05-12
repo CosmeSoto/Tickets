@@ -469,7 +469,7 @@ export function EditUserModal({
     }
   }
 
-  const validateForm = (): boolean => {
+  const validateForm = (): { isValid: boolean; errors: Record<string, string> } => {
     const newErrors: Record<string, string> = {}
     if (!formData.name.trim()) newErrors.name = 'El nombre es requerido'
     else if (formData.name.trim().length < 2) newErrors.name = 'Mínimo 2 caracteres'
@@ -480,11 +480,13 @@ export function EditUserModal({
     if (formData.role !== 'ADMIN' && !formData.departmentId)
       newErrors.departmentId = 'Requerido para este rol'
     setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+    return { isValid: Object.keys(newErrors).length === 0, errors: newErrors }
   }
 
   const handleSubmit = async () => {
-    if (!user || !validateForm()) return
+    if (!user) return
+    const { isValid } = validateForm()
+    if (!isValid) return
     setLoading(true)
     try {
       const res = await fetch(`/api/users/${user.id}`, {
@@ -544,10 +546,7 @@ export function EditUserModal({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent
-          className='max-w-2xl max-h-[90vh] overflow-y-auto'
-          aria-describedby={undefined}
-        >
+        <DialogContent className='max-w-2xl max-h-[90vh]' aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle className='flex items-center gap-2'>
               <User className='h-5 w-5 text-primary' />
@@ -555,7 +554,7 @@ export function EditUserModal({
             </DialogTitle>
           </DialogHeader>
 
-          <div className='space-y-6'>
+          <div className='space-y-6 overflow-y-auto max-h-[calc(90vh-80px)]'>
             {/* Cabecera: Avatar + info */}
             <UserHeaderCard
               user={user}

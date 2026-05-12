@@ -29,7 +29,7 @@ describe('ForSaleSection Visibility', () => {
       accessories: ['Cargador', 'Mouse'],
       notes: 'Equipo en buen estado',
       saleListingPrice: 850.5,
-      updatedAt: new Date('2024-01-01'),
+      updatedAt: '2024-01-01T00:00:00.000Z',
       type: {
         id: 'type-1',
         name: 'Laptop',
@@ -185,7 +185,7 @@ const mockItems: PublicEquipmentItem[] = [
     accessories: ['Cargador', 'Mouse'],
     notes: 'Equipo en buen estado',
     saleListingPrice: 850.5,
-    updatedAt: new Date('2024-01-01'),
+    updatedAt: '2024-01-01T00:00:00.000Z',
     type: {
       id: 'type-1',
       name: 'Laptop',

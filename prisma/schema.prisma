@@ -98,6 +98,7 @@ model categories {
   sla_policies           sla_policies[]           @relation("SLAPolicyCategory")
   technician_assignments technician_assignments[]
   tickets                tickets[]
+  patrolFamilyConfigs    patrol_family_config[]   @relation("PatrolIncidentCategory")
 
   @@index([departmentId])
   @@index([parentId, level, isActive])
@@ -336,6 +337,8 @@ model tickets {
   users_tickets_clientIdTousers    users                       @relation("tickets_clientIdTousers", fields: [clientId], references: [id])
   users_tickets_createdByIdTousers users?                      @relation("tickets_createdByIdTousers", fields: [createdById], references: [id])
   family                           families?                   @relation(fields: [familyId], references: [id])
+  checkInId                        String?                     @map("check_in_id")
+  checkIn                          patrol_check_ins?           @relation(fields: [checkInId], references: [id])
 
   @@index([assigneeId, status])
   @@index([categoryId, status])
@@ -435,6 +438,7 @@ model users {
   canManageInventory                                Boolean                         @default(false)
   ticketsEnabled                                    Boolean                         @default(true)
   inventoryEnabled                                  Boolean                         @default(false)
+  patrolsEnabled                                    Boolean                         @default(false) @map("patrols_enabled")
   lastLogin                                         DateTime?
   oauthProvider                                     String?
   oauthId                                           String?
@@ -497,6 +501,9 @@ model users {
   assetRequestsReviewed                             asset_requests[]                @relation("AssetRequestReviewer")
   assetRequestsFulfilled                            asset_requests[]                @relation("AssetRequestFulfiller")
   batchesReceived                                   equipment_batches[]             @relation("BatchReceiver")
+  patrolsAsGuard                                    patrols[]                       @relation("PatrolGuardExecution")
+  patrolSchedulesAsGuard                            patrol_schedules[]              @relation("PatrolGuard")
+  patrolCheckIns                                    patrol_check_ins[]              @relation("PatrolCheckInGuard")
 
   @@index([departmentId])
   @@index([name, email])
@@ -1545,6 +1552,11 @@ model families {
   contracts                   contracts[]
   assetRequests               asset_requests[]
   customFields                family_custom_fields[]
+  patrolFamilyConfig          patrol_family_config?
+  patrolCheckpoints           patrol_checkpoints[]
+  patrolRoutes                patrol_routes[]
+  patrolSchedules             patrol_schedules[]
+  patrols                     patrols[]
 
   @@index([isActive, order])
   @@map("families")
@@ -1732,6 +1744,10 @@ enum NotificationType {
   ERROR
   INVENTORY
   TICKET_FAMILY_CHANGE
+  PATROL_MISSED
+  PATROL_INCOMPLETE
+  PATROL_ASSIGNED
+  OFFLINE_SYNC_REJECTED
 }
 
 enum ResolutionStatus {
@@ -1762,6 +1778,7 @@ enum TicketSource {
   CHAT
   API
   ADMIN
+  PATROL
 }
 
 enum TicketStatus {
@@ -2260,4 +2277,237 @@ model equipment_custom_values {
   @@index([equipmentId])
   @@index([fieldName, fieldValue])
   @@map("equipment_custom_values")
+}
+
+// ── Patrol Module ─────────────────────────────────────────────────────────────
+
+enum PatrolStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  MISSED
+  INCOMPLETE
+}
+
+enum QRType {
+  DYNAMIC
+  STATIC
+}
+
+enum CheckInValidationResult {
+  VALID
+  QR_TOKEN_INVALID
+  GPS_OUT_OF_GEOFENCE
+  OFFLINE_SYNC_REJECTED
+}
+
+enum CheckInMethod {
+  QR_DYNAMIC
+  QR_STATIC
+  OFFLINE_SYNC
+}
+
+enum PatrolRecurrence {
+  NONE
+  DAILY
+  WEEKLY
+  CUSTOM
+}
+
+model patrol_family_config {
+  id                          String    @id @default(uuid())
+  familyId                    String    @unique @map("family_id")
+  patrolsEnabled              Boolean   @default(true)  @map("patrols_enabled")
+  qrWindowMinutes             Int       @default(5)     @map("qr_window_minutes")
+  geofenceRadiusMeters        Int       @default(50)    @map("geofence_radius_meters")
+  photoRetentionDays          Int       @default(90)    @map("photo_retention_days")
+  photoCompressionQuality     Float     @default(0.82)  @map("photo_compression_quality")
+  photoMaxWidthPx             Int       @default(1280)  @map("photo_max_width_px")
+  requirePhotoOnStart         Boolean   @default(false) @map("require_photo_on_start")
+  requirePhotoOnEnd           Boolean   @default(false) @map("require_photo_on_end")
+  offlineSyncToleranceMinutes Int       @default(30)    @map("offline_sync_tolerance_minutes")
+  alertCompletionThreshold    Int       @default(80)    @map("alert_completion_threshold")
+  gracePeriodMinutes          Int       @default(15)    @map("grace_period_minutes")
+  patrolIncidentCategoryId    String?   @map("patrol_incident_category_id")
+  createdAt                   DateTime  @default(now()) @map("created_at")
+  updatedAt                   DateTime  @updatedAt      @map("updated_at")
+
+  family                      families    @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  incidentCategory            categories? @relation("PatrolIncidentCategory", fields: [patrolIncidentCategoryId], references: [id])
+
+  @@index([familyId])
+  @@map("patrol_family_config")
+}
+
+model patrol_checkpoints {
+  id                    String    @id @default(uuid())
+  familyId              String    @map("family_id")
+  name                  String    @db.VarChar(200)
+  description           String?
+  location              String    @db.VarChar(500)
+  latitude              Float?
+  longitude             Float?
+  geofenceRadiusMeters  Int?      @map("geofence_radius_meters")
+  hasConnectivity       Boolean   @default(true)  @map("has_connectivity")
+  isSensitive           Boolean   @default(false) @map("is_sensitive")
+  isActive              Boolean   @default(true)  @map("is_active")
+  qrType                QRType    @default(DYNAMIC) @map("qr_type")
+  qrSecret              String    @map("qr_secret")
+  qrStaticToken         String?   @map("qr_static_token")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt      @map("updated_at")
+
+  family                families                   @relation(fields: [familyId], references: [id])
+  routeCheckpoints      patrol_route_checkpoints[]
+  checkIns              patrol_check_ins[]
+
+  @@index([familyId, isActive])
+  @@index([qrType, isActive])
+  @@map("patrol_checkpoints")
+}
+
+model patrol_routes {
+  id                       String    @id @default(uuid())
+  familyId                 String    @map("family_id")
+  name                     String    @db.VarChar(200)
+  description              String?
+  estimatedDurationMinutes Int       @map("estimated_duration_minutes")
+  isActive                 Boolean   @default(true) @map("is_active")
+  createdAt                DateTime  @default(now()) @map("created_at")
+  updatedAt                DateTime  @updatedAt      @map("updated_at")
+
+  family                   families                   @relation(fields: [familyId], references: [id])
+  routeCheckpoints         patrol_route_checkpoints[]
+  schedules                patrol_schedules[]
+  patrols                  patrols[]
+
+  @@index([familyId, isActive])
+  @@map("patrol_routes")
+}
+
+model patrol_route_checkpoints {
+  id           String    @id @default(uuid())
+  routeId      String    @map("route_id")
+  checkpointId String    @map("checkpoint_id")
+  order        Int
+  isRequired   Boolean   @default(true) @map("is_required")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  route        patrol_routes      @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  checkpoint   patrol_checkpoints @relation(fields: [checkpointId], references: [id])
+
+  @@unique([routeId, checkpointId])
+  @@unique([routeId, order])
+  @@index([routeId, order])
+  @@index([checkpointId])
+  @@map("patrol_route_checkpoints")
+}
+
+model patrol_schedules {
+  id              String           @id @default(uuid())
+  familyId        String           @map("family_id")
+  routeId         String           @map("route_id")
+  guardId         String           @map("guard_id")
+  scheduledStart  DateTime         @map("scheduled_start")
+  scheduledEnd    DateTime         @map("scheduled_end")
+  recurrence      PatrolRecurrence @default(NONE)
+  recurrenceDays  Int[]            @default([]) @map("recurrence_days")
+  isActive        Boolean          @default(true) @map("is_active")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt      @map("updated_at")
+
+  family          families         @relation(fields: [familyId], references: [id])
+  route           patrol_routes    @relation(fields: [routeId], references: [id])
+  guard           users            @relation("PatrolGuard", fields: [guardId], references: [id])
+  patrols         patrols[]
+
+  @@index([guardId, isActive])
+  @@index([familyId, isActive])
+  @@index([routeId, isActive])
+  @@map("patrol_schedules")
+}
+
+model patrols {
+  id                   String        @id @default(uuid())
+  familyId             String        @map("family_id")
+  scheduleId           String?       @map("schedule_id")
+  routeId              String        @map("route_id")
+  guardId              String        @map("guard_id")
+  status               PatrolStatus  @default(PENDING)
+  scheduledStart       DateTime      @map("scheduled_start")
+  scheduledEnd         DateTime      @map("scheduled_end")
+  startedAt            DateTime?     @map("started_at")
+  completedAt          DateTime?     @map("completed_at")
+  completionPercentage Float         @default(0) @map("completion_percentage")
+  missedCheckpointIds  String[]      @default([]) @map("missed_checkpoint_ids")
+  startPhotoId         String?       @map("start_photo_id")
+  endPhotoId           String?       @map("end_photo_id")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt      @map("updated_at")
+
+  family               families          @relation(fields: [familyId], references: [id])
+  schedule             patrol_schedules? @relation(fields: [scheduleId], references: [id])
+  route                patrol_routes     @relation(fields: [routeId], references: [id])
+  guard                users             @relation("PatrolGuardExecution", fields: [guardId], references: [id])
+  checkIns             patrol_check_ins[]
+  startPhoto           patrol_photos?    @relation("PatrolStartPhoto", fields: [startPhotoId], references: [id])
+  endPhoto             patrol_photos?    @relation("PatrolEndPhoto", fields: [endPhotoId], references: [id])
+
+  @@index([guardId, status])
+  @@index([familyId, scheduledStart])
+  @@index([status, scheduledStart])
+  @@index([scheduleId, status])
+  @@map("patrols")
+}
+
+model patrol_check_ins {
+  id                           String                  @id @default(uuid())
+  patrolId                     String                  @map("patrol_id")
+  checkpointId                 String                  @map("checkpoint_id")
+  guardId                      String                  @map("guard_id")
+  submittedTokenHash           String                  @map("submitted_token_hash")
+  gpsLat                       Float?                  @map("gps_lat")
+  gpsLng                       Float?                  @map("gps_lng")
+  gpsAccuracyMeters            Float?                  @map("gps_accuracy_meters")
+  distanceFromCheckpointMeters Float?                  @map("distance_from_checkpoint_meters")
+  validationResult             CheckInValidationResult @map("validation_result")
+  method                       CheckInMethod           @map("method")
+  deviceTimestamp              DateTime                @map("device_timestamp")
+  serverTimestamp              DateTime                @default(now()) @map("server_timestamp")
+  syncedAt                     DateTime?               @map("synced_at")
+  isOffline                    Boolean                 @default(false) @map("is_offline")
+  createdAt                    DateTime                @default(now()) @map("created_at")
+
+  patrol                       patrols            @relation(fields: [patrolId], references: [id], onDelete: Cascade)
+  checkpoint                   patrol_checkpoints @relation(fields: [checkpointId], references: [id])
+  guard                        users              @relation("PatrolCheckInGuard", fields: [guardId], references: [id])
+  photos                       patrol_photos[]
+  tickets                      tickets[]
+
+  @@index([patrolId, checkpointId])
+  @@index([patrolId, createdAt(sort: Desc)])
+  @@index([checkpointId, validationResult])
+  @@map("patrol_check_ins")
+}
+
+model patrol_photos {
+  id          String    @id @default(uuid())
+  checkInId   String?   @map("check_in_id")
+  patrolId    String?   @map("patrol_id")
+  path        String
+  size        Int
+  mimeType    String    @map("mime_type")
+  capturedAt  DateTime  @map("captured_at")
+  deletedAt   DateTime? @map("deleted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  checkIn     patrol_check_ins? @relation(fields: [checkInId], references: [id])
+  patrolStart patrols[]         @relation("PatrolStartPhoto")
+  patrolEnd   patrols[]         @relation("PatrolEndPhoto")
+
+  @@index([checkInId])
+  @@index([patrolId])
+  @@index([capturedAt(sort: Desc)])
+  @@index([deletedAt])
+  @@map("patrol_photos")
 }

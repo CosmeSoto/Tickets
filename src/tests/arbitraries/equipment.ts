@@ -11,7 +11,7 @@ import type { PublicEquipmentItem, BulkEquipmentInput } from '@/types/equipment-
  * Arbitrario para el enum de condición de equipo
  */
 export const equipmentConditionArbitrary = (): fc.Arbitrary<EquipmentCondition> =>
-  fc.constantFrom<EquipmentCondition>('EXCELLENT', 'GOOD', 'FAIR', 'POOR', 'DAMAGED', 'FOR_PARTS')
+  fc.constantFrom<EquipmentCondition>('NEW', 'LIKE_NEW', 'GOOD', 'FAIR', 'POOR')
 
 /**
  * Arbitrario para el enum de estado de equipo
@@ -30,7 +30,7 @@ export const equipmentStatusArbitrary = (): fc.Arbitrary<EquipmentStatus> =>
  * Arbitrario para el enum de tipo de propiedad
  */
 export const ownershipTypeArbitrary = (): fc.Arbitrary<OwnershipType> =>
-  fc.constantFrom<OwnershipType>('OWNED', 'LEASED', 'RENTED', 'DONATED')
+  fc.constantFrom<OwnershipType>('FIXED_ASSET', 'RENTAL', 'LOAN')
 
 /**
  * Arbitrario para código de equipo siguiendo el patrón: {FAMILIA}-{TIPO}-{MODO}-{AÑO}-{SEC}
@@ -196,7 +196,7 @@ export const bulkEquipmentInputAutoArbitrary = (): fc.Arbitrary<BulkEquipmentInp
       serialNumbers: fc.option(
         fc.oneof(
           // Either empty array or array matching quantity
-          fc.constant([]),
+          fc.constant([] as string[]),
           fc.array(fc.stringMatching(/^[A-Z0-9]{8,20}$/), {
             minLength: quantity,
             maxLength: quantity,
@@ -204,6 +204,7 @@ export const bulkEquipmentInputAutoArbitrary = (): fc.Arbitrary<BulkEquipmentInp
         ),
         { nil: undefined }
       ),
+      modelId: fc.uuid(),
       brand: brandArbitrary(),
       model: modelArbitrary(),
       typeId: fc.uuid(),
@@ -256,6 +257,7 @@ export const bulkEquipmentInputManualArbitrary = (): fc.Arbitrary<BulkEquipmentI
         }),
         { nil: undefined }
       ),
+      modelId: fc.uuid(),
       brand: brandArbitrary(),
       model: modelArbitrary(),
       typeId: fc.uuid(),

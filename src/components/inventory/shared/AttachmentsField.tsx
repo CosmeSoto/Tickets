@@ -68,7 +68,7 @@ export function AttachmentsField({ files, onChange, maxFileSizeMB = 10 }: Attach
                     type='button'
                     size='sm'
                     variant='outline'
-                    onClick={openCamera}
+                    onClick={() => openCamera()}
                     title='Tomar foto'
                   >
                     <Camera className='h-4 w-4 mr-1.5' />

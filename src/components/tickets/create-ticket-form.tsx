@@ -479,7 +479,12 @@ export function CreateTicketForm({
                       </div>
                       <div className='flex items-center gap-2'>
                         {showCamera && (
-                          <Button type='button' variant='outline' size='sm' onClick={openCamera}>
+                          <Button
+                            type='button'
+                            variant='outline'
+                            size='sm'
+                            onClick={() => openCamera()}
+                          >
                             <Camera className='h-3.5 w-3.5 mr-1.5' />
                             Cámara
                           </Button>

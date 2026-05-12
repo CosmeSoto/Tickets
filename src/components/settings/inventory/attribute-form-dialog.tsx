@@ -28,7 +28,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import type { Attribute, AttributeType, CreateAttributeData } from '@/hooks/inventory/use-attribute-management'
+import type {
+  Attribute,
+  AttributeType,
+  CreateAttributeData,
+} from '@/hooks/inventory/use-attribute-management'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -162,12 +166,10 @@ export function AttributeFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className='max-w-2xl max-h-[90vh] overflow-y-auto'>
+      <DialogContent className='max-w-2xl max-h-[90vh]'>
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>
-              {isEditing ? 'Editar Atributo' : 'Nuevo Atributo'}
-            </DialogTitle>
+            <DialogTitle>{isEditing ? 'Editar Atributo' : 'Nuevo Atributo'}</DialogTitle>
             <DialogDescription>
               {isEditing
                 ? 'Modifica las propiedades del atributo'
@@ -175,7 +177,7 @@ export function AttributeFormDialog({
             </DialogDescription>
           </DialogHeader>
 
-          <div className='space-y-4 py-4'>
+          <div className='space-y-4 py-4 overflow-y-auto max-h-[calc(90vh-120px)]'>
             <div className='grid grid-cols-2 gap-4'>
               <div className='space-y-2'>
                 <Label htmlFor='attr-name'>
@@ -207,9 +209,7 @@ export function AttributeFormDialog({
                 <Input
                   id='attr-label'
                   value={formData.attributeLabel}
-                  onChange={e =>
-                    setFormData(prev => ({ ...prev, attributeLabel: e.target.value }))
-                  }
+                  onChange={e => setFormData(prev => ({ ...prev, attributeLabel: e.target.value }))}
                   placeholder='ej: Número de Serie'
                   disabled={saving}
                 />

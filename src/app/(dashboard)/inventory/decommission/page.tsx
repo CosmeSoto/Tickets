@@ -41,7 +41,7 @@ export default function DecommissionPage() {
   }
 
   return (
-    <ModuleLayout title="Actas de Baja" subtitle={subtitle}>
+    <ModuleLayout title='Actas de Baja' subtitle={subtitle}>
       <DecommissionRequestList
         onViewDetail={setSelectedRequest}
         refreshTrigger={refreshTrigger}
@@ -49,17 +49,19 @@ export default function DecommissionPage() {
       />
 
       <Dialog open={!!selectedRequest} onOpenChange={o => !o && setSelectedRequest(null)}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
+        <DialogContent className='max-w-lg max-h-[90vh]' aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Detalle de Solicitud</DialogTitle>
           </DialogHeader>
-          {selectedRequest && (
-            <DecommissionApprovalPanel
-              request={selectedRequest}
-              userContext={userContext}
-              onActionComplete={handleActionComplete}
-            />
-          )}
+          <div className='overflow-y-auto max-h-[calc(90vh-80px)]'>
+            {selectedRequest && (
+              <DecommissionApprovalPanel
+                request={selectedRequest}
+                userContext={userContext}
+                onActionComplete={handleActionComplete}
+              />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </ModuleLayout>

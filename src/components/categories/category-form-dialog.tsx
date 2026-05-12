@@ -59,7 +59,6 @@ export function CategoryFormDialog({
   onLoadTechnicians,
   families = [],
 }: CategoryFormDialogProps) {
-  
   const {
     addTechnician,
     removeTechnician,
@@ -75,12 +74,13 @@ export function CategoryFormDialog({
 
   // Memoizar opciones de familias para el Combobox
   const familyOptions = useMemo(
-    () => families.map(f => ({
-      value: f.id,
-      label: f.name,
-      color: f.color || undefined,
-      description: f.code,
-    })),
+    () =>
+      families.map(f => ({
+        value: f.id,
+        label: f.name,
+        color: f.color || undefined,
+        description: f.code,
+      })),
     [families]
   )
 
@@ -118,23 +118,23 @@ export function CategoryFormDialog({
   const getHierarchyPath = () => {
     // Crear un mapa de todas las categorías disponibles
     const allCategories = new Map()
-    
+
     // Agregar availableParents
     availableParents.forEach(cat => {
       allCategories.set(cat.id, cat)
     })
-    
+
     // Agregar la categoría que se está editando si existe
     if (editingCategory) {
       allCategories.set(editingCategory.id, editingCategory)
     }
-    
+
     // Función recursiva para construir la ruta completa
     const buildPath = (category: CategoryData | any): any[] => {
       if (!category) {
         return []
       }
-      
+
       // Si no tiene padre, es la raíz
       if (!category.categories && !category.parentId) {
         const rootInfo = {
@@ -143,11 +143,11 @@ export function CategoryFormDialog({
           level: category.level,
           color: category.color,
           levelName: category.levelName || getLevelNameByNumber(category.level),
-          technicians: category.technician_assignments || []
+          technicians: category.technician_assignments || [],
         }
         return [rootInfo]
       }
-      
+
       // Buscar el padre en los datos disponibles
       let parentCategory: CategoryData | any = null
       if (category.categories) {
@@ -156,7 +156,7 @@ export function CategoryFormDialog({
       } else if (category.parentId) {
         parentCategory = allCategories.get(category.parentId)
       }
-      
+
       // Construir recursivamente desde el padre
       const parentPath = parentCategory ? buildPath(parentCategory) : []
       const currentInfo = {
@@ -165,14 +165,14 @@ export function CategoryFormDialog({
         level: category.level,
         color: category.color,
         levelName: category.levelName || getLevelNameByNumber(category.level),
-        technicians: category.technician_assignments || []
+        technicians: category.technician_assignments || [],
       }
-      
+
       return [...parentPath, currentInfo]
     }
-    
+
     let result = []
-    
+
     // Si estamos editando una categoría existente, incluir toda la ruta hasta ella
     if (editingCategory) {
       result = buildPath(editingCategory as CategoryData)
@@ -188,7 +188,7 @@ export function CategoryFormDialog({
           level: getResultingLevel(),
           color: formData.color,
           levelName: getResultingLevelName(),
-          technicians: []
+          technicians: [],
         }
         result = [...parentPath, newCategoryInfo]
       }
@@ -196,27 +196,34 @@ export function CategoryFormDialog({
     // Categoría de nivel 1 (sin padre)
     else {
       const editingCat = editingCategory as CategoryData | null
-      result = [{
-        id: editingCat?.id || 'new',
-        name: formData.name || editingCat?.name || 'Nueva Categoría',
-        level: 1,
-        color: formData.color,
-        levelName: 'Principal',
-        technicians: editingCat?.technician_assignments || []
-      }]
+      result = [
+        {
+          id: editingCat?.id || 'new',
+          name: formData.name || editingCat?.name || 'Nueva Categoría',
+          level: 1,
+          color: formData.color,
+          levelName: 'Principal',
+          technicians: editingCat?.technician_assignments || [],
+        },
+      ]
     }
-    
+
     return result
   }
 
   // Función auxiliar para obtener el nombre del nivel
   const getLevelNameByNumber = (level: number): string => {
     switch (level) {
-      case 1: return 'Principal'
-      case 2: return 'Subcategoría'
-      case 3: return 'Especialidad'
-      case 4: return 'Detalle'
-      default: return 'Máximo'
+      case 1:
+        return 'Principal'
+      case 2:
+        return 'Subcategoría'
+      case 3:
+        return 'Especialidad'
+      case 4:
+        return 'Detalle'
+      default:
+        return 'Máximo'
     }
   }
 
@@ -229,21 +236,24 @@ export function CategoryFormDialog({
   const getResultingLevelName = () => {
     const level = getResultingLevel()
     switch (level) {
-      case 1: return 'Principal'
-      case 2: return 'Subcategoría'
-      case 3: return 'Especialidad'
-      case 4: return 'Detalle'
-      default: return 'Máximo'
+      case 1:
+        return 'Principal'
+      case 2:
+        return 'Subcategoría'
+      case 3:
+        return 'Especialidad'
+      case 4:
+        return 'Detalle'
+      default:
+        return 'Máximo'
     }
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className='max-w-2xl max-h-[90vh] overflow-y-auto' aria-describedby={undefined}>
+      <DialogContent className='max-w-2xl max-h-[90vh]' aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>
-            {editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}
-          </DialogTitle>
+          <DialogTitle>{editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}</DialogTitle>
           <DialogDescription>
             {editingCategory
               ? 'Modifica los datos de la categoría'
@@ -251,14 +261,11 @@ export function CategoryFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={onSubmit} className='space-y-4'>
-
+        <form onSubmit={onSubmit} className='space-y-4 overflow-y-auto max-h-[calc(90vh-120px)]'>
           {/* ── PASO 1: Familia ── */}
           <div className='space-y-3 border rounded-lg p-3 bg-muted/30'>
             <div className='space-y-2'>
-              <Label className='text-sm font-medium'>
-                Familia *
-              </Label>
+              <Label className='text-sm font-medium'>Familia *</Label>
               {formData.parentId ? (
                 // Familia derivada del padre — solo lectura
                 <div className='flex items-center gap-2 px-3 py-2 rounded-md border bg-background text-sm'>
@@ -270,25 +277,29 @@ export function CategoryFormDialog({
                       />
                       <span className='font-medium'>{derivedFamily.name}</span>
                       <span className='text-muted-foreground text-xs'>({derivedFamily.code})</span>
-                      <span className='text-xs text-muted-foreground ml-auto'>Heredada del padre</span>
+                      <span className='text-xs text-muted-foreground ml-auto'>
+                        Heredada del padre
+                      </span>
                     </>
                   ) : (
-                    <span className='text-muted-foreground text-xs'>Sin familia asignada al padre</span>
+                    <span className='text-muted-foreground text-xs'>
+                      Sin familia asignada al padre
+                    </span>
                   )}
                 </div>
               ) : (
                 <Combobox
                   value={formData.familyId || ''}
-                  onValueChange={(familyId) => {
+                  onValueChange={familyId => {
                     setFormData({ ...formData, familyId, departmentId: null, parentId: null })
                     onLoadDepartments(familyId)
                     onLoadAvailableParents(editingCategory?.id, familyId)
                     onLoadTechnicians(familyId)
                   }}
                   options={familyOptions}
-                  placeholder="Buscar familia..."
-                  searchPlaceholder="Escribe para buscar..."
-                  emptyText="No se encontraron familias"
+                  placeholder='Buscar familia...'
+                  searchPlaceholder='Escribe para buscar...'
+                  emptyText='No se encontraron familias'
                   disabled={submitting}
                 />
               )}
@@ -314,7 +325,7 @@ export function CategoryFormDialog({
                 <DepartmentSelector
                   departments={filteredDepartments}
                   value={formData.departmentId}
-                  onChange={(deptId) => setFormData({ ...formData, departmentId: deptId })}
+                  onChange={deptId => setFormData({ ...formData, departmentId: deptId })}
                   placeholder='Seleccionar departamento...'
                   disabled={submitting}
                 />
@@ -325,7 +336,8 @@ export function CategoryFormDialog({
                   <div className='text-xs text-green-600 bg-green-50 p-2 rounded flex items-start gap-2'>
                     <Building className='h-4 w-4 mt-0.5 flex-shrink-0' />
                     <span>
-                      <strong>Auto-asignación inteligente:</strong> Los tickets se asignarán preferentemente a técnicos de este departamento.
+                      <strong>Auto-asignación inteligente:</strong> Los tickets se asignarán
+                      preferentemente a técnicos de este departamento.
                     </span>
                   </div>
                 )}
@@ -348,7 +360,9 @@ export function CategoryFormDialog({
                   type='button'
                   variant='outline'
                   size='sm'
-                  onClick={() => onLoadAvailableParents(editingCategory?.id, derivedFamilyId ?? undefined)}
+                  onClick={() =>
+                    onLoadAvailableParents(editingCategory?.id, derivedFamilyId ?? undefined)
+                  }
                   disabled={submitting}
                   className='text-xs px-2 py-1'
                 >
@@ -384,14 +398,15 @@ export function CategoryFormDialog({
               <CategorySelector
                 categories={availableParents}
                 value={formData.parentId}
-                onChange={(categoryId) => setFormData({ ...formData, parentId: categoryId })}
+                onChange={categoryId => setFormData({ ...formData, parentId: categoryId })}
                 placeholder='Buscar categoría padre...'
                 disabled={submitting}
               />
 
               {availableParents.length === 0 && (
                 <p className='text-xs text-muted-foreground bg-muted p-2 rounded'>
-                  No hay categorías padre disponibles en esta familia. Se creará como categoría principal.
+                  No hay categorías padre disponibles en esta familia. Se creará como categoría
+                  principal.
                 </p>
               )}
 
@@ -407,7 +422,13 @@ export function CategoryFormDialog({
                       const isLast = index === array.length - 1
                       return (
                         <span key={`${item.id}-${index}`}>
-                          <span className={isLast ? 'font-medium text-slate-900 dark:text-slate-100' : ''}>{item.name}</span>
+                          <span
+                            className={
+                              isLast ? 'font-medium text-slate-900 dark:text-slate-100' : ''
+                            }
+                          >
+                            {item.name}
+                          </span>
                           {!isLast && <span className='mx-1 text-slate-400'>→</span>}
                         </span>
                       )
@@ -491,7 +512,7 @@ export function CategoryFormDialog({
                 {getLevelDescription(getResultingLevel())}
               </Badge>
             </div>
-            
+
             <TechnicianSelector
               technicians={availableTechnicians}
               technicianAssignments={formData.technician_assignments}
@@ -503,7 +524,7 @@ export function CategoryFormDialog({
               disabled={submitting}
               categoryLevel={getResultingLevel()}
             />
-            
+
             {/* Información compacta sobre cascada */}
             {formData.technician_assignments.length === 0 && (
               <div className='text-xs bg-amber-50 p-2 rounded text-amber-700'>
@@ -513,9 +534,9 @@ export function CategoryFormDialog({
           </div>
 
           {/* Vista Previa de Asignación - Simplificada */}
-          <div className="space-y-3 border-t pt-4">
-            <Label className="text-sm font-medium">🎯 Vista Previa de Asignación</Label>
-            
+          <div className='space-y-3 border-t pt-4'>
+            <Label className='text-sm font-medium'>🎯 Vista Previa de Asignación</Label>
+
             <AssignmentStrategyPreview
               categoryId={editingCategory?.id || null}
               categoryLevel={getResultingLevel()}
@@ -524,9 +545,9 @@ export function CategoryFormDialog({
           </div>
 
           <DialogFooter>
-            <Button 
-              type='button' 
-              variant='outline' 
+            <Button
+              type='button'
+              variant='outline'
               onClick={() => onOpenChange(false)}
               disabled={submitting}
             >
@@ -538,8 +559,10 @@ export function CategoryFormDialog({
                   <RefreshCw className='h-4 w-4 mr-2 animate-spin' />
                   {editingCategory ? 'Actualizando...' : 'Creando...'}
                 </>
+              ) : editingCategory ? (
+                'Actualizar'
               ) : (
-                editingCategory ? 'Actualizar' : 'Crear'
+                'Crear'
               )}
             </Button>
           </DialogFooter>

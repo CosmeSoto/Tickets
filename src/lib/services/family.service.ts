@@ -83,6 +83,24 @@ export interface FamilyWithConfig {
     createdAt: Date
     updatedAt: Date
   } | null
+  patrolFamilyConfig: {
+    id: string
+    familyId: string
+    patrolsEnabled: boolean
+    qrWindowMinutes: number
+    geofenceRadiusMeters: number
+    photoRetentionDays: number
+    photoCompressionQuality: number
+    photoMaxWidthPx: number
+    requirePhotoOnStart: boolean
+    requirePhotoOnEnd: boolean
+    offlineSyncToleranceMinutes: number
+    alertCompletionThreshold: number
+    gracePeriodMinutes: number
+    patrolIncidentCategoryId: string | null
+    createdAt: Date
+    updatedAt: Date
+  } | null
 }
 
 // ============================================================
@@ -127,6 +145,25 @@ export class FamilyService {
           requireFinancialForNew: true,
           autoApproveDecommission: false,
           requireDeliveryAct: true,
+        },
+      })
+
+      // 4. Crear patrol_family_config con defaults
+      await tx.patrol_family_config.create({
+        data: {
+          familyId: family.id,
+          patrolsEnabled: true,
+          qrWindowMinutes: 5,
+          geofenceRadiusMeters: 50,
+          photoRetentionDays: 90,
+          photoCompressionQuality: 0.82,
+          photoMaxWidthPx: 1280,
+          requirePhotoOnStart: false,
+          requirePhotoOnEnd: false,
+          offlineSyncToleranceMinutes: 30,
+          alertCompletionThreshold: 80,
+          gracePeriodMinutes: 15,
+          patrolIncidentCategoryId: null,
         },
       })
 
@@ -193,6 +230,7 @@ export class FamilyService {
       include: {
         ticketFamilyConfig: true,
         formConfig: true,
+        patrolFamilyConfig: true,
       },
     })
 

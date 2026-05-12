@@ -78,7 +78,7 @@ export class SalesManagerService {
       },
       include: {
         model: { select: { brand: true, model: true } },
-        family: { select: { id: true, name: true } },
+        type: { include: { family: { select: { id: true, name: true } } } },
       },
     })
 
@@ -95,9 +95,7 @@ export class SalesManagerService {
       where: { id: { in: equipmentIds } },
       data: {
         status: 'FOR_SALE',
-        salePrice,
-        saleCurrency,
-        saleNotes,
+        saleListingPrice: salePrice,
       },
     })
 
@@ -119,12 +117,14 @@ export class SalesManagerService {
     }
 
     // Notificar a administradores de familias
-    const familyIds = [...new Set(equipment.map(eq => eq.familyId).filter(Boolean))]
+    const familyIds = [
+      ...new Set(equipment.map(eq => eq.type.family?.id).filter((id): id is string => Boolean(id))),
+    ]
     for (const familyId of familyIds) {
-      const family = equipment.find(eq => eq.familyId === familyId)?.family
-      const count = equipment.filter(eq => eq.familyId === familyId).length
+      const family = equipment.find(eq => eq.type.family?.id === familyId)?.type.family
+      const count = equipment.filter(eq => eq.type.family?.id === familyId).length
 
-      await this.notifyFamilyAdmins(familyId as string, {
+      await this.notifyFamilyAdmins(familyId, {
         type: 'EQUIPMENT_FOR_SALE',
         title: `${count} equipo(s) activado(s) para venta`,
         message: `Se han activado ${count} equipo(s) de la familia ${family?.name} para venta con precio de $${salePrice.toLocaleString()} ${saleCurrency}`,
@@ -178,9 +178,7 @@ export class SalesManagerService {
       where: { id: { in: equipmentIds } },
       data: {
         status: 'AVAILABLE',
-        salePrice: null,
-        saleCurrency: null,
-        saleNotes: null,
+        saleListingPrice: null,
       },
     })
 
@@ -196,7 +194,7 @@ export class SalesManagerService {
           serialNumber: eq.serialNumber,
           model: eq.model ? `${eq.model.brand} ${eq.model.model}` : null,
           reason,
-          previousPrice: eq.salePrice,
+          previousPrice: eq.saleListingPrice,
         },
       })
     }
@@ -232,7 +230,7 @@ export class SalesManagerService {
         id: true,
         code: true,
         serialNumber: true,
-        salePrice: true,
+        saleListingPrice: true,
       },
     })
 
@@ -243,7 +241,7 @@ export class SalesManagerService {
     // Actualizar precios
     const updated = await prisma.equipment.updateMany({
       where: { id: { in: equipmentIds } },
-      data: { salePrice: newPrice },
+      data: { saleListingPrice: newPrice },
     })
 
     // Auditoría
@@ -256,7 +254,7 @@ export class SalesManagerService {
         changes: {
           code: eq.code,
           serialNumber: eq.serialNumber,
-          previousPrice: eq.salePrice,
+          previousPrice: eq.saleListingPrice,
           newPrice,
         },
       })
@@ -336,62 +334,68 @@ export class SalesManagerService {
   // ── Obtener estadísticas de ventas ─────────────────────────────────────────
 
   static async getSalesStats(familyId?: string): Promise<SalesStats> {
-    const whereForSale: any = { status: 'FOR_SALE' }
-    const whereAvailable: any = { status: 'AVAILABLE' }
+    const typeFamilyFilter = familyId ? { type: { familyId } } : {}
+    const whereForSale: any = { status: 'FOR_SALE', ...typeFamilyFilter }
+    const whereAvailable: any = { status: 'AVAILABLE', ...typeFamilyFilter }
 
-    if (familyId) {
-      whereForSale.familyId = familyId
-      whereAvailable.familyId = familyId
-    }
-
-    // Total en venta
     const totalForSale = await prisma.equipment.count({ where: whereForSale })
-
-    // Total disponible
     const totalAvailable = await prisma.equipment.count({ where: whereAvailable })
 
-    // Valor total
     const valueAgg = await prisma.equipment.aggregate({
       where: whereForSale,
-      _sum: { salePrice: true },
+      _sum: { saleListingPrice: true },
     })
-    const totalValue = valueAgg._sum.salePrice || 0
+    const totalValue = valueAgg._sum.saleListingPrice ?? 0
 
-    // Por familia
-    const byFamilyRaw = await prisma.equipment.groupBy({
-      by: ['familyId'],
+    const forSaleRows = await prisma.equipment.findMany({
       where: whereForSale,
-      _count: true,
-      _sum: { salePrice: true },
+      select: { typeId: true, saleListingPrice: true },
     })
+    const typeIds = [...new Set(forSaleRows.map(r => r.typeId))]
+    const types =
+      typeIds.length > 0
+        ? await prisma.equipment_types.findMany({
+            where: { id: { in: typeIds } },
+            select: { id: true, familyId: true },
+          })
+        : []
 
-    const familyIds = byFamilyRaw.map(f => f.familyId).filter(Boolean) as string[]
-    const families = await prisma.families.findMany({
-      where: { id: { in: familyIds } },
-      select: { id: true, name: true },
-    })
+    const famIds = [
+      ...new Set(types.map(t => t.familyId).filter((id): id is string => Boolean(id))),
+    ]
+    const families =
+      famIds.length > 0
+        ? await prisma.families.findMany({
+            where: { id: { in: famIds } },
+            select: { id: true, name: true },
+          })
+        : []
+    const familyNameById = new Map(families.map(f => [f.id, f.name] as const))
 
-    const byFamily = byFamilyRaw
-      .filter(f => f.familyId)
-      .map(f => {
-        const family = families.find(fam => fam.id === f.familyId)
-        return {
-          familyId: f.familyId!,
-          familyName: family?.name || 'Sin familia',
-          count: f._count,
-          value: f._sum.salePrice || 0,
-        }
-      })
+    const byFamilyMap = new Map<string, { count: number; value: number }>()
+    for (const row of forSaleRows) {
+      const fid = types.find(t => t.id === row.typeId)?.familyId
+      if (!fid) continue
+      const cur = byFamilyMap.get(fid) || { count: 0, value: 0 }
+      cur.count += 1
+      cur.value += row.saleListingPrice ?? 0
+      byFamilyMap.set(fid, cur)
+    }
+    const byFamily = Array.from(byFamilyMap.entries()).map(([id, v]) => ({
+      familyId: id,
+      familyName: familyNameById.get(id) || 'Sin familia',
+      count: v.count,
+      value: v.value,
+    }))
 
-    // Por modelo
     const byModelRaw = await prisma.equipment.groupBy({
       by: ['modelId'],
       where: whereForSale,
-      _count: true,
-      _sum: { salePrice: true },
+      _count: { _all: true },
+      _sum: { saleListingPrice: true },
     })
 
-    const modelIds = byModelRaw.map(m => m.modelId).filter(Boolean) as string[]
+    const modelIds = byModelRaw.map(m => m.modelId).filter((id): id is string => Boolean(id))
     const models = await prisma.equipment_models.findMany({
       where: { id: { in: modelIds } },
       select: { id: true, brand: true, model: true },
@@ -404,8 +408,8 @@ export class SalesManagerService {
         return {
           modelId: m.modelId!,
           modelName: model ? `${model.brand} ${model.model}` : 'Sin modelo',
-          count: m._count,
-          value: m._sum.salePrice || 0,
+          count: m._count._all,
+          value: m._sum.saleListingPrice ?? 0,
         }
       })
 
@@ -440,7 +444,7 @@ export class SalesManagerService {
       Object.assign(where, familyFilter)
     }
 
-    if (familyId) where.familyId = familyId
+    if (familyId) where.type = { familyId }
     if (modelId) where.modelId = modelId
     if (warehouseId) where.warehouseId = warehouseId
     if (search) {
@@ -455,7 +459,7 @@ export class SalesManagerService {
         where,
         include: {
           model: { select: { brand: true, model: true, sku: true } },
-          family: { select: { name: true, color: true } },
+          type: { include: { family: { select: { name: true, color: true } } } },
           warehouse: { select: { name: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -495,7 +499,7 @@ export class SalesManagerService {
       Object.assign(where, familyFilter)
     }
 
-    if (familyId) where.familyId = familyId
+    if (familyId) where.type = { familyId }
     if (modelId) where.modelId = modelId
     if (search) {
       where.OR = [
@@ -509,7 +513,7 @@ export class SalesManagerService {
         where,
         include: {
           model: { select: { brand: true, model: true, sku: true } },
-          family: { select: { name: true, color: true } },
+          type: { include: { family: { select: { name: true, color: true } } } },
           warehouse: { select: { name: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -560,13 +564,12 @@ export class SalesManagerService {
 
     // Enviar notificaciones
     for (const admin of admins) {
-      await NotificationService.create({
+      await NotificationService.push({
         userId: admin.id,
-        type: notification.type as any,
+        type: 'INVENTORY',
         title: notification.title,
         message: notification.message,
-        priority: 'MEDIUM',
-        metadata: notification.metadata,
+        metadata: { ...notification.metadata, kind: notification.type },
       })
     }
   }

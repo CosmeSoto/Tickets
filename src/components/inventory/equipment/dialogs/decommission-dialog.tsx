@@ -59,22 +59,24 @@ export function DecommissionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className='max-w-lg max-h-[90vh] overflow-y-auto' aria-describedby={undefined}>
+      <DialogContent className='max-w-lg max-h-[90vh]' aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
-        <DecommissionRequestForm
-          assetType='EQUIPMENT'
-          assetId={equipmentId}
-          assetName={`${equipmentCode} — ${equipmentBrand} ${equipmentModel}`}
-          acquisitionMode={acquisitionMode}
-          onSuccess={() => {
-            onOpenChange(false)
-            onSuccess()
-          }}
-          onCancel={() => onOpenChange(false)}
-        />
+        <div className='overflow-y-auto max-h-[calc(90vh-100px)]'>
+          <DecommissionRequestForm
+            assetType='EQUIPMENT'
+            assetId={equipmentId}
+            assetName={`${equipmentCode} — ${equipmentBrand} ${equipmentModel}`}
+            acquisitionMode={acquisitionMode}
+            onSuccess={() => {
+              onOpenChange(false)
+              onSuccess()
+            }}
+            onCancel={() => onOpenChange(false)}
+          />
+        </div>
       </DialogContent>
     </Dialog>
   )

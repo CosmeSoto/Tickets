@@ -144,7 +144,7 @@ export function SaleDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className='max-w-lg max-h-[90vh] overflow-y-auto' aria-describedby={undefined}>
+      <DialogContent className='max-w-lg max-h-[90vh]' aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className='flex items-center gap-2'>
             <DollarSign className='h-5 w-5' />
@@ -160,7 +160,10 @@ export function SaleDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className='space-y-4'>
+        <form
+          onSubmit={handleSubmit}
+          className='space-y-4 overflow-y-auto max-h-[calc(90vh-120px)]'
+        >
           {/* Comprador */}
           <div className='space-y-3'>
             <p className='text-xs font-medium text-muted-foreground uppercase tracking-wide'>

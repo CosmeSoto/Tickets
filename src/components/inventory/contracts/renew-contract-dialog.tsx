@@ -120,7 +120,7 @@ export function RenewContractDialog({ contract, open, onOpenChange }: RenewContr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className='max-w-2xl max-h-[90vh] overflow-y-auto'>
+      <DialogContent className='max-w-2xl max-h-[90vh]'>
         <DialogHeader>
           <DialogTitle className='flex items-center gap-2'>
             <RefreshCw className='h-5 w-5' />
@@ -131,7 +131,10 @@ export function RenewContractDialog({ contract, open, onOpenChange }: RenewContr
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className='space-y-6'>
+        <form
+          onSubmit={handleSubmit}
+          className='space-y-6 overflow-y-auto max-h-[calc(90vh-120px)]'
+        >
           {/* Fechas del nuevo contrato */}
           <div className='space-y-4'>
             <div className='flex items-center gap-2 text-sm font-medium'>

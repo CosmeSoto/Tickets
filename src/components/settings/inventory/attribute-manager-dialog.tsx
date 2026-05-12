@@ -309,7 +309,7 @@ export function AttributeManagerDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className='max-w-5xl max-h-[90vh] overflow-y-auto'>
+        <DialogContent className='max-w-5xl max-h-[90vh]'>
           <DialogHeader>
             <DialogTitle>Atributos de {typeName}</DialogTitle>
             <DialogDescription>
@@ -317,7 +317,7 @@ export function AttributeManagerDialog({
             </DialogDescription>
           </DialogHeader>
 
-          <div className='space-y-4 py-4'>
+          <div className='space-y-4 py-4 overflow-y-auto max-h-[calc(90vh-120px)]'>
             <DataTable
               data={attributes}
               columns={columns}

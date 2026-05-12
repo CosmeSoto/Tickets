@@ -33,7 +33,7 @@ const formSchema = z.object({
   familyId: z.string().min(1, 'Selecciona una familia'),
   description: z.string().min(10, 'La descripción debe tener al menos 10 caracteres'),
   justification: z.string().min(20, 'La justificación debe tener al menos 20 caracteres'),
-  quantity: z.coerce.number().min(1, 'La cantidad debe ser al menos 1').default(1),
+  quantity: z.coerce.number().int().min(1, 'La cantidad debe ser al menos 1'),
   neededBy: z.string().optional(),
 })
 

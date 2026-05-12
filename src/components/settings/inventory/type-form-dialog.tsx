@@ -92,7 +92,8 @@ export function TypeFormDialog({
         allowMultipleAssignments: (initialData as any).allowMultipleAssignments || false,
         maxAssignments: (initialData as any).maxAssignments || null,
         // Consumable specific
-        trackStock: (initialData as any).trackStock !== undefined ? (initialData as any).trackStock : true,
+        trackStock:
+          (initialData as any).trackStock !== undefined ? (initialData as any).trackStock : true,
         minStockLevel: (initialData as any).minStockLevel || null,
         reorderPoint: (initialData as any).reorderPoint || null,
       })
@@ -126,16 +127,16 @@ export function TypeFormDialog({
     }
 
     if (typeKind === 'license' && formData.allowMultipleAssignments) {
-      if (formData.maxAssignments !== null && formData.maxAssignments < 1) {
+      if (formData.maxAssignments != null && formData.maxAssignments < 1) {
         newErrors.maxAssignments = 'Debe ser mayor a 0'
       }
     }
 
     if (typeKind === 'consumable') {
-      if (formData.minStockLevel !== null && formData.minStockLevel < 0) {
+      if (formData.minStockLevel != null && formData.minStockLevel < 0) {
         newErrors.minStockLevel = 'No puede ser negativo'
       }
-      if (formData.reorderPoint !== null && formData.reorderPoint < 0) {
+      if (formData.reorderPoint != null && formData.reorderPoint < 0) {
         newErrors.reorderPoint = 'No puede ser negativo'
       }
     }
@@ -169,7 +170,7 @@ export function TypeFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className='max-w-2xl max-h-[90vh] overflow-y-auto'>
+      <DialogContent className='max-w-2xl max-h-[90vh]'>
         <DialogHeader>
           <DialogTitle>
             {mode === 'create' ? `Nuevo ${labels.singular}` : `Editar ${labels.singular}`}
@@ -181,7 +182,7 @@ export function TypeFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className='space-y-4 py-4'>
+        <div className='space-y-4 py-4 overflow-y-auto max-h-[calc(90vh-120px)]'>
           {/* Basic fields */}
           <div className='space-y-2'>
             <Label htmlFor='name'>
@@ -228,7 +229,7 @@ export function TypeFormDialog({
           {typeKind === 'equipment' && (
             <div className='space-y-3'>
               <h4 className='font-semibold text-sm'>Configuración de Equipos</h4>
-              
+
               <div className='flex items-center justify-between p-3 border rounded-lg'>
                 <div>
                   <p className='text-sm font-medium'>Requiere número de serie</p>
@@ -277,7 +278,7 @@ export function TypeFormDialog({
           {typeKind === 'license' && (
             <div className='space-y-3'>
               <h4 className='font-semibold text-sm'>Configuración de Licencias</h4>
-              
+
               <div className='flex items-center justify-between p-3 border rounded-lg'>
                 <div>
                   <p className='text-sm font-medium'>Requiere clave de licencia</p>
@@ -315,7 +316,10 @@ export function TypeFormDialog({
                     min={1}
                     value={formData.maxAssignments || ''}
                     onChange={e =>
-                      updateField('maxAssignments', e.target.value ? parseInt(e.target.value) : null)
+                      updateField(
+                        'maxAssignments',
+                        e.target.value ? parseInt(e.target.value) : null
+                      )
                     }
                     placeholder='Ej: 5 (dejar vacío para ilimitado)'
                     className={errors.maxAssignments ? 'border-destructive' : ''}
@@ -333,7 +337,7 @@ export function TypeFormDialog({
           {typeKind === 'consumable' && (
             <div className='space-y-3'>
               <h4 className='font-semibold text-sm'>Configuración de Consumibles</h4>
-              
+
               <div className='flex items-center justify-between p-3 border rounded-lg'>
                 <div>
                   <p className='text-sm font-medium'>Rastrear inventario</p>
@@ -358,7 +362,10 @@ export function TypeFormDialog({
                       min={0}
                       value={formData.minStockLevel || ''}
                       onChange={e =>
-                        updateField('minStockLevel', e.target.value ? parseInt(e.target.value) : null)
+                        updateField(
+                          'minStockLevel',
+                          e.target.value ? parseInt(e.target.value) : null
+                        )
                       }
                       placeholder='Ej: 10'
                       className={errors.minStockLevel ? 'border-destructive' : ''}
@@ -380,7 +387,10 @@ export function TypeFormDialog({
                       min={0}
                       value={formData.reorderPoint || ''}
                       onChange={e =>
-                        updateField('reorderPoint', e.target.value ? parseInt(e.target.value) : null)
+                        updateField(
+                          'reorderPoint',
+                          e.target.value ? parseInt(e.target.value) : null
+                        )
                       }
                       placeholder='Ej: 20'
                       className={errors.reorderPoint ? 'border-destructive' : ''}

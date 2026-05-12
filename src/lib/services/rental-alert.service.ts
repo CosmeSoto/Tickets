@@ -34,7 +34,7 @@ export class RentalAlertService {
       },
       include: {
         model: { select: { brand: true, model: true } },
-        family: { select: { id: true, name: true } },
+        type: { include: { family: { select: { id: true, name: true } } } },
         assignments: {
           where: { isActive: true },
           include: { receiver: { select: { id: true, name: true } } },
@@ -51,7 +51,7 @@ export class RentalAlertService {
       )
 
       // Buscar administradores de la familia del equipo
-      const admins = await this.getFamilyAdmins(equipment.familyId)
+      const admins = await this.getFamilyAdmins(equipment.type.family?.id ?? null)
 
       // Información del equipo
       const equipmentInfo = `${equipment.model?.brand || equipment.brand} ${equipment.model?.model || equipment.model_old} (${equipment.code})`
@@ -116,7 +116,7 @@ export class RentalAlertService {
   private static async checkContractRentals(now: Date, alertThreshold: Date) {
     const expiringContracts = await prisma.contracts.findMany({
       where: {
-        category: 'RENTAL',
+        category: 'EQUIPMENT_RENTAL',
         status: { in: ['ACTIVE', 'EXPIRING'] },
         endDate: { lte: alertThreshold, gte: now },
         expiryAlertSentAt: null,
@@ -262,13 +262,13 @@ export class RentalAlertService {
       rentalEndDate: { lte: threshold, gte: now },
     }
 
-    if (familyId) where.familyId = familyId
+    if (familyId) where.type = { familyId }
 
     const rentals = await prisma.equipment.findMany({
       where,
       include: {
         model: { select: { brand: true, model: true } },
-        family: { select: { name: true, color: true } },
+        type: { include: { family: { select: { name: true, color: true } } } },
         assignments: {
           where: { isActive: true },
           include: { receiver: { select: { name: true, email: true } } },

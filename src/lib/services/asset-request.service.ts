@@ -21,6 +21,7 @@ import { AssetRequestStatus, AssetType, UserRole } from '@prisma/client'
 import { FolioService } from './folio.service'
 import { AuditServiceComplete } from './audit-service-complete'
 import { NotificationService } from './notification-service'
+import { EmailService } from '@/lib/services/email/email-service'
 import { createModuleCache, getSetting } from '@/lib/api-cache'
 import { getAccessibleFamilyIds } from '@/lib/inventory/family-access'
 import { validateReviewerComment } from '@/lib/validations/inventory/asset-request'
@@ -748,10 +749,12 @@ export class AssetRequestService {
             data: {
               equipmentId,
               receiverId: request.requesterId,
-              assignedById: userId,
-              assignedAt: new Date(),
-              status: 'ACTIVE',
-              notes: `Asignado por solicitud ${request.code}`,
+              delivererId: userId,
+              assignmentType: 'PERMANENT',
+              startDate: new Date(),
+              isActive: true,
+              accessories: [],
+              observations: `Asignado por solicitud ${request.code}`,
             },
             include: {
               equipment: {
@@ -1122,17 +1125,10 @@ export class AssetRequestService {
       })
 
       // Email al solicitante
-      await NotificationService.email({
+      await EmailService.queueEmail({
         to: requesterEmail,
         subject: `Solicitud ${code} aprobada`,
-        template: 'asset-request-approved',
-        data: {
-          requesterName,
-          code,
-          quantity,
-          equipmentCodes,
-          comment,
-        },
+        text: `Hola ${requesterName},\n\nTu solicitud ${code} ha sido aprobada. Unidades: ${quantity}.\nEquipos asignados: ${equipmentCodes}${comment ? `\n\nComentario: ${comment}` : ''}`,
       })
     } catch (error) {
       console.error('[ASSET_REQUEST] Error notifying approval with equipment:', error)

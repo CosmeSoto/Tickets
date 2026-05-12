@@ -1,0 +1,169 @@
+/**
+ * Utilidades de exportación y etiquetas para el módulo de patrullas.
+ * Sigue el mismo patrón que ticket-utils.ts.
+ */
+
+import type { ExportColumn } from '@/lib/utils/export'
+
+// ── Mapas de etiquetas en español ─────────────────────────────────────────────
+
+export const PATROL_STATUS_LABELS_ES: Record<string, string> = {
+  PENDING: 'Pendiente',
+  IN_PROGRESS: 'En Progreso',
+  COMPLETED: 'Completado',
+  MISSED: 'Omitida',
+  INCOMPLETE: 'Incompleta',
+}
+
+export const CHECK_IN_METHOD_LABELS_ES: Record<string, string> = {
+  QR_DYNAMIC: 'QR Dinámico',
+  QR_STATIC: 'QR Estático',
+  OFFLINE_SYNC: 'Sincronización Offline',
+}
+
+export const CHECK_IN_VALIDATION_LABELS_ES: Record<string, string> = {
+  VALID: 'Válido',
+  QR_TOKEN_INVALID: 'Token QR Inválido',
+  GPS_OUT_OF_GEOFENCE: 'Fuera de Geofence',
+  OFFLINE_SYNC_REJECTED: 'Sync Offline Rechazado',
+}
+
+export const PATROL_RECURRENCE_LABELS_ES: Record<string, string> = {
+  NONE: 'Sin recurrencia',
+  DAILY: 'Diaria',
+  WEEKLY: 'Semanal',
+  CUSTOM: 'Personalizada',
+}
+
+export const QR_TYPE_LABELS_ES: Record<string, string> = {
+  DYNAMIC: 'QR Dinámico',
+  STATIC: 'QR Estático',
+}
+
+// ── Helpers de color para badges ──────────────────────────────────────────────
+
+export function getPatrolStatusColor(status: string): string {
+  const map: Record<string, string> = {
+    PENDING: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+    IN_PROGRESS: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+    COMPLETED: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+    MISSED: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+    INCOMPLETE: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+  }
+  return map[status] ?? 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400'
+}
+
+export function getValidationResultColor(result: string): string {
+  const map: Record<string, string> = {
+    VALID: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+    QR_TOKEN_INVALID: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+    GPS_OUT_OF_GEOFENCE: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+    OFFLINE_SYNC_REJECTED: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+  }
+  return map[result] ?? 'bg-gray-100 text-gray-800'
+}
+
+// ── Columnas de exportación ───────────────────────────────────────────────────
+
+/** Historial de patrullas (admin) */
+export const PATROL_HISTORY_EXPORT_COLUMNS: ExportColumn[] = [
+  {
+    key: 'id',
+    label: 'ID',
+    format: (_v: any, r: any) => r?.id?.slice(-8)?.toUpperCase() ?? '',
+  },
+  { key: 'route', label: 'Ruta', format: (v: any) => v?.name ?? '' },
+  { key: 'guard', label: 'Guardia', format: (v: any) => v?.name ?? '' },
+  { key: 'family', label: 'Área', format: (v: any) => v?.name ?? '' },
+  {
+    key: 'scheduledStart',
+    label: 'Inicio Programado',
+    format: (v: any) => (v ? new Date(v).toLocaleString('es-EC') : ''),
+  },
+  {
+    key: 'startedAt',
+    label: 'Inicio Real',
+    format: (v: any) => (v ? new Date(v).toLocaleString('es-EC') : '—'),
+  },
+  {
+    key: 'completedAt',
+    label: 'Completado',
+    format: (v: any) => (v ? new Date(v).toLocaleString('es-EC') : '—'),
+  },
+  {
+    key: 'status',
+    label: 'Estado',
+    format: (v: string) => PATROL_STATUS_LABELS_ES[v] ?? v,
+  },
+  {
+    key: 'completionPercentage',
+    label: 'Completitud %',
+    format: (v: any) => (v != null ? `${Math.round(v)}%` : '—'),
+  },
+]
+
+/** Timeline de check-ins */
+export const PATROL_CHECKINS_EXPORT_COLUMNS: ExportColumn[] = [
+  { key: 'checkpoint', label: 'Checkpoint', format: (v: any) => v?.name ?? '' },
+  { key: 'checkpoint', label: 'Ubicación', format: (v: any) => v?.location ?? '' },
+  {
+    key: 'createdAt',
+    label: 'Registrado',
+    format: (v: any) => (v ? new Date(v).toLocaleString('es-EC') : ''),
+  },
+  {
+    key: 'method',
+    label: 'Método',
+    format: (v: string) => CHECK_IN_METHOD_LABELS_ES[v] ?? v,
+  },
+  {
+    key: 'validationResult',
+    label: 'Resultado',
+    format: (v: string) => CHECK_IN_VALIDATION_LABELS_ES[v] ?? v,
+  },
+  {
+    key: 'gpsLat',
+    label: 'GPS Validado',
+    format: (_v: any, r: any) => (r?.gpsLat != null ? 'Sí' : 'No'),
+  },
+  {
+    key: 'distanceFromCheckpointMeters',
+    label: 'Distancia (m)',
+    format: (v: any) => (v != null ? `${Math.round(v)} m` : '—'),
+  },
+]
+
+/** Reporte de cumplimiento por guardia */
+export const PATROL_COMPLIANCE_GUARD_EXPORT_COLUMNS: ExportColumn[] = [
+  { key: 'guardName', label: 'Guardia' },
+  { key: 'assigned', label: 'Asignadas' },
+  { key: 'completed', label: 'Completadas' },
+  { key: 'missed', label: 'Omitidas' },
+  { key: 'incomplete', label: 'Incompletas' },
+  {
+    key: 'avgCompletion',
+    label: 'Completitud Promedio %',
+    format: (v: any) => (v != null ? `${Math.round(v)}%` : '—'),
+  },
+]
+
+/** Reporte de cumplimiento por ruta */
+export const PATROL_COMPLIANCE_ROUTE_EXPORT_COLUMNS: ExportColumn[] = [
+  { key: 'routeName', label: 'Ruta' },
+  { key: 'executions', label: 'Ejecuciones' },
+  {
+    key: 'completionRate',
+    label: 'Tasa de Completitud %',
+    format: (v: any) => (v != null ? `${Math.round(v)}%` : '—'),
+  },
+  {
+    key: 'avgDurationMinutes',
+    label: 'Duración Promedio (min)',
+    format: (v: any) => (v != null ? `${Math.round(v)} min` : '—'),
+  },
+  {
+    key: 'mostMissedCheckpoints',
+    label: 'Checkpoint Más Omitido',
+    format: (v: any) => (Array.isArray(v) && v.length > 0 ? (v[0]?.name ?? '—') : '—'),
+  },
+]

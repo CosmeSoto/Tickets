@@ -125,7 +125,7 @@ export function BulkForSaleModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className='max-w-4xl max-h-[90vh] overflow-y-auto'>
+      <DialogContent className='max-w-4xl max-h-[90vh]'>
         <DialogHeader>
           <DialogTitle>Marcar Equipos en Venta</DialogTitle>
           <DialogDescription>
@@ -133,7 +133,7 @@ export function BulkForSaleModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className='space-y-6'>
+        <div className='space-y-6 overflow-y-auto max-h-[calc(90vh-120px)]'>
           {/* Precio Común */}
           <div className='space-y-2'>
             <div className='flex items-center gap-2'>

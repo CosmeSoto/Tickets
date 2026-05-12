@@ -129,7 +129,7 @@ export function ConvertToPurchaseDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className='max-w-lg max-h-[90vh] overflow-y-auto'>
+      <DialogContent className='max-w-lg max-h-[90vh]'>
         <DialogHeader>
           <DialogTitle className='flex items-center gap-2'>
             <ShoppingCart className='h-5 w-5' />
@@ -142,7 +142,10 @@ export function ConvertToPurchaseDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className='space-y-4 pt-1'>
+        <form
+          onSubmit={handleSubmit}
+          className='space-y-4 pt-1 overflow-y-auto max-h-[calc(90vh-120px)]'
+        >
           {/* Banner informativo */}
           <div className='rounded-md border border-border bg-muted/40 px-3 py-2.5 flex gap-2 text-sm text-muted-foreground'>
             <Info className='h-4 w-4 mt-0.5 shrink-0' />

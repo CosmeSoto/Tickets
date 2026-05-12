@@ -36,7 +36,7 @@ export interface ModelWithStock {
   model: string
   sku: string | null
   typeId: string
-  specifications: any
+  specifications?: Record<string, any> | null
   defaultAccessories: string[]
   standardPrice: number | null
   modelPhotoUrl: string | null
@@ -93,7 +93,6 @@ export async function createModel(data: CreateModelInput) {
         model: data.model,
         sku: data.sku,
         typeId: data.typeId,
-        specifications: data.specifications || Prisma.JsonNull,
         defaultAccessories: data.defaultAccessories || [],
         standardPrice: data.standardPrice,
         modelPhotoUrl: data.modelPhotoUrl,
@@ -215,7 +214,6 @@ export async function updateModel(id: string, data: UpdateModelInput) {
         model: data.model,
         sku: data.sku,
         typeId: data.typeId,
-        specifications: data.specifications !== undefined ? data.specifications : undefined,
         defaultAccessories: data.defaultAccessories,
         standardPrice: data.standardPrice,
         modelPhotoUrl: data.modelPhotoUrl,

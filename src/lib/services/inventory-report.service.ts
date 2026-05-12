@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 
 /**
  * Servicio para generación de reportes de inventario
@@ -14,17 +15,15 @@ export class InventoryReportService {
     userRole?: string
   }) {
     try {
-      const where: any = {}
-
-      // Aplicar scope de familias
-      if (params.familyId) where.familyId = params.familyId
-      if (params.modelId) where.modelId = params.modelId
+      const instancesWhere: Prisma.equipmentWhereInput = {
+        ...(params.familyId ? { type: { familyId: params.familyId } } : {}),
+      }
 
       const models = await prisma.equipment_models.findMany({
         where: params.modelId ? { id: params.modelId } : {},
         include: {
-          equipment: {
-            where,
+          instances: {
+            where: instancesWhere,
             select: {
               id: true,
               code: true,
@@ -44,14 +43,14 @@ export class InventoryReportService {
         model: model.model,
         sku: model.sku,
         type: model.type.name,
-        total: model.equipment.length,
-        available: model.equipment.filter(e => e.status === 'AVAILABLE').length,
-        assigned: model.equipment.filter(e => e.status === 'ASSIGNED').length,
-        maintenance: model.equipment.filter(e => e.status === 'MAINTENANCE').length,
-        retired: model.equipment.filter(e => e.status === 'RETIRED').length,
-        totalValue: model.equipment.reduce((sum, e) => sum + (e.purchasePrice || 0), 0),
-        rentalCount: model.equipment.filter(e => e.ownershipType === 'RENTAL').length,
-        rentalMonthlyCost: model.equipment
+        total: model.instances.length,
+        available: model.instances.filter(e => e.status === 'AVAILABLE').length,
+        assigned: model.instances.filter(e => e.status === 'ASSIGNED').length,
+        maintenance: model.instances.filter(e => e.status === 'MAINTENANCE').length,
+        retired: model.instances.filter(e => e.status === 'RETIRED').length,
+        totalValue: model.instances.reduce((sum, e) => sum + (e.purchasePrice || 0), 0),
+        rentalCount: model.instances.filter(e => e.ownershipType === 'RENTAL').length,
+        rentalMonthlyCost: model.instances
           .filter(e => e.ownershipType === 'RENTAL')
           .reduce((sum, e) => sum + (e.rentalMonthlyCost || 0), 0),
       }))
@@ -168,7 +167,7 @@ export class InventoryReportService {
           model: { select: { brand: true, model: true } },
           supplier: { select: { name: true } },
           equipment: {
-            where: params.familyId ? { familyId: params.familyId } : {},
+            where: params.familyId ? { type: { familyId: params.familyId } } : {},
             select: {
               id: true,
               code: true,
@@ -182,7 +181,7 @@ export class InventoryReportService {
         batchId: batch.id,
         batchCode: batch.batchCode,
         model: `${batch.model.brand} ${batch.model.model}`,
-        supplier: batch.supplier.name,
+        supplier: batch.supplier?.name ?? '—',
         quantity: batch.quantity,
         unitPrice: batch.unitPrice,
         totalPrice: batch.totalPrice,

@@ -34,6 +34,8 @@ import {
   Building2,
   Layers,
   ExternalLink,
+  MapPin,
+  ClipboardList,
 } from 'lucide-react'
 import { Notifications } from '@/components/ui/notifications'
 import { Button } from '@/components/ui/button'
@@ -99,6 +101,19 @@ const navigationByRole: Record<string, NavItem[]> = {
     },
     { name: 'Familias', href: '/admin/families', icon: Layers },
     { name: 'Usuarios', href: '/admin/users', icon: Users },
+    {
+      name: 'Rondas',
+      href: '/admin/patrols',
+      icon: Shield,
+      children: [
+        { name: 'Dashboard', href: '/admin/patrols', icon: LayoutDashboard },
+        { name: 'Checkpoints', href: '/admin/patrols/checkpoints', icon: MapPin },
+        { name: 'Rutas', href: '/admin/patrols/routes', icon: ClipboardList },
+        { name: 'Programación', href: '/admin/patrols/schedules', icon: ClipboardList },
+        { name: 'Reportes', href: '/admin/patrols/reports', icon: BarChart3 },
+        { name: 'Configuración', href: '/admin/settings/patrols', icon: Settings },
+      ],
+    },
     { name: 'Auditoría', href: '/admin/audit', icon: Shield },
     { name: 'Página Pública', href: '/admin/help-config', icon: Globe },
     { name: 'Configuración Sistema', href: '/admin/settings', icon: Settings },
@@ -126,6 +141,18 @@ const navigationByRole: Record<string, NavItem[]> = {
         { name: 'Mis Activos', href: '/inventory', icon: Monitor },
         { name: 'Mantenimientos', href: '/inventory/maintenance', icon: Wrench },
         { name: 'Actas', href: '/inventory/acts', icon: FileText },
+      ],
+    },
+    {
+      name: 'Rondas',
+      href: '/admin/patrols',
+      icon: Shield,
+      children: [
+        { name: 'Dashboard', href: '/admin/patrols', icon: LayoutDashboard },
+        { name: 'Checkpoints', href: '/admin/patrols/checkpoints', icon: MapPin },
+        { name: 'Rutas', href: '/admin/patrols/routes', icon: ClipboardList },
+        { name: 'Programación', href: '/admin/patrols/schedules', icon: ClipboardList },
+        { name: 'Reportes', href: '/admin/patrols/reports', icon: BarChart3 },
       ],
     },
   ],
@@ -180,6 +207,12 @@ const navigationByRole: Record<string, NavItem[]> = {
         { name: 'Mantenimientos', href: '/inventory/maintenance', icon: Wrench },
         { name: 'Actas', href: '/inventory/acts', icon: FileText },
       ],
+    },
+    {
+      name: 'Mis Rondas',
+      href: '/patrol',
+      icon: Shield,
+      children: [{ name: 'Patrullas Activas', href: '/patrol', icon: MapPin }],
     },
   ],
 
@@ -319,7 +352,7 @@ export function RoleDashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   // Módulos activos — debe estar antes de cualquier return condicional
-  const { tickets: hasTickets, inventory: hasInventory } = useUserModules()
+  const { tickets: hasTickets, inventory: hasInventory, patrols: hasPatrols } = useUserModules()
 
   if (!session) {
     return null
@@ -347,6 +380,7 @@ export function RoleDashboardLayout({
       // Para Admin normal: filtrar según módulos activos de sus familias asignadas
       if (item.href === '/admin/tickets' || item.name === 'Tickets') return hasTickets
       if (item.href === '/inventory' || item.name === 'Inventario') return hasInventory
+      if (item.href === '/admin/patrols' || item.name === 'Rondas') return hasPatrols
       return true
     })
     navigation = adminNav
@@ -361,6 +395,15 @@ export function RoleDashboardLayout({
       // Ocultar Inventario/Equipos si ninguna familia lo tiene habilitado
       if (item.href === '/inventory') {
         return hasInventory
+      }
+      // Ocultar Rondas si el usuario no tiene patrolsEnabled
+      if (
+        item.href === '/admin/patrols' ||
+        item.href === '/patrol' ||
+        item.name === 'Rondas' ||
+        item.name === 'Mis Rondas'
+      ) {
+        return hasPatrols
       }
       return true
     })

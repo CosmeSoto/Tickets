@@ -85,7 +85,14 @@ interface PreviewModalProps {
   onDownload: (att: Attachment) => void
 }
 
-function PreviewModal({ attachment, allImages, baseUrl, onClose, onNavigate, onDownload }: PreviewModalProps) {
+function PreviewModal({
+  attachment,
+  allImages,
+  baseUrl,
+  onClose,
+  onNavigate,
+  onDownload,
+}: PreviewModalProps) {
   const [zoom, setZoom] = useState(1)
   const isImage = attachment.mimeType.startsWith('image/')
   const isPdf = attachment.mimeType === 'application/pdf'
@@ -95,11 +102,14 @@ function PreviewModal({ attachment, allImages, baseUrl, onClose, onNavigate, onD
   const hasPrev = currentIndex > 0
   const hasNext = currentIndex < allImages.length - 1
 
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape') onClose()
-    if (e.key === 'ArrowLeft' && hasPrev) onNavigate(allImages[currentIndex - 1])
-    if (e.key === 'ArrowRight' && hasNext) onNavigate(allImages[currentIndex + 1])
-  }, [onClose, hasPrev, hasNext, allImages, currentIndex, onNavigate])
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+      if (e.key === 'ArrowLeft' && hasPrev) onNavigate(allImages[currentIndex - 1])
+      if (e.key === 'ArrowRight' && hasNext) onNavigate(allImages[currentIndex + 1])
+    },
+    [onClose, hasPrev, hasNext, allImages, currentIndex, onNavigate]
+  )
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown)
@@ -107,7 +117,9 @@ function PreviewModal({ attachment, allImages, baseUrl, onClose, onNavigate, onD
   }, [handleKeyDown])
 
   // Reset zoom when attachment changes
-  useEffect(() => { setZoom(1) }, [attachment.id])
+  useEffect(() => {
+    setZoom(1)
+  }, [attachment.id])
 
   return (
     <div
@@ -124,8 +136,12 @@ function PreviewModal({ attachment, allImages, baseUrl, onClose, onNavigate, onD
         <div className='flex items-center justify-between gap-3 px-4 py-2.5 border-b border-border bg-card shrink-0'>
           <div className='flex items-center gap-2 min-w-0'>
             <FileIcon mimeType={attachment.mimeType} />
-            <span className='text-sm font-medium truncate max-w-[280px]'>{attachment.originalName}</span>
-            <span className='text-xs text-muted-foreground shrink-0'>{formatSize(attachment.size)}</span>
+            <span className='text-sm font-medium truncate max-w-[280px]'>
+              {attachment.originalName}
+            </span>
+            <span className='text-xs text-muted-foreground shrink-0'>
+              {formatSize(attachment.size)}
+            </span>
           </div>
           <div className='flex items-center gap-1 shrink-0'>
             {isImage && (
@@ -140,7 +156,9 @@ function PreviewModal({ attachment, allImages, baseUrl, onClose, onNavigate, onD
                 >
                   <ZoomOut className='h-3.5 w-3.5' />
                 </Button>
-                <span className='text-xs text-muted-foreground w-10 text-center'>{Math.round(zoom * 100)}%</span>
+                <span className='text-xs text-muted-foreground w-10 text-center'>
+                  {Math.round(zoom * 100)}%
+                </span>
                 <Button
                   size='icon'
                   variant='ghost'
@@ -175,17 +193,23 @@ function PreviewModal({ attachment, allImages, baseUrl, onClose, onNavigate, onD
         </div>
 
         {/* Contenido */}
-        <div className='relative flex items-center justify-center overflow-auto bg-black/5 dark:bg-black/30'
+        <div
+          className='relative flex items-center justify-center overflow-auto bg-black/5 dark:bg-black/30'
           style={{ minHeight: '200px', maxHeight: 'calc(92vh - 52px)' }}
         >
           {isImage && (
-            <div className='overflow-auto flex items-center justify-center p-4'
+            <div
+              className='overflow-auto flex items-center justify-center p-4'
               style={{ maxHeight: 'calc(92vh - 52px)', maxWidth: '92vw' }}
             >
               <img
                 src={previewUrl}
                 alt={attachment.originalName}
-                style={{ transform: `scale(${zoom})`, transformOrigin: 'center', transition: 'transform 0.15s ease' }}
+                style={{
+                  transform: `scale(${zoom})`,
+                  transformOrigin: 'center',
+                  transition: 'transform 0.15s ease',
+                }}
                 className='max-h-[80vh] max-w-[80vw] object-contain rounded select-none'
                 draggable={false}
               />
@@ -269,7 +293,9 @@ export function EquipmentAttachments({ equipmentId, canManage }: EquipmentAttach
   const baseUrl = `/api/inventory/equipment/${equipmentId}/attachments`
 
   const images = attachments.filter(a => a.mimeType.startsWith('image/'))
-  const previewable = attachments.filter(a => a.mimeType.startsWith('image/') || a.mimeType === 'application/pdf')
+  const previewable = attachments.filter(
+    a => a.mimeType.startsWith('image/') || a.mimeType === 'application/pdf'
+  )
 
   useEffect(() => {
     loadAttachments()
@@ -290,7 +316,11 @@ export function EquipmentAttachments({ equipmentId, canManage }: EquipmentAttach
     if (!file) return
 
     if (file.size > 20 * 1024 * 1024) {
-      toast({ title: 'Archivo muy grande', description: 'El límite es 20 MB', variant: 'destructive' })
+      toast({
+        title: 'Archivo muy grande',
+        description: 'El límite es 20 MB',
+        variant: 'destructive',
+      })
       return
     }
 
@@ -363,15 +393,32 @@ export function EquipmentAttachments({ equipmentId, canManage }: EquipmentAttach
               {({ openFile, openCamera, showCamera }) => (
                 <div className='flex items-center gap-1.5'>
                   {showCamera && (
-                    <Button size='sm' variant='outline' onClick={openCamera} disabled={uploading} title='Tomar foto'>
-                      {uploading ? <Loader2 className='h-4 w-4 animate-spin' /> : <Camera className='h-4 w-4' />}
+                    <Button
+                      size='sm'
+                      variant='outline'
+                      onClick={() => openCamera()}
+                      disabled={uploading}
+                      title='Tomar foto'
+                    >
+                      {uploading ? (
+                        <Loader2 className='h-4 w-4 animate-spin' />
+                      ) : (
+                        <Camera className='h-4 w-4' />
+                      )}
                     </Button>
                   )}
                   <Button size='sm' variant='outline' onClick={openFile} disabled={uploading}>
-                    {uploading
-                      ? <><Loader2 className='h-4 w-4 mr-2 animate-spin' />Subiendo...</>
-                      : <><Upload className='h-4 w-4 mr-2' />{showCamera ? 'Archivo' : 'Subir archivo'}</>
-                    }
+                    {uploading ? (
+                      <>
+                        <Loader2 className='h-4 w-4 mr-2 animate-spin' />
+                        Subiendo...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className='h-4 w-4 mr-2' />
+                        {showCamera ? 'Archivo' : 'Subir archivo'}
+                      </>
+                    )}
                   </Button>
                 </div>
               )}
@@ -391,7 +438,6 @@ export function EquipmentAttachments({ equipmentId, canManage }: EquipmentAttach
             </div>
           ) : (
             <div className='space-y-3'>
-
               {/* ── Galería de imágenes ── */}
               {images.length > 0 && (
                 <div>
@@ -421,7 +467,10 @@ export function EquipmentAttachments({ equipmentId, canManage }: EquipmentAttach
                         {canManage && (
                           <button
                             type='button'
-                            onClick={e => { e.stopPropagation(); setDeleteTarget(att) }}
+                            onClick={e => {
+                              e.stopPropagation()
+                              setDeleteTarget(att)
+                            }}
                             className='absolute top-1 right-1 h-5 w-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive'
                             title='Eliminar'
                           >
@@ -494,7 +543,6 @@ export function EquipmentAttachments({ equipmentId, canManage }: EquipmentAttach
                   </div>
                 </div>
               )}
-
             </div>
           )}
         </CardContent>

@@ -1,0 +1,111 @@
+/**
+ * GET  /api/patrols/family-config/[familyId]  — Obtiene config de patrullas de una familia
+ * PUT  /api/patrols/family-config/[familyId]  — Actualiza config (solo ADMIN)
+ */
+
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { getOrCreatePatrolFamilyConfig } from '@/lib/patrol/patrol-family-config'
+import { validatePatrolFamilyConfig } from '@/lib/patrol/patrol-config-validator'
+import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
+import prisma from '@/lib/prisma'
+
+// ── GET ───────────────────────────────────────────────────────────────────────
+
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ familyId: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+    const { familyId } = await params
+    const config = await getOrCreatePatrolFamilyConfig(familyId)
+
+    // Nunca exponer patrolIncidentCategoryId como dato sensible — es solo un FK
+    return NextResponse.json({ success: true, data: config })
+  } catch (error) {
+    console.error('[patrol/family-config] GET:', error)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+  }
+}
+
+// ── PUT ───────────────────────────────────────────────────────────────────────
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ familyId: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    if (session.user.role !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'Solo administradores pueden modificar esta configuración' },
+        { status: 403 }
+      )
+    }
+
+    const { familyId } = await params
+    const body = await request.json()
+
+    // Validar rangos con el validador puro
+    const validation = validatePatrolFamilyConfig(body)
+    if (!validation.valid) {
+      return NextResponse.json(
+        { error: 'Configuración inválida', details: validation.errors },
+        { status: 422 }
+      )
+    }
+
+    // Asegurar que el registro existe antes de actualizar
+    await getOrCreatePatrolFamilyConfig(familyId)
+
+    const oldConfig = await prisma.patrol_family_config.findUnique({ where: { familyId } })
+
+    // Campos permitidos para actualización
+    const allowedFields = [
+      'patrolsEnabled',
+      'qrWindowMinutes',
+      'geofenceRadiusMeters',
+      'photoRetentionDays',
+      'photoCompressionQuality',
+      'photoMaxWidthPx',
+      'requirePhotoOnStart',
+      'requirePhotoOnEnd',
+      'offlineSyncToleranceMinutes',
+      'alertCompletionThreshold',
+      'gracePeriodMinutes',
+      'patrolIncidentCategoryId',
+    ] as const
+
+    const updateData: Record<string, unknown> = {}
+    for (const field of allowedFields) {
+      if (body[field] !== undefined) {
+        updateData[field] = body[field]
+      }
+    }
+
+    const updated = await prisma.patrol_family_config.update({
+      where: { familyId },
+      data: updateData,
+    })
+
+    await AuditServiceComplete.log({
+      action: 'PATROL_FAMILY_CONFIG_UPDATED',
+      entityType: 'patrol',
+      entityId: familyId,
+      userId: session.user.id,
+      oldValues: oldConfig ?? undefined,
+      newValues: updated,
+      request,
+    })
+
+    return NextResponse.json({ success: true, data: updated })
+  } catch (error) {
+    console.error('[patrol/family-config] PUT:', error)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+  }
+}

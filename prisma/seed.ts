@@ -1001,6 +1001,19 @@ async function seedSystemModules() {
       requiresManager: false,
       familyScoped: true,
     },
+    {
+      key: 'patrols',
+      name: 'Rondas y Patrullajes',
+      description: 'Planificación, ejecución y auditoría de rondas de seguridad',
+      icon: 'Shield',
+      isActive: true,
+      order: 4,
+      defaultForAdmin: true,
+      defaultForTech: false,
+      defaultForClient: false,
+      requiresManager: false,
+      familyScoped: true,
+    },
   ]
 
   for (const mod of modules) {
@@ -1010,7 +1023,7 @@ async function seedSystemModules() {
       create: mod,
     })
   }
-  console.log('✅ Módulos del sistema (tickets, inventory, asset-requests)')
+  console.log('✅ Módulos del sistema (tickets, inventory, asset-requests, patrols)')
 }
 
 // ============================================

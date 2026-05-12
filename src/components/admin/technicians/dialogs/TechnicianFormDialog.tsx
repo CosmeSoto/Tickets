@@ -28,12 +28,7 @@ import {
 } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Save, User } from 'lucide-react'
-import type { 
-  Technician, 
-  TechnicianFormData, 
-  Department, 
-  Category 
-} from '@/types/technicians'
+import type { Technician, TechnicianFormData, Department, Category } from '@/types/technicians'
 import { validateTechnicianForm } from '../TechnicianManagement.module'
 import { extractApiError, extractCatchError } from '@/lib/utils/api-error'
 import { SimpleCategoryAssignment } from './SimpleCategoryAssignment'
@@ -55,7 +50,7 @@ const initialFormData: TechnicianFormData = {
   phone: '',
   departmentId: null,
   isActive: true,
-  assignedCategories: []
+  assignedCategories: [],
 }
 
 export function TechnicianFormDialog({
@@ -66,7 +61,7 @@ export function TechnicianFormDialog({
   departments,
   availableCategories,
   onSuccess,
-  onClose
+  onClose,
 }: Props) {
   const { toast } = useToast()
   const [formData, setFormData] = useState<TechnicianFormData>(initialFormData)
@@ -86,19 +81,20 @@ export function TechnicianFormDialog({
         phone: editingTechnician.phone || '',
         departmentId: editingTechnician.departmentId || null,
         isActive: editingTechnician.isActive,
-        assignedCategories: editingTechnician.technicianAssignments?.map(assignment => ({
-          categoryId: assignment.category.id,
-          priority: assignment.priority,
-          maxTickets: assignment.maxTickets,
-          autoAssign: assignment.autoAssign
-        })) || []
+        assignedCategories:
+          editingTechnician.technicianAssignments?.map(assignment => ({
+            categoryId: assignment.category.id,
+            priority: assignment.priority,
+            maxTickets: assignment.maxTickets,
+            autoAssign: assignment.autoAssign,
+          })) || [],
       })
     } else if (promotingUser) {
       setFormData({
         ...initialFormData,
         name: promotingUser.name,
         email: promotingUser.email,
-        phone: promotingUser.phone || ''
+        phone: promotingUser.phone || '',
       })
     } else {
       setFormData(initialFormData)
@@ -108,37 +104,38 @@ export function TechnicianFormDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     // Validar que estemos en modo edición o promoción
     if (!isEditing && !isPromoting) {
       toast({
         title: 'Operación no disponible',
-        description: 'Los técnicos se crean promoviendo usuarios. Por favor, selecciona un usuario primero.',
-        variant: 'destructive'
+        description:
+          'Los técnicos se crean promoviendo usuarios. Por favor, selecciona un usuario primero.',
+        variant: 'destructive',
       })
       onClose()
       return
     }
-    
+
     const validation = validateTechnicianForm(formData)
     if (!validation.isValid) {
       setErrors(validation.errors)
       toast({
         title: 'Error de validación',
         description: 'Por favor corrige los errores en el formulario antes de continuar',
-        variant: 'destructive'
+        variant: 'destructive',
       })
       return
     }
 
     setLoading(true)
     setErrors({})
-    
+
     try {
       let url: string
       let method: string
       let payload: any
-      
+
       if (isEditing) {
         // Para técnicos existentes, solo actualizar asignaciones de categorías
         url = `/api/technicians/${editingTechnician.id}`
@@ -148,8 +145,8 @@ export function TechnicianFormDialog({
           assignments: formData.assignedCategories.map(a => ({
             categoryId: a.categoryId,
             priorityLevel: a.priority,
-            maxTickets: a.maxTickets
-          }))
+            maxTickets: a.maxTickets,
+          })),
         }
       } else if (isPromoting) {
         // Para promoción de usuarios a técnicos
@@ -157,25 +154,25 @@ export function TechnicianFormDialog({
         method = 'POST'
         payload = {
           departmentId: formData.departmentId,
-          assignedCategories: formData.assignedCategories
+          assignedCategories: formData.assignedCategories,
         }
       } else {
         // Crear nuevo técnico (no implementado - se hace desde usuarios)
         toast({
           title: 'Operación no disponible',
           description: 'Los técnicos se crean promoviendo usuarios desde el módulo de usuarios',
-          variant: 'destructive'
+          variant: 'destructive',
         })
         return
       }
-      
+
       console.log('🔄 [TECHNICIAN-FORM] Enviando:', { url, method, payload })
-      
+
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-        credentials: 'include'
+        credentials: 'include',
       })
 
       const result = await response.json()
@@ -196,13 +193,19 @@ export function TechnicianFormDialog({
         // Marcar errores de campo si vienen del servidor
         if (result.details && Array.isArray(result.details)) {
           const fieldErrors: Record<string, string> = {}
-          result.details.forEach((d: any) => { if (d.field) fieldErrors[d.field] = d.message })
+          result.details.forEach((d: any) => {
+            if (d.field) fieldErrors[d.field] = d.message
+          })
           setErrors(fieldErrors)
         }
         toast({ title: 'Error', description: extractApiError(result), variant: 'destructive' })
       }
     } catch (err) {
-      toast({ title: 'Error de conexión', description: extractCatchError(err), variant: 'destructive' })
+      toast({
+        title: 'Error de conexión',
+        description: extractCatchError(err),
+        variant: 'destructive',
+      })
     } finally {
       setLoading(false)
     }
@@ -217,133 +220,138 @@ export function TechnicianFormDialog({
           categoryId: '',
           priority: 2, // Regular por defecto
           maxTickets: 10,
-          autoAssign: true
+          autoAssign: true,
         },
-        ...prev.assignedCategories
-      ]
+        ...prev.assignedCategories,
+      ],
     }))
   }
 
   const removeCategoryAssignment = (index: number) => {
     setFormData(prev => ({
       ...prev,
-      assignedCategories: prev.assignedCategories.filter((_, i) => i !== index)
+      assignedCategories: prev.assignedCategories.filter((_, i) => i !== index),
     }))
   }
 
   const updateCategoryAssignment = (index: number, field: string, value: any) => {
     setFormData(prev => ({
       ...prev,
-      assignedCategories: prev.assignedCategories.map((assignment, i) => 
+      assignedCategories: prev.assignedCategories.map((assignment, i) =>
         i === index ? { ...assignment, [field]: value } : assignment
-      )
+      ),
     }))
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
+      <DialogContent className='max-w-4xl max-h-[90vh]' aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle className="flex items-center space-x-2">
-            <User className="h-5 w-5" />
+          <DialogTitle className='flex items-center space-x-2'>
+            <User className='h-5 w-5' />
             <span>{title}</span>
           </DialogTitle>
           <DialogDescription>
-            {isEditing 
+            {isEditing
               ? 'Modifica la información del técnico'
-              : isPromoting 
+              : isPromoting
                 ? 'Configura los datos para promover este usuario a técnico'
-                : 'Completa la información para crear un nuevo técnico'
-            }
+                : 'Completa la información para crear un nuevo técnico'}
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form
+          onSubmit={handleSubmit}
+          className='space-y-6 overflow-y-auto max-h-[calc(90vh-120px)]'
+        >
           {/* Información básica - Solo lectura para técnicos existentes */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Información Básica</CardTitle>
-              <p className="text-sm text-muted-foreground">
+              <CardTitle className='text-lg'>Información Básica</CardTitle>
+              <p className='text-sm text-muted-foreground'>
                 Los datos personales solo se pueden editar desde el módulo de usuarios
               </p>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-                <p className="text-sm text-blue-900">
-                  <strong>Nota:</strong> Nombre, email, teléfono y departamento están bloqueados. Para editarlos, ve al módulo de usuarios del administrador.
+            <CardContent className='space-y-4'>
+              <div className='bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4'>
+                <p className='text-sm text-blue-900'>
+                  <strong>Nota:</strong> Nombre, email, teléfono y departamento están bloqueados.
+                  Para editarlos, ve al módulo de usuarios del administrador.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                 <div>
-                  <Label htmlFor="name">Nombre completo *</Label>
+                  <Label htmlFor='name'>Nombre completo *</Label>
                   <Input
-                    id="name"
+                    id='name'
                     value={formData.name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Nombre del técnico"
+                    onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder='Nombre del técnico'
                     className={errors.name ? 'border-red-500' : ''}
                     disabled={true} // Siempre bloqueado - editar desde usuarios
                   />
-                  {errors.name && <p className="text-sm text-red-500 mt-1">{errors.name}</p>}
-                  <p className="text-xs text-muted-foreground mt-1">
+                  {errors.name && <p className='text-sm text-red-500 mt-1'>{errors.name}</p>}
+                  <p className='text-xs text-muted-foreground mt-1'>
                     Editar desde el módulo de usuarios
                   </p>
                 </div>
 
                 <div>
-                  <Label htmlFor="email">Email *</Label>
+                  <Label htmlFor='email'>Email *</Label>
                   <Input
-                    id="email"
-                    type="email"
+                    id='email'
+                    type='email'
                     value={formData.email}
-                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                    placeholder="email@ejemplo.com"
+                    onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder='email@ejemplo.com'
                     className={errors.email ? 'border-red-500' : ''}
                     disabled={true} // Siempre bloqueado - editar desde usuarios
                   />
-                  {errors.email && <p className="text-sm text-red-500 mt-1">{errors.email}</p>}
-                  <p className="text-xs text-muted-foreground mt-1">
+                  {errors.email && <p className='text-sm text-red-500 mt-1'>{errors.email}</p>}
+                  <p className='text-xs text-muted-foreground mt-1'>
                     Editar desde el módulo de usuarios
                   </p>
                 </div>
 
                 <div>
-                  <Label htmlFor="phone">Teléfono</Label>
+                  <Label htmlFor='phone'>Teléfono</Label>
                   <Input
-                    id="phone"
+                    id='phone'
                     value={formData.phone}
-                    onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                    placeholder="+1 234 567 8900"
+                    onChange={e => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                    placeholder='+1 234 567 8900'
                     className={errors.phone ? 'border-red-500' : ''}
                     disabled={true} // Siempre bloqueado - editar desde usuarios
                   />
-                  {errors.phone && <p className="text-sm text-red-500 mt-1">{errors.phone}</p>}
-                  <p className="text-xs text-muted-foreground mt-1">
+                  {errors.phone && <p className='text-sm text-red-500 mt-1'>{errors.phone}</p>}
+                  <p className='text-xs text-muted-foreground mt-1'>
                     Editar desde el módulo de usuarios
                   </p>
                 </div>
 
                 <div>
-                  <Label htmlFor="department">Departamento</Label>
-                  <Select 
-                    value={formData.departmentId || 'none'} 
-                    onValueChange={(value) => setFormData(prev => ({ 
-                      ...prev, 
-                      departmentId: value === 'none' ? null : value 
-                    }))}
+                  <Label htmlFor='department'>Departamento</Label>
+                  <Select
+                    value={formData.departmentId || 'none'}
+                    onValueChange={value =>
+                      setFormData(prev => ({
+                        ...prev,
+                        departmentId: value === 'none' ? null : value,
+                      }))
+                    }
                     disabled={true} // Siempre bloqueado - editar desde usuarios
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar departamento" />
+                      <SelectValue placeholder='Seleccionar departamento' />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">Sin departamento</SelectItem>
+                      <SelectItem value='none'>Sin departamento</SelectItem>
                       {departments.map(dept => (
                         <SelectItem key={dept.id} value={dept.id}>
-                          <div className="flex items-center space-x-2">
-                            <div 
-                              className="w-3 h-3 rounded-full" 
+                          <div className='flex items-center space-x-2'>
+                            <div
+                              className='w-3 h-3 rounded-full'
                               style={{ backgroundColor: dept.color }}
                             />
                             <span>{dept.name}</span>
@@ -352,19 +360,19 @@ export function TechnicianFormDialog({
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className='text-xs text-muted-foreground mt-1'>
                     Editar desde el módulo de usuarios
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2">
+              <div className='flex items-center space-x-2'>
                 <Switch
-                  id="isActive"
+                  id='isActive'
                   checked={formData.isActive}
-                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isActive: checked }))}
+                  onCheckedChange={checked => setFormData(prev => ({ ...prev, isActive: checked }))}
                 />
-                <Label htmlFor="isActive">Técnico activo</Label>
+                <Label htmlFor='isActive'>Técnico activo</Label>
               </div>
             </CardContent>
           </Card>
@@ -380,11 +388,11 @@ export function TechnicianFormDialog({
           />
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
+            <Button type='button' variant='outline' onClick={onClose} disabled={loading}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading}>
-              <Save className="h-4 w-4 mr-2" />
+            <Button type='submit' disabled={loading}>
+              <Save className='h-4 w-4 mr-2' />
               {loading ? 'Guardando...' : 'Guardar'}
             </Button>
           </DialogFooter>
