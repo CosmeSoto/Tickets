@@ -314,16 +314,7 @@ export default function TechnicianTicketDetailPage() {
             </Card>
           )}
 
-          {/* Calificación cuando el técnico es el solicitante */}
-          {isRequester && (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') && (
-            <TicketRatingSystem
-              ticketId={ticket.id}
-              technicianId={ticket.assignee?.id}
-              canRate={canRate}
-              mode='client'
-              onRatingSubmitted={loadTicket}
-            />
-          )}
+          {/* Calificación cuando el técnico es el solicitante/}
 
           {/* Tabs — sin el tab de Estado */}
           <Tabs defaultValue='timeline'>
@@ -479,6 +470,15 @@ export default function TechnicianTicketDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Calificación */}
+          <TicketRatingSystem
+            ticketId={ticket.id}
+            technicianId={ticket.assignee?.id}
+            canRate={canRate}
+            mode={isRequester ? 'client' : 'admin'}
+            onRatingSubmitted={loadTicket}
+          />
         </div>
       </div>
     </TicketDetailLayout>

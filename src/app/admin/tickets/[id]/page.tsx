@@ -356,10 +356,9 @@ export default function AdminTicketDetailPage() {
             )}
 
           <Tabs defaultValue='timeline'>
-            <TabsList className='grid w-full grid-cols-4'>
+            <TabsList className='grid w-full grid-cols-3'>
               <TabsTrigger value='timeline'>Historial</TabsTrigger>
               <TabsTrigger value='resolution'>Plan</TabsTrigger>
-              <TabsTrigger value='rating'>Calificación</TabsTrigger>
               <TabsTrigger value='files'>Archivos</TabsTrigger>
             </TabsList>
 
@@ -379,20 +378,6 @@ export default function AdminTicketDetailPage() {
                 canEdit
                 mode='admin'
                 onPlanChange={() => setTimelineKey(k => k + 1)}
-              />
-            </TabsContent>
-
-            <TabsContent value='rating' className='space-y-4'>
-              <TicketRatingSystem
-                ticketId={ticket.id}
-                technicianId={ticket.assignee?.id}
-                canRate={
-                  session?.user?.id === ticket.client.id &&
-                  (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED')
-                }
-                showTechnicianStats
-                mode='admin'
-                onRatingSubmitted={loadTicket}
               />
             </TabsContent>
 
@@ -425,6 +410,19 @@ export default function AdminTicketDetailPage() {
             editForm={editForm}
             filteredResolvers={filteredResolvers}
             onEditFormChange={handleEditFormChange}
+          />
+
+          {/* Calificación */}
+          <TicketRatingSystem
+            ticketId={ticket.id}
+            technicianId={ticket.assignee?.id}
+            canRate={
+              session?.user?.id === ticket.client.id &&
+              (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED')
+            }
+            showTechnicianStats
+            mode='admin'
+            onRatingSubmitted={loadTicket}
           />
         </div>
       </div>

@@ -282,9 +282,8 @@ export default function ClientTicketDetailPage() {
 
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className='grid w-full grid-cols-3'>
+            <TabsList className='grid w-full grid-cols-2'>
               <TabsTrigger value='timeline'>Historial</TabsTrigger>
-              <TabsTrigger value='rating'>Calificación</TabsTrigger>
               <TabsTrigger value='files'>Archivos</TabsTrigger>
             </TabsList>
             <TabsContent value='timeline' className='space-y-4'>
@@ -296,21 +295,6 @@ export default function ClientTicketDetailPage() {
                 onCommentAdded={() => setFileKey(k => k + 1)}
                 onStopPolling={fn => {
                   stopPollingRef.current = fn
-                }}
-              />
-            </TabsContent>
-            <TabsContent value='rating' className='space-y-4'>
-              <TicketRatingSystem
-                ticketId={ticket.id}
-                technicianId={ticket.assignee?.id}
-                canRate={ticket.status === 'RESOLVED' || ticket.status === 'CLOSED'}
-                showTechnicianStats={false}
-                mode='client'
-                onRatingSubmitted={() => {
-                  setTicket(prev =>
-                    prev ? { ...prev, status: 'CLOSED', closedAt: new Date().toISOString() } : prev
-                  )
-                  setTimelineKey(k => k + 1)
                 }}
               />
             </TabsContent>
@@ -387,6 +371,21 @@ export default function ClientTicketDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Calificación */}
+          <TicketRatingSystem
+            ticketId={ticket.id}
+            technicianId={ticket.assignee?.id}
+            canRate={ticket.status === 'RESOLVED' || ticket.status === 'CLOSED'}
+            showTechnicianStats={false}
+            mode='client'
+            onRatingSubmitted={() => {
+              setTicket(prev =>
+                prev ? { ...prev, status: 'CLOSED', closedAt: new Date().toISOString() } : prev
+              )
+              setTimelineKey(k => k + 1)
+            }}
+          />
         </div>
       </div>
 
