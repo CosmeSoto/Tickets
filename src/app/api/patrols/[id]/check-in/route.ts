@@ -43,7 +43,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       where: { id: patrolId },
       select: {
         id: true,
-        guardId: true,
+        agentId: true,
         familyId: true,
         status: true,
         scheduledStart: true,
@@ -79,8 +79,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     if (!patrol) return NextResponse.json({ error: 'Patrulla no encontrada' }, { status: 404 })
 
-    // Validar que el guardia es el asignado
-    if (patrol.guardId !== session.user.id) {
+    // Validar que el agente es el asignado
+    if (patrol.agentId !== session.user.id) {
       return NextResponse.json({ error: 'No autorizado para esta patrulla' }, { status: 403 })
     }
 
@@ -120,7 +120,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // ── Validar foto requerida ─────────────────────────────────────────────
     const photoRequired =
       checkpoint.isSensitive ||
-      checkpoint.qrType === 'STATIC' ||
       (data.gpsLat !== undefined && checkpoint.latitude !== null && checkpoint.longitude !== null)
 
     if (photoRequired && !data.photoBase64) {
@@ -182,7 +181,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         id: randomUUID(),
         patrolId,
         checkpointId: data.checkpointId,
-        guardId: session.user.id,
+        agentId: session.user.id,
         submittedTokenHash: PatrolQRService.hashTokenForStorage(data.qrToken),
         gpsLat: data.gpsLat,
         gpsLng: data.gpsLng,

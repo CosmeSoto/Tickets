@@ -989,25 +989,12 @@ async function seedSystemModules() {
       familyScoped: true,
     },
     {
-      key: 'asset-requests',
-      name: 'Solicitudes de Activos',
-      description: 'Solicitudes formales para obtener activos del inventario',
-      icon: 'ClipboardList',
-      isActive: true,
-      order: 3,
-      defaultForAdmin: true,
-      defaultForTech: false,
-      defaultForClient: false,
-      requiresManager: false,
-      familyScoped: true,
-    },
-    {
       key: 'patrols',
       name: 'Rondas y Patrullajes',
       description: 'Planificación, ejecución y auditoría de rondas de seguridad',
       icon: 'Shield',
       isActive: true,
-      order: 4,
+      order: 3,
       defaultForAdmin: true,
       defaultForTech: false,
       defaultForClient: false,
@@ -1023,7 +1010,7 @@ async function seedSystemModules() {
       create: mod,
     })
   }
-  console.log('✅ Módulos del sistema (tickets, inventory, asset-requests, patrols)')
+  console.log('✅ Módulos del sistema (tickets, inventory, patrols)')
 }
 
 // ============================================

@@ -1,27 +1,26 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import {
   Plus,
-  Search,
   MapPin,
-  QrCode,
-  Download,
+  Monitor,
+  Copy,
+  ExternalLink,
   Pencil,
+  Download,
   PowerOff,
   Power,
   Loader2,
-  Wifi,
-  WifiOff,
-  ShieldAlert,
-  RefreshCw,
+  Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog,
   DialogContent,
@@ -30,9 +29,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
-import { Textarea } from '@/components/ui/textarea'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,8 +41,13 @@ import {
 } from '@/components/ui/alert-dialog'
 import { useToast } from '@/hooks/use-toast'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
-import { useDebounce } from '@/hooks/common/use-debounce'
-import { QR_TYPE_LABELS_ES } from '@/lib/utils/patrol-utils'
+import { DataTable } from '@/components/ui/data-table'
+import { ExportButton } from '@/components/common/export-button'
+import { useModuleData } from '@/hooks/common/use-module-data'
+import { usePagination } from '@/hooks/common/use-pagination'
+import { useExport } from '@/hooks/common/use-export'
+import { createCheckpointColumns } from '@/components/patrols/patrol-columns'
+import { PATROL_CHECKPOINTS_EXPORT_COLUMNS } from '@/lib/utils/patrol-utils'
 
 interface Checkpoint {
   id: string
@@ -71,15 +72,6 @@ interface Family {
   code: string
 }
 
-interface Pagination {
-  total: number
-  page: number
-  limit: number
-  totalPages: number
-  hasNext: boolean
-  hasPrev: boolean
-}
-
 const EMPTY_FORM = {
   familyId: '',
   name: '',
@@ -97,14 +89,12 @@ export default function CheckpointsPage() {
   const router = useRouter()
   const { toast } = useToast()
 
-  const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([])
+  const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
+
   const [families, setFamilies] = useState<Family[]>([])
-  const [pagination, setPagination] = useState<Pagination | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [page, setPage] = useState(1)
-  const [search, setSearch] = useState('')
   const [includeInactive, setIncludeInactive] = useState(false)
-  const debouncedSearch = useDebounce(search, 300)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -112,27 +102,54 @@ export default function CheckpointsPage() {
   const [saving, setSaving] = useState(false)
 
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null)
+  const [reactivatingId, setReactivatingId] = useState<string | null>(null)
+  const [permanentlyDeletingId, setPermanentlyDeletingId] = useState<string | null>(null)
   const [downloadingQrId, setDownloadingQrId] = useState<string | null>(null)
+  const [displayModalOpen, setDisplayModalOpen] = useState(false)
+  const [selectedCheckpointForDisplay, setSelectedCheckpointForDisplay] =
+    useState<Checkpoint | null>(null)
 
-  const fetchCheckpoints = useCallback(async () => {
-    setLoading(true)
-    try {
-      const params = new URLSearchParams({
-        page: String(page),
-        limit: '25',
-        ...(debouncedSearch ? { search: debouncedSearch } : {}),
-        ...(includeInactive ? { includeInactive: 'true' } : {}),
-      })
-      const res = await fetch(`/api/patrols/checkpoints?${params}`)
-      const data = await res.json()
-      setCheckpoints(data.data ?? [])
-      setPagination(data.pagination ?? null)
-    } catch {
-      toast({ title: 'Error', description: 'Error al cargar checkpoints', variant: 'destructive' })
-    } finally {
-      setLoading(false)
-    }
-  }, [page, debouncedSearch, includeInactive, toast])
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
+  // Build endpoint with params
+  const endpoint = useMemo(() => {
+    const params = new URLSearchParams()
+    params.append('limit', '100')
+    if (includeInactive) params.append('includeInactive', 'true')
+    if (debouncedSearch) params.append('search', debouncedSearch)
+    return `/api/patrols/checkpoints?${params.toString()}`
+  }, [debouncedSearch, includeInactive])
+
+  // Fetch data with useModuleData
+  const {
+    data: checkpointsRaw,
+    loading,
+    error,
+    reload,
+  } = useModuleData<Checkpoint>({
+    endpoint,
+    initialLoad: true,
+  })
+
+  const checkpoints = checkpointsRaw || []
+
+  // Pagination
+  const pagination = usePagination(checkpoints, { pageSize: 20 })
+
+  // Export
+  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+    filename: 'checkpoints-patrullas',
+    title: 'Checkpoints',
+    subtitle: `Exportado el ${new Date().toLocaleDateString('es-EC')} • ${checkpoints.length} checkpoints`,
+    getData: () => checkpoints,
+    columns: PATROL_CHECKPOINTS_EXPORT_COLUMNS,
+  })
 
   const fetchFamilies = useCallback(async () => {
     try {
@@ -152,15 +169,6 @@ export default function CheckpointsPage() {
     }
     fetchFamilies()
   }, [session, status, router, fetchFamilies])
-
-  useEffect(() => {
-    if (session) fetchCheckpoints()
-  }, [session, fetchCheckpoints])
-
-  // Reset page on search change
-  useEffect(() => {
-    setPage(1)
-  }, [debouncedSearch])
 
   const openCreate = () => {
     setEditingId(null)
@@ -226,7 +234,7 @@ export default function CheckpointsPage() {
 
       toast({ title: editingId ? 'Checkpoint actualizado' : 'Checkpoint creado' })
       setDialogOpen(false)
-      fetchCheckpoints()
+      reload()
     } catch (err) {
       toast({
         title: 'Error',
@@ -244,7 +252,7 @@ export default function CheckpointsPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Error al desactivar')
       toast({ title: 'Checkpoint desactivado' })
-      fetchCheckpoints()
+      reload()
     } catch (err) {
       toast({
         title: 'Error',
@@ -266,13 +274,33 @@ export default function CheckpointsPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Error al reactivar')
       toast({ title: 'Checkpoint reactivado' })
-      fetchCheckpoints()
+      reload()
     } catch (err) {
       toast({
         title: 'Error',
         description: err instanceof Error ? err.message : 'Error',
         variant: 'destructive',
       })
+    } finally {
+      setReactivatingId(null)
+    }
+  }
+
+  const handlePermanentDelete = async (id: string) => {
+    try {
+      const res = await fetch(`/api/patrols/checkpoints/${id}?permanent=true`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Error al eliminar permanentemente')
+      toast({ title: 'Checkpoint eliminado permanentemente' })
+      reload()
+    } catch (err) {
+      toast({
+        title: 'Error',
+        description: err instanceof Error ? err.message : 'Error',
+        variant: 'destructive',
+      })
+    } finally {
+      setPermanentlyDeletingId(null)
     }
   }
 
@@ -299,13 +327,48 @@ export default function CheckpointsPage() {
     }
   }
 
+  const openDisplayModal = (cp: Checkpoint) => {
+    setSelectedCheckpointForDisplay(cp)
+    setDisplayModalOpen(true)
+  }
+
+  const copyDisplayUrl = () => {
+    if (!selectedCheckpointForDisplay) return
+    const url = `${window.location.origin}/patrol-checkpoint-display/${selectedCheckpointForDisplay.id}`
+    navigator.clipboard.writeText(url)
+    toast({ title: 'URL copiada al portapapeles' })
+  }
+
   if (status === 'loading' || !session) return null
+
+  // Create columns with callbacks
+  const columns = createCheckpointColumns({
+    onEdit: openEdit,
+    onDownloadQR: handleDownloadQR,
+    onDeactivate: id => setDeactivatingId(id),
+    onReactivate: id => setReactivatingId(id),
+    onPermanentDelete: id => setPermanentlyDeletingId(id),
+    onOpenDisplay: openDisplayModal,
+    downloadingQrId,
+    isSuperAdmin,
+  })
+
+  // Pagination config
+  const paginationConfig = {
+    page: pagination.currentPage,
+    limit: pagination.pageSize,
+    total: checkpoints.length,
+    onPageChange: (page: number) => pagination.goToPage(page),
+    onLimitChange: (limit: number) => pagination.setPageSize(limit),
+  }
 
   return (
     <ModuleLayout
       title='Checkpoints'
       subtitle='Puntos de control físicos para patrullaje'
       loading={loading && checkpoints.length === 0}
+      error={error}
+      onRetry={reload}
       headerActions={
         <Button size='sm' onClick={openCreate}>
           <Plus className='h-4 w-4 sm:mr-2' />
@@ -313,269 +376,119 @@ export default function CheckpointsPage() {
         </Button>
       }
     >
-      {/* Filtros */}
+      {/* Filtros custom */}
       <div className='flex flex-col sm:flex-row gap-3 mb-4'>
         <div className='relative flex-1'>
-          <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
           <Input
             placeholder='Buscar checkpoints...'
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className='pl-9'
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
           />
         </div>
         <div className='flex items-center gap-2'>
           <Switch
-            id='show-inactive'
+            id='show-inactive-cp'
             checked={includeInactive}
             onCheckedChange={v => {
               setIncludeInactive(v)
-              setPage(1)
+              pagination.goToPage(1)
             }}
           />
-          <Label htmlFor='show-inactive' className='text-sm cursor-pointer'>
+          <Label htmlFor='show-inactive-cp' className='text-sm cursor-pointer'>
             Mostrar inactivos
           </Label>
         </div>
-        <Button variant='outline' size='sm' onClick={fetchCheckpoints} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-        </Button>
       </div>
 
-      {/* Tabla / Cards */}
-      {loading ? (
-        <div className='flex items-center justify-center py-16'>
-          <Loader2 className='h-6 w-6 animate-spin text-muted-foreground' />
-        </div>
-      ) : checkpoints.length === 0 ? (
-        <Card>
-          <CardContent className='flex flex-col items-center justify-center py-16 text-center'>
-            <MapPin className='h-12 w-12 text-muted-foreground/30 mb-4' />
-            <p className='text-sm font-medium text-muted-foreground'>No hay checkpoints</p>
-            <p className='text-xs text-muted-foreground mt-1'>
-              Crea el primer checkpoint con el botón de arriba
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          {/* Mobile: cards */}
-          <div className='space-y-3 sm:hidden'>
-            {checkpoints.map(cp => (
-              <Card key={cp.id} className={!cp.isActive ? 'opacity-60' : ''}>
-                <CardContent className='p-4 space-y-2'>
-                  <div className='flex items-start justify-between gap-2'>
-                    <div className='min-w-0'>
-                      <p className='font-medium text-sm truncate'>{cp.name}</p>
-                      <p className='text-xs text-muted-foreground truncate'>{cp.location}</p>
-                    </div>
-                    <div className='flex gap-1 flex-shrink-0'>
-                      <Badge variant='outline' className='text-xs'>
-                        {QR_TYPE_LABELS_ES[cp.qrType] ?? cp.qrType}
-                      </Badge>
-                      {!cp.isActive && (
-                        <Badge variant='secondary' className='text-xs'>
-                          Inactivo
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                  <div className='flex items-center gap-3 text-xs text-muted-foreground'>
-                    {cp.hasConnectivity ? (
-                      <Wifi className='h-3 w-3' />
-                    ) : (
-                      <WifiOff className='h-3 w-3' />
-                    )}
-                    <span>{cp.hasConnectivity ? 'Con conectividad' : 'Sin conectividad'}</span>
-                    {cp.isSensitive && (
-                      <>
-                        <ShieldAlert className='h-3 w-3 text-orange-500' />
-                        <span className='text-orange-600 dark:text-orange-400'>Sensible</span>
-                      </>
-                    )}
-                  </div>
-                  <div className='flex gap-2 pt-1'>
-                    <Button
-                      size='sm'
-                      variant='outline'
-                      className='flex-1'
-                      onClick={() => openEdit(cp)}
-                    >
-                      <Pencil className='h-3 w-3 mr-1' /> Editar
-                    </Button>
-                    <Button
-                      size='sm'
-                      variant='outline'
-                      onClick={() => handleDownloadQR(cp)}
-                      disabled={downloadingQrId === cp.id}
-                    >
-                      {downloadingQrId === cp.id ? (
-                        <Loader2 className='h-3 w-3 animate-spin' />
-                      ) : (
-                        <Download className='h-3 w-3' />
-                      )}
-                    </Button>
-                    {cp.isActive ? (
-                      <Button
-                        size='sm'
-                        variant='outline'
-                        className='text-destructive hover:text-destructive'
-                        onClick={() => setDeactivatingId(cp.id)}
-                        title='Desactivar'
-                      >
-                        <PowerOff className='h-3 w-3' />
-                      </Button>
-                    ) : (
-                      <Button
-                        size='sm'
-                        variant='outline'
-                        className='text-green-600 hover:text-green-700 dark:text-green-400'
-                        onClick={() => handleReactivate(cp.id)}
-                        title='Reactivar'
-                      >
-                        <Power className='h-3 w-3' />
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+      {/* DataTable */}
+      <DataTable
+        title='Checkpoints'
+        description={`Gestión de puntos de control (${checkpoints.length} checkpoints)`}
+        data={checkpoints}
+        columns={columns}
+        loading={loading}
+        error={error}
+        pagination={paginationConfig}
+        onRefresh={reload}
+        externalSearch={true}
+        hideInternalFilters={true}
+        rowActions={(cp: Checkpoint) => (
+          <div className='flex items-center gap-1'>
+            <Button size='sm' variant='ghost' onClick={() => openEdit(cp)}>
+              <Pencil className='h-3.5 w-3.5' />
+            </Button>
+            {cp.qrType === 'DYNAMIC' && cp.isActive && (
+              <Button
+                size='sm'
+                variant='ghost'
+                onClick={() => openDisplayModal(cp)}
+                title='Ver pantalla'
+              >
+                <Monitor className='h-3.5 w-3.5' />
+              </Button>
+            )}
+            <Button
+              size='sm'
+              variant='ghost'
+              onClick={() => handleDownloadQR(cp)}
+              disabled={downloadingQrId === cp.id}
+              title='Descargar QR'
+            >
+              {downloadingQrId === cp.id ? (
+                <Loader2 className='h-3.5 w-3.5 animate-spin' />
+              ) : (
+                <Download className='h-3.5 w-3.5' />
+              )}
+            </Button>
+            {cp.isActive ? (
+              <Button
+                size='sm'
+                variant='ghost'
+                className='text-destructive hover:text-destructive'
+                onClick={() => setDeactivatingId(cp.id)}
+                title='Desactivar'
+              >
+                <PowerOff className='h-3.5 w-3.5' />
+              </Button>
+            ) : (
+              <Button
+                size='sm'
+                variant='ghost'
+                className='text-green-600 hover:text-green-700 dark:text-green-400'
+                onClick={() => setReactivatingId(cp.id)}
+                title='Reactivar'
+              >
+                <Power className='h-3.5 w-3.5' />
+              </Button>
+            )}
+            {isSuperAdmin && (
+              <Button
+                size='sm'
+                variant='ghost'
+                className='text-red-700 hover:text-red-800 dark:text-red-500'
+                onClick={() => setPermanentlyDeletingId(cp.id)}
+                title='Eliminar permanentemente'
+              >
+                <Trash2 className='h-3.5 w-3.5' />
+              </Button>
+            )}
           </div>
-
-          {/* Desktop: table */}
-          <div className='hidden sm:block rounded-lg border overflow-hidden'>
-            <table className='w-full text-sm'>
-              <thead className='bg-muted/50'>
-                <tr>
-                  <th className='text-left px-4 py-3 font-medium text-muted-foreground'>Nombre</th>
-                  <th className='text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell'>
-                    Ubicación
-                  </th>
-                  <th className='text-left px-4 py-3 font-medium text-muted-foreground'>Tipo QR</th>
-                  <th className='text-left px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell'>
-                    Conectividad
-                  </th>
-                  <th className='text-left px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell'>
-                    Sensible
-                  </th>
-                  <th className='text-left px-4 py-3 font-medium text-muted-foreground'>Estado</th>
-                  <th className='w-32' />
-                </tr>
-              </thead>
-              <tbody className='divide-y'>
-                {checkpoints.map(cp => (
-                  <tr
-                    key={cp.id}
-                    className={`hover:bg-muted/30 transition-colors ${!cp.isActive ? 'opacity-60' : ''}`}
-                  >
-                    <td className='px-4 py-3 font-medium'>{cp.name}</td>
-                    <td className='px-4 py-3 text-muted-foreground hidden md:table-cell max-w-[200px] truncate'>
-                      {cp.location}
-                    </td>
-                    <td className='px-4 py-3'>
-                      <Badge variant='outline' className='text-xs'>
-                        <QrCode className='h-3 w-3 mr-1' />
-                        {QR_TYPE_LABELS_ES[cp.qrType] ?? cp.qrType}
-                      </Badge>
-                    </td>
-                    <td className='px-4 py-3 hidden lg:table-cell'>
-                      {cp.hasConnectivity ? (
-                        <span className='flex items-center gap-1 text-xs'>
-                          <Wifi className='h-3 w-3 text-green-500' /> Sí
-                        </span>
-                      ) : (
-                        <span className='flex items-center gap-1 text-xs'>
-                          <WifiOff className='h-3 w-3 text-muted-foreground' /> No
-                        </span>
-                      )}
-                    </td>
-                    <td className='px-4 py-3 hidden lg:table-cell text-xs'>
-                      {cp.isSensitive ? (
-                        <span className='text-orange-600 dark:text-orange-400'>Sí</span>
-                      ) : (
-                        'No'
-                      )}
-                    </td>
-                    <td className='px-4 py-3'>
-                      <Badge variant={cp.isActive ? 'default' : 'secondary'} className='text-xs'>
-                        {cp.isActive ? 'Activo' : 'Inactivo'}
-                      </Badge>
-                    </td>
-                    <td className='px-4 py-3'>
-                      <div className='flex items-center gap-1 justify-end'>
-                        <Button size='sm' variant='ghost' onClick={() => openEdit(cp)}>
-                          <Pencil className='h-3.5 w-3.5' />
-                        </Button>
-                        <Button
-                          size='sm'
-                          variant='ghost'
-                          onClick={() => handleDownloadQR(cp)}
-                          disabled={downloadingQrId === cp.id}
-                          title='Descargar QR'
-                        >
-                          {downloadingQrId === cp.id ? (
-                            <Loader2 className='h-3.5 w-3.5 animate-spin' />
-                          ) : (
-                            <Download className='h-3.5 w-3.5' />
-                          )}
-                        </Button>
-                        {cp.isActive ? (
-                          <Button
-                            size='sm'
-                            variant='ghost'
-                            className='text-destructive hover:text-destructive'
-                            onClick={() => setDeactivatingId(cp.id)}
-                            title='Desactivar'
-                          >
-                            <PowerOff className='h-3.5 w-3.5' />
-                          </Button>
-                        ) : (
-                          <Button
-                            size='sm'
-                            variant='ghost'
-                            className='text-green-600 hover:text-green-700 dark:text-green-400'
-                            onClick={() => handleReactivate(cp.id)}
-                            title='Reactivar'
-                          >
-                            <Power className='h-3.5 w-3.5' />
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Paginación */}
-          {pagination && pagination.totalPages > 1 && (
-            <div className='flex items-center justify-between mt-4'>
-              <p className='text-xs text-muted-foreground'>
-                {pagination.total} checkpoint{pagination.total !== 1 ? 's' : ''}
-              </p>
-              <div className='flex gap-2'>
-                <Button
-                  size='sm'
-                  variant='outline'
-                  disabled={!pagination.hasPrev}
-                  onClick={() => setPage(p => p - 1)}
-                >
-                  Anterior
-                </Button>
-                <Button
-                  size='sm'
-                  variant='outline'
-                  disabled={!pagination.hasNext}
-                  onClick={() => setPage(p => p + 1)}
-                >
-                  Siguiente
-                </Button>
-              </div>
-            </div>
-          )}
-        </>
-      )}
+        )}
+        actions={
+          <ExportButton
+            onExportCSV={exportCSV}
+            onExportExcel={exportExcel}
+            onExportPDF={exportPDF}
+            loading={exporting}
+            disabled={checkpoints.length === 0}
+          />
+        }
+        emptyState={{
+          icon: <MapPin className='h-12 w-12 text-muted-foreground mx-auto mb-4' />,
+          title: 'No hay checkpoints',
+          description: 'Crea el primer checkpoint con el botón de arriba',
+        }}
+      />
 
       {/* ── Dialog crear/editar ── */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -777,6 +690,117 @@ export default function CheckpointsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ── Confirm reactivate ── */}
+      <AlertDialog open={!!reactivatingId} onOpenChange={() => setReactivatingId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Reactivar checkpoint?</AlertDialogTitle>
+            <AlertDialogDescription>
+              El checkpoint podrá agregarse a nuevas rutas nuevamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className='bg-green-700 text-white hover:bg-green-800'
+              onClick={() => reactivatingId && handleReactivate(reactivatingId)}
+            >
+              Reactivar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Confirm permanent delete ── */}
+      <AlertDialog
+        open={!!permanentlyDeletingId}
+        onOpenChange={() => setPermanentlyDeletingId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar checkpoint PERMANENTEMENTE?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. El checkpoint se eliminará completamente de la base
+              de datos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className='bg-red-700 text-white hover:bg-red-800'
+              onClick={() => permanentlyDeletingId && handlePermanentDelete(permanentlyDeletingId)}
+            >
+              Eliminar Permanentemente
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Modal de pantalla QR ── */}
+      <Dialog open={displayModalOpen} onOpenChange={setDisplayModalOpen}>
+        <DialogContent className='sm:max-w-lg'>
+          <DialogHeader>
+            <DialogTitle>Pantalla de Visualización QR</DialogTitle>
+            <DialogDescription>
+              Abre esta URL en la pantalla física donde los guardias escanearán el QR.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedCheckpointForDisplay && (
+            <div className='space-y-4 py-2'>
+              <div className='space-y-2'>
+                <Label className='text-sm'>Checkpoint</Label>
+                <p className='font-medium'>{selectedCheckpointForDisplay.name}</p>
+                <p className='text-sm text-muted-foreground'>
+                  {selectedCheckpointForDisplay.location}
+                </p>
+              </div>
+
+              <div className='space-y-2'>
+                <Label className='text-sm'>URL de la pantalla</Label>
+                <div className='flex gap-2'>
+                  <Input
+                    readOnly
+                    value={`${window.location.origin}/patrol-checkpoint-display/${selectedCheckpointForDisplay.id}`}
+                    className='font-mono text-xs'
+                  />
+                  <Button variant='outline' onClick={copyDisplayUrl}>
+                    <Copy className='h-4 w-4' />
+                  </Button>
+                </div>
+              </div>
+
+              <div className='pt-2'>
+                <Button
+                  className='w-full'
+                  onClick={() => {
+                    window.open(
+                      `/patrol-checkpoint-display/${selectedCheckpointForDisplay.id}`,
+                      '_blank'
+                    )
+                  }}
+                >
+                  <ExternalLink className='h-4 w-4 mr-2' />
+                  Abrir en nueva pestaña
+                </Button>
+              </div>
+
+              <div className='p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-400'>
+                <strong>Nota:</strong> Esta página está diseñada para mostrarse en una pantalla
+                física (tableta, monitor, etc.) donde los guardias pueden escanear el QR. Solo los
+                administradores pueden acceder a esta configuración.
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setDisplayModalOpen(false)}>
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </ModuleLayout>
   )
 }

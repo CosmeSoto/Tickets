@@ -73,7 +73,7 @@ export const PATROL_HISTORY_EXPORT_COLUMNS: ExportColumn[] = [
     format: (_v: any, r: any) => r?.id?.slice(-8)?.toUpperCase() ?? '',
   },
   { key: 'route', label: 'Ruta', format: (v: any) => v?.name ?? '' },
-  { key: 'guard', label: 'Guardia', format: (v: any) => v?.name ?? '' },
+  { key: 'agent', label: 'Agente', format: (v: any) => v?.name ?? '' },
   { key: 'family', label: 'Área', format: (v: any) => v?.name ?? '' },
   {
     key: 'scheduledStart',
@@ -133,9 +133,9 @@ export const PATROL_CHECKINS_EXPORT_COLUMNS: ExportColumn[] = [
   },
 ]
 
-/** Reporte de cumplimiento por guardia */
-export const PATROL_COMPLIANCE_GUARD_EXPORT_COLUMNS: ExportColumn[] = [
-  { key: 'guardName', label: 'Guardia' },
+/** Reporte de cumplimiento por personal */
+export const PATROL_COMPLIANCE_AGENT_EXPORT_COLUMNS: ExportColumn[] = [
+  { key: 'agentName', label: 'Agente' },
   { key: 'assigned', label: 'Asignadas' },
   { key: 'completed', label: 'Completadas' },
   { key: 'missed', label: 'Omitidas' },
@@ -144,6 +144,99 @@ export const PATROL_COMPLIANCE_GUARD_EXPORT_COLUMNS: ExportColumn[] = [
     key: 'avgCompletion',
     label: 'Completitud Promedio %',
     format: (v: any) => (v != null ? `${Math.round(v)}%` : '—'),
+  },
+]
+
+/** Checkpoints */
+export const PATROL_CHECKPOINTS_EXPORT_COLUMNS: ExportColumn[] = [
+  { key: 'name', label: 'Nombre' },
+  { key: 'location', label: 'Ubicación' },
+  { key: 'family', label: 'Área', format: (v: any) => v?.name ?? '—' },
+  {
+    key: 'qrType',
+    label: 'Tipo QR',
+    format: (v: string) => QR_TYPE_LABELS_ES[v] ?? v,
+  },
+  {
+    key: 'hasConnectivity',
+    label: 'Conectividad',
+    format: (v: boolean) => (v ? 'Sí' : 'No'),
+  },
+  {
+    key: 'isSensitive',
+    label: 'Sensible',
+    format: (v: boolean) => (v ? 'Sí' : 'No'),
+  },
+  {
+    key: 'isActive',
+    label: 'Estado',
+    format: (v: boolean) => (v ? 'Activo' : 'Inactivo'),
+  },
+  {
+    key: 'createdAt',
+    label: 'Creado',
+    format: (v: any) => (v ? new Date(v).toLocaleString('es-EC') : ''),
+  },
+]
+
+/** Rutas */
+export const PATROL_ROUTES_EXPORT_COLUMNS: ExportColumn[] = [
+  { key: 'name', label: 'Nombre' },
+  {
+    key: 'family',
+    label: 'Área',
+    format: (v: any) => v?.name ?? '—',
+  },
+  {
+    key: 'estimatedDurationMinutes',
+    label: 'Duración (min)',
+  },
+  {
+    key: '_count',
+    label: 'Checkpoints',
+    format: (v: any) => (v && typeof v === 'object' ? (v.routeCheckpoints ?? 0) : 0),
+  },
+  {
+    key: 'isActive',
+    label: 'Estado',
+    format: (v: boolean) => (v ? 'Activa' : 'Inactiva'),
+  },
+  {
+    key: 'createdAt',
+    label: 'Creado',
+    format: (v: any) => (v ? new Date(v).toLocaleString('es-EC') : ''),
+  },
+]
+
+/** Programaciones */
+export const PATROL_SCHEDULES_EXPORT_COLUMNS: ExportColumn[] = [
+  { key: 'route', label: 'Ruta', format: (v: any) => v?.name ?? '' },
+  { key: 'family', label: 'Área', format: (v: any) => v?.name ?? '—' },
+  { key: 'agent', label: 'Agente', format: (v: any) => v?.name ?? '' },
+  {
+    key: 'scheduledStart',
+    label: 'Inicio',
+    format: (v: any) => (v ? new Date(v).toLocaleString('es-EC') : ''),
+  },
+  {
+    key: 'scheduledEnd',
+    label: 'Fin',
+    format: (v: any) => (v ? new Date(v).toLocaleString('es-EC') : ''),
+  },
+  {
+    key: 'recurrence',
+    label: 'Recurrencia',
+    format: (v: string) => PATROL_RECURRENCE_LABELS_ES[v] ?? v,
+  },
+  {
+    key: 'isActive',
+    label: 'Estado',
+    format: (v: boolean) => (v ? 'Activa' : 'Inactiva'),
+  },
+  {
+    key: 'createdAt',
+    label: 'Creado',
+    format: (v: any) => (v ? new Date(v).toLocaleString('es-EC') : ''),
   },
 ]
 

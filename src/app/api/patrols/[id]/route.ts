@@ -67,7 +67,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         familyId: true,
         scheduleId: true,
         routeId: true,
-        guardId: true,
+        agentId: true,
         status: true,
         scheduledStart: true,
         scheduledEnd: true,
@@ -79,7 +79,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         endPhotoId: true,
         createdAt: true,
         updatedAt: true,
-        guard: { select: { id: true, name: true, email: true } },
+        agent: { select: { id: true, name: true, email: true } },
         route: {
           select: {
             id: true,
@@ -127,9 +127,9 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
     if (!patrol) return NextResponse.json({ error: 'Patrulla no encontrada' }, { status: 404 })
 
-    const isGuard = patrol.guardId === session.user.id
+    const isAgent = patrol.agentId === session.user.id
     const sessionUser = session.user as { isSuperAdmin?: boolean }
-    if (!isGuard) {
+    if (!isAgent) {
       if (session.user.role === 'CLIENT') {
         return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
       }
@@ -194,7 +194,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       where: { id },
       select: {
         id: true,
-        guardId: true,
+        agentId: true,
         familyId: true,
         status: true,
         routeId: true,
@@ -210,10 +210,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     if (!patrol) return NextResponse.json({ error: 'Patrulla no encontrada' }, { status: 404 })
 
-    // Solo el guardia asignado puede iniciar/finalizar
-    if (patrol.guardId !== session.user.id) {
+    // Solo el agente asignado puede iniciar/finalizar
+    if (patrol.agentId !== session.user.id) {
       return NextResponse.json(
-        { error: 'Solo el guardia asignado puede operar esta patrulla' },
+        { error: 'Solo el agente asignado puede operar esta patrulla' },
         { status: 403 }
       )
     }

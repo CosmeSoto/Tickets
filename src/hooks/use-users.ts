@@ -29,6 +29,7 @@ export interface UserData {
   avatar?: string
   isActive: boolean
   canManageInventory?: boolean
+  canRequestAssets?: boolean
   ticketsEnabled?: boolean
   inventoryEnabled?: boolean
   patrolsEnabled?: boolean

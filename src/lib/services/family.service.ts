@@ -154,7 +154,7 @@ export class FamilyService {
           familyId: family.id,
           patrolsEnabled: true,
           qrWindowMinutes: 5,
-          geofenceRadiusMeters: 50,
+          geofenceRadiusMeters: 1,
           photoRetentionDays: 90,
           photoCompressionQuality: 0.82,
           photoMaxWidthPx: 1280,

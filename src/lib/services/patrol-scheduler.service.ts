@@ -31,7 +31,7 @@ export class PatrolSchedulerService {
         id: true,
         familyId: true,
         routeId: true,
-        guardId: true,
+        agentId: true,
         scheduledStart: true,
         scheduledEnd: true,
         recurrence: true,
@@ -52,7 +52,7 @@ export class PatrolSchedulerService {
         familyId: schedule.familyId,
         scheduleId: schedule.id,
         routeId: schedule.routeId,
-        guardId: schedule.guardId,
+        agentId: schedule.agentId,
         scheduledStart: start,
         scheduledEnd: end,
       })),
@@ -173,10 +173,10 @@ export class PatrolSchedulerService {
         },
         select: {
           id: true,
-          guardId: true,
+          agentId: true,
           familyId: true,
           route: { select: { name: true } },
-          guard: { select: { name: true } },
+          agent: { select: { name: true } },
           scheduledStart: true,
         },
       })
@@ -207,10 +207,10 @@ export class PatrolSchedulerService {
   private static async notifyMissed(
     patrols: Array<{
       id: string
-      guardId: string
+      agentId: string
       familyId: string
       route: { name: string }
-      guard: { name: string }
+      agent: { name: string }
       scheduledStart: Date
     }>,
     familyId: string
@@ -243,10 +243,10 @@ export class PatrolSchedulerService {
           userId: supervisor.id,
           type: NotificationType.PATROL_MISSED,
           title: 'Ronda no iniciada',
-          message: `La ronda "${patrol.route.name}" asignada a ${patrol.guard.name} programada para ${scheduledTime} no fue iniciada.`,
+          message: `La ronda "${patrol.route.name}" asignada a ${patrol.agent.name} programada para ${scheduledTime} no fue iniciada.`,
           metadata: {
             patrolId: patrol.id,
-            guardId: patrol.guardId,
+            agentId: patrol.agentId,
             familyId: patrol.familyId,
           },
         })

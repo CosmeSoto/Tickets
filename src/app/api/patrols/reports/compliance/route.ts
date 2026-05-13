@@ -13,11 +13,11 @@ import { withCache, buildCacheKey } from '@/lib/api-cache'
 
 const querySchema = z.object({
   familyId: z.string().uuid().optional(),
-  guardId: z.string().uuid().optional(),
+  agentId: z.string().uuid().optional(),
   routeId: z.string().uuid().optional(),
   from: z.string().datetime(),
   to: z.string().datetime(),
-  groupBy: z.enum(['guard', 'route']).default('guard'),
+  groupBy: z.enum(['agent', 'route']).default('agent'),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(25),
 })
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const { familyId, guardId, routeId, from, to, groupBy, page, limit } = parsed.data
+    const { familyId, agentId, routeId, from, to, groupBy, page, limit } = parsed.data
     const fromDate = new Date(from)
     const toDate = new Date(to)
 
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
 
     const cacheKey = buildCacheKey('patrol:compliance', {
       familyId,
-      guardId,
+      agentId,
       routeId,
       from,
       to,
@@ -77,58 +77,60 @@ export async function GET(request: NextRequest) {
     const data = await withCache(cacheKey, 60, async () => {
       const baseWhere = {
         ...(familyId ? { familyId } : {}),
-        ...(guardId ? { guardId } : {}),
+        ...(agentId ? { agentId } : {}),
         ...(routeId ? { routeId } : {}),
         scheduledStart: { gte: fromDate, lte: toDate },
+        schedule: { isActive: true },
       }
 
-      if (groupBy === 'guard') {
+      if (groupBy === 'agent') {
         const stats = await prisma.patrols.groupBy({
-          by: ['guardId'],
+          by: ['agentId'],
           where: baseWhere,
           _count: { id: true },
           _avg: { completionPercentage: true },
         })
 
         const completedStats = await prisma.patrols.groupBy({
-          by: ['guardId'],
+          by: ['agentId'],
           where: { ...baseWhere, status: 'COMPLETED' },
           _count: { id: true },
         })
         const missedStats = await prisma.patrols.groupBy({
-          by: ['guardId'],
+          by: ['agentId'],
           where: { ...baseWhere, status: 'MISSED' },
           _count: { id: true },
         })
         const incompleteStats = await prisma.patrols.groupBy({
-          by: ['guardId'],
+          by: ['agentId'],
           where: { ...baseWhere, status: 'INCOMPLETE' },
           _count: { id: true },
         })
 
-        const guardIds = stats.map(s => s.guardId)
-        const guards = await prisma.users.findMany({
-          where: { id: { in: guardIds } },
+        const agentIds = stats.map(s => s.agentId)
+        const agents = await prisma.users.findMany({
+          where: { id: { in: agentIds } },
           select: { id: true, name: true },
         })
-        const guardMap = new Map(guards.map(g => [g.id, g.name]))
+        const agentMap = new Map(agents.map(g => [g.id, g.name]))
 
-        const completedMap = new Map(completedStats.map(s => [s.guardId, s._count.id]))
-        const missedMap = new Map(missedStats.map(s => [s.guardId, s._count.id]))
-        const incompleteMap = new Map(incompleteStats.map(s => [s.guardId, s._count.id]))
+        const completedMap = new Map(completedStats.map(s => [s.agentId, s._count.id]))
+        const missedMap = new Map(missedStats.map(s => [s.agentId, s._count.id]))
+        const incompleteMap = new Map(incompleteStats.map(s => [s.agentId, s._count.id]))
 
         const total = stats.length
         const paginated = stats.slice((page - 1) * limit, page * limit)
 
         return {
-          groupBy: 'guard',
-          byGuard: paginated.map(s => ({
-            guardId: s.guardId,
-            guardName: guardMap.get(s.guardId) ?? s.guardId,
+          groupBy: 'agent',
+          byAgent: paginated.map(s => ({
+            id: s.agentId,
+            agentId: s.agentId,
+            agentName: agentMap.get(s.agentId) ?? s.agentId,
             assigned: s._count.id,
-            completed: completedMap.get(s.guardId) ?? 0,
-            missed: missedMap.get(s.guardId) ?? 0,
-            incomplete: incompleteMap.get(s.guardId) ?? 0,
+            completed: completedMap.get(s.agentId) ?? 0,
+            missed: missedMap.get(s.agentId) ?? 0,
+            incomplete: incompleteMap.get(s.agentId) ?? 0,
             avgCompletion: Math.round(s._avg.completionPercentage ?? 0),
           })),
           pagination: {
@@ -224,6 +226,7 @@ export async function GET(request: NextRequest) {
             }))
 
           return {
+            id: s.routeId,
             routeId: s.routeId,
             routeName: routeMap.get(s.routeId) ?? s.routeId,
             executions: s._count.id,

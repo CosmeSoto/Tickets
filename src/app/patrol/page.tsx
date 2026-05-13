@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { PatrolStatusBadge } from '@/components/patrol/patrol-status-badge'
 import { PatrolProgress } from '@/components/patrol/patrol-progress'
-import { useDebounce } from '@/hooks/common/use-debounce'
 
 interface PatrolListItem {
   id: string
@@ -39,6 +38,7 @@ export default function PatrolListPage() {
   const [patrols, setPatrols] = useState<PatrolListItem[]>([])
   const [pagination, setPagination] = useState<Pagination | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [statusFilter, setStatusFilter] = useState<string>('active')
 
@@ -50,7 +50,7 @@ export default function PatrolListPage() {
       return
     }
     const user = session.user as any
-    if (!user.patrolsEnabled) {
+    if (user.patrolsEnabled === false) {
       router.push('/unauthorized')
       return
     }
@@ -58,19 +58,29 @@ export default function PatrolListPage() {
 
   const fetchPatrols = async (p: number, sf: string) => {
     setLoading(true)
+    setLoadError(null)
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 45_000)
     try {
       const params = new URLSearchParams({ page: String(p), limit: '20' })
       if (sf === 'active') params.set('status', 'PENDING,IN_PROGRESS')
       else if (sf !== 'all') params.set('status', sf.toUpperCase())
 
-      const res = await fetch(`/api/patrols?${params}`)
+      const res = await fetch(`/api/patrols?${params}`, { signal: controller.signal })
       if (!res.ok) throw new Error('Error al cargar patrullas')
       const data = await res.json()
       setPatrols(data.data ?? [])
       setPagination(data.pagination ?? null)
-    } catch {
+    } catch (err) {
       setPatrols([])
+      setPagination(null)
+      if (err instanceof Error && err.name === 'AbortError') {
+        setLoadError('Tiempo de espera agotado. Por favor, intenta de nuevo.')
+      } else {
+        setLoadError(err instanceof Error ? err.message : 'No se pudieron cargar las patrullas')
+      }
     } finally {
+      clearTimeout(timeoutId)
       setLoading(false)
     }
   }
@@ -92,7 +102,9 @@ export default function PatrolListPage() {
     <ModuleLayout
       title='Mis Rondas'
       subtitle='Patrullas asignadas y en progreso'
-      loading={loading && patrols.length === 0}
+      loading={loading && patrols.length === 0 && !loadError}
+      error={loadError}
+      onRetry={() => fetchPatrols(page, statusFilter)}
     >
       {/* Filtros de estado */}
       <div className='flex gap-2 flex-wrap mb-4'>

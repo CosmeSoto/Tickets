@@ -35,7 +35,7 @@ export interface PatrolCheckIn {
 export interface PatrolData {
   id: string
   familyId: string
-  guardId: string
+  agentId: string
   status: string
   scheduledStart: string
   scheduledEnd: string
@@ -45,7 +45,7 @@ export interface PatrolData {
   missedCheckpointIds: string[]
   startPhotoId: string | null
   endPhotoId: string | null
-  guard: { id: string; name: string; email: string }
+  agent: { id: string; name: string; email: string }
   route: {
     id: string
     name: string
@@ -83,8 +83,10 @@ export function usePatrolData(patrolId: string): UsePatrolDataReturn {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const fetchPatrol = useCallback(async () => {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 45_000)
     try {
-      const res = await fetch(`/api/patrols/${patrolId}`)
+      const res = await fetch(`/api/patrols/${patrolId}`, { signal: controller.signal })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error ?? 'Error al cargar la patrulla')
@@ -93,8 +95,13 @@ export function usePatrolData(patrolId: string): UsePatrolDataReturn {
       setPatrol(data.data)
       setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido')
+      if (err instanceof Error && err.name === 'AbortError') {
+        setError('Tiempo de espera agotado. Por favor, intenta de nuevo.')
+      } else {
+        setError(err instanceof Error ? err.message : 'Error desconocido')
+      }
     } finally {
+      clearTimeout(timeoutId)
       setLoading(false)
     }
   }, [patrolId])

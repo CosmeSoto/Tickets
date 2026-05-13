@@ -154,6 +154,7 @@ export async function GET(request: NextRequest) {
         avatar: true,
         isActive: true,
         canManageInventory: true,
+        canRequestAssets: true,
         ticketsEnabled: true,
         inventoryEnabled: true,
         patrolsEnabled: true,

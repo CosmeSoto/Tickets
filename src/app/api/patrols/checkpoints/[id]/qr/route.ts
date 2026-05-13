@@ -33,6 +33,15 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         qrSecret: true, // Solo para generar el token — NUNCA en la respuesta
         qrStaticToken: true, // Solo para QR estático — NUNCA en la respuesta
         isActive: true,
+        family: {
+          select: {
+            patrolFamilyConfig: {
+              select: {
+                qrWindowMinutes: true,
+              },
+            },
+          },
+        },
       },
     })
 
@@ -47,8 +56,9 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       // Token estático fijo
       token = checkpoint.qrStaticToken!
     } else {
-      // Token dinámico para la ventana actual (5 min por defecto)
-      const windowIndex = Math.floor(Date.now() / 1000 / (5 * 60))
+      // Token dinámico para la ventana actual (usar configuración de la familia)
+      const qrWindowMinutes = checkpoint.family?.patrolFamilyConfig?.qrWindowMinutes ?? 5
+      const windowIndex = Math.floor(Date.now() / 1000 / (qrWindowMinutes * 60))
       token = PatrolQRService.generateToken(checkpoint.qrSecret, windowIndex)
     }
 

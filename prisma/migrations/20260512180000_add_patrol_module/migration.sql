@@ -104,7 +104,7 @@ CREATE TABLE "patrol_schedules" (
     "id" TEXT NOT NULL,
     "family_id" TEXT NOT NULL,
     "route_id" TEXT NOT NULL,
-    "guard_id" TEXT NOT NULL,
+    "agent_id" TEXT NOT NULL,
     "scheduled_start" TIMESTAMP(3) NOT NULL,
     "scheduled_end" TIMESTAMP(3) NOT NULL,
     "recurrence" "PatrolRecurrence" NOT NULL DEFAULT 'NONE',
@@ -121,7 +121,7 @@ CREATE TABLE "patrols" (
     "family_id" TEXT NOT NULL,
     "schedule_id" TEXT,
     "route_id" TEXT NOT NULL,
-    "guard_id" TEXT NOT NULL,
+    "agent_id" TEXT NOT NULL,
     "status" "PatrolStatus" NOT NULL DEFAULT 'PENDING',
     "scheduled_start" TIMESTAMP(3) NOT NULL,
     "scheduled_end" TIMESTAMP(3) NOT NULL,
@@ -141,7 +141,7 @@ CREATE TABLE "patrol_check_ins" (
     "id" TEXT NOT NULL,
     "patrol_id" TEXT NOT NULL,
     "checkpoint_id" TEXT NOT NULL,
-    "guard_id" TEXT NOT NULL,
+    "agent_id" TEXT NOT NULL,
     "submitted_token_hash" TEXT NOT NULL,
     "gps_lat" DOUBLE PRECISION,
     "gps_lng" DOUBLE PRECISION,
@@ -172,11 +172,11 @@ CREATE UNIQUE INDEX "patrol_route_checkpoints_route_id_order_key" ON "patrol_rou
 CREATE INDEX "patrol_route_checkpoints_route_id_order_idx" ON "patrol_route_checkpoints"("route_id", "order");
 CREATE INDEX "patrol_route_checkpoints_checkpoint_id_idx" ON "patrol_route_checkpoints"("checkpoint_id");
 
-CREATE INDEX "patrol_schedules_guard_id_is_active_idx" ON "patrol_schedules"("guard_id", "is_active");
+CREATE INDEX "patrol_schedules_agent_id_is_active_idx" ON "patrol_schedules"("agent_id", "is_active");
 CREATE INDEX "patrol_schedules_family_id_is_active_idx" ON "patrol_schedules"("family_id", "is_active");
 CREATE INDEX "patrol_schedules_route_id_is_active_idx" ON "patrol_schedules"("route_id", "is_active");
 
-CREATE INDEX "patrols_guard_id_status_idx" ON "patrols"("guard_id", "status");
+CREATE INDEX "patrols_agent_id_status_idx" ON "patrols"("agent_id", "status");
 CREATE INDEX "patrols_family_id_scheduled_start_idx" ON "patrols"("family_id", "scheduled_start");
 CREATE INDEX "patrols_status_scheduled_start_idx" ON "patrols"("status", "scheduled_start");
 CREATE INDEX "patrols_schedule_id_status_idx" ON "patrols"("schedule_id", "status");
@@ -211,8 +211,8 @@ ALTER TABLE "patrol_schedules" ADD CONSTRAINT "patrol_schedules_family_id_fkey"
   FOREIGN KEY ("family_id") REFERENCES "families"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "patrol_schedules" ADD CONSTRAINT "patrol_schedules_route_id_fkey"
   FOREIGN KEY ("route_id") REFERENCES "patrol_routes"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-ALTER TABLE "patrol_schedules" ADD CONSTRAINT "patrol_schedules_guard_id_fkey"
-  FOREIGN KEY ("guard_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "patrol_schedules" ADD CONSTRAINT "patrol_schedules_agent_id_fkey"
+  FOREIGN KEY ("agent_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 ALTER TABLE "patrols" ADD CONSTRAINT "patrols_family_id_fkey"
   FOREIGN KEY ("family_id") REFERENCES "families"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -220,8 +220,8 @@ ALTER TABLE "patrols" ADD CONSTRAINT "patrols_schedule_id_fkey"
   FOREIGN KEY ("schedule_id") REFERENCES "patrol_schedules"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 ALTER TABLE "patrols" ADD CONSTRAINT "patrols_route_id_fkey"
   FOREIGN KEY ("route_id") REFERENCES "patrol_routes"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-ALTER TABLE "patrols" ADD CONSTRAINT "patrols_guard_id_fkey"
-  FOREIGN KEY ("guard_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "patrols" ADD CONSTRAINT "patrols_agent_id_fkey"
+  FOREIGN KEY ("agent_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "patrols" ADD CONSTRAINT "patrols_start_photo_id_fkey"
   FOREIGN KEY ("start_photo_id") REFERENCES "patrol_photos"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 ALTER TABLE "patrols" ADD CONSTRAINT "patrols_end_photo_id_fkey"
@@ -231,8 +231,8 @@ ALTER TABLE "patrol_check_ins" ADD CONSTRAINT "patrol_check_ins_patrol_id_fkey"
   FOREIGN KEY ("patrol_id") REFERENCES "patrols"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "patrol_check_ins" ADD CONSTRAINT "patrol_check_ins_checkpoint_id_fkey"
   FOREIGN KEY ("checkpoint_id") REFERENCES "patrol_checkpoints"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-ALTER TABLE "patrol_check_ins" ADD CONSTRAINT "patrol_check_ins_guard_id_fkey"
-  FOREIGN KEY ("guard_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "patrol_check_ins" ADD CONSTRAINT "patrol_check_ins_agent_id_fkey"
+  FOREIGN KEY ("agent_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 ALTER TABLE "patrol_photos" ADD CONSTRAINT "patrol_photos_check_in_id_fkey"
   FOREIGN KEY ("check_in_id") REFERENCES "patrol_check_ins"("id") ON DELETE SET NULL ON UPDATE CASCADE;

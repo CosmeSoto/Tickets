@@ -39,7 +39,7 @@ export interface PatrolFormState {
 const DEFAULT_FORM: PatrolFormState = {
   patrolsEnabled: true,
   qrWindowMinutes: 5,
-  geofenceRadiusMeters: 50,
+  geofenceRadiusMeters: 1,
   photoRetentionDays: 90,
   photoCompressionQuality: 0.82,
   photoMaxWidthPx: 1280,

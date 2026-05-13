@@ -501,9 +501,9 @@ model users {
   assetRequestsReviewed                             asset_requests[]                @relation("AssetRequestReviewer")
   assetRequestsFulfilled                            asset_requests[]                @relation("AssetRequestFulfiller")
   batchesReceived                                   equipment_batches[]             @relation("BatchReceiver")
-  patrolsAsGuard                                    patrols[]                       @relation("PatrolGuardExecution")
-  patrolSchedulesAsGuard                            patrol_schedules[]              @relation("PatrolGuard")
-  patrolCheckIns                                    patrol_check_ins[]              @relation("PatrolCheckInGuard")
+  patrolsAsAgent                                    patrols[]                       @relation("PatrolAgentExecution")
+  patrolSchedulesAsAgent                            patrol_schedules[]              @relation("PatrolAgent")
+  patrolCheckIns                                    patrol_check_ins[]              @relation("PatrolCheckInAgent")
 
   @@index([departmentId])
   @@index([name, email])
@@ -2319,7 +2319,7 @@ model patrol_family_config {
   familyId                    String    @unique @map("family_id")
   patrolsEnabled              Boolean   @default(true)  @map("patrols_enabled")
   qrWindowMinutes             Int       @default(5)     @map("qr_window_minutes")
-  geofenceRadiusMeters        Int       @default(50)    @map("geofence_radius_meters")
+  geofenceRadiusMeters        Int       @default(1)    @map("geofence_radius_meters")
   photoRetentionDays          Int       @default(90)    @map("photo_retention_days")
   photoCompressionQuality     Float     @default(0.82)  @map("photo_compression_quality")
   photoMaxWidthPx             Int       @default(1280)  @map("photo_max_width_px")
@@ -2407,7 +2407,7 @@ model patrol_schedules {
   id              String           @id @default(uuid())
   familyId        String           @map("family_id")
   routeId         String           @map("route_id")
-  guardId         String           @map("guard_id")
+  agentId         String           @map("agent_id")
   scheduledStart  DateTime         @map("scheduled_start")
   scheduledEnd    DateTime         @map("scheduled_end")
   recurrence      PatrolRecurrence @default(NONE)
@@ -2418,10 +2418,10 @@ model patrol_schedules {
 
   family          families         @relation(fields: [familyId], references: [id])
   route           patrol_routes    @relation(fields: [routeId], references: [id])
-  guard           users            @relation("PatrolGuard", fields: [guardId], references: [id])
+  agent           users            @relation("PatrolAgent", fields: [agentId], references: [id])
   patrols         patrols[]
 
-  @@index([guardId, isActive])
+  @@index([agentId, isActive])
   @@index([familyId, isActive])
   @@index([routeId, isActive])
   @@map("patrol_schedules")
@@ -2432,7 +2432,7 @@ model patrols {
   familyId             String        @map("family_id")
   scheduleId           String?       @map("schedule_id")
   routeId              String        @map("route_id")
-  guardId              String        @map("guard_id")
+  agentId              String        @map("agent_id")
   status               PatrolStatus  @default(PENDING)
   scheduledStart       DateTime      @map("scheduled_start")
   scheduledEnd         DateTime      @map("scheduled_end")
@@ -2448,12 +2448,12 @@ model patrols {
   family               families          @relation(fields: [familyId], references: [id])
   schedule             patrol_schedules? @relation(fields: [scheduleId], references: [id])
   route                patrol_routes     @relation(fields: [routeId], references: [id])
-  guard                users             @relation("PatrolGuardExecution", fields: [guardId], references: [id])
+  agent                users             @relation("PatrolAgentExecution", fields: [agentId], references: [id])
   checkIns             patrol_check_ins[]
   startPhoto           patrol_photos?    @relation("PatrolStartPhoto", fields: [startPhotoId], references: [id])
   endPhoto             patrol_photos?    @relation("PatrolEndPhoto", fields: [endPhotoId], references: [id])
 
-  @@index([guardId, status])
+  @@index([agentId, status])
   @@index([familyId, scheduledStart])
   @@index([status, scheduledStart])
   @@index([scheduleId, status])
@@ -2464,7 +2464,7 @@ model patrol_check_ins {
   id                           String                  @id @default(uuid())
   patrolId                     String                  @map("patrol_id")
   checkpointId                 String                  @map("checkpoint_id")
-  guardId                      String                  @map("guard_id")
+  agentId                      String                  @map("agent_id")
   submittedTokenHash           String                  @map("submitted_token_hash")
   gpsLat                       Float?                  @map("gps_lat")
   gpsLng                       Float?                  @map("gps_lng")
@@ -2480,7 +2480,7 @@ model patrol_check_ins {
 
   patrol                       patrols            @relation(fields: [patrolId], references: [id], onDelete: Cascade)
   checkpoint                   patrol_checkpoints @relation(fields: [checkpointId], references: [id])
-  guard                        users              @relation("PatrolCheckInGuard", fields: [guardId], references: [id])
+  agent                        users              @relation("PatrolCheckInAgent", fields: [agentId], references: [id])
   photos                       patrol_photos[]
   tickets                      tickets[]
 

@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
           id: true,
           startedAt: true,
           completionPercentage: true,
-          guard: { select: { id: true, name: true } },
+          agent: { select: { id: true, name: true } },
           checkIns: {
             where: { validationResult: 'VALID' },
             select: { checkpointId: true },
@@ -149,7 +149,7 @@ export async function GET(request: NextRequest) {
         today: { scheduled, completed, inProgress, missed },
         activePatrols: activePatrols.map(p => ({
           id: p.id,
-          guardName: p.guard.name,
+          agentName: p.agent.name,
           routeName: p.route.name,
           startedAt: p.startedAt,
           completionPercentage: p.completionPercentage,

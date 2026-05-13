@@ -37,7 +37,7 @@ const FIELD_RANGES: Record<keyof PatrolFamilyConfigInput, FieldRange> = {
     label: 'Ventana QR (minutos)',
   },
   geofenceRadiusMeters: {
-    min: 5,
+    min: 1,
     max: 5000,
     label: 'Radio de geofence (metros)',
   },

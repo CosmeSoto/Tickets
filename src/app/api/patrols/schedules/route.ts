@@ -17,7 +17,7 @@ import { randomUUID } from 'crypto'
 const createScheduleSchema = z.object({
   familyId: z.string().uuid(),
   routeId: z.string().uuid(),
-  guardId: z.string().uuid(),
+  agentId: z.string().uuid(),
   scheduledStart: z.string().datetime(),
   scheduledEnd: z.string().datetime(),
   recurrence: z.enum(['NONE', 'DAILY', 'WEEKLY', 'CUSTOM']).default('NONE'),
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const familyId = searchParams.get('familyId')
-    const guardId = searchParams.get('guardId')
+    const agentId = searchParams.get('agentId')
     const routeId = searchParams.get('routeId')
     const page = Math.max(1, parseInt(searchParams.get('page') ?? '1'))
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') ?? '25')))
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
 
     const where = {
       ...(familyId ? { familyId } : {}),
-      ...(guardId ? { guardId } : {}),
+      ...(agentId ? { agentId } : {}),
       ...(routeId ? { routeId } : {}),
       ...(includeInactive ? {} : { isActive: true }),
     }
@@ -52,8 +52,9 @@ export async function GET(request: NextRequest) {
         select: {
           id: true,
           familyId: true,
+          family: { select: { id: true, name: true } },
           routeId: true,
-          guardId: true,
+          agentId: true,
           scheduledStart: true,
           scheduledEnd: true,
           recurrence: true,
@@ -61,7 +62,7 @@ export async function GET(request: NextRequest) {
           isActive: true,
           createdAt: true,
           route: { select: { id: true, name: true } },
-          guard: { select: { id: true, name: true, email: true } },
+          agent: { select: { id: true, name: true, email: true } },
         },
         orderBy: { scheduledStart: 'asc' },
         skip: (page - 1) * limit,
@@ -122,13 +123,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validar que el guardia tiene patrolsEnabled
-    const guard = await prisma.users.findUnique({
-      where: { id: data.guardId },
+    // Validar que el agente tiene patrolsEnabled
+    const agent = await prisma.users.findUnique({
+      where: { id: data.agentId },
       select: { id: true, name: true, patrolsEnabled: true },
     })
-    if (!guard) return NextResponse.json({ error: 'Guardia no encontrado' }, { status: 404 })
-    if (!guard.patrolsEnabled) {
+    if (!agent) return NextResponse.json({ error: 'Agente no encontrado' }, { status: 404 })
+    if (!agent.patrolsEnabled) {
       return NextResponse.json(
         { error: 'El usuario seleccionado no tiene el módulo de patrullas habilitado' },
         { status: 422 }
@@ -145,10 +146,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'La ruta está desactivada' }, { status: 422 })
     }
 
-    // Verificar solapamiento de patrullas para el mismo guardia/familia
+    // Verificar solapamiento de patrullas para el mismo agente/familia
     const overlap = await prisma.patrols.findFirst({
       where: {
-        guardId: data.guardId,
+        agentId: data.agentId,
         familyId: data.familyId,
         status: { in: ['PENDING', 'IN_PROGRESS'] },
         scheduledStart: { lt: end },
@@ -158,7 +159,7 @@ export async function POST(request: NextRequest) {
     if (overlap) {
       return NextResponse.json(
         {
-          error: 'El guardia ya tiene una patrulla programada en ese horario',
+          error: 'El agente ya tiene una patrulla programada en ese horario',
           code: 'SCHEDULE_OVERLAP',
         },
         { status: 409 }
@@ -171,7 +172,7 @@ export async function POST(request: NextRequest) {
         id: randomUUID(),
         familyId: data.familyId,
         routeId: data.routeId,
-        guardId: data.guardId,
+        agentId: data.agentId,
         scheduledStart: start,
         scheduledEnd: end,
         recurrence: data.recurrence,
@@ -182,9 +183,9 @@ export async function POST(request: NextRequest) {
     // Generar patrullas para el horizonte de 30 días
     const generatedCount = await PatrolSchedulerService.generatePatrols(schedule.id)
 
-    // Notificar al guardia
+    // Notificar al agente
     await NotificationService.push({
-      userId: data.guardId,
+      userId: data.agentId,
       type: NotificationType.PATROL_ASSIGNED,
       title: 'Nueva ronda asignada',
       message: `Se te ha asignado la ruta "${route.name}" programada para ${start.toLocaleString('es-EC', { timeZone: 'America/Guayaquil' })}.`,
@@ -198,7 +199,7 @@ export async function POST(request: NextRequest) {
       userId: session.user.id,
       newValues: {
         routeId: data.routeId,
-        guardId: data.guardId,
+        agentId: data.agentId,
         recurrence: data.recurrence,
         generatedPatrols: generatedCount,
       },

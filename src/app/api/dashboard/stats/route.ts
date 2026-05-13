@@ -76,6 +76,53 @@ async function calculateAvgResponseTime(): Promise<string> {
   }
 }
 
+/** Primera respuesta solo sobre tickets del cliente — mucho más barato que el promedio global. */
+async function calculateAvgResponseTimeForClient(clientId: string): Promise<string> {
+  try {
+    const since = new Date()
+    since.setDate(since.getDate() - AVG_RESPONSE_SAMPLE_DAYS)
+
+    const ticketsWithComments = await prisma.tickets.findMany({
+      where: {
+        clientId,
+        createdAt: { gte: since },
+        comments: { some: {} },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: AVG_RESPONSE_MAX_TICKETS,
+      select: {
+        id: true,
+        createdAt: true,
+        comments: {
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+          select: { createdAt: true },
+        },
+      },
+    })
+
+    if (ticketsWithComments.length === 0) return '2h'
+
+    const totalMinutes = ticketsWithComments.reduce((acc, ticket) => {
+      if (ticket.comments[0]) {
+        const diff = ticket.comments[0].createdAt.getTime() - ticket.createdAt.getTime()
+        return acc + diff / (1000 * 60)
+      }
+      return acc
+    }, 0)
+
+    const avgMinutes = totalMinutes / ticketsWithComments.length
+    const hours = Math.floor(avgMinutes / 60)
+    const minutes = Math.floor(avgMinutes % 60)
+
+    if (hours > 0) return `${hours}h ${minutes > 0 ? minutes + 'min' : ''}`
+    return `${minutes}min`
+  } catch (error) {
+    console.error('Error calculating client response time:', error)
+    return '2h'
+  }
+}
+
 // Función para generar actividad reciente
 async function getRecentActivity(role: string, _userId: string) {
   const activities: any[] = []
@@ -722,7 +769,7 @@ export async function GET(request: NextRequest) {
         resolvedTickets,
         thisMonthTickets,
         resolvedTicketsWithTime,
-        ratings,
+        ratingsAgg,
         assignedEquipment,
         pendingMaintenance,
         ticketsToRate,
@@ -752,9 +799,10 @@ export async function GET(request: NextRequest) {
           take: 500,
           select: { createdAt: true, resolvedAt: true },
         }),
-        prisma.ticket_ratings.findMany({
+        prisma.ticket_ratings.aggregate({
           where: { tickets: { clientId: userId } },
-          select: { rating: true },
+          _avg: { rating: true },
+          _count: { id: true },
         }),
         // Equipos asignados al cliente
         prisma.equipment_assignments.count({
@@ -782,12 +830,12 @@ export async function GET(request: NextRequest) {
             ticket_ratings: null,
           },
         }),
-        calculateAvgResponseTime(),
+        calculateAvgResponseTimeForClient(userId),
       ])
 
       const avgResolutionTime = calculateAvgResolutionTime(resolvedTicketsWithTime)
-      const avgRating =
-        ratings.length > 0 ? ratings.reduce((acc, r) => acc + r.rating, 0) / ratings.length : 0
+      const totalRatings = ratingsAgg._count.id
+      const avgRating = ratingsAgg._avg.rating != null ? ratingsAgg._avg.rating : 0
 
       stats = {
         totalTickets,
@@ -797,7 +845,7 @@ export async function GET(request: NextRequest) {
         thisMonthTickets,
         avgResolutionTime,
         satisfactionRating: Math.round(avgRating * 10) / 10,
-        totalRatings: ratings.length,
+        totalRatings,
         ticketsToRate,
         responseTime,
         assignedEquipment,

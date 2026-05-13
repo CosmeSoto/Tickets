@@ -18,6 +18,7 @@ import { randomUUID } from 'crypto'
 const SAFE_CHECKPOINT_SELECT = {
   id: true,
   familyId: true,
+  family: { select: { id: true, name: true } },
   name: true,
   description: true,
   location: true,

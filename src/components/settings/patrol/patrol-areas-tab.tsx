@@ -212,16 +212,16 @@ export function PatrolAreasTab({
                   <Input
                     id='geofenceRadius'
                     type='number'
-                    min={5}
+                    min={1}
                     max={5000}
                     value={form.geofenceRadiusMeters}
                     onChange={e =>
-                      onSetField('geofenceRadiusMeters', parseInt(e.target.value) || 50)
+                      onSetField('geofenceRadiusMeters', parseInt(e.target.value) || 1)
                     }
                     disabled={saving}
                     className='h-8 text-sm'
                   />
-                  <p className='text-xs text-muted-foreground'>Rango: 5–5000 m. Default: 50 m</p>
+                  <p className='text-xs text-muted-foreground'>Rango: 1–5000 m. Default: 1 m</p>
                 </div>
               </CardContent>
             </Card>

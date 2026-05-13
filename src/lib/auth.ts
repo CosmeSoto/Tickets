@@ -364,10 +364,12 @@ export const authOptions: NextAuthOptions = {
                 token.ticketsEnabled = dbUser.ticketsEnabled ?? true
                 token.inventoryEnabled = dbUser.inventoryEnabled ?? true
                 token.canRequestAssets = dbUser.canRequestAssets ?? false
+                token.patrolsEnabled = dbUser.patrolsEnabled ?? false
                 token.isOAuth = true
               } else {
                 token.role = 'CLIENT'
                 token.isOAuth = true
+                token.patrolsEnabled = false
               }
             } catch (error) {
               console.error('Error obteniendo usuario OAuth:', error)
@@ -391,6 +393,7 @@ export const authOptions: NextAuthOptions = {
                   ticketsEnabled: true,
                   inventoryEnabled: true,
                   canRequestAssets: true,
+                  patrolsEnabled: true,
                 },
               })
               token.canManageInventory = dbUser?.canManageInventory ?? false
@@ -398,12 +401,14 @@ export const authOptions: NextAuthOptions = {
               token.ticketsEnabled = dbUser?.ticketsEnabled ?? true
               token.inventoryEnabled = dbUser?.inventoryEnabled ?? true
               token.canRequestAssets = dbUser?.canRequestAssets ?? false
+              token.patrolsEnabled = dbUser?.patrolsEnabled ?? false
             } catch {
               token.canManageInventory = false
               token.isSuperAdmin = false
               token.ticketsEnabled = true
               token.inventoryEnabled = true
               token.canRequestAssets = false
+              token.patrolsEnabled = false
             }
           }
         }
@@ -424,6 +429,7 @@ export const authOptions: NextAuthOptions = {
                   ticketsEnabled: true,
                   inventoryEnabled: true,
                   canRequestAssets: true,
+                  patrolsEnabled: true,
                   departmentId: true,
                   departments: { select: { name: true } },
                 },
@@ -439,6 +445,7 @@ export const authOptions: NextAuthOptions = {
               token.ticketsEnabled = dbUser.ticketsEnabled ?? true
               token.inventoryEnabled = dbUser.inventoryEnabled ?? true
               token.canRequestAssets = dbUser.canRequestAssets ?? false
+              token.patrolsEnabled = dbUser.patrolsEnabled ?? false
               token.departmentId = dbUser.departmentId || undefined
               token.department = dbUser.departments?.name || undefined
             }
@@ -481,6 +488,7 @@ export const authOptions: NextAuthOptions = {
           ;(session.user as any).ticketsEnabled = (token.ticketsEnabled as boolean) ?? true
           ;(session.user as any).inventoryEnabled = (token.inventoryEnabled as boolean) ?? true
           ;(session.user as any).canRequestAssets = (token.canRequestAssets as boolean) ?? false
+          session.user.patrolsEnabled = (token.patrolsEnabled as boolean) ?? false
 
           // IMPORTANTE: Pasar loginTime a la sesión para el monitor de timeout
           if (token.loginTime) {

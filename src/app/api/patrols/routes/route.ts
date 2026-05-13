@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
         select: {
           id: true,
           familyId: true,
+          family: { select: { id: true, name: true } },
           name: true,
           description: true,
           estimatedDurationMinutes: true,

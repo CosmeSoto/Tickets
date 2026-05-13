@@ -1,17 +1,17 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import {
   Plus,
-  Search,
   ClipboardList,
+  AlertTriangle,
   Pencil,
   PowerOff,
+  Trash2,
   Loader2,
   RefreshCw,
-  AlertTriangle,
   ChevronUp,
   ChevronDown,
   X,
@@ -20,7 +20,9 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog,
   DialogContent,
@@ -29,9 +31,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
-import { Textarea } from '@/components/ui/textarea'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,7 +43,13 @@ import {
 } from '@/components/ui/alert-dialog'
 import { useToast } from '@/hooks/use-toast'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
-import { useDebounce } from '@/hooks/common/use-debounce'
+import { DataTable } from '@/components/ui/data-table'
+import { ExportButton } from '@/components/common/export-button'
+import { useModuleData } from '@/hooks/common/use-module-data'
+import { usePagination } from '@/hooks/common/use-pagination'
+import { useExport } from '@/hooks/common/use-export'
+import { createRouteColumns } from '@/components/patrols/patrol-columns'
+import { PATROL_ROUTES_EXPORT_COLUMNS } from '@/lib/utils/patrol-utils'
 
 interface CheckpointOption {
   id: string
@@ -85,15 +90,6 @@ interface Family {
   code: string
 }
 
-interface Pagination {
-  total: number
-  page: number
-  limit: number
-  totalPages: number
-  hasNext: boolean
-  hasPrev: boolean
-}
-
 const EMPTY_FORM = {
   familyId: '',
   name: '',
@@ -106,14 +102,12 @@ export default function RoutesPage() {
   const router = useRouter()
   const { toast } = useToast()
 
-  const [routes, setRoutes] = useState<PatrolRoute[]>([])
+  const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
+
   const [families, setFamilies] = useState<Family[]>([])
-  const [pagination, setPagination] = useState<Pagination | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [page, setPage] = useState(1)
-  const [search, setSearch] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
   const [includeInactive, setIncludeInactive] = useState(false)
-  const debouncedSearch = useDebounce(search, 300)
+  const [debouncedSearch, setDebouncedSearch] = useState('')
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -123,26 +117,49 @@ export default function RoutesPage() {
   const [saving, setSaving] = useState(false)
 
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null)
+  const [permanentlyDeletingId, setPermanentlyDeletingId] = useState<string | null>(null)
 
-  const fetchRoutes = useCallback(async () => {
-    setLoading(true)
-    try {
-      const params = new URLSearchParams({
-        page: String(page),
-        limit: '25',
-        ...(debouncedSearch ? { search: debouncedSearch } : {}),
-        ...(includeInactive ? { includeInactive: 'true' } : {}),
-      })
-      const res = await fetch(`/api/patrols/routes?${params}`)
-      const data = await res.json()
-      setRoutes(data.data ?? [])
-      setPagination(data.pagination ?? null)
-    } catch {
-      toast({ title: 'Error', description: 'Error al cargar rutas', variant: 'destructive' })
-    } finally {
-      setLoading(false)
-    }
-  }, [page, debouncedSearch, includeInactive, toast])
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
+  // Build endpoint
+  const endpoint = useMemo(() => {
+    const params = new URLSearchParams()
+    params.append('limit', '100')
+    if (debouncedSearch) params.append('search', debouncedSearch)
+    if (includeInactive) params.append('includeInactive', 'true')
+    return `/api/patrols/routes?${params.toString()}`
+  }, [debouncedSearch, includeInactive])
+
+  // Fetch data
+  const {
+    data: routesRaw,
+    loading,
+    error,
+    reload,
+  } = useModuleData<PatrolRoute>({
+    endpoint,
+    initialLoad: true,
+  })
+
+  const routes = routesRaw || []
+
+  // Pagination
+  const pagination = usePagination(routes, { pageSize: 20 })
+
+  // Export
+  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+    filename: 'rutas-patrullas',
+    title: 'Rutas de Patrulla',
+    subtitle: `Exportado el ${new Date().toLocaleDateString('es-EC')} • ${routes.length} rutas`,
+    getData: () => routes,
+    columns: PATROL_ROUTES_EXPORT_COLUMNS,
+  })
 
   const fetchFamilies = useCallback(async () => {
     try {
@@ -176,14 +193,6 @@ export default function RoutesPage() {
     }
     fetchFamilies()
   }, [session, status, router, fetchFamilies])
-
-  useEffect(() => {
-    if (session) fetchRoutes()
-  }, [session, fetchRoutes])
-
-  useEffect(() => {
-    setPage(1)
-  }, [debouncedSearch])
 
   useEffect(() => {
     if (form.familyId) fetchCheckpointsForFamily(form.familyId)
@@ -311,7 +320,7 @@ export default function RoutesPage() {
         toast({ title: editingId ? 'Ruta actualizada' : 'Ruta creada' })
       }
       setDialogOpen(false)
-      fetchRoutes()
+      reload()
     } catch (err) {
       toast({
         title: 'Error',
@@ -335,7 +344,7 @@ export default function RoutesPage() {
             ? `${data.cancelledPatrols} patrulla(s) cancelada(s)`
             : undefined,
       })
-      fetchRoutes()
+      reload()
     } catch (err) {
       toast({
         title: 'Error',
@@ -347,15 +356,50 @@ export default function RoutesPage() {
     }
   }
 
+  const handlePermanentDelete = async (id: string) => {
+    try {
+      const res = await fetch(`/api/patrols/routes/${id}?permanent=true`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Error al eliminar permanentemente')
+      toast({ title: 'Ruta eliminada permanentemente' })
+      reload()
+    } catch (err) {
+      toast({
+        title: 'Error',
+        description: err instanceof Error ? err.message : 'Error',
+        variant: 'destructive',
+      })
+    } finally {
+      setPermanentlyDeletingId(null)
+    }
+  }
+
   const hasInactiveCheckpoints = routeCheckpoints.some(rc => !rc.isActive)
 
   if (status === 'loading' || !session) return null
+
+  const columns = createRouteColumns({
+    onEdit: openEdit,
+    onDeactivate: id => setDeactivatingId(id),
+    onPermanentDelete: id => setPermanentlyDeletingId(id),
+    isSuperAdmin,
+  })
+
+  const paginationConfig = {
+    page: pagination.currentPage,
+    limit: pagination.pageSize,
+    total: routes.length,
+    onPageChange: (page: number) => pagination.goToPage(page),
+    onLimitChange: (limit: number) => pagination.setPageSize(limit),
+  }
 
   return (
     <ModuleLayout
       title='Rutas de Patrulla'
       subtitle='Secuencias ordenadas de checkpoints para los recorridos'
       loading={loading && routes.length === 0}
+      error={error}
+      onRetry={reload}
       headerActions={
         <Button size='sm' onClick={openCreate}>
           <Plus className='h-4 w-4 sm:mr-2' />
@@ -366,12 +410,10 @@ export default function RoutesPage() {
       {/* Filtros */}
       <div className='flex flex-col sm:flex-row gap-3 mb-4'>
         <div className='relative flex-1'>
-          <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
           <Input
             placeholder='Buscar rutas...'
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className='pl-9'
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
           />
         </div>
         <div className='flex items-center gap-2'>
@@ -380,183 +422,71 @@ export default function RoutesPage() {
             checked={includeInactive}
             onCheckedChange={v => {
               setIncludeInactive(v)
-              setPage(1)
+              pagination.goToPage(1)
             }}
           />
           <Label htmlFor='show-inactive-routes' className='text-sm cursor-pointer'>
             Mostrar inactivas
           </Label>
         </div>
-        <Button variant='outline' size='sm' onClick={fetchRoutes} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-        </Button>
       </div>
 
-      {/* Lista */}
-      {loading ? (
-        <div className='flex items-center justify-center py-16'>
-          <Loader2 className='h-6 w-6 animate-spin text-muted-foreground' />
-        </div>
-      ) : routes.length === 0 ? (
-        <Card>
-          <CardContent className='flex flex-col items-center justify-center py-16 text-center'>
-            <ClipboardList className='h-12 w-12 text-muted-foreground/30 mb-4' />
-            <p className='text-sm font-medium text-muted-foreground'>No hay rutas</p>
-            <p className='text-xs text-muted-foreground mt-1'>
-              Crea la primera ruta con el botón de arriba
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          {/* Mobile: cards */}
-          <div className='space-y-3 sm:hidden'>
-            {routes.map(route => (
-              <Card key={route.id} className={!route.isActive ? 'opacity-60' : ''}>
-                <CardContent className='p-4 space-y-2'>
-                  <div className='flex items-start justify-between gap-2'>
-                    <div className='min-w-0'>
-                      <p className='font-medium text-sm truncate'>{route.name}</p>
-                      <p className='text-xs text-muted-foreground'>
-                        {route.estimatedDurationMinutes} min estimados
-                      </p>
-                    </div>
-                    <Badge
-                      variant={route.isActive ? 'default' : 'secondary'}
-                      className='text-xs flex-shrink-0'
-                    >
-                      {route.isActive ? 'Activa' : 'Inactiva'}
-                    </Badge>
-                  </div>
-                  <p className='text-xs text-muted-foreground'>
-                    {route._count.routeCheckpoints} checkpoint
-                    {route._count.routeCheckpoints !== 1 ? 's' : ''}
-                  </p>
-                  {route.routeCheckpoints.some(rc => !rc.checkpoint.isActive) && (
-                    <div className='flex items-center gap-1 text-xs text-orange-600 dark:text-orange-400'>
-                      <AlertTriangle className='h-3 w-3' />
-                      Contiene checkpoints inactivos
-                    </div>
-                  )}
-                  <div className='flex gap-2 pt-1'>
-                    <Button
-                      size='sm'
-                      variant='outline'
-                      className='flex-1'
-                      onClick={() => openEdit(route)}
-                    >
-                      <Pencil className='h-3 w-3 mr-1' /> Editar
-                    </Button>
-                    {route.isActive && (
-                      <Button
-                        size='sm'
-                        variant='outline'
-                        className='text-destructive hover:text-destructive'
-                        onClick={() => setDeactivatingId(route.id)}
-                      >
-                        <PowerOff className='h-3 w-3' />
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+      {/* DataTable */}
+      <DataTable
+        title='Rutas de Patrulla'
+        description={`Gestión de rutas (${routes.length} rutas)`}
+        data={routes}
+        columns={columns}
+        loading={loading}
+        error={error}
+        pagination={paginationConfig}
+        onRefresh={reload}
+        externalSearch={true}
+        hideInternalFilters={true}
+        rowActions={(route: PatrolRoute) => (
+          <div className='flex items-center gap-1 justify-end'>
+            <Button size='sm' variant='ghost' onClick={() => openEdit(route)}>
+              <Pencil className='h-3.5 w-3.5' />
+            </Button>
+            {route.isActive && (
+              <Button
+                size='sm'
+                variant='ghost'
+                className='text-destructive hover:text-destructive'
+                onClick={() => setDeactivatingId(route.id)}
+              >
+                <PowerOff className='h-3.5 w-3.5' />
+              </Button>
+            )}
+            {isSuperAdmin && (
+              <Button
+                size='sm'
+                variant='ghost'
+                className='text-red-700 hover:text-red-800 dark:text-red-500'
+                onClick={() => setPermanentlyDeletingId(route.id)}
+                title='Eliminar permanentemente'
+              >
+                <Trash2 className='h-3.5 w-3.5' />
+              </Button>
+            )}
           </div>
-
-          {/* Desktop: table */}
-          <div className='hidden sm:block rounded-lg border overflow-hidden'>
-            <table className='w-full text-sm'>
-              <thead className='bg-muted/50'>
-                <tr>
-                  <th className='text-left px-4 py-3 font-medium text-muted-foreground'>Nombre</th>
-                  <th className='text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell'>
-                    Duración est.
-                  </th>
-                  <th className='text-left px-4 py-3 font-medium text-muted-foreground'>
-                    Checkpoints
-                  </th>
-                  <th className='text-left px-4 py-3 font-medium text-muted-foreground'>Estado</th>
-                  <th className='w-24' />
-                </tr>
-              </thead>
-              <tbody className='divide-y'>
-                {routes.map(route => (
-                  <tr
-                    key={route.id}
-                    className={`hover:bg-muted/30 transition-colors ${!route.isActive ? 'opacity-60' : ''}`}
-                  >
-                    <td className='px-4 py-3'>
-                      <div>
-                        <p className='font-medium'>{route.name}</p>
-                        {route.routeCheckpoints.some(rc => !rc.checkpoint.isActive) && (
-                          <div className='flex items-center gap-1 text-xs text-orange-600 dark:text-orange-400 mt-0.5'>
-                            <AlertTriangle className='h-3 w-3' />
-                            Checkpoints inactivos
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className='px-4 py-3 text-muted-foreground hidden md:table-cell'>
-                      {route.estimatedDurationMinutes} min
-                    </td>
-                    <td className='px-4 py-3 text-muted-foreground'>
-                      {route._count.routeCheckpoints}
-                    </td>
-                    <td className='px-4 py-3'>
-                      <Badge variant={route.isActive ? 'default' : 'secondary'} className='text-xs'>
-                        {route.isActive ? 'Activa' : 'Inactiva'}
-                      </Badge>
-                    </td>
-                    <td className='px-4 py-3'>
-                      <div className='flex items-center gap-1 justify-end'>
-                        <Button size='sm' variant='ghost' onClick={() => openEdit(route)}>
-                          <Pencil className='h-3.5 w-3.5' />
-                        </Button>
-                        {route.isActive && (
-                          <Button
-                            size='sm'
-                            variant='ghost'
-                            className='text-destructive hover:text-destructive'
-                            onClick={() => setDeactivatingId(route.id)}
-                          >
-                            <PowerOff className='h-3.5 w-3.5' />
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {pagination && pagination.totalPages > 1 && (
-            <div className='flex items-center justify-between mt-4'>
-              <p className='text-xs text-muted-foreground'>
-                {pagination.total} ruta{pagination.total !== 1 ? 's' : ''}
-              </p>
-              <div className='flex gap-2'>
-                <Button
-                  size='sm'
-                  variant='outline'
-                  disabled={!pagination.hasPrev}
-                  onClick={() => setPage(p => p - 1)}
-                >
-                  Anterior
-                </Button>
-                <Button
-                  size='sm'
-                  variant='outline'
-                  disabled={!pagination.hasNext}
-                  onClick={() => setPage(p => p + 1)}
-                >
-                  Siguiente
-                </Button>
-              </div>
-            </div>
-          )}
-        </>
-      )}
+        )}
+        actions={
+          routes.length > 0 ? (
+            <ExportButton
+              onExportCSV={exportCSV}
+              onExportExcel={exportExcel}
+              onExportPDF={exportPDF}
+              loading={exporting}
+            />
+          ) : undefined
+        }
+        emptyState={{
+          icon: <ClipboardList className='h-12 w-12 text-muted-foreground mx-auto mb-4' />,
+          title: 'No hay rutas',
+          description: 'Crea la primera ruta con el botón de arriba',
+        }}
+      />
 
       {/* ── Dialog crear/editar ── */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -779,6 +709,31 @@ export default function RoutesPage() {
               onClick={() => deactivatingId && handleDeactivate(deactivatingId)}
             >
               Desactivar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirm permanent delete */}
+      <AlertDialog
+        open={!!permanentlyDeletingId}
+        onOpenChange={() => setPermanentlyDeletingId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar ruta PERMANENTEMENTE?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. La ruta se eliminará completamente de la base de
+              datos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className='bg-red-700 text-white hover:bg-red-800'
+              onClick={() => permanentlyDeletingId && handlePermanentDelete(permanentlyDeletingId)}
+            >
+              Eliminar Permanentemente
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

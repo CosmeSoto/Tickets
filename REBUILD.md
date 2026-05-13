@@ -34,14 +34,28 @@ docker system prune -a --volumes
 ### 3. Reconstruir Contenedores
 
 ```bash
-# Reconstruir desde cero
-docker-compose -f docker-compose.dev.yml up --build -d
+
+# Desarrollo diario:
+docker compose -f docker-compose.dev.yml up -d
+
+# Si cambias código normal o Reconstruir desde cero:
+docker compose -f docker-compose.dev.yml up -d --build
+
+clear
 
 # Ver logs para verificar que todo está corriendo
 docker-compose -f docker-compose.dev.yml logs -f
 ```
 
-### 4. Verificar que los Servicios Están Corriendo
+### 4. Si cambias Prisma/schema:
+
+```bash
+docker exec tickets-app-dev npx prisma migrate dev --name nombre_del_cambio
+docker exec tickets-app-dev npx prisma generate
+docker compose -f docker-compose.dev.yml restart app
+```
+
+### 5. Verificar que los Servicios Están Corriendo
 
 ```bash
 # Verificar estado de los contenedores
@@ -54,7 +68,7 @@ docker-compose -f docker-compose.dev.yml ps
 # - tickets-nginx-dev (running)
 ```
 
-### 5. Ejecutar Migraciones y Seed
+### 6. Ejecutar Migraciones y Seed
 
 El seed se ejecuta automáticamente al iniciar el contenedor de la app. Si necesitas ejecutarlo manualmente:
 
@@ -72,7 +86,7 @@ npx prisma db seed
 exit
 ```
 
-### 6. Verificar los Datos
+### 7. Verificar los Datos
 
 ```bash
 # Conectarse a la base de datos
@@ -88,6 +102,13 @@ ORDER BY "order";
 
 # Salir de psql
 \q
+```
+
+### 8. Cuando ya validaste y quieres pasar a producción:
+
+```bash
+docker compose -f docker-compose.dev.yml down
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
 ```
 
 ## ✅ Resultado Esperado

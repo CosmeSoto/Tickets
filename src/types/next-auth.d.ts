@@ -18,6 +18,7 @@ declare module 'next-auth' {
       inventoryEnabled?: boolean
       ticketsEnabled?: boolean
       canRequestAssets?: boolean
+      patrolsEnabled?: boolean
     }
   }
 
@@ -45,6 +46,7 @@ declare module 'next-auth/jwt' {
     inventoryEnabled?: boolean
     ticketsEnabled?: boolean
     canRequestAssets?: boolean
+    patrolsEnabled?: boolean
     loginTime?: number
   }
 }

@@ -46,7 +46,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       where: { id: patrolId },
       select: {
         id: true,
-        guardId: true,
+        agentId: true,
         familyId: true,
         status: true,
         scheduledStart: true,
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     })
 
     if (!patrol) return NextResponse.json({ error: 'Patrulla no encontrada' }, { status: 404 })
-    if (patrol.guardId !== session.user.id) {
+    if (patrol.agentId !== session.user.id) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             id: randomUUID(),
             patrolId,
             checkpointId: item.checkpointId,
-            guardId: session.user.id,
+            agentId: session.user.id,
             submittedTokenHash: PatrolQRService.hashTokenForStorage(item.qrToken),
             gpsLat: item.gpsLat,
             gpsLng: item.gpsLng,
@@ -202,7 +202,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             id: randomUUID(),
             patrolId,
             checkpointId: item.checkpointId,
-            guardId: session.user.id,
+            agentId: session.user.id,
             submittedTokenHash: PatrolQRService.hashTokenForStorage(item.qrToken),
             gpsLat: item.gpsLat,
             gpsLng: item.gpsLng,
@@ -257,7 +257,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           id: randomUUID(),
           patrolId,
           checkpointId: item.checkpointId,
-          guardId: session.user.id,
+          agentId: session.user.id,
           submittedTokenHash: PatrolQRService.hashTokenForStorage(item.qrToken),
           gpsLat: item.gpsLat,
           gpsLng: item.gpsLng,

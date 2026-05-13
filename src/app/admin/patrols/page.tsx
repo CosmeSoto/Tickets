@@ -34,7 +34,7 @@ interface DashboardData {
   }
   activePatrols: Array<{
     id: string
-    guardName: string
+    agentName: string
     routeName: string
     startedAt: string | null
     completionPercentage: number
@@ -230,7 +230,7 @@ export default function PatrolDashboardPage() {
                       <div className='flex items-start justify-between gap-2 mb-2'>
                         <div className='min-w-0'>
                           <p className='font-medium text-sm truncate'>{patrol.routeName}</p>
-                          <p className='text-xs text-muted-foreground'>{patrol.guardName}</p>
+                          <p className='text-xs text-muted-foreground'>{patrol.agentName}</p>
                         </div>
                         <PatrolStatusBadge status='IN_PROGRESS' />
                       </div>

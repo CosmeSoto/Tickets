@@ -99,8 +99,6 @@ const navigationByRole: Record<string, NavItem[]> = {
         { name: 'Configuración', href: '/admin/settings/inventory', icon: Settings },
       ],
     },
-    { name: 'Familias', href: '/admin/families', icon: Layers },
-    { name: 'Usuarios', href: '/admin/users', icon: Users },
     {
       name: 'Rondas',
       href: '/admin/patrols',
@@ -114,6 +112,8 @@ const navigationByRole: Record<string, NavItem[]> = {
         { name: 'Configuración', href: '/admin/settings/patrols', icon: Settings },
       ],
     },
+    { name: 'Familias', href: '/admin/families', icon: Layers },
+    { name: 'Usuarios', href: '/admin/users', icon: Users },
     { name: 'Auditoría', href: '/admin/audit', icon: Shield },
     { name: 'Página Pública', href: '/admin/help-config', icon: Globe },
     { name: 'Configuración Sistema', href: '/admin/settings', icon: Settings },
@@ -358,6 +358,7 @@ export function RoleDashboardLayout({
     return null
   }
 
+  const canRequestAssets = (session.user as any)?.canRequestAssets ?? false
   const userRole = session.user.role as string
   const canManageInventory = (session.user as any).canManageInventory
   const isSuperAdmin = (session.user as any).isSuperAdmin === true
@@ -407,6 +408,23 @@ export function RoleDashboardLayout({
       }
       return true
     })
+
+    // Añadir "Solicitudes de Activos" para CLIENT si canRequestAssets es true
+    if (navKey === 'CLIENT' && canRequestAssets) {
+      navigation = navigation.map(item => {
+        if (item.name === 'Mis Equipos' && item.children) {
+          const newChildren = [...item.children]
+          const insertIndex = newChildren.findIndex(child => child.name === 'Mantenimientos')
+          newChildren.splice(insertIndex, 0, {
+            name: 'Solicitudes de Activos',
+            href: '/inventory/asset-requests',
+            icon: FileText,
+          })
+          return { ...item, children: newChildren }
+        }
+        return item
+      })
+    }
   }
 
   const handleLogout = async () => {

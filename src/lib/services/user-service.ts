@@ -60,6 +60,7 @@ export interface UpdateUserData {
   avatar?: string | null
   isActive?: boolean
   canManageInventory?: boolean
+  canRequestAssets?: boolean
   ticketsEnabled?: boolean
   inventoryEnabled?: boolean
   patrolsEnabled?: boolean
@@ -216,6 +217,7 @@ export class UserService {
         isActive: true,
         isEmailVerified: true,
         canManageInventory: true,
+        canRequestAssets: true,
         isSuperAdmin: true,
         ticketsEnabled: true,
         inventoryEnabled: true,
@@ -399,6 +401,7 @@ export class UserService {
     if (data.isActive !== undefined) updateData.isActive = data.isActive
     if (data.canManageInventory !== undefined)
       updateData.canManageInventory = data.canManageInventory
+    if (data.canRequestAssets !== undefined) updateData.canRequestAssets = data.canRequestAssets
     if (data.ticketsEnabled !== undefined) updateData.ticketsEnabled = data.ticketsEnabled
     if (data.inventoryEnabled !== undefined) updateData.inventoryEnabled = data.inventoryEnabled
     if (data.patrolsEnabled !== undefined) updateData.patrolsEnabled = data.patrolsEnabled

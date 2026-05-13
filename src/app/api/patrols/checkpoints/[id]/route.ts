@@ -1,7 +1,7 @@
 /**
  * GET    /api/patrols/checkpoints/[id]  — Detalle de checkpoint
- * PATCH  /api/patrols/checkpoints/[id]  — Actualiza checkpoint
- * DELETE /api/patrols/checkpoints/[id]  — Desactiva checkpoint (soft delete)
+ * PATCH  /api/patrols/checkpoints/[id]  — Actualiza checkpoint (ADMIN de la familia o SuperAdmin)
+ * DELETE /api/patrols/checkpoints/[id]  — Desactiva checkpoint — solo SuperAdmin
  *
  * qrSecret y qrStaticToken NUNCA se incluyen en las respuestas.
  */
@@ -13,6 +13,7 @@ import { z } from 'zod'
 import prisma from '@/lib/prisma'
 import { PatrolQRService } from '@/lib/services/patrol-qr.service'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
+import { checkPatrolFamilyAccess, canDeletePatrolResource } from '@/lib/patrol/patrol-access'
 
 const SAFE_CHECKPOINT_SELECT = {
   id: true,
@@ -29,6 +30,15 @@ const SAFE_CHECKPOINT_SELECT = {
   qrType: true,
   createdAt: true,
   updatedAt: true,
+  family: {
+    select: {
+      patrolFamilyConfig: {
+        select: {
+          qrWindowMinutes: true,
+        },
+      },
+    },
+  },
 } as const
 
 const patchCheckpointSchema = z.object({
@@ -85,6 +95,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     })
     if (!existing) return NextResponse.json({ error: 'Checkpoint no encontrado' }, { status: 404 })
 
+    // Verificar acceso a la familia del checkpoint
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    const hasAccess = await checkPatrolFamilyAccess(
+      session.user.id,
+      existing.familyId,
+      session.user.role,
+      isSuperAdmin
+    )
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'No tienes acceso a esta área' }, { status: 403 })
+    }
+
     const body = await request.json()
     const { regenerateSecret, ...rest } = patchCheckpointSchema.parse(body)
 
@@ -138,7 +160,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 }
 
-// ── DELETE (soft) ─────────────────────────────────────────────────────────────
+// ── DELETE (soft o hard) — solo SuperAdmin para hard delete ──────────────────
 
 export async function DELETE(
   request: NextRequest,
@@ -148,33 +170,83 @@ export async function DELETE(
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-    if (!['ADMIN', 'TECHNICIAN'].includes(session.user.role)) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-    }
-
     const { id } = await params
+    const { searchParams } = new URL(request.url)
+    const isPermanent = searchParams.get('permanent') === 'true'
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+
     const existing = await prisma.patrol_checkpoints.findUnique({
       where: { id },
-      select: { id: true, name: true, isActive: true },
+      select: { id: true, name: true, isActive: true, familyId: true },
     })
     if (!existing) return NextResponse.json({ error: 'Checkpoint no encontrado' }, { status: 404 })
 
-    // Soft delete — preserva historial de check-ins
-    await prisma.patrol_checkpoints.update({
-      where: { id },
-      data: { isActive: false },
-    })
+    // Si es hard delete, solo SuperAdmin puede hacerlo
+    if (isPermanent && !canDeletePatrolResource(session.user.role, isSuperAdmin)) {
+      return NextResponse.json(
+        { error: 'Solo el Super Administrador puede eliminar permanentemente checkpoints' },
+        { status: 403 }
+      )
+    }
 
-    await AuditServiceComplete.log({
-      action: 'PATROL_CHECKPOINT_DEACTIVATED',
-      entityType: 'patrol',
-      entityId: id,
-      userId: session.user.id,
-      details: { name: existing.name },
-      request,
-    })
+    // Soft delete (desactivar): ADMIN y TECHNICIAN pueden hacerlo (con acceso a la familia)
+    if (!isPermanent) {
+      const hasAccess = await checkPatrolFamilyAccess(
+        session.user.id,
+        existing.familyId,
+        session.user.role,
+        isSuperAdmin
+      )
+      if (!hasAccess) {
+        return NextResponse.json({ error: 'No tienes acceso a esta área' }, { status: 403 })
+      }
+    }
 
-    return NextResponse.json({ success: true, message: 'Checkpoint desactivado' })
+    if (isPermanent) {
+      // Verificar si el checkpoint está en alguna ruta
+      const routeCheckpointCount = await prisma.patrol_route_checkpoints.count({
+        where: { checkpointId: id },
+      })
+      if (routeCheckpointCount > 0) {
+        return NextResponse.json(
+          { error: 'No se puede eliminar el checkpoint porque está en uso en rutas' },
+          { status: 409 }
+        )
+      }
+
+      // Hard delete: eliminar permanentemente de la BD
+      await prisma.patrol_checkpoints.delete({
+        where: { id },
+      })
+
+      await AuditServiceComplete.log({
+        action: 'PATROL_CHECKPOINT_PERMANENTLY_DELETED',
+        entityType: 'patrol',
+        entityId: id,
+        userId: session.user.id,
+        details: { name: existing.name, familyId: existing.familyId },
+        request,
+      })
+
+      return NextResponse.json({ success: true, message: 'Checkpoint eliminado permanentemente' })
+    } else {
+      // Soft delete — preserva historial de check-ins
+      await prisma.patrol_checkpoints.update({
+        where: { id },
+        data: { isActive: false },
+      })
+
+      await AuditServiceComplete.log({
+        action: 'PATROL_CHECKPOINT_DEACTIVATED',
+        entityType: 'patrol',
+        entityId: id,
+        userId: session.user.id,
+        details: { name: existing.name, familyId: existing.familyId },
+        request,
+      })
+
+      return NextResponse.json({ success: true, message: 'Checkpoint desactivado' })
+    }
   } catch (error) {
     console.error('[patrol/checkpoints/[id]] DELETE:', error)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })

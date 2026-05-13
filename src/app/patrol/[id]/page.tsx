@@ -46,7 +46,7 @@ export default function PatrolExecutionPage() {
       return
     }
     const user = session.user as any
-    if (!user.patrolsEnabled) {
+    if (user.patrolsEnabled === false) {
       router.push('/unauthorized')
       return
     }

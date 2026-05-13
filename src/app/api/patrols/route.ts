@@ -32,12 +32,21 @@ export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-    const me = await prisma.users.findUnique({
-      where: { id: session.user.id },
-      select: { patrolsEnabled: true },
-    })
-    if (!me?.patrolsEnabled) {
+    const sessionUser = session.user as { patrolsEnabled?: boolean }
+    const fromToken = sessionUser.patrolsEnabled
+
+    if (fromToken === false) {
       return NextResponse.json({ error: 'Módulo de patrullas no habilitado' }, { status: 403 })
+    }
+
+    if (fromToken !== true) {
+      const me = await prisma.users.findUnique({
+        where: { id: session.user.id },
+        select: { patrolsEnabled: true },
+      })
+      if (!me?.patrolsEnabled) {
+        return NextResponse.json({ error: 'Módulo de patrullas no habilitado' }, { status: 403 })
+      }
     }
 
     const { searchParams } = new URL(request.url)
@@ -45,7 +54,7 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') ?? '20', 10) || 20))
     const statusWhere = buildStatusWhere(searchParams.get('status'))
 
-    const where = { guardId: session.user.id, ...statusWhere }
+    const where = { agentId: session.user.id, ...statusWhere }
 
     const [total, rows] = await Promise.all([
       prisma.patrols.count({ where }),
