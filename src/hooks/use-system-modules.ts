@@ -49,6 +49,19 @@ const FALLBACK: SystemModule[] = [
     requiresManager: true,
     familyScoped: true,
   },
+  {
+    key: 'patrols',
+    name: 'Rondas y Patrullajes',
+    description: 'Ejecución y supervisión de rondas de seguridad',
+    icon: 'Shield',
+    isActive: true,
+    order: 3,
+    defaultForAdmin: true,
+    defaultForTech: false,
+    defaultForClient: false,
+    requiresManager: false,
+    familyScoped: true,
+  },
 ]
 
 export function useSystemModules() {
@@ -81,6 +94,10 @@ export function getModuleRoleDescription(moduleKey: string, role: string): strin
       TECHNICIAN: 'Ver y gestionar activos de sus familias asignadas',
       CLIENT: 'Ver sus equipos asignados y solicitar mantenimientos',
     },
+    patrols: {
+      TECHNICIAN: 'Supervisar y ejecutar rondas de seguridad como guardia',
+      CLIENT: 'Ejecutar rondas de seguridad asignadas desde el móvil',
+    },
   }
   return descriptions[moduleKey]?.[role] ?? 'Acceso al módulo'
 }
@@ -92,6 +109,7 @@ export function getModuleEmoji(moduleKey: string): string {
   const emojis: Record<string, string> = {
     tickets: '🎫',
     inventory: '📦',
+    patrols: '🛡️',
     contracts: '📄',
     reports: '📊',
     knowledge: '📚',

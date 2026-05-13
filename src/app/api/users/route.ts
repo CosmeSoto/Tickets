@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search')
     const limit = searchParams.get('limit')
     const canManageInventory = searchParams.get('canManageInventory')
+    const patrolsEnabled = searchParams.get('patrolsEnabled')
     const isSuperAdmin = searchParams.get('isSuperAdmin')
 
     // Construir filtros para Prisma
@@ -53,6 +54,10 @@ export async function GET(request: NextRequest) {
 
     if (canManageInventory !== null) {
       where.canManageInventory = canManageInventory === 'true'
+    }
+
+    if (patrolsEnabled !== null) {
+      where.patrolsEnabled = patrolsEnabled === 'true'
     }
 
     if (isSuperAdmin !== null) {
@@ -104,6 +109,7 @@ export async function GET(request: NextRequest) {
         departmentId: departmentId ?? '',
         familyId: familyId ?? '',
         canManageInventory: canManageInventory ?? '',
+        patrolsEnabled: patrolsEnabled ?? '',
         isSuperAdmin: isSuperAdmin ?? '',
         limit: limit ?? '500',
       })
@@ -150,6 +156,7 @@ export async function GET(request: NextRequest) {
         canManageInventory: true,
         ticketsEnabled: true,
         inventoryEnabled: true,
+        patrolsEnabled: true,
         isSuperAdmin: true,
         createdAt: true,
         lastLogin: true,
@@ -254,6 +261,7 @@ export async function GET(request: NextRequest) {
         departmentId: departmentId ?? '',
         familyId: familyId ?? '',
         canManageInventory: canManageInventory ?? '',
+        patrolsEnabled: patrolsEnabled ?? '',
         isSuperAdmin: isSuperAdmin ?? '',
         limit: limit ?? '500',
       })

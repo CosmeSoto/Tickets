@@ -31,6 +31,7 @@ export interface UserData {
   canManageInventory?: boolean
   ticketsEnabled?: boolean
   inventoryEnabled?: boolean
+  patrolsEnabled?: boolean
   isSuperAdmin?: boolean
   lastLogin?: string
   createdAt: string

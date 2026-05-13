@@ -71,6 +71,7 @@ interface Guard {
   id: string
   name: string
   email: string
+  role: string
 }
 
 interface Pagination {
@@ -554,7 +555,7 @@ export default function SchedulesPage() {
                 <option value=''>Selecciona un guardia</option>
                 {guards.map(g => (
                   <option key={g.id} value={g.id}>
-                    {g.name} — {g.email}
+                    {g.name} ({g.role === 'TECHNICIAN' ? 'Técnico' : 'Cliente'}) — {g.email}
                   </option>
                 ))}
               </select>

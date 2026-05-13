@@ -62,6 +62,7 @@ export interface UpdateUserData {
   canManageInventory?: boolean
   ticketsEnabled?: boolean
   inventoryEnabled?: boolean
+  patrolsEnabled?: boolean
   isSuperAdmin?: boolean
   assignedCategories?: {
     categoryId: string
@@ -216,6 +217,9 @@ export class UserService {
         isEmailVerified: true,
         canManageInventory: true,
         isSuperAdmin: true,
+        ticketsEnabled: true,
+        inventoryEnabled: true,
+        patrolsEnabled: true,
         lastLogin: true,
         createdAt: true,
         updatedAt: true,
@@ -397,6 +401,7 @@ export class UserService {
       updateData.canManageInventory = data.canManageInventory
     if (data.ticketsEnabled !== undefined) updateData.ticketsEnabled = data.ticketsEnabled
     if (data.inventoryEnabled !== undefined) updateData.inventoryEnabled = data.inventoryEnabled
+    if (data.patrolsEnabled !== undefined) updateData.patrolsEnabled = data.patrolsEnabled
     if (data.isSuperAdmin !== undefined) updateData.isSuperAdmin = data.isSuperAdmin
 
     // Manejar departmentId explícitamente

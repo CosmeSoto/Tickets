@@ -31,12 +31,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 
-    const user = await prisma.users.findUnique({
-      where: { id: session.user.id },
-      select: { patrolsEnabled: true },
-    })
-    if (!user?.patrolsEnabled) {
-      return NextResponse.json({ error: 'Módulo de patrullas no habilitado' }, { status: 403 })
+    if (session.user.role === 'TECHNICIAN') {
+      const user = await prisma.users.findUnique({
+        where: { id: session.user.id },
+        select: { patrolsEnabled: true },
+      })
+      if (!user?.patrolsEnabled) {
+        return NextResponse.json({ error: 'Módulo de patrullas no habilitado' }, { status: 403 })
+      }
     }
 
     const { searchParams } = new URL(request.url)

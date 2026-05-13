@@ -56,6 +56,7 @@ interface EditUserData {
   canRequestAssets: boolean
   ticketsEnabled: boolean
   inventoryEnabled: boolean
+  patrolsEnabled: boolean
   isSuperAdmin: boolean
   avatar?: File
 }
@@ -85,6 +86,7 @@ export function EditUserModal({
     canRequestAssets: false,
     ticketsEnabled: true,
     inventoryEnabled: false,
+    patrolsEnabled: false,
     isSuperAdmin: false,
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -303,6 +305,7 @@ export function EditUserModal({
         canRequestAssets: (user as any).canRequestAssets ?? false,
         ticketsEnabled: (user as any).ticketsEnabled ?? true,
         inventoryEnabled: (user as any).inventoryEnabled ?? false,
+        patrolsEnabled: (user as any).patrolsEnabled ?? false,
         isSuperAdmin: user.isSuperAdmin ?? false,
         avatar: undefined,
       })
@@ -503,6 +506,7 @@ export function EditUserModal({
           canRequestAssets: formData.canRequestAssets,
           ticketsEnabled: formData.ticketsEnabled,
           inventoryEnabled: formData.inventoryEnabled,
+          patrolsEnabled: formData.patrolsEnabled,
           isSuperAdmin: formData.role === 'ADMIN' ? formData.isSuperAdmin : false,
         }),
       })
@@ -709,6 +713,7 @@ export function EditUserModal({
                         if (mod.key === 'tickets') return formData.ticketsEnabled
                         if (mod.key === 'inventory')
                           return formData.inventoryEnabled || formData.canManageInventory
+                        if (mod.key === 'patrols') return formData.patrolsEnabled
                         return false
                       })()
 
@@ -722,6 +727,8 @@ export function EditUserModal({
                             canManageInventory:
                               formData.role === 'TECHNICIAN' ? v : p.canManageInventory,
                           }))
+                        } else if (mod.key === 'patrols') {
+                          setFormData(p => ({ ...p, patrolsEnabled: v }))
                         }
                       }
 
@@ -842,6 +849,7 @@ export function EditUserModal({
                   canManageInventory={formData.canManageInventory}
                   ticketsEnabled={formData.ticketsEnabled}
                   inventoryEnabled={formData.inventoryEnabled}
+                  patrolsEnabled={formData.patrolsEnabled}
                 />
               )}
               {/* Para ADMIN normal: panel informativo de sus familias */}

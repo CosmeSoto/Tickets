@@ -20,6 +20,7 @@ const updateUserSchema = z.object({
   canRequestAssets: z.boolean().optional(),
   ticketsEnabled: z.boolean().optional(),
   inventoryEnabled: z.boolean().optional(),
+  patrolsEnabled: z.boolean().optional(),
   isSuperAdmin: z.boolean().optional(),
   assignedCategories: z
     .array(
@@ -249,10 +250,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         })
       }
 
-      // Si cambian ticketsEnabled o inventoryEnabled, notificar para refrescar navegación
+      // Si cambian ticketsEnabled, inventoryEnabled o patrolsEnabled, notificar para refrescar navegación
       if (
         validatedData.ticketsEnabled !== undefined ||
-        validatedData.inventoryEnabled !== undefined
+        validatedData.inventoryEnabled !== undefined ||
+        validatedData.patrolsEnabled !== undefined
       ) {
         NotificationEvents.emit(targetId, {
           type: 'session_refresh',

@@ -19,6 +19,7 @@ interface UserModulesPanelProps {
   canManageInventory: boolean
   ticketsEnabled?: boolean
   inventoryEnabled?: boolean
+  patrolsEnabled?: boolean
 }
 
 export function UserModulesPanel({
@@ -27,16 +28,18 @@ export function UserModulesPanel({
   canManageInventory,
   ticketsEnabled,
   inventoryEnabled,
+  patrolsEnabled,
 }: UserModulesPanelProps) {
   const [data, setData] = useState<{
     tickets: boolean
     inventory: boolean
+    patrols: boolean
     families: Array<{
       id: string
       name: string
       code: string
       color?: string | null
-      modules: { tickets: boolean; inventory: boolean }
+      modules: { tickets: boolean; inventory: boolean; patrols: boolean }
     }>
   } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -48,17 +51,17 @@ export function UserModulesPanel({
       .then(r => (r.ok ? r.json() : null))
       .then(d => {
         setData(d)
-        // Auto-expandir si hay módulos inactivos (hay algo que mostrar)
         if (d && (!d.tickets || !d.inventory)) setExpanded(true)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [userId, canManageInventory, ticketsEnabled, inventoryEnabled])
+  }, [userId, canManageInventory, ticketsEnabled, inventoryEnabled, patrolsEnabled])
 
   const isAdminRole = role === 'ADMIN'
   const hasFamilies = data && data.families.length > 0
   const ticketsActive = data?.tickets ?? false
   const inventoryActive = data?.inventory ?? false
+  const patrolsActive = data?.patrols ?? false
 
   const getTicketsGuide = () => {
     if (ticketsActive) return null
@@ -149,6 +152,13 @@ export function UserModulesPanel({
             >
               📦 {inventoryActive ? 'ON' : 'OFF'}
             </span>
+            <span
+              className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                patrolsActive ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+              }`}
+            >
+              🛡️ {patrolsActive ? 'ON' : 'OFF'}
+            </span>
           </div>
         </div>
         <svg
@@ -179,6 +189,23 @@ export function UserModulesPanel({
             families={data?.families.filter(f => f.modules.inventory)}
             guide={getInventoryGuide()}
             badge={role === 'TECHNICIAN' && !canManageInventory ? 'Requiere Gestor' : undefined}
+          />
+          <ModuleStatusCard
+            emoji='🛡️'
+            name='Rondas y Patrullajes'
+            active={patrolsActive}
+            families={data?.families.filter(f => f.modules.patrols)}
+            guide={
+              patrolsActive
+                ? null
+                : {
+                    type: 'info' as const,
+                    steps: [
+                      'Activar el toggle "Rondas" en la sección anterior',
+                      'Admin → Configuración → Rondas → Seleccionar área → Activar módulo',
+                    ],
+                  }
+            }
           />
         </div>
       )}
