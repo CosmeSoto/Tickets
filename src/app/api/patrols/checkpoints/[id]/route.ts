@@ -40,6 +40,7 @@ const patchCheckpointSchema = z.object({
   geofenceRadiusMeters: z.number().min(1).max(10000).nullable().optional(),
   hasConnectivity: z.boolean().optional(),
   isSensitive: z.boolean().optional(),
+  isActive: z.boolean().optional(), // Para reactivar un checkpoint desactivado
   regenerateSecret: z.boolean().optional(), // Si true, genera nuevo qrSecret
 })
 
@@ -115,11 +116,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         name: existing.name,
         hasConnectivity: existing.hasConnectivity,
         qrType: existing.qrType,
+        isActive: existing.isActive,
       },
       newValues: {
         name: updated.name,
         hasConnectivity: updated.hasConnectivity,
         qrType: updated.qrType,
+        isActive: updated.isActive,
         secretRegenerated: !!regenerateSecret,
       },
       request,

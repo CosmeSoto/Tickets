@@ -11,6 +11,7 @@ import {
   Download,
   Pencil,
   PowerOff,
+  Power,
   Loader2,
   Wifi,
   WifiOff,
@@ -255,6 +256,26 @@ export default function CheckpointsPage() {
     }
   }
 
+  const handleReactivate = async (id: string) => {
+    try {
+      const res = await fetch(`/api/patrols/checkpoints/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: true }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Error al reactivar')
+      toast({ title: 'Checkpoint reactivado' })
+      fetchCheckpoints()
+    } catch (err) {
+      toast({
+        title: 'Error',
+        description: err instanceof Error ? err.message : 'Error',
+        variant: 'destructive',
+      })
+    }
+  }
+
   const handleDownloadQR = async (cp: Checkpoint) => {
     setDownloadingQrId(cp.id)
     try {
@@ -394,14 +415,25 @@ export default function CheckpointsPage() {
                         <Download className='h-3 w-3' />
                       )}
                     </Button>
-                    {cp.isActive && (
+                    {cp.isActive ? (
                       <Button
                         size='sm'
                         variant='outline'
                         className='text-destructive hover:text-destructive'
                         onClick={() => setDeactivatingId(cp.id)}
+                        title='Desactivar'
                       >
                         <PowerOff className='h-3 w-3' />
+                      </Button>
+                    ) : (
+                      <Button
+                        size='sm'
+                        variant='outline'
+                        className='text-green-600 hover:text-green-700 dark:text-green-400'
+                        onClick={() => handleReactivate(cp.id)}
+                        title='Reactivar'
+                      >
+                        <Power className='h-3 w-3' />
                       </Button>
                     )}
                   </div>
@@ -487,7 +519,7 @@ export default function CheckpointsPage() {
                             <Download className='h-3.5 w-3.5' />
                           )}
                         </Button>
-                        {cp.isActive && (
+                        {cp.isActive ? (
                           <Button
                             size='sm'
                             variant='ghost'
@@ -496,6 +528,16 @@ export default function CheckpointsPage() {
                             title='Desactivar'
                           >
                             <PowerOff className='h-3.5 w-3.5' />
+                          </Button>
+                        ) : (
+                          <Button
+                            size='sm'
+                            variant='ghost'
+                            className='text-green-600 hover:text-green-700 dark:text-green-400'
+                            onClick={() => handleReactivate(cp.id)}
+                            title='Reactivar'
+                          >
+                            <Power className='h-3.5 w-3.5' />
                           </Button>
                         )}
                       </div>
@@ -669,7 +711,9 @@ export default function CheckpointsPage() {
                 <div>
                   <Label className='text-sm font-medium'>Tiene conectividad</Label>
                   <p className='text-xs text-muted-foreground'>
-                    Determina si usa QR dinámico o estático
+                    ON = QR Dinámico (cambia constantemente, máxima seguridad)
+                    <br />
+                    OFF = QR Estático (permanente, ideal para imprimir)
                   </p>
                 </div>
                 <Switch
@@ -695,7 +739,7 @@ export default function CheckpointsPage() {
 
             {!form.hasConnectivity && (
               <div className='p-3 rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 text-xs text-orange-700 dark:text-orange-400'>
-                Sin conectividad → QR Estático. Se requerirá foto en cada check-in.
+                Sin conectividad → QR Estático.
               </div>
             )}
           </div>
