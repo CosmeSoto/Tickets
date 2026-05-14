@@ -56,7 +56,15 @@ function getCellText<T>(row: T, col: ExportColumn): string {
     raw = ''
   }
 
-  if (col.format) return col.format(raw, row)
+  if (col.format) {
+    try {
+      const formatted = col.format(raw, row)
+      return formatted != null ? String(formatted) : ''
+    } catch (e) {
+      console.error('[getCellText] Error in format function:', e)
+      return ''
+    }
+  }
   if (raw === null || raw === undefined) return ''
   if (typeof raw === 'boolean') return raw ? 'Sí' : 'No'
   if (raw instanceof Date) return raw.toLocaleDateString('es-ES')
@@ -221,8 +229,9 @@ function sanitizeFilename(name: string): string {
     .slice(0, 80)
 }
 
-function escapeHTML(str: string): string {
-  return str
+function escapeHTML(str: string | null | undefined): string {
+  if (str == null) return ''
+  return String(str)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
