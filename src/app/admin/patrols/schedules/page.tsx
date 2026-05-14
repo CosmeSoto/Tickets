@@ -9,6 +9,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -553,86 +560,97 @@ export default function SchedulesPage() {
 
       {/* ── Dialog crear/editar ── */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className='sm:max-w-lg'>
+        <DialogContent className='sm:max-w-2xl'>
           <DialogHeader>
-            <DialogTitle>{editingId ? 'Editar Programación' : 'Nueva Programación'}</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className='text-xl'>
+              {editingId ? 'Editar Programación' : 'Nueva Programación'}
+            </DialogTitle>
+            <DialogDescription className='text-base'>
               {editingId
                 ? 'Modifica los datos de la programación existente.'
                 : 'Asigna una ruta a un guardia en un horario específico.'}
             </DialogDescription>
           </DialogHeader>
 
-          <div className='space-y-4 py-2 max-h-[65vh] overflow-y-auto pr-1'>
+          <div className='space-y-5 py-3 max-h-[70vh] overflow-y-auto pr-2'>
             {/* Área */}
-            <div className='space-y-1.5'>
-              <Label className='text-sm'>
+            <div className='space-y-2'>
+              <Label className='text-base font-medium'>
                 Área <span className='text-destructive'>*</span>
               </Label>
-              <select
+              <Select
                 value={form.familyId}
-                onChange={e => setForm(f => ({ ...f, familyId: e.target.value, routeId: '' }))}
-                className='w-full h-9 rounded-md border border-input bg-background px-3 text-sm'
+                onValueChange={value => setForm(f => ({ ...f, familyId: value, routeId: '' }))}
                 disabled={saving}
               >
-                <option value=''>Selecciona un área</option>
-                {families.map(f => (
-                  <option key={f.id} value={f.id}>
-                    {f.name} ({f.code})
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className='h-11'>
+                  <SelectValue placeholder='Selecciona un área' />
+                </SelectTrigger>
+                <SelectContent>
+                  {families.map(f => (
+                    <SelectItem key={f.id} value={f.id}>
+                      {f.name} ({f.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Ruta */}
-            <div className='space-y-1.5'>
-              <Label className='text-sm'>
+            <div className='space-y-2'>
+              <Label className='text-base font-medium'>
                 Ruta <span className='text-destructive'>*</span>
               </Label>
-              <select
+              <Select
                 value={form.routeId}
-                onChange={e => setForm(f => ({ ...f, routeId: e.target.value }))}
-                className='w-full h-9 rounded-md border border-input bg-background px-3 text-sm'
+                onValueChange={value => setForm(f => ({ ...f, routeId: value }))}
                 disabled={saving || !form.familyId}
               >
-                <option value=''>Selecciona una ruta</option>
-                {routes.map(r => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className='h-11'>
+                  <SelectValue placeholder='Selecciona una ruta' />
+                </SelectTrigger>
+                <SelectContent>
+                  {routes.map(r => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Agente */}
-            <div className='space-y-1.5'>
-              <Label className='text-sm'>
+            <div className='space-y-2'>
+              <Label className='text-base font-medium'>
                 Agente <span className='text-destructive'>*</span>
               </Label>
-              <select
+              <Select
                 value={form.agentId}
-                onChange={e => setForm(f => ({ ...f, agentId: e.target.value }))}
-                className='w-full h-9 rounded-md border border-input bg-background px-3 text-sm'
+                onValueChange={value => setForm(f => ({ ...f, agentId: value }))}
                 disabled={saving}
               >
-                <option value=''>Selecciona un agente</option>
-                {agents.map(g => (
-                  <option key={g.id} value={g.id}>
-                    {g.name} ({g.role === 'TECHNICIAN' ? 'Técnico' : 'Cliente'}) — {g.email}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className='h-11'>
+                  <SelectValue placeholder='Selecciona un agente' />
+                </SelectTrigger>
+                <SelectContent>
+                  {agents.map(g => (
+                    <SelectItem key={g.id} value={g.id}>
+                      {g.name} ({g.role === 'TECHNICIAN' ? 'Técnico' : 'Cliente'}) — {g.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {agents.length === 0 && (
-                <p className='text-xs text-muted-foreground'>
+                <p className='text-sm text-muted-foreground'>
                   No hay usuarios con el módulo de patrullas habilitado
                 </p>
               )}
             </div>
 
             {/* Fechas */}
-            <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
-              <div className='space-y-1.5'>
-                <Label className='text-sm'>
+            <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+              <div className='space-y-2'>
+                <Label className='text-base font-medium'>
                   {form.recurrence === 'NONE' ? 'Inicio' : 'Hora de inicio'}{' '}
                   <span className='text-destructive'>*</span>
                 </Label>
@@ -641,13 +659,14 @@ export default function SchedulesPage() {
                   value={form.scheduledStart}
                   onChange={e => setForm(f => ({ ...f, scheduledStart: e.target.value }))}
                   disabled={saving}
+                  className='h-11'
                 />
                 {form.recurrence !== 'NONE' && (
-                  <p className='text-xs text-muted-foreground'>Hora a la que inicia cada ronda</p>
+                  <p className='text-sm text-muted-foreground'>Hora a la que inicia cada ronda</p>
                 )}
               </div>
-              <div className='space-y-1.5'>
-                <Label className='text-sm'>
+              <div className='space-y-2'>
+                <Label className='text-base font-medium'>
                   {form.recurrence === 'NONE' ? 'Fin' : 'Hora de fin'}{' '}
                   <span className='text-destructive'>*</span>
                 </Label>
@@ -656,50 +675,55 @@ export default function SchedulesPage() {
                   value={form.scheduledEnd}
                   onChange={e => setForm(f => ({ ...f, scheduledEnd: e.target.value }))}
                   disabled={saving}
+                  className='h-11'
                 />
                 {form.recurrence !== 'NONE' && (
-                  <p className='text-xs text-muted-foreground'>Hora a la que termina cada ronda</p>
+                  <p className='text-sm text-muted-foreground'>Hora a la que termina cada ronda</p>
                 )}
               </div>
             </div>
 
             {form.recurrence !== 'NONE' && (
-              <div className='p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-400'>
+              <div className='p-4 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-sm text-blue-700 dark:text-blue-300'>
                 Con recurrencia activa, se generarán rondas automáticamente para los próximos 30
                 días usando la hora de inicio y fin configuradas.
               </div>
             )}
 
             {/* Recurrencia */}
-            <div className='space-y-1.5'>
-              <Label className='text-sm'>Recurrencia</Label>
-              <select
+            <div className='space-y-2'>
+              <Label className='text-base font-medium'>Recurrencia</Label>
+              <Select
                 value={form.recurrence}
-                onChange={e =>
+                onValueChange={value =>
                   setForm(f => ({
                     ...f,
-                    recurrence: e.target.value as FormData['recurrence'],
+                    recurrence: value as FormData['recurrence'],
                     recurrenceDays: [],
                   }))
                 }
-                className='w-full h-9 rounded-md border border-input bg-background px-3 text-sm'
                 disabled={saving}
               >
-                {Object.entries(PATROL_RECURRENCE_LABELS_ES).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className='h-11'>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(PATROL_RECURRENCE_LABELS_ES).map(([k, v]) => (
+                    <SelectItem key={k} value={k}>
+                      {v}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Días de la semana (para WEEKLY / CUSTOM) */}
             {(form.recurrence === 'WEEKLY' || form.recurrence === 'CUSTOM') && (
-              <div className='space-y-2'>
-                <Label className='text-sm'>
+              <div className='space-y-3'>
+                <Label className='text-base font-medium'>
                   Días de la semana <span className='text-destructive'>*</span>
                 </Label>
-                <div className='flex gap-1.5 flex-wrap'>
+                <div className='flex gap-2 flex-wrap'>
                   {DAY_LABELS.map((label, localDay) => {
                     // Convertir día local a UTC para comparar con recurrenceDays guardados
                     const utcDay = localDayToUTCDay(localDay, form.scheduledStart)
@@ -709,10 +733,10 @@ export default function SchedulesPage() {
                         key={localDay}
                         type='button'
                         onClick={() => toggleDay(localDay)}
-                        className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
+                        className={`px-4 py-2.5 rounded-lg text-sm font-semibold border-2 transition-all duration-200 ${
                           isSelected
-                            ? 'bg-primary text-primary-foreground border-primary'
-                            : 'border-border text-muted-foreground hover:bg-muted'
+                            ? 'bg-primary text-primary-foreground border-primary shadow-md'
+                            : 'border-border text-muted-foreground hover:bg-muted hover:border-muted-foreground'
                         }`}
                         disabled={saving}
                       >
@@ -725,12 +749,17 @@ export default function SchedulesPage() {
             )}
           </div>
 
-          <DialogFooter>
-            <Button variant='outline' onClick={() => setDialogOpen(false)} disabled={saving}>
+          <DialogFooter className='gap-3 pt-2'>
+            <Button
+              variant='outline'
+              onClick={() => setDialogOpen(false)}
+              disabled={saving}
+              className='h-11 px-6'
+            >
               Cancelar
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? <Loader2 className='h-4 w-4 mr-2 animate-spin' /> : null}
+            <Button onClick={handleSave} disabled={saving} className='h-11 px-6'>
+              {saving ? <Loader2 className='h-5 w-5 mr-2 animate-spin' /> : null}
               {editingId ? 'Guardar cambios' : 'Crear programación'}
             </Button>
           </DialogFooter>

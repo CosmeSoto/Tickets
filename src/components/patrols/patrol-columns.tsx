@@ -272,7 +272,9 @@ export function createScheduleColumns({
       key: 'route',
       label: 'Ruta',
       sortable: true,
-      render: (schedule: any) => <span className='font-medium'>{schedule.route?.name ?? '—'}</span>,
+      render: (schedule: any) => (
+        <span className='font-medium'>{schedule?.route?.name ?? '—'}</span>
+      ),
     },
     {
       key: 'family',
@@ -280,7 +282,7 @@ export function createScheduleColumns({
       sortable: true,
       render: (schedule: any) => (
         <span className='text-xs text-muted-foreground truncate max-w-[150px]'>
-          {schedule.family?.name ?? '—'}
+          {schedule?.family?.name ?? '—'}
         </span>
       ),
     },
@@ -288,14 +290,17 @@ export function createScheduleColumns({
       key: 'agent',
       label: 'Personal',
       sortable: true,
-      render: (schedule: any) => (
-        <div className='flex items-center gap-2'>
-          <User className='h-4 w-4 text-muted-foreground shrink-0' />
-          <div className='min-w-0'>
-            <div className='font-medium text-sm truncate'>{schedule.agent?.name ?? '—'}</div>
+      render: (schedule: any) => {
+        if (!schedule) return <span className='text-muted-foreground text-xs'>—</span>
+        return (
+          <div className='flex items-center gap-2'>
+            <User className='h-4 w-4 text-muted-foreground shrink-0' />
+            <div className='min-w-0'>
+              <div className='font-medium text-sm truncate'>{schedule.agent?.name ?? '—'}</div>
+            </div>
           </div>
-        </div>
-      ),
+        )
+      },
     },
     {
       key: 'scheduledStart',

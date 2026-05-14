@@ -52,7 +52,17 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1)
     const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') ?? '20', 10) || 20))
-    const statusWhere = buildStatusWhere(searchParams.get('status'))
+    const statusParam = searchParams.get('status')
+    const statusWhere = buildStatusWhere(statusParam)
+
+    // Para el filtro 'active' (PENDING + IN_PROGRESS), ordenar por scheduledStart asc
+    // mostrando primero las más próximas/actuales.
+    // Para otros filtros, ordenar desc para ver las más recientes primero.
+    const isActiveFilter =
+      statusParam === 'PENDING,IN_PROGRESS' || statusParam === 'IN_PROGRESS,PENDING'
+    const orderBy = isActiveFilter
+      ? { scheduledStart: 'asc' as const }
+      : { scheduledStart: 'desc' as const }
 
     const where = { agentId: session.user.id, ...statusWhere }
 
@@ -62,7 +72,7 @@ export async function GET(request: NextRequest) {
         where,
         skip: (page - 1) * limit,
         take: limit,
-        orderBy: { scheduledStart: 'asc' },
+        orderBy,
         select: {
           id: true,
           status: true,
@@ -96,11 +106,7 @@ export async function GET(request: NextRequest) {
       const completionPercentage = calculateCompletionPercentage(visitedRequired, required.length)
       const progress =
         p.status === 'IN_PROGRESS'
-          ? {
-              visitedRequired,
-              totalRequired: required.length,
-              completionPercentage,
-            }
+          ? { visitedRequired, totalRequired: required.length, completionPercentage }
           : undefined
 
       return {

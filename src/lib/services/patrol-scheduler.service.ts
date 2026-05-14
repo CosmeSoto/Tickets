@@ -107,9 +107,21 @@ export class PatrolSchedulerService {
       }
 
       case PatrolRecurrence.DAILY: {
-        // Una ocurrencia por día desde scheduledStart hasta el horizonte.
+        // Una ocurrencia por día desde scheduledStart (o desde hoy si ya pasó) hasta el horizonte.
         // Usamos UTC para avanzar el cursor día a día sin drift de DST.
         const cursor = new Date(schedule.scheduledStart)
+
+        // Si scheduledStart ya pasó, empezar desde hoy con la misma hora UTC
+        const now = new Date()
+        if (cursor < now) {
+          cursor.setUTCFullYear(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+          // Mantener la hora UTC original del scheduledStart
+          cursor.setUTCHours(startUTCHours, startUTCMinutes, 0, 0)
+          // Si la hora de hoy ya pasó, empezar mañana
+          if (cursor <= now) {
+            cursor.setUTCDate(cursor.getUTCDate() + 1)
+          }
+        }
 
         while (cursor <= horizonEnd) {
           occurrences.push({
@@ -129,8 +141,21 @@ export class PatrolSchedulerService {
         if (days.size === 0) break
 
         // Empezar desde el inicio del día UTC del scheduledStart
+        // Si scheduledStart ya pasó, empezar desde hoy
+        const now = new Date()
         const cursor = new Date(schedule.scheduledStart)
         cursor.setUTCHours(0, 0, 0, 0)
+
+        // Si el inicio del schedule ya pasó, avanzar al día de hoy
+        const todayUTC = new Date()
+        todayUTC.setUTCHours(0, 0, 0, 0)
+        if (cursor < todayUTC) {
+          cursor.setUTCFullYear(
+            todayUTC.getUTCFullYear(),
+            todayUTC.getUTCMonth(),
+            todayUTC.getUTCDate()
+          )
+        }
 
         while (cursor <= horizonEnd) {
           if (days.has(cursor.getUTCDay())) {
@@ -138,8 +163,8 @@ export class PatrolSchedulerService {
             const start = new Date(cursor)
             start.setUTCHours(startUTCHours, startUTCMinutes, 0, 0)
 
-            // Solo incluir si la fecha de inicio es >= scheduledStart original
-            if (start >= schedule.scheduledStart && start <= horizonEnd) {
+            // Solo incluir si la fecha de inicio es en el futuro (o igual al scheduledStart original)
+            if (start >= schedule.scheduledStart && start > now && start <= horizonEnd) {
               occurrences.push({
                 start,
                 end: new Date(start.getTime() + durationMs),

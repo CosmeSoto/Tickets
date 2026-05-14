@@ -152,7 +152,8 @@ export function DataTable<T extends { id: string }>({
 
   const safeData = useMemo(() => {
     if (!data || !Array.isArray(data)) return []
-    return data
+    // Filtrar elementos null/undefined que pueden llegar por bugs de estado
+    return data.filter((item): item is T => item != null)
   }, [data])
 
   // Orden semántico para campos especiales
