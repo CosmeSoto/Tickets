@@ -270,6 +270,25 @@ export default function SchedulesPage() {
     }))
   }
 
+  // Cuando cambia scheduledStart, recalcular recurrenceDays si ya hay días seleccionados
+  // para mantener la correspondencia UTC correcta
+  const handleStartChange = (newStart: string) => {
+    if (form.recurrenceDays.length > 0 && form.scheduledStart) {
+      // Convertir los días UTC actuales a días locales con la hora anterior
+      // y luego reconvertir a UTC con la nueva hora
+      const oldLocalDays = form.recurrenceDays.map(utcDay =>
+        utcDayToLocalDay(utcDay, form.scheduledStart)
+      )
+      const newUtcDays = oldLocalDays
+        .map(localDay => localDayToUTCDay(localDay, newStart))
+        .filter((d, i, arr) => arr.indexOf(d) === i) // deduplicar
+        .sort((a, b) => a - b)
+      setForm(f => ({ ...f, scheduledStart: newStart, recurrenceDays: newUtcDays }))
+    } else {
+      setForm(f => ({ ...f, scheduledStart: newStart }))
+    }
+  }
+
   const openCreate = () => {
     setEditingId(null)
     setForm({ ...EMPTY_FORM, familyId: families[0]?.id ?? '' })
@@ -600,25 +619,25 @@ export default function SchedulesPage() {
             <DialogTitle className='text-xl'>
               {editingId ? 'Editar Programación' : 'Nueva Programación'}
             </DialogTitle>
-            <DialogDescription className='text-base'>
+            <DialogDescription>
               {editingId
                 ? 'Modifica los datos de la programación existente.'
                 : 'Asigna una ruta a un guardia en un horario específico.'}
             </DialogDescription>
           </DialogHeader>
 
-          <div className='space-y-5 py-3 max-h-[70vh] overflow-y-auto pr-2'>
-            {/* Área */}
-            <div className='space-y-2'>
-              <Label className='text-base font-medium'>
+          <div className='space-y-4 py-2 max-h-[72vh] overflow-y-auto pr-2'>
+            {/* ── 1. Área ── */}
+            <div className='space-y-1.5'>
+              <Label className='text-sm font-medium'>
                 Área <span className='text-destructive'>*</span>
               </Label>
               <Select
                 value={form.familyId}
-                onValueChange={value => setForm(f => ({ ...f, familyId: value, routeId: '' }))}
+                onValueChange={v => setForm(f => ({ ...f, familyId: v, routeId: '' }))}
                 disabled={saving}
               >
-                <SelectTrigger className='h-11'>
+                <SelectTrigger className='h-10'>
                   <SelectValue placeholder='Selecciona un área' />
                 </SelectTrigger>
                 <SelectContent>
@@ -631,18 +650,22 @@ export default function SchedulesPage() {
               </Select>
             </div>
 
-            {/* Ruta */}
-            <div className='space-y-2'>
-              <Label className='text-base font-medium'>
+            {/* ── 2. Ruta ── */}
+            <div className='space-y-1.5'>
+              <Label className='text-sm font-medium'>
                 Ruta <span className='text-destructive'>*</span>
               </Label>
               <Select
                 value={form.routeId}
-                onValueChange={value => setForm(f => ({ ...f, routeId: value }))}
+                onValueChange={v => setForm(f => ({ ...f, routeId: v }))}
                 disabled={saving || !form.familyId}
               >
-                <SelectTrigger className='h-11'>
-                  <SelectValue placeholder='Selecciona una ruta' />
+                <SelectTrigger className='h-10'>
+                  <SelectValue
+                    placeholder={
+                      form.familyId ? 'Selecciona una ruta' : 'Primero selecciona un área'
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {routes.map(r => (
@@ -654,120 +677,55 @@ export default function SchedulesPage() {
               </Select>
             </div>
 
-            {/* Agente */}
-            <div className='space-y-2'>
-              <Label className='text-base font-medium'>
+            {/* ── 3. Agente ── */}
+            <div className='space-y-1.5'>
+              <Label className='text-sm font-medium'>
                 Agente <span className='text-destructive'>*</span>
               </Label>
               <Select
                 value={form.agentId}
-                onValueChange={value => setForm(f => ({ ...f, agentId: value }))}
+                onValueChange={v => setForm(f => ({ ...f, agentId: v }))}
                 disabled={saving}
               >
-                <SelectTrigger className='h-11'>
+                <SelectTrigger className='h-10'>
                   <SelectValue placeholder='Selecciona un agente' />
                 </SelectTrigger>
                 <SelectContent>
                   {agents.map(g => (
                     <SelectItem key={g.id} value={g.id}>
-                      {g.name} ({g.role === 'TECHNICIAN' ? 'Técnico' : 'Cliente'}) — {g.email}
+                      {g.name} — {g.email}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               {agents.length === 0 && (
-                <p className='text-sm text-muted-foreground'>
+                <p className='text-xs text-muted-foreground'>
                   No hay usuarios con el módulo de patrullas habilitado
                 </p>
               )}
             </div>
 
-            {/* Fechas — comportamiento diferente según recurrencia */}
-            {form.recurrence === 'NONE' ? (
-              /* Sin recurrencia: fecha + hora completa para inicio y fin */
-              <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-                <div className='space-y-2'>
-                  <Label className='text-base font-medium'>
-                    Inicio <span className='text-destructive'>*</span>
-                  </Label>
-                  <Input
-                    type='datetime-local'
-                    value={form.scheduledStart}
-                    onChange={e => setForm(f => ({ ...f, scheduledStart: e.target.value }))}
-                    disabled={saving}
-                    className='h-11'
-                  />
-                </div>
-                <div className='space-y-2'>
-                  <Label className='text-base font-medium'>
-                    Fin <span className='text-destructive'>*</span>
-                  </Label>
-                  <Input
-                    type='datetime-local'
-                    value={form.scheduledEnd}
-                    onChange={e => setForm(f => ({ ...f, scheduledEnd: e.target.value }))}
-                    disabled={saving}
-                    className='h-11'
-                  />
-                </div>
-              </div>
-            ) : (
-              /* Con recurrencia: fecha de inicio + solo hora de fin (mismo día) */
-              <div className='space-y-4'>
-                <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-                  <div className='space-y-2'>
-                    <Label className='text-base font-medium'>
-                      Fecha y hora de inicio <span className='text-destructive'>*</span>
-                    </Label>
-                    <Input
-                      type='datetime-local'
-                      value={form.scheduledStart}
-                      onChange={e => setForm(f => ({ ...f, scheduledStart: e.target.value }))}
-                      disabled={saving}
-                      className='h-11'
-                    />
-                    <p className='text-sm text-muted-foreground'>
-                      Primera fecha y hora de inicio de la ronda
-                    </p>
-                  </div>
-                  <div className='space-y-2'>
-                    <Label className='text-base font-medium'>
-                      Hora de fin <span className='text-destructive'>*</span>
-                    </Label>
-                    <Input
-                      type='time'
-                      value={form.endTimeOnly}
-                      onChange={e => setForm(f => ({ ...f, endTimeOnly: e.target.value }))}
-                      disabled={saving}
-                      className='h-11'
-                    />
-                    <p className='text-sm text-muted-foreground'>
-                      Hora a la que termina cada ronda
-                    </p>
-                  </div>
-                </div>
-                <div className='p-4 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-sm text-blue-700 dark:text-blue-300'>
-                  Se generarán rondas automáticamente para los próximos 30 días con el horario
-                  configurado.
-                </div>
-              </div>
-            )}
+            <div className='border-t pt-4' />
 
-            {/* Recurrencia */}
-            <div className='space-y-2'>
-              <Label className='text-base font-medium'>Recurrencia</Label>
+            {/* ── 4. Recurrencia — PRIMERO para que las fechas se adapten ── */}
+            <div className='space-y-1.5'>
+              <Label className='text-sm font-medium'>Tipo de programación</Label>
               <Select
                 value={form.recurrence}
-                onValueChange={value =>
+                onValueChange={v =>
                   setForm(f => ({
                     ...f,
-                    recurrence: value as FormData['recurrence'],
+                    recurrence: v as FormData['recurrence'],
+                    // Limpiar días y hora de fin al cambiar tipo
                     recurrenceDays: [],
+                    endTimeOnly: '',
+                    // Para NONE, limpiar scheduledEnd para que el usuario lo rellene
+                    scheduledEnd: v === 'NONE' ? '' : f.scheduledEnd,
                   }))
                 }
                 disabled={saving}
               >
-                <SelectTrigger className='h-11'>
+                <SelectTrigger className='h-10'>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -778,17 +736,124 @@ export default function SchedulesPage() {
                   ))}
                 </SelectContent>
               </Select>
+              <p className='text-xs text-muted-foreground'>
+                {form.recurrence === 'NONE' &&
+                  'Una sola ronda en la fecha y hora exactas que indiques.'}
+                {form.recurrence === 'DAILY' &&
+                  'Una ronda cada día a la misma hora, durante 30 días.'}
+                {form.recurrence === 'WEEKLY' &&
+                  'Una ronda por semana en los días que selecciones.'}
+                {form.recurrence === 'CUSTOM' &&
+                  'Rondas en los días específicos de la semana que elijas.'}
+              </p>
             </div>
 
-            {/* Días de la semana (para WEEKLY / CUSTOM) */}
+            {/* ── 5. Fechas — cambian según recurrencia ── */}
+            {form.recurrence === 'NONE' ? (
+              /* Sin recurrencia: fecha + hora completa de inicio Y fin */
+              <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
+                <div className='space-y-1.5'>
+                  <Label className='text-sm font-medium'>
+                    Fecha y hora de inicio <span className='text-destructive'>*</span>
+                  </Label>
+                  <Input
+                    type='datetime-local'
+                    value={form.scheduledStart}
+                    onChange={e => handleStartChange(e.target.value)}
+                    disabled={saving}
+                    className='h-10'
+                  />
+                </div>
+                <div className='space-y-1.5'>
+                  <Label className='text-sm font-medium'>
+                    Fecha y hora de fin <span className='text-destructive'>*</span>
+                  </Label>
+                  <Input
+                    type='datetime-local'
+                    value={form.scheduledEnd}
+                    min={form.scheduledStart}
+                    onChange={e => setForm(f => ({ ...f, scheduledEnd: e.target.value }))}
+                    disabled={saving}
+                    className='h-10'
+                  />
+                </div>
+              </div>
+            ) : (
+              /* Con recurrencia: fecha+hora de inicio y SOLO hora de fin */
+              <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
+                <div className='space-y-1.5'>
+                  <Label className='text-sm font-medium'>
+                    Primera fecha de inicio <span className='text-destructive'>*</span>
+                  </Label>
+                  <Input
+                    type='datetime-local'
+                    value={form.scheduledStart}
+                    onChange={e => handleStartChange(e.target.value)}
+                    disabled={saving}
+                    className='h-10'
+                  />
+                  <p className='text-xs text-muted-foreground'>
+                    Desde cuándo empieza la programación
+                  </p>
+                </div>
+                <div className='space-y-1.5'>
+                  <Label className='text-sm font-medium'>
+                    Hora de fin de cada ronda <span className='text-destructive'>*</span>
+                  </Label>
+                  <Input
+                    type='time'
+                    value={form.endTimeOnly}
+                    onChange={e => setForm(f => ({ ...f, endTimeOnly: e.target.value }))}
+                    disabled={saving}
+                    className='h-10'
+                  />
+                  <p className='text-xs text-muted-foreground'>Hora a la que termina cada ronda</p>
+                </div>
+              </div>
+            )}
+
+            {/* Resumen de duración calculada */}
+            {form.scheduledStart &&
+              (form.recurrence === 'NONE' ? form.scheduledEnd : form.endTimeOnly) &&
+              (() => {
+                try {
+                  let endDate: Date
+                  const startDate = new Date(form.scheduledStart)
+                  if (form.recurrence === 'NONE') {
+                    endDate = new Date(form.scheduledEnd)
+                  } else {
+                    const [h, m] = form.endTimeOnly.split(':').map(Number)
+                    endDate = new Date(startDate)
+                    endDate.setHours(h, m, 0, 0)
+                    if (endDate <= startDate) endDate.setDate(endDate.getDate() + 1)
+                  }
+                  const diffMs = endDate.getTime() - startDate.getTime()
+                  if (diffMs > 0) {
+                    const diffH = Math.floor(diffMs / 3600000)
+                    const diffM = Math.floor((diffMs % 3600000) / 60000)
+                    const label =
+                      diffH > 0 ? `${diffH}h${diffM > 0 ? ` ${diffM}min` : ''}` : `${diffM}min`
+                    return (
+                      <p className='text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2'>
+                        ⏱ Duración de cada ronda:{' '}
+                        <span className='font-medium text-foreground'>{label}</span>
+                      </p>
+                    )
+                  }
+                } catch {
+                  /* silencioso */
+                }
+                return null
+              })()}
+
+            {/* ── 6. Días de la semana (solo WEEKLY / CUSTOM) ── */}
             {(form.recurrence === 'WEEKLY' || form.recurrence === 'CUSTOM') && (
-              <div className='space-y-3'>
-                <Label className='text-base font-medium'>
+              <div className='space-y-2'>
+                <Label className='text-sm font-medium'>
                   Días de la semana <span className='text-destructive'>*</span>
                 </Label>
                 <div className='flex gap-2 flex-wrap'>
                   {DAY_LABELS.map((label, localDay) => {
-                    // Convertir día local a UTC para comparar con recurrenceDays guardados
                     const utcDay = localDayToUTCDay(localDay, form.scheduledStart)
                     const isSelected = form.recurrenceDays.includes(utcDay)
                     return (
@@ -796,10 +861,10 @@ export default function SchedulesPage() {
                         key={localDay}
                         type='button'
                         onClick={() => toggleDay(localDay)}
-                        className={`px-4 py-2.5 rounded-lg text-sm font-semibold border-2 transition-all duration-200 ${
+                        className={`px-3.5 py-2 rounded-lg text-sm font-semibold border-2 transition-all ${
                           isSelected
-                            ? 'bg-primary text-primary-foreground border-primary shadow-md'
-                            : 'border-border text-muted-foreground hover:bg-muted hover:border-muted-foreground'
+                            ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                            : 'border-border text-muted-foreground hover:bg-muted'
                         }`}
                         disabled={saving}
                       >
@@ -808,21 +873,30 @@ export default function SchedulesPage() {
                     )
                   })}
                 </div>
+                {form.recurrenceDays.length === 0 && (
+                  <p className='text-xs text-destructive'>Selecciona al menos un día</p>
+                )}
+              </div>
+            )}
+
+            {/* Banner informativo para recurrencias */}
+            {form.recurrence !== 'NONE' && (
+              <div className='flex items-start gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-300'>
+                <span className='mt-0.5'>ℹ️</span>
+                <span>
+                  Se generarán rondas automáticamente para los próximos <strong>30 días</strong>. El
+                  cron nocturno las mantiene actualizadas.
+                </span>
               </div>
             )}
           </div>
 
-          <DialogFooter className='gap-3 pt-2'>
-            <Button
-              variant='outline'
-              onClick={() => setDialogOpen(false)}
-              disabled={saving}
-              className='h-11 px-6'
-            >
+          <DialogFooter className='gap-2 pt-2'>
+            <Button variant='outline' onClick={() => setDialogOpen(false)} disabled={saving}>
               Cancelar
             </Button>
-            <Button onClick={handleSave} disabled={saving} className='h-11 px-6'>
-              {saving ? <Loader2 className='h-5 w-5 mr-2 animate-spin' /> : null}
+            <Button onClick={handleSave} disabled={saving}>
+              {saving && <Loader2 className='h-4 w-4 mr-2 animate-spin' />}
               {editingId ? 'Guardar cambios' : 'Crear programación'}
             </Button>
           </DialogFooter>

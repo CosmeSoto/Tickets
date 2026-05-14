@@ -304,16 +304,30 @@ export function createScheduleColumns({
     },
     {
       key: 'scheduledStart',
-      label: 'Inicio',
+      label: 'Horario',
       sortable: true,
-      render: (schedule: PatrolSchedule) => (
-        <span className='text-muted-foreground text-xs'>
-          {new Date(schedule.scheduledStart).toLocaleString('es-EC', {
-            dateStyle: 'short',
-            timeStyle: 'short',
-          })}
-        </span>
-      ),
+      render: (schedule: PatrolSchedule) => {
+        if (!schedule) return <span className='text-muted-foreground text-xs'>—</span>
+        const start = new Date(schedule.scheduledStart)
+        const end = new Date(schedule.scheduledEnd)
+        const diffMs = end.getTime() - start.getTime()
+        const diffH = Math.floor(diffMs / 3600000)
+        const diffM = Math.floor((diffMs % 3600000) / 60000)
+        // Para recurrencias, mostrar solo la hora; para NONE mostrar fecha+hora
+        const isRecurring = schedule.recurrence !== 'NONE'
+        const startLabel = isRecurring
+          ? start.toLocaleTimeString('es-EC', { timeStyle: 'short' })
+          : start.toLocaleString('es-EC', { dateStyle: 'short', timeStyle: 'short' })
+        const endLabel = end.toLocaleTimeString('es-EC', { timeStyle: 'short' })
+        const durLabel = diffH > 0 ? `${diffH}h${diffM > 0 ? `${diffM}m` : ''}` : `${diffM}min`
+        return (
+          <div className='text-xs'>
+            <span className='text-foreground font-medium'>{startLabel}</span>
+            <span className='text-muted-foreground'> → {endLabel}</span>
+            <span className='ml-1 text-muted-foreground'>({durLabel})</span>
+          </div>
+        )
+      },
     },
     {
       key: 'recurrence',

@@ -11,7 +11,6 @@ import {
   PowerOff,
   Trash2,
   Loader2,
-  RefreshCw,
   ChevronUp,
   ChevronDown,
   X,
@@ -523,16 +522,31 @@ export default function RoutesPage() {
               {/* Duración */}
               <div className='space-y-1.5'>
                 <Label className='text-sm'>
-                  Duración estimada (min) <span className='text-destructive'>*</span>
+                  Duración estimada <span className='text-destructive'>*</span>
                 </Label>
-                <Input
-                  type='number'
-                  min={1}
-                  max={1440}
-                  value={form.estimatedDurationMinutes}
-                  onChange={e => setForm(f => ({ ...f, estimatedDurationMinutes: e.target.value }))}
-                  disabled={saving}
-                />
+                <div className='flex items-center gap-2'>
+                  <Input
+                    type='number'
+                    min={1}
+                    max={1440}
+                    value={form.estimatedDurationMinutes}
+                    onChange={e =>
+                      setForm(f => ({ ...f, estimatedDurationMinutes: e.target.value }))
+                    }
+                    disabled={saving}
+                    className='h-9'
+                    placeholder='60'
+                  />
+                  <span className='text-sm text-muted-foreground whitespace-nowrap'>min</span>
+                </div>
+                {(() => {
+                  const mins = parseInt(form.estimatedDurationMinutes)
+                  if (!mins || mins <= 0) return null
+                  const h = Math.floor(mins / 60)
+                  const m = mins % 60
+                  const label = h > 0 ? `${h}h${m > 0 ? ` ${m}min` : ''}` : `${m}min`
+                  return <p className='text-xs text-muted-foreground'>≈ {label}</p>
+                })()}
               </div>
             </div>
 
