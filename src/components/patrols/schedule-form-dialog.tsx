@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, CalendarClock, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -35,7 +35,6 @@ interface ScheduleFormDialogProps {
   agents: Agent[]
   saving: boolean
   onSave: (form: FormData, editingId: string | null) => Promise<void>
-  onRouteChange: (routeId: string) => void
   onFamilyChange: (familyId: string) => void
 }
 
@@ -49,7 +48,6 @@ export function ScheduleFormDialog({
   agents,
   saving,
   onSave,
-  onRouteChange,
   onFamilyChange,
 }: ScheduleFormDialogProps) {
   const { toast } = useToast()
@@ -226,7 +224,6 @@ export function ScheduleFormDialog({
                   }
                   return updated
                 })
-                onRouteChange(v)
               }}
               disabled={saving || !form.familyId}
             >

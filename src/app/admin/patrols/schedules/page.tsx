@@ -146,38 +146,7 @@ export default function SchedulesPage() {
     fetchAgents()
   }, [session, status, router, fetchFamilies, fetchAgents])
 
-  const handleRouteChange = useCallback(
-    (routeId: string) => {
-      const selectedRoute = routes.find(r => r.id === routeId)
-      setInitialForm(prev => {
-        if (!prev) return prev
-        const updated = { ...prev, routeId }
-        if (selectedRoute?.estimatedDurationMinutes && prev.scheduledStart) {
-          const startDate = new Date(prev.scheduledStart)
-          if (!isNaN(startDate.getTime())) {
-            const endDate = new Date(
-              startDate.getTime() + selectedRoute.estimatedDurationMinutes * 60000
-            )
-            if (prev.recurrence === 'NONE') {
-              const y = endDate.getFullYear()
-              const mo = String(endDate.getMonth() + 1).padStart(2, '0')
-              const d = String(endDate.getDate()).padStart(2, '0')
-              const h = String(endDate.getHours()).padStart(2, '0')
-              const mi = String(endDate.getMinutes()).padStart(2, '0')
-              updated.scheduledEnd = `${y}-${mo}-${d}T${h}:${mi}`
-            } else {
-              const h = String(endDate.getHours()).padStart(2, '0')
-              const mi = String(endDate.getMinutes()).padStart(2, '0')
-              updated.endTimeOnly = `${h}:${mi}`
-            }
-          }
-        }
-        return updated
-      })
-    },
-    [routes]
-  )
-
+  // handleFamilyChange: notifica al padre para cargar rutas y agentes del área seleccionada
   const handleFamilyChange = useCallback(
     (familyId: string) => {
       if (familyId) {
@@ -468,7 +437,6 @@ export default function SchedulesPage() {
         agents={agents}
         saving={saving}
         onSave={handleSave}
-        onRouteChange={handleRouteChange}
         onFamilyChange={handleFamilyChange}
       />
 
