@@ -3,24 +3,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import {
-  Plus,
-  CalendarClock,
-  Pencil,
-  PowerOff,
-  Power,
-  Trash2,
-  Loader2,
-  RefreshCw,
-  User,
-  Clock,
-} from 'lucide-react'
+import { Plus, CalendarClock, Pencil, PowerOff, Power, Trash2, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,
@@ -78,7 +65,7 @@ interface PatrolRoute {
   name: string
 }
 
-interface Guard {
+interface Agent {
   id: string
   name: string
   email: string
@@ -86,6 +73,39 @@ interface Guard {
 }
 
 const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+
+/**
+ * Convierte un día local (0-6) a día UTC dado un datetime-local string.
+ * Necesario porque el scheduler usa getUTCDay() para calcular ocurrencias.
+ * Para horas 00:00-18:59 Ecuador (UTC-5), el día local = día UTC.
+ * Para horas 19:00-23:59 Ecuador, el día UTC es el día siguiente.
+ */
+function localDayToUTCDay(localDay: number, scheduledStartLocal: string): number {
+  if (!scheduledStartLocal) return localDay
+  // Crear una fecha con el día local seleccionado y la hora del scheduledStart
+  // para determinar si cruza medianoche UTC
+  const refDate = new Date(scheduledStartLocal)
+  if (isNaN(refDate.getTime())) return localDay
+  // Diferencia entre día UTC y día local del scheduledStart
+  const localDayOfRef = refDate.getDay()
+  const utcDayOfRef = refDate.getUTCDay()
+  const dayOffset = (utcDayOfRef - localDayOfRef + 7) % 7
+  return (localDay + dayOffset) % 7
+}
+
+/**
+ * Convierte un día UTC (0-6) a día local dado un datetime-local string.
+ * Usado al cargar un schedule existente para mostrar los días correctos al usuario.
+ */
+function utcDayToLocalDay(utcDay: number, scheduledStartLocal: string): number {
+  if (!scheduledStartLocal) return utcDay
+  const refDate = new Date(scheduledStartLocal)
+  if (isNaN(refDate.getTime())) return utcDay
+  const localDayOfRef = refDate.getDay()
+  const utcDayOfRef = refDate.getUTCDay()
+  const dayOffset = (utcDayOfRef - localDayOfRef + 7) % 7
+  return (utcDay - dayOffset + 7) % 7
+}
 
 interface FormData {
   familyId: string
@@ -196,9 +216,13 @@ export default function SchedulesPage() {
     }
   }, [])
 
-  const fetchAgents = useCallback(async () => {
+  const fetchAgents = useCallback(async (familyId?: string) => {
     try {
-      const res = await fetch('/api/users?patrolsEnabled=true&limit=100')
+      const params = new URLSearchParams()
+      params.append('patrolsEnabled', 'true')
+      params.append('limit', '100')
+      if (familyId) params.append('familyId', familyId)
+      const res = await fetch(`/api/users?${params.toString()}`)
       const data = await res.json()
       if (data.data) setAgents(data.data)
     } catch {
@@ -217,15 +241,23 @@ export default function SchedulesPage() {
   }, [session, status, router, fetchFamilies, fetchAgents])
 
   useEffect(() => {
-    if (form.familyId) fetchRoutesForFamily(form.familyId)
-  }, [form.familyId, fetchRoutesForFamily])
+    if (form.familyId) {
+      fetchRoutesForFamily(form.familyId)
+      fetchAgents(form.familyId)
+    } else {
+      fetchRoutesForFamily('')
+      fetchAgents()
+    }
+  }, [form.familyId, fetchRoutesForFamily, fetchAgents])
 
-  const toggleDay = (day: number) => {
+  const toggleDay = (localDay: number) => {
+    // Convertir el día local seleccionado a día UTC para guardarlo
+    const utcDay = localDayToUTCDay(localDay, form.scheduledStart)
     setForm(f => ({
       ...f,
-      recurrenceDays: f.recurrenceDays.includes(day)
-        ? f.recurrenceDays.filter(d => d !== day)
-        : [...f.recurrenceDays, day].sort((a, b) => a - b),
+      recurrenceDays: f.recurrenceDays.includes(utcDay)
+        ? f.recurrenceDays.filter(d => d !== utcDay)
+        : [...f.recurrenceDays, utcDay].sort((a, b) => a - b),
     }))
   }
 
@@ -259,8 +291,9 @@ export default function SchedulesPage() {
       recurrenceDays: schedule.recurrenceDays,
     })
 
-    // Cargar rutas para la familia
+    // Cargar rutas y agentes para la familia del schedule
     fetchRoutesForFamily(schedule.familyId)
+    fetchAgents(schedule.familyId)
     setDialogOpen(true)
   }
 
@@ -600,7 +633,8 @@ export default function SchedulesPage() {
             <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
               <div className='space-y-1.5'>
                 <Label className='text-sm'>
-                  Inicio <span className='text-destructive'>*</span>
+                  {form.recurrence === 'NONE' ? 'Inicio' : 'Hora de inicio'}{' '}
+                  <span className='text-destructive'>*</span>
                 </Label>
                 <Input
                   type='datetime-local'
@@ -608,10 +642,14 @@ export default function SchedulesPage() {
                   onChange={e => setForm(f => ({ ...f, scheduledStart: e.target.value }))}
                   disabled={saving}
                 />
+                {form.recurrence !== 'NONE' && (
+                  <p className='text-xs text-muted-foreground'>Hora a la que inicia cada ronda</p>
+                )}
               </div>
               <div className='space-y-1.5'>
                 <Label className='text-sm'>
-                  Fin <span className='text-destructive'>*</span>
+                  {form.recurrence === 'NONE' ? 'Fin' : 'Hora de fin'}{' '}
+                  <span className='text-destructive'>*</span>
                 </Label>
                 <Input
                   type='datetime-local'
@@ -619,8 +657,18 @@ export default function SchedulesPage() {
                   onChange={e => setForm(f => ({ ...f, scheduledEnd: e.target.value }))}
                   disabled={saving}
                 />
+                {form.recurrence !== 'NONE' && (
+                  <p className='text-xs text-muted-foreground'>Hora a la que termina cada ronda</p>
+                )}
               </div>
             </div>
+
+            {form.recurrence !== 'NONE' && (
+              <div className='p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-400'>
+                Con recurrencia activa, se generarán rondas automáticamente para los próximos 30
+                días usando la hora de inicio y fin configuradas.
+              </div>
+            )}
 
             {/* Recurrencia */}
             <div className='space-y-1.5'>
@@ -652,21 +700,26 @@ export default function SchedulesPage() {
                   Días de la semana <span className='text-destructive'>*</span>
                 </Label>
                 <div className='flex gap-1.5 flex-wrap'>
-                  {DAY_LABELS.map((label, i) => (
-                    <button
-                      key={i}
-                      type='button'
-                      onClick={() => toggleDay(i)}
-                      className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
-                        form.recurrenceDays.includes(i)
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'border-border text-muted-foreground hover:bg-muted'
-                      }`}
-                      disabled={saving}
-                    >
-                      {label}
-                    </button>
-                  ))}
+                  {DAY_LABELS.map((label, localDay) => {
+                    // Convertir día local a UTC para comparar con recurrenceDays guardados
+                    const utcDay = localDayToUTCDay(localDay, form.scheduledStart)
+                    const isSelected = form.recurrenceDays.includes(utcDay)
+                    return (
+                      <button
+                        key={localDay}
+                        type='button'
+                        onClick={() => toggleDay(localDay)}
+                        className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
+                          isSelected
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'border-border text-muted-foreground hover:bg-muted'
+                        }`}
+                        disabled={saving}
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
             )}

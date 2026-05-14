@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
         where,
         skip: (page - 1) * limit,
         take: limit,
-        orderBy: { scheduledStart: 'desc' },
+        orderBy: { scheduledStart: 'asc' },
         select: {
           id: true,
           status: true,

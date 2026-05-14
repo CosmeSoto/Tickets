@@ -183,7 +183,9 @@ export function createRouteColumns({
       render: (route: any) => (
         <div>
           <p className='font-medium'>{route.name}</p>
-          {route.routeCheckpoints.some(rc => !rc.checkpoint.isActive) && (
+          {route.routeCheckpoints.some(
+            (rc: { checkpoint: { isActive: boolean } }) => !rc.checkpoint.isActive
+          ) && (
             <div className='flex items-center gap-1 text-xs text-orange-600 dark:text-orange-400 mt-0.5'>
               <AlertTriangle className='h-3 w-3' />
               Checkpoints inactivos

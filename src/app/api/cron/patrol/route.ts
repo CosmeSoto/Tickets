@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Mantenimiento completado: ${result.patrolsMissed} patrullas marcadas MISSED, ${result.photosDeleted} fotos eliminadas`,
+      message: `Mantenimiento completado: ${result.patrolsMissed} patrullas marcadas MISSED, ${result.patrolsGenerated} patrullas generadas, ${result.photosDeleted} fotos eliminadas`,
       data: result,
       timestamp: result.timestamp,
     })

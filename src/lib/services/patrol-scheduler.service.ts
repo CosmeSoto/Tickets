@@ -64,6 +64,14 @@ export class PatrolSchedulerService {
 
   /**
    * Calcula las fechas de ocurrencia para un schedule dentro del horizonte.
+   *
+   * Toda la aritmética de fechas usa métodos UTC explícitos para garantizar
+   * comportamiento correcto independientemente del timezone del servidor.
+   *
+   * Para recurrencia NONE: scheduledStart/End son la fecha exacta de la patrulla.
+   * Para DAILY/WEEKLY/CUSTOM: scheduledStart define la hora de inicio de cada patrulla,
+   *   scheduledEnd define la hora de fin de cada patrulla (la duración).
+   *   El límite de generación es el horizonte de días (no scheduledEnd).
    */
   private static calculateOccurrences(
     schedule: {
@@ -75,55 +83,62 @@ export class PatrolSchedulerService {
     horizonDays: number
   ): Array<{ start: Date; end: Date }> {
     const occurrences: Array<{ start: Date; end: Date }> = []
-    const horizonEnd = new Date()
-    horizonEnd.setDate(horizonEnd.getDate() + horizonDays)
 
+    // Horizonte: ahora + horizonDays días (en UTC)
+    const horizonEnd = new Date()
+    horizonEnd.setUTCDate(horizonEnd.getUTCDate() + horizonDays)
+    horizonEnd.setUTCHours(23, 59, 59, 999)
+
+    // Duración de cada patrulla individual
     const durationMs = schedule.scheduledEnd.getTime() - schedule.scheduledStart.getTime()
+
+    // Hora y minutos UTC del scheduledStart (se aplican a cada ocurrencia)
+    const startUTCHours = schedule.scheduledStart.getUTCHours()
+    const startUTCMinutes = schedule.scheduledStart.getUTCMinutes()
 
     switch (schedule.recurrence) {
       case PatrolRecurrence.NONE: {
-        // Una sola ocurrencia
-        if (schedule.scheduledStart <= horizonEnd) {
-          occurrences.push({
-            start: schedule.scheduledStart,
-            end: schedule.scheduledEnd,
-          })
-        }
+        // Una sola ocurrencia — usar las fechas exactas del schedule
+        occurrences.push({
+          start: new Date(schedule.scheduledStart),
+          end: new Date(schedule.scheduledEnd),
+        })
         break
       }
 
       case PatrolRecurrence.DAILY: {
-        // Una ocurrencia por día desde scheduledStart hasta el horizonte
+        // Una ocurrencia por día desde scheduledStart hasta el horizonte.
+        // Usamos UTC para avanzar el cursor día a día sin drift de DST.
         const cursor = new Date(schedule.scheduledStart)
+
         while (cursor <= horizonEnd) {
           occurrences.push({
             start: new Date(cursor),
             end: new Date(cursor.getTime() + durationMs),
           })
-          cursor.setDate(cursor.getDate() + 1)
+          cursor.setUTCDate(cursor.getUTCDate() + 1)
         }
         break
       }
 
       case PatrolRecurrence.WEEKLY:
       case PatrolRecurrence.CUSTOM: {
-        // Ocurrencias en los días de la semana especificados en recurrenceDays
-        // 0 = Domingo, 1 = Lunes, ..., 6 = Sábado
+        // Ocurrencias en los días UTC de la semana especificados en recurrenceDays.
+        // recurrenceDays usa getUTCDay(): 0=Dom, 1=Lun, ..., 6=Sáb (en UTC).
         const days = new Set(schedule.recurrenceDays)
         if (days.size === 0) break
 
+        // Empezar desde el inicio del día UTC del scheduledStart
         const cursor = new Date(schedule.scheduledStart)
-        // Retroceder al inicio de la semana del scheduledStart para no perder días
+        cursor.setUTCHours(0, 0, 0, 0)
+
         while (cursor <= horizonEnd) {
-          if (days.has(cursor.getDay())) {
-            // Mantener la hora del scheduledStart original
+          if (days.has(cursor.getUTCDay())) {
+            // Aplicar la hora UTC del scheduledStart original al día actual
             const start = new Date(cursor)
-            start.setHours(
-              schedule.scheduledStart.getHours(),
-              schedule.scheduledStart.getMinutes(),
-              schedule.scheduledStart.getSeconds(),
-              0
-            )
+            start.setUTCHours(startUTCHours, startUTCMinutes, 0, 0)
+
+            // Solo incluir si la fecha de inicio es >= scheduledStart original
             if (start >= schedule.scheduledStart && start <= horizonEnd) {
               occurrences.push({
                 start,
@@ -131,13 +146,47 @@ export class PatrolSchedulerService {
               })
             }
           }
-          cursor.setDate(cursor.getDate() + 1)
+          cursor.setUTCDate(cursor.getUTCDate() + 1)
         }
         break
       }
     }
 
     return occurrences
+  }
+
+  // ── Regeneración periódica de patrullas ────────────────────────────────────
+
+  /**
+   * Regenera patrullas futuras para todos los schedules activos con recurrencia.
+   * Diseñado para ejecutarse como cron job nocturno.
+   * Usa skipDuplicates para ser idempotente — no crea duplicados.
+   *
+   * @returns Número total de patrullas nuevas generadas
+   */
+  static async regenerateActiveSchedules(): Promise<number> {
+    const activeSchedules = await prisma.patrol_schedules.findMany({
+      where: {
+        isActive: true,
+        recurrence: { not: 'NONE' },
+      },
+      select: { id: true },
+    })
+
+    let totalGenerated = 0
+    for (const schedule of activeSchedules) {
+      try {
+        const count = await this.generatePatrols(schedule.id, 30)
+        totalGenerated += count
+      } catch (err) {
+        console.error(`[PatrolSchedulerService] Error regenerando schedule ${schedule.id}:`, err)
+      }
+    }
+
+    console.log(
+      `[PatrolSchedulerService] ${totalGenerated} patrullas generadas para ${activeSchedules.length} schedules activos`
+    )
+    return totalGenerated
   }
 
   // ── Detección de patrullas perdidas ─────────────────────────────────────────

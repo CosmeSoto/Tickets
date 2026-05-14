@@ -96,7 +96,7 @@ export default function PatrolReportsPage() {
     return groupBy === 'agent' ? agentRows : routeRows
   }, [groupBy, agentRows, routeRows])
 
-  const pagination = usePagination(activeRows, { pageSize: 20 })
+  const pagination = usePagination(activeRows as any[], { pageSize: 20 })
 
   const agentExport = useExport({
     filename: 'cumplimiento-personal',
@@ -337,8 +337,8 @@ export default function PatrolReportsPage() {
       <DataTable
         title={groupBy === 'agent' ? 'Cumplimiento por Personal' : 'Cumplimiento por Ruta'}
         description={`Resultados del período: ${new Date(from).toLocaleDateString('es-EC')} - ${new Date(to).toLocaleDateString('es-EC')}`}
-        data={activeRows}
-        columns={columns}
+        data={activeRows as any[]}
+        columns={columns as any}
         loading={loading}
         pagination={paginationConfig}
         onRefresh={fetchReport}

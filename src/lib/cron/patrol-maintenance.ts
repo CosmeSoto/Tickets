@@ -10,6 +10,7 @@ export interface PatrolMaintenanceResult {
   photosDeleted: number
   photoErrors: number
   patrolsMissed: number
+  patrolsGenerated: number
   timestamp: string
 }
 
@@ -22,6 +23,7 @@ export async function runPatrolMaintenanceJobs(): Promise<PatrolMaintenanceResul
   let photosDeleted = 0
   let photoErrors = 0
   let patrolsMissed = 0
+  let patrolsGenerated = 0
 
   // 1. Retención de fotos
   try {
@@ -39,5 +41,12 @@ export async function runPatrolMaintenanceJobs(): Promise<PatrolMaintenanceResul
     console.error('[patrol-maintenance] Error en job de detección de patrullas perdidas:', err)
   }
 
-  return { photosDeleted, photoErrors, patrolsMissed, timestamp }
+  // 3. Regeneración de patrullas futuras para schedules activos con recurrencia
+  try {
+    patrolsGenerated = await PatrolSchedulerService.regenerateActiveSchedules()
+  } catch (err) {
+    console.error('[patrol-maintenance] Error en job de regeneración de patrullas:', err)
+  }
+
+  return { photosDeleted, photoErrors, patrolsMissed, patrolsGenerated, timestamp }
 }

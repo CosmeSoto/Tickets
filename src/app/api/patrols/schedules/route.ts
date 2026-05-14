@@ -146,11 +146,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'La ruta está desactivada' }, { status: 422 })
     }
 
-    // Verificar solapamiento de patrullas para el mismo agente/familia
+    // Verificar solapamiento de patrullas para el mismo agente en el mismo horario
+    // Para recurrencias, solo verificamos la primera ocurrencia (el día de inicio)
     const overlap = await prisma.patrols.findFirst({
       where: {
         agentId: data.agentId,
-        familyId: data.familyId,
         status: { in: ['PENDING', 'IN_PROGRESS'] },
         scheduledStart: { lt: end },
         scheduledEnd: { gt: start },

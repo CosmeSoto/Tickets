@@ -2457,6 +2457,7 @@ model patrols {
   @@index([familyId, scheduledStart])
   @@index([status, scheduledStart])
   @@index([scheduleId, status])
+  @@unique([scheduleId, scheduledStart], name: "patrol_schedule_start_unique")
   @@map("patrols")
 }
 

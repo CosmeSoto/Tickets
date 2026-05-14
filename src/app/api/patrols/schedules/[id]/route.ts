@@ -11,6 +11,7 @@ import { z } from 'zod'
 import prisma from '@/lib/prisma'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
 import { checkPatrolFamilyAccess, canDeletePatrolResource } from '@/lib/patrol/patrol-access'
+import { PatrolSchedulerService } from '@/lib/services/patrol-scheduler.service'
 
 const patchScheduleSchema = z.object({
   familyId: z.string().uuid().optional(),
@@ -170,19 +171,44 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       data: updateData,
     })
 
+    // Si cambiaron datos que afectan las patrullas futuras (hora, días, agente, ruta),
+    // cancelar las patrullas PENDING futuras y regenerarlas con los nuevos datos
+    const affectsPatrols =
+      updateData.scheduledStart !== undefined ||
+      updateData.scheduledEnd !== undefined ||
+      updateData.recurrenceDays !== undefined ||
+      updateData.recurrence !== undefined ||
+      updateData.agentId !== undefined ||
+      updateData.routeId !== undefined
+
+    let regeneratedCount = 0
+    if (affectsPatrols && updated.isActive) {
+      // Cancelar patrullas PENDING futuras de este schedule
+      await prisma.patrols.deleteMany({
+        where: {
+          scheduleId: id,
+          status: 'PENDING',
+          scheduledStart: { gt: new Date() },
+        },
+      })
+      // Regenerar con los nuevos datos
+      regeneratedCount = await PatrolSchedulerService.generatePatrols(id, 30)
+    }
+
     await AuditServiceComplete.log({
       action: 'PATROL_SCHEDULE_UPDATED',
       entityType: 'patrol',
       entityId: id,
       userId: session.user.id,
       oldValues: existing,
-      newValues: data,
+      newValues: { ...data, regeneratedPatrols: regeneratedCount },
       request,
     })
 
     return NextResponse.json({
       success: true,
       data: updated,
+      regeneratedPatrols: regeneratedCount,
     })
   } catch (error) {
     console.error('[patrol/schedules/[id]] PATCH:', error)
@@ -250,20 +276,43 @@ export async function DELETE(
     }
 
     if (isPermanent) {
-      // Verificar si la programación tiene patrullas asociadas
-      const patrolCount = await prisma.patrols.count({
-        where: { scheduleId: id },
-      })
-      if (patrolCount > 0) {
-        return NextResponse.json(
-          { error: 'No se puede eliminar la programación porque tiene patrullas asociadas' },
-          { status: 409 }
-        )
-      }
+      // Primero borramos todas las patrullas asociadas (con sus check-ins y fotos)
+      await prisma.$transaction(async tx => {
+        // 1. Primero obtenemos los IDs de las patrullas para este schedule
+        const patrolIds = (
+          await tx.patrols.findMany({
+            where: { scheduleId: id },
+            select: { id: true },
+          })
+        ).map(p => p.id)
 
-      // Hard delete: eliminar permanentemente de la BD
-      await prisma.patrol_schedules.delete({
-        where: { id },
+        if (patrolIds.length > 0) {
+          // 2. Desasignamos las fotos de las patrullas para evitar restricciones
+          await tx.patrols.updateMany({
+            where: { scheduleId: id },
+            data: { startPhotoId: null, endPhotoId: null },
+          })
+
+          // 3. Borramos check-ins
+          await tx.patrol_check_ins.deleteMany({
+            where: { patrolId: { in: patrolIds } },
+          })
+
+          // 4. Borramos fotos
+          await tx.patrol_photos.deleteMany({
+            where: { patrolId: { in: patrolIds } },
+          })
+
+          // 5. Borramos patrullas
+          await tx.patrols.deleteMany({
+            where: { id: { in: patrolIds } },
+          })
+        }
+
+        // 6. Borramos la programación
+        await tx.patrol_schedules.delete({
+          where: { id },
+        })
       })
 
       await AuditServiceComplete.log({
@@ -291,6 +340,9 @@ export async function DELETE(
     }
   } catch (error) {
     console.error('[patrol/schedules/[id]] DELETE:', error)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Error interno del servidor' },
+      { status: 500 }
+    )
   }
 }
