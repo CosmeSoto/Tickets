@@ -208,9 +208,13 @@ export function createRouteColumns({
       key: 'estimatedDurationMinutes',
       label: 'Duración Est.',
       sortable: true,
-      render: (route: PatrolRoute) => (
-        <span className='text-muted-foreground'>{route.estimatedDurationMinutes} min</span>
-      ),
+      render: (route: PatrolRoute) => {
+        const mins = route.estimatedDurationMinutes
+        const h = Math.floor(mins / 60)
+        const m = mins % 60
+        const label = h > 0 ? `${h}h${m > 0 ? ` ${m}min` : ''}` : `${m}min`
+        return <span className='text-muted-foreground text-sm'>{label}</span>
+      },
     },
     {
       key: '_count.routeCheckpoints',

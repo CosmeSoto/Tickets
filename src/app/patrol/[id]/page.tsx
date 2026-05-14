@@ -325,11 +325,30 @@ export default function PatrolExecutionPage() {
       <div className='p-4 space-y-4 max-w-2xl mx-auto'>
         {/* Progreso */}
         <Card>
-          <CardContent className='pt-4'>
+          <CardContent className='pt-4 space-y-3'>
             <PatrolProgress
               visitedRequired={patrol.progress.visitedRequired}
               totalRequired={patrol.progress.totalRequired}
             />
+            {/* Resumen de tiempo de la ronda */}
+            {patrol.route.estimatedDurationMinutes > 0 && (
+              <div className='flex items-center justify-between text-xs text-muted-foreground border-t pt-2'>
+                <span className='flex items-center gap-1'>
+                  ⏱ Duración estimada:{' '}
+                  <span className='font-medium text-foreground ml-1'>
+                    {patrol.route.estimatedDurationMinutes >= 60
+                      ? `${Math.floor(patrol.route.estimatedDurationMinutes / 60)}h${patrol.route.estimatedDurationMinutes % 60 > 0 ? ` ${patrol.route.estimatedDurationMinutes % 60}min` : ''}`
+                      : `${patrol.route.estimatedDurationMinutes}min`}
+                  </span>
+                </span>
+                {checkpoints.length > 0 && (
+                  <span>
+                    ~{Math.round(patrol.route.estimatedDurationMinutes / checkpoints.length)}{' '}
+                    min/checkpoint
+                  </span>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -484,6 +503,7 @@ export default function PatrolExecutionPage() {
               }))}
               visitedIds={visitedIds}
               currentCheckpointId={nextCheckpoint?.checkpoint.id}
+              estimatedDurationMinutes={patrol.route.estimatedDurationMinutes}
               onCheckpointClick={isInProgress ? () => setScannerActive(true) : undefined}
             />
           </CardContent>

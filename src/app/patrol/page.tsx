@@ -159,9 +159,19 @@ export default function PatrolListPage() {
                     </div>
                     <PatrolStatusBadge status={patrol.status} />
                   </div>
-                  <div className='flex items-center gap-1.5 text-xs text-muted-foreground'>
-                    <Clock className='h-3 w-3' />
-                    {formatDate(patrol.scheduledStart)}
+                  <div className='flex items-center gap-3 text-xs text-muted-foreground'>
+                    <span className='flex items-center gap-1'>
+                      <Clock className='h-3 w-3' />
+                      {formatDate(patrol.scheduledStart)}
+                    </span>
+                    {patrol.route.estimatedDurationMinutes > 0 && (
+                      <span className='flex items-center gap-1'>
+                        ⏱{' '}
+                        {patrol.route.estimatedDurationMinutes >= 60
+                          ? `${Math.floor(patrol.route.estimatedDurationMinutes / 60)}h${patrol.route.estimatedDurationMinutes % 60 > 0 ? ` ${patrol.route.estimatedDurationMinutes % 60}min` : ''}`
+                          : `${patrol.route.estimatedDurationMinutes}min`}
+                      </span>
+                    )}
                   </div>
                   {patrol.status === 'IN_PROGRESS' && patrol.progress && (
                     <PatrolProgress
@@ -184,6 +194,9 @@ export default function PatrolListPage() {
                     Área
                   </th>
                   <th className='text-left px-4 py-3 font-medium text-muted-foreground'>Inicio</th>
+                  <th className='text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell'>
+                    Duración
+                  </th>
                   <th className='text-left px-4 py-3 font-medium text-muted-foreground'>Estado</th>
                   <th className='text-left px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell'>
                     Progreso
@@ -204,6 +217,13 @@ export default function PatrolListPage() {
                     </td>
                     <td className='px-4 py-3 text-muted-foreground'>
                       {formatDate(patrol.scheduledStart)}
+                    </td>
+                    <td className='px-4 py-3 text-muted-foreground text-sm hidden md:table-cell'>
+                      {patrol.route.estimatedDurationMinutes > 0
+                        ? patrol.route.estimatedDurationMinutes >= 60
+                          ? `${Math.floor(patrol.route.estimatedDurationMinutes / 60)}h${patrol.route.estimatedDurationMinutes % 60 > 0 ? ` ${patrol.route.estimatedDurationMinutes % 60}min` : ''}`
+                          : `${patrol.route.estimatedDurationMinutes}min`
+                        : '—'}
                     </td>
                     <td className='px-4 py-3'>
                       <PatrolStatusBadge status={patrol.status} />

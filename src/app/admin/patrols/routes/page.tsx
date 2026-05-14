@@ -544,8 +544,21 @@ export default function RoutesPage() {
                   if (!mins || mins <= 0) return null
                   const h = Math.floor(mins / 60)
                   const m = mins % 60
-                  const label = h > 0 ? `${h}h${m > 0 ? ` ${m}min` : ''}` : `${m}min`
-                  return <p className='text-xs text-muted-foreground'>≈ {label}</p>
+                  const totalLabel = h > 0 ? `${h}h${m > 0 ? ` ${m}min` : ''}` : `${m}min`
+                  const cpCount = routeCheckpoints.length
+                  const perCp = cpCount > 0 ? Math.round(mins / cpCount) : null
+                  return (
+                    <div className='space-y-0.5'>
+                      <p className='text-xs text-muted-foreground'>≈ {totalLabel} total</p>
+                      {perCp !== null && (
+                        <p className='text-xs text-muted-foreground'>
+                          ≈ <span className='font-medium text-foreground'>{perCp} min</span> por
+                          checkpoint
+                          <span className='text-muted-foreground'> ({cpCount} checkpoints)</span>
+                        </p>
+                      )}
+                    </div>
+                  )
                 })()}
               </div>
             </div>
