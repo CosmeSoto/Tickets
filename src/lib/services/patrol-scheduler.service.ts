@@ -90,7 +90,24 @@ export class PatrolSchedulerService {
     horizonEnd.setUTCHours(23, 59, 59, 999)
 
     // Duración de cada patrulla individual
-    const durationMs = schedule.scheduledEnd.getTime() - schedule.scheduledStart.getTime()
+    // Para recurrencias, normalizar scheduledEnd al mismo día UTC que scheduledStart
+    // para evitar duraciones > 24h por errores del formulario anterior
+    let durationMs = schedule.scheduledEnd.getTime() - schedule.scheduledStart.getTime()
+    if (schedule.recurrence !== PatrolRecurrence.NONE && durationMs > 24 * 60 * 60 * 1000) {
+      // scheduledEnd tiene fecha incorrecta — recalcular usando solo la hora UTC
+      const correctedEnd = new Date(schedule.scheduledStart)
+      correctedEnd.setUTCHours(
+        schedule.scheduledEnd.getUTCHours(),
+        schedule.scheduledEnd.getUTCMinutes(),
+        0,
+        0
+      )
+      // Si la hora de fin es anterior o igual a la de inicio, es del día siguiente
+      if (correctedEnd <= schedule.scheduledStart) {
+        correctedEnd.setUTCDate(correctedEnd.getUTCDate() + 1)
+      }
+      durationMs = correctedEnd.getTime() - schedule.scheduledStart.getTime()
+    }
 
     // Hora y minutos UTC del scheduledStart (se aplican a cada ocurrencia)
     const startUTCHours = schedule.scheduledStart.getUTCHours()

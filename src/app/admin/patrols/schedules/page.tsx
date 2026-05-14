@@ -118,8 +118,9 @@ interface FormData {
   familyId: string
   routeId: string
   agentId: string
-  scheduledStart: string
-  scheduledEnd: string
+  scheduledStart: string // datetime-local: fecha + hora de inicio
+  scheduledEnd: string // datetime-local para NONE; solo se usa la hora para recurrencias
+  endTimeOnly: string // time (HH:MM) — hora de fin para recurrencias DAILY/WEEKLY/CUSTOM
   recurrence: 'NONE' | 'DAILY' | 'WEEKLY' | 'CUSTOM'
   recurrenceDays: number[]
 }
@@ -130,6 +131,7 @@ const EMPTY_FORM: FormData = {
   agentId: '',
   scheduledStart: '',
   scheduledEnd: '',
+  endTimeOnly: '',
   recurrence: 'NONE',
   recurrenceDays: [],
 }
@@ -277,7 +279,7 @@ export default function SchedulesPage() {
   const openEdit = (schedule: PatrolSchedule) => {
     setEditingId(schedule.id)
 
-    // Formatear fechas para datetime-local
+    // Formatear fechas para datetime-local (usa hora local del cliente)
     const formatDateTimeLocal = (iso: string) => {
       const date = new Date(iso)
       const year = date.getFullYear()
@@ -288,12 +290,19 @@ export default function SchedulesPage() {
       return `${year}-${month}-${day}T${hours}:${minutes}`
     }
 
+    // Para recurrencias, extraer solo la hora de fin del scheduledEnd
+    // El scheduledEnd en DB puede tener fecha incorrecta si fue creado con bug anterior
+    // Usamos solo HH:MM del scheduledEnd para el campo endTimeOnly
+    const endDate = new Date(schedule.scheduledEnd)
+    const endTimeOnly = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`
+
     setForm({
       familyId: schedule.familyId,
       routeId: schedule.routeId,
       agentId: schedule.agentId,
       scheduledStart: formatDateTimeLocal(schedule.scheduledStart),
       scheduledEnd: formatDateTimeLocal(schedule.scheduledEnd),
+      endTimeOnly,
       recurrence: schedule.recurrence as any,
       recurrenceDays: schedule.recurrenceDays,
     })
@@ -305,12 +314,15 @@ export default function SchedulesPage() {
   }
 
   const handleSave = async () => {
+    const isRecurring = form.recurrence !== 'NONE'
+
     if (
       !form.familyId ||
       !form.routeId ||
       !form.agentId ||
       !form.scheduledStart ||
-      !form.scheduledEnd
+      (!isRecurring && !form.scheduledEnd) ||
+      (isRecurring && !form.endTimeOnly)
     ) {
       toast({
         title: 'Campos requeridos',
@@ -319,7 +331,30 @@ export default function SchedulesPage() {
       })
       return
     }
-    if (new Date(form.scheduledEnd) <= new Date(form.scheduledStart)) {
+
+    // Construir scheduledEnd correcto según el tipo de recurrencia
+    let scheduledEndISO: string
+    if (isRecurring) {
+      // Para recurrencias: el fin es el mismo día que el inicio, con la hora de endTimeOnly
+      // Esto garantiza que durationMs sea siempre < 24h
+      const startDate = new Date(form.scheduledStart)
+      const [endHour, endMin] = form.endTimeOnly.split(':').map(Number)
+      const endDate = new Date(startDate)
+      endDate.setHours(endHour, endMin, 0, 0)
+
+      // Si la hora de fin es anterior o igual a la de inicio, es del día siguiente
+      // (ej: ronda nocturna 23:00 - 01:00)
+      if (endDate <= startDate) {
+        endDate.setDate(endDate.getDate() + 1)
+      }
+      scheduledEndISO = endDate.toISOString()
+    } else {
+      scheduledEndISO = new Date(form.scheduledEnd).toISOString()
+    }
+
+    const startISO = new Date(form.scheduledStart).toISOString()
+
+    if (new Date(scheduledEndISO) <= new Date(startISO)) {
       toast({
         title: 'Horario inválido',
         description: 'La hora de fin debe ser posterior a la de inicio',
@@ -328,7 +363,7 @@ export default function SchedulesPage() {
       return
     }
 
-    if (form.recurrence === 'WEEKLY' || form.recurrence === 'CUSTOM') {
+    if (isRecurring && (form.recurrence === 'WEEKLY' || form.recurrence === 'CUSTOM')) {
       if (!Array.isArray(form.recurrenceDays) || form.recurrenceDays.length === 0) {
         toast({
           title: 'Días requeridos',
@@ -345,8 +380,8 @@ export default function SchedulesPage() {
         familyId: form.familyId,
         routeId: form.routeId,
         agentId: form.agentId,
-        scheduledStart: new Date(form.scheduledStart).toISOString(),
-        scheduledEnd: new Date(form.scheduledEnd).toISOString(),
+        scheduledStart: startISO,
+        scheduledEnd: scheduledEndISO,
         recurrence: form.recurrence,
         recurrenceDays: form.recurrenceDays,
       }
@@ -647,46 +682,74 @@ export default function SchedulesPage() {
               )}
             </div>
 
-            {/* Fechas */}
-            <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-              <div className='space-y-2'>
-                <Label className='text-base font-medium'>
-                  {form.recurrence === 'NONE' ? 'Inicio' : 'Hora de inicio'}{' '}
-                  <span className='text-destructive'>*</span>
-                </Label>
-                <Input
-                  type='datetime-local'
-                  value={form.scheduledStart}
-                  onChange={e => setForm(f => ({ ...f, scheduledStart: e.target.value }))}
-                  disabled={saving}
-                  className='h-11'
-                />
-                {form.recurrence !== 'NONE' && (
-                  <p className='text-sm text-muted-foreground'>Hora a la que inicia cada ronda</p>
-                )}
+            {/* Fechas — comportamiento diferente según recurrencia */}
+            {form.recurrence === 'NONE' ? (
+              /* Sin recurrencia: fecha + hora completa para inicio y fin */
+              <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+                <div className='space-y-2'>
+                  <Label className='text-base font-medium'>
+                    Inicio <span className='text-destructive'>*</span>
+                  </Label>
+                  <Input
+                    type='datetime-local'
+                    value={form.scheduledStart}
+                    onChange={e => setForm(f => ({ ...f, scheduledStart: e.target.value }))}
+                    disabled={saving}
+                    className='h-11'
+                  />
+                </div>
+                <div className='space-y-2'>
+                  <Label className='text-base font-medium'>
+                    Fin <span className='text-destructive'>*</span>
+                  </Label>
+                  <Input
+                    type='datetime-local'
+                    value={form.scheduledEnd}
+                    onChange={e => setForm(f => ({ ...f, scheduledEnd: e.target.value }))}
+                    disabled={saving}
+                    className='h-11'
+                  />
+                </div>
               </div>
-              <div className='space-y-2'>
-                <Label className='text-base font-medium'>
-                  {form.recurrence === 'NONE' ? 'Fin' : 'Hora de fin'}{' '}
-                  <span className='text-destructive'>*</span>
-                </Label>
-                <Input
-                  type='datetime-local'
-                  value={form.scheduledEnd}
-                  onChange={e => setForm(f => ({ ...f, scheduledEnd: e.target.value }))}
-                  disabled={saving}
-                  className='h-11'
-                />
-                {form.recurrence !== 'NONE' && (
-                  <p className='text-sm text-muted-foreground'>Hora a la que termina cada ronda</p>
-                )}
-              </div>
-            </div>
-
-            {form.recurrence !== 'NONE' && (
-              <div className='p-4 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-sm text-blue-700 dark:text-blue-300'>
-                Con recurrencia activa, se generarán rondas automáticamente para los próximos 30
-                días usando la hora de inicio y fin configuradas.
+            ) : (
+              /* Con recurrencia: fecha de inicio + solo hora de fin (mismo día) */
+              <div className='space-y-4'>
+                <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+                  <div className='space-y-2'>
+                    <Label className='text-base font-medium'>
+                      Fecha y hora de inicio <span className='text-destructive'>*</span>
+                    </Label>
+                    <Input
+                      type='datetime-local'
+                      value={form.scheduledStart}
+                      onChange={e => setForm(f => ({ ...f, scheduledStart: e.target.value }))}
+                      disabled={saving}
+                      className='h-11'
+                    />
+                    <p className='text-sm text-muted-foreground'>
+                      Primera fecha y hora de inicio de la ronda
+                    </p>
+                  </div>
+                  <div className='space-y-2'>
+                    <Label className='text-base font-medium'>
+                      Hora de fin <span className='text-destructive'>*</span>
+                    </Label>
+                    <Input
+                      type='time'
+                      value={form.endTimeOnly}
+                      onChange={e => setForm(f => ({ ...f, endTimeOnly: e.target.value }))}
+                      disabled={saving}
+                      className='h-11'
+                    />
+                    <p className='text-sm text-muted-foreground'>
+                      Hora a la que termina cada ronda
+                    </p>
+                  </div>
+                </div>
+                <div className='p-4 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-sm text-blue-700 dark:text-blue-300'>
+                  Se generarán rondas automáticamente para los próximos 30 días con el horario
+                  configurado.
+                </div>
               </div>
             )}
 
