@@ -1,6 +1,10 @@
 #!/bin/sh
 set -e
 
+# Imagen standalone: no hay `prisma` en PATH ni npx resuelve el CLI.
+PRISMA_CLI='node ./node_modules/prisma/build/index.js'
+TSX_CLI='node ./node_modules/tsx/dist/cli.mjs'
+
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  Sistema de Tickets — Iniciando..."
 echo "  NODE_ENV: ${NODE_ENV}"
@@ -10,12 +14,12 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 # ── 1. Migraciones de base de datos ──────────────────────────────────────────
 # migrate deploy aplica solo las migraciones pendientes — idempotente y seguro.
 echo "==> Ejecutando migraciones..."
-npx prisma migrate deploy
+$PRISMA_CLI migrate deploy
 echo "==> Migraciones completadas."
 
 # ── 2. Seed inicial (solo si la tabla de usuarios está vacía) ─────────────────
 # Evita re-seedear en cada reinicio del contenedor.
-USER_COUNT=$(npx prisma db execute --stdin <<'SQL' 2>/dev/null || echo "0"
+USER_COUNT=$($PRISMA_CLI db execute --stdin <<'SQL' 2>/dev/null || echo "0"
 SELECT COUNT(*)::text FROM users;
 SQL
 )
@@ -23,7 +27,7 @@ USER_COUNT=$(echo "$USER_COUNT" | tr -d '[:space:]' | tail -1)
 
 if [ "$USER_COUNT" = "0" ] || [ -z "$USER_COUNT" ]; then
   echo "==> Base de datos vacía — ejecutando seed inicial..."
-  npm run db:seed
+  $TSX_CLI prisma/seed.ts
   echo "==> Seed completado."
 else
   echo "==> Base de datos ya tiene datos (${USER_COUNT} usuarios) — omitiendo seed."

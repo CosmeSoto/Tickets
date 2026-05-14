@@ -109,6 +109,11 @@ ORDER BY "order";
 ```bash
 docker compose -f docker-compose.dev.yml down
 docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml logs -f app
+
+docker compose -f docker-compose.prod.yml exec postgres \
+  psql -U tickets_user -d tickets_db -c \
+  "UPDATE system_modules SET \"isActive\" = false WHERE key = 'in
 ```
 
 ## ✅ Resultado Esperado

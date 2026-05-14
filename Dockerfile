@@ -66,12 +66,14 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modul
 COPY --chown=nextjs:nodejs docker/migrate-data.sh ./docker/migrate-data.sh
 RUN chmod +x ./docker/migrate-data.sh
 
-# Herramientas para seed (tsx + bcryptjs)
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/tsx        ./node_modules/tsx
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/bcryptjs   ./node_modules/bcryptjs
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.bin/tsx   ./node_modules/.bin/tsx
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/esbuild    ./node_modules/esbuild
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@esbuild   ./node_modules/@esbuild
+# Herramientas para seed (tsx + dependencias mínimas del CLI)
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/tsx              ./node_modules/tsx
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/bcryptjs         ./node_modules/bcryptjs
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.bin/tsx          ./node_modules/.bin/tsx
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/esbuild          ./node_modules/esbuild
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@esbuild          ./node_modules/@esbuild
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/get-tsconfig      ./node_modules/get-tsconfig
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/resolve-pkg-maps ./node_modules/resolve-pkg-maps
 
 # Entrypoint (migraciones + arranque)
 COPY --chown=nextjs:nodejs docker/entrypoint.sh ./entrypoint.sh
@@ -87,6 +89,6 @@ ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:3000/api/health || exit 1
+  CMD curl -fsS http://127.0.0.1:3000/api/health || exit 1
 
 CMD ["./entrypoint.sh"]

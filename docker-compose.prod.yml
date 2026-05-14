@@ -13,7 +13,6 @@
 ##############################################################################
 
 services:
-
   # ── Base de datos ───────────────────────────────────────────────────────────
   postgres:
     image: postgres:15-alpine
@@ -28,7 +27,7 @@ services:
       - tickets-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tickets_user -d tickets_db"]
+      test: ['CMD-SHELL', 'pg_isready -U tickets_user -d tickets_db']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -46,7 +45,7 @@ services:
     restart: unless-stopped
     command: redis-server /usr/local/etc/redis/redis.conf
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
       timeout: 3s
       retries: 5
@@ -93,7 +92,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      test: ['CMD', 'curl', '-fsS', 'http://127.0.0.1:3000/api/health']
       interval: 30s
       timeout: 10s
       retries: 5
@@ -104,13 +103,13 @@ services:
     image: nginx:alpine
     container_name: tickets-nginx
     ports:
-      - "80:80"
-      - "443:443"
+      - '80:80'
+      - '443:443'
     volumes:
-      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx.local.conf:/etc/nginx/nginx.conf:ro
       - app_uploads:/var/www/uploads:ro
-      # Certificados SSL — montar desde el host o usar certbot
-      - ${SSL_CERT_PATH:-./docker/certs}:/etc/nginx/ssl:ro
+      # Certificados SSL (mkcert para red local)
+      - ${SSL_CERT_PATH:-./docker/certs}:/etc/nginx/certs:ro
     networks:
       - tickets-network
     depends_on:

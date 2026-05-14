@@ -1,14 +1,14 @@
 'use client'
 
+import { Suspense, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect } from 'react'
 import { RoleDashboardLayout } from '@/components/layout/role-dashboard-layout'
 import { UnifiedAssetForm } from '@/components/inventory/unified-asset-form'
 import { Card, CardContent } from '@/components/ui/card'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 
-export default function NewEquipmentPage() {
+function NewEquipmentPageContent() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -57,5 +57,23 @@ export default function NewEquipmentPage() {
         </Card>
       </div>
     </RoleDashboardLayout>
+  )
+}
+
+function NewEquipmentPageSuspenseFallback() {
+  return (
+    <RoleDashboardLayout title='Nuevo Activo Individual' subtitle='Cargando...'>
+      <div className='flex items-center justify-center h-64'>
+        <Loader2 className='h-8 w-8 animate-spin text-primary' />
+      </div>
+    </RoleDashboardLayout>
+  )
+}
+
+export default function NewEquipmentPage() {
+  return (
+    <Suspense fallback={<NewEquipmentPageSuspenseFallback />}>
+      <NewEquipmentPageContent />
+    </Suspense>
   )
 }
