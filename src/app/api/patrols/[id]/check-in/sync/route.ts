@@ -17,6 +17,7 @@ import { calculateCompletionPercentage } from '@/lib/patrol/patrol-completion'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
 import { NotificationService } from '@/lib/services/notification-service'
 import { NotificationType } from '@prisma/client'
+import { getPatrolSupervisors } from '@/lib/patrol/patrol-helpers'
 
 const offlineCheckInSchema = z.object({
   checkpointId: z.string().uuid(),
@@ -115,18 +116,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     )
 
     // Supervisores para notificaciones de rechazo
-    const supervisors = await prisma.users.findMany({
-      where: {
-        isActive: true,
-        patrolsEnabled: true,
-        role: { in: ['ADMIN', 'TECHNICIAN'] },
-        OR: [
-          { adminFamilyAssignments: { some: { familyId: patrol.familyId, isActive: true } } },
-          { technicianFamilyAssignments: { some: { familyId: patrol.familyId, isActive: true } } },
-        ],
-      },
-      select: { id: true },
-    })
+    const supervisors = await getPatrolSupervisors(patrol.familyId)
 
     for (const batchItem of batchResults) {
       const item = checkIns.find(ci => ci.localQueueId === batchItem.localQueueId)!

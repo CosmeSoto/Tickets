@@ -1,207 +1,356 @@
-# Instrucciones para Reconstruir Contenedores desde Cero
+# Guía de Despliegue y Mantenimiento
 
-Este documento contiene las instrucciones para reconstruir completamente los contenedores Docker y la base de datos desde cero, eliminando todos los datos antiguos y duplicados.
+## 🚀 Comandos Rápidos
 
-## ⚠️ ADVERTENCIA
-
-Este proceso **eliminará TODOS los datos** de la base de datos. Solo ejecutar en desarrollo.
-
-## 📋 Pasos para Reconstruir
-
-### 1. Detener y Eliminar Contenedores Actuales
+### Producción (red local con HTTPS)
 
 ```bash
-# Detener todos los contenedores
-docker-compose -f docker-compose.dev.yml down
+# Primer despliegue o cuando cambia tu IP:
+sudo ./start-production.sh
 
-# Eliminar volúmenes (esto borra la base de datos)
-docker-compose -f docker-compose.dev.yml down -v
+# Si solo necesitas levantar (IP no cambió):
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d
 
-# Verificar que no queden contenedores
-docker ps -a | grep tickets
+# Reconstruir después de cambios en código:
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+
+# Ver logs en tiempo real:
+docker compose --env-file .env.production -f docker-compose.prod.yml logs -f app
+
+# Ver logs de todos los servicios:
+docker compose --env-file .env.production -f docker-compose.prod.yml logs -f
+
+# Detener todo:
+docker compose --env-file .env.production -f docker-compose.prod.yml down
+
+# Detener y borrar datos (⚠️ DESTRUCTIVO):
+docker compose --env-file .env.production -f docker-compose.prod.yml down -v
 ```
 
-### 2. Limpiar Imágenes y Caché (Opcional pero Recomendado)
+### Desarrollo local
 
 ```bash
-# Eliminar imágenes del proyecto
-docker images | grep tickets | awk '{print $3}' | xargs docker rmi -f
+# ─── Opción A: Solo BD + Redis (app corre con npm run dev en tu Mac) ───
+docker compose up -d
+npm run dev
+# Acceder en: http://localhost:3000
 
-# Limpiar caché de Docker
-docker system prune -a --volumes
-```
-
-### 3. Reconstruir Contenedores
-
-```bash
-
-# Desarrollo diario:
-docker compose -f docker-compose.dev.yml up -d
-
-# Si cambias código normal o Reconstruir desde cero:
+# ─── Opción B: Todo en Docker (app + nginx + postgres + redis) ─────────
+# Primera vez (instala deps + compila):
 docker compose -f docker-compose.dev.yml up -d --build
 
-clear
+# Siguientes veces (más rápido):
+docker compose -f docker-compose.dev.yml up -d
 
-# Ver logs para verificar que todo está corriendo
-docker-compose -f docker-compose.dev.yml logs -f
+# Ver logs de la app:
+docker compose -f docker-compose.dev.yml logs -f app
+
+# Acceder en: http://localhost:3000 o https://gestion.local (si tienes hosts configurado)
+
+# Detener:
+docker compose -f docker-compose.dev.yml down
+
+# Detener y borrar datos (⚠️ DESTRUCTIVO):
+docker compose -f docker-compose.dev.yml down -v
 ```
 
-### 4. Si cambias Prisma/schema:
+### Migraciones y Seed en desarrollo
 
 ```bash
+# Si usas Opción A (npm run dev):
+npx prisma migrate dev --name nombre_del_cambio
+npx prisma db seed
+
+# Si usas Opción B (Docker):
 docker exec tickets-app-dev npx prisma migrate dev --name nombre_del_cambio
 docker exec tickets-app-dev npx prisma generate
 docker compose -f docker-compose.dev.yml restart app
+
+# Seed manual:
+docker exec tickets-app-dev npx prisma db seed
 ```
 
-### 5. Verificar que los Servicios Están Corriendo
+---
+
+## 📋 Despliegue a Producción (paso a paso)
+
+### 1. Preparar el entorno
 
 ```bash
-# Verificar estado de los contenedores
-docker-compose -f docker-compose.dev.yml ps
+# Copiar variables de entorno si no existen
+cp .env.example .env.production  # Solo la primera vez
+
+# Editar con tus valores reales:
+# - DB_PASSWORD
+# - NEXTAUTH_SECRET
+# - ENCRYPTION_KEY
+```
+
+### 2. Levantar con el script automático
+
+```bash
+sudo ./start-production.sh
+```
+
+Este script hace todo automáticamente:
+
+- Detecta tu IP actual
+- Actualiza `/etc/hosts` → `gestion.local`
+- Actualiza `NEXTAUTH_URL` en los archivos `.env`
+- Regenera certificados SSL si la IP cambió
+- Ejecuta `docker compose -f docker-compose.prod.yml up -d --build`
+
+### 3. Ejecutar migraciones (solo primera vez o tras cambios de schema)
+
+```bash
+# Las migraciones se ejecutan automáticamente en el entrypoint.
+# Si necesitas forzarlas manualmente:
+docker exec tickets-app npx prisma migrate deploy
+```
+
+### 4. Ejecutar seed (solo primera vez)
+
+```bash
+docker exec tickets-app sh -c "node ./node_modules/tsx/dist/cli.mjs prisma/seed.ts"
+```
+
+### 5. Verificar que funciona
+
+```bash
+# Estado de los contenedores:
+docker compose -f docker-compose.prod.yml ps
 
 # Deberías ver:
-# - tickets-postgres-dev (healthy)
-# - tickets-redis-dev (healthy)
-# - tickets-app-dev (running)
-# - tickets-nginx-dev (running)
+# tickets-postgres  (healthy)
+# tickets-redis     (healthy)
+# tickets-app       (healthy)
+# tickets-nginx     (running)
+
+# Probar acceso:
+curl -k https://gestion.local/api/health
 ```
 
-### 6. Ejecutar Migraciones y Seed
+---
 
-El seed se ejecuta automáticamente al iniciar el contenedor de la app. Si necesitas ejecutarlo manualmente:
+## 🌐 Acceso desde otros equipos de la red
+
+Cada equipo cliente necesita agregar en su archivo hosts:
+
+```
+# Windows: C:\Windows\System32\drivers\etc\hosts
+# Mac/Linux: /etc/hosts
+
+TU_IP_ACTUAL    gestion.local www.gestion.local
+```
+
+Para ver tu IP actual:
 
 ```bash
-# Entrar al contenedor de la app
-docker-compose -f docker-compose.dev.yml exec app sh
-
-# Ejecutar migraciones
-npx prisma migrate deploy
-
-# Ejecutar seed
-npx prisma db seed
-
-# Salir del contenedor
-exit
+ifconfig | grep "inet " | grep -v 127.0.0.1
 ```
 
-### 7. Verificar los Datos
+---
+
+## 🔄 Cuando cambia tu IP
 
 ```bash
-# Conectarse a la base de datos
-docker-compose -f docker-compose.dev.yml exec postgres psql -U tickets_user -d tickets_db
-
-# Verificar atributos de Laptop (no debe haber duplicados)
-SELECT attribute_name, attribute_label, "order"
-FROM equipment_type_attributes
-WHERE equipment_type_id = (
-  SELECT id FROM equipment_types WHERE name = 'Laptop' LIMIT 1
-)
-ORDER BY "order";
-
-# Salir de psql
-\q
+sudo ./start-production.sh
 ```
 
-### 8. Cuando ya validaste y quieres pasar a producción:
+Luego actualizar `/etc/hosts` en los equipos clientes con la nueva IP.
+
+---
+
+## 🗄️ Base de Datos
+
+### Migraciones (tras cambios en prisma/schema.prisma)
 
 ```bash
-docker compose -f docker-compose.dev.yml down
-docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
-docker compose -f docker-compose.prod.yml logs -f app
+# ─── Desarrollo (npm run dev) ──────────────────
+npx prisma migrate dev --name nombre_del_cambio
 
-docker compose -f docker-compose.prod.yml exec postgres \
-  psql -U tickets_user -d tickets_db -c \
-  "UPDATE system_modules SET \"isActive\" = false WHERE key = 'in
+# ─── Desarrollo (Docker) ──────────────────────
+docker exec tickets-app-dev npx prisma migrate dev --name nombre_del_cambio
+docker exec tickets-app-dev npx prisma generate
+docker compose -f docker-compose.dev.yml restart app
+
+# ─── Producción ────────────────────────────────
+# Las migraciones se ejecutan automáticamente al iniciar el contenedor.
+# Si necesitas forzar manualmente:
+docker exec tickets-app npx prisma migrate deploy
+docker compose --env-file .env.production -f docker-compose.prod.yml restart app
 ```
 
-## ✅ Resultado Esperado
-
-Después de la reconstrucción, deberías tener:
-
-- **Base de datos limpia** sin duplicados
-- **Atributos consistentes** en español:
-  - `marca`, `modelo`, `numero_serie`, `procesador`, `ram`, etc.
-- **Orden correcto** de atributos (1, 2, 3, 4...)
-- **Sin errores** en la interfaz de gestión de atributos
-
-## 🔧 Cambios Realizados en el Seed
-
-### Antes (Inglés - Inconsistente)
-
-```typescript
-attributeName: 'processor'
-attributeName: 'storage'
-attributeName: 'screen_size'
-```
-
-### Después (Español - Consistente)
-
-```typescript
-attributeName: 'procesador'
-attributeName: 'almacenamiento'
-attributeName: 'pantalla_pulgadas'
-```
-
-## 📝 Notas Importantes
-
-1. **Nombres de atributos en español**: Todos los `attributeName` ahora usan snake_case en español
-2. **Labels descriptivos**: Los `attributeLabel` son amigables para el usuario
-3. **Orden secuencial**: Los atributos tienen orden 1, 2, 3, 4... sin duplicados
-4. **Upsert mejorado**: El seed ahora actualiza correctamente los atributos existentes
-
-## 🐛 Solución de Problemas
-
-### Si siguen apareciendo duplicados:
-
-1. Verificar que el seed se ejecutó correctamente:
+### Conectarse a la BD directamente
 
 ```bash
-docker-compose -f docker-compose.dev.yml logs app | grep "Seed de atributos"
+# Desarrollo (Opción A — postgres en Docker, app en host):
+docker exec -it tickets-postgres psql -U tickets_user -d tickets_db
+
+# Desarrollo (Opción B — todo en Docker):
+docker exec -it tickets-postgres-dev psql -U tickets_user -d tickets_db
+
+# Producción:
+docker compose --env-file .env.production -f docker-compose.prod.yml exec postgres psql -U tickets_user -d tickets_db
 ```
 
-2. Verificar la base de datos directamente:
+### Backup manual
 
 ```bash
-docker-compose -f docker-compose.dev.yml exec postgres psql -U tickets_user -d tickets_db -c "SELECT COUNT(*) FROM equipment_type_attributes;"
+docker compose --env-file .env.production -f docker-compose.prod.yml exec postgres \
+  pg_dump -U tickets_user tickets_db | gzip > backup-$(date +%Y%m%d).sql.gz
 ```
 
-3. Si es necesario, ejecutar el seed manualmente:
+### Restaurar backup
 
 ```bash
-docker-compose -f docker-compose.dev.yml exec app npx prisma db seed
+gunzip -c backup-YYYYMMDD.sql.gz | \
+  docker compose --env-file .env.production -f docker-compose.prod.yml exec -T postgres \
+  psql -U tickets_user -d tickets_db
 ```
 
-### Si hay errores de conexión:
+---
 
-1. Verificar que los servicios están healthy:
+## 🧹 Limpieza y Reconstrucción Total
+
+⚠️ **ESTO BORRA TODOS LOS DATOS**
 
 ```bash
-docker-compose -f docker-compose.dev.yml ps
+# ─── Desarrollo ────────────────────────────────
+docker compose -f docker-compose.dev.yml down -v
+docker compose -f docker-compose.dev.yml up -d --build
+docker exec tickets-app-dev npx prisma db seed
+
+# ─── Producción ────────────────────────────────
+docker compose --env-file .env.production -f docker-compose.prod.yml down -v
+
+# Eliminar imágenes del proyecto
+docker images | grep tickets | awk '{print $3}' | xargs docker rmi -f 2>/dev/null
+
+# Limpiar caché de Docker (opcional — libera espacio)
+docker system prune -a --volumes
+
+# Reconstruir desde cero
+sudo ./start-production.sh
+
+# Ejecutar seed manualmente (si la BD está vacía se ejecuta solo)
+docker exec tickets-app sh -c "node ./node_modules/tsx/dist/cli.mjs prisma/seed.ts"
 ```
 
-2. Reiniciar los contenedores:
+---
+
+## 🔧 Solución de Problemas
+
+### El contenedor `app` no arranca
 
 ```bash
-docker-compose -f docker-compose.dev.yml restart
+# Ver logs detallados:
+docker compose -f docker-compose.prod.yml logs app
+
+# Causas comunes:
+# - DATABASE_URL incorrecto → verificar .env.production
+# - Puerto 3000 ocupado → docker ps -a
+# - Error de build → reconstruir con --build --no-cache
+docker compose -f docker-compose.prod.yml up -d --build --no-cache
 ```
 
-## 📚 Archivos Modificados
+### No puedo acceder a gestion.local
 
-- ✅ `prisma/seeds/attributes.seed.ts` - Corregido con nombres en español
-- 🗑️ `prisma/scripts/clean-duplicate-attributes.ts` - Eliminado (obsoleto)
-- 🗑️ `prisma/scripts/migrate-custom-fields-to-attributes.ts` - Eliminado (obsoleto)
-- 🗑️ `prisma/scripts/migrate-units-to-attributes.ts` - Eliminado (obsoleto)
-- 🗑️ `prisma/scripts/validate-migration.ts` - Eliminado (obsoleto)
-- 🗑️ `backups/migration-*.json` - Eliminados (obsoletos)
+```bash
+# 1. Verificar que resuelve:
+dscacheutil -q host -a name gestion.local
 
-## 🎯 Próximos Pasos
+# 2. Si no resuelve, ejecutar:
+sudo ./start-production.sh
 
-Después de reconstruir, puedes:
+# 3. Verificar que nginx está corriendo:
+docker compose -f docker-compose.prod.yml ps nginx
 
-1. Acceder a la aplicación en `http://localhost:3000`
-2. Ir a **Configuración → Inventario → Catálogos**
-3. Seleccionar un tipo (ej: Laptop)
-4. Hacer clic en "Gestionar Atributos"
-5. Verificar que no hay duplicados y el orden es correcto
+# 4. Verificar certificados:
+curl -vk https://gestion.local 2>&1 | grep "SSL certificate"
+```
+
+### Error de certificado SSL en otros equipos
+
+Los equipos clientes verán un aviso de certificado no confiable. Opciones:
+
+1. Aceptar la excepción en el navegador (más rápido)
+2. Instalar el CA de mkcert en cada equipo (más limpio):
+   ```bash
+   # En tu Mac, exportar el CA:
+   mkcert -CAROOT  # muestra la ruta del CA
+   # Copiar rootCA.pem a los equipos clientes e instalarlo
+   ```
+
+### Contenedor postgres no está healthy
+
+```bash
+# Verificar logs:
+docker compose -f docker-compose.prod.yml logs postgres
+
+# Reiniciar solo postgres:
+docker compose -f docker-compose.prod.yml restart postgres
+
+# Esperar a que esté healthy:
+docker compose -f docker-compose.prod.yml exec postgres pg_isready -U tickets_user
+```
+
+### Cron de patrullas no se ejecuta
+
+El cron debe llamarse externamente cada 5 minutos. Opciones:
+
+```bash
+# Opción 1: crontab del host
+crontab -e
+# Agregar:
+*/5 * * * * curl -s -H "Authorization: Bearer TU_CRON_SECRET" https://gestion.local/api/cron/patrol > /dev/null
+
+# Opción 2: ejecutar manualmente para probar
+curl -H "Authorization: Bearer TU_CRON_SECRET" https://gestion.local/api/cron/patrol
+```
+
+---
+
+## 📁 Archivos de Configuración Importantes
+
+| Archivo                   | Propósito                                     |
+| ------------------------- | --------------------------------------------- |
+| `.env.local`              | Variables para desarrollo (`npm run dev`)     |
+| `.env.production`         | Variables para producción (Docker)            |
+| `.env.local.production`   | Override local de producción                  |
+| `docker-compose.yml`      | Solo postgres + redis (desarrollo sin Docker) |
+| `docker-compose.dev.yml`  | Todo en Docker (desarrollo)                   |
+| `docker-compose.prod.yml` | Producción con nginx + SSL                    |
+| `docker/nginx.local.conf` | Configuración de nginx (proxy + SSL)          |
+| `docker/certs/`           | Certificados SSL (generados por mkcert)       |
+| `start-production.sh`     | Script automático de despliegue               |
+
+---
+
+## 🏗️ Arquitectura de Servicios
+
+```
+┌─────────────────────────────────────────────────┐
+│  Equipos de la red (navegadores)                │
+│  → https://gestion.local                        │
+└──────────────────────┬──────────────────────────┘
+                       │ :443 (HTTPS)
+┌──────────────────────▼──────────────────────────┐
+│  nginx (tickets-nginx)                          │
+│  - SSL termination (mkcert)                     │
+│  - Proxy reverso → app:3000                     │
+│  - Archivos estáticos (/uploads, /_next/static) │
+└──────────────────────┬──────────────────────────┘
+                       │ :3000
+┌──────────────────────▼──────────────────────────┐
+│  Next.js App (tickets-app)                      │
+│  - API Routes                                   │
+│  - Server-Side Rendering                        │
+│  - Cron jobs (llamados externamente)            │
+└───────┬──────────────────────────┬──────────────┘
+        │ :5432                    │ :6379
+┌───────▼───────┐          ┌──────▼───────┐
+│  PostgreSQL   │          │    Redis     │
+│  (datos)      │          │  (caché/SSE) │
+└───────────────┘          └──────────────┘
+```

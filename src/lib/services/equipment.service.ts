@@ -77,7 +77,7 @@ export class EquipmentService {
         },
       })
 
-      return equipment
+      return equipment as unknown as Equipment
     } catch (error) {
       console.error('Error creando equipo:', error)
       throw error

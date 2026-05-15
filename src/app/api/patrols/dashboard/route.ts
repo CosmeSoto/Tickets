@@ -9,6 +9,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { withCache, buildCacheKey } from '@/lib/api-cache'
+import { checkPatrolModuleAccess } from '@/lib/patrol/patrol-helpers'
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,17 +20,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 
-    // ADMIN siempre tiene acceso al dashboard de patrullas (administra el módulo)
-    // TECHNICIAN necesita patrolsEnabled para acceder
-    if (session.user.role === 'TECHNICIAN') {
-      const user = await prisma.users.findUnique({
-        where: { id: session.user.id },
-        select: { patrolsEnabled: true },
-      })
-      if (!user?.patrolsEnabled) {
-        return NextResponse.json({ error: 'Módulo de patrullas no habilitado' }, { status: 403 })
-      }
-    }
+    // ADMIN siempre tiene acceso al dashboard. TECHNICIAN necesita patrolsEnabled.
+    const denied = await checkPatrolModuleAccess(session.user.id, session.user.role)
+    if (denied) return denied
 
     const { searchParams } = new URL(request.url)
     const familyId = searchParams.get('familyId')

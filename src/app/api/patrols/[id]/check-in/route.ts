@@ -118,9 +118,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const familyRadius = familyConfig?.geofenceRadiusMeters ?? 50
 
     // ── Validar foto requerida ─────────────────────────────────────────────
-    const photoRequired =
-      checkpoint.isSensitive ||
-      (data.gpsLat !== undefined && checkpoint.latitude !== null && checkpoint.longitude !== null)
+    // Solo se exige foto cuando el checkpoint está marcado como sensible.
+    // La presencia de GPS no implica obligatoriedad de foto.
+    const photoRequired = checkpoint.isSensitive
 
     if (photoRequired && !data.photoBase64) {
       return NextResponse.json(

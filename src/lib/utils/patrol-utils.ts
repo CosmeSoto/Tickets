@@ -5,6 +5,9 @@
 
 import type { ExportColumn } from '@/lib/utils/export'
 
+// Re-exportar helper de formateo para uso en componentes (client-safe)
+export { formatDurationMinutes } from '@/lib/patrol/patrol-format'
+
 // ── Mapas de etiquetas en español ─────────────────────────────────────────────
 
 export const PATROL_STATUS_LABELS_ES: Record<string, string> = {

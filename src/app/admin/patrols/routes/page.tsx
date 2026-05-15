@@ -48,7 +48,7 @@ import { useModuleData } from '@/hooks/common/use-module-data'
 import { usePagination } from '@/hooks/common/use-pagination'
 import { useExport } from '@/hooks/common/use-export'
 import { createRouteColumns } from '@/components/patrols/patrol-columns'
-import { PATROL_ROUTES_EXPORT_COLUMNS } from '@/lib/utils/patrol-utils'
+import { PATROL_ROUTES_EXPORT_COLUMNS, formatDurationMinutes } from '@/lib/utils/patrol-utils'
 
 interface CheckpointOption {
   id: string
@@ -542,9 +542,7 @@ export default function RoutesPage() {
                 {(() => {
                   const mins = parseInt(form.estimatedDurationMinutes)
                   if (!mins || mins <= 0) return null
-                  const h = Math.floor(mins / 60)
-                  const m = mins % 60
-                  const totalLabel = h > 0 ? `${h}h${m > 0 ? ` ${m}min` : ''}` : `${m}min`
+                  const totalLabel = formatDurationMinutes(mins)
                   const cpCount = routeCheckpoints.length
                   const perCp = cpCount > 0 ? Math.round(mins / cpCount) : null
                   return (

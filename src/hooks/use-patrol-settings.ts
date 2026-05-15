@@ -96,6 +96,7 @@ export function usePatrolSettings() {
       ])
 
       const familiesData = await familiesRes.json()
+      // family-config solo está disponible para ADMIN — si falla (ej: TECHNICIAN), usar mapa vacío
       const configsData = configsRes.ok
         ? await configsRes.json()
         : { data: {} as Record<string, boolean> }

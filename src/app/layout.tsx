@@ -13,6 +13,7 @@ import { SessionTimeoutMonitor } from '@/components/auth/session-timeout-monitor
 const inter = Inter({
   subsets: ['latin'],
   display: 'swap',
+  fallback: ['system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
 })
 
 export const metadata: Metadata = {
@@ -36,7 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </AppDataProvider>
             </SessionProviderWrapper>
             <Toaster />
-            <SonnerToaster position="top-right" richColors />
+            <SonnerToaster position='top-right' richColors />
           </ToastProvider>
         </QueryProvider>
       </body>

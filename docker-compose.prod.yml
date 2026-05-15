@@ -66,6 +66,8 @@ services:
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?NEXTAUTH_SECRET requerida}
       NEXTAUTH_URL: ${NEXTAUTH_URL}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY requerida}
+      BACKUP_ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY:-}
+      CRON_SECRET: ${CRON_SECRET:-}
       UPLOAD_DIR: /app/public/uploads
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       # Email (opcional)

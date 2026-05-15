@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
 import { PATROL_RECURRENCE_LABELS_ES } from '@/lib/utils/patrol-utils'
+import { formatDurationMinutes } from '@/lib/utils/patrol-utils'
 import { FormData, EMPTY_FORM, Family, PatrolRoute, Agent, DAY_LABELS } from './types'
 import { localDayToUTCDay, utcDayToLocalDay, formatDateTimeLocal } from './utils'
 
@@ -239,9 +240,7 @@ export function ScheduleFormDialog({
                     {r.estimatedDurationMinutes > 0 && (
                       <span className='ml-2 text-muted-foreground text-xs'>
                         {'— '}
-                        {r.estimatedDurationMinutes >= 60
-                          ? `${Math.floor(r.estimatedDurationMinutes / 60)}h${r.estimatedDurationMinutes % 60 > 0 ? ` ${r.estimatedDurationMinutes % 60}min` : ''}`
-                          : `${r.estimatedDurationMinutes}min`}
+                        {formatDurationMinutes(r.estimatedDurationMinutes)}
                       </span>
                     )}
                   </SelectItem>
@@ -252,13 +251,12 @@ export function ScheduleFormDialog({
               (() => {
                 const r = routes.find(x => x.id === form.routeId)
                 if (!r) return null
-                const h = Math.floor(r.estimatedDurationMinutes / 60)
-                const m = r.estimatedDurationMinutes % 60
-                const label = h > 0 ? `${h}h${m > 0 ? ` ${m}min` : ''}` : `${m}min`
                 return (
                   <p className='text-xs text-muted-foreground'>
                     ⏱ Duración estimada de la ruta:{' '}
-                    <span className='font-medium text-foreground'>{label}</span>
+                    <span className='font-medium text-foreground'>
+                      {formatDurationMinutes(r.estimatedDurationMinutes)}
+                    </span>
                     {' — '}la hora de fin se ha sugerido automáticamente
                   </p>
                 )
@@ -410,10 +408,7 @@ export function ScheduleFormDialog({
                 if (diffMs <= 0) return null
 
                 const diffMins = Math.round(diffMs / 60000)
-                const diffH = Math.floor(diffMins / 60)
-                const diffM = diffMins % 60
-                const scheduleLabel =
-                  diffH > 0 ? `${diffH}h${diffM > 0 ? ` ${diffM}min` : ''}` : `${diffM}min`
+                const scheduleLabel = formatDurationMinutes(diffMins)
 
                 const selectedRoute = routes.find(r => r.id === form.routeId)
                 const routeMins = selectedRoute?.estimatedDurationMinutes ?? 0
@@ -425,24 +420,17 @@ export function ScheduleFormDialog({
                       ⏱ Duración de cada ronda:{' '}
                       <span className='font-medium text-foreground'>{scheduleLabel}</span>
                     </p>
-                    {isTooShort &&
-                      (() => {
-                        const rH = Math.floor(routeMins / 60)
-                        const rM = routeMins % 60
-                        const routeLabel =
-                          rH > 0 ? `${rH}h${rM > 0 ? ` ${rM}min` : ''}` : `${rM}min`
-                        return (
-                          <div className='flex items-start gap-2 p-3 rounded-lg bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 text-xs text-orange-700 dark:text-orange-300'>
-                            <span className='mt-0.5 flex-shrink-0'>⚠️</span>
-                            <span>
-                              La ruta tiene una duración estimada de <strong>{routeLabel}</strong>,
-                              pero el horario asignado solo da <strong>{scheduleLabel}</strong>. El
-                              agente podría no tener tiempo suficiente para completar todos los
-                              checkpoints.
-                            </span>
-                          </div>
-                        )
-                      })()}
+                    {isTooShort && (
+                      <div className='flex items-start gap-2 p-3 rounded-lg bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 text-xs text-orange-700 dark:text-orange-300'>
+                        <span className='mt-0.5 flex-shrink-0'>⚠️</span>
+                        <span>
+                          La ruta tiene una duración estimada de{' '}
+                          <strong>{formatDurationMinutes(routeMins)}</strong>, pero el horario
+                          asignado solo da <strong>{scheduleLabel}</strong>. El agente podría no
+                          tener tiempo suficiente para completar todos los checkpoints.
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )
               } catch {

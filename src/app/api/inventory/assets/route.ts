@@ -207,15 +207,29 @@ export async function GET(req: NextRequest) {
     id: item.id,
     name: item.model
       ? `${item.model.brand} ${item.model.model}`
-      : `${item.brand} ${item.modelDeprecated}`,
+      : `${(item as any).brand ?? ''} ${(item as any).modelDeprecated ?? ''}`.trim(),
+    subtype: 'EQUIPMENT' as const,
+    familyId: item.type?.family?.id ?? '',
+    family: {
+      name: item.type?.family?.name ?? '',
+      icon: item.type?.family?.icon ?? null,
+      color: item.type?.family?.color ?? null,
+    },
+    status: item.status ?? 'ACTIVE',
+    code: (item as any).code ?? undefined,
+    acquisitionMode: (item as any).acquisitionMode ?? undefined,
+    createdAt: item.createdAt.toISOString(),
+  }))
+
+  const mappedConsumables: UnifiedAsset[] = consumableItems.map((item: any) => ({
     id: item.id,
     name: item.name,
     subtype: 'MRO' as const,
-    familyId: item.consumableType.familyId ?? '',
+    familyId: item.consumableType?.familyId ?? '',
     family: {
-      name: item.consumableType.family?.name ?? '',
-      icon: item.consumableType.family?.icon ?? null,
-      color: item.consumableType.family?.color ?? null,
+      name: item.consumableType?.family?.name ?? '',
+      icon: item.consumableType?.family?.icon ?? null,
+      color: item.consumableType?.family?.color ?? null,
     },
     status: 'ACTIVE',
     acquisitionMode: undefined,

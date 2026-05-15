@@ -13,6 +13,7 @@ import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
 import { NotificationService } from '@/lib/services/notification-service'
 import { calculateCompletionPercentage } from '@/lib/patrol/patrol-completion'
 import { NotificationType } from '@prisma/client'
+import { getPatrolSupervisors } from '@/lib/patrol/patrol-helpers'
 
 /** Admin/técnico: solo patrullas del área (familia) asignada; admin sin asignaciones = acceso legacy total. */
 async function canViewPatrolAsStaff(
@@ -266,6 +267,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         },
       })
 
+      await AuditServiceComplete.log({
+        action: 'PATROL_STARTED',
+        entityType: 'patrol',
+        entityId: id,
+        userId: session.user.id,
+        details: { routeId: patrol.routeId, hasStartPhoto: !!startPhotoId },
+        request,
+      })
+
       return NextResponse.json({ success: true, status: 'IN_PROGRESS' })
     }
 
@@ -325,23 +335,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       // Notificar si completitud por debajo del umbral
       const threshold = familyConfig?.alertCompletionThreshold ?? 80
       if (completionPct < threshold) {
-        // Notificar supervisores
-        const supervisors = await prisma.users.findMany({
-          where: {
-            isActive: true,
-            patrolsEnabled: true,
-            role: { in: ['ADMIN', 'TECHNICIAN'] },
-            OR: [
-              { adminFamilyAssignments: { some: { familyId: patrol.familyId, isActive: true } } },
-              {
-                technicianFamilyAssignments: {
-                  some: { familyId: patrol.familyId, isActive: true },
-                },
-              },
-            ],
-          },
-          select: { id: true },
-        })
+        const supervisors = await getPatrolSupervisors(patrol.familyId)
 
         await Promise.allSettled(
           supervisors.map(s =>

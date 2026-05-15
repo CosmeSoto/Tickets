@@ -50,7 +50,7 @@ export function useUserModules() {
         now - modulesMemoryCache.at < MODULES_MEMORY_TTL_MS
 
       if (memHit) {
-        setModules(modulesMemoryCache.data)
+        setModules(modulesMemoryCache!.data)
         setLoading(false)
         return
       }

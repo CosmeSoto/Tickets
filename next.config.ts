@@ -1,18 +1,13 @@
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
-  // Excluir pdfkit/fontkit del bundling de Turbopack (incompatibilidad con @swc/helpers)
-  serverExternalPackages: ['pdfkit', 'fontkit'],
+  // Excluir paquetes server-only del bundling del client
+  serverExternalPackages: ['pdfkit', 'fontkit', 'ioredis'],
 
   // Performance optimizations
   experimental: {
     optimizeCss: true,
-    optimizePackageImports: [
-      'lucide-react',
-      '@radix-ui/react-icons',
-      'recharts',
-      'date-fns'
-    ]
+    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons', 'recharts', 'date-fns'],
   },
 
   // Image optimization
@@ -26,8 +21,8 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: '**'
-      }
+        hostname: '**',
+      },
     ],
     // CDN configuration
     loader: process.env.CDN_ENABLED === 'true' ? 'custom' : 'default',
@@ -50,30 +45,30 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'X-DNS-Prefetch-Control',
-            value: 'on'
+            value: 'on',
           },
           {
             key: 'X-Frame-Options',
-            value: 'DENY'
+            value: 'DENY',
           },
           {
             key: 'X-Content-Type-Options',
-            value: 'nosniff'
+            value: 'nosniff',
           },
           {
             key: 'Referrer-Policy',
-            value: 'origin-when-cross-origin'
-          }
-        ]
+            value: 'origin-when-cross-origin',
+          },
+        ],
       },
       {
         source: '/api/(.*)',
         headers: [
           {
             key: 'Cache-Control',
-            value: 'no-store, no-cache'
-          }
-        ]
+            value: 'no-store, no-cache',
+          },
+        ],
       },
       // Enhanced static asset caching
       {
@@ -81,34 +76,34 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable'
+            value: 'public, max-age=31536000, immutable',
           },
           {
             key: 'CDN-Cache-Control',
-            value: 'public, max-age=31536000, immutable'
+            value: 'public, max-age=31536000, immutable',
           },
           {
             key: 'Vary',
-            value: 'Accept-Encoding'
-          }
-        ]
+            value: 'Accept-Encoding',
+          },
+        ],
       },
       {
         source: '/images/(.*)',
         headers: [
           {
             key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable'
+            value: 'public, max-age=31536000, immutable',
           },
           {
             key: 'CDN-Cache-Control',
-            value: 'public, max-age=31536000, immutable'
+            value: 'public, max-age=31536000, immutable',
           },
           {
             key: 'Vary',
-            value: 'Accept-Encoding'
-          }
-        ]
+            value: 'Accept-Encoding',
+          },
+        ],
       },
       // Font optimization
       {
@@ -116,13 +111,13 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable'
+            value: 'public, max-age=31536000, immutable',
           },
           {
             key: 'Cross-Origin-Resource-Policy',
-            value: 'cross-origin'
-          }
-        ]
+            value: 'cross-origin',
+          },
+        ],
       },
       // CSS and JS optimization
       {
@@ -130,13 +125,13 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable'
+            value: 'public, max-age=31536000, immutable',
           },
           {
             key: 'Vary',
-            value: 'Accept-Encoding'
-          }
-        ]
+            value: 'Accept-Encoding',
+          },
+        ],
       },
       // Service Worker
       {
@@ -144,14 +139,14 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'Cache-Control',
-            value: 'public, max-age=0, must-revalidate'
+            value: 'public, max-age=0, must-revalidate',
           },
           {
             key: 'Service-Worker-Allowed',
-            value: '/'
-          }
-        ]
-      }
+            value: '/',
+          },
+        ],
+      },
     ]
   },
 
@@ -161,23 +156,21 @@ const nextConfig: NextConfig = {
       {
         source: '/dashboard',
         destination: '/',
-        permanent: false
-      }
+        permanent: false,
+      },
     ]
   },
 
   // Rewrites for CDN integration
   async rewrites() {
     const rewrites = []
-    
+
     // CDN rewrites if enabled
     if (process.env.CDN_ENABLED === 'true' && process.env.CDN_BASE_URL) {
-      rewrites.push(
-        {
-          source: '/cdn-assets/:path*',
-          destination: `${process.env.CDN_BASE_URL}/:path*`
-        }
-      )
+      rewrites.push({
+        source: '/cdn-assets/:path*',
+        destination: `${process.env.CDN_BASE_URL}/:path*`,
+      })
     }
 
     return rewrites
@@ -185,7 +178,7 @@ const nextConfig: NextConfig = {
 
   // Output configuration
   output: 'standalone',
-  
+
   // PoweredBy header removal
   poweredByHeader: false,
 
@@ -197,7 +190,7 @@ const nextConfig: NextConfig = {
 
   // TypeScript configuration
   typescript: {
-    ignoreBuildErrors: true // Temporalmente ignorar errores para build
+    ignoreBuildErrors: true, // Temporalmente ignorar errores para build
   },
 
   // Webpack optimization
@@ -234,9 +227,9 @@ const nextConfig: NextConfig = {
               chunks: 'all',
               priority: 5,
               reuseExistingChunk: true,
-            }
-          }
-        }
+            },
+          },
+        },
       }
 
       // Asset optimization plugins
@@ -258,7 +251,7 @@ const nextConfig: NextConfig = {
   env: {
     CDN_ENABLED: process.env.CDN_ENABLED || 'false',
     CDN_BASE_URL: process.env.CDN_BASE_URL || '',
-  }
+  },
 }
 
 export default nextConfig

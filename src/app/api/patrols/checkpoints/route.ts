@@ -13,6 +13,7 @@ import prisma from '@/lib/prisma'
 import { PatrolQRService } from '@/lib/services/patrol-qr.service'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
 import { randomUUID } from 'crypto'
+import { checkPatrolModuleAccess } from '@/lib/patrol/patrol-helpers'
 
 // Campos seguros para devolver en respuestas (excluye qrSecret y qrStaticToken)
 const SAFE_CHECKPOINT_SELECT = {
@@ -105,18 +106,9 @@ export async function POST(request: NextRequest) {
     if (!['ADMIN', 'TECHNICIAN'].includes(session.user.role)) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
-    if (session.user.role === 'TECHNICIAN') {
-      const user = await prisma.users.findUnique({
-        where: { id: session.user.id },
-        select: { patrolsEnabled: true },
-      })
-      if (!user?.patrolsEnabled) {
-        return NextResponse.json(
-          { error: 'Módulo de patrullas no habilitado para este usuario' },
-          { status: 403 }
-        )
-      }
-    }
+
+    const denied = await checkPatrolModuleAccess(session.user.id, session.user.role)
+    if (denied) return denied
 
     const body = await request.json()
     const data = createCheckpointSchema.parse(body)

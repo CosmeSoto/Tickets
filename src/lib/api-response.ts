@@ -25,7 +25,7 @@ export class ApiResponse {
       data,
       message,
       timestamp: new Date().toISOString(),
-      requestId: this.generateRequestId()
+      requestId: this.generateRequestId(),
     }
 
     return NextResponse.json(response, { status })
@@ -34,19 +34,14 @@ export class ApiResponse {
   /**
    * Create an error response
    */
-  static error(
-    message: string, 
-    status: number = 500, 
-    details?: any, 
-    code?: string
-  ): NextResponse {
+  static error(message: string, status: number = 500, details?: any, code?: string): NextResponse {
     const response: ApiResponseData = {
       success: false,
       error: message,
       code,
       timestamp: new Date().toISOString(),
       requestId: this.generateRequestId(),
-      ...(details && { data: details })
+      ...(details && { data: details }),
     }
 
     return NextResponse.json(response, { status })
@@ -98,7 +93,7 @@ export class ApiResponse {
    * Create a paginated response
    */
   static paginated<T>(
-    data: T[], 
+    data: T[],
     pagination: {
       page: number
       limit: number
@@ -114,11 +109,11 @@ export class ApiResponse {
       success: true,
       data: {
         items: data,
-        pagination
+        pagination,
       },
       message,
       timestamp: new Date().toISOString(),
-      requestId: this.generateRequestId()
+      requestId: this.generateRequestId(),
     }
 
     return NextResponse.json(response)
@@ -133,13 +128,17 @@ export class ApiResponse {
 }
 
 /**
- * API Response Builder for more complex responses
+ * API Response Builder for more complex responses (fluent/builder pattern).
+ * Nota: No confundir con ApiResponseBuilder de @/lib/api/response-builder,
+ * que es la implementación estándar usada en las rutas admin.
+ * Este builder de estilo fluent solo se usa internamente en este módulo.
+ * @internal
  */
-export class ApiResponseBuilder {
+export class ApiResponseFluentBuilder {
   private response: Partial<ApiResponseData> = {
     success: true,
     timestamp: new Date().toISOString(),
-    requestId: ApiResponse['generateRequestId']()
+    requestId: ApiResponse['generateRequestId'](),
   }
 
   /**

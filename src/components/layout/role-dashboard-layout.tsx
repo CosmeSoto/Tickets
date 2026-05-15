@@ -183,6 +183,18 @@ const navigationByRole: Record<string, NavItem[]> = {
         { name: 'Reportes', href: '/inventory/reports', icon: BarChart3 },
       ],
     },
+    {
+      name: 'Rondas',
+      href: '/admin/patrols',
+      icon: Shield,
+      children: [
+        { name: 'Dashboard', href: '/admin/patrols', icon: LayoutDashboard },
+        { name: 'Checkpoints', href: '/admin/patrols/checkpoints', icon: MapPin },
+        { name: 'Rutas', href: '/admin/patrols/routes', icon: ClipboardList },
+        { name: 'Programación', href: '/admin/patrols/schedules', icon: ClipboardList },
+        { name: 'Reportes', href: '/admin/patrols/reports', icon: BarChart3 },
+      ],
+    },
   ],
 
   // Cliente: sus tickets + sus equipos asignados + mantenimientos

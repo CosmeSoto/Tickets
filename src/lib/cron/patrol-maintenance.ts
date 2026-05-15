@@ -1,6 +1,7 @@
 /**
  * Jobs de mantenimiento del módulo de patrullas.
- * Ejecutar nocturnamente vía /api/cron/patrol.
+ * Ejecutar cada 5 minutos vía /api/cron/patrol para recordatorios,
+ * o nocturnamente para retención de fotos y regeneración.
  */
 
 import { PatrolPhotoService } from '@/lib/services/patrol-photo.service'
@@ -11,6 +12,7 @@ export interface PatrolMaintenanceResult {
   photoErrors: number
   patrolsMissed: number
   patrolsGenerated: number
+  reminderssSent: number
   timestamp: string
 }
 
@@ -24,14 +26,13 @@ export async function runPatrolMaintenanceJobs(): Promise<PatrolMaintenanceResul
   let photoErrors = 0
   let patrolsMissed = 0
   let patrolsGenerated = 0
+  let reminderssSent = 0
 
-  // 1. Retención de fotos
+  // 1. Enviar recordatorios de rondas próximas a iniciar
   try {
-    const photoResult = await PatrolPhotoService.runRetentionJob()
-    photosDeleted = photoResult.deleted
-    photoErrors = photoResult.errors
+    reminderssSent = await PatrolSchedulerService.sendUpcomingReminders()
   } catch (err) {
-    console.error('[patrol-maintenance] Error en job de retención de fotos:', err)
+    console.error('[patrol-maintenance] Error en job de recordatorios:', err)
   }
 
   // 2. Detección de patrullas perdidas
@@ -48,5 +49,17 @@ export async function runPatrolMaintenanceJobs(): Promise<PatrolMaintenanceResul
     console.error('[patrol-maintenance] Error en job de regeneración de patrullas:', err)
   }
 
-  return { photosDeleted, photoErrors, patrolsMissed, patrolsGenerated, timestamp }
+  // 4. Retención de fotos (solo ejecutar si es de noche — entre 00:00 y 05:00)
+  const hour = new Date().getHours()
+  if (hour >= 0 && hour < 5) {
+    try {
+      const photoResult = await PatrolPhotoService.runRetentionJob()
+      photosDeleted = photoResult.deleted
+      photoErrors = photoResult.errors
+    } catch (err) {
+      console.error('[patrol-maintenance] Error en job de retención de fotos:', err)
+    }
+  }
+
+  return { photosDeleted, photoErrors, patrolsMissed, patrolsGenerated, reminderssSent, timestamp }
 }

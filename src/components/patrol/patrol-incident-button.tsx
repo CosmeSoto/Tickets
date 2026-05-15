@@ -79,19 +79,11 @@ export function PatrolIncidentButton({
       })
       return
     }
-    if (!photoFile) {
-      toast({
-        title: 'Foto requerida',
-        description: 'Adjunta una foto como evidencia del incidente',
-        variant: 'destructive',
-      })
-      return
-    }
 
     setSubmitting(true)
     try {
-      // Convertir foto a base64 para enviar junto con el ticket
-      const photoBase64 = await fileToBase64(photoFile)
+      // Convertir foto a base64 si existe
+      const photoBase64 = photoFile ? await fileToBase64(photoFile) : undefined
 
       const res = await fetch('/api/tickets', {
         method: 'POST',
@@ -104,10 +96,11 @@ export function PatrolIncidentButton({
           source: 'PATROL',
           checkInId,
           patrolId,
-          // La foto se adjunta como attachment en el servidor
-          photoBase64,
-          photoMimeType: photoFile.type,
-          photoName: photoFile.name,
+          ...(photoBase64 && {
+            photoBase64,
+            photoMimeType: photoFile!.type,
+            photoName: photoFile!.name,
+          }),
         }),
       })
 
@@ -157,8 +150,8 @@ export function PatrolIncidentButton({
               Reportar Incidente
             </DialogTitle>
             <DialogDescription>
-              Se creará un ticket de soporte vinculado a este check-in. Se requiere foto como
-              evidencia.
+              Se creará un ticket de soporte vinculado a este check-in. Puedes adjuntar una foto
+              como evidencia.
             </DialogDescription>
           </DialogHeader>
 
@@ -196,9 +189,7 @@ export function PatrolIncidentButton({
 
             {/* Foto de evidencia */}
             <div className='space-y-1.5'>
-              <Label className='text-sm font-medium'>
-                Foto de evidencia <span className='text-destructive'>*</span>
-              </Label>
+              <Label className='text-sm font-medium'>Foto de evidencia (opcional)</Label>
 
               {photoPreview ? (
                 <div className='relative rounded-lg overflow-hidden border border-border'>
@@ -264,7 +255,7 @@ export function PatrolIncidentButton({
             <Button
               variant='destructive'
               onClick={handleSubmit}
-              disabled={submitting || !title.trim() || !photoFile}
+              disabled={submitting || !title.trim()}
             >
               {submitting ? (
                 <>

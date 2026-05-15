@@ -13,6 +13,7 @@ import { NotificationService } from '@/lib/services/notification-service'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
 import { NotificationType } from '@prisma/client'
 import { randomUUID } from 'crypto'
+import { checkPatrolModuleAccess } from '@/lib/patrol/patrol-helpers'
 
 const createScheduleSchema = z.object({
   familyId: z.string().uuid(),
@@ -99,15 +100,9 @@ export async function POST(request: NextRequest) {
     if (!['ADMIN', 'TECHNICIAN'].includes(session.user.role)) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
-    if (session.user.role === 'TECHNICIAN') {
-      const user = await prisma.users.findUnique({
-        where: { id: session.user.id },
-        select: { patrolsEnabled: true },
-      })
-      if (!user?.patrolsEnabled) {
-        return NextResponse.json({ error: 'Módulo de patrullas no habilitado' }, { status: 403 })
-      }
-    }
+
+    const denied = await checkPatrolModuleAccess(session.user.id, session.user.role)
+    if (denied) return denied
 
     const body = await request.json()
     const data = createScheduleSchema.parse(body)

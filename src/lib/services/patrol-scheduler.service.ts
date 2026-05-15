@@ -11,6 +11,7 @@ import { randomUUID } from 'crypto'
 import prisma from '@/lib/prisma'
 import { NotificationService } from '@/lib/services/notification-service'
 import { NotificationType, PatrolRecurrence } from '@prisma/client'
+import { getPatrolSupervisors } from '@/lib/patrol/patrol-helpers'
 
 export class PatrolSchedulerService {
   // ── Generación de patrullas ─────────────────────────────────────────────────
@@ -181,7 +182,7 @@ export class PatrolSchedulerService {
             start.setUTCHours(startUTCHours, startUTCMinutes, 0, 0)
 
             // Solo incluir si la fecha de inicio es en el futuro (o igual al scheduledStart original)
-            if (start >= schedule.scheduledStart && start > now && start <= horizonEnd) {
+            if (start >= schedule.scheduledStart && start >= now && start <= horizonEnd) {
               occurrences.push({
                 start,
                 end: new Date(start.getTime() + durationMs),
@@ -229,6 +230,84 @@ export class PatrolSchedulerService {
       `[PatrolSchedulerService] ${totalGenerated} patrullas generadas para ${activeSchedules.length} schedules activos`
     )
     return totalGenerated
+  }
+
+  // ── Recordatorios de rondas próximas ────────────────────────────────────────
+
+  /**
+   * Envía notificaciones de recordatorio a los agentes cuyas rondas están
+   * próximas a iniciar (dentro de los próximos 15 minutos).
+   *
+   * Diseñado para ejecutarse cada 5 minutos vía cron.
+   * Usa un campo de metadata para evitar enviar duplicados.
+   *
+   * @returns Número de recordatorios enviados
+   */
+  static async sendUpcomingReminders(): Promise<number> {
+    const now = new Date()
+    const reminderWindowMs = 15 * 60 * 1000 // 15 minutos
+    const windowEnd = new Date(now.getTime() + reminderWindowMs)
+
+    // Buscar patrullas PENDING que inician en los próximos 15 minutos
+    const upcomingPatrols = await prisma.patrols.findMany({
+      where: {
+        status: 'PENDING',
+        scheduledStart: { gte: now, lte: windowEnd },
+      },
+      select: {
+        id: true,
+        agentId: true,
+        scheduledStart: true,
+        route: { select: { name: true } },
+        family: { select: { name: true } },
+      },
+    })
+
+    if (upcomingPatrols.length === 0) return 0
+
+    // Verificar cuáles ya recibieron recordatorio (evitar duplicados)
+    const patrolIds = upcomingPatrols.map(p => p.id)
+    const alreadyNotified = await prisma.notifications.findMany({
+      where: {
+        type: 'PATROL_ASSIGNED',
+        metadata: { path: ['reminderFor'], array_contains: patrolIds },
+      },
+      select: { metadata: true },
+    })
+
+    // Extraer IDs ya notificados del metadata
+    const notifiedIds = new Set<string>()
+    for (const n of alreadyNotified) {
+      const meta = n.metadata as any
+      if (meta?.reminderFor) notifiedIds.add(meta.reminderFor)
+    }
+
+    let sent = 0
+    for (const patrol of upcomingPatrols) {
+      if (notifiedIds.has(patrol.id)) continue
+
+      const minutesUntilStart = Math.round(
+        (patrol.scheduledStart.getTime() - now.getTime()) / 60000
+      )
+      const startTime = patrol.scheduledStart.toLocaleTimeString('es-EC', {
+        timeZone: 'America/Guayaquil',
+        timeStyle: 'short',
+      })
+
+      await NotificationService.push({
+        userId: patrol.agentId,
+        type: NotificationType.PATROL_ASSIGNED,
+        title: '🔔 Ronda próxima a iniciar',
+        message: `Tu ronda "${patrol.route.name}" inicia en ${minutesUntilStart} minutos (${startTime}). Prepárate para escanear los checkpoints.`,
+        metadata: { patrolId: patrol.id, reminderFor: patrol.id, type: 'upcoming_reminder' },
+      })
+      sent++
+    }
+
+    if (sent > 0) {
+      console.log(`[PatrolSchedulerService] ${sent} recordatorios enviados`)
+    }
+    return sent
   }
 
   // ── Detección de patrullas perdidas ─────────────────────────────────────────
@@ -306,19 +385,7 @@ export class PatrolSchedulerService {
     }>,
     familyId: string
   ): Promise<void> {
-    // Obtener supervisores (ADMIN y TECHNICIAN con patrolsEnabled) de la familia
-    const supervisors = await prisma.users.findMany({
-      where: {
-        isActive: true,
-        patrolsEnabled: true,
-        role: { in: ['ADMIN', 'TECHNICIAN'] },
-        OR: [
-          { adminFamilyAssignments: { some: { familyId, isActive: true } } },
-          { technicianFamilyAssignments: { some: { familyId, isActive: true } } },
-        ],
-      },
-      select: { id: true },
-    })
+    const supervisors = await getPatrolSupervisors(familyId)
 
     if (supervisors.length === 0) return
 

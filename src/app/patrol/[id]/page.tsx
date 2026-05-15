@@ -18,6 +18,7 @@ import { PatrolCheckpointScanner } from '@/components/patrol/patrol-checkpoint-s
 import { PatrolIncidentButton } from '@/components/patrol/patrol-incident-button'
 import { FileInputWithCamera } from '@/components/common/file-input-with-camera'
 import { compressImageFile, fileToBase64 } from '@/lib/utils/image-utils'
+import { formatDurationMinutes } from '@/lib/utils/patrol-utils'
 
 export default function PatrolExecutionPage() {
   const { data: session, status } = useSession()
@@ -336,9 +337,7 @@ export default function PatrolExecutionPage() {
                 <span className='flex items-center gap-1'>
                   ⏱ Duración estimada:{' '}
                   <span className='font-medium text-foreground ml-1'>
-                    {patrol.route.estimatedDurationMinutes >= 60
-                      ? `${Math.floor(patrol.route.estimatedDurationMinutes / 60)}h${patrol.route.estimatedDurationMinutes % 60 > 0 ? ` ${patrol.route.estimatedDurationMinutes % 60}min` : ''}`
-                      : `${patrol.route.estimatedDurationMinutes}min`}
+                    {formatDurationMinutes(patrol.route.estimatedDurationMinutes)}
                   </span>
                 </span>
                 {checkpoints.length > 0 && (
@@ -477,13 +476,15 @@ export default function PatrolExecutionPage() {
           </Card>
         )}
 
-        {/* Botón de incidente (solo en progreso y si hay un check-in reciente) */}
-        {isInProgress && lastCheckInId && (
+        {/* Botón de incidente — visible siempre que la patrulla esté en progreso */}
+        {isInProgress && (
           <div className='flex justify-end'>
             <PatrolIncidentButton
               patrolId={patrolId}
               familyId={patrol.familyId}
-              checkInId={lastCheckInId}
+              checkInId={
+                lastCheckInId ?? patrol.checkIns[patrol.checkIns.length - 1]?.id ?? patrolId
+              }
               onIncidentCreated={() => toast({ title: 'Incidente reportado' })}
             />
           </div>

@@ -16,7 +16,11 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import type { Column } from '@/components/ui/data-table'
-import { QR_TYPE_LABELS_ES, PATROL_RECURRENCE_LABELS_ES } from '@/lib/utils/patrol-utils'
+import {
+  QR_TYPE_LABELS_ES,
+  PATROL_RECURRENCE_LABELS_ES,
+  formatDurationMinutes,
+} from '@/lib/utils/patrol-utils'
 
 // ===== CHECKPOINTS =====
 
@@ -208,13 +212,11 @@ export function createRouteColumns({
       key: 'estimatedDurationMinutes',
       label: 'Duración Est.',
       sortable: true,
-      render: (route: PatrolRoute) => {
-        const mins = route.estimatedDurationMinutes
-        const h = Math.floor(mins / 60)
-        const m = mins % 60
-        const label = h > 0 ? `${h}h${m > 0 ? ` ${m}min` : ''}` : `${m}min`
-        return <span className='text-muted-foreground text-sm'>{label}</span>
-      },
+      render: (route: PatrolRoute) => (
+        <span className='text-muted-foreground text-sm'>
+          {formatDurationMinutes(route.estimatedDurationMinutes)}
+        </span>
+      ),
     },
     {
       key: '_count.routeCheckpoints',
@@ -315,20 +317,18 @@ export function createScheduleColumns({
         const start = new Date(schedule.scheduledStart)
         const end = new Date(schedule.scheduledEnd)
         const diffMs = end.getTime() - start.getTime()
-        const diffH = Math.floor(diffMs / 3600000)
-        const diffM = Math.floor((diffMs % 3600000) / 60000)
+        const diffMins = Math.round(diffMs / 60000)
         // Para recurrencias, mostrar solo la hora; para NONE mostrar fecha+hora
         const isRecurring = schedule.recurrence !== 'NONE'
         const startLabel = isRecurring
           ? start.toLocaleTimeString('es-EC', { timeStyle: 'short' })
           : start.toLocaleString('es-EC', { dateStyle: 'short', timeStyle: 'short' })
         const endLabel = end.toLocaleTimeString('es-EC', { timeStyle: 'short' })
-        const durLabel = diffH > 0 ? `${diffH}h${diffM > 0 ? `${diffM}m` : ''}` : `${diffM}min`
         return (
           <div className='text-xs'>
             <span className='text-foreground font-medium'>{startLabel}</span>
             <span className='text-muted-foreground'> → {endLabel}</span>
-            <span className='ml-1 text-muted-foreground'>({durLabel})</span>
+            <span className='ml-1 text-muted-foreground'>({formatDurationMinutes(diffMins)})</span>
           </div>
         )
       },

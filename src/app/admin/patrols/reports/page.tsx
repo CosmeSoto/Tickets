@@ -25,6 +25,7 @@ import { Badge } from '@/components/ui/badge'
 import {
   PATROL_COMPLIANCE_AGENT_EXPORT_COLUMNS,
   PATROL_COMPLIANCE_ROUTE_EXPORT_COLUMNS,
+  formatDurationMinutes,
 } from '@/lib/utils/patrol-utils'
 import { createAgentColumns, createReportRouteColumns } from '@/components/patrols/patrol-columns'
 

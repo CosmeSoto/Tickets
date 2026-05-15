@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { PatrolStatusBadge } from '@/components/patrol/patrol-status-badge'
 import { PatrolProgress } from '@/components/patrol/patrol-progress'
+import { formatDurationMinutes } from '@/lib/utils/patrol-utils'
 
 interface PatrolListItem {
   id: string
@@ -166,10 +167,7 @@ export default function PatrolListPage() {
                     </span>
                     {patrol.route.estimatedDurationMinutes > 0 && (
                       <span className='flex items-center gap-1'>
-                        ⏱{' '}
-                        {patrol.route.estimatedDurationMinutes >= 60
-                          ? `${Math.floor(patrol.route.estimatedDurationMinutes / 60)}h${patrol.route.estimatedDurationMinutes % 60 > 0 ? ` ${patrol.route.estimatedDurationMinutes % 60}min` : ''}`
-                          : `${patrol.route.estimatedDurationMinutes}min`}
+                        ⏱ {formatDurationMinutes(patrol.route.estimatedDurationMinutes)}
                       </span>
                     )}
                   </div>
@@ -219,11 +217,7 @@ export default function PatrolListPage() {
                       {formatDate(patrol.scheduledStart)}
                     </td>
                     <td className='px-4 py-3 text-muted-foreground text-sm hidden md:table-cell'>
-                      {patrol.route.estimatedDurationMinutes > 0
-                        ? patrol.route.estimatedDurationMinutes >= 60
-                          ? `${Math.floor(patrol.route.estimatedDurationMinutes / 60)}h${patrol.route.estimatedDurationMinutes % 60 > 0 ? ` ${patrol.route.estimatedDurationMinutes % 60}min` : ''}`
-                          : `${patrol.route.estimatedDurationMinutes}min`
-                        : '—'}
+                      {formatDurationMinutes(patrol.route.estimatedDurationMinutes)}
                     </td>
                     <td className='px-4 py-3'>
                       <PatrolStatusBadge status={patrol.status} />

@@ -235,6 +235,8 @@ export class ModelAggregationService {
       modelId,
       brand: first.brand,
       model: first.modelDeprecated,
+      typeId: first.typeId ?? '',
+      typeName: (first as any).type?.name ?? 'Sin tipo',
       total,
       available,
       assigned,

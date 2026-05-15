@@ -10,6 +10,7 @@ import { authOptions } from '@/lib/auth'
 import { z } from 'zod'
 import prisma from '@/lib/prisma'
 import { withCache, buildCacheKey } from '@/lib/api-cache'
+import { checkPatrolModuleAccess } from '@/lib/patrol/patrol-helpers'
 
 const querySchema = z.object({
   familyId: z.string().uuid().optional(),
@@ -31,15 +32,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 
-    if (session.user.role === 'TECHNICIAN') {
-      const user = await prisma.users.findUnique({
-        where: { id: session.user.id },
-        select: { patrolsEnabled: true },
-      })
-      if (!user?.patrolsEnabled) {
-        return NextResponse.json({ error: 'Módulo de patrullas no habilitado' }, { status: 403 })
-      }
-    }
+    const denied = await checkPatrolModuleAccess(session.user.id, session.user.role)
+    if (denied) return denied
 
     const { searchParams } = new URL(request.url)
     const rawParams = Object.fromEntries(searchParams.entries())
@@ -80,7 +74,8 @@ export async function GET(request: NextRequest) {
         ...(agentId ? { agentId } : {}),
         ...(routeId ? { routeId } : {}),
         scheduledStart: { gte: fromDate, lte: toDate },
-        schedule: { isActive: true },
+        // No filtrar por schedule.isActive — las patrullas históricas deben aparecer
+        // aunque el schedule haya sido desactivado posteriormente.
       }
 
       if (groupBy === 'agent') {

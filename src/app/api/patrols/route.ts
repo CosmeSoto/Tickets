@@ -85,46 +85,66 @@ export async function GET(request: NextRequest) {
               id: true,
               name: true,
               estimatedDurationMinutes: true,
-              routeCheckpoints: { select: { isRequired: true, checkpointId: true } },
             },
           },
           family: { select: { id: true, name: true, color: true } },
-          checkIns: {
-            where: { validationResult: 'VALID' },
-            select: { checkpointId: true },
-          },
         },
       }),
     ])
 
     const totalPages = Math.max(1, Math.ceil(total / limit))
 
-    const data = rows.map(p => {
-      const required = p.route.routeCheckpoints.filter(rc => rc.isRequired)
-      const visited = new Set(p.checkIns.map(c => c.checkpointId))
-      const visitedRequired = required.filter(rc => visited.has(rc.checkpointId)).length
-      const completionPercentage = calculateCompletionPercentage(visitedRequired, required.length)
-      const progress =
-        p.status === 'IN_PROGRESS'
-          ? { visitedRequired, totalRequired: required.length, completionPercentage }
-          : undefined
+    // Solo cargar progreso en tiempo real para patrullas IN_PROGRESS (evita N+1 innecesario)
+    const inProgressIds = rows.filter(p => p.status === 'IN_PROGRESS').map(p => p.id)
+    const progressMap = new Map<
+      string,
+      { visitedRequired: number; totalRequired: number; completionPercentage: number }
+    >()
 
-      return {
-        id: p.id,
-        status: p.status,
-        scheduledStart: p.scheduledStart.toISOString(),
-        scheduledEnd: p.scheduledEnd.toISOString(),
-        startedAt: p.startedAt?.toISOString() ?? null,
-        completionPercentage: p.completionPercentage,
-        route: {
-          id: p.route.id,
-          name: p.route.name,
-          estimatedDurationMinutes: p.route.estimatedDurationMinutes,
+    if (inProgressIds.length > 0) {
+      const inProgressPatrols = await prisma.patrols.findMany({
+        where: { id: { in: inProgressIds } },
+        select: {
+          id: true,
+          route: {
+            select: {
+              routeCheckpoints: { select: { isRequired: true, checkpointId: true } },
+            },
+          },
+          checkIns: {
+            where: { validationResult: 'VALID' },
+            select: { checkpointId: true },
+          },
         },
-        family: p.family,
-        ...(progress ? { progress } : {}),
+      })
+
+      for (const p of inProgressPatrols) {
+        const required = p.route.routeCheckpoints.filter(rc => rc.isRequired)
+        const visited = new Set(p.checkIns.map(c => c.checkpointId))
+        const visitedRequired = required.filter(rc => visited.has(rc.checkpointId)).length
+        progressMap.set(p.id, {
+          visitedRequired,
+          totalRequired: required.length,
+          completionPercentage: calculateCompletionPercentage(visitedRequired, required.length),
+        })
       }
-    })
+    }
+
+    const data = rows.map(p => ({
+      id: p.id,
+      status: p.status,
+      scheduledStart: p.scheduledStart.toISOString(),
+      scheduledEnd: p.scheduledEnd.toISOString(),
+      startedAt: p.startedAt?.toISOString() ?? null,
+      completionPercentage: p.completionPercentage,
+      route: {
+        id: p.route.id,
+        name: p.route.name,
+        estimatedDurationMinutes: p.route.estimatedDurationMinutes,
+      },
+      family: p.family,
+      ...(progressMap.has(p.id) ? { progress: progressMap.get(p.id) } : {}),
+    }))
 
     return NextResponse.json({
       success: true,
