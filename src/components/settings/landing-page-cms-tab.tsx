@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
+import { Separator } from '@/components/ui/separator'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Select,
   SelectContent,
@@ -15,7 +17,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Globe, Save, Eye, Crown, Lock } from 'lucide-react'
+import {
+  Globe,
+  Save,
+  Eye,
+  Crown,
+  Building2,
+  Mail,
+  Phone,
+  MapPin,
+  Clock,
+  Facebook,
+  Instagram,
+  Twitter,
+  Linkedin,
+  MessageCircle,
+  Link2,
+} from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { ImageUploader } from './image-uploader'
 import { LandingServicesManager } from './landing-services-manager'
@@ -35,7 +53,17 @@ interface LandingContent {
   companyTagline: string
   companyLogoLightUrl?: string
   companyLogoDarkUrl?: string
+  contactEmail?: string
+  contactPhone?: string
+  contactAddress?: string
+  socialFacebook?: string
+  socialInstagram?: string
+  socialTwitter?: string
+  socialLinkedin?: string
+  socialWhatsapp?: string
+  scheduleText?: string
   footerText: string
+  footerLinksJson?: string
   metaTitle: string
   metaDescription: string
 }
@@ -79,7 +107,17 @@ export function LandingPageCMSTab({ isSuperAdmin = false }: { isSuperAdmin?: boo
           companyTagline: data.companyTagline || '',
           companyLogoLightUrl: data.companyLogoLightUrl || '',
           companyLogoDarkUrl: data.companyLogoDarkUrl || '',
+          contactEmail: data.contactEmail || '',
+          contactPhone: data.contactPhone || '',
+          contactAddress: data.contactAddress || '',
+          socialFacebook: data.socialFacebook || '',
+          socialInstagram: data.socialInstagram || '',
+          socialTwitter: data.socialTwitter || '',
+          socialLinkedin: data.socialLinkedin || '',
+          socialWhatsapp: data.socialWhatsapp || '',
+          scheduleText: data.scheduleText || '',
           footerText: data.footerText || '',
+          footerLinksJson: data.footerLinksJson || '',
           metaTitle: data.metaTitle || '',
           metaDescription: data.metaDescription || '',
         })
@@ -200,7 +238,7 @@ export function LandingPageCMSTab({ isSuperAdmin = false }: { isSuperAdmin?: boo
               id='heroTitle'
               value={content.heroTitle}
               onChange={e => setContent({ ...content, heroTitle: e.target.value })}
-              placeholder='Soporte Técnico Profesional'
+              placeholder='Gestión Integral de Operaciones'
             />
           </div>
 
@@ -330,80 +368,361 @@ export function LandingPageCMSTab({ isSuperAdmin = false }: { isSuperAdmin?: boo
       {/* Gestión de Servicios */}
       <LandingServicesManager />
 
-      {/* Información de la Empresa */}
+      {/* Información de la Empresa y Footer */}
       <Card className={!isSuperAdmin ? 'opacity-60' : ''}>
-        <CardHeader>
-          <CardTitle className='flex items-center gap-2'>
-            Información de la Empresa
-            {!isSuperAdmin && (
-              <Badge className='bg-amber-100 text-amber-700 border-amber-200 flex items-center gap-1 text-xs'>
-                <Crown className='h-3 w-3' />
-                Solo Super Admin
-              </Badge>
-            )}
-          </CardTitle>
-          <CardDescription>
-            {isSuperAdmin
-              ? 'Nombre, logos y datos de identidad de la empresa'
-              : 'Solo el Administrador Principal puede modificar la identidad de la empresa'}
-          </CardDescription>
+        <CardHeader className='pb-4'>
+          <div className='flex items-center justify-between'>
+            <div className='flex items-center gap-3'>
+              <div className='h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center'>
+                <Building2 className='h-5 w-5 text-primary' />
+              </div>
+              <div>
+                <CardTitle className='flex items-center gap-2'>
+                  Empresa y Footer
+                  {!isSuperAdmin && (
+                    <Badge className='bg-amber-100 text-amber-700 border-amber-200 flex items-center gap-1 text-xs'>
+                      <Crown className='h-3 w-3' />
+                      Solo Super Admin
+                    </Badge>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  {isSuperAdmin
+                    ? 'Identidad, contacto, redes sociales y pie de página'
+                    : 'Solo el Administrador Principal puede modificar esta sección'}
+                </CardDescription>
+              </div>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent className='space-y-4'>
-          <div className='space-y-2'>
-            <Label htmlFor='companyName'>Nombre de la Empresa</Label>
-            <Input
-              id='companyName'
-              value={content.companyName}
-              onChange={e =>
-                isSuperAdmin && setContent({ ...content, companyName: e.target.value })
-              }
-              disabled={!isSuperAdmin}
-            />
-          </div>
+        <CardContent>
+          <Tabs defaultValue='identity' className='w-full'>
+            <TabsList className='grid w-full grid-cols-4'>
+              <TabsTrigger value='identity'>Identidad</TabsTrigger>
+              <TabsTrigger value='contact'>Contacto</TabsTrigger>
+              <TabsTrigger value='social'>Redes</TabsTrigger>
+              <TabsTrigger value='footer'>Footer</TabsTrigger>
+            </TabsList>
 
-          <div className='space-y-2'>
-            <Label htmlFor='companyTagline'>Eslogan</Label>
-            <Input
-              id='companyTagline'
-              value={content.companyTagline}
-              onChange={e =>
-                isSuperAdmin && setContent({ ...content, companyTagline: e.target.value })
-              }
-              disabled={!isSuperAdmin}
-            />
-          </div>
+            {/* Tab: Identidad */}
+            <TabsContent value='identity' className='space-y-5 mt-5'>
+              <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                <div className='space-y-2'>
+                  <Label htmlFor='companyName' className='text-sm font-medium'>
+                    Nombre de la Empresa
+                  </Label>
+                  <Input
+                    id='companyName'
+                    value={content.companyName}
+                    onChange={e =>
+                      isSuperAdmin && setContent({ ...content, companyName: e.target.value })
+                    }
+                    disabled={!isSuperAdmin}
+                    placeholder='Mi Empresa S.A.'
+                  />
+                </div>
+                <div className='space-y-2'>
+                  <Label htmlFor='companyTagline' className='text-sm font-medium'>
+                    Eslogan
+                  </Label>
+                  <Input
+                    id='companyTagline'
+                    value={content.companyTagline}
+                    onChange={e =>
+                      isSuperAdmin && setContent({ ...content, companyTagline: e.target.value })
+                    }
+                    disabled={!isSuperAdmin}
+                    placeholder='Tu frase representativa'
+                  />
+                </div>
+              </div>
 
-          <div className='space-y-4'>
-            <ImageUploader
-              label='Logo Tema Claro'
-              currentUrl={content.companyLogoLightUrl}
-              onUpload={url => {
-                if (!isSuperAdmin) return
-                setContent({ ...content, companyLogoLightUrl: url })
-              }}
-              type='logo-light'
-            />
+              <Separator />
 
-            <ImageUploader
-              label='Logo Tema Oscuro'
-              currentUrl={content.companyLogoDarkUrl}
-              onUpload={url => {
-                if (!isSuperAdmin) return
-                setContent({ ...content, companyLogoDarkUrl: url })
-              }}
-              type='logo-dark'
-            />
-          </div>
+              <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
+                <ImageUploader
+                  label='Logo Tema Claro'
+                  currentUrl={content.companyLogoLightUrl}
+                  onUpload={url => {
+                    if (!isSuperAdmin) return
+                    setContent({ ...content, companyLogoLightUrl: url })
+                  }}
+                  type='logo-light'
+                />
+                <ImageUploader
+                  label='Logo Tema Oscuro'
+                  currentUrl={content.companyLogoDarkUrl}
+                  onUpload={url => {
+                    if (!isSuperAdmin) return
+                    setContent({ ...content, companyLogoDarkUrl: url })
+                  }}
+                  type='logo-dark'
+                />
+              </div>
+            </TabsContent>
 
-          <div className='space-y-2'>
-            <Label htmlFor='footerText'>Texto del Footer</Label>
-            <Input
-              id='footerText'
-              value={content.footerText}
-              onChange={e => isSuperAdmin && setContent({ ...content, footerText: e.target.value })}
-              disabled={!isSuperAdmin}
-            />
-          </div>
+            {/* Tab: Contacto */}
+            <TabsContent value='contact' className='space-y-5 mt-5'>
+              <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                <div className='space-y-2'>
+                  <Label
+                    htmlFor='contactEmail'
+                    className='flex items-center gap-2 text-sm font-medium'
+                  >
+                    <Mail className='h-4 w-4 text-muted-foreground' />
+                    Correo Electrónico
+                  </Label>
+                  <Input
+                    id='contactEmail'
+                    type='email'
+                    value={content.contactEmail || ''}
+                    onChange={e =>
+                      isSuperAdmin && setContent({ ...content, contactEmail: e.target.value })
+                    }
+                    disabled={!isSuperAdmin}
+                    placeholder='contacto@empresa.com'
+                  />
+                </div>
+                <div className='space-y-2'>
+                  <Label
+                    htmlFor='contactPhone'
+                    className='flex items-center gap-2 text-sm font-medium'
+                  >
+                    <Phone className='h-4 w-4 text-muted-foreground' />
+                    Teléfono
+                  </Label>
+                  <Input
+                    id='contactPhone'
+                    value={content.contactPhone || ''}
+                    onChange={e =>
+                      isSuperAdmin && setContent({ ...content, contactPhone: e.target.value })
+                    }
+                    disabled={!isSuperAdmin}
+                    placeholder='+56 9 1234 5678'
+                  />
+                </div>
+              </div>
+
+              <div className='space-y-2'>
+                <Label
+                  htmlFor='contactAddress'
+                  className='flex items-center gap-2 text-sm font-medium'
+                >
+                  <MapPin className='h-4 w-4 text-muted-foreground' />
+                  Dirección
+                </Label>
+                <Input
+                  id='contactAddress'
+                  value={content.contactAddress || ''}
+                  onChange={e =>
+                    isSuperAdmin && setContent({ ...content, contactAddress: e.target.value })
+                  }
+                  disabled={!isSuperAdmin}
+                  placeholder='Av. Principal 123, Ciudad'
+                />
+              </div>
+
+              <div className='space-y-2'>
+                <Label
+                  htmlFor='scheduleText'
+                  className='flex items-center gap-2 text-sm font-medium'
+                >
+                  <Clock className='h-4 w-4 text-muted-foreground' />
+                  Horario de Atención
+                </Label>
+                <Input
+                  id='scheduleText'
+                  value={content.scheduleText || ''}
+                  onChange={e =>
+                    isSuperAdmin && setContent({ ...content, scheduleText: e.target.value })
+                  }
+                  disabled={!isSuperAdmin}
+                  placeholder='Lunes a Viernes, 9:00 - 18:00'
+                />
+              </div>
+            </TabsContent>
+
+            {/* Tab: Redes Sociales */}
+            <TabsContent value='social' className='space-y-5 mt-5'>
+              <p className='text-sm text-muted-foreground'>
+                Agrega los enlaces a tus redes sociales. Se mostrarán como íconos en el footer.
+              </p>
+              <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                <div className='space-y-2'>
+                  <Label
+                    htmlFor='socialFacebook'
+                    className='flex items-center gap-2 text-sm font-medium'
+                  >
+                    <Facebook className='h-4 w-4 text-[#1877F2]' />
+                    Facebook
+                  </Label>
+                  <Input
+                    id='socialFacebook'
+                    value={content.socialFacebook || ''}
+                    onChange={e =>
+                      isSuperAdmin && setContent({ ...content, socialFacebook: e.target.value })
+                    }
+                    disabled={!isSuperAdmin}
+                    placeholder='https://facebook.com/tu-pagina'
+                  />
+                </div>
+                <div className='space-y-2'>
+                  <Label
+                    htmlFor='socialInstagram'
+                    className='flex items-center gap-2 text-sm font-medium'
+                  >
+                    <Instagram className='h-4 w-4 text-[#E4405F]' />
+                    Instagram
+                  </Label>
+                  <Input
+                    id='socialInstagram'
+                    value={content.socialInstagram || ''}
+                    onChange={e =>
+                      isSuperAdmin && setContent({ ...content, socialInstagram: e.target.value })
+                    }
+                    disabled={!isSuperAdmin}
+                    placeholder='https://instagram.com/tu-cuenta'
+                  />
+                </div>
+                <div className='space-y-2'>
+                  <Label
+                    htmlFor='socialTwitter'
+                    className='flex items-center gap-2 text-sm font-medium'
+                  >
+                    <Twitter className='h-4 w-4 text-[#1DA1F2]' />
+                    Twitter / X
+                  </Label>
+                  <Input
+                    id='socialTwitter'
+                    value={content.socialTwitter || ''}
+                    onChange={e =>
+                      isSuperAdmin && setContent({ ...content, socialTwitter: e.target.value })
+                    }
+                    disabled={!isSuperAdmin}
+                    placeholder='https://twitter.com/tu-cuenta'
+                  />
+                </div>
+                <div className='space-y-2'>
+                  <Label
+                    htmlFor='socialLinkedin'
+                    className='flex items-center gap-2 text-sm font-medium'
+                  >
+                    <Linkedin className='h-4 w-4 text-[#0A66C2]' />
+                    LinkedIn
+                  </Label>
+                  <Input
+                    id='socialLinkedin'
+                    value={content.socialLinkedin || ''}
+                    onChange={e =>
+                      isSuperAdmin && setContent({ ...content, socialLinkedin: e.target.value })
+                    }
+                    disabled={!isSuperAdmin}
+                    placeholder='https://linkedin.com/company/tu-empresa'
+                  />
+                </div>
+                <div className='space-y-2 md:col-span-2'>
+                  <Label
+                    htmlFor='socialWhatsapp'
+                    className='flex items-center gap-2 text-sm font-medium'
+                  >
+                    <MessageCircle className='h-4 w-4 text-[#25D366]' />
+                    WhatsApp
+                  </Label>
+                  <Input
+                    id='socialWhatsapp'
+                    value={content.socialWhatsapp || ''}
+                    onChange={e =>
+                      isSuperAdmin && setContent({ ...content, socialWhatsapp: e.target.value })
+                    }
+                    disabled={!isSuperAdmin}
+                    placeholder='https://wa.me/56912345678'
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Tab: Footer */}
+            <TabsContent value='footer' className='space-y-5 mt-5'>
+              <div className='space-y-2'>
+                <Label htmlFor='footerText' className='text-sm font-medium'>
+                  Texto de Copyright
+                </Label>
+                <Input
+                  id='footerText'
+                  value={content.footerText}
+                  onChange={e =>
+                    isSuperAdmin && setContent({ ...content, footerText: e.target.value })
+                  }
+                  disabled={!isSuperAdmin}
+                  placeholder='© 2024 Mi Empresa. Todos los derechos reservados.'
+                />
+                <p className='text-xs text-muted-foreground'>
+                  Se muestra en la parte inferior del footer
+                </p>
+              </div>
+
+              <Separator />
+
+              <div className='space-y-3'>
+                <div className='flex items-center gap-2'>
+                  <Link2 className='h-4 w-4 text-muted-foreground' />
+                  <Label className='text-sm font-medium'>Enlaces del Footer</Label>
+                </div>
+                <p className='text-xs text-muted-foreground'>
+                  Agrega enlaces adicionales que aparecerán en el footer (formato JSON). Ejemplo:
+                  Políticas de privacidad, Términos de uso, etc.
+                </p>
+                <Textarea
+                  id='footerLinksJson'
+                  value={content.footerLinksJson || ''}
+                  onChange={e =>
+                    isSuperAdmin && setContent({ ...content, footerLinksJson: e.target.value })
+                  }
+                  disabled={!isSuperAdmin}
+                  placeholder='[{"label": "Política de Privacidad", "url": "/privacidad"}, {"label": "Términos de Uso", "url": "/terminos"}]'
+                  rows={4}
+                  className='font-mono text-xs'
+                />
+              </div>
+
+              <Separator />
+
+              {/* Preview del Footer */}
+              <div className='space-y-2'>
+                <Label className='text-sm font-medium'>Vista Previa del Footer</Label>
+                <div className='rounded-lg border bg-muted/30 p-6'>
+                  <div className='max-w-md mx-auto text-center space-y-3'>
+                    <p className='font-semibold text-sm'>
+                      {content.companyName || 'Nombre de la Empresa'}
+                    </p>
+                    {content.companyTagline && (
+                      <p className='text-xs text-muted-foreground'>{content.companyTagline}</p>
+                    )}
+                    <div className='flex items-center justify-center gap-3'>
+                      {content.socialFacebook && (
+                        <Facebook className='h-4 w-4 text-muted-foreground' />
+                      )}
+                      {content.socialInstagram && (
+                        <Instagram className='h-4 w-4 text-muted-foreground' />
+                      )}
+                      {content.socialTwitter && (
+                        <Twitter className='h-4 w-4 text-muted-foreground' />
+                      )}
+                      {content.socialLinkedin && (
+                        <Linkedin className='h-4 w-4 text-muted-foreground' />
+                      )}
+                      {content.socialWhatsapp && (
+                        <MessageCircle className='h-4 w-4 text-muted-foreground' />
+                      )}
+                    </div>
+                    <p className='text-xs text-muted-foreground'>
+                      {content.footerText || '© 2024'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 

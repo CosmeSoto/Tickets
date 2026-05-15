@@ -14,6 +14,9 @@ docker compose --env-file .env.production -f docker-compose.prod.yml up -d
 # Reconstruir después de cambios en código:
 docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
 
+# Reconstruye la app con migraciones
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build app
+
 # Ver logs en tiempo real:
 docker compose --env-file .env.production -f docker-compose.prod.yml logs -f app
 

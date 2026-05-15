@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Loader2 } from 'lucide-react'
 import * as Icons from 'lucide-react'
@@ -22,7 +23,18 @@ interface LandingContent {
   servicesSubtitle: string
   servicesEnabled: boolean
   companyName: string
+  companyTagline?: string
+  contactEmail?: string
+  contactPhone?: string
+  contactAddress?: string
+  socialFacebook?: string
+  socialInstagram?: string
+  socialTwitter?: string
+  socialLinkedin?: string
+  socialWhatsapp?: string
+  scheduleText?: string
   footerText: string
+  footerLinksJson?: string
 }
 
 interface Service {
@@ -34,8 +46,8 @@ interface Service {
 }
 
 const defaultContent: LandingContent = {
-  heroTitle: 'Soporte Técnico Profesional',
-  heroSubtitle: 'Resolvemos tus problemas técnicos de manera rápida y eficiente',
+  heroTitle: 'Gestión Integral de Operaciones',
+  heroSubtitle: 'Tickets, inventario, rondas en una sola plataforma',
   heroCtaPrimary: 'Crear Ticket de Soporte',
   heroCtaPrimaryUrl: '/login',
   heroCtaSecondary: 'Ver Servicios',
@@ -45,16 +57,31 @@ const defaultContent: LandingContent = {
   servicesSubtitle: 'Ofrecemos soporte técnico integral',
   servicesEnabled: true,
   companyName: 'Sistema de Tickets',
+  companyTagline: 'Gestión Integral de Operaciones',
   footerText: `© ${new Date().getFullYear()} Sistema de Tickets`,
 }
 
 export default function HomePage() {
   const { data: session, status } = useSession()
+  const router = useRouter()
   const [content, setContent] = useState<LandingContent | null>(null)
   const [services, setServices] = useState<Service[]>([])
   const [forSaleItems, setForSaleItems] = useState<PublicEquipmentItem[]>([])
   const [forSaleEnabled, setForSaleEnabled] = useState(true)
   const [loading, setLoading] = useState(true)
+
+  // Redirigir usuarios autenticados al dashboard
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user) {
+      const dest =
+        session.user.role === 'ADMIN'
+          ? '/admin'
+          : session.user.role === 'TECHNICIAN'
+            ? '/technician'
+            : '/client'
+      router.replace(dest)
+    }
+  }, [status, session, router])
 
   useEffect(() => {
     // Fetch landing page content and services
@@ -126,11 +153,11 @@ export default function HomePage() {
                 </Button>
               ) : (
                 <>
-                  <Button asChild variant='ghost' size='sm' className='hidden sm:inline-flex'>
+                  <Button asChild variant='ghost' size='sm'>
                     <Link href='/login'>Iniciar Sesión</Link>
                   </Button>
-                  <Button asChild size='sm'>
-                    <Link href='/login'>Crear Ticket</Link>
+                  <Button asChild size='sm' className='hidden sm:inline-flex'>
+                    <Link href='/client/tickets/create'>Crear Ticket</Link>
                   </Button>
                 </>
               )}
@@ -170,7 +197,7 @@ export default function HomePage() {
           {/* Badge */}
           <div className='inline-flex items-center gap-2 bg-primary/10 border border-primary/25 text-primary text-sm font-medium px-4 py-1.5 rounded-full mb-8'>
             <span className='w-2 h-2 rounded-full bg-primary animate-pulse' />
-            Plataforma de gestión integral
+            Gestión Integral de Operaciones integral
           </div>
 
           <h1 className='text-4xl sm:text-5xl md:text-6xl font-bold mb-6 text-foreground leading-tight'>
@@ -263,10 +290,151 @@ export default function HomePage() {
       {forSaleEnabled && forSaleItems.length > 0 && <ForSaleSection items={forSaleItems} />}
 
       {/* ── Footer ─────────────────────────────────────────────────────── */}
-      <footer className='bg-card border-t border-border py-10'>
-        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-4'>
-          <SystemLogo size='md' showText={true} className='justify-center' />
-          <p className='text-sm text-muted-foreground'>{d.footerText}</p>
+      <footer className='bg-card border-t border-border'>
+        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
+          {/* Main footer content */}
+          <div className='py-12 grid grid-cols-1 md:grid-cols-3 gap-8'>
+            {/* Company Info */}
+            <div className='space-y-4'>
+              <SystemLogo size='md' showText={true} />
+              {d.companyTagline && (
+                <p className='text-sm text-muted-foreground'>{d.companyTagline}</p>
+              )}
+              {/* Social Icons */}
+              {(d.socialFacebook ||
+                d.socialInstagram ||
+                d.socialTwitter ||
+                d.socialLinkedin ||
+                d.socialWhatsapp) && (
+                <div className='flex items-center gap-3 pt-2'>
+                  {d.socialFacebook && (
+                    <a
+                      href={d.socialFacebook}
+                      target='_blank'
+                      rel='noopener noreferrer'
+                      className='h-9 w-9 rounded-full bg-muted flex items-center justify-center hover:bg-primary/10 hover:text-primary transition-colors'
+                      aria-label='Facebook'
+                    >
+                      <Icons.Facebook className='h-4 w-4' />
+                    </a>
+                  )}
+                  {d.socialInstagram && (
+                    <a
+                      href={d.socialInstagram}
+                      target='_blank'
+                      rel='noopener noreferrer'
+                      className='h-9 w-9 rounded-full bg-muted flex items-center justify-center hover:bg-primary/10 hover:text-primary transition-colors'
+                      aria-label='Instagram'
+                    >
+                      <Icons.Instagram className='h-4 w-4' />
+                    </a>
+                  )}
+                  {d.socialTwitter && (
+                    <a
+                      href={d.socialTwitter}
+                      target='_blank'
+                      rel='noopener noreferrer'
+                      className='h-9 w-9 rounded-full bg-muted flex items-center justify-center hover:bg-primary/10 hover:text-primary transition-colors'
+                      aria-label='Twitter'
+                    >
+                      <Icons.Twitter className='h-4 w-4' />
+                    </a>
+                  )}
+                  {d.socialLinkedin && (
+                    <a
+                      href={d.socialLinkedin}
+                      target='_blank'
+                      rel='noopener noreferrer'
+                      className='h-9 w-9 rounded-full bg-muted flex items-center justify-center hover:bg-primary/10 hover:text-primary transition-colors'
+                      aria-label='LinkedIn'
+                    >
+                      <Icons.Linkedin className='h-4 w-4' />
+                    </a>
+                  )}
+                  {d.socialWhatsapp && (
+                    <a
+                      href={d.socialWhatsapp}
+                      target='_blank'
+                      rel='noopener noreferrer'
+                      className='h-9 w-9 rounded-full bg-muted flex items-center justify-center hover:bg-primary/10 hover:text-primary transition-colors'
+                      aria-label='WhatsApp'
+                    >
+                      <Icons.MessageCircle className='h-4 w-4' />
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Contact Info */}
+            {(d.contactEmail || d.contactPhone || d.contactAddress || d.scheduleText) && (
+              <div className='space-y-3'>
+                <h4 className='text-sm font-semibold text-foreground'>Contacto</h4>
+                {d.contactEmail && (
+                  <a
+                    href={`mailto:${d.contactEmail}`}
+                    className='flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors'
+                  >
+                    <Icons.Mail className='h-4 w-4 flex-shrink-0' />
+                    {d.contactEmail}
+                  </a>
+                )}
+                {d.contactPhone && (
+                  <a
+                    href={`tel:${d.contactPhone}`}
+                    className='flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors'
+                  >
+                    <Icons.Phone className='h-4 w-4 flex-shrink-0' />
+                    {d.contactPhone}
+                  </a>
+                )}
+                {d.contactAddress && (
+                  <p className='flex items-start gap-2 text-sm text-muted-foreground'>
+                    <Icons.MapPin className='h-4 w-4 flex-shrink-0 mt-0.5' />
+                    {d.contactAddress}
+                  </p>
+                )}
+                {d.scheduleText && (
+                  <p className='flex items-center gap-2 text-sm text-muted-foreground'>
+                    <Icons.Clock className='h-4 w-4 flex-shrink-0' />
+                    {d.scheduleText}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Footer Links */}
+            {d.footerLinksJson &&
+              (() => {
+                try {
+                  const links = JSON.parse(d.footerLinksJson) as { label: string; url: string }[]
+                  if (links.length === 0) return null
+                  return (
+                    <div className='space-y-3'>
+                      <h4 className='text-sm font-semibold text-foreground'>Enlaces</h4>
+                      <nav className='flex flex-col gap-2'>
+                        {links.map((link, i) => (
+                          <a
+                            key={i}
+                            href={link.url}
+                            className='text-sm text-muted-foreground hover:text-foreground transition-colors'
+                          >
+                            {link.label}
+                          </a>
+                        ))}
+                      </nav>
+                    </div>
+                  )
+                } catch {
+                  return null
+                }
+              })()}
+          </div>
+
+          {/* Bottom bar */}
+          <div className='border-t border-border py-6'>
+            <p className='text-center text-xs text-muted-foreground'>{d.footerText}</p>
+          </div>
         </div>
       </footer>
     </div>

@@ -6,31 +6,38 @@ PRISMA_CLI='node ./node_modules/prisma/build/index.js'
 TSX_CLI='node ./node_modules/tsx/dist/cli.mjs'
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  Sistema de Tickets — Iniciando..."
+echo "  Sistema de Gestión — Iniciando..."
 echo "  NODE_ENV: ${NODE_ENV}"
 echo "  NEXTAUTH_URL: ${NEXTAUTH_URL}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # ── 1. Migraciones de base de datos ──────────────────────────────────────────
-# migrate deploy aplica solo las migraciones pendientes — idempotente y seguro.
 echo "==> Ejecutando migraciones..."
 $PRISMA_CLI migrate deploy
 echo "==> Migraciones completadas."
 
 # ── 2. Seed inicial (solo si la tabla de usuarios está vacía) ─────────────────
-# Evita re-seedear en cada reinicio del contenedor.
-USER_COUNT=$($PRISMA_CLI db execute --stdin <<'SQL' 2>/dev/null || echo "0"
-SELECT COUNT(*)::text FROM users;
-SQL
-)
-USER_COUNT=$(echo "$USER_COUNT" | tr -d '[:space:]' | tail -1)
+# Usa node directamente para consultar la BD — más confiable que parsear prisma CLI.
+echo "==> Verificando si la base de datos necesita seed..."
 
-if [ "$USER_COUNT" = "0" ] || [ -z "$USER_COUNT" ]; then
+NEEDS_SEED=$(node -e "
+const { PrismaClient } = require('@prisma/client');
+const p = new PrismaClient();
+p.users.count().then(c => {
+  console.log(c === 0 ? 'yes' : 'no');
+  return p.\$disconnect();
+}).catch(() => {
+  console.log('yes');
+  process.exit(0);
+});
+" 2>/dev/null || echo "yes")
+
+if [ "$NEEDS_SEED" = "yes" ]; then
   echo "==> Base de datos vacía — ejecutando seed inicial..."
   $TSX_CLI prisma/seed.ts
   echo "==> Seed completado."
 else
-  echo "==> Base de datos ya tiene datos (${USER_COUNT} usuarios) — omitiendo seed."
+  echo "==> Base de datos ya tiene datos — omitiendo seed."
 fi
 
 # ── 3. Copiar uploads iniciales si el volumen está vacío ─────────────────────
