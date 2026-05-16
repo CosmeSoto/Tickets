@@ -249,12 +249,14 @@ export class PatrolSchedulerService {
     // Obtener configuraciones de familia para conocer el tiempo de recordatorio
     const familyConfigs = await prisma.patrol_family_config.findMany({
       where: { patrolsEnabled: true },
-      select: { familyId: true, gracePeriodMinutes: true },
+      select: { familyId: true, reminderMinutesBefore: true },
     })
 
-    // Usar el mayor gracePeriodMinutes como ventana de búsqueda (default 5 min)
+    // Usar el mayor reminderMinutesBefore como ventana de búsqueda (default 5 min)
     const maxReminderMinutes =
-      familyConfigs.length > 0 ? Math.max(...familyConfigs.map(c => c.gracePeriodMinutes ?? 5)) : 5
+      familyConfigs.length > 0
+        ? Math.max(...familyConfigs.map(c => c.reminderMinutesBefore ?? 5))
+        : 5
     const reminderWindowMs = maxReminderMinutes * 60 * 1000
     const windowEnd = new Date(now.getTime() + reminderWindowMs)
 

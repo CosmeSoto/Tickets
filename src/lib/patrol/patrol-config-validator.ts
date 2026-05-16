@@ -12,6 +12,7 @@ export interface PatrolFamilyConfigInput {
   offlineSyncToleranceMinutes?: number
   alertCompletionThreshold?: number
   gracePeriodMinutes?: number
+  reminderMinutesBefore?: number
 }
 
 export interface ConfigValidationError {
@@ -70,6 +71,11 @@ const FIELD_RANGES: Record<keyof PatrolFamilyConfigInput, FieldRange> = {
     min: 0,
     max: 120,
     label: 'Período de gracia (minutos)',
+  },
+  reminderMinutesBefore: {
+    min: 1,
+    max: 60,
+    label: 'Recordatorio antes (minutos)',
   },
 }
 

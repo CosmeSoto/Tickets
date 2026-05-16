@@ -78,6 +78,7 @@ export async function PUT(
       'offlineSyncToleranceMinutes',
       'alertCompletionThreshold',
       'gracePeriodMinutes',
+      'reminderMinutesBefore',
       'patrolIncidentCategoryId',
     ] as const
 

@@ -390,13 +390,35 @@ export function PatrolAreasTab({
                       max={120}
                       value={form.gracePeriodMinutes}
                       onChange={e =>
-                        onSetField('gracePeriodMinutes', parseInt(e.target.value) || 15)
+                        onSetField('gracePeriodMinutes', parseInt(e.target.value) || 5)
                       }
                       disabled={saving}
                       className='h-8 text-sm'
                     />
                     <p className='text-xs text-muted-foreground'>
-                      Tiempo antes de marcar una ronda como OMITIDA
+                      Tiempo antes de marcar una ronda como OMITIDA y permitir iniciar
+                      anticipadamente
+                    </p>
+                  </div>
+                  <div className='space-y-1.5'>
+                    <Label htmlFor='reminderMinutes' className='text-xs'>
+                      Recordatorio antes (minutos)
+                    </Label>
+                    <Input
+                      id='reminderMinutes'
+                      type='number'
+                      min={1}
+                      max={60}
+                      value={form.reminderMinutesBefore ?? 5}
+                      onChange={e =>
+                        onSetField('reminderMinutesBefore', parseInt(e.target.value) || 5)
+                      }
+                      disabled={saving}
+                      className='h-8 text-sm'
+                    />
+                    <p className='text-xs text-muted-foreground'>
+                      Minutos antes de enviar notificación al agente de que su ronda está por
+                      iniciar
                     </p>
                   </div>
                 </div>

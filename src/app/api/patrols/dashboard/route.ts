@@ -152,12 +152,27 @@ export async function GET(request: NextRequest) {
       }))
 
       // Incidentes abiertos originados en patrullas
-      const [openIncidents, inProgressIncidents] = await Promise.all([
+      const [openIncidents, inProgressIncidents, recentIncidents] = await Promise.all([
         prisma.tickets.count({
           where: { source: 'PATROL', status: 'OPEN', ...familyFilter },
         }),
         prisma.tickets.count({
           where: { source: 'PATROL', status: 'IN_PROGRESS', ...familyFilter },
+        }),
+        prisma.tickets.findMany({
+          where: { source: 'PATROL', status: { in: ['OPEN', 'IN_PROGRESS'] }, ...familyFilter },
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            priority: true,
+            createdAt: true,
+            ticketCode: true,
+            users_tickets_clientIdTousers: { select: { name: true } },
+            family: { select: { name: true, color: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 5,
         }),
       ])
 
@@ -175,6 +190,16 @@ export async function GET(request: NextRequest) {
         last7Days: { missed: last7Missed, incomplete: last7Incomplete, completed: last7Completed },
         last30Days: { avgCompletionByRoute },
         openIncidents: { open: openIncidents, inProgress: inProgressIncidents },
+        recentIncidents: recentIncidents.map(t => ({
+          id: t.id,
+          title: t.title,
+          status: t.status,
+          priority: t.priority,
+          createdAt: t.createdAt,
+          ticketCode: t.ticketCode,
+          reportedBy: t.users_tickets_clientIdTousers.name,
+          family: t.family?.name ?? null,
+        })),
       }
     })
 

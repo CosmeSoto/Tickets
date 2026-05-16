@@ -186,11 +186,12 @@ export function UserDetailsModal({
               Módulos
             </p>
             <div className='flex flex-wrap gap-2'>
-              <ModuleChip enabled={user.ticketsEnabled !== false} label='Tickets' />
+              <ModuleChip enabled={user.ticketsEnabled !== false} label='🎫 Tickets' />
               <ModuleChip
                 enabled={user.inventoryEnabled === true || user.canManageInventory === true}
-                label='Inventario'
+                label='📦 Inventario'
               />
+              <ModuleChip enabled={user.patrolsEnabled === true} label='🛡️ Rondas' />
               {user.canManageInventory && (
                 <div className='flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs border border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-400'>
                   <Shield className='h-3 w-3' />

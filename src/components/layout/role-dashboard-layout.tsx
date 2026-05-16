@@ -106,7 +106,6 @@ const navigationByRole: Record<string, NavItem[]> = {
       icon: Shield,
       children: [
         { name: 'Dashboard', href: '/admin/patrols', icon: LayoutDashboard },
-        { name: 'Incidencias', href: '/admin/patrols/incidents', icon: AlertTriangle },
         { name: 'Checkpoints', href: '/admin/patrols/checkpoints', icon: MapPin },
         { name: 'Rutas', href: '/admin/patrols/routes', icon: ClipboardList },
         { name: 'Programación', href: '/admin/patrols/schedules', icon: ClipboardList },
@@ -152,10 +151,6 @@ const navigationByRole: Record<string, NavItem[]> = {
       children: [
         { name: 'Dashboard', href: '/admin/patrols', icon: LayoutDashboard },
         { name: 'Mis Rondas', href: '/patrol', icon: MapPin },
-        { name: 'Incidencias', href: '/admin/patrols/incidents', icon: AlertTriangle },
-        { name: 'Checkpoints', href: '/admin/patrols/checkpoints', icon: MapPin },
-        { name: 'Rutas', href: '/admin/patrols/routes', icon: ClipboardList },
-        { name: 'Programación', href: '/admin/patrols/schedules', icon: ClipboardList },
         { name: 'Reportes', href: '/admin/patrols/reports', icon: BarChart3 },
       ],
     },
@@ -194,10 +189,6 @@ const navigationByRole: Record<string, NavItem[]> = {
       children: [
         { name: 'Dashboard', href: '/admin/patrols', icon: LayoutDashboard },
         { name: 'Mis Rondas', href: '/patrol', icon: MapPin },
-        { name: 'Incidencias', href: '/admin/patrols/incidents', icon: AlertTriangle },
-        { name: 'Checkpoints', href: '/admin/patrols/checkpoints', icon: MapPin },
-        { name: 'Rutas', href: '/admin/patrols/routes', icon: ClipboardList },
-        { name: 'Programación', href: '/admin/patrols/schedules', icon: ClipboardList },
         { name: 'Reportes', href: '/admin/patrols/reports', icon: BarChart3 },
       ],
     },

@@ -298,31 +298,55 @@ export default function PatrolDashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Incidentes abiertos */}
+          {/* Incidentes de Patrulla */}
           <Card>
             <CardHeader className='pb-3'>
               <CardTitle className='text-sm flex items-center gap-2'>
                 <AlertTriangle className='h-4 w-4 text-orange-500' />
-                Incidentes de Patrulla
+                Incidencias de Rondas
               </CardTitle>
             </CardHeader>
             <CardContent className='space-y-2'>
-              {[
-                { label: 'Abiertos', value: data?.openIncidents.open },
-                { label: 'En progreso', value: data?.openIncidents.inProgress },
-              ].map(item => (
-                <div key={item.label} className='flex items-center justify-between text-sm'>
-                  <span className='text-muted-foreground'>{item.label}</span>
-                  <Badge variant='outline'>{item.value ?? '—'}</Badge>
+              <div className='flex items-center justify-between text-sm'>
+                <span className='text-muted-foreground'>Abiertas</span>
+                <Badge variant='outline'>{data?.openIncidents.open ?? '—'}</Badge>
+              </div>
+              <div className='flex items-center justify-between text-sm'>
+                <span className='text-muted-foreground'>En progreso</span>
+                <Badge variant='outline'>{data?.openIncidents.inProgress ?? '—'}</Badge>
+              </div>
+
+              {/* Lista de incidencias recientes */}
+              {data?.recentIncidents && data.recentIncidents.length > 0 && (
+                <div className='border-t pt-2 mt-2 space-y-1.5'>
+                  <p className='text-xs font-medium text-muted-foreground'>Recientes</p>
+                  {data.recentIncidents.map((inc: any) => (
+                    <div
+                      key={inc.id}
+                      className='p-2 rounded border hover:bg-muted/30 cursor-pointer transition-colors'
+                      onClick={() => router.push(`/admin/tickets/${inc.id}`)}
+                    >
+                      <p className='text-xs font-medium truncate'>{inc.title}</p>
+                      <div className='flex items-center gap-2 mt-0.5'>
+                        <span className='text-[10px] text-muted-foreground'>{inc.reportedBy}</span>
+                        {inc.ticketCode && (
+                          <span className='text-[10px] font-mono text-muted-foreground'>
+                            {inc.ticketCode}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
+
               <Button
                 variant='link'
                 size='sm'
                 className='p-0 h-auto text-xs'
-                onClick={() => router.push('/admin/tickets?source=PATROL')}
+                onClick={() => router.push('/admin/patrols/incidents')}
               >
-                Ver tickets de patrulla →
+                Ver todas las incidencias →
               </Button>
             </CardContent>
           </Card>

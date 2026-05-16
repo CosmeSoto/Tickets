@@ -246,10 +246,15 @@ export async function GET(request: Request) {
     const enrichedFamilies = families.map(f => ({
       ...f,
       modules: {
-        tickets: (ticketMap.get(f.id) ?? true) && (ticketsEnabled || isAdminRole),
-        inventory:
-          (invMap.get(f.id) ?? false) && (canManageInventory || inventoryEnabled || isAdminRole),
-        patrols: (patrolMap.get(f.id) ?? false) && patrolsEnabled,
+        tickets: isSuperAdmin
+          ? true
+          : (ticketMap.get(f.id) ?? true) && (ticketsEnabled || isAdminRole),
+        inventory: isSuperAdmin
+          ? true
+          : (invMap.get(f.id) ?? false) && (canManageInventory || inventoryEnabled || isAdminRole),
+        patrols: isSuperAdmin
+          ? true
+          : (patrolMap.get(f.id) ?? false) && (patrolsEnabled || isAdminRole),
       },
     }))
 

@@ -6,17 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import {
-  AlertTriangle,
-  Activity,
-  Building,
-  Layers,
-  Package,
-  ShieldCheck,
-  Shield,
-  Save,
-  User,
-} from 'lucide-react'
+import { AlertTriangle, Activity, Building, ShieldCheck, Save, User } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { UserData } from '@/hooks/use-users'
 import { USER_ROLE_FORM_OPTIONS, type UserRole } from '@/lib/constants/user-constants'
@@ -24,19 +14,17 @@ import { DepartmentSelector } from '@/components/ui/department-selector'
 import { Switch } from '@/components/ui/switch'
 import { extractApiError, extractCatchError } from '@/lib/utils/api-error'
 import {
-  useSystemModules,
-  getModuleRoleDescription,
-  getModuleEmoji,
-} from '@/hooks/use-system-modules'
-import {
   FamilyAssignmentSection,
   type FamilyOption,
 } from '@/components/users/family-assignment-section'
 import { UnassignConfirmDialog } from '@/components/users/unassign-confirm-dialog'
 import { UserModulesPanel } from '@/components/users/user-modules-panel'
+import { ModuleAccessCard } from '@/components/users/module-access-card'
 import { UserHeaderCard } from '@/components/users/edit-modal/UserHeaderCard'
 import { UserPersonalDataSection } from '@/components/users/edit-modal/UserPersonalDataSection'
 import { UserSecuritySection } from '@/components/users/edit-modal/UserSecuritySection'
+import { validateUserForm, useUserAvatarHandler } from './user-utils'
+import { useSystemModules } from '@/hooks/use-system-modules'
 
 interface EditUserModalProps {
   isOpen: boolean
@@ -76,6 +64,7 @@ export function EditUserModal({
   const [loading, setLoading] = useState(false)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [isLocked, setIsLocked] = useState(false)
+  const { handleAvatarChange } = useUserAvatarHandler()
   const [formData, setFormData] = useState<EditUserData>({
     name: '',
     email: '',
@@ -471,31 +460,6 @@ export function EditUserModal({
     }
   }
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (!file.type.startsWith('image/')) {
-      toast({
-        title: 'Archivo inválido',
-        description: 'Selecciona una imagen válida',
-        variant: 'destructive',
-      })
-      return
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast({
-        title: 'Archivo muy grande',
-        description: 'La imagen debe ser menor a 5MB',
-        variant: 'destructive',
-      })
-      return
-    }
-    setFormData(p => ({ ...p, avatar: file }))
-    const reader = new FileReader()
-    reader.onload = e => setAvatarPreview(e.target?.result as string)
-    reader.readAsDataURL(file)
-  }
-
   const handleDeleteAvatar = async () => {
     if (!user) return
     try {
@@ -514,24 +478,21 @@ export function EditUserModal({
     }
   }
 
-  const validateForm = (): { isValid: boolean; errors: Record<string, string> } => {
-    const newErrors: Record<string, string> = {}
-    if (!formData.name.trim()) newErrors.name = 'El nombre es requerido'
-    else if (formData.name.trim().length < 2) newErrors.name = 'Mínimo 2 caracteres'
-    if (!formData.email.trim()) newErrors.email = 'El email es requerido'
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Email inválido'
-    if (formData.phone && !/^[\d\s\-\+\(\)]+$/.test(formData.phone))
-      newErrors.phone = 'Formato inválido'
-    if (formData.role !== 'ADMIN' && !formData.departmentId)
-      newErrors.departmentId = 'Requerido para este rol'
-    setErrors(newErrors)
-    return { isValid: Object.keys(newErrors).length === 0, errors: newErrors }
+  const onAvatarFileSelect = (file: File) => {
+    setFormData(p => ({ ...p, avatar: file }))
+  }
+
+  const onAvatarPreviewUpdate = (preview: string) => {
+    setAvatarPreview(preview)
   }
 
   const handleSubmit = async () => {
     if (!user) return
-    const { isValid } = validateForm()
-    if (!isValid) return
+    const { isValid, errors: validationErrors } = validateUserForm(formData)
+    if (!isValid) {
+      setErrors(validationErrors)
+      return
+    }
     setLoading(true)
     try {
       const res = await fetch(`/api/users/${user.id}`, {
@@ -610,7 +571,7 @@ export function EditUserModal({
               isCurrentUser={isCurrentUser}
               isLocked={isLocked}
               hasNewAvatar={!!formData.avatar}
-              onAvatarChange={handleAvatarChange}
+              onAvatarChange={e => handleAvatarChange(e, onAvatarFileSelect, onAvatarPreviewUpdate)}
               onDeleteAvatar={handleDeleteAvatar}
               onResetAvatar={() => {
                 setFormData(p => ({ ...p, avatar: undefined }))
@@ -738,144 +699,118 @@ export function EditUserModal({
                 )}
               </div>
 
-              {/* ── Módulos — grid escalable, funciona con 2 o 10 módulos ── */}
+              {/* ── Módulos con familias integradas ── */}
               {!formData.isSuperAdmin && systemModules.length > 0 && (
                 <div className='space-y-2 pt-1'>
                   <p className='text-xs font-semibold text-muted-foreground uppercase tracking-wide'>
                     Acceso a módulos
                   </p>
 
-                  {/* Grid 2 columnas — escala bien con más módulos */}
-                  <div className='grid grid-cols-2 gap-2'>
-                    {systemModules.map(mod => {
-                      const isEnabled = (() => {
-                        if (mod.key === 'tickets') return formData.ticketsEnabled
-                        if (mod.key === 'inventory')
-                          return formData.inventoryEnabled || formData.canManageInventory
-                        if (mod.key === 'patrols') return formData.patrolsEnabled
-                        return false
-                      })()
-
-                      const handleToggle = (v: boolean) => {
-                        if (mod.key === 'tickets') {
-                          setFormData(p => ({ ...p, ticketsEnabled: v }))
-                        } else if (mod.key === 'inventory') {
-                          setFormData(p => ({
-                            ...p,
-                            inventoryEnabled: v,
-                            canManageInventory:
-                              formData.role === 'TECHNICIAN' ? v : p.canManageInventory,
-                          }))
-                        } else if (mod.key === 'patrols') {
-                          setFormData(p => ({ ...p, patrolsEnabled: v }))
-                        }
+                  <div className='space-y-2'>
+                    {/* Tickets */}
+                    <ModuleAccessCard
+                      moduleKey='tickets'
+                      moduleName='Tickets de Soporte'
+                      role={formData.role}
+                      enabled={formData.ticketsEnabled}
+                      onToggle={v => setFormData(p => ({ ...p, ticketsEnabled: v }))}
+                      families={allFamilies}
+                      assignedFamilyIds={
+                        formData.role === 'TECHNICIAN' ? technicianFamilyIds : clientFamilyIds
                       }
+                      nativeFamilyId={
+                        user && typeof user.department === 'object'
+                          ? ((user.department as any)?.familyId ?? null)
+                          : null
+                      }
+                      readOnlyFamilyIds={adminScopeReadOnlyIds}
+                      onAssignFamily={
+                        formData.role === 'TECHNICIAN'
+                          ? handleAssignTechnicianFamily
+                          : handleAssignClientFamily
+                      }
+                      onUnassignFamily={
+                        formData.role === 'TECHNICIAN'
+                          ? (handleUnassignTechnicianFamily as (id: string) => Promise<any>)
+                          : handleUnassignClientFamily
+                      }
+                      loading={loadingFamilies}
+                      disabled={loading}
+                    />
 
-                      return (
-                        <div key={mod.key} className='space-y-1.5'>
-                          {/* Tarjeta del módulo */}
-                          <button
-                            type='button'
-                            onClick={() => handleToggle(!isEnabled)}
-                            className={`w-full text-left rounded-xl border-2 p-3 transition-all duration-150 ${
-                              isEnabled
-                                ? 'border-primary/40 bg-primary/5 shadow-sm'
-                                : 'border-border bg-background hover:border-border/80 hover:bg-muted/30'
-                            }`}
-                          >
-                            <div className='flex items-start justify-between gap-2'>
-                              <div className='flex items-center gap-2 min-w-0'>
-                                <span className='text-xl leading-none'>
-                                  {getModuleEmoji(mod.key)}
-                                </span>
-                                <div className='min-w-0'>
-                                  <p
-                                    className={`text-xs font-semibold leading-tight ${isEnabled ? 'text-primary' : 'text-foreground'}`}
-                                  >
-                                    {mod.name}
-                                  </p>
-                                  <p className='text-[10px] text-muted-foreground leading-tight mt-0.5 line-clamp-2'>
-                                    {getModuleRoleDescription(mod.key, formData.role)}
-                                  </p>
-                                </div>
-                              </div>
-                              {/* Indicador visual de estado */}
-                              <div
-                                className={`flex-shrink-0 w-4 h-4 rounded-full border-2 mt-0.5 transition-colors ${
-                                  isEnabled
-                                    ? 'bg-primary border-primary'
-                                    : 'bg-background border-muted-foreground/30'
-                                }`}
-                              >
-                                {isEnabled && (
-                                  <svg
-                                    className='w-full h-full text-primary-foreground p-0.5'
-                                    viewBox='0 0 12 12'
-                                    fill='none'
-                                  >
-                                    <path
-                                      d='M2 6l3 3 5-5'
-                                      stroke='currentColor'
-                                      strokeWidth='2'
-                                      strokeLinecap='round'
-                                      strokeLinejoin='round'
-                                    />
-                                  </svg>
-                                )}
-                              </div>
-                            </div>
-                          </button>
+                    {/* Inventario */}
+                    <ModuleAccessCard
+                      moduleKey='inventory'
+                      moduleName='Inventario'
+                      role={formData.role}
+                      enabled={formData.inventoryEnabled || formData.canManageInventory}
+                      onToggle={v =>
+                        setFormData(p => ({
+                          ...p,
+                          inventoryEnabled: v,
+                          canManageInventory:
+                            formData.role === 'TECHNICIAN' ? v : p.canManageInventory,
+                        }))
+                      }
+                      families={allFamilies}
+                      assignedFamilyIds={inventoryFamilyIds}
+                      nativeFamilyId={
+                        user && typeof user.department === 'object'
+                          ? ((user.department as any)?.familyId ?? null)
+                          : null
+                      }
+                      readOnlyFamilyIds={adminScopeReadOnlyIds}
+                      onAssignFamily={handleAssignInventoryFamily}
+                      onUnassignFamily={handleUnassignInventoryFamily}
+                      options={{
+                        canManageInventory: formData.canManageInventory,
+                        onToggleManager: v => setFormData(p => ({ ...p, canManageInventory: v })),
+                        canRequestAssets: formData.canRequestAssets,
+                        onToggleRequestAssets: v =>
+                          setFormData(p => ({ ...p, canRequestAssets: v })),
+                      }}
+                      loading={loadingFamilies}
+                      disabled={loading}
+                    />
 
-                          {/* Sub-opción gestión completa — solo cuando está activo y aplica */}
-                          {mod.requiresManager && isEnabled && formData.role !== 'CLIENT' && (
-                            <div
-                              className={`flex items-center justify-between rounded-lg border px-2.5 py-1.5 transition-colors ${
-                                formData.canManageInventory
-                                  ? 'border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20'
-                                  : 'border-dashed border-border bg-muted/20'
-                              }`}
-                            >
-                              <div className='flex items-center gap-1.5 min-w-0'>
-                                <span className='text-xs'>🔧</span>
-                                <p className='text-[11px] font-medium text-foreground leading-tight'>
-                                  Gestión completa
-                                </p>
-                              </div>
-                              <Switch
-                                checked={formData.canManageInventory}
-                                onCheckedChange={v =>
-                                  setFormData(p => ({ ...p, canManageInventory: v }))
-                                }
-                              />
-                            </div>
-                          )}
+                    {/* Rondas — no para ADMIN (admin usa admin_family_assignments) */}
+                    {formData.role !== 'ADMIN' && (
+                      <ModuleAccessCard
+                        moduleKey='patrols'
+                        moduleName='Rondas y Patrullajes'
+                        role={formData.role}
+                        enabled={formData.patrolsEnabled}
+                        onToggle={v => setFormData(p => ({ ...p, patrolsEnabled: v }))}
+                        families={allFamilies}
+                        assignedFamilyIds={patrolFamilyIds}
+                        nativeFamilyId={
+                          user && typeof user.department === 'object'
+                            ? ((user.department as any)?.familyId ?? null)
+                            : null
+                        }
+                        readOnlyFamilyIds={adminScopeReadOnlyIds}
+                        onAssignFamily={handleAssignPatrolFamily}
+                        onUnassignFamily={handleUnassignPatrolFamily}
+                        loading={loadingFamilies}
+                        disabled={loading}
+                      />
+                    )}
 
-                          {/* Sub-opción solicitar activos — solo cuando inventario está activo */}
-                          {mod.key === 'inventory' && isEnabled && (
-                            <div
-                              className={`flex items-center justify-between rounded-lg border px-2.5 py-1.5 transition-colors ${
-                                formData.canRequestAssets
-                                  ? 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20'
-                                  : 'border-dashed border-border bg-muted/20'
-                              }`}
-                            >
-                              <div className='flex items-center gap-1.5 min-w-0'>
-                                <span className='text-xs'>📋</span>
-                                <p className='text-[11px] font-medium text-foreground leading-tight'>
-                                  Solicitar activos
-                                </p>
-                              </div>
-                              <Switch
-                                checked={formData.canRequestAssets}
-                                onCheckedChange={v =>
-                                  setFormData(p => ({ ...p, canRequestAssets: v }))
-                                }
-                              />
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
+                    {/* Rondas para ADMIN — solo toggle, sin familias (usa admin_family_assignments) */}
+                    {formData.role === 'ADMIN' && (
+                      <ModuleAccessCard
+                        moduleKey='patrols'
+                        moduleName='Rondas y Patrullajes'
+                        role={formData.role}
+                        enabled={formData.patrolsEnabled}
+                        onToggle={v => setFormData(p => ({ ...p, patrolsEnabled: v }))}
+                        families={[]}
+                        assignedFamilyIds={[]}
+                        onAssignFamily={async () => {}}
+                        onUnassignFamily={async () => {}}
+                        disabled={loading}
+                      />
+                    )}
                   </div>
                 </div>
               )}
@@ -904,134 +839,17 @@ export function EditUserModal({
               )}
             </div>
 
-            {/* ── Familias asignadas — solo para TECHNICIAN ── */}
-            {user && formData.role === 'TECHNICIAN' && (
-              <>
-                <Separator />
-                <div className='space-y-3'>
-                  <div>
-                    <h3 className='text-sm font-semibold text-foreground flex items-center gap-1.5'>
-                      <Layers className='h-4 w-4 text-muted-foreground' />
-                      Familias asignadas
-                    </h3>
-                    <p className='text-xs text-muted-foreground mt-0.5'>
-                      Familias donde este técnico puede atender tickets. Puedes asignar o quitar
-                      familias directamente aquí.
-                    </p>
-                  </div>
-                  <FamilyAssignmentSection
-                    families={allFamilies}
-                    assignedFamilyIds={technicianFamilyIds}
-                    nativeFamilyId={
-                      typeof user.department === 'object'
-                        ? ((user.department as any)?.familyId ?? null)
-                        : null
-                    }
-                    readOnlyFamilyIds={adminScopeReadOnlyIds}
-                    onAssign={handleAssignTechnicianFamily}
-                    onUnassign={handleUnassignTechnicianFamily}
-                    isLoading={loadingFamilies}
-                    error={familyError}
-                  />
-                </div>
-              </>
-            )}
+            {/* ── Familias asignadas — solo para TECHNICIAN (no Super Admin) ── */}
+            {/* ELIMINADO: ahora integrado en ModuleAccessCard de Tickets */}
 
-            {/* ── Familias adicionales — para CLIENT con módulos activos ── */}
-            {user &&
-              formData.role === 'CLIENT' &&
-              (formData.ticketsEnabled ||
-                formData.inventoryEnabled ||
-                formData.canManageInventory) && (
-                <>
-                  <Separator />
-                  <div className='space-y-3'>
-                    <div>
-                      <h3 className='text-sm font-semibold text-foreground flex items-center gap-1.5'>
-                        <Layers className='h-4 w-4 text-muted-foreground' />
-                        Familias adicionales
-                      </h3>
-                      <p className='text-xs text-muted-foreground mt-0.5'>
-                        Familias donde este cliente puede crear tickets fuera de su departamento
-                        nativo. Su familia base se determina automáticamente por su departamento.
-                      </p>
-                    </div>
-                    <FamilyAssignmentSection
-                      families={allFamilies}
-                      assignedFamilyIds={clientFamilyIds}
-                      nativeFamilyId={
-                        typeof user.department === 'object'
-                          ? ((user.department as any)?.familyId ?? null)
-                          : null
-                      }
-                      readOnlyFamilyIds={adminScopeReadOnlyIds}
-                      onAssign={handleAssignClientFamily}
-                      onUnassign={handleUnassignClientFamily}
-                      isLoading={loadingFamilies}
-                      error={familyError}
-                    />
-                  </div>
-                </>
-              )}
+            {/* ── Familias adicionales — para CLIENT (no Super Admin) ── */}
+            {/* ELIMINADO: ahora integrado en ModuleAccessCard de Tickets */}
 
-            {/* ── Familias de inventario — para usuarios con canManageInventory ── */}
-            {user && formData.canManageInventory && (
-              <>
-                <Separator />
-                <div className='space-y-3'>
-                  <div>
-                    <h3 className='text-sm font-semibold text-foreground flex items-center gap-1.5'>
-                      <Package className='h-4 w-4 text-muted-foreground' />
-                      Familias de inventario
-                    </h3>
-                    <p className='text-xs text-muted-foreground mt-0.5'>
-                      Familias donde este usuario puede gestionar activos de inventario.
-                    </p>
-                  </div>
-                  <FamilyAssignmentSection
-                    families={allFamilies}
-                    assignedFamilyIds={inventoryFamilyIds}
-                    readOnlyFamilyIds={adminScopeReadOnlyIds}
-                    onAssign={handleAssignInventoryFamily}
-                    onUnassign={handleUnassignInventoryFamily}
-                    isLoading={loadingFamilies}
-                    error={familyError}
-                  />
-                </div>
-              </>
-            )}
+            {/* ── Familias de inventario (no Super Admin) ── */}
+            {/* ELIMINADO: ahora integrado en ModuleAccessCard de Inventario */}
 
-            {/* ── Familias de rondas — para usuarios con patrolsEnabled (no ADMIN) ── */}
-            {user && formData.patrolsEnabled && formData.role !== 'ADMIN' && (
-              <>
-                <Separator />
-                <div className='space-y-3'>
-                  <div>
-                    <h3 className='text-sm font-semibold text-foreground flex items-center gap-1.5'>
-                      <Shield className='h-4 w-4 text-muted-foreground' />
-                      Familias de rondas
-                    </h3>
-                    <p className='text-xs text-muted-foreground mt-0.5'>
-                      Familias donde este usuario puede ejecutar o supervisar rondas de seguridad.
-                    </p>
-                  </div>
-                  <FamilyAssignmentSection
-                    families={allFamilies}
-                    assignedFamilyIds={patrolFamilyIds}
-                    nativeFamilyId={
-                      typeof user.department === 'object'
-                        ? ((user.department as any)?.familyId ?? null)
-                        : null
-                    }
-                    readOnlyFamilyIds={adminScopeReadOnlyIds}
-                    onAssign={handleAssignPatrolFamily}
-                    onUnassign={handleUnassignPatrolFamily}
-                    isLoading={loadingFamilies}
-                    error={familyError}
-                  />
-                </div>
-              </>
-            )}
+            {/* ── Familias de rondas (no ADMIN, no Super Admin) ── */}
+            {/* ELIMINADO: ahora integrado en ModuleAccessCard de Rondas */}
 
             {/* ── Familias asignadas — para ADMIN normal (solo visible para SUPER_ADMIN) ── */}
             {user &&
@@ -1044,10 +862,11 @@ export function EditUserModal({
                     <div>
                       <h3 className='text-sm font-semibold text-foreground flex items-center gap-1.5'>
                         <ShieldCheck className='h-4 w-4 text-muted-foreground' />
-                        Familias asignadas
+                        Familias de administración
                       </h3>
                       <p className='text-xs text-muted-foreground mt-0.5'>
-                        Familias a las que este administrador tiene acceso restringido.
+                        Familias que este administrador puede gestionar. Define el alcance de todos
+                        sus módulos.
                       </p>
                     </div>
                     <FamilyAssignmentSection

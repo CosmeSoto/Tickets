@@ -2353,6 +2353,7 @@ model patrol_family_config {
   offlineSyncToleranceMinutes Int       @default(30)    @map("offline_sync_tolerance_minutes")
   alertCompletionThreshold    Int       @default(80)    @map("alert_completion_threshold")
   gracePeriodMinutes          Int       @default(5)     @map("grace_period_minutes")
+  reminderMinutesBefore       Int       @default(5)     @map("reminder_minutes_before")
   patrolIncidentCategoryId    String?   @map("patrol_incident_category_id")
   createdAt                   DateTime  @default(now()) @map("created_at")
   updatedAt                   DateTime  @updatedAt      @map("updated_at")
