@@ -121,21 +121,38 @@ export async function GET(request: NextRequest) {
       ]
     }
 
-    // ADMIN normal: solo ver usuarios de sus familias (no super admins, no usuarios de otras familias)
+    // ADMIN normal: solo ver usuarios de sus familias (Union_Scope: no super admins, no usuarios de otras familias)
     if (session.user.role === 'ADMIN' && !(session.user as any).isSuperAdmin) {
-      const { getAdminFamilyScope, getDepartmentIdsForScope } =
-        await import('@/lib/auth/admin-scope')
+      const { getAdminFamilyScope, getModuleFamilyIds } = await import('@/lib/auth/admin-scope')
       const scope = await getAdminFamilyScope(session.user.id, false)
-      const deptIds = await getDepartmentIdsForScope(scope)
+      const inventoryFamilyIds = await getModuleFamilyIds(session.user.id, 'inventory')
+      const patrolFamilyIds = await getModuleFamilyIds(session.user.id, 'patrols')
 
-      if (deptIds && deptIds.length > 0) {
-        where.AND = [
-          ...(where.AND ?? []),
-          {
-            OR: [{ departmentId: { in: deptIds } }, { departmentId: null }],
-          },
-          { isSuperAdmin: false },
-        ]
+      // Union_Scope: combinar todas las familias de todos los módulos
+      const unionSet = new Set<string>()
+      if (scope.familyIds) {
+        scope.familyIds.forEach(id => unionSet.add(id))
+      }
+      inventoryFamilyIds.forEach(id => unionSet.add(id))
+      patrolFamilyIds.forEach(id => unionSet.add(id))
+
+      if (unionSet.size > 0) {
+        // Obtener departamentos de las familias del Union_Scope
+        const depts = await (
+          await import('@/lib/prisma')
+        ).default.departments.findMany({
+          where: { familyId: { in: Array.from(unionSet) }, isActive: true },
+          select: { id: true },
+        })
+        const deptIds = depts.map(d => d.id)
+
+        if (deptIds.length > 0) {
+          where.AND = [
+            ...(where.AND ?? []),
+            { departmentId: { in: deptIds } },
+            { isSuperAdmin: false },
+          ]
+        }
       }
     }
 

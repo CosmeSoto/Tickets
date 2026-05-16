@@ -68,11 +68,11 @@ export function AssetRequestCreateForm({ onSuccess, onCancel }: AssetRequestCrea
     },
   })
 
-  // Cargar familias disponibles
+  // Cargar familias disponibles (módulo inventario)
   useEffect(() => {
     const loadFamilies = async () => {
       try {
-        const response = await fetch('/api/families')
+        const response = await fetch('/api/inventory/families')
         if (response.ok) {
           const data = await response.json()
           setFamilies(data.families || [])

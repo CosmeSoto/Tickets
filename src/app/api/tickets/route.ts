@@ -97,6 +97,14 @@ export async function GET(request: NextRequest) {
           })
         }
       }
+    } else if (session.user.role === 'ADMIN' && !(session.user as any).isSuperAdmin) {
+      // Admin Normal: filtrar tickets por su scope de familias (admin_family_assignments + nativa)
+      const { getUserFamilyScope, buildFamilyFilter } = await import('@/lib/auth/admin-scope')
+      const scope = await getUserFamilyScope(session.user.id, 'ADMIN', false)
+      const familyFilter = buildFamilyFilter(scope)
+      if (Object.keys(familyFilter).length > 0) {
+        andParts.push(familyFilter)
+      }
     }
 
     if (andParts.length > 0) {
@@ -371,6 +379,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Crear nuevo ticket usando TicketService (maneja familyId, ticketCode, codeIsManual)
+    // Validar que el familyId está dentro del scope del admin (si es Admin Normal)
+    if (
+      ticketData.familyId &&
+      session.user.role === 'ADMIN' &&
+      !(session.user as any).isSuperAdmin
+    ) {
+      const { getUserFamilyScope } = await import('@/lib/auth/admin-scope')
+      const scope = await getUserFamilyScope(session.user.id, 'ADMIN', false)
+      if (scope.familyIds && !scope.familyIds.includes(ticketData.familyId)) {
+        return NextResponse.json(
+          { success: false, message: 'No tienes permiso para crear tickets en esta familia' },
+          { status: 403 }
+        )
+      }
+    }
+
     const newTicket = (await TicketService.createTicket({
       title: ticketData.title,
       description: ticketData.description,

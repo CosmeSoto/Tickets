@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
 
     // Construir scope de familias según rol del usuario
     const familyScope: any = {}
+    const requestScope: any = {}
 
     if (role === 'CLIENT') {
       // Clientes solo ven equipos asignados a ellos
@@ -32,17 +33,56 @@ export async function GET(request: NextRequest) {
           pendingActs: 0,
         })
       }
-      // Clientes con canManageInventory ven su familia
+      // Clientes con canManageInventory ven su familia (a través de typeId)
       if (user.familyId) {
-        familyScope.familyId = user.familyId
+        const typesInFamily = await prisma.equipment_types.findMany({
+          where: { familyId: user.familyId },
+          select: { id: true },
+        })
+        familyScope.typeId = { in: typesInFamily.map(t => t.id) }
       }
     } else if (role === 'TECHNICIAN') {
-      // Técnicos ven su familia si tienen una asignada
+      // Técnicos ven su familia si tienen una asignada (a través de typeId)
       if (user.familyId) {
-        familyScope.familyId = user.familyId
+        const typesInFamily = await prisma.equipment_types.findMany({
+          where: { familyId: user.familyId },
+          select: { id: true },
+        })
+        familyScope.typeId = { in: typesInFamily.map(t => t.id) }
       }
+    } else if (role === 'ADMIN') {
+      // Admin Normal: filtrar por sus familias de inventario asignadas
+      if (!user.isSuperAdmin) {
+        const { getModuleFamilyIds } = await import('@/lib/auth/admin-scope')
+        const inventoryFamilyIds = await getModuleFamilyIds(user.id, 'inventory')
+        if (inventoryFamilyIds.length > 0) {
+          // Obtener typeIds que pertenecen a las familias del scope
+          const typesInScope = await prisma.equipment_types.findMany({
+            where: { familyId: { in: inventoryFamilyIds } },
+            select: { id: true },
+          })
+          const typeIds = typesInScope.map(t => t.id)
+          if (typeIds.length > 0) {
+            familyScope.typeId = { in: typeIds }
+          } else {
+            familyScope.id = '__NONE__' // No hay tipos en scope, no mostrar nada
+          }
+          // Para asset_requests y delivery_acts (tienen familyId directo)
+          requestScope.familyId = { in: inventoryFamilyIds }
+        } else {
+          familyScope.id = '__NONE__' // Sin familias asignadas
+          requestScope.id = '__NONE__'
+        }
+      }
+      // Super Admin: sin filtro (ve todo)
     }
-    // ADMIN ve todo (sin filtro)
+
+    // Scope separado para asset_requests y delivery_acts (TECHNICIAN/CLIENT con familyId)
+    if (role === 'TECHNICIAN' && user.familyId) {
+      requestScope.familyId = user.familyId
+    } else if (role === 'CLIENT' && user.canManageInventory && user.familyId) {
+      requestScope.familyId = user.familyId
+    }
 
     // Obtener estadísticas en paralelo
     const [
@@ -81,12 +121,12 @@ export async function GET(request: NextRequest) {
 
       // Solicitudes pendientes
       prisma.asset_requests.count({
-        where: { ...familyScope, status: 'PENDING' },
+        where: { ...requestScope, status: 'PENDING' },
       }),
 
       // Actas pendientes de firma
       prisma.delivery_acts.count({
-        where: { ...familyScope, status: 'PENDING' },
+        where: { ...requestScope, status: 'PENDING' },
       }),
     ])
 

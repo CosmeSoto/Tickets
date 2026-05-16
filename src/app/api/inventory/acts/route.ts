@@ -72,6 +72,27 @@ export async function GET(request: NextRequest) {
           },
         },
       }
+    } else if (isAdmin && !isSuperAdmin) {
+      // Admin Normal sin familyId explícito: aplicar scope de inventario
+      const { getInventoryScope } = await import('@/lib/inventory/scope-filter')
+      const scope = await getInventoryScope(
+        userId,
+        userRole,
+        false,
+        (session.user as any).canManageInventory === true
+      )
+      if (scope.familyIds && scope.familyIds.length > 0) {
+        filters.assignment = {
+          ...filters.assignment,
+          equipment: {
+            type: {
+              familyId: { in: scope.familyIds },
+            },
+          },
+        }
+      } else if (scope.noAccess) {
+        return NextResponse.json({ acts: [], total: 0, page, limit, totalPages: 0 })
+      }
     }
 
     // Rango de fechas

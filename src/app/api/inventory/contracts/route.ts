@@ -26,13 +26,40 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const familyId = searchParams.get('familyId') || undefined
 
+  // Admin Normal: resolver scope de inventario si no se pasa familyId explícito
+  let scopeFamilyIds: string[] | undefined = undefined
+  if (!familyId && session.user.role === 'ADMIN' && !(session.user as any).isSuperAdmin) {
+    const { getInventoryScope } = await import('@/lib/inventory/scope-filter')
+    const scope = await getInventoryScope(
+      session.user.id,
+      session.user.role,
+      false,
+      (session.user as any).canManageInventory === true
+    )
+    scopeFamilyIds = scope.familyIds
+  }
+
+  // Construir filtro de familia para equipment (a través de type)
+  const equipFamilyFilter = familyId
+    ? { type: { familyId } }
+    : scopeFamilyIds
+      ? { type: { familyId: { in: scopeFamilyIds } } }
+      : {}
+
+  // Construir filtro de familia para licenses (a través de licenseType)
+  const licenseFamilyFilter = familyId
+    ? { licenseType: { familyId } }
+    : scopeFamilyIds
+      ? { licenseType: { familyId: { in: scopeFamilyIds } } }
+      : {}
+
   // Equipos en arrendamiento o activo de tercero (tienen contrato)
   const [equipmentContracts, licenseContracts] = await Promise.all([
     prisma.equipment.findMany({
       where: {
         ownershipType: { in: ['RENTAL', 'LOAN'] },
         status: { not: 'RETIRED' },
-        ...(familyId ? { type: { familyId } } : {}),
+        ...equipFamilyFilter,
       },
       select: {
         id: true,
@@ -58,11 +85,8 @@ export async function GET(req: NextRequest) {
 
     prisma.software_licenses.findMany({
       where: {
-        OR: [
-          { expirationDate: { not: null } },
-          { renewalCost: { not: null } },
-        ],
-        ...(familyId ? { licenseType: { familyId } } : {}),
+        OR: [{ expirationDate: { not: null } }, { renewalCost: { not: null } }],
+        ...licenseFamilyFilter,
       },
       select: {
         id: true,

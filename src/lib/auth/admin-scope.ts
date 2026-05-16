@@ -49,6 +49,9 @@ export async function getUserFamilyScope(
   let assignedIds: string[] = []
 
   if (role === 'ADMIN') {
+    // Admin normal: su scope general se define por admin_family_assignments + nativa
+    // Esto controla: qué familias ve en la sección Familias, Usuarios, Departamentos, etc.
+    // Las familias de inventario/rondas son para filtrar DENTRO de cada módulo específico
     const assignments = await prisma.admin_family_assignments.findMany({
       where: { adminId: userId, isActive: true },
       select: { familyId: true },

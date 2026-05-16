@@ -10,6 +10,15 @@ import {
 
 export async function getAdminStats(userId: string, isSuperAdmin: boolean) {
   const now = new Date()
+
+  // Scope de familias para Admin Normal (tickets)
+  let ticketFamilyFilter: Record<string, any> = {}
+  if (!isSuperAdmin) {
+    const { getUserFamilyScope, buildFamilyFilter } = await import('@/lib/auth/admin-scope')
+    const scope = await getUserFamilyScope(userId, 'ADMIN', false)
+    ticketFamilyFilter = buildFamilyFilter(scope)
+  }
+
   const [
     totalUsers,
     totalTickets,
@@ -26,20 +35,22 @@ export async function getAdminStats(userId: string, isSuperAdmin: boolean) {
     avgFirstResponseTime,
   ] = await Promise.all([
     prisma.users.count(),
-    prisma.tickets.count(),
-    prisma.tickets.count({ where: { status: 'OPEN' } }),
-    prisma.tickets.count({ where: { status: 'IN_PROGRESS' } }),
-    prisma.tickets.count({ where: { status: 'RESOLVED' } }),
-    prisma.tickets.count({ where: { status: 'CLOSED' } }),
+    prisma.tickets.count({ where: ticketFamilyFilter }),
+    prisma.tickets.count({ where: { status: 'OPEN', ...ticketFamilyFilter } }),
+    prisma.tickets.count({ where: { status: 'IN_PROGRESS', ...ticketFamilyFilter } }),
+    prisma.tickets.count({ where: { status: 'RESOLVED', ...ticketFamilyFilter } }),
+    prisma.tickets.count({ where: { status: 'CLOSED', ...ticketFamilyFilter } }),
     prisma.tickets.count({
       where: {
         priority: 'HIGH',
         status: { in: ['OPEN', 'IN_PROGRESS'] },
+        ...ticketFamilyFilter,
       },
     }),
     prisma.tickets.count({
       where: {
         status: { in: ['OPEN', 'IN_PROGRESS'] },
+        ...ticketFamilyFilter,
         OR: [
           {
             priority: 'HIGH',
@@ -59,17 +70,20 @@ export async function getAdminStats(userId: string, isSuperAdmin: boolean) {
     prisma.tickets.count({
       where: {
         createdAt: { gte: new Date(new Date().setHours(0, 0, 0, 0)) },
+        ...ticketFamilyFilter,
       },
     }),
     prisma.tickets.count({
       where: {
         createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+        ...ticketFamilyFilter,
       },
     }),
     prisma.tickets.findMany({
       where: {
         status: { in: ['RESOLVED', 'CLOSED'] },
         resolvedAt: { not: null },
+        ...ticketFamilyFilter,
       },
       orderBy: { resolvedAt: 'desc' },
       take: 500,
@@ -136,6 +150,25 @@ export async function getAdminStats(userId: string, isSuperAdmin: boolean) {
   }
 
   try {
+    // Scope de familias para inventario (Admin Normal)
+    let inventoryFamilyFilter: Record<string, any> = {}
+    if (!isSuperAdmin) {
+      const { getModuleFamilyIds } = await import('@/lib/auth/admin-scope')
+      const invFamilyIds = await getModuleFamilyIds(userId, 'inventory')
+      if (invFamilyIds.length > 0) {
+        // Filtrar equipos por tipo → familia
+        const typesInScope = await prisma.equipment_types.findMany({
+          where: { familyId: { in: invFamilyIds } },
+          select: { id: true },
+        })
+        const typeIds = typesInScope.map(t => t.id)
+        inventoryFamilyFilter =
+          typeIds.length > 0 ? { typeId: { in: typeIds } } : { id: '__NONE__' }
+      } else {
+        inventoryFamilyFilter = { id: '__NONE__' }
+      }
+    }
+
     const [
       totalAssets,
       availableAssets,
@@ -146,10 +179,10 @@ export async function getAdminStats(userId: string, isSuperAdmin: boolean) {
       totalLicenses,
       expiredLicenses,
     ] = await Promise.all([
-      prisma.equipment.count({ where: { status: { not: 'RETIRED' } } }),
-      prisma.equipment.count({ where: { status: 'AVAILABLE' } }),
-      prisma.equipment.count({ where: { status: 'ASSIGNED' } }),
-      prisma.equipment.count({ where: { status: 'MAINTENANCE' } }),
+      prisma.equipment.count({ where: { status: { not: 'RETIRED' }, ...inventoryFamilyFilter } }),
+      prisma.equipment.count({ where: { status: 'AVAILABLE', ...inventoryFamilyFilter } }),
+      prisma.equipment.count({ where: { status: 'ASSIGNED', ...inventoryFamilyFilter } }),
+      prisma.equipment.count({ where: { status: 'MAINTENANCE', ...inventoryFamilyFilter } }),
       prisma.consumables.count(),
       prisma.$queryRaw<Array<{ count: bigint }>>`
           SELECT COUNT(*) as count FROM consumables WHERE current_stock <= min_stock

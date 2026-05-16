@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import {
   Plus,
   Edit,
@@ -108,6 +109,8 @@ const DEFAULT_FORM: FamilyFormData = {
 export default function FamiliesPage() {
   const router = useRouter()
   const { toast } = useToast()
+  const { data: session } = useSession()
+  const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
 
   const [families, setFamilies] = useState<Family[]>([])
   const [loading, setLoading] = useState(true)
@@ -277,10 +280,12 @@ export default function FamiliesPage() {
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Recargar
           </Button>
-          <Button onClick={openCreateDialog}>
-            <Plus className='h-4 w-4 mr-2' />
-            Nueva Familia
-          </Button>
+          {isSuperAdmin && (
+            <Button onClick={openCreateDialog}>
+              <Plus className='h-4 w-4 mr-2' />
+              Nueva Familia
+            </Button>
+          )}
         </div>
       }
     >
@@ -458,38 +463,44 @@ export default function FamiliesPage() {
                           className='flex items-center justify-end gap-1'
                           onClick={e => e.stopPropagation()}
                         >
-                          <Button
-                            variant='ghost'
-                            size='sm'
-                            className='h-10 w-10 sm:h-8 sm:w-8 p-0 touch-manipulation'
-                            onClick={() => openEditDialog(family)}
-                            title='Editar familia'
-                          >
-                            <Edit className='h-4 w-4' />
-                          </Button>
-                          <Button
-                            variant='ghost'
-                            size='sm'
-                            className='h-10 w-10 sm:h-8 sm:w-8 p-0 touch-manipulation'
-                            onClick={() => handleToggleActive(family)}
-                            disabled={toggling === family.id}
-                            title={family.isActive ? 'Desactivar' : 'Activar'}
-                          >
-                            {family.isActive ? (
-                              <ToggleRight className='h-4 w-4 text-primary' />
-                            ) : (
-                              <ToggleLeft className='h-4 w-4 text-muted-foreground' />
-                            )}
-                          </Button>
-                          <Button
-                            variant='ghost'
-                            size='sm'
-                            className='h-10 w-10 sm:h-8 sm:w-8 p-0 text-destructive hover:text-destructive touch-manipulation'
-                            onClick={() => openDeleteDialog(family)}
-                            title='Eliminar familia'
-                          >
-                            <Trash2 className='h-4 w-4' />
-                          </Button>
+                          {isSuperAdmin && (
+                            <Button
+                              variant='ghost'
+                              size='sm'
+                              className='h-10 w-10 sm:h-8 sm:w-8 p-0 touch-manipulation'
+                              onClick={() => openEditDialog(family)}
+                              title='Editar familia'
+                            >
+                              <Edit className='h-4 w-4' />
+                            </Button>
+                          )}
+                          {isSuperAdmin && (
+                            <Button
+                              variant='ghost'
+                              size='sm'
+                              className='h-10 w-10 sm:h-8 sm:w-8 p-0 touch-manipulation'
+                              onClick={() => handleToggleActive(family)}
+                              disabled={toggling === family.id}
+                              title={family.isActive ? 'Desactivar' : 'Activar'}
+                            >
+                              {family.isActive ? (
+                                <ToggleRight className='h-4 w-4 text-primary' />
+                              ) : (
+                                <ToggleLeft className='h-4 w-4 text-muted-foreground' />
+                              )}
+                            </Button>
+                          )}
+                          {isSuperAdmin && (
+                            <Button
+                              variant='ghost'
+                              size='sm'
+                              className='h-10 w-10 sm:h-8 sm:w-8 p-0 text-destructive hover:text-destructive touch-manipulation'
+                              onClick={() => openDeleteDialog(family)}
+                              title='Eliminar familia'
+                            >
+                              <Trash2 className='h-4 w-4' />
+                            </Button>
+                          )}
                           <Button
                             variant='ghost'
                             size='sm'

@@ -89,6 +89,16 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    // Admin Normal: aplicar scope de familias al reporte
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    if (!isSuperAdmin) {
+      const { getUserFamilyScope, buildFamilyFilter } = await import('@/lib/auth/admin-scope')
+      const scope = await getUserFamilyScope(session.user.id, 'ADMIN', false)
+      if (scope.familyIds && scope.familyIds.length > 0) {
+        filters.familyIds = scope.familyIds
+      }
+    }
+
     // Aplicar límite máximo por seguridad (usar configuración global)
     const finalLimit = limit
       ? Math.min(limit, REPORT_LIMITS[reportType as keyof typeof REPORT_LIMITS])
@@ -295,6 +305,15 @@ export async function POST(request: NextRequest) {
     // Si es técnico, solo puede ver sus propios reportes
     if (session.user.role === 'TECHNICIAN') {
       reportFilters.assigneeId = session.user.id
+    }
+
+    // Admin Normal: aplicar scope de familias al reporte
+    if (session.user.role === 'ADMIN' && !(session.user as any).isSuperAdmin) {
+      const { getUserFamilyScope } = await import('@/lib/auth/admin-scope')
+      const scope = await getUserFamilyScope(session.user.id, 'ADMIN', false)
+      if (scope.familyIds && scope.familyIds.length > 0) {
+        reportFilters.familyIds = scope.familyIds
+      }
     }
 
     // Reutilizar la lógica de GET

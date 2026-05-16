@@ -60,6 +60,20 @@ export async function GET(request: NextRequest) {
 
     if (familyId) {
       where.licenseType = { familyId }
+    } else if (session.user.role === 'ADMIN' && !(session.user as any).isSuperAdmin) {
+      // Admin Normal sin familyId explícito: aplicar scope de inventario
+      const { getInventoryScope } = await import('@/lib/inventory/scope-filter')
+      const scope = await getInventoryScope(
+        session.user.id,
+        session.user.role,
+        false,
+        (session.user as any).canManageInventory === true
+      )
+      if (scope.familyIds && scope.familyIds.length > 0) {
+        where.licenseType = { familyId: { in: scope.familyIds } }
+      } else if (scope.noAccess) {
+        return NextResponse.json({ items: [], total: 0, page: 1, limit: 10 })
+      }
     }
 
     if (contractType) {
@@ -96,18 +110,24 @@ export async function GET(request: NextRequest) {
     const page = validatedFilters.page || 1
     const limit = validatedFilters.limit || 10
 
-    const orderBy = orderByParam === 'renewalDate'
-      ? { renewalDate: 'asc' as const }
-      : { createdAt: 'desc' as const }
+    const orderBy =
+      orderByParam === 'renewalDate'
+        ? { renewalDate: 'asc' as const }
+        : { createdAt: 'desc' as const }
 
     const cacheKey = buildCacheKey('inventory:licenses', {
       uid: session.user.id,
       role: session.user.role,
-      page, limit,
+      page,
+      limit,
       search: validatedFilters.search,
       assigned: validatedFilters.assigned,
       expired: validatedFilters.expired,
-      supplierId, familyId, contractType, licenseScope, orderByParam,
+      supplierId,
+      familyId,
+      contractType,
+      licenseScope,
+      orderByParam,
     })
 
     const { licenses: rawLicenses, total } = await withCache(cacheKey, 10, async () => {
@@ -131,10 +151,13 @@ export async function GET(request: NextRequest) {
     })
 
     const processedLicenses = rawLicenses.map((l: any) => {
-      const renewalAlertStatus = getRenewalAlertStatus(l.renewalDate ? new Date(l.renewalDate) : null)
-      const base = session.user.role === 'ADMIN' || session.user.role === 'TECHNICIAN'
-        ? l
-        : { ...l, key: l.key ? '••••••••' : null }
+      const renewalAlertStatus = getRenewalAlertStatus(
+        l.renewalDate ? new Date(l.renewalDate) : null
+      )
+      const base =
+        session.user.role === 'ADMIN' || session.user.role === 'TECHNICIAN'
+          ? l
+          : { ...l, key: l.key ? '••••••••' : null }
       return { ...base, renewalAlertStatus }
     })
 
@@ -158,7 +181,7 @@ export async function POST(request: NextRequest) {
     if (!session?.user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
-    if (!await canManageInventory(session.user.id, session.user.role)) {
+    if (!(await canManageInventory(session.user.id, session.user.role))) {
       return inventoryForbidden()
     }
 
@@ -177,16 +200,19 @@ export async function POST(request: NextRequest) {
         vendor: validatedData.vendor,
         cost: validatedData.cost,
       },
-      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+      ipAddress:
+        request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
     }).catch(err => console.error('[AUDIT] Error registrando creación de licencia:', err))
 
     await invalidateCache('inventory:licenses:*').catch(() => {})
 
     // Notificar a admins (asíncrono)
-    notifyAdminsNewLicense(license.name, license.licenseType?.name || 'Sin tipo', validatedData.cost).catch(
-      err => console.error('[NOTIFICATION] Error notificando nueva licencia:', err)
-    )
+    notifyAdminsNewLicense(
+      license.name,
+      license.licenseType?.name || 'Sin tipo',
+      validatedData.cost
+    ).catch(err => console.error('[NOTIFICATION] Error notificando nueva licencia:', err))
 
     return NextResponse.json(license, { status: 201 })
   } catch (error) {

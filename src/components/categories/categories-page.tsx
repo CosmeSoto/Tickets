@@ -74,27 +74,35 @@ export default function CategoriesPage() {
   const [adminFamilyIds, setAdminFamilyIds] = useState<Set<string> | null>(null)
 
   // Familias desde el contexto global (cache Redis, sin peticion extra)
-  const { families } = useFamilies()
+  const { families: contextFamilies } = useFamilies()
 
-  // Familias ya disponibles desde el contexto global
+  // Para Admin Normal: cargar familias específicas del módulo de tickets
+  const [ticketFamilies, setTicketFamilies] = useState<typeof contextFamilies>([])
 
-  // Cargar familias asignadas al admin (para mostrar/ocultar acciones)
   useEffect(() => {
     if (isSuperAdmin) {
+      // Super Admin ve todas las familias
+      setTicketFamilies(contextFamilies)
       setAdminFamilyIds(null) // null = sin restricción
       return
     }
-    fetch('/api/families?includeInactive=false')
+    // Admin Normal: cargar solo familias del módulo de tickets
+    fetch('/api/families?includeInactive=false&module=tickets')
       .then(r => r.json())
       .then(data => {
-        // La API ya filtra por admin_family_assignments para admin normal
-        // Si devuelve familias, esas son las que tiene asignadas
         if (data.success && Array.isArray(data.data)) {
+          setTicketFamilies(data.data)
           setAdminFamilyIds(new Set(data.data.map((f: any) => f.id)))
         }
       })
-      .catch(() => setAdminFamilyIds(null))
-  }, [isSuperAdmin])
+      .catch(() => {
+        setTicketFamilies(contextFamilies)
+        setAdminFamilyIds(null)
+      })
+  }, [isSuperAdmin, contextFamilies])
+
+  // Usar ticketFamilies en lugar de families del contexto global
+  const families = ticketFamilies
 
   const canManageCat = (category: any): boolean => {
     if (isSuperAdmin) return true

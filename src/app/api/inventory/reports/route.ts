@@ -25,50 +25,111 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams
     const reportType = searchParams.get('type') || 'equipment-summary'
-    const startDate = searchParams.get('startDate') ? new Date(searchParams.get('startDate')!) : undefined
+    const startDate = searchParams.get('startDate')
+      ? new Date(searchParams.get('startDate')!)
+      : undefined
     const endDate = searchParams.get('endDate') ? new Date(searchParams.get('endDate')!) : undefined
     const departmentId = searchParams.get('departmentId') || undefined
     const days = parseInt(searchParams.get('days') || '30')
 
+    // Admin Normal: resolver scope de inventario
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    let scopeFamilyIds: string[] | undefined = undefined
+    if (!isSuperAdmin) {
+      const { getInventoryScope } = await import('@/lib/inventory/scope-filter')
+      const scope = await getInventoryScope(
+        session.user.id,
+        session.user.role,
+        false,
+        (session.user as any).canManageInventory === true
+      )
+      scopeFamilyIds = scope.familyIds
+      if (scope.noAccess) {
+        return NextResponse.json({ data: [], message: 'Sin acceso a familias de inventario' })
+      }
+    }
+
     let data: any
-    const reportParams = { startDate: startDate?.toISOString(), endDate: endDate?.toISOString(), departmentId, days }
+    const reportParams = {
+      startDate: startDate?.toISOString(),
+      endDate: endDate?.toISOString(),
+      departmentId,
+      days,
+    }
 
     switch (reportType) {
       case 'equipment-summary':
-        data = await withReportCache('inventory:equipment-summary', reportParams,
-          () => InventoryReportService.getEquipmentSummaryReport({ startDate, endDate, departmentId }), 600)
+        data = await withReportCache(
+          'inventory:equipment-summary',
+          reportParams,
+          () =>
+            InventoryReportService.getEquipmentSummaryReport({ startDate, endDate, departmentId }),
+          600
+        )
         break
       case 'assignments':
-        data = await withReportCache('inventory:assignments', reportParams,
-          () => InventoryReportService.getAssignmentsReport({ startDate, endDate }), 300)
+        data = await withReportCache(
+          'inventory:assignments',
+          reportParams,
+          () => InventoryReportService.getAssignmentsReport({ startDate, endDate }),
+          300
+        )
         break
       case 'pending-acts':
-        data = await withReportCache('inventory:pending-acts', {},
-          () => InventoryReportService.getPendingActsReport(), 120)
+        data = await withReportCache(
+          'inventory:pending-acts',
+          {},
+          () => InventoryReportService.getPendingActsReport(),
+          120
+        )
         break
       case 'maintenance-costs':
-        data = await withReportCache('inventory:maintenance-costs', reportParams,
-          () => InventoryReportService.getMaintenanceCostsReport({ startDate, endDate }), 600)
+        data = await withReportCache(
+          'inventory:maintenance-costs',
+          reportParams,
+          () => InventoryReportService.getMaintenanceCostsReport({ startDate, endDate }),
+          600
+        )
         break
       case 'consumable-usage':
-        data = await withReportCache('inventory:consumable-usage', reportParams,
-          () => InventoryReportService.getConsumableUsageReport({ startDate, endDate }), 300)
+        data = await withReportCache(
+          'inventory:consumable-usage',
+          reportParams,
+          () => InventoryReportService.getConsumableUsageReport({ startDate, endDate }),
+          300
+        )
         break
       case 'license-expiration':
-        data = await withReportCache('inventory:license-expiration', { days },
-          () => InventoryReportService.getLicenseExpirationReport(days), 600)
+        data = await withReportCache(
+          'inventory:license-expiration',
+          { days },
+          () => InventoryReportService.getLicenseExpirationReport(days),
+          600
+        )
         break
       case 'inventory-value':
-        data = await withReportCache('inventory:inventory-value', {},
-          () => InventoryReportService.getInventoryValueReport(), 900)
+        data = await withReportCache(
+          'inventory:inventory-value',
+          {},
+          () => InventoryReportService.getInventoryValueReport(),
+          900
+        )
         break
       case 'rental-equipment':
-        data = await withReportCache('inventory:rental-equipment', {},
-          () => InventoryReportService.getRentalEquipmentReport(), 600)
+        data = await withReportCache(
+          'inventory:rental-equipment',
+          {},
+          () => InventoryReportService.getRentalEquipmentReport(),
+          600
+        )
         break
       case 'acts-history':
-        data = await withReportCache('inventory:acts-history', reportParams,
-          () => getActsHistoryReport({ startDate, endDate }), 300)
+        data = await withReportCache(
+          'inventory:acts-history',
+          reportParams,
+          () => getActsHistoryReport({ startDate, endDate }),
+          300
+        )
         break
       default:
         return NextResponse.json({ error: 'Tipo de reporte no válido' }, { status: 400 })
@@ -91,9 +152,15 @@ export async function GET(request: NextRequest) {
 }
 
 async function getActsHistoryReport({ startDate, endDate }: { startDate?: Date; endDate?: Date }) {
-  const dateFilter = startDate || endDate
-    ? { createdAt: { ...(startDate ? { gte: startDate } : {}), ...(endDate ? { lte: endDate } : {}) } }
-    : {}
+  const dateFilter =
+    startDate || endDate
+      ? {
+          createdAt: {
+            ...(startDate ? { gte: startDate } : {}),
+            ...(endDate ? { lte: endDate } : {}),
+          },
+        }
+      : {}
 
   const [deliveryActs, returnActs, decommissionRequests] = await Promise.all([
     prisma.delivery_acts.findMany({
@@ -161,9 +228,7 @@ async function getActsHistoryReport({ startDate, endDate }: { startDate?: Date; 
     ...decommissionRequests.map(r => ({
       tipo: 'Solicitud de Baja',
       folio: r.act?.folio ?? '—',
-      equipo: r.equipment
-        ? `${r.equipment.brand} ${r.equipment.model} (${r.equipment.code})`
-        : '—',
+      equipo: r.equipment ? `${r.equipment.brand} ${r.equipment.model} (${r.equipment.code})` : '—',
       equipoId: r.equipment?.id ?? null,
       persona: r.requester?.name ?? '—',
       estado: r.status,

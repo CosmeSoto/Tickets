@@ -11,12 +11,9 @@ import { randomUUID } from 'crypto'
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { success: false, message: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
     }
 
     const { searchParams } = new URL(request.url)
@@ -25,17 +22,27 @@ export async function GET(request: NextRequest) {
     const categoryId = searchParams.get('categoryId')
 
     const where: any = {}
-    
+
     if (isActive !== null) {
       where.isActive = isActive === 'true'
     }
-    
+
     if (priority) {
       where.priority = priority
     }
-    
+
     if (categoryId) {
       where.categoryId = categoryId
+    }
+
+    // Admin Normal: filtrar SLA policies por categorías dentro de su scope de tickets
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    if (!isSuperAdmin) {
+      const { getUserFamilyScope } = await import('@/lib/auth/admin-scope')
+      const scope = await getUserFamilyScope(session.user.id, 'ADMIN', false)
+      if (scope.familyIds && scope.familyIds.length > 0) {
+        where.category = { departments: { familyId: { in: scope.familyIds } } }
+      }
     }
 
     const policies = await prisma.sla_policies.findMany({
@@ -45,27 +52,27 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             name: true,
-            color: true
-          }
+            color: true,
+          },
         },
         _count: {
           select: {
             ticket_sla_metrics: true,
-            sla_violations: true
-          }
-        }
+            sla_violations: true,
+          },
+        },
       },
       orderBy: [
         { isActive: 'desc' },
-        { 
-          priority: 'asc' // URGENT, HIGH, MEDIUM, LOW
-        }
-      ]
+        {
+          priority: 'asc', // URGENT, HIGH, MEDIUM, LOW
+        },
+      ],
     })
 
     return NextResponse.json({
       success: true,
-      data: policies
+      data: policies,
     })
   } catch (error) {
     console.error('Error fetching SLA policies:', error)
@@ -73,7 +80,7 @@ export async function GET(request: NextRequest) {
       {
         success: false,
         message: 'Error al cargar políticas de SLA',
-        error: error instanceof Error ? error.message : 'Error desconocido'
+        error: error instanceof Error ? error.message : 'Error desconocido',
       },
       { status: 500 }
     )
@@ -87,12 +94,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { success: false, message: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
     }
 
     const data = await request.json()
@@ -113,10 +117,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!['URGENT', 'HIGH', 'MEDIUM', 'LOW'].includes(data.priority)) {
-      return NextResponse.json(
-        { success: false, message: 'Prioridad inválida' },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, message: 'Prioridad inválida' }, { status: 400 })
     }
 
     if (!data.responseTimeHours || data.responseTimeHours < 1) {
@@ -138,16 +139,17 @@ export async function POST(request: NextRequest) {
       where: {
         priority: data.priority,
         categoryId: data.categoryId || null,
-        isActive: true
-      }
+        isActive: true,
+      },
     })
 
     if (existing) {
       return NextResponse.json(
-        { 
-          success: false, 
-          message: 'Ya existe una política activa para esta prioridad' + 
-                   (data.categoryId ? ' y categoría' : '')
+        {
+          success: false,
+          message:
+            'Ya existe una política activa para esta prioridad' +
+            (data.categoryId ? ' y categoría' : ''),
         },
         { status: 400 }
       )
@@ -167,23 +169,23 @@ export async function POST(request: NextRequest) {
         businessHoursStart: data.businessHoursStart || '09:00:00',
         businessHoursEnd: data.businessHoursEnd || '18:00:00',
         businessDays: data.businessDays || 'MON,TUE,WED,THU,FRI',
-        isActive: data.isActive !== false
+        isActive: data.isActive !== false,
       },
       include: {
         category: {
           select: {
             id: true,
             name: true,
-            color: true
-          }
-        }
-      }
+            color: true,
+          },
+        },
+      },
     })
 
     return NextResponse.json({
       success: true,
       data: policy,
-      message: 'Política de SLA creada exitosamente'
+      message: 'Política de SLA creada exitosamente',
     })
   } catch (error) {
     console.error('Error creating SLA policy:', error)
@@ -191,7 +193,7 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         message: 'Error al crear política de SLA',
-        error: error instanceof Error ? error.message : 'Error desconocido'
+        error: error instanceof Error ? error.message : 'Error desconocido',
       },
       { status: 500 }
     )

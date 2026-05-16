@@ -100,7 +100,7 @@ export default function SchedulesPage() {
 
   const fetchFamilies = useCallback(async () => {
     try {
-      const res = await fetch('/api/families?includeInactive=false')
+      const res = await fetch('/api/families?includeInactive=false&module=patrols')
       const data = await res.json()
       if (data.success) setFamilies(data.data)
     } catch {

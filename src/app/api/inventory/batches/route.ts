@@ -95,10 +95,13 @@ export async function GET(request: NextRequest) {
     let allowedFamilyIds: string[] | null = null // null = sin restricción (superadmin)
 
     if (role === 'ADMIN' && !isSuperAdmin) {
-      const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
-      const scope = await getAdminFamilyScope(userId, false)
-      if (scope.familyIds && scope.familyIds.length > 0) {
-        allowedFamilyIds = scope.familyIds
+      // Admin Normal: usar scope específico de inventario
+      const { getModuleFamilyIds } = await import('@/lib/auth/admin-scope')
+      const invFamilyIds = await getModuleFamilyIds(userId, 'inventory')
+      if (invFamilyIds.length > 0) {
+        allowedFamilyIds = invFamilyIds
+      } else {
+        allowedFamilyIds = [] // Sin acceso
       }
     } else if (role !== 'ADMIN' && userCanManageInventory) {
       // Gestor: solo sus familias de inventario

@@ -47,6 +47,21 @@ export async function GET(request: NextRequest) {
       ...(includeInactive ? {} : { isActive: true }),
     }
 
+    // Admin Normal: filtrar por familias de patrullas asignadas
+    if (!familyId && session.user.role === 'ADMIN' && !(session.user as any).isSuperAdmin) {
+      const { getPatrolAccessibleFamilyIds } = await import('@/lib/patrol/patrol-access')
+      const accessibleFamilyIds = await getPatrolAccessibleFamilyIds(
+        session.user.id,
+        session.user.role,
+        false
+      )
+      if (accessibleFamilyIds !== undefined && accessibleFamilyIds.length > 0) {
+        ;(where as any).familyId = { in: accessibleFamilyIds }
+      } else if (accessibleFamilyIds !== undefined && accessibleFamilyIds.length === 0) {
+        ;(where as any).familyId = '__NONE__'
+      }
+    }
+
     const [schedules, total] = await Promise.all([
       prisma.patrol_schedules.findMany({
         where,

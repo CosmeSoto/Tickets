@@ -32,12 +32,24 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 }
 
-// PUT /api/families/[id] — Actualiza datos base de la familia
+// PUT /api/families/[id] — Actualiza datos base de la familia; solo SUPER ADMIN
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session || session.user.role !== 'ADMIN') {
       return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
+    }
+
+    const currentUser = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: { isSuperAdmin: true },
+    })
+
+    if (!currentUser?.isSuperAdmin) {
+      return NextResponse.json(
+        { success: false, message: 'Solo el Administrador Principal puede editar familias' },
+        { status: 403 }
+      )
     }
 
     const { id } = await params
@@ -87,7 +99,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   }
 }
 
-// DELETE /api/families/[id] — Elimina familia; 409 si hay registros asociados
+// DELETE /api/families/[id] — Elimina familia; solo SUPER ADMIN; 409 si hay registros asociados
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -96,6 +108,18 @@ export async function DELETE(
     const session = await getServerSession(authOptions)
     if (!session || session.user.role !== 'ADMIN') {
       return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
+    }
+
+    const currentUser = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: { isSuperAdmin: true },
+    })
+
+    if (!currentUser?.isSuperAdmin) {
+      return NextResponse.json(
+        { success: false, message: 'Solo el Administrador Principal puede eliminar familias' },
+        { status: 403 }
+      )
     }
 
     const { id } = await params

@@ -5,8 +5,8 @@ import prisma from '@/lib/prisma'
 
 /**
  * GET /api/patrols/family-config
- * Devuelve patrolsEnabled de todas las familias que ya tienen fila en patrol_family_config.
- * Familias sin fila se interpretan como enabled (true) en el cliente — igual que inventario.
+ * Devuelve patrolsEnabled de las familias accesibles para el usuario.
+ * Super Admin ve todas. Admin Normal solo ve las de su scope de patrullas.
  */
 export async function GET() {
   const session = await getServerSession(authOptions)
@@ -15,9 +15,30 @@ export async function GET() {
   }
 
   try {
-    const configs = await prisma.patrol_family_config.findMany({
-      select: { familyId: true, patrolsEnabled: true },
-    })
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+
+    let configs: Array<{ familyId: string; patrolsEnabled: boolean }>
+    if (isSuperAdmin) {
+      configs = await prisma.patrol_family_config.findMany({
+        select: { familyId: true, patrolsEnabled: true },
+      })
+    } else {
+      // Admin Normal: solo configs de sus familias de patrullas
+      const { getPatrolAccessibleFamilyIds } = await import('@/lib/patrol/patrol-access')
+      const accessibleFamilyIds = await getPatrolAccessibleFamilyIds(
+        session.user.id,
+        session.user.role,
+        false
+      )
+      if (accessibleFamilyIds && accessibleFamilyIds.length > 0) {
+        configs = await prisma.patrol_family_config.findMany({
+          where: { familyId: { in: accessibleFamilyIds } },
+          select: { familyId: true, patrolsEnabled: true },
+        })
+      } else {
+        configs = []
+      }
+    }
 
     const map: Record<string, boolean> = {}
     for (const c of configs) {

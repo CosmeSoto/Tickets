@@ -93,8 +93,28 @@ export async function GET(request: NextRequest) {
         where.familyId = { in: [] }
       }
     } else if (role === 'ADMIN') {
-      if (familyId) where.familyId = familyId
-      if (textSearchCondition) where.OR = textSearchCondition
+      const isSuperAdmin = (session.user as any).isSuperAdmin === true
+      if (!isSuperAdmin) {
+        // Admin Normal: filtrar por familias del scope de tickets
+        const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
+        const scope = await getAdminFamilyScope(session.user.id, false)
+        if (scope.familyIds && scope.familyIds.length > 0) {
+          const effectiveIds = familyId
+            ? scope.familyIds.filter(id => id === familyId)
+            : scope.familyIds
+          const familyCondition = [{ familyId: { in: effectiveIds } }, { familyId: null }]
+          where.AND = [
+            { OR: familyCondition },
+            ...(textSearchCondition ? [{ OR: textSearchCondition }] : []),
+          ]
+        } else {
+          where.familyId = { in: [] }
+        }
+      } else {
+        // Super Admin: sin restricción
+        if (familyId) where.familyId = familyId
+        if (textSearchCondition) where.OR = textSearchCondition
+      }
     } else {
       if (textSearchCondition) where.OR = textSearchCondition
     }

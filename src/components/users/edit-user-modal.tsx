@@ -348,8 +348,12 @@ export function EditUserModal({
       setLoadingFamilies(true)
       setFamilyError(null)
       try {
-        // Always fetch all active families
-        const familiesRes = await fetch('/api/families?active=true')
+        // Super Admin ve todas las familias para asignar; Admin normal ve solo las suyas
+        const viewerIsSuperAdmin = (session?.user as any)?.isSuperAdmin === true
+        const familyUrl = viewerIsSuperAdmin
+          ? '/api/families?active=true&scope=all'
+          : '/api/families?active=true'
+        const familiesRes = await fetch(familyUrl)
         if (familiesRes.ok) {
           const familiesData = await familiesRes.json()
           const families = familiesData.data ?? familiesData ?? []
@@ -781,44 +785,26 @@ export function EditUserModal({
                       disabled={loading}
                     />
 
-                    {/* Rondas — no para ADMIN (admin usa admin_family_assignments) */}
-                    {formData.role !== 'ADMIN' && (
-                      <ModuleAccessCard
-                        moduleKey='patrols'
-                        moduleName='Rondas y Patrullajes'
-                        role={formData.role}
-                        enabled={formData.patrolsEnabled}
-                        onToggle={v => setFormData(p => ({ ...p, patrolsEnabled: v }))}
-                        families={allFamilies}
-                        assignedFamilyIds={patrolFamilyIds}
-                        nativeFamilyId={
-                          user && typeof user.department === 'object'
-                            ? ((user.department as any)?.familyId ?? null)
-                            : null
-                        }
-                        readOnlyFamilyIds={adminScopeReadOnlyIds}
-                        onAssignFamily={handleAssignPatrolFamily}
-                        onUnassignFamily={handleUnassignPatrolFamily}
-                        loading={loadingFamilies}
-                        disabled={loading}
-                      />
-                    )}
-
-                    {/* Rondas para ADMIN — solo toggle, sin familias (usa admin_family_assignments) */}
-                    {formData.role === 'ADMIN' && (
-                      <ModuleAccessCard
-                        moduleKey='patrols'
-                        moduleName='Rondas y Patrullajes'
-                        role={formData.role}
-                        enabled={formData.patrolsEnabled}
-                        onToggle={v => setFormData(p => ({ ...p, patrolsEnabled: v }))}
-                        families={[]}
-                        assignedFamilyIds={[]}
-                        onAssignFamily={async () => {}}
-                        onUnassignFamily={async () => {}}
-                        disabled={loading}
-                      />
-                    )}
+                    {/* Rondas — para todos los roles, siempre usa patrol_family_assignments */}
+                    <ModuleAccessCard
+                      moduleKey='patrols'
+                      moduleName='Rondas y Patrullajes'
+                      role={formData.role}
+                      enabled={formData.patrolsEnabled}
+                      onToggle={v => setFormData(p => ({ ...p, patrolsEnabled: v }))}
+                      families={allFamilies}
+                      assignedFamilyIds={patrolFamilyIds}
+                      nativeFamilyId={
+                        user && typeof user.department === 'object'
+                          ? ((user.department as any)?.familyId ?? null)
+                          : null
+                      }
+                      readOnlyFamilyIds={adminScopeReadOnlyIds}
+                      onAssignFamily={handleAssignPatrolFamily}
+                      onUnassignFamily={handleUnassignPatrolFamily}
+                      loading={loadingFamilies}
+                      disabled={loading}
+                    />
                   </div>
                 </div>
               )}

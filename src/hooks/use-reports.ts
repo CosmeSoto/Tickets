@@ -71,11 +71,11 @@ export function useReports() {
     [selectedFamilyId, activeTab]
   )
 
-  // ── Load families list ──
+  // ── Load families list (módulo tickets) ──
   useEffect(() => {
     async function loadFamilies() {
       try {
-        const res = await fetch('/api/families')
+        const res = await fetch('/api/families?module=tickets')
         const json = await res.json()
         if (json.success) {
           setFamilies(json.data ?? [])

@@ -51,6 +51,24 @@ export async function PUT(
     const { familyId } = await params
     const body = await request.json()
 
+    // Admin Normal: verificar que tiene acceso a esta familia en el módulo de patrullas
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    if (!isSuperAdmin) {
+      const { checkPatrolFamilyAccess } = await import('@/lib/patrol/patrol-access')
+      const hasAccess = await checkPatrolFamilyAccess(
+        session.user.id,
+        familyId,
+        session.user.role,
+        false
+      )
+      if (!hasAccess) {
+        return NextResponse.json(
+          { error: 'No tienes permiso para modificar la configuración de esta familia' },
+          { status: 403 }
+        )
+      }
+    }
+
     // Validar rangos con el validador puro
     const validation = validatePatrolFamilyConfig(body)
     if (!validation.valid) {

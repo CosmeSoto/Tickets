@@ -146,7 +146,7 @@ export function useInventorySettings() {
     setLoadingFamilies(true)
     try {
       const [familiesRes, configsRes] = await Promise.all([
-        fetch('/api/families?includeInactive=true'),
+        fetch('/api/families?includeInactive=true&module=inventory'),
         fetch('/api/inventory/family-config'),
       ])
       const familiesData = await familiesRes.json()

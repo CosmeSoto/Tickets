@@ -65,6 +65,22 @@ export async function GET(request: NextRequest) {
       ])
       if (userFamilyId) allowedFamilyIds.add(userFamilyId)
 
+      // Admin Normal con forClientId: intersectar familias del cliente con el scope del admin
+      // Solo mostrar familias que AMBOS (cliente y admin) tienen acceso
+      if (forClientId && session.user.role === 'ADMIN' && !(session.user as any).isSuperAdmin) {
+        const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
+        const adminScope = await getAdminFamilyScope(session.user.id, false)
+        if (adminScope.familyIds && adminScope.familyIds.length > 0) {
+          const adminFamilySet = new Set(adminScope.familyIds)
+          // Eliminar familias que el admin no tiene en su scope
+          for (const fId of allowedFamilyIds) {
+            if (!adminFamilySet.has(fId)) {
+              allowedFamilyIds.delete(fId)
+            }
+          }
+        }
+      }
+
       if (allowedFamilyIds.size === 0) {
         return NextResponse.json({ success: true, data: [] })
       }
@@ -194,18 +210,74 @@ export async function GET(request: NextRequest) {
     // ── ADMIN ────────────────────────────────────────────────────────────────
     const currentUser = await prisma.users.findUnique({
       where: { id: session.user.id },
-      select: { isSuperAdmin: true },
+      select: {
+        isSuperAdmin: true,
+        patrolsEnabled: true,
+        inventoryEnabled: true,
+        canManageInventory: true,
+      },
     })
 
+    const includeAll = searchParams.get('scope') === 'all' && currentUser?.isSuperAdmin === true
+    const moduleFilter = searchParams.get('module') // 'tickets' | 'inventory' | 'patrols' | null
     let families = await FamilyService.findAll(includeInactive)
 
-    if (!currentUser?.isSuperAdmin) {
+    if (!currentUser?.isSuperAdmin && !includeAll) {
       try {
-        const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
-        const scope = await getAdminFamilyScope(session.user.id, false)
-        if (scope.familyIds && scope.familyIds.length > 0) {
-          const allowedIds = new Set(scope.familyIds)
+        const userId = session.user.id
+
+        // Si se pide un módulo específico, filtrar por las familias de ese módulo
+        if (moduleFilter === 'inventory') {
+          const invAssigns = await prisma.inventory_manager_families.findMany({
+            where: { managerId: userId },
+            select: { familyId: true },
+          })
+          const nativeUser = await prisma.users.findUnique({
+            where: { id: userId },
+            select: { departments: { select: { familyId: true } } },
+          })
+          const allowedIds = new Set(invAssigns.map(a => a.familyId))
+          if (nativeUser?.departments?.familyId) allowedIds.add(nativeUser.departments.familyId)
           families = families.filter(f => allowedIds.has(f.id))
+        } else if (moduleFilter === 'patrols') {
+          const patrolAssigns = await prisma.patrol_family_assignments.findMany({
+            where: { userId, isActive: true },
+            select: { familyId: true },
+          })
+          const nativeUser = await prisma.users.findUnique({
+            where: { id: userId },
+            select: { departments: { select: { familyId: true } } },
+          })
+          const allowedIds = new Set(patrolAssigns.map(a => a.familyId))
+          if (nativeUser?.departments?.familyId) allowedIds.add(nativeUser.departments.familyId)
+          families = families.filter(f => allowedIds.has(f.id))
+        } else if (moduleFilter === 'tickets') {
+          // Módulo de tickets: usar admin_family_assignments + nativa
+          const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
+          const scope = await getAdminFamilyScope(userId, false)
+          if (scope.familyIds && scope.familyIds.length > 0) {
+            const allowedIds = new Set(scope.familyIds)
+            families = families.filter(f => allowedIds.has(f.id))
+          }
+        } else {
+          // Default (sin módulo específico): calcular Union_Scope
+          // Union_Scope = General_Scope + Inventory families + Patrols families + Nativa (deduplicado)
+          const { getAdminFamilyScope, getModuleFamilyIds } = await import('@/lib/auth/admin-scope')
+          const scope = await getAdminFamilyScope(userId, false)
+          const inventoryFamilyIds = await getModuleFamilyIds(userId, 'inventory')
+          const patrolFamilyIds = await getModuleFamilyIds(userId, 'patrols')
+
+          // Combinar todos los IDs de familias (deduplicado)
+          const unionSet = new Set<string>()
+          if (scope.familyIds) {
+            scope.familyIds.forEach(id => unionSet.add(id))
+          }
+          inventoryFamilyIds.forEach(id => unionSet.add(id))
+          patrolFamilyIds.forEach(id => unionSet.add(id))
+
+          if (unionSet.size > 0) {
+            families = families.filter(f => unionSet.has(f.id))
+          }
         }
       } catch {
         /* fallback seguro */
@@ -222,12 +294,24 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/families — Crea una nueva familia; solo ADMIN
+// POST /api/families — Crea una nueva familia; solo SUPER ADMIN
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session || session.user.role !== 'ADMIN') {
       return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
+    }
+
+    const currentUser = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: { isSuperAdmin: true },
+    })
+
+    if (!currentUser?.isSuperAdmin) {
+      return NextResponse.json(
+        { success: false, message: 'Solo el Administrador Principal puede crear familias' },
+        { status: 403 }
+      )
     }
 
     const body = await request.json()

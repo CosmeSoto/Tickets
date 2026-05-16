@@ -28,12 +28,20 @@ export async function getPatrolAccessibleFamilyIds(
   // SuperAdmin: acceso total
   if (role === 'ADMIN' && isSuperAdmin) return undefined
 
-  // Admin normal: familias asignadas + nativa
+  // Admin normal: familias asignadas para módulo de patrullas + nativa
   if (role === 'ADMIN') {
-    const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
-    const scope = await getAdminFamilyScope(userId, false)
-    if (!scope.familyIds || scope.familyIds.length === 0) return undefined
-    return scope.familyIds
+    const { getModuleFamilyIds } = await import('@/lib/auth/admin-scope')
+    const patrolFamilyIds = await getModuleFamilyIds(userId, 'patrols')
+    if (patrolFamilyIds.length === 0) {
+      // Fallback: si no tiene asignaciones de patrullas, usar solo familia nativa
+      const user = await prisma.users.findUnique({
+        where: { id: userId },
+        select: { departments: { select: { familyId: true } } },
+      })
+      const nativeFamilyId = user?.departments?.familyId
+      return nativeFamilyId ? [nativeFamilyId] : []
+    }
+    return patrolFamilyIds
   }
 
   // TECHNICIAN/CLIENT: primero buscar en patrol_family_assignments (asignación específica de rondas)

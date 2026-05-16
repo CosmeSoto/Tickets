@@ -48,6 +48,24 @@ export async function GET(request: NextRequest) {
     if (familyId) {
       const familyFilter = { OR: [{ familyId }, { familyId: null }] }
       where.AND = [familyFilter]
+    } else {
+      // Sin familyId explícito: aplicar scope de inventario del usuario
+      const isSuperAdmin = (session.user as any).isSuperAdmin === true
+      const userCanManageInventory = (session.user as any).canManageInventory === true
+      if (session.user.role === 'ADMIN' && !isSuperAdmin) {
+        const { getInventoryScope, buildInventoryFamilyWhere } =
+          await import('@/lib/inventory/scope-filter')
+        const scope = await getInventoryScope(
+          session.user.id,
+          session.user.role,
+          false,
+          userCanManageInventory
+        )
+        const familyFilter = buildInventoryFamilyWhere(scope.familyIds, true) // includeGlobal=true para proveedores
+        if (Object.keys(familyFilter).length > 0) {
+          where.AND = [...((where.AND as any[]) ?? []), familyFilter]
+        }
+      }
     }
 
     const suppliers = await (prisma.suppliers.findMany as any)({

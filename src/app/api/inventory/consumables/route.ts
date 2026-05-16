@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { ConsumableService } from '@/lib/services/consumable.service'
-import { createConsumableSchema, consumableFiltersSchema } from '@/lib/validations/inventory/consumable'
+import {
+  createConsumableSchema,
+  consumableFiltersSchema,
+} from '@/lib/validations/inventory/consumable'
 import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
 import { ZodError } from 'zod'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
@@ -30,12 +33,31 @@ export async function GET(request: NextRequest) {
     }
 
     const validatedFilters = consumableFiltersSchema.parse(filters)
+    const familyIdFilter = searchParams.get('familyId') || undefined
+
+    // Admin Normal sin familyId explícito: aplicar scope de inventario
+    if (!familyIdFilter && session.user.role === 'ADMIN' && !(session.user as any).isSuperAdmin) {
+      const { getInventoryScope } = await import('@/lib/inventory/scope-filter')
+      const scope = await getInventoryScope(
+        session.user.id,
+        session.user.role,
+        false,
+        (session.user as any).canManageInventory === true
+      )
+      if (scope.familyIds && scope.familyIds.length > 0) {
+        ;(validatedFilters as any).scopeFamilyIds = scope.familyIds
+      } else if (scope.noAccess) {
+        return NextResponse.json({ items: [], total: 0, page: 1, limit: 10 })
+      }
+    }
 
     const cacheKey = buildCacheKey('inventory:consumables', {
       role: session.user.id,
       ...validatedFilters,
     })
-    const result = await withCache(cacheKey, 10, () => ConsumableService.listConsumables(validatedFilters))
+    const result = await withCache(cacheKey, 10, () =>
+      ConsumableService.listConsumables(validatedFilters)
+    )
 
     return NextResponse.json({
       ...result,
@@ -61,13 +83,16 @@ export async function POST(request: NextRequest) {
     if (!session?.user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
-    if (!await canManageInventory(session.user.id, session.user.role)) {
+    if (!(await canManageInventory(session.user.id, session.user.role))) {
       return inventoryForbidden()
     }
 
     const body = await request.json()
     const validatedData = createConsumableSchema.parse(body)
-    const consumable = await ConsumableService.createConsumable(validatedData as any, session.user.id)
+    const consumable = await ConsumableService.createConsumable(
+      validatedData as any,
+      session.user.id
+    )
 
     await AuditServiceComplete.log({
       action: AuditActionsComplete.CONSUMABLE_CREATED,
@@ -80,7 +105,8 @@ export async function POST(request: NextRequest) {
         currentStock: validatedData.currentStock,
         costPerUnit: validatedData.costPerUnit,
       },
-      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+      ipAddress:
+        request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
     }).catch(err => console.error('[AUDIT] Error registrando creación de consumible:', err))
 

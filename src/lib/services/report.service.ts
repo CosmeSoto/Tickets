@@ -231,12 +231,20 @@ export class ReportService {
       isActive: true,
     }
     if (familyId !== 'all') {
-      // Para técnicos: asignados a la familia
+      // Para técnicos: asignados a la(s) familia(s)
       // Para admins: cualquier admin activo (pueden resolver en cualquier familia)
+      const familyFilter = familyId.includes(',')
+        ? {
+            in: familyId
+              .split(',')
+              .map(id => id.trim())
+              .filter(Boolean),
+          }
+        : familyId
       resolverWhere.OR = [
         {
           role: 'TECHNICIAN',
-          technicianFamilyAssignments: { some: { familyId, isActive: true } },
+          technicianFamilyAssignments: { some: { familyId: familyFilter, isActive: true } },
         },
         { role: 'ADMIN' },
       ]
@@ -343,7 +351,7 @@ export class ReportService {
       }
     }
 
-    if (familyId === 'all') {
+    if (familyId === 'all' || familyId.includes(',')) {
       // Agrupar por período + familia
       const map = new Map<string, TemporalTrendPoint>()
       for (const t of tickets) {
@@ -388,10 +396,16 @@ export class ReportService {
             orderBy: [{ order: 'asc' }, { name: 'asc' }],
             select: { id: true, name: true },
           })
-        : await prisma.families.findMany({
-            where: { id: familyId },
-            select: { id: true, name: true },
-          })
+        : familyId.includes(',')
+          ? await prisma.families.findMany({
+              where: { id: { in: familyId.split(',') }, isActive: true },
+              orderBy: [{ order: 'asc' }, { name: 'asc' }],
+              select: { id: true, name: true },
+            })
+          : await prisma.families.findMany({
+              where: { id: familyId },
+              select: { id: true, name: true },
+            })
 
     const priorities = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const
     const results: SLAComplianceRow[] = []

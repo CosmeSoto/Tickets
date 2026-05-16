@@ -24,14 +24,31 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
     }
 
-    const includeInactive = isAdmin && request.nextUrl.searchParams.get('includeInactive') === 'true'
+    const includeInactive =
+      isAdmin && request.nextUrl.searchParams.get('includeInactive') === 'true'
     const familyId = request.nextUrl.searchParams.get('familyId') ?? undefined
+
+    // Determinar filtro de familia
+    let familyFilter: Record<string, any> = {}
+    if (familyId) {
+      familyFilter = { OR: [{ familyId }, { familyId: null }] }
+    } else if (isAdmin && !(user as any).isSuperAdmin) {
+      // Admin Normal sin familyId explícito: aplicar scope de inventario
+      const { getInventoryScope, buildInventoryFamilyWhere } =
+        await import('@/lib/inventory/scope-filter')
+      const scope = await getInventoryScope(
+        user.id,
+        user.role,
+        false,
+        (user as any).canManageInventory === true
+      )
+      familyFilter = buildInventoryFamilyWhere(scope.familyIds, true) // includeGlobal=true para bodegas compartidas
+    }
 
     const warehouses = await (prisma.warehouses.findMany as any)({
       where: {
         ...(includeInactive ? {} : { isActive: true }),
-        // Si se filtra por familia: mostrar bodegas de esa familia + bodegas compartidas (sin familia)
-        ...(familyId ? { OR: [{ familyId }, { familyId: null }] } : {}),
+        ...familyFilter,
       },
       include: {
         manager: { select: { id: true, name: true, email: true } },
@@ -63,7 +80,8 @@ export async function POST(request: NextRequest) {
 
     const { name, location, description, managerId, familyId } = await request.json()
 
-    if (!name?.trim()) return NextResponse.json({ error: 'El nombre es requerido' }, { status: 400 })
+    if (!name?.trim())
+      return NextResponse.json({ error: 'El nombre es requerido' }, { status: 400 })
 
     const warehouse = await (prisma.warehouses.create as any)({
       data: {

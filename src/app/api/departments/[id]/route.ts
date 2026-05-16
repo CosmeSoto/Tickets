@@ -8,17 +8,17 @@ import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit
 const departmentSchema = z.object({
   name: z.string().min(2).max(100).optional(),
   description: z.string().optional(),
-  color: z.string().regex(/^#[0-9A-F]{6}$/i).optional(),
+  color: z
+    .string()
+    .regex(/^#[0-9A-F]{6}$/i)
+    .optional(),
   isActive: z.boolean().optional(),
   order: z.number().int().min(0).optional(),
   familyId: z.string().nullable().optional(),
 })
 
 // GET /api/departments/[id] - Obtener departamento
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
@@ -33,10 +33,10 @@ export async function GET(
         _count: {
           select: {
             users: true,
-            categories: true
-          }
-        }
-      }
+            categories: true,
+          },
+        },
+      },
     })
 
     if (!department) {
@@ -48,7 +48,7 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      data: department
+      data: department,
     })
   } catch (error) {
     console.error('❌ Error al obtener departamento:', error)
@@ -59,11 +59,8 @@ export async function GET(
   }
 }
 
-// PUT /api/departments/[id] - Actualizar departamento
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+// PUT /api/departments/[id] - Actualizar departamento; ADMIN solo en sus familias
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session || session.user.role !== 'ADMIN') {
@@ -76,7 +73,7 @@ export async function PUT(
 
     // Verificar si el departamento existe
     const existing = await prisma.departments.findUnique({
-      where: { id }
+      where: { id },
     })
 
     if (!existing) {
@@ -86,10 +83,42 @@ export async function PUT(
       )
     }
 
+    const currentUser = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: { isSuperAdmin: true },
+    })
+
+    if (!currentUser?.isSuperAdmin) {
+      const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
+      const scope = await getAdminFamilyScope(session.user.id, false)
+      const allowedFamilyIds = scope.familyIds ? new Set(scope.familyIds) : new Set()
+
+      // Verificar que el departamento existente esté en una familia permitida
+      if (existing.familyId && !allowedFamilyIds.has(existing.familyId)) {
+        return NextResponse.json(
+          { success: false, error: 'No tiene permisos para editar este departamento' },
+          { status: 403 }
+        )
+      }
+
+      // Si se cambia la familia, verificar que la nueva familia también esté permitida
+      if (validatedData.familyId !== undefined && validatedData.familyId !== existing.familyId) {
+        if (validatedData.familyId && !allowedFamilyIds.has(validatedData.familyId)) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: 'Solo puede asignar el departamento a las familias que tiene asignadas',
+            },
+            { status: 403 }
+          )
+        }
+      }
+    }
+
     // Si se cambia el nombre, verificar que no exista otro con ese nombre
     if (validatedData.name && validatedData.name !== existing.name) {
       const duplicate = await prisma.departments.findUnique({
-        where: { name: validatedData.name }
+        where: { name: validatedData.name },
       })
 
       if (duplicate) {
@@ -122,7 +151,7 @@ export async function PUT(
     // Preparar oldValues y newValues para auditoría
     const oldValues: any = {}
     const newValues: any = {}
-    
+
     Object.keys(validatedData).forEach(key => {
       const typedKey = key as keyof typeof validatedData
       if (validatedData[typedKey] !== undefined && validatedData[typedKey] !== existing[typedKey]) {
@@ -138,10 +167,10 @@ export async function PUT(
         _count: {
           select: {
             users: true,
-            categories: true
-          }
-        }
-      }
+            categories: true,
+          },
+        },
+      },
     })
 
     // Registrar en auditoría
@@ -152,11 +181,11 @@ export async function PUT(
         entityId: department.id,
         userId: session.user.id,
         details: {
-          departmentName: department.name
+          departmentName: department.name,
         },
         oldValues,
         newValues,
-        request
+        request,
       })
     }
 
@@ -167,11 +196,11 @@ export async function PUT(
     return NextResponse.json({
       success: true,
       data: department,
-      message: `Departamento "${department.name}" actualizado exitosamente`
+      message: `Departamento "${department.name}" actualizado exitosamente`,
     })
   } catch (error) {
     console.error('❌ Error al actualizar departamento:', error)
-    
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { success: false, error: 'Datos inválidos', details: error.errors },
@@ -179,7 +208,6 @@ export async function PUT(
       )
     }
 
-    
     return NextResponse.json(
       { success: false, error: 'Error al actualizar departamento' },
       { status: 500 }
@@ -187,7 +215,7 @@ export async function PUT(
   }
 }
 
-// DELETE /api/departments/[id] - Eliminar departamento
+// DELETE /api/departments/[id] - Eliminar departamento; ADMIN solo en sus familias
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -207,10 +235,10 @@ export async function DELETE(
         _count: {
           select: {
             users: true,
-            categories: true
-          }
-        }
-      }
+            categories: true,
+          },
+        },
+      },
     })
 
     if (!department) {
@@ -220,20 +248,38 @@ export async function DELETE(
       )
     }
 
+    const currentUser = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: { isSuperAdmin: true },
+    })
+
+    if (!currentUser?.isSuperAdmin) {
+      const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
+      const scope = await getAdminFamilyScope(session.user.id, false)
+      const allowedFamilyIds = scope.familyIds ? new Set(scope.familyIds) : new Set()
+
+      if (department.familyId && !allowedFamilyIds.has(department.familyId)) {
+        return NextResponse.json(
+          { success: false, error: 'No tiene permisos para eliminar este departamento' },
+          { status: 403 }
+        )
+      }
+    }
+
     // Verificar si tiene usuarios o categorías asignadas
     if (department._count.users > 0 || department._count.categories > 0) {
       return NextResponse.json(
-        { 
-          success: false, 
+        {
+          success: false,
           error: `No se puede eliminar el departamento "${department.name}" porque tiene ${department._count.users} usuario(s) y ${department._count.categories} categoría(s) asignado(s)`,
-          canDelete: false
+          canDelete: false,
         },
         { status: 400 }
       )
     }
 
     await prisma.departments.delete({
-      where: { id }
+      where: { id },
     })
 
     // Registrar en auditoría
@@ -246,9 +292,9 @@ export async function DELETE(
         departmentName: department.name,
         description: department.description,
         usersCount: department._count.users,
-        categoriesCount: department._count.categories
+        categoriesCount: department._count.categories,
       },
-      request
+      request,
     })
 
     if (process.env.NODE_ENV === 'development') {
@@ -257,7 +303,7 @@ export async function DELETE(
 
     return NextResponse.json({
       success: true,
-      message: `Departamento "${department.name}" eliminado exitosamente`
+      message: `Departamento "${department.name}" eliminado exitosamente`,
     })
   } catch (error) {
     console.error('❌ Error al eliminar departamento:', error)

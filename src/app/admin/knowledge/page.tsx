@@ -80,8 +80,28 @@ export default function AdminKnowledgePage() {
   const [articleToDelete, setArticleToDelete] = useState<Article | null>(null)
   const [deleting, setDeleting] = useState(false)
 
-  // Familias desde el contexto global (cache Redis, sin peticion extra)
-  const { families } = useFamilies()
+  // Familias del módulo de tickets (para Admin Normal solo las asignadas)
+  const { families: contextFamilies } = useFamilies()
+  const [families, setFamilies] = useState<typeof contextFamilies>([])
+  const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
+
+  useEffect(() => {
+    if (isSuperAdmin) {
+      setFamilies(contextFamilies)
+      return
+    }
+    // Admin Normal: cargar solo familias del módulo de tickets
+    fetch('/api/families?includeInactive=false&module=tickets')
+      .then(r => r.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.data)) {
+          setFamilies(data.data)
+        } else {
+          setFamilies(contextFamilies)
+        }
+      })
+      .catch(() => setFamilies(contextFamilies))
+  }, [isSuperAdmin, contextFamilies])
 
   // Admin usa el endpoint con filtrado por familia (sin restricción de rol)
   const {

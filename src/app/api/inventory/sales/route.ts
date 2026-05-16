@@ -24,7 +24,23 @@ export async function GET(req: NextRequest) {
   const limit = parseInt(searchParams.get('limit') ?? '20')
   const skip = (page - 1) * limit
 
-  const where = status ? { status: status as any } : {}
+  const where: any = status ? { status: status as any } : {}
+
+  // Admin Normal: filtrar ventas por scope de inventario (a través de equipment.type.familyId)
+  if (role === 'ADMIN' && !isSuperAdmin) {
+    const { getInventoryScope } = await import('@/lib/inventory/scope-filter')
+    const scope = await getInventoryScope(
+      session.user.id,
+      role,
+      false,
+      (session.user as any).canManageInventory === true
+    )
+    if (scope.familyIds && scope.familyIds.length > 0) {
+      where.equipment = { type: { familyId: { in: scope.familyIds } } }
+    } else if (scope.noAccess) {
+      return NextResponse.json({ sales: [], total: 0, page, limit, totalPages: 0 })
+    }
+  }
 
   const [sales, total] = await Promise.all([
     prisma.equipment_sales.findMany({

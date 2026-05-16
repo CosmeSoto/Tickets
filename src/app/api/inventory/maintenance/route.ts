@@ -38,6 +38,25 @@ export async function GET(request: NextRequest) {
     // Filtrar por familia a través del equipo
     if (familyId) {
       where.equipment = { type: { familyId } }
+    } else if (
+      !isClient &&
+      !personalOnly &&
+      session.user.role === 'ADMIN' &&
+      !(session.user as any).isSuperAdmin
+    ) {
+      // Admin Normal sin familyId explícito: aplicar scope de inventario
+      const { getInventoryScope } = await import('@/lib/inventory/scope-filter')
+      const scope = await getInventoryScope(
+        session.user.id,
+        session.user.role,
+        false,
+        (session.user as any).canManageInventory === true
+      )
+      if (scope.familyIds && scope.familyIds.length > 0) {
+        where.equipment = { type: { familyId: { in: scope.familyIds } } }
+      } else if (scope.noAccess) {
+        where.id = '__NONE__'
+      }
     }
 
     // Cliente solo ve mantenimientos de sus equipos asignados

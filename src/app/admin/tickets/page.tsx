@@ -30,7 +30,26 @@ export default function AdminTicketsPage() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'all' | 'created'>('all')
 
-  const { families } = useFamilies()
+  const { families: contextFamilies } = useFamilies()
+  const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
+  const [families, setFamilies] = useState<typeof contextFamilies>([])
+
+  useEffect(() => {
+    if (isSuperAdmin) {
+      setFamilies(contextFamilies)
+      return
+    }
+    fetch('/api/families?includeInactive=false&module=tickets')
+      .then(r => r.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.data)) {
+          setFamilies(data.data)
+        } else {
+          setFamilies(contextFamilies)
+        }
+      })
+      .catch(() => setFamilies(contextFamilies))
+  }, [isSuperAdmin, contextFamilies])
 
   // Todos los tickets del sistema
   const {

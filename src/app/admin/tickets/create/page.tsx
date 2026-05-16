@@ -248,8 +248,11 @@ export default function CreateTicketPage() {
   }
 
   const handleClientSelect = async (clientId: string) => {
-    const client = clients.find(c => c.id === clientId) as unknown as User | undefined
-    setSelectedClient(client || null)
+    // Si es el admin mismo, no buscar en la lista de clients
+    if (clientId !== session?.user?.id) {
+      const client = clients.find(c => c.id === clientId) as unknown as User | undefined
+      setSelectedClient(client || null)
+    }
     setValue('clientId', clientId)
     // Limpiar familia y categoría al cambiar cliente
     setSelectedFamilyId('')
@@ -259,7 +262,13 @@ export default function CreateTicketPage() {
     // Cargar familias del cliente seleccionado
     if (clientId) {
       try {
-        const res = await fetch(`/api/families?asClient=true&forClientId=${clientId}`)
+        // Si es el admin mismo, usar asClient=true sin forClientId
+        // Si es otro usuario, usar forClientId
+        const isOwnTicket = clientId === session?.user?.id
+        const url = isOwnTicket
+          ? '/api/families?asClient=true'
+          : `/api/families?asClient=true&forClientId=${clientId}`
+        const res = await fetch(url)
         if (res.ok) {
           const json = await res.json()
           const families = json.data ?? []
@@ -321,7 +330,7 @@ export default function CreateTicketPage() {
   return (
     <ModuleLayout
       title='Crear Nuevo Ticket'
-      subtitle='Crear ticket en nombre de un cliente'
+      subtitle='Crear ticket propio o en nombre de un usuario'
       headerActions={headerActions}
     >
       <div className='max-w-6xl mx-auto'>
@@ -366,15 +375,36 @@ export default function CreateTicketPage() {
                           <User className='h-4 w-4 mr-2' />
                           Cliente *
                         </Label>
+                        <div className='flex gap-2'>
+                          <Button
+                            type='button'
+                            variant={clientId === session?.user?.id ? 'default' : 'outline'}
+                            size='sm'
+                            onClick={() => {
+                              if (session?.user?.id) {
+                                setValue('clientId', session.user.id)
+                                setSelectedClient({
+                                  id: session.user.id,
+                                  name: session.user.name || '',
+                                  email: session.user.email || '',
+                                  role: 'ADMIN',
+                                } as User)
+                                handleClientSelect(session.user.id)
+                              }
+                            }}
+                          >
+                            Ticket Propio
+                          </Button>
+                          <span className='text-xs text-muted-foreground self-center'>o</span>
+                        </div>
                         <UserCombobox
-                          role='CLIENT'
-                          value={watch('clientId')}
+                          value={clientId === session?.user?.id ? undefined : watch('clientId')}
                           onValueChange={clientId => {
                             setValue('clientId', clientId)
                             handleClientSelect(clientId)
                           }}
-                          placeholder='Buscar cliente por nombre o email...'
-                          emptyText='No se encontraron clientes'
+                          placeholder='Buscar usuario por nombre o email...'
+                          emptyText='No se encontraron usuarios'
                           showEmail={true}
                           showDepartment={true}
                           className={errors.clientId ? 'border-red-500' : ''}
@@ -384,8 +414,9 @@ export default function CreateTicketPage() {
                         )}
                         {selectedClient && (
                           <p className='text-xs text-muted-foreground'>
-                            💡 Tip: El cliente recibirá notificaciones automáticas sobre el progreso
-                            del ticket
+                            {clientId === session?.user?.id
+                              ? '💡 Crearás un ticket propio. Selecciona el área de soporte a continuación.'
+                              : '💡 El usuario recibirá notificaciones automáticas sobre el progreso del ticket'}
                           </p>
                         )}
                       </div>
@@ -827,8 +858,10 @@ export default function CreateTicketPage() {
             <Alert>
               <AlertCircle className='h-4 w-4' />
               <AlertDescription>
-                <strong>Nota:</strong> Este ticket se creará en nombre del cliente seleccionado. El
-                cliente recibirá notificaciones automáticas sobre el progreso del ticket.
+                <strong>Nota:</strong>{' '}
+                {clientId === session?.user?.id
+                  ? 'Este ticket se creará como solicitud propia.'
+                  : 'Este ticket se creará en nombre del usuario seleccionado. El usuario recibirá notificaciones automáticas sobre el progreso del ticket.'}
               </AlertDescription>
             </Alert>
           </div>

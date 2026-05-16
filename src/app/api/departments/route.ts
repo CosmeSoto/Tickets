@@ -50,6 +50,26 @@ export async function GET(request: NextRequest) {
     if (isActive !== null) where.isActive = isActive === 'true'
     if (familyId) where.familyId = familyId
 
+    // Admin Normal: solo departamentos de sus familias (Union_Scope = General + Inventory + Patrols + Nativa)
+    if (session.user.role === 'ADMIN' && !(session.user as any).isSuperAdmin && !familyId) {
+      const { getAdminFamilyScope, getModuleFamilyIds } = await import('@/lib/auth/admin-scope')
+      const scope = await getAdminFamilyScope(session.user.id, false)
+      const inventoryFamilyIds = await getModuleFamilyIds(session.user.id, 'inventory')
+      const patrolFamilyIds = await getModuleFamilyIds(session.user.id, 'patrols')
+
+      // Union_Scope: combinar todas las familias de todos los módulos (deduplicado)
+      const unionSet = new Set<string>()
+      if (scope.familyIds) {
+        scope.familyIds.forEach(id => unionSet.add(id))
+      }
+      inventoryFamilyIds.forEach(id => unionSet.add(id))
+      patrolFamilyIds.forEach(id => unionSet.add(id))
+
+      if (unionSet.size > 0) {
+        where.familyId = { in: Array.from(unionSet) }
+      }
+    }
+
     const departments = await prisma.departments.findMany({
       where,
       orderBy: [{ order: 'asc' }, { name: 'asc' }],
@@ -74,7 +94,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/departments - Crear departamento
+// POST /api/departments - Crear departamento; ADMIN solo en sus familias
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -82,8 +102,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    const currentUser = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: { isSuperAdmin: true },
+    })
+
     const body = await request.json()
     const validatedData = departmentSchema.parse(body)
+
+    if (!currentUser?.isSuperAdmin) {
+      const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
+      const scope = await getAdminFamilyScope(session.user.id, false)
+      const allowedFamilyIds = scope.familyIds ? new Set(scope.familyIds) : new Set()
+
+      if (validatedData.familyId && !allowedFamilyIds.has(validatedData.familyId)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Solo puede crear departamentos en las familias que tiene asignadas',
+          },
+          { status: 403 }
+        )
+      }
+    }
 
     // Verificar si ya existe un departamento con ese nombre
     const existing = await prisma.departments.findUnique({

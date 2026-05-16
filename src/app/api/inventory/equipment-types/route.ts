@@ -31,16 +31,39 @@ export async function GET(req: NextRequest) {
     const { searchParams } = req.nextUrl
     const familyId = searchParams.get('familyId') ?? undefined
     const includeInactive = isAdmin && searchParams.get('includeInactive') === 'true'
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+
+    // Admin Normal sin familyId explícito: filtrar por scope de inventario
+    let effectiveFamilyFilter: any = {}
+    if (familyId) {
+      effectiveFamilyFilter = { OR: [{ familyId }, { familyId: null }] }
+    } else if (isAdmin && !isSuperAdmin) {
+      const { getModuleFamilyIds } = await import('@/lib/auth/admin-scope')
+      const inventoryFamilyIds = await getModuleFamilyIds(userId, 'inventory')
+      if (inventoryFamilyIds.length > 0) {
+        effectiveFamilyFilter = {
+          OR: [{ familyId: { in: inventoryFamilyIds } }, { familyId: null }],
+        }
+      } else {
+        effectiveFamilyFilter = { familyId: null } // Solo globales
+      }
+    }
 
     const types = await prisma.equipment_types.findMany({
       where: {
         ...(includeInactive ? {} : { isActive: true }),
-        // Sin familia = global (visible para todas las familias)
-        // Con familia = solo esa familia + los globales
-        ...(familyId ? { OR: [{ familyId }, { familyId: null }] } : {}),
+        ...effectiveFamilyFilter,
       },
       orderBy: [{ order: 'asc' }, { name: 'asc' }],
-      select: { id: true, code: true, name: true, icon: true, familyId: true, isActive: true, order: true },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        icon: true,
+        familyId: true,
+        isActive: true,
+        order: true,
+      },
     })
 
     return NextResponse.json({ types })

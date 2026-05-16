@@ -4,8 +4,7 @@ import { prisma } from '@/lib/prisma'
  * Retorna los IDs de familias accesibles para un usuario según su rol:
  *
  * - SuperAdmin (ADMIN + isSuperAdmin): acceso total → undefined (sin restricción)
- * - Admin normal (ADMIN sin isSuperAdmin): solo sus familias asignadas en admin_family_assignments
- *   Si no tiene ninguna asignada, acceso total por compatibilidad (admin recién creado)
+ * - Admin normal (ADMIN sin isSuperAdmin): sus familias en inventory_manager_families + nativa
  * - Gestor (canManageInventory=true): sus familias en inventory_manager_families
  * - Cualquier otro rol: undefined (sin restricción de familia, la API decide qué mostrar)
  *
@@ -22,12 +21,20 @@ export async function getAccessibleFamilyIds(
   // SuperAdmin: acceso total
   if (role === 'ADMIN' && isSuperAdmin) return undefined
 
-  // Admin normal: familias asignadas + nativa
+  // Admin normal: familias de inventario asignadas + nativa
   if (role === 'ADMIN') {
-    const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
-    const scope = await getAdminFamilyScope(userId, false)
-    if (!scope.familyIds || scope.familyIds.length === 0) return undefined
-    return scope.familyIds
+    const { getModuleFamilyIds } = await import('@/lib/auth/admin-scope')
+    const inventoryFamilyIds = await getModuleFamilyIds(userId, 'inventory')
+    if (inventoryFamilyIds.length === 0) {
+      // Admin sin asignaciones de inventario: solo su familia nativa
+      const user = await prisma.users.findUnique({
+        where: { id: userId },
+        select: { departments: { select: { familyId: true } } },
+      })
+      const nativeFamilyId = user?.departments?.familyId
+      return nativeFamilyId ? [nativeFamilyId] : []
+    }
+    return inventoryFamilyIds
   }
 
   // Gestor de inventario (cualquier rol): sus familias asignadas

@@ -65,12 +65,6 @@ export async function POST(request: NextRequest) {
         { error: 'El usuario no tiene el módulo de rondas habilitado' },
         { status: 400 }
       )
-    // ADMIN no necesita asignación de familias de rondas (usa admin_family_assignments)
-    if (user.role === 'ADMIN')
-      return NextResponse.json(
-        { error: 'Los administradores gestionan rondas según sus familias de administración' },
-        { status: 400 }
-      )
 
     // Validar que la familia existe y está activa
     const family = await prisma.families.findUnique({
