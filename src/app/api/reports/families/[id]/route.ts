@@ -22,14 +22,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     })
 
     if (!currentUser?.isSuperAdmin) {
-      const assignment = await prisma.admin_family_assignments.findFirst({
-        where: { adminId: session.user.id, familyId: id, isActive: true },
-      })
-      // Si tiene asignaciones pero no incluye esta familia, denegar
-      const totalAssignments = await prisma.admin_family_assignments.count({
-        where: { adminId: session.user.id, isActive: true },
-      })
-      if (totalAssignments > 0 && !assignment) {
+      const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
+      const scope = await getAdminFamilyScope(session.user.id, false)
+      if (scope.familyIds && scope.familyIds.length > 0 && !scope.familyIds.includes(id)) {
         return NextResponse.json(
           { success: false, message: 'No tienes acceso a esta familia' },
           { status: 403 }

@@ -24,12 +24,10 @@ export async function GET(_request: NextRequest) {
     let familyIds: string[] | undefined // undefined = todas
 
     if (role === 'ADMIN' && !isSuperAdmin) {
-      const assignments = await prisma.admin_family_assignments.findMany({
-        where: { adminId: userId, isActive: true },
-        select: { familyId: true },
-      })
-      if (assignments.length > 0) {
-        familyIds = assignments.map(a => a.familyId)
+      const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
+      const scope = await getAdminFamilyScope(userId, false)
+      if (scope.familyIds && scope.familyIds.length > 0) {
+        familyIds = scope.familyIds
       }
     } else if (role === 'TECHNICIAN' || (role === 'CLIENT' && canManageInventory)) {
       const invFamilies = await prisma.inventory_manager_families.findMany({
@@ -90,17 +88,29 @@ export async function GET(_request: NextRequest) {
 
     const stats = await withCache(cacheKey, 120, async () => {
       const [
-        totalAssets, availableAssets, assignedAssets, maintenanceAssets, retiredAssets,
-        totalConsumables, lowStockConsumables, outOfStockConsumables,
-        totalLicenses, expiredLicenses, expiringLicenses,
-        pendingDeliveryActs, pendingReturnActs, pendingDecommissions,
+        totalAssets,
+        availableAssets,
+        assignedAssets,
+        maintenanceAssets,
+        retiredAssets,
+        totalConsumables,
+        lowStockConsumables,
+        outOfStockConsumables,
+        totalLicenses,
+        expiredLicenses,
+        expiringLicenses,
+        pendingDeliveryActs,
+        pendingReturnActs,
+        pendingDecommissions,
       ] = await Promise.all([
         prisma.equipment.count({ where: { ...familyFilter, status: { not: 'RETIRED' } } }),
         prisma.equipment.count({ where: { ...familyFilter, status: 'AVAILABLE' } }),
         prisma.equipment.count({ where: { ...familyFilter, status: 'ASSIGNED' } }),
         prisma.equipment.count({ where: { ...familyFilter, status: 'MAINTENANCE' } }),
         prisma.equipment.count({ where: { ...familyFilter, status: 'RETIRED' } }),
-        prisma.consumables.count({ where: { consumableType: { familyId: { in: activeFamilyIds } } } }),
+        prisma.consumables.count({
+          where: { consumableType: { familyId: { in: activeFamilyIds } } },
+        }),
         prisma.$queryRaw<Array<{ count: bigint }>>`
           SELECT COUNT(*) as count FROM consumables c
           INNER JOIN consumable_types ct ON c.type_id = ct.id
@@ -113,7 +123,9 @@ export async function GET(_request: NextRequest) {
             currentStock: 0,
           },
         }),
-        prisma.software_licenses.count({ where: { licenseType: { familyId: { in: activeFamilyIds } } } }),
+        prisma.software_licenses.count({
+          where: { licenseType: { familyId: { in: activeFamilyIds } } },
+        }),
         prisma.software_licenses.count({
           where: {
             licenseType: { familyId: { in: activeFamilyIds } },

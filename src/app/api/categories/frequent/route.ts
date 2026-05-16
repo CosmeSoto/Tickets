@@ -95,15 +95,11 @@ export async function GET(request: NextRequest) {
       ])
       if (userDept?.departments?.familyId) allowedFamilyIds.add(userDept.departments.familyId)
     } else if (session.user.role === 'ADMIN' && !isSuperAdmin) {
-      const adminAssignments = await prisma.admin_family_assignments.findMany({
-        where: { adminId: clientId, isActive: true },
-        select: { familyId: true },
-      })
-      // Admin sin asignaciones explícitas → acceso total (igual que superAdmin)
-      if (adminAssignments.length > 0) {
-        allowedFamilyIds = new Set(adminAssignments.map(a => a.familyId))
+      const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
+      const scope = await getAdminFamilyScope(clientId, false)
+      if (scope.familyIds && scope.familyIds.length > 0) {
+        allowedFamilyIds = new Set(scope.familyIds)
       }
-      // Si no tiene asignaciones → allowedFamilyIds queda null (sin restricción)
     }
     // ADMIN superAdmin → allowedFamilyIds = null (sin restricción)
 

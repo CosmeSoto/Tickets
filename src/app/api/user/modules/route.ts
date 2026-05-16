@@ -185,6 +185,22 @@ export async function GET(request: Request) {
       }
     }
 
+    // Siempre incluir la familia nativa del usuario (derivada de su departamento)
+    // Para Super Admin no es necesario (ya tiene todas las familias)
+    if (!(role === 'ADMIN' && isSuperAdmin)) {
+      const userWithDept = await prisma.users.findUnique({
+        where: { id: userId },
+        select: {
+          departmentId: true,
+          departments: { select: { familyId: true } },
+        },
+      })
+      const nativeFamilyId = userWithDept?.departments?.familyId
+      if (nativeFamilyId && !familyIds.includes(nativeFamilyId)) {
+        familyIds = [...familyIds, nativeFamilyId]
+      }
+    }
+
     if (familyIds.length === 0) {
       // Super Admin sin familias: acceso total
       if (role === 'ADMIN' && isSuperAdmin) {
@@ -248,13 +264,11 @@ export async function GET(request: Request) {
       modules: {
         tickets: isSuperAdmin
           ? true
-          : (ticketMap.get(f.id) ?? true) && (ticketsEnabled || isAdminRole),
+          : (ticketMap.get(f.id) ?? true) && (ticketsEnabled || (isAdminRole && ticketsEnabled)),
         inventory: isSuperAdmin
           ? true
-          : (invMap.get(f.id) ?? false) && (canManageInventory || inventoryEnabled || isAdminRole),
-        patrols: isSuperAdmin
-          ? true
-          : (patrolMap.get(f.id) ?? false) && (patrolsEnabled || isAdminRole),
+          : (invMap.get(f.id) ?? false) && (canManageInventory || inventoryEnabled),
+        patrols: isSuperAdmin ? true : (patrolMap.get(f.id) ?? false) && patrolsEnabled,
       },
     }))
 
@@ -283,10 +297,11 @@ export async function GET(request: Request) {
         resolvedInventory = true
         resolvedPatrols = true
       } else {
-        // Admin normal: el flag del usuario es el permiso, la familia determina disponibilidad
-        resolvedTickets = ticketsEnabled && (familyHasTickets || ticketConfigs.length === 0)
-        resolvedInventory = inventoryEnabled || canManageInventory || familyHasInventory
-        resolvedPatrols = patrolsEnabled && (familyHasPatrols || patrolConfigs.length === 0)
+        // Admin normal: el flag del usuario es el PERMISO obligatorio
+        // Solo ve el módulo si tiene el flag habilitado
+        resolvedTickets = ticketsEnabled
+        resolvedInventory = inventoryEnabled || canManageInventory
+        resolvedPatrols = patrolsEnabled
       }
     } else if (role === 'TECHNICIAN') {
       // Técnico: el flag del usuario es el permiso, la familia determina disponibilidad

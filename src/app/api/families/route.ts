@@ -201,12 +201,10 @@ export async function GET(request: NextRequest) {
 
     if (!currentUser?.isSuperAdmin) {
       try {
-        const assignments = await prisma.admin_family_assignments.findMany({
-          where: { adminId: session.user.id, isActive: true },
-          select: { familyId: true },
-        })
-        if (assignments.length > 0) {
-          const allowedIds = new Set(assignments.map(a => a.familyId))
+        const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
+        const scope = await getAdminFamilyScope(session.user.id, false)
+        if (scope.familyIds && scope.familyIds.length > 0) {
+          const allowedIds = new Set(scope.familyIds)
           families = families.filter(f => allowedIds.has(f.id))
         }
       } catch {

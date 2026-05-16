@@ -26,15 +26,12 @@ export async function canManageCategory(
   if (!categoryFamilyId) return true
 
   try {
-    const assignments = await prisma.admin_family_assignments.findMany({
-      where: { adminId: userId, isActive: true },
-      select: { familyId: true },
-    })
-    // Sin asignaciones explícitas → acceso total (compatibilidad con admins existentes)
-    if (assignments.length === 0) return true
-    return assignments.some(a => a.familyId === categoryFamilyId)
+    const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
+    const scope = await getAdminFamilyScope(userId, false)
+    // Sin asignaciones → acceso total (compatibilidad)
+    if (!scope.familyIds || scope.familyIds.length === 0) return true
+    return scope.familyIds.includes(categoryFamilyId)
   } catch {
-    // Si la tabla no existe, no restringir
     return true
   }
 }
@@ -48,8 +45,8 @@ export async function getCategoryFamilyId(categoryId: string): Promise<string | 
     const category = await prisma.categories.findUnique({
       where: { id: categoryId },
       select: {
-        departments: { select: { familyId: true } }
-      }
+        departments: { select: { familyId: true } },
+      },
     })
     return category?.departments?.familyId ?? null
   } catch {
@@ -64,7 +61,7 @@ export async function getDepartmentFamilyId(departmentId: string): Promise<strin
   try {
     const dept = await prisma.departments.findUnique({
       where: { id: departmentId },
-      select: { familyId: true }
+      select: { familyId: true },
     })
     return dept?.familyId ?? null
   } catch {

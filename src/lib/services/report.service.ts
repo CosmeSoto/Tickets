@@ -75,7 +75,18 @@ function buildDateFilter(dateRange?: DateRange) {
 
 function buildTicketWhere(familyId: string | 'all', dateRange?: DateRange) {
   const where: Record<string, unknown> = {}
-  if (familyId !== 'all') where.familyId = familyId
+  if (familyId !== 'all') {
+    if (familyId.includes(',')) {
+      where.familyId = {
+        in: familyId
+          .split(',')
+          .map(id => id.trim())
+          .filter(Boolean),
+      }
+    } else {
+      where.familyId = familyId
+    }
+  }
   const dateFilter = buildDateFilter(dateRange)
   if (dateFilter) where.createdAt = dateFilter
   return where
@@ -117,17 +128,30 @@ export class ReportService {
     dateRange?: DateRange
   ): Promise<FamilyExecutiveSummary[]> {
     // Obtener familias a procesar
-    const families =
-      familyId === 'all'
-        ? await prisma.families.findMany({
-            where: { isActive: true },
-            orderBy: [{ order: 'asc' }, { name: 'asc' }],
-            select: { id: true, name: true, code: true, color: true },
-          })
-        : await prisma.families.findMany({
-            where: { id: familyId },
-            select: { id: true, name: true, code: true, color: true },
-          })
+    let families
+    if (familyId === 'all') {
+      families = await prisma.families.findMany({
+        where: { isActive: true },
+        orderBy: [{ order: 'asc' }, { name: 'asc' }],
+        select: { id: true, name: true, code: true, color: true },
+      })
+    } else if (familyId.includes(',')) {
+      // Múltiples IDs separados por coma (admin normal con scope restringido)
+      const ids = familyId
+        .split(',')
+        .map(id => id.trim())
+        .filter(Boolean)
+      families = await prisma.families.findMany({
+        where: { id: { in: ids }, isActive: true },
+        orderBy: [{ order: 'asc' }, { name: 'asc' }],
+        select: { id: true, name: true, code: true, color: true },
+      })
+    } else {
+      families = await prisma.families.findMany({
+        where: { id: familyId },
+        select: { id: true, name: true, code: true, color: true },
+      })
+    }
 
     const results: FamilyExecutiveSummary[] = []
 

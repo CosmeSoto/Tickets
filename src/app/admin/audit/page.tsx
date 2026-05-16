@@ -13,15 +13,15 @@
 'use client'
 
 import { ModuleLayout } from '@/components/common/layout/module-layout'
-import { useToast } from '@/hooks/use-toast'
 import { useAudit } from '@/hooks/use-audit'
+import { useExport } from '@/hooks/common/use-export'
 import { AuditStatsCards } from '@/components/audit/audit-stats-cards'
 import { AuditFiltersComponent } from '@/components/audit/audit-filters'
 import { AuditTable } from '@/components/audit/audit-table'
 import { AuditDetailsDialog } from '@/components/audit/audit-details-dialog'
+import { AUDIT_EXPORT_COLUMNS } from '@/components/audit/utils/audit-export-columns'
 
 export default function AuditPage() {
-  const { toast } = useToast()
   const {
     // Session
     session,
@@ -50,9 +50,16 @@ export default function AuditPage() {
     closeLogDetails,
     handlePageChange,
     handleLimitChange,
-    handleExportCSV,
-    handleExportJSON,
   } = useAudit()
+
+  // Exportación estándar (CSV, Excel, PDF) usando los datos filtrados de la tabla
+  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+    filename: 'auditoria',
+    title: 'Registro de Auditoría',
+    subtitle: `Exportado el ${new Date().toLocaleDateString('es-EC')} • ${logs.length} registros`,
+    columns: AUDIT_EXPORT_COLUMNS,
+    getData: () => logs,
+  })
 
   // ── Loading state (sesión) ──
   if (status === 'loading') {
@@ -72,56 +79,8 @@ export default function AuditPage() {
     return null
   }
 
-  // ── Export handlers with toast ──
-  const handleExportCSVWithToast = () => {
-    toast({
-      title: '📤 Exportando...',
-      description: 'Preparando archivo CSV. Esto puede tomar unos momentos.',
-    })
-
-    handleExportCSV(
-      message => {
-        toast({
-          title: '✅ Exportación Completada',
-          description: message,
-          duration: 10000,
-        })
-      },
-      error => {
-        toast({
-          title: '❌ Error en Exportación',
-          description: error,
-          variant: 'destructive',
-          duration: 8000,
-        })
-      }
-    )
-  }
-
-  const handleExportJSONWithToast = () => {
-    toast({
-      title: '📤 Exportando...',
-      description: 'Preparando archivo JSON. Esto puede tomar unos momentos.',
-    })
-
-    handleExportJSON(
-      message => {
-        toast({
-          title: '✅ Exportación Completada',
-          description: message,
-          duration: 10000,
-        })
-      },
-      error => {
-        toast({
-          title: '❌ Error en Exportación',
-          description: error,
-          variant: 'destructive',
-          duration: 8000,
-        })
-      }
-    )
-  }
+  // ── Export handlers ──
+  // Usamos directamente exportCSV, exportExcel, exportPDF del hook useExport
 
   return (
     <ModuleLayout
@@ -141,8 +100,9 @@ export default function AuditPage() {
           loading={loading}
           onFilterChange={updateFilter}
           onClearFilters={clearFilters}
-          onExportCSV={handleExportCSVWithToast}
-          onExportJSON={handleExportJSONWithToast}
+          onExportCSV={exportCSV}
+          onExportJSON={exportExcel}
+          onExportPDF={exportPDF}
         />
 
         {/* Tabla de Logs */}

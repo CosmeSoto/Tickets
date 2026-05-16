@@ -69,14 +69,11 @@ export async function GET(request: NextRequest) {
       // familyId explícito tiene prioridad — no sobreescribir
       if (role === 'ADMIN' && !isSuperAdmin) {
         try {
-          const assignments = await prisma.admin_family_assignments.findMany({
-            where: { adminId: session.user.id, isActive: true },
-            select: { familyId: true },
-          })
-          if (assignments.length > 0) {
-            where.departments = { familyId: { in: assignments.map(a => a.familyId) } }
+          const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
+          const scope = await getAdminFamilyScope(session.user.id, false)
+          if (scope.familyIds && scope.familyIds.length > 0) {
+            where.departments = { familyId: { in: scope.familyIds } }
           }
-          // Sin asignaciones → ve todas (compatibilidad con admins existentes)
         } catch {
           /* tabla no existe → no restringir */
         }

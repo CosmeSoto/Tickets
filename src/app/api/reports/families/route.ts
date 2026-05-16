@@ -34,14 +34,10 @@ export async function GET(request: NextRequest) {
 
     let familyScope: string = 'all'
     if (!currentUser?.isSuperAdmin) {
-      const assignments = await prisma.admin_family_assignments.findMany({
-        where: { adminId: session.user.id, isActive: true },
-        select: { familyId: true },
-      })
-      if (assignments.length > 0) {
-        // Pasar la primera familia asignada como scope (el ReportService filtrará)
-        // Para "all" con restricción, usamos el primer ID y el servicio maneja el array
-        familyScope = assignments.map(a => a.familyId).join(',')
+      const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
+      const scope = await getAdminFamilyScope(session.user.id, false)
+      if (scope.familyIds && scope.familyIds.length > 0) {
+        familyScope = scope.familyIds.join(',')
       }
     }
 

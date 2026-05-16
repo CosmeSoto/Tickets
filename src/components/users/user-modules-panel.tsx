@@ -20,6 +20,10 @@ interface UserModulesPanelProps {
   ticketsEnabled?: boolean
   inventoryEnabled?: boolean
   patrolsEnabled?: boolean
+  /** Si es true, el panel inicia colapsado sin auto-expandir */
+  defaultCollapsed?: boolean
+  /** Si es true, no muestra guías de "Cómo activar" para módulos inactivos */
+  hideGuides?: boolean
 }
 
 export function UserModulesPanel({
@@ -29,6 +33,8 @@ export function UserModulesPanel({
   ticketsEnabled,
   inventoryEnabled,
   patrolsEnabled,
+  defaultCollapsed = false,
+  hideGuides = false,
 }: UserModulesPanelProps) {
   const [data, setData] = useState<{
     tickets: boolean
@@ -51,7 +57,7 @@ export function UserModulesPanel({
       .then(r => (r.ok ? r.json() : null))
       .then(d => {
         setData(d)
-        if (d && (!d.tickets || !d.inventory)) setExpanded(true)
+        if (!defaultCollapsed && d && (!d.tickets || !d.inventory)) setExpanded(true)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -180,14 +186,14 @@ export function UserModulesPanel({
             name='Tickets'
             active={ticketsActive}
             families={data?.families.filter(f => f.modules.tickets)}
-            guide={getTicketsGuide()}
+            guide={hideGuides ? null : getTicketsGuide()}
           />
           <ModuleStatusCard
             emoji='📦'
             name='Inventario'
             active={inventoryActive}
             families={data?.families.filter(f => f.modules.inventory)}
-            guide={getInventoryGuide()}
+            guide={hideGuides ? null : getInventoryGuide()}
             badge={role === 'TECHNICIAN' && !canManageInventory ? 'Requiere Gestor' : undefined}
           />
           <ModuleStatusCard
@@ -196,7 +202,7 @@ export function UserModulesPanel({
             active={patrolsActive}
             families={data?.families.filter(f => f.modules.patrols)}
             guide={
-              patrolsActive
+              hideGuides || patrolsActive
                 ? null
                 : {
                     type: 'info' as const,

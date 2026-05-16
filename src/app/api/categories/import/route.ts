@@ -75,11 +75,15 @@ export async function POST(request: NextRequest) {
       const { getSetting } = await import('@/lib/api-cache')
       const val = await getSetting('maxFileSize', 600, '10')
       maxFileSizeMB = parseInt(val ?? '10') || 10
-    } catch { /* usar default */ }
+    } catch {
+      /* usar default */
+    }
 
     if (file.size > maxFileSizeMB * 1024 * 1024) {
       return NextResponse.json(
-        { error: `El archivo no puede superar ${maxFileSizeMB} MB (configurado en ajustes del sistema)` },
+        {
+          error: `El archivo no puede superar ${maxFileSizeMB} MB (configurado en ajustes del sistema)`,
+        },
         { status: 400 }
       )
     }
@@ -89,7 +93,10 @@ export async function POST(request: NextRequest) {
     try {
       rows = await parseImportFile(file)
     } catch {
-      return NextResponse.json({ error: 'No se pudo leer el archivo. Verifica que sea un CSV o Excel válido.' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'No se pudo leer el archivo. Verifica que sea un CSV o Excel válido.' },
+        { status: 400 }
+      )
     }
 
     if (rows.length === 0) {
@@ -156,16 +163,12 @@ export async function POST(request: NextRequest) {
     let allowedFamilyIds: Set<string> | null = null
     let hasExplicitAssignments = false
     if (!isSuperAdmin) {
-      const assignments = await prisma.admin_family_assignments.findMany({
-        where: { adminId: session.user.id, isActive: true },
-        select: { familyId: true },
-      })
-      hasExplicitAssignments = assignments.length > 0
-      if (hasExplicitAssignments) {
-        allowedFamilyIds = new Set(assignments.map(a => a.familyId))
+      const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
+      const scope = await getAdminFamilyScope(session.user.id, false)
+      hasExplicitAssignments = (scope.familyIds?.length ?? 0) > 0
+      if (hasExplicitAssignments && scope.familyIds) {
+        allowedFamilyIds = new Set(scope.familyIds)
       }
-      // Si no tiene asignaciones explícitas → acceso total (admin legacy)
-      // Si tiene asignaciones → solo esas familias
     }
 
     // Modo replace sin familyId → solo SuperAdmin

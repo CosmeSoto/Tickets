@@ -121,6 +121,24 @@ export async function GET(request: NextRequest) {
       ]
     }
 
+    // ADMIN normal: solo ver usuarios de sus familias (no super admins, no usuarios de otras familias)
+    if (session.user.role === 'ADMIN' && !(session.user as any).isSuperAdmin) {
+      const { getAdminFamilyScope, getDepartmentIdsForScope } =
+        await import('@/lib/auth/admin-scope')
+      const scope = await getAdminFamilyScope(session.user.id, false)
+      const deptIds = await getDepartmentIdsForScope(scope)
+
+      if (deptIds && deptIds.length > 0) {
+        where.AND = [
+          ...(where.AND ?? []),
+          {
+            OR: [{ departmentId: { in: deptIds } }, { departmentId: null }],
+          },
+          { isSuperAdmin: false },
+        ]
+      }
+    }
+
     // Intentar servir desde caché (solo para listas sin búsqueda de texto)
     if (!search) {
       const cacheKey = buildCacheKey('users:list', {

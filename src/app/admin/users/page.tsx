@@ -332,6 +332,7 @@ export default function AdminUsersPage() {
           onClearFilters={clearFilters}
           departments={departments as any}
           loading={loading}
+          viewerIsSuperAdmin={(session?.user as any)?.isSuperAdmin === true}
         />
 
         {/* DataTable */}

@@ -43,12 +43,10 @@ export async function canManageAsset(
 
   if (role === 'ADMIN') {
     if (!assetFamilyId) return true
-    const assignments = await prisma.admin_family_assignments.findMany({
-      where: { adminId: userId, isActive: true },
-      select: { familyId: true },
-    })
-    if (assignments.length === 0) return true
-    return assignments.some(a => a.familyId === assetFamilyId)
+    const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
+    const scope = await getAdminFamilyScope(userId, false)
+    if (!scope.familyIds || scope.familyIds.length === 0) return true
+    return scope.familyIds.includes(assetFamilyId)
   }
 
   const user = await prisma.users.findUnique({
@@ -142,12 +140,10 @@ export async function isAdminOfFamily(
   if (!familyId) return true // activo sin familia → cualquier admin puede
 
   try {
-    const assignments = await prisma.admin_family_assignments.findMany({
-      where: { adminId: userId, isActive: true },
-      select: { familyId: true },
-    })
-    if (assignments.length === 0) return true // sin asignaciones explícitas → acceso total
-    return assignments.some(a => a.familyId === familyId)
+    const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
+    const scope = await getAdminFamilyScope(userId, false)
+    if (!scope.familyIds || scope.familyIds.length === 0) return true
+    return scope.familyIds.includes(familyId)
   } catch {
     return false
   }

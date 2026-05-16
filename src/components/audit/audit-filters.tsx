@@ -25,7 +25,8 @@ interface AuditFiltersProps {
   onFilterChange: (key: keyof AuditFilters, value: string) => void
   onClearFilters: () => void
   onExportCSV: () => void
-  onExportJSON: () => void
+  onExportJSON: () => void | Promise<void>
+  onExportPDF?: () => void
 }
 
 export function AuditFiltersComponent({
@@ -37,6 +38,7 @@ export function AuditFiltersComponent({
   onClearFilters,
   onExportCSV,
   onExportJSON,
+  onExportPDF,
 }: AuditFiltersProps) {
   return (
     <Card>
@@ -156,7 +158,7 @@ export function AuditFiltersComponent({
                 variant='outline'
                 size='sm'
                 disabled={loading}
-                className='min-h-9 flex-1 min-w-[calc(50%-0.25rem)] sm:min-w-0 sm:flex-initial'
+                className='min-h-9 flex-1 min-w-[calc(33%-0.25rem)] sm:min-w-0 sm:flex-initial'
               >
                 <Download className='h-4 w-4 mr-1' />
                 CSV
@@ -166,11 +168,23 @@ export function AuditFiltersComponent({
                 variant='outline'
                 size='sm'
                 disabled={loading}
-                className='min-h-9 flex-1 min-w-[calc(50%-0.25rem)] sm:min-w-0 sm:flex-initial'
+                className='min-h-9 flex-1 min-w-[calc(33%-0.25rem)] sm:min-w-0 sm:flex-initial'
               >
                 <Download className='h-4 w-4 mr-1' />
-                JSON
+                Excel
               </Button>
+              {onExportPDF && (
+                <Button
+                  onClick={onExportPDF}
+                  variant='outline'
+                  size='sm'
+                  disabled={loading}
+                  className='min-h-9 flex-1 min-w-[calc(33%-0.25rem)] sm:min-w-0 sm:flex-initial'
+                >
+                  <Download className='h-4 w-4 mr-1' />
+                  PDF
+                </Button>
+              )}
               <Button
                 onClick={onClearFilters}
                 variant='outline'
@@ -180,7 +194,9 @@ export function AuditFiltersComponent({
                 Limpiar
               </Button>
             </div>
-            <p className='text-xs text-muted-foreground'>Máx. 50,000 registros por exportación</p>
+            <p className='text-xs text-muted-foreground'>
+              Exporta los registros según los filtros aplicados
+            </p>
           </div>
         </div>
 

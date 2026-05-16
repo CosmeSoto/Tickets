@@ -22,15 +22,12 @@ export async function getAccessibleFamilyIds(
   // SuperAdmin: acceso total
   if (role === 'ADMIN' && isSuperAdmin) return undefined
 
-  // Admin normal: solo sus familias asignadas
+  // Admin normal: familias asignadas + nativa
   if (role === 'ADMIN') {
-    const assignments = await prisma.admin_family_assignments.findMany({
-      where: { adminId: userId, isActive: true },
-      select: { familyId: true },
-    })
-    // Si no tiene asignaciones explícitas, acceso total (admin recién configurado)
-    if (assignments.length === 0) return undefined
-    return assignments.map(a => a.familyId)
+    const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
+    const scope = await getAdminFamilyScope(userId, false)
+    if (!scope.familyIds || scope.familyIds.length === 0) return undefined
+    return scope.familyIds
   }
 
   // Gestor de inventario (cualquier rol): sus familias asignadas

@@ -234,18 +234,12 @@ export async function hasAccessToEquipment(
 // ── Funciones Auxiliares ──────────────────────────────────────────────────────
 
 /**
- * Obtiene los IDs de familias asignadas a un Family Admin
+ * Obtiene los IDs de familias asignadas a un Family Admin (incluye nativa)
  */
 async function getUserFamilyIds(userId: string): Promise<string[]> {
-  const assignments = await prisma.admin_family_assignments.findMany({
-    where: {
-      adminId: userId,
-      isActive: true,
-    },
-    select: { familyId: true },
-  })
-
-  return assignments.map(a => a.familyId)
+  const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
+  const scope = await getAdminFamilyScope(userId, false)
+  return scope.familyIds ?? []
 }
 
 /**

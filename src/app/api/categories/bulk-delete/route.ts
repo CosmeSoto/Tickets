@@ -43,19 +43,11 @@ export async function DELETE(request: NextRequest) {
 
     // Verificar permisos de familia para admin normal
     if (familyId && !isSuperAdmin) {
-      const totalAssignments = await prisma.admin_family_assignments.count({
-        where: { adminId: session.user.id, isActive: true },
-      })
-      if (totalAssignments > 0) {
-        // Tiene asignaciones explícitas → verificar que esta familia esté entre ellas
-        const assignment = await prisma.admin_family_assignments.findFirst({
-          where: { adminId: session.user.id, familyId, isActive: true },
-        })
-        if (!assignment) {
-          return NextResponse.json({ error: 'No tienes permiso para esta área' }, { status: 403 })
-        }
+      const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
+      const scope = await getAdminFamilyScope(session.user.id, false)
+      if (scope.familyIds && scope.familyIds.length > 0 && !scope.familyIds.includes(familyId)) {
+        return NextResponse.json({ error: 'No tienes permiso para esta área' }, { status: 403 })
       }
-      // Sin asignaciones explícitas → acceso total (admin legacy)
     }
 
     // Obtener categorías a eliminar

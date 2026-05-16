@@ -254,12 +254,62 @@ export function formatRelativeTime(dateString: string): string {
 }
 
 /**
- * Format value for display (handles sizes, dates, booleans, etc.)
+ * Format value for display (handles sizes, dates, booleans, roles, etc.)
  */
 export function formatValue(key: string, value: any): string {
   // Ocultar información sensible
   if (key === 'checksum' || key === 'hash') {
     return '(Verificación de integridad)'
+  }
+
+  // Formatear roles
+  if (
+    (key === 'role' || key === 'targetRole' || key === 'createdByRole') &&
+    typeof value === 'string'
+  ) {
+    const roles: Record<string, string> = {
+      ADMIN: 'Administrador',
+      TECHNICIAN: 'Técnico',
+      CLIENT: 'Cliente',
+    }
+    return roles[value] || value
+  }
+
+  // Formatear prioridades
+  if (key === 'priority' && typeof value === 'string') {
+    const priorities: Record<string, string> = {
+      LOW: 'Baja',
+      MEDIUM: 'Media',
+      HIGH: 'Alta',
+      CRITICAL: 'Crítica',
+    }
+    return priorities[value] || value
+  }
+
+  // Formatear estados
+  if (key === 'status' && typeof value === 'string') {
+    const statuses: Record<string, string> = {
+      OPEN: 'Abierto',
+      IN_PROGRESS: 'En Progreso',
+      RESOLVED: 'Resuelto',
+      CLOSED: 'Cerrado',
+      PENDING: 'Pendiente',
+      COMPLETED: 'Completado',
+      MISSED: 'Omitido',
+      INCOMPLETE: 'Incompleto',
+    }
+    return statuses[value] || value
+  }
+
+  // Formatear recurrencia
+  if (key === 'recurrence' && typeof value === 'string') {
+    const recurrences: Record<string, string> = {
+      NONE: 'Sin recurrencia',
+      DAILY: 'Diaria',
+      WEEKLY: 'Semanal',
+      CUSTOM: 'Personalizada',
+    }
+    return recurrences[value] || value
   }
 
   // Formatear tamaños de archivo
@@ -270,6 +320,14 @@ export function formatValue(key: string, value: any): string {
       return `${mb.toFixed(2)} MB`
     }
     return `${kb.toFixed(2)} KB`
+  }
+
+  // Formatear porcentajes
+  if (
+    (key.includes('Pct') || key.includes('Percentage') || key.includes('Threshold')) &&
+    typeof value === 'number'
+  ) {
+    return `${value}%`
   }
 
   // Formatear fechas
@@ -301,12 +359,29 @@ export function formatValue(key: string, value: any): string {
 
   // Formatear booleanos
   if (typeof value === 'boolean') {
+    if (key === 'createdOnBehalf') return value ? 'Sí (en nombre de otro usuario)' : 'No'
     return value ? 'Sí' : 'No'
+  }
+
+  // Formatear números
+  if (typeof value === 'number') {
+    return String(value)
   }
 
   // Formatear objetos
   if (typeof value === 'object' && value !== null) {
+    if (Array.isArray(value)) {
+      return value.length === 0 ? 'Ninguno' : value.join(', ')
+    }
     return JSON.stringify(value, null, 2)
+  }
+
+  // Si es un UUID, ocultarlo
+  if (
+    typeof value === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+  ) {
+    return '(ID interno)'
   }
 
   return String(value)
@@ -340,8 +415,49 @@ export function getFieldLabel(key: string): string {
     views: 'Visualizaciones',
     helpful: 'Útil',
     notHelpful: 'No Útil',
+    // Campos de asignación de familias
+    familyName: 'Familia',
+    familyId: 'Familia',
+    targetUserName: 'Usuario Afectado',
+    targetUserId: 'Usuario',
+    targetRole: 'Rol del Usuario',
+    adminName: 'Administrador',
+    adminId: 'Administrador',
+    technicianName: 'Técnico',
+    technicianId: 'Técnico',
+    clientName: 'Cliente',
+    clientId: 'Cliente',
+    userName: 'Usuario',
+    userEmail: 'Email',
+    ticketTitle: 'Título del Ticket',
+    ticketCode: 'Código del Ticket',
+    categoryName: 'Categoría',
+    departmentName: 'Departamento',
+    priority: 'Prioridad',
+    assigneeName: 'Asignado a',
+    // Campos de módulos
+    ticketsEnabled: 'Módulo Tickets',
+    inventoryEnabled: 'Módulo Inventario',
+    patrolsEnabled: 'Módulo Rondas',
+    canManageInventory: 'Gestor de Inventario',
+    canRequestAssets: 'Solicitar Activos',
+    isSuperAdmin: 'Super Admin',
+    // Campos de patrullas
+    routeId: 'Ruta',
+    routeName: 'Ruta',
+    agentId: 'Agente',
+    agentName: 'Agente',
+    recurrence: 'Recurrencia',
+    generatedPatrols: 'Patrullas Generadas',
+    completionPct: 'Completitud',
+    missedCount: 'Checkpoints Omitidos',
+    // Campos de creación en nombre de otro
+    createdOnBehalf: 'Creado en nombre de otro',
+    createdByRole: 'Rol del creador',
+    createdByName: 'Creado por',
+    onBehalfOfName: 'En nombre de',
   }
-  return labels[key] || key.charAt(0).toUpperCase() + key.slice(1)
+  return labels[key] || key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')
 }
 
 /**
@@ -364,5 +480,12 @@ export function shouldHideField(key: string, value: any): boolean {
   if (key === 'result' && value === 'SUCCESS') return true
   // Ocultar contadores si son 0
   if ((key === 'CategoriesCount' || key === 'TotalCurrentTickets') && value === 0) return true
+  // Ocultar UUIDs cuando hay un campo con nombre correspondiente
+  if (key.endsWith('Id') && typeof value === 'string' && value.includes('-') && value.length > 30)
+    return true
+  // Ocultar campos internos de auditoría
+  if (key === 'oldValues' || key === 'newValues' || key === 'changes') return true
+  if (key === 'userAgent') return true
+  if (key === 'ip' && value === 'Unknown') return true
   return false
 }

@@ -96,15 +96,12 @@ export class ContractService {
     // Gestor (canManageInventory): ve solo contratos de sus familias en inventory_manager_families
     if (userId && userRole && !isSuperAdmin) {
       if (userRole === 'ADMIN') {
-        // Admin normal: filtrar por sus familias asignadas si tiene alguna
-        const adminFamilies = await prisma.admin_family_assignments.findMany({
-          where: { adminId: userId, isActive: true },
-          select: { familyId: true },
-        })
-        if (adminFamilies.length > 0) {
-          where.familyId = { in: adminFamilies.map(f => f.familyId) }
+        // Admin normal: filtrar por sus familias (asignadas + nativa)
+        const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
+        const scope = await getAdminFamilyScope(userId, false)
+        if (scope.familyIds && scope.familyIds.length > 0) {
+          where.familyId = { in: scope.familyIds }
         }
-        // Si no tiene asignaciones → ve todo (comportamiento existente)
       } else {
         // Gestor: solo sus familias en inventory_manager_families
         const managerFamilies = await prisma.inventory_manager_families.findMany({

@@ -95,15 +95,11 @@ export async function GET(request: NextRequest) {
     let allowedFamilyIds: string[] | null = null // null = sin restricción (superadmin)
 
     if (role === 'ADMIN' && !isSuperAdmin) {
-      // Admin normal: solo sus familias asignadas
-      const assignments = await prisma.admin_family_assignments.findMany({
-        where: { adminId: userId, isActive: true },
-        select: { familyId: true },
-      })
-      if (assignments.length > 0) {
-        allowedFamilyIds = assignments.map(a => a.familyId)
+      const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
+      const scope = await getAdminFamilyScope(userId, false)
+      if (scope.familyIds && scope.familyIds.length > 0) {
+        allowedFamilyIds = scope.familyIds
       }
-      // Sin asignaciones → acceso total (admin legacy)
     } else if (role !== 'ADMIN' && userCanManageInventory) {
       // Gestor: solo sus familias de inventario
       const assignments = await prisma.inventory_manager_families.findMany({

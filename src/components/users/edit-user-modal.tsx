@@ -716,7 +716,11 @@ export function EditUserModal({
                       onToggle={v => setFormData(p => ({ ...p, ticketsEnabled: v }))}
                       families={allFamilies}
                       assignedFamilyIds={
-                        formData.role === 'TECHNICIAN' ? technicianFamilyIds : clientFamilyIds
+                        formData.role === 'TECHNICIAN'
+                          ? technicianFamilyIds
+                          : formData.role === 'ADMIN'
+                            ? adminFamilyIds
+                            : clientFamilyIds
                       }
                       nativeFamilyId={
                         user && typeof user.department === 'object'
@@ -727,12 +731,16 @@ export function EditUserModal({
                       onAssignFamily={
                         formData.role === 'TECHNICIAN'
                           ? handleAssignTechnicianFamily
-                          : handleAssignClientFamily
+                          : formData.role === 'ADMIN'
+                            ? handleAssignAdminFamily
+                            : handleAssignClientFamily
                       }
                       onUnassignFamily={
                         formData.role === 'TECHNICIAN'
                           ? (handleUnassignTechnicianFamily as (id: string) => Promise<any>)
-                          : handleUnassignClientFamily
+                          : formData.role === 'ADMIN'
+                            ? handleUnassignAdminFamily
+                            : handleUnassignClientFamily
                       }
                       loading={loadingFamilies}
                       disabled={loading}
@@ -839,47 +847,7 @@ export function EditUserModal({
               )}
             </div>
 
-            {/* ── Familias asignadas — solo para TECHNICIAN (no Super Admin) ── */}
-            {/* ELIMINADO: ahora integrado en ModuleAccessCard de Tickets */}
-
-            {/* ── Familias adicionales — para CLIENT (no Super Admin) ── */}
-            {/* ELIMINADO: ahora integrado en ModuleAccessCard de Tickets */}
-
-            {/* ── Familias de inventario (no Super Admin) ── */}
-            {/* ELIMINADO: ahora integrado en ModuleAccessCard de Inventario */}
-
-            {/* ── Familias de rondas (no ADMIN, no Super Admin) ── */}
-            {/* ELIMINADO: ahora integrado en ModuleAccessCard de Rondas */}
-
-            {/* ── Familias asignadas — para ADMIN normal (solo visible para SUPER_ADMIN) ── */}
-            {user &&
-              session?.user?.isSuperAdmin &&
-              formData.role === 'ADMIN' &&
-              !formData.isSuperAdmin && (
-                <>
-                  <Separator />
-                  <div className='space-y-3'>
-                    <div>
-                      <h3 className='text-sm font-semibold text-foreground flex items-center gap-1.5'>
-                        <ShieldCheck className='h-4 w-4 text-muted-foreground' />
-                        Familias de administración
-                      </h3>
-                      <p className='text-xs text-muted-foreground mt-0.5'>
-                        Familias que este administrador puede gestionar. Define el alcance de todos
-                        sus módulos.
-                      </p>
-                    </div>
-                    <FamilyAssignmentSection
-                      families={allFamilies}
-                      assignedFamilyIds={adminFamilyIds}
-                      onAssign={handleAssignAdminFamily}
-                      onUnassign={handleUnassignAdminFamily}
-                      isLoading={loadingFamilies}
-                      error={familyError}
-                    />
-                  </div>
-                </>
-              )}
+            {/* Las familias se asignan dentro de cada ModuleAccessCard */}
 
             <Separator />
 

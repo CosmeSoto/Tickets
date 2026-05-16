@@ -1,12 +1,8 @@
 'use client'
 
 /**
- * UserDetailsModal — Panel de información del usuario para gestión.
- *
- * Muestra datos relevantes para administrar el usuario:
- * perfil, rol, módulos habilitados, departamento y acceso.
- *
- * Las métricas de tickets pertenecen al módulo de tickets, no aquí.
+ * Modal de detalles del usuario — vista de solo lectura.
+ * Muestra perfil, rol, módulos habilitados, departamento y acceso.
  */
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './dialog'
@@ -21,21 +17,20 @@ import {
   Building2,
   Clock,
   Shield,
-  Package,
-  Ticket,
   Edit,
   Trash2,
   CheckCircle2,
   XCircle,
+  Calendar,
 } from 'lucide-react'
 import { RoleBadge } from '@/components/ui/role-badge'
-import { formatTimeAgo } from '@/hooks/use-users'
 import type { UserData } from '@/hooks/use-users'
+import { getUserInitials } from '@/components/users/user-utils'
+import { UserModulesPanel } from '@/components/users/user-modules-panel'
 
 interface UserDetailsModalProps {
   isOpen: boolean
   onClose: () => void
-  /** Pasar el objeto completo evita una petición extra a la API */
   user: UserData | null
   onEdit?: () => void
   onDelete?: () => void
@@ -56,7 +51,7 @@ function InfoRow({
     <div className='flex items-start gap-3'>
       <Icon className='h-4 w-4 text-muted-foreground mt-0.5 shrink-0' />
       <div className='min-w-0'>
-        <p className='text-xs text-muted-foreground'>{label}</p>
+        <p className='text-[11px] text-muted-foreground'>{label}</p>
         <div className='text-sm font-medium'>{value}</div>
       </div>
     </div>
@@ -66,15 +61,47 @@ function InfoRow({
 function ModuleChip({ enabled, label }: { enabled: boolean; label: string }) {
   return (
     <div
-      className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs border ${
+      className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border transition-colors ${
         enabled
           ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/30 dark:text-green-400'
-          : 'border-border bg-muted text-muted-foreground'
+          : 'border-border bg-muted/50 text-muted-foreground'
       }`}
     >
       {enabled ? <CheckCircle2 className='h-3 w-3' /> : <XCircle className='h-3 w-3' />}
       {label}
     </div>
+  )
+}
+
+function formatDateTime(dateString: string): React.ReactNode {
+  const date = new Date(dateString)
+  const now = new Date()
+  const isToday = date.toDateString() === now.toDateString()
+  const isYesterday = new Date(now.getTime() - 86400000).toDateString() === date.toDateString()
+
+  const time = date.toLocaleTimeString('es-EC', {
+    timeZone: 'America/Guayaquil',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+
+  if (isToday) {
+    return <span>Hoy, {time}</span>
+  }
+  if (isYesterday) {
+    return <span>Ayer, {time}</span>
+  }
+
+  return (
+    <span>
+      {date.toLocaleDateString('es-EC', {
+        timeZone: 'America/Guayaquil',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      })}{' '}
+      <span className='text-muted-foreground'>{time}</span>
+    </span>
   )
 }
 
@@ -98,9 +125,11 @@ export function UserDetailsModal({
   const deptColor =
     user.department && typeof user.department !== 'string' ? user.department.color : undefined
 
+  const isSuperAdmin = (user as any).isSuperAdmin === true
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className='max-w-md' aria-describedby={undefined}>
+      <DialogContent className='max-w-md max-h-[90vh] overflow-y-auto' aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className='flex items-center gap-2'>
             <User className='h-4 w-4' />
@@ -108,32 +137,29 @@ export function UserDetailsModal({
           </DialogTitle>
         </DialogHeader>
 
-        <div className='space-y-5'>
-          {/* Cabecera con avatar */}
+        <div className='space-y-4'>
+          {/* ── Cabecera con avatar prominente ── */}
           <div className='flex items-center gap-4'>
-            <Avatar className='h-14 w-14'>
+            <Avatar className='h-16 w-16 border-2 border-border shadow-sm'>
               <AvatarImage src={user.avatar} alt={user.name} />
-              <AvatarFallback className='text-lg font-semibold'>
-                {user.name.slice(0, 2).toUpperCase()}
+              <AvatarFallback className='text-lg font-bold bg-primary/10 text-primary'>
+                {getUserInitials(user.name)}
               </AvatarFallback>
             </Avatar>
-            <div className='min-w-0'>
-              <p className='text-base font-semibold truncate'>{user.name}</p>
-              <div className='flex items-center gap-2 mt-1 flex-wrap'>
-                <RoleBadge
-                  role={user.role}
-                  isSuperAdmin={(user as any).isSuperAdmin}
-                  iconSize='sm'
-                />
+            <div className='min-w-0 flex-1'>
+              <p className='text-base font-bold truncate'>{user.name}</p>
+              <p className='text-xs text-muted-foreground truncate'>{user.email}</p>
+              <div className='flex items-center gap-2 mt-1.5 flex-wrap'>
+                <RoleBadge role={user.role} isSuperAdmin={isSuperAdmin} iconSize='sm' />
                 <Badge
                   variant='outline'
-                  className={`text-xs ${
+                  className={`text-[10px] px-1.5 py-0 ${
                     user.isActive
                       ? 'border-green-300 text-green-700 dark:border-green-700 dark:text-green-400'
-                      : 'border-muted-foreground/30 text-muted-foreground'
+                      : 'border-red-300 text-red-700 dark:border-red-700 dark:text-red-400'
                   }`}
                 >
-                  {user.isActive ? 'Activo' : 'Inactivo'}
+                  {user.isActive ? '● Activo' : '● Inactivo'}
                 </Badge>
               </div>
             </div>
@@ -141,9 +167,8 @@ export function UserDetailsModal({
 
           <Separator />
 
-          {/* Datos de contacto */}
-          <div className='space-y-3'>
-            <InfoRow icon={Mail} label='Email' value={user.email} />
+          {/* ── Información de contacto ── */}
+          <div className='grid grid-cols-1 gap-3'>
             {user.phone && <InfoRow icon={Phone} label='Teléfono' value={user.phone} />}
             {deptName && (
               <InfoRow
@@ -165,25 +190,23 @@ export function UserDetailsModal({
             <InfoRow
               icon={Clock}
               label='Último acceso'
-              value={user.lastLogin ? formatTimeAgo(user.lastLogin) : 'Nunca'}
+              value={
+                user.lastLogin ? (
+                  formatDateTime(user.lastLogin)
+                ) : (
+                  <span className='text-muted-foreground italic'>Nunca</span>
+                )
+              }
             />
-            <InfoRow
-              icon={Clock}
-              label='Registrado'
-              value={new Date(user.createdAt).toLocaleDateString('es-EC', {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric',
-              })}
-            />
+            <InfoRow icon={Calendar} label='Registrado' value={formatDateTime(user.createdAt)} />
           </div>
 
           <Separator />
 
-          {/* Módulos habilitados */}
-          <div className='space-y-2'>
-            <p className='text-xs font-medium text-muted-foreground uppercase tracking-wide'>
-              Módulos
+          {/* ── Módulos habilitados ── */}
+          <div className='space-y-2.5'>
+            <p className='text-xs font-semibold text-muted-foreground uppercase tracking-wide'>
+              Módulos habilitados
             </p>
             <div className='flex flex-wrap gap-2'>
               <ModuleChip enabled={user.ticketsEnabled !== false} label='🎫 Tickets' />
@@ -193,15 +216,27 @@ export function UserDetailsModal({
               />
               <ModuleChip enabled={user.patrolsEnabled === true} label='🛡️ Rondas' />
               {user.canManageInventory && (
-                <div className='flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs border border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-400'>
+                <div className='flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400'>
                   <Shield className='h-3 w-3' />
-                  Gestor de inventario
+                  Gestor
                 </div>
               )}
             </div>
           </div>
 
-          {/* Acciones */}
+          {/* ── Estado de acceso (familias por módulo) ── */}
+          <UserModulesPanel
+            userId={user.id}
+            role={user.role}
+            canManageInventory={user.canManageInventory ?? false}
+            ticketsEnabled={user.ticketsEnabled}
+            inventoryEnabled={user.inventoryEnabled}
+            patrolsEnabled={user.patrolsEnabled}
+            defaultCollapsed
+            hideGuides
+          />
+
+          {/* ── Acciones ── */}
           {(canEdit || canDelete) && (
             <>
               <Separator />

@@ -30,6 +30,7 @@ import {
 import { useUnifiedDashboard } from '@/hooks/use-unified-dashboard'
 import { useSystemStatus } from '@/hooks/use-system-status'
 import { useSession } from 'next-auth/react'
+import { useUserModules } from '@/hooks/use-user-modules'
 import { AssignedFamiliesPanel } from '@/components/dashboard/assigned-families-panel'
 import { TicketsStatsSection } from '@/components/dashboard/modules/tickets-stats-section'
 import { InventoryStatsSection } from '@/components/dashboard/modules/inventory-stats-section'
@@ -48,6 +49,7 @@ export default function AdminDashboard() {
   const router = useRouter()
   const { data: session } = useSession()
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
+  const { tickets: hasTickets, inventory: hasInventory } = useUserModules()
 
   const {
     userName,
@@ -81,10 +83,10 @@ export default function AdminDashboard() {
     sortedData: sortedFamilyMetrics,
     requestSort: requestFamilySort,
     getSortIcon: getFamilySortIcon,
-  } = useTableSort<FamilyMetric>(
-    (stats?.familyMetrics ?? []) as FamilyMetric[],
-    { key: 'openTickets', direction: 'desc' }
-  )
+  } = useTableSort<FamilyMetric>((stats?.familyMetrics ?? []) as FamilyMetric[], {
+    key: 'openTickets',
+    direction: 'desc',
+  })
 
   const {
     systemStatus,
@@ -153,11 +155,11 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* 2. Módulo Tickets */}
-      <TicketsStatsSection stats={stats} role='ADMIN' />
+      {/* 2. Módulo Tickets — solo si tiene acceso */}
+      {hasTickets && <TicketsStatsSection stats={stats} role='ADMIN' />}
 
-      {/* 3. Módulo Inventario (autocontenido, aparece solo si hay acceso) */}
-      <InventoryStatsSection role='ADMIN' />
+      {/* 3. Módulo Inventario — solo si tiene acceso */}
+      {hasInventory && <InventoryStatsSection role='ADMIN' />}
 
       {/* Métricas por Familia — dinámicas según módulos activos */}
       {stats.familyMetrics && stats.familyMetrics.length > 0 && (

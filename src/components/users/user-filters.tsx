@@ -38,6 +38,8 @@ interface UserFiltersProps {
   onRefresh: () => void
   onClearFilters: () => void
   departments?: Array<{ id: string; name: string; color: string }>
+  /** Si el viewer es super admin — controla visibilidad del filtro Super Admin */
+  viewerIsSuperAdmin?: boolean
 }
 
 export function UserFilters({
@@ -53,6 +55,7 @@ export function UserFilters({
   onRefresh,
   onClearFilters,
   departments = [],
+  viewerIsSuperAdmin = false,
 }: UserFiltersProps) {
   // Contar filtros activos
   const activeFiltersCount = [
@@ -106,6 +109,8 @@ export function UserFilters({
             </Button>
             {USER_ROLE_FILTER_OPTIONS.slice(1).map(option => {
               const isSuperAdmin = option.value === 'SUPER_ADMIN'
+              // Ocultar filtro Super Admin para admin normal
+              if (isSuperAdmin && !viewerIsSuperAdmin) return null
               const role = isSuperAdmin ? 'ADMIN' : (option.value as UserRole)
               const Icon = isSuperAdmin ? Crown : USER_ROLE_ICONS[role as UserRole]
               const isActive = roleFilter === option.value
