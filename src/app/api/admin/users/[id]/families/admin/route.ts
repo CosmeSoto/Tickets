@@ -31,16 +31,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     if (!familyId) return NextResponse.json({ error: 'familyId es requerido' }, { status: 400 })
 
-    // Verify target user has role ADMIN and isSuperAdmin=false
+    // Verify target user exists
     const targetUser = await prisma.users.findUnique({
       where: { id: adminId },
       select: { id: true, name: true, role: true, isSuperAdmin: true },
     })
-    if (!targetUser || targetUser.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'Usuario no encontrado o no es administrador' },
-        { status: 404 }
-      )
+    if (!targetUser) {
+      return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
     }
     if (targetUser.isSuperAdmin) {
       return NextResponse.json(

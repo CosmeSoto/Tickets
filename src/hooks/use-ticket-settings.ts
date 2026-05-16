@@ -120,7 +120,7 @@ export function useTicketSettings() {
   const loadFamilies = useCallback(async () => {
     setLoadingFamilies(true)
     try {
-      const res = await fetch('/api/families?includeInactive=true&module=tickets')
+      const res = await fetch('/api/families?includeInactive=true&module=tickets&configMode=true')
       const data = await res.json()
       if (data.success) setFamilies(data.data)
     } catch {

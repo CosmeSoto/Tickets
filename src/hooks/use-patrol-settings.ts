@@ -94,7 +94,7 @@ export function usePatrolSettings() {
     setLoadingFamilies(true)
     try {
       const [familiesRes, configsRes] = await Promise.all([
-        fetch('/api/families?includeInactive=false&module=patrols'),
+        fetch('/api/families?includeInactive=false&module=patrols&configMode=true'),
         fetch('/api/patrols/family-config'),
       ])
 

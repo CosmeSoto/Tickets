@@ -220,7 +220,33 @@ export async function GET(request: NextRequest) {
 
     const includeAll = searchParams.get('scope') === 'all' && session.user.role === 'ADMIN'
     const moduleFilter = searchParams.get('module') // 'tickets' | 'inventory' | 'patrols' | null
+    const configMode = searchParams.get('configMode') === 'true' // Si es true, no filtrar por módulo habilitado (para pantallas de configuración)
     let families = await FamilyService.findAll(includeInactive)
+
+    // Filtrar por módulo habilitado en la familia (aplica a TODOS los roles, incluso Super Admin)
+    // EXCEPTO en configMode (pantallas de configuración necesitan ver todas para activar/desactivar)
+    if (!configMode) {
+      if (moduleFilter === 'tickets') {
+        families = families.filter((f: any) => {
+          if (!f.ticketFamilyConfig) return true
+          return f.ticketFamilyConfig.ticketsEnabled !== false
+        })
+      } else if (moduleFilter === 'inventory') {
+        const invConfigs = await prisma.inventory_family_config.findMany({
+          where: { inventoryEnabled: false },
+          select: { familyId: true },
+        })
+        const disabledInvIds = new Set(invConfigs.map(c => c.familyId))
+        families = families.filter((f: any) => !disabledInvIds.has(f.id))
+      } else if (moduleFilter === 'patrols') {
+        const patrolConfigs = await prisma.patrol_family_config.findMany({
+          where: { patrolsEnabled: false },
+          select: { familyId: true },
+        })
+        const disabledPatrolIds = new Set(patrolConfigs.map(c => c.familyId))
+        families = families.filter((f: any) => !disabledPatrolIds.has(f.id))
+      }
+    }
 
     if (!currentUser?.isSuperAdmin && !includeAll) {
       try {

@@ -378,8 +378,8 @@ export default function CreateTicketPage() {
                         <div className='flex gap-2'>
                           <Button
                             type='button'
-                            variant={clientId === session?.user?.id ? 'default' : 'outline'}
-                            size='sm'
+                            variant={clientId === session?.user?.id ? 'secondary' : 'ghost'}
+                            size='xs'
                             onClick={() => {
                               if (session?.user?.id) {
                                 setValue('clientId', session.user.id)

@@ -370,95 +370,68 @@ export function EditUserModal({
       setLoadingFamilies(true)
       setFamilyError(null)
       try {
-        // Super Admin ve todas las familias; Admin Normal solo las de su scope por módulo
+        // Cargar familias por módulo (filtradas por módulo habilitado en la familia)
+        // y todas las familias activas (para mostrar read-only las que están fuera del scope)
         const viewerIsSuperAdmin = (session?.user as any)?.isSuperAdmin === true
 
-        // Cargar configuraciones de módulos por familia (qué familias tienen cada módulo habilitado)
-        const [ticketConfigRes, inventoryConfigRes, patrolConfigRes] = await Promise.all([
-          fetch('/api/families?includeInactive=true&module=tickets'), // Familias con tickets habilitado
-          fetch('/api/inventory/family-config'),
-          fetch('/api/patrols/family-config'),
+        const [ticketModuleRes, inventoryModuleRes, patrolModuleRes, allRes] = await Promise.all([
+          fetch('/api/families?includeInactive=false&module=tickets'),
+          fetch('/api/families?includeInactive=false&module=inventory'),
+          fetch('/api/families?includeInactive=false&module=patrols'),
+          fetch('/api/families?includeInactive=false&scope=all'),
         ])
-        // Familias con tickets habilitado (el endpoint module=tickets ya filtra por ticketsEnabled)
-        const ticketEnabledIds = new Set<string>()
-        if (ticketConfigRes.ok) {
-          const data = await ticketConfigRes.json()
-          ;(data.data ?? []).forEach((f: any) => ticketEnabledIds.add(f.id))
-        }
-        // Familias con inventario habilitado
-        const inventoryDisabledIds = new Set<string>()
-        if (inventoryConfigRes.ok) {
-          const data = await inventoryConfigRes.json()
-          const configMap = data.data ?? {}
-          // Solo marcar como deshabilitadas las que explícitamente tienen inventoryEnabled=false
-          Object.entries(configMap).forEach(([fId, enabled]) => {
-            if (!enabled) inventoryDisabledIds.add(fId)
-          })
-        }
-        // Familias con patrullas habilitado
-        const patrolDisabledIds = new Set<string>()
-        if (patrolConfigRes.ok) {
-          const data = await patrolConfigRes.json()
-          const configMap = data.data ?? {}
-          // Solo marcar como deshabilitadas las que explícitamente tienen patrolsEnabled=false
-          Object.entries(configMap).forEach(([fId, enabled]) => {
-            if (!enabled) patrolDisabledIds.add(fId)
-          })
+
+        const parseFamilies = async (res: Response) => {
+          if (!res.ok) return [] as FamilyOption[]
+          const data = await res.json()
+          return ((data.data ?? []) as FamilyOption[]).filter(f => f.isActive)
         }
 
+        const tModuleFamilies = await parseFamilies(ticketModuleRes)
+        const iModuleFamilies = await parseFamilies(inventoryModuleRes)
+        const pModuleFamilies = await parseFamilies(patrolModuleRes)
+        const allActiveFamilies = await parseFamilies(allRes)
+
+        setAllFamilies(allActiveFamilies)
+
         if (viewerIsSuperAdmin) {
-          const familiesRes = await fetch('/api/families?includeInactive=false&scope=all')
-          if (familiesRes.ok) {
-            const familiesData = await familiesRes.json()
-            const families = (familiesData.data ?? familiesData ?? []).filter(
-              (f: FamilyOption) => f.isActive
-            )
-            setAllFamilies(families)
-            // Filtrar por módulo habilitado (familias sin config = habilitadas por defecto)
-            setTicketFamilies(
-              families.filter(
-                (f: FamilyOption) => ticketEnabledIds.size === 0 || ticketEnabledIds.has(f.id)
-              )
-            )
-            setInventoryFamilies(
-              families.filter((f: FamilyOption) => !inventoryDisabledIds.has(f.id))
-            )
-            setPatrolFamilies(families.filter((f: FamilyOption) => !patrolDisabledIds.has(f.id)))
-          }
+          // Super Admin: ve todas las familias que tienen el módulo habilitado
+          setTicketFamilies(tModuleFamilies)
+          setInventoryFamilies(iModuleFamilies)
+          setPatrolFamilies(pModuleFamilies)
         } else {
-          // Admin Normal: cargar familias por módulo (solo las que puede gestionar)
-          const [ticketRes, inventoryRes, patrolRes, allRes] = await Promise.all([
+          // Admin Normal: ve todas las familias activas pero solo puede editar las de su scope
+          // Las familias con módulo desactivado no aparecen (ya filtradas por el endpoint)
+          setTicketFamilies(
+            tModuleFamilies.length > 0
+              ? allActiveFamilies.filter(f => tModuleFamilies.some(t => t.id === f.id))
+              : allActiveFamilies
+          )
+          setInventoryFamilies(
+            iModuleFamilies.length > 0
+              ? allActiveFamilies.filter(f => iModuleFamilies.some(i => i.id === f.id))
+              : allActiveFamilies
+          )
+          setPatrolFamilies(
+            pModuleFamilies.length > 0
+              ? allActiveFamilies.filter(f => pModuleFamilies.some(p => p.id === f.id))
+              : allActiveFamilies
+          )
+
+          // Cargar scope IDs por módulo del admin (para calcular read-only)
+          const [adminTicketRes, adminInvRes, adminPatrolRes] = await Promise.all([
             fetch('/api/families?includeInactive=false&module=tickets'),
             fetch('/api/families?includeInactive=false&module=inventory'),
             fetch('/api/families?includeInactive=false&module=patrols'),
-            fetch('/api/families?includeInactive=false&scope=all'), // Todas las familias activas para mostrar read-only
           ])
-          const parseFamilies = async (res: Response) => {
-            if (!res.ok) return [] as FamilyOption[]
-            const data = await res.json()
-            return ((data.data ?? []) as FamilyOption[]).filter(f => f.isActive)
-          }
-          const tFamilies = await parseFamilies(ticketRes)
-          const iFamilies = await parseFamilies(inventoryRes)
-          const pFamilies = await parseFamilies(patrolRes)
-          const allActiveFamilies = await parseFamilies(allRes)
-
-          // Filtrar por módulo habilitado en la familia
-          const filteredTicket = allActiveFamilies.filter(
-            f => ticketEnabledIds.size === 0 || ticketEnabledIds.has(f.id)
-          )
-          const filteredInventory = allActiveFamilies.filter(f => !inventoryDisabledIds.has(f.id))
-          const filteredPatrol = allActiveFamilies.filter(f => !patrolDisabledIds.has(f.id))
-
-          setTicketFamilies(filteredTicket)
-          setInventoryFamilies(filteredInventory)
-          setPatrolFamilies(filteredPatrol)
-          setAllFamilies(allActiveFamilies)
-          // Guardar scope IDs por módulo (para calcular read-only)
-          setAdminTicketScopeIds(tFamilies.map(f => f.id))
-          setAdminInventoryScopeIds(iFamilies.map(f => f.id))
-          setAdminPatrolScopeIds(pFamilies.map(f => f.id))
-          setAdminScopeIds(tFamilies.map(f => f.id))
+          // Nota: estos endpoints ya filtran por scope del admin Y por módulo habilitado
+          const adminTFamilies = await parseFamilies(adminTicketRes)
+          const adminIFamilies = await parseFamilies(adminInvRes)
+          const adminPFamilies = await parseFamilies(adminPatrolRes)
+          setAdminTicketScopeIds(adminTFamilies.map(f => f.id))
+          setAdminInventoryScopeIds(adminIFamilies.map(f => f.id))
+          setAdminPatrolScopeIds(adminPFamilies.map(f => f.id))
+          setAdminScopeIds(adminTFamilies.map(f => f.id))
         }
 
         // Fetch viewer's admin scope if viewer is ADMIN (not super)
@@ -470,8 +443,8 @@ export function EditUserModal({
             const scopeAssignments = scopeData.data ?? []
             setAdminScopeIds(scopeAssignments.map((a: any) => a.familyId))
           }
-        } else {
-          setAdminScopeIds([])
+        } else if (!viewerIsSuperAdmin) {
+          // Ya se seteó arriba
         }
 
         // Fetch role-specific assignments
