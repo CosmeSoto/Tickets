@@ -34,6 +34,14 @@ export interface CreateTicketData {
   isAdmin?: boolean
   /** Usuario que registra la acción en ticket_history (p. ej. admin en nombre de un cliente). Por defecto clientId. */
   historyUserId?: string
+  /** Usuario que realmente creó el ticket (para auditoría cuando se crea en nombre de otro) */
+  createdById?: string
+  /** Origen del ticket (WEB, PATROL, etc.) */
+  source?: string
+  /** ID del check-in de patrulla que originó este ticket */
+  checkInId?: string
+  /** ID de familia explícito (usado por incidentes de patrulla) */
+  familyId?: string
 }
 
 export interface UpdateTicketData {
@@ -169,13 +177,15 @@ export class TicketService {
       ApplicationLogger.databaseOperationStart('create', 'tickets')
 
       // 1. Resolver familyId desde categoryId → department → familyId
+      // Si se proporciona familyId explícito (ej: incidentes de patrulla), usarlo directamente
       const category = await prisma.categories.findUnique({
         where: { id: data.categoryId },
         include: { departments: { select: { familyId: true } } },
       })
 
-      // Prioridad: categoría → departamento → familia default → primera familia activa
+      // Prioridad: familyId explícito → categoría → departamento → familia default → primera familia activa
       let familyId: string | undefined =
+        data.familyId ??
         category?.departments?.familyId ??
         (await TicketFamilyConfigService.getDefaultFamily())?.id ??
         undefined
@@ -213,7 +223,16 @@ export class TicketService {
       }
 
       // Extraer campos propios del servicio antes de pasar a Prisma
-      const { ticketCode: _tc, isAdmin: _ia, historyUserId: _hu, ...ticketData } = data
+      const {
+        ticketCode: _tc,
+        isAdmin: _ia,
+        historyUserId: _hu,
+        source,
+        checkInId,
+        familyId: _fid,
+        createdById,
+        ...ticketData
+      } = data
 
       const ticket = await prisma.tickets.create({
         data: {
@@ -222,6 +241,9 @@ export class TicketService {
           updatedAt: new Date(),
           ...(familyId && { familyId }),
           ...(ticketCode && { ticketCode }),
+          ...(source && { source: source as any }),
+          ...(checkInId && { checkInId }),
+          ...(createdById && { createdById }),
           codeIsManual,
         },
         include: {

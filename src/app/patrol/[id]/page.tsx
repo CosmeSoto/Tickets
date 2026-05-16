@@ -485,6 +485,7 @@ export default function PatrolExecutionPage() {
               checkInId={
                 lastCheckInId ?? patrol.checkIns[patrol.checkIns.length - 1]?.id ?? patrolId
               }
+              incidentCategoryId={patrol.familyConfig?.patrolIncidentCategoryId}
               onIncidentCreated={() => toast({ title: 'Incidente reportado' })}
             />
           </div>

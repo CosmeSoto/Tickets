@@ -17,7 +17,8 @@ import prisma from '@/lib/prisma'
  *
  * - SuperAdmin: undefined (sin restricción)
  * - Admin normal: sus familias en admin_family_assignments (o todas si no tiene ninguna asignada)
- * - TECHNICIAN: sus familias en technician_family_assignments
+ * - TECHNICIAN/CLIENT: sus familias en patrol_family_assignments (asignación específica de rondas)
+ *   Si no tiene asignaciones de rondas, fallback a technician_family_assignments (familia nativa)
  */
 export async function getPatrolAccessibleFamilyIds(
   userId: string,
@@ -38,15 +39,26 @@ export async function getPatrolAccessibleFamilyIds(
     return assignments.map(a => a.familyId)
   }
 
-  // TECHNICIAN: sus familias asignadas
+  // TECHNICIAN/CLIENT: primero buscar en patrol_family_assignments (asignación específica de rondas)
+  const patrolAssignments = await prisma.patrol_family_assignments.findMany({
+    where: { userId, isActive: true },
+    select: { familyId: true },
+  })
+
+  if (patrolAssignments.length > 0) {
+    return patrolAssignments.map(a => a.familyId)
+  }
+
+  // Fallback para TECHNICIAN: usar technician_family_assignments (familia nativa)
   if (role === 'TECHNICIAN') {
-    const assignments = await prisma.technician_family_assignments.findMany({
+    const techAssignments = await prisma.technician_family_assignments.findMany({
       where: { technicianId: userId, isActive: true },
       select: { familyId: true },
     })
-    return assignments.map(a => a.familyId)
+    return techAssignments.map(a => a.familyId)
   }
 
+  // CLIENT sin asignaciones de rondas: sin acceso a supervisión
   return []
 }
 

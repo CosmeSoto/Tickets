@@ -479,6 +479,7 @@ model users {
   stockMovements                                    stock_movements[]               @relation("StockMovementUser")
   technician_assignments                            technician_assignments[]
   technicianFamilyAssignments                       technician_family_assignments[]
+  patrolFamilyAssignments                           patrol_family_assignments[]     @relation("PatrolFamilyAssignments")
   ticketCollaborationsAdded                         ticket_collaborators[]          @relation("CollaboratorAddedBy")
   ticketCollaborations                              ticket_collaborators[]          @relation("TicketCollaborator")
   ticket_history                                    ticket_history[]
@@ -1552,6 +1553,7 @@ model families {
   supplierTypes               supplier_types[]
   suppliers                   suppliers[]
   technicianFamilyAssignments technician_family_assignments[]
+  patrolFamilyAssignments     patrol_family_assignments[]     @relation("PatrolFamilyAssignments")
   warehouses                  warehouses[]
   ticketCodeCounters          ticket_code_counters[]
   ticketFamilyConfig          ticket_family_config?
@@ -1697,6 +1699,22 @@ model admin_family_assignments {
   @@index([adminId, isActive])
   @@index([familyId, isActive])
   @@map("admin_family_assignments")
+}
+
+model patrol_family_assignments {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  familyId  String   @map("family_id")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user      users    @relation("PatrolFamilyAssignments", fields: [userId], references: [id], onDelete: Cascade)
+  family    families @relation("PatrolFamilyAssignments", fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, familyId])
+  @@index([userId, isActive])
+  @@index([familyId, isActive])
+  @@map("patrol_family_assignments")
 }
 
 model client_family_assignments {
@@ -2334,7 +2352,7 @@ model patrol_family_config {
   requirePhotoOnEnd           Boolean   @default(false) @map("require_photo_on_end")
   offlineSyncToleranceMinutes Int       @default(30)    @map("offline_sync_tolerance_minutes")
   alertCompletionThreshold    Int       @default(80)    @map("alert_completion_threshold")
-  gracePeriodMinutes          Int       @default(15)    @map("grace_period_minutes")
+  gracePeriodMinutes          Int       @default(5)     @map("grace_period_minutes")
   patrolIncidentCategoryId    String?   @map("patrol_incident_category_id")
   createdAt                   DateTime  @default(now()) @map("created_at")
   updatedAt                   DateTime  @updatedAt      @map("updated_at")

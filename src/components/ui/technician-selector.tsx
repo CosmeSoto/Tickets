@@ -323,9 +323,21 @@ export function TechnicianSelector({
           </div>
         </div>
 
-        {/* Dropdown */}
+        {/* Overlay para cerrar */}
         {isOpen && (
-          <div className='absolute z-50 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-60 overflow-auto'>
+          <div
+            className='fixed inset-0 z-40'
+            onClick={() => {
+              setIsOpen(false)
+              setSearchTerm('')
+              setHighlightedIndex(-1)
+            }}
+          />
+        )}
+
+        {/* Dropdown - rendered inline to avoid overflow clipping from parent scroll containers */}
+        {isOpen && (
+          <div className='relative z-50 w-full bg-card border border-border rounded-md shadow-lg max-h-60 overflow-auto'>
             <div ref={listRef}>
               {filteredTechnicians.length > 0 ? (
                 filteredTechnicians.map((technician, index) => (
@@ -393,18 +405,6 @@ export function TechnicianSelector({
               )}
             </div>
           </div>
-        )}
-
-        {/* Overlay para cerrar */}
-        {isOpen && (
-          <div
-            className='fixed inset-0 z-40'
-            onClick={() => {
-              setIsOpen(false)
-              setSearchTerm('')
-              setHighlightedIndex(-1)
-            }}
-          />
         )}
       </div>
 

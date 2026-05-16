@@ -66,11 +66,29 @@ export async function GET(request: NextRequest) {
       groupBy,
       page,
       limit,
+      userId: session.user.id,
     })
 
     const data = await withCache(cacheKey, 60, async () => {
+      // Determinar familias accesibles para el usuario
+      const { getPatrolAccessibleFamilyIds } = await import('@/lib/patrol/patrol-access')
+      const isSuperAdmin = (session.user as any).isSuperAdmin === true
+      const accessibleFamilyIds = await getPatrolAccessibleFamilyIds(
+        session.user.id,
+        session.user.role,
+        isSuperAdmin
+      )
+
+      // Construir filtro de familia: explícito > accesibles > sin filtro (super admin)
+      let familyWhere: Record<string, any> = {}
+      if (familyId) {
+        familyWhere = { familyId }
+      } else if (accessibleFamilyIds !== undefined && accessibleFamilyIds.length > 0) {
+        familyWhere = { familyId: { in: accessibleFamilyIds } }
+      }
+
       const baseWhere = {
-        ...(familyId ? { familyId } : {}),
+        ...familyWhere,
         ...(agentId ? { agentId } : {}),
         ...(routeId ? { routeId } : {}),
         scheduledStart: { gte: fromDate, lte: toDate },

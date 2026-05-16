@@ -236,7 +236,7 @@ export class PatrolSchedulerService {
 
   /**
    * Envía notificaciones de recordatorio a los agentes cuyas rondas están
-   * próximas a iniciar (dentro de los próximos 15 minutos).
+   * próximas a iniciar (dentro del gracePeriodMinutes configurado por familia, default 5 min).
    *
    * Diseñado para ejecutarse cada 5 minutos vía cron.
    * Usa un campo de metadata para evitar enviar duplicados.
@@ -245,10 +245,20 @@ export class PatrolSchedulerService {
    */
   static async sendUpcomingReminders(): Promise<number> {
     const now = new Date()
-    const reminderWindowMs = 15 * 60 * 1000 // 15 minutos
+
+    // Obtener configuraciones de familia para conocer el tiempo de recordatorio
+    const familyConfigs = await prisma.patrol_family_config.findMany({
+      where: { patrolsEnabled: true },
+      select: { familyId: true, gracePeriodMinutes: true },
+    })
+
+    // Usar el mayor gracePeriodMinutes como ventana de búsqueda (default 5 min)
+    const maxReminderMinutes =
+      familyConfigs.length > 0 ? Math.max(...familyConfigs.map(c => c.gracePeriodMinutes ?? 5)) : 5
+    const reminderWindowMs = maxReminderMinutes * 60 * 1000
     const windowEnd = new Date(now.getTime() + reminderWindowMs)
 
-    // Buscar patrullas PENDING que inician en los próximos 15 minutos
+    // Buscar patrullas PENDING que inician en los próximos N minutos
     const upcomingPatrols = await prisma.patrols.findMany({
       where: {
         status: 'PENDING',

@@ -32,6 +32,11 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { USER_ROLE_FORM_OPTIONS, type UserRole } from '@/lib/constants/user-constants'
 import { DepartmentSelector } from '@/components/ui/department-selector'
+import {
+  useSystemModules,
+  getModuleRoleDescription,
+  getModuleEmoji,
+} from '@/hooks/use-system-modules'
 
 interface CreateUserModalProps {
   isOpen: boolean
@@ -49,6 +54,10 @@ interface NewUserData {
   departmentId: string
   phone: string
   isSuperAdmin: boolean
+  ticketsEnabled: boolean
+  inventoryEnabled: boolean
+  patrolsEnabled: boolean
+  canManageInventory: boolean
   avatar?: File
 }
 
@@ -67,6 +76,7 @@ export function CreateUserModal({
 
   const isSuperAdminSession = (session?.user as any)?.isSuperAdmin === true
   const defaultRole: UserRole = suggestedRole ?? 'CLIENT'
+  const { modules: systemModules } = useSystemModules()
 
   const [formData, setFormData] = useState<NewUserData>({
     name: '',
@@ -76,6 +86,10 @@ export function CreateUserModal({
     departmentId: '',
     phone: '',
     isSuperAdmin: false,
+    ticketsEnabled: true,
+    inventoryEnabled: false,
+    patrolsEnabled: false,
+    canManageInventory: false,
     avatar: undefined,
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -96,6 +110,10 @@ export function CreateUserModal({
       departmentId: '',
       phone: '',
       isSuperAdmin: false,
+      ticketsEnabled: true,
+      inventoryEnabled: false,
+      patrolsEnabled: false,
+      canManageInventory: false,
       avatar: undefined,
     })
     setErrors({})
@@ -172,6 +190,10 @@ export function CreateUserModal({
           phone: formData.phone.trim() || null,
           isActive: true,
           isSuperAdmin: formData.role === 'ADMIN' ? formData.isSuperAdmin : false,
+          ticketsEnabled: formData.ticketsEnabled,
+          inventoryEnabled: formData.inventoryEnabled,
+          patrolsEnabled: formData.patrolsEnabled,
+          canManageInventory: formData.canManageInventory,
         }),
       })
       const result = await response.json()
@@ -500,6 +522,105 @@ export function CreateUserModal({
               </div>
             )}
           </div>
+
+          {/* ── SECCIÓN 4: Acceso a módulos ────────────────────────── */}
+          {systemModules.length > 0 && (
+            <>
+              <Separator />
+              <div className='space-y-3'>
+                <h3 className='text-sm font-semibold text-foreground flex items-center gap-1.5'>
+                  <Info className='h-4 w-4 text-muted-foreground' />
+                  Acceso a módulos
+                </h3>
+                {formData.role === 'ADMIN' ? (
+                  <p className='text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2'>
+                    Los administradores tienen acceso a todos los módulos por defecto.
+                  </p>
+                ) : (
+                  <div className='grid grid-cols-2 gap-2'>
+                    {systemModules.map(mod => {
+                      const isEnabled = (() => {
+                        if (mod.key === 'tickets') return formData.ticketsEnabled
+                        if (mod.key === 'inventory')
+                          return formData.inventoryEnabled || formData.canManageInventory
+                        if (mod.key === 'patrols') return formData.patrolsEnabled
+                        return false
+                      })()
+
+                      const handleToggle = (v: boolean) => {
+                        if (mod.key === 'tickets') {
+                          setFormData(p => ({ ...p, ticketsEnabled: v }))
+                        } else if (mod.key === 'inventory') {
+                          setFormData(p => ({
+                            ...p,
+                            inventoryEnabled: v,
+                            canManageInventory:
+                              formData.role === 'TECHNICIAN' ? v : p.canManageInventory,
+                          }))
+                        } else if (mod.key === 'patrols') {
+                          setFormData(p => ({ ...p, patrolsEnabled: v }))
+                        }
+                      }
+
+                      return (
+                        <button
+                          key={mod.key}
+                          type='button'
+                          onClick={() => handleToggle(!isEnabled)}
+                          className={`w-full text-left rounded-xl border-2 p-3 transition-all duration-150 ${
+                            isEnabled
+                              ? 'border-primary/40 bg-primary/5 shadow-sm'
+                              : 'border-border bg-background hover:border-border/80 hover:bg-muted/30'
+                          }`}
+                        >
+                          <div className='flex items-start justify-between gap-2'>
+                            <div className='flex items-center gap-2 min-w-0'>
+                              <span className='text-xl leading-none'>
+                                {getModuleEmoji(mod.key)}
+                              </span>
+                              <div className='min-w-0'>
+                                <p
+                                  className={`text-xs font-semibold leading-tight ${isEnabled ? 'text-primary' : 'text-foreground'}`}
+                                >
+                                  {mod.name}
+                                </p>
+                                <p className='text-[10px] text-muted-foreground leading-tight mt-0.5 line-clamp-2'>
+                                  {getModuleRoleDescription(mod.key, formData.role)}
+                                </p>
+                              </div>
+                            </div>
+                            <div
+                              className={`flex-shrink-0 w-4 h-4 rounded-full border-2 mt-0.5 transition-colors ${
+                                isEnabled
+                                  ? 'bg-primary border-primary'
+                                  : 'bg-background border-muted-foreground/30'
+                              }`}
+                            >
+                              {isEnabled && (
+                                <svg
+                                  className='w-full h-full text-primary-foreground p-0.5'
+                                  viewBox='0 0 12 12'
+                                  fill='none'
+                                >
+                                  <path
+                                    d='M2 6l3 3 5-5'
+                                    stroke='currentColor'
+                                    strokeWidth='2'
+                                    strokeLinecap='round'
+                                    strokeLinejoin='round'
+                                  />
+                                </svg>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           {/* ── FOOTER ────────────────────────────────────────────── */}
           <div className='flex justify-end gap-2 pt-2'>

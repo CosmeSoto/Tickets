@@ -128,7 +128,7 @@ export async function GET(request: Request) {
       })
       familyIds = assignments.map(a => a.familyId)
 
-      // Solo agregar familias de inventario si es gestor explícito
+      // Agregar familias de inventario si es gestor explícito
       if (canManageInventory) {
         const invAssignments = await prisma.inventory_manager_families.findMany({
           where: { managerId: userId },
@@ -136,6 +136,16 @@ export async function GET(request: Request) {
         })
         const invIds = invAssignments.map(a => a.familyId)
         familyIds = [...new Set([...familyIds, ...invIds])]
+      }
+
+      // Agregar familias de rondas si tiene el módulo habilitado
+      if (patrolsEnabled) {
+        const patrolAssignments = await prisma.patrol_family_assignments.findMany({
+          where: { userId, isActive: true },
+          select: { familyId: true },
+        })
+        const patrolIds = patrolAssignments.map(a => a.familyId)
+        familyIds = [...new Set([...familyIds, ...patrolIds])]
       }
     } else if (role === 'CLIENT') {
       // Familias explícitamente asignadas al cliente
@@ -163,19 +173,25 @@ export async function GET(request: Request) {
         const ticketIds = ticketFamilies.map(t => t.familyId!).filter(Boolean)
         familyIds = [...new Set([...explicitIds, ...ticketIds])]
       }
+
+      // Agregar familias de rondas si tiene el módulo habilitado
+      if (patrolsEnabled) {
+        const patrolAssignments = await prisma.patrol_family_assignments.findMany({
+          where: { userId, isActive: true },
+          select: { familyId: true },
+        })
+        const patrolIds = patrolAssignments.map(a => a.familyId)
+        familyIds = [...new Set([...familyIds, ...patrolIds])]
+      }
     }
 
     if (familyIds.length === 0) {
       // Super Admin sin familias: acceso total
       if (role === 'ADMIN' && isSuperAdmin) {
-        return { tickets: true, inventory: true, patrols: patrolsEnabled, families: [] }
+        return { tickets: true, inventory: true, patrols: true, families: [] }
       }
-      // Admin normal sin familias asignadas: acceso total (legacy — admin creado antes del sistema de familias)
+      // Admin normal sin familias asignadas: respetar flags del usuario
       if (role === 'ADMIN') {
-        return { tickets: true, inventory: true, patrols: patrolsEnabled, families: [] }
-      }
-      // Para clientes con módulos explícitamente habilitados pero sin familias aún
-      if (role === 'CLIENT') {
         return {
           tickets: ticketsEnabled,
           inventory: inventoryEnabled || canManageInventory,
@@ -183,7 +199,14 @@ export async function GET(request: Request) {
           families: [],
         }
       }
-      return { tickets: false, inventory: false, patrols: false, families: [] }
+      // Para técnicos y clientes sin familias: respetar los flags del usuario
+      // Esto permite que un usuario con módulos habilitados vea la sección aunque no tenga familias aún
+      return {
+        tickets: ticketsEnabled,
+        inventory: inventoryEnabled || canManageInventory,
+        patrols: patrolsEnabled,
+        families: [],
+      }
     }
 
     // Consultar configs de módulos para esas familias
@@ -210,57 +233,68 @@ export async function GET(request: Request) {
     const invMap = new Map(invConfigs.map(c => [c.familyId, c.inventoryEnabled]))
     const patrolMap = new Map(patrolConfigs.map(c => [c.familyId, c.patrolsEnabled]))
 
-    // Para ADMIN: siempre mostrar los módulos activos de sus familias
-    // Para TECHNICIAN/CLIENT: respetar flags de permisos del usuario
+    // Para todos los roles: las familias enriquecidas muestran qué módulos tiene cada familia
+    // combinado con los permisos del usuario
     const isAdminRole = role === 'ADMIN'
 
+    // Determinar primero qué familias tienen cada módulo activo (sin considerar flags del usuario)
+    const familyHasTickets = families.some(f => ticketMap.get(f.id) ?? true)
+    const familyHasInventory = families.some(f => invMap.get(f.id) ?? false)
+    const familyHasPatrols = families.some(f => patrolMap.get(f.id) ?? false)
+
+    // Familias enriquecidas con módulos efectivos (combinando config de familia + permisos del usuario)
     const enrichedFamilies = families.map(f => ({
       ...f,
       modules: {
-        tickets: ticketMap.get(f.id) ?? false,
-        inventory: isAdminRole
-          ? (invMap.get(f.id) ?? false)
-          : canManageInventory || inventoryEnabled
-            ? (invMap.get(f.id) ?? false)
-            : false,
-        patrols: patrolsEnabled ? (patrolMap.get(f.id) ?? false) : false,
+        tickets: (ticketMap.get(f.id) ?? true) && (ticketsEnabled || isAdminRole),
+        inventory:
+          (invMap.get(f.id) ?? false) && (canManageInventory || inventoryEnabled || isAdminRole),
+        patrols: (patrolMap.get(f.id) ?? false) && patrolsEnabled,
       },
     }))
-
-    const familyHasTickets = enrichedFamilies.some(f => f.modules.tickets)
-    const familyHasInventory = enrichedFamilies.some(f => invMap.get(f.id) ?? false)
-    const familyHasPatrols = enrichedFamilies.some(f => f.modules.patrols)
 
     /**
      * Tabla de reglas de visibilidad de módulos:
      *
-     * | Rol            | Tickets                              | Inventario                                              |
-     * |----------------|--------------------------------------|---------------------------------------------------------|
-     * | Super Admin    | Siempre true                         | Siempre true                                            |
-     * | Admin normal   | Si alguna familia tiene tickets ON   | Si alguna familia tiene inventario ON                   |
-     * | Technician     | Si alguna familia tiene tickets ON   | inventoryEnabled=true O canManageInventory=true         |
-     * | Client         | Flag ticketsEnabled del usuario      | inventoryEnabled=true O canManageInventory=true         |
+     * | Rol            | Tickets                                                    | Inventario                                              |
+     * |----------------|------------------------------------------------------------|---------------------------------------------------------|
+     * | Super Admin    | Siempre true                                               | Siempre true                                            |
+     * | Admin normal   | Si alguna familia tiene tickets ON                         | Si alguna familia tiene inventario ON                   |
+     * | Technician     | ticketsEnabled Y alguna familia tiene tickets ON           | inventoryEnabled O canManageInventory                   |
+     * | Client         | ticketsEnabled del usuario                                 | inventoryEnabled O canManageInventory                   |
      *
-     * inventoryEnabled = puede VER el módulo (sus equipos asignados)
-     * canManageInventory = puede GESTIONAR activos (crear, editar, configurar)
+     * El flag del usuario (ticketsEnabled, inventoryEnabled, patrolsEnabled) actúa como PERMISO.
+     * La config de la familia determina DISPONIBILIDAD.
+     * El módulo se muestra si el usuario tiene permiso Y al menos una familia lo tiene activo,
+     * O si el usuario tiene permiso aunque no haya config de familia (para no bloquear acceso).
      */
     let resolvedTickets: boolean
     let resolvedInventory: boolean
     let resolvedPatrols: boolean
 
     if (role === 'ADMIN') {
-      resolvedTickets = isSuperAdmin ? true : familyHasTickets
-      resolvedInventory = isSuperAdmin ? true : familyHasInventory
-      resolvedPatrols = isSuperAdmin ? true : patrolsEnabled && familyHasPatrols
+      if (isSuperAdmin) {
+        resolvedTickets = true
+        resolvedInventory = true
+        resolvedPatrols = true
+      } else {
+        // Admin normal: el flag del usuario es el permiso, la familia determina disponibilidad
+        resolvedTickets = ticketsEnabled && (familyHasTickets || ticketConfigs.length === 0)
+        resolvedInventory = inventoryEnabled || canManageInventory || familyHasInventory
+        resolvedPatrols = patrolsEnabled && (familyHasPatrols || patrolConfigs.length === 0)
+      }
     } else if (role === 'TECHNICIAN') {
-      resolvedTickets = familyHasTickets
+      // Técnico: el flag del usuario es el permiso, la familia determina disponibilidad
+      // Si ticketsEnabled=true y alguna familia tiene tickets, mostrar
+      // Si ticketsEnabled=true pero ninguna familia tiene config de tickets, mostrar igual (familia sin config = habilitado por defecto)
+      resolvedTickets = ticketsEnabled && (familyHasTickets || ticketConfigs.length === 0)
       resolvedInventory = inventoryEnabled || canManageInventory
-      resolvedPatrols = patrolsEnabled && familyHasPatrols
+      resolvedPatrols = patrolsEnabled && (familyHasPatrols || patrolConfigs.length === 0)
     } else {
-      // CLIENT
+      // CLIENT: el flag del usuario es el permiso principal
       resolvedTickets = ticketsEnabled
       resolvedInventory = inventoryEnabled || canManageInventory
-      resolvedPatrols = patrolsEnabled && familyHasPatrols
+      resolvedPatrols = patrolsEnabled && (familyHasPatrols || patrolConfigs.length === 0)
     }
 
     return {

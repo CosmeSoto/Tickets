@@ -13,6 +13,7 @@ import {
   Layers,
   Package,
   ShieldCheck,
+  Shield,
   Save,
   User,
 } from 'lucide-react'
@@ -98,6 +99,7 @@ export function EditUserModal({
   const [technicianFamilyIds, setTechnicianFamilyIds] = useState<string[]>([])
   const [clientFamilyIds, setClientFamilyIds] = useState<string[]>([])
   const [inventoryFamilyIds, setInventoryFamilyIds] = useState<string[]>([])
+  const [patrolFamilyIds, setPatrolFamilyIds] = useState<string[]>([])
   const [adminFamilyIds, setAdminFamilyIds] = useState<string[]>([])
   const [adminScopeIds, setAdminScopeIds] = useState<string[]>([]) // viewer's own families
   const [confirmUnassign, setConfirmUnassign] = useState<{
@@ -262,6 +264,36 @@ export function EditUserModal({
     invalidateModulesCache()
   }
 
+  // PATROL handlers
+  const handleAssignPatrolFamily = async (familyId: string) => {
+    if (!user) return
+    const res = await fetch('/api/patrol-family-assignments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user.id, familyId }),
+    })
+    if (!res.ok) {
+      const data = await res.json()
+      throw new Error(data.error ?? 'Error al asignar familia')
+    }
+    setPatrolFamilyIds(prev => [...prev, familyId])
+    invalidateModulesCache()
+  }
+
+  const handleUnassignPatrolFamily = async (familyId: string) => {
+    if (!user) return
+    const res = await fetch(
+      `/api/patrol-family-assignments?userId=${user.id}&familyId=${familyId}`,
+      { method: 'DELETE' }
+    )
+    if (!res.ok) {
+      const data = await res.json()
+      throw new Error(data.error ?? 'Error al desasignar familia')
+    }
+    setPatrolFamilyIds(prev => prev.filter(id => id !== familyId))
+    invalidateModulesCache()
+  }
+
   // ADMIN handlers
   const handleAssignAdminFamily = async (familyId: string) => {
     if (!user) return
@@ -375,6 +407,16 @@ export function EditUserModal({
             setInventoryFamilyIds(
               Array.isArray(families) ? families.map((f: any) => f.familyId ?? f.id) : []
             )
+          }
+        }
+
+        // Cargar familias de rondas si tiene el módulo habilitado
+        if ((user as any).patrolsEnabled) {
+          const res = await fetch(`/api/patrol-family-assignments?userId=${user.id}`)
+          if (res.ok) {
+            const data = await res.json()
+            const assignments = data.data ?? []
+            setPatrolFamilyIds(assignments.map((a: any) => a.familyId))
           }
         }
 
@@ -689,18 +731,15 @@ export function EditUserModal({
                       Acceso como Administrador de Familia
                     </p>
                     <p className='text-xs text-muted-foreground'>
-                      Este admin ve los módulos de las familias que tiene asignadas en{' '}
-                      <span className='font-mono text-[11px]'>
-                        Admin → Usuarios → [Usuario] → Familias asignadas
-                      </span>
-                      . Si no tiene familias asignadas, tiene acceso completo al sistema.
+                      Los módulos habilitados abajo determinan qué secciones verá este admin.
+                      Además, solo verá datos de las familias que tenga asignadas.
                     </p>
                   </div>
                 )}
               </div>
 
               {/* ── Módulos — grid escalable, funciona con 2 o 10 módulos ── */}
-              {formData.role !== 'ADMIN' && systemModules.length > 0 && (
+              {!formData.isSuperAdmin && systemModules.length > 0 && (
                 <div className='space-y-2 pt-1'>
                   <p className='text-xs font-semibold text-muted-foreground uppercase tracking-wide'>
                     Acceso a módulos
@@ -842,7 +881,7 @@ export function EditUserModal({
               )}
 
               {/* Panel de estado actual — separado de los controles, colapsado por defecto */}
-              {user && formData.role !== 'ADMIN' && (
+              {user && !formData.isSuperAdmin && (
                 <UserModulesPanel
                   userId={user.id}
                   role={formData.role}
@@ -852,14 +891,15 @@ export function EditUserModal({
                   patrolsEnabled={formData.patrolsEnabled}
                 />
               )}
-              {/* Para ADMIN normal: panel informativo de sus familias */}
-              {user && formData.role === 'ADMIN' && !formData.isSuperAdmin && (
+              {/* Para Super Admin: acceso total, no necesita panel */}
+              {user && formData.isSuperAdmin && (
                 <UserModulesPanel
                   userId={user.id}
                   role={formData.role}
                   canManageInventory={true}
                   ticketsEnabled={true}
                   inventoryEnabled={true}
+                  patrolsEnabled={true}
                 />
               )}
             </div>
@@ -954,6 +994,38 @@ export function EditUserModal({
                     readOnlyFamilyIds={adminScopeReadOnlyIds}
                     onAssign={handleAssignInventoryFamily}
                     onUnassign={handleUnassignInventoryFamily}
+                    isLoading={loadingFamilies}
+                    error={familyError}
+                  />
+                </div>
+              </>
+            )}
+
+            {/* ── Familias de rondas — para usuarios con patrolsEnabled (no ADMIN) ── */}
+            {user && formData.patrolsEnabled && formData.role !== 'ADMIN' && (
+              <>
+                <Separator />
+                <div className='space-y-3'>
+                  <div>
+                    <h3 className='text-sm font-semibold text-foreground flex items-center gap-1.5'>
+                      <Shield className='h-4 w-4 text-muted-foreground' />
+                      Familias de rondas
+                    </h3>
+                    <p className='text-xs text-muted-foreground mt-0.5'>
+                      Familias donde este usuario puede ejecutar o supervisar rondas de seguridad.
+                    </p>
+                  </div>
+                  <FamilyAssignmentSection
+                    families={allFamilies}
+                    assignedFamilyIds={patrolFamilyIds}
+                    nativeFamilyId={
+                      typeof user.department === 'object'
+                        ? ((user.department as any)?.familyId ?? null)
+                        : null
+                    }
+                    readOnlyFamilyIds={adminScopeReadOnlyIds}
+                    onAssign={handleAssignPatrolFamily}
+                    onUnassign={handleUnassignPatrolFamily}
                     isLoading={loadingFamilies}
                     error={familyError}
                   />

@@ -42,6 +42,10 @@ export interface CreateUserData {
   department?: string // Deprecated, usar departmentId
   phone?: string
   isSuperAdmin?: boolean
+  ticketsEnabled?: boolean
+  inventoryEnabled?: boolean
+  patrolsEnabled?: boolean
+  canManageInventory?: boolean
   assignedCategories?: {
     categoryId: string
     priority: number
@@ -259,6 +263,10 @@ export class UserService {
           phone: data.phone || null,
           isActive: true,
           isSuperAdmin: data.role === 'ADMIN' ? (data.isSuperAdmin ?? false) : false,
+          ticketsEnabled: data.ticketsEnabled ?? true,
+          inventoryEnabled: data.inventoryEnabled ?? false,
+          patrolsEnabled: data.patrolsEnabled ?? false,
+          canManageInventory: data.canManageInventory ?? false,
           isEmailVerified: false,
           createdAt: new Date(),
           updatedAt: new Date(),

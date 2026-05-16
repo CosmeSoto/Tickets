@@ -25,21 +25,44 @@ export async function GET(request: NextRequest) {
     if (denied) return denied
 
     const { searchParams } = new URL(request.url)
-    const familyId = searchParams.get('familyId')
+    const familyIdParam = searchParams.get('familyId')
+
+    // Determinar familias accesibles para el usuario
+    const { getPatrolAccessibleFamilyIds } = await import('@/lib/patrol/patrol-access')
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    const accessibleFamilyIds = await getPatrolAccessibleFamilyIds(
+      session.user.id,
+      session.user.role,
+      isSuperAdmin
+    )
+
+    // Si se pasa familyId explícito, usarlo (validando que tenga acceso)
+    // Si no, usar todas las familias accesibles del usuario
+    let familyFilter: Record<string, any> = {}
+    if (familyIdParam) {
+      familyFilter = { familyId: familyIdParam }
+    } else if (accessibleFamilyIds !== undefined && accessibleFamilyIds.length > 0) {
+      familyFilter = { familyId: { in: accessibleFamilyIds } }
+    }
+    // Si accessibleFamilyIds es undefined (super admin) o no se pasa filtro, no filtrar
 
     const cacheKey = buildCacheKey('patrol:dashboard', {
       userId: session.user.id,
-      familyId: familyId ?? 'all',
+      familyId: familyIdParam ?? accessibleFamilyIds?.join(',') ?? 'all',
     })
 
     const data = await withCache(cacheKey, 30, async () => {
+      // Usar timezone de Ecuador para calcular "hoy" correctamente
       const now = new Date()
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      const ecuadorOffset = -5 * 60 // UTC-5 en minutos
+      const localNow = new Date(now.getTime() + ecuadorOffset * 60 * 1000)
+      const todayStart = new Date(
+        Date.UTC(localNow.getUTCFullYear(), localNow.getUTCMonth(), localNow.getUTCDate()) -
+          ecuadorOffset * 60 * 1000
+      )
       const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
       const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
       const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-
-      const familyFilter = familyId ? { familyId } : {}
 
       // Conteos del día
       const [scheduled, completed, inProgress, missed] = await Promise.all([
@@ -131,10 +154,10 @@ export async function GET(request: NextRequest) {
       // Incidentes abiertos originados en patrullas
       const [openIncidents, inProgressIncidents] = await Promise.all([
         prisma.tickets.count({
-          where: { source: 'PATROL', status: 'OPEN', ...(familyId ? { familyId } : {}) },
+          where: { source: 'PATROL', status: 'OPEN', ...familyFilter },
         }),
         prisma.tickets.count({
-          where: { source: 'PATROL', status: 'IN_PROGRESS', ...(familyId ? { familyId } : {}) },
+          where: { source: 'PATROL', status: 'IN_PROGRESS', ...familyFilter },
         }),
       ])
 

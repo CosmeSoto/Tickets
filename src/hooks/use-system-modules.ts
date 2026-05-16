@@ -87,16 +87,19 @@ export function useSystemModules() {
 export function getModuleRoleDescription(moduleKey: string, role: string): string {
   const descriptions: Record<string, Record<string, string>> = {
     tickets: {
-      TECHNICIAN: 'Ver y atender tickets asignados a sus familias',
+      ADMIN: 'Crear propios y de su personal, gestionar tickets de sus familias',
+      TECHNICIAN: 'Crear sus tickets y atender los asignados por categoría',
       CLIENT: 'Crear y seguir sus propios tickets de soporte',
     },
     inventory: {
-      TECHNICIAN: 'Ver y gestionar activos de sus familias asignadas',
+      ADMIN: 'Gestionar activos de inventario de sus familias asignadas',
+      TECHNICIAN: 'Ver y gestionar activos de sus familias como gestor',
       CLIENT: 'Ver sus equipos asignados y solicitar mantenimientos',
     },
     patrols: {
-      TECHNICIAN: 'Supervisar y ejecutar rondas de seguridad como guardia',
-      CLIENT: 'Ejecutar rondas de seguridad asignadas desde el móvil',
+      ADMIN: 'Ver reportes y supervisar rondas de sus familias',
+      TECHNICIAN: 'Supervisar rondas y ejecutar patrullas asignadas',
+      CLIENT: 'Ejecutar rondas de seguridad asignadas como agente',
     },
   }
   return descriptions[moduleKey]?.[role] ?? 'Acceso al módulo'

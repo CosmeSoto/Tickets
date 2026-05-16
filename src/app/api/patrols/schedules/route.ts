@@ -118,12 +118,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validar que el agente tiene patrolsEnabled
+    // Validar que el agente tiene patrolsEnabled y no es ADMIN
     const agent = await prisma.users.findUnique({
       where: { id: data.agentId },
-      select: { id: true, name: true, patrolsEnabled: true },
+      select: { id: true, name: true, role: true, patrolsEnabled: true },
     })
     if (!agent) return NextResponse.json({ error: 'Agente no encontrado' }, { status: 404 })
+    if (agent.role === 'ADMIN') {
+      return NextResponse.json(
+        { error: 'Los administradores no pueden ser asignados como agentes de ronda' },
+        { status: 422 }
+      )
+    }
     if (!agent.patrolsEnabled) {
       return NextResponse.json(
         { error: 'El usuario seleccionado no tiene el módulo de patrullas habilitado' },

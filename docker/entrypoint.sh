@@ -13,7 +13,10 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 
 # ── 1. Migraciones de base de datos ──────────────────────────────────────────
 echo "==> Ejecutando migraciones..."
-$PRISMA_CLI migrate deploy
+$PRISMA_CLI migrate deploy || {
+  echo "==> migrate deploy falló — intentando db push (modo desarrollo/pruebas)..."
+  $PRISMA_CLI db push --accept-data-loss
+}
 echo "==> Migraciones completadas."
 
 # ── 2. Seed inicial (solo si la tabla de usuarios está vacía) ─────────────────

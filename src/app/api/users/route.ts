@@ -14,6 +14,10 @@ const createUserSchema = z.object({
   department: z.string().optional(), // Deprecated, usar departmentId
   phone: z.string().optional(),
   isSuperAdmin: z.boolean().optional(),
+  ticketsEnabled: z.boolean().optional(),
+  inventoryEnabled: z.boolean().optional(),
+  patrolsEnabled: z.boolean().optional(),
+  canManageInventory: z.boolean().optional(),
 })
 
 export async function GET(request: NextRequest) {
@@ -35,6 +39,7 @@ export async function GET(request: NextRequest) {
     const departmentId = searchParams.get('departmentId')
     const department = searchParams.get('department')
     const familyId = searchParams.get('familyId')
+    const patrolFamilyId = searchParams.get('patrolFamilyId')
     const search = searchParams.get('search')
     const limit = searchParams.get('limit')
     const canManageInventory = searchParams.get('canManageInventory')
@@ -83,6 +88,21 @@ export async function GET(request: NextRequest) {
             { technicianFamilyAssignments: { some: { familyId, isActive: true } } },
             // Técnico cuyo departamento pertenece a la familia (asignación nativa)
             { departments: { familyId } },
+          ],
+        },
+      ]
+    }
+
+    // Filtrar por familia de rondas: usuarios con patrol_family_assignments O departamento nativo
+    if (patrolFamilyId) {
+      where.AND = [
+        ...(where.AND ?? []),
+        {
+          OR: [
+            // Asignación explícita en patrol_family_assignments
+            { patrolFamilyAssignments: { some: { familyId: patrolFamilyId, isActive: true } } },
+            // Usuario cuyo departamento pertenece a la familia (nativa)
+            { departments: { familyId: patrolFamilyId } },
           ],
         },
       ]

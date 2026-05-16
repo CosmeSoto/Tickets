@@ -221,13 +221,33 @@ export async function POST(request: NextRequest) {
     }
 
     if (!ticketData.categoryId) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'La categoría es requerida',
-        },
-        { status: 400 }
-      )
+      // Si viene de una patrulla sin categoría configurada, buscar una categoría por defecto
+      if (ticketData.source === 'PATROL') {
+        const defaultCategory = await prisma.categories.findFirst({
+          where: { level: 1 },
+          orderBy: { createdAt: 'asc' },
+        })
+        if (defaultCategory) {
+          ticketData.categoryId = defaultCategory.id
+        } else {
+          return NextResponse.json(
+            {
+              success: false,
+              message:
+                'No hay categorías configuradas en el sistema. Crea al menos una categoría antes de reportar incidentes.',
+            },
+            { status: 400 }
+          )
+        }
+      } else {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'La categoría es requerida',
+          },
+          { status: 400 }
+        )
+      }
     }
 
     // Verificar que la categoría existe
@@ -247,12 +267,14 @@ export async function POST(request: NextRequest) {
 
     // Determinar el clientId basado en el rol del usuario
     let clientId = session.user.id // Por defecto, el usuario actual es el cliente
+    let createdOnBehalf = false
 
-    // Si es admin y especifica un clientId, usar ese
+    // Solo ADMIN puede crear tickets en nombre de otro usuario
     if (session.user.role === 'ADMIN' && ticketData.clientId) {
       // Verificar que el cliente existe
       const client = await prisma.users.findUnique({
         where: { id: ticketData.clientId },
+        select: { id: true, role: true, name: true },
       })
 
       if (!client) {
@@ -266,6 +288,7 @@ export async function POST(request: NextRequest) {
       }
 
       clientId = ticketData.clientId
+      createdOnBehalf = ticketData.clientId !== session.user.id
     }
 
     // ── Lógica de escalamiento para técnicos ──────────────────────────────
@@ -365,6 +388,12 @@ export async function POST(request: NextRequest) {
         session.user.role === 'ADMIN' && { ticketCode: ticketData.ticketCode }),
       isAdmin: session.user.role === 'ADMIN',
       historyUserId: session.user.id,
+      // Registrar quién creó el ticket (para auditoría en creación en nombre de otro)
+      createdById: session.user.id,
+      // Campos de patrulla (incidentes reportados desde rondas)
+      ...(ticketData.source && { source: ticketData.source }),
+      ...(ticketData.checkInId && { checkInId: ticketData.checkInId }),
+      ...(ticketData.familyId && { familyId: ticketData.familyId }),
     })) as any
 
     // ⭐ AUDITORÍA: Registrar creación de ticket
@@ -379,6 +408,13 @@ export async function POST(request: NextRequest) {
         categoryName: newTicket.categories.name,
         clientName: newTicket.users_tickets_clientIdTousers.name,
         assigneeName: newTicket.users_tickets_assigneeIdTousers?.name || 'Sin asignar',
+        ...(createdOnBehalf && {
+          createdOnBehalf: true,
+          createdByRole: session.user.role,
+          createdByName: session.user.name,
+          onBehalfOfId: clientId,
+          onBehalfOfName: newTicket.users_tickets_clientIdTousers.name,
+        }),
       },
       request: request,
     })

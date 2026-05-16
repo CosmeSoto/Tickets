@@ -147,7 +147,11 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
     const familyCfg = await prisma.patrol_family_config.findUnique({
       where: { familyId: patrol.familyId },
-      select: { requirePhotoOnStart: true, requirePhotoOnEnd: true },
+      select: {
+        requirePhotoOnStart: true,
+        requirePhotoOnEnd: true,
+        patrolIncidentCategoryId: true,
+      },
     })
 
     // Calcular progreso en tiempo real
@@ -174,6 +178,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         familyConfig: {
           requirePhotoOnStart: familyCfg?.requirePhotoOnStart ?? false,
           requirePhotoOnEnd: familyCfg?.requirePhotoOnEnd ?? false,
+          patrolIncidentCategoryId: familyCfg?.patrolIncidentCategoryId ?? null,
         },
       },
     })
@@ -199,6 +204,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         familyId: true,
         status: true,
         routeId: true,
+        scheduledStart: true,
+        scheduledEnd: true,
         route: {
           select: {
             routeCheckpoints: {
@@ -222,13 +229,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const body = await request.json()
     const data = patchPatrolSchema.parse(body)
 
-    // Obtener config de familia para saber si se requiere foto
+    // Obtener config de familia para saber si se requiere foto y grace period
     const familyConfig = await prisma.patrol_family_config.findUnique({
       where: { familyId: patrol.familyId },
       select: {
         requirePhotoOnStart: true,
         requirePhotoOnEnd: true,
         alertCompletionThreshold: true,
+        gracePeriodMinutes: true,
       },
     })
 
@@ -237,6 +245,38 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         return NextResponse.json(
           { error: 'La patrulla no está en estado PENDING' },
           { status: 409 }
+        )
+      }
+
+      // Validar que el agente está dentro del rango de tiempo programado
+      // Se permite iniciar hasta gracePeriodMinutes antes del scheduledStart (default 5 min)
+      const gracePeriodMinutes = familyConfig?.gracePeriodMinutes ?? 5
+      const now = new Date()
+      const earliestStart = new Date(
+        patrol.scheduledStart.getTime() - gracePeriodMinutes * 60 * 1000
+      )
+      const latestStart = patrol.scheduledEnd
+
+      if (now < earliestStart) {
+        const minutesUntilStart = Math.ceil(
+          (patrol.scheduledStart.getTime() - now.getTime()) / 60000
+        )
+        return NextResponse.json(
+          {
+            error: `Aún no puedes iniciar esta ronda. Faltan ${minutesUntilStart} minutos para el horario programado.`,
+            code: 'TOO_EARLY',
+          },
+          { status: 422 }
+        )
+      }
+
+      if (now > latestStart) {
+        return NextResponse.json(
+          {
+            error: 'El horario programado para esta ronda ya finalizó.',
+            code: 'TOO_LATE',
+          },
+          { status: 422 }
         )
       }
 

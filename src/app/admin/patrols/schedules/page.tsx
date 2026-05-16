@@ -127,10 +127,14 @@ export default function SchedulesPage() {
       const params = new URLSearchParams()
       params.append('patrolsEnabled', 'true')
       params.append('limit', '100')
-      if (familyId) params.append('familyId', familyId)
+      if (familyId) params.append('patrolFamilyId', familyId)
       const res = await fetch(`/api/users?${params.toString()}`)
       const data = await res.json()
-      if (data.data) setAgents(data.data)
+      // Solo TECHNICIAN y CLIENT pueden ser asignados como agentes de ronda
+      // ADMIN (normal y super) solo supervisa, no ejecuta patrullas
+      if (data.data) {
+        setAgents(data.data.filter((u: any) => u.role !== 'ADMIN'))
+      }
     } catch {
       /* silencioso */
     }
