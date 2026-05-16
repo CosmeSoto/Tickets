@@ -21,10 +21,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'familyIds debe ser un array' }, { status: 400 })
     }
 
-    // Verify target user has canManageInventory=true
+    // Verify target user has canManageInventory=true AND inventoryEnabled=true
     const targetUser = await prisma.users.findUnique({
       where: { id: userId },
-      select: { id: true, name: true, role: true, canManageInventory: true },
+      select: {
+        id: true,
+        name: true,
+        role: true,
+        canManageInventory: true,
+        inventoryEnabled: true,
+      },
     })
     if (!targetUser) {
       return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
@@ -32,6 +38,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (!targetUser.canManageInventory) {
       return NextResponse.json(
         { error: 'El usuario no tiene permisos de gestión de inventario' },
+        { status: 400 }
+      )
+    }
+    if (!targetUser.inventoryEnabled) {
+      return NextResponse.json(
+        { error: 'El usuario no tiene el módulo de inventario habilitado' },
         { status: 400 }
       )
     }
@@ -44,12 +56,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     if (!viewer?.isSuperAdmin && familyIds.length > 0) {
       // Verify all requested familyIds are in the admin's scope
-      const adminAssignments = await prisma.admin_family_assignments.findMany({
-        where: { adminId: session.user.id, isActive: true },
-        select: { familyId: true },
-      })
-      const adminFamilyIds = new Set(adminAssignments.map(a => a.familyId))
-      const unauthorized = familyIds.filter(id => !adminFamilyIds.has(id))
+      const { getUserFamilyScope } = await import('@/lib/auth/admin-scope')
+      const scope = await getUserFamilyScope(session.user.id, 'ADMIN', false)
+      const allowedFamilyIds = scope.familyIds ? new Set(scope.familyIds) : new Set()
+      const unauthorized = familyIds.filter(id => !allowedFamilyIds.has(id))
       if (unauthorized.length > 0) {
         return NextResponse.json(
           { error: 'No tienes acceso a algunas de las familias solicitadas' },

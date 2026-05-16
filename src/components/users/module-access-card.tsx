@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { getModuleEmoji, getModuleRoleDescription } from '@/hooks/use-system-modules'
+import { useToast } from '@/hooks/use-toast'
 
 export interface ModuleFamily {
   id: string
@@ -66,6 +67,7 @@ export function ModuleAccessCard({
   const [expanded, setExpanded] = useState(false)
   const [search, setSearch] = useState('')
   const [savingId, setSavingId] = useState<string | null>(null)
+  const { toast } = useToast()
 
   const assignedSet = new Set(assignedFamilyIds)
   const readOnlySet = new Set(readOnlyFamilyIds)
@@ -87,6 +89,12 @@ export function ModuleAccessCard({
       } else {
         await onUnassignFamily(familyId)
       }
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.message || 'Error al cambiar la asignación de la familia',
+        variant: 'destructive',
+      })
     } finally {
       setSavingId(null)
     }

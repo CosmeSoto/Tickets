@@ -66,6 +66,22 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
 
+    // RBAC: ADMIN can only assign families they have access to
+    const viewer = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: { isSuperAdmin: true },
+    })
+
+    if (!viewer?.isSuperAdmin) {
+      // Verify requested familyId is in the admin's scope
+      const { getUserFamilyScope } = await import('@/lib/auth/admin-scope')
+      const scope = await getUserFamilyScope(session.user.id, 'ADMIN', false)
+      const allowedFamilyIds = scope.familyIds ? new Set(scope.familyIds) : new Set()
+      if (!allowedFamilyIds.has(familyId)) {
+        return NextResponse.json({ error: 'No tienes acceso a esta familia' }, { status: 403 })
+      }
+    }
+
     // Validar que la familia existe y está activa
     const family = await prisma.families.findUnique({
       where: { id: familyId },
