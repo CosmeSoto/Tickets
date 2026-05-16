@@ -218,7 +218,7 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    const includeAll = searchParams.get('scope') === 'all' && currentUser?.isSuperAdmin === true
+    const includeAll = searchParams.get('scope') === 'all' && session.user.role === 'ADMIN'
     const moduleFilter = searchParams.get('module') // 'tickets' | 'inventory' | 'patrols' | null
     let families = await FamilyService.findAll(includeInactive)
 

@@ -83,6 +83,12 @@ export function EditUserModal({
 
   // ── Family assignment state ──────────────────────────────────────────────
   const [allFamilies, setAllFamilies] = useState<FamilyOption[]>([])
+  const [ticketFamilies, setTicketFamilies] = useState<FamilyOption[]>([])
+  const [inventoryFamilies, setInventoryFamilies] = useState<FamilyOption[]>([])
+  const [patrolFamilies, setPatrolFamilies] = useState<FamilyOption[]>([])
+  const [adminTicketScopeIds, setAdminTicketScopeIds] = useState<string[]>([])
+  const [adminInventoryScopeIds, setAdminInventoryScopeIds] = useState<string[]>([])
+  const [adminPatrolScopeIds, setAdminPatrolScopeIds] = useState<string[]>([])
   const [loadingFamilies, setLoadingFamilies] = useState(false)
   const [familyError, setFamilyError] = useState<string | null>(null)
   const [technicianFamilyIds, setTechnicianFamilyIds] = useState<string[]>([])
@@ -119,14 +125,30 @@ export function EditUserModal({
     window.dispatchEvent(new CustomEvent('modules-updated'))
   }
 
-  // Compute read-only family IDs for ADMIN-scoped viewers
-  const adminScopeReadOnlyIds = (() => {
-    const viewerIsAdmin = session?.user?.role === 'ADMIN' && !session?.user?.isSuperAdmin
-    if (!viewerIsAdmin || adminScopeIds.length === 0) return []
-    // Families assigned to the user but NOT in viewer's scope
-    const allAssigned = [...technicianFamilyIds, ...clientFamilyIds, ...inventoryFamilyIds]
-    return allAssigned.filter(id => !adminScopeIds.includes(id))
+  // Compute read-only family IDs per module for ADMIN-scoped viewers
+  // Familias que NO están en el scope del admin para ese módulo → aparecen deshabilitadas/transparentes
+  const viewerIsAdminNormal =
+    session?.user?.role === 'ADMIN' && !(session?.user as any)?.isSuperAdmin
+
+  const ticketReadOnlyIds = (() => {
+    if (!viewerIsAdminNormal || adminTicketScopeIds.length === 0) return []
+    // Todas las familias que NO están en el scope de tickets del admin
+    return allFamilies.map(f => f.id).filter(id => !adminTicketScopeIds.includes(id))
   })()
+
+  const inventoryReadOnlyIds = (() => {
+    if (!viewerIsAdminNormal || adminInventoryScopeIds.length === 0) return []
+    return allFamilies.map(f => f.id).filter(id => !adminInventoryScopeIds.includes(id))
+  })()
+
+  const patrolReadOnlyIds = (() => {
+    if (!viewerIsAdminNormal || adminPatrolScopeIds.length === 0) return []
+    return allFamilies.map(f => f.id).filter(id => !adminPatrolScopeIds.includes(id))
+  })()
+
+  const adminScopeReadOnlyIds = [
+    ...new Set([...ticketReadOnlyIds, ...inventoryReadOnlyIds, ...patrolReadOnlyIds]),
+  ]
 
   // TECHNICIAN handlers
   const handleAssignTechnicianFamily = async (familyId: string) => {
@@ -348,16 +370,95 @@ export function EditUserModal({
       setLoadingFamilies(true)
       setFamilyError(null)
       try {
-        // Super Admin ve todas las familias para asignar; Admin normal ve solo las suyas
+        // Super Admin ve todas las familias; Admin Normal solo las de su scope por módulo
         const viewerIsSuperAdmin = (session?.user as any)?.isSuperAdmin === true
-        const familyUrl = viewerIsSuperAdmin
-          ? '/api/families?active=true&scope=all'
-          : '/api/families?active=true'
-        const familiesRes = await fetch(familyUrl)
-        if (familiesRes.ok) {
-          const familiesData = await familiesRes.json()
-          const families = familiesData.data ?? familiesData ?? []
-          setAllFamilies(families.filter((f: FamilyOption) => f.isActive))
+
+        // Cargar configuraciones de módulos por familia (qué familias tienen cada módulo habilitado)
+        const [ticketConfigRes, inventoryConfigRes, patrolConfigRes] = await Promise.all([
+          fetch('/api/families?includeInactive=true&module=tickets'), // Familias con tickets habilitado
+          fetch('/api/inventory/family-config'),
+          fetch('/api/patrols/family-config'),
+        ])
+        // Familias con tickets habilitado (el endpoint module=tickets ya filtra por ticketsEnabled)
+        const ticketEnabledIds = new Set<string>()
+        if (ticketConfigRes.ok) {
+          const data = await ticketConfigRes.json()
+          ;(data.data ?? []).forEach((f: any) => ticketEnabledIds.add(f.id))
+        }
+        // Familias con inventario habilitado
+        const inventoryDisabledIds = new Set<string>()
+        if (inventoryConfigRes.ok) {
+          const data = await inventoryConfigRes.json()
+          const configMap = data.data ?? {}
+          // Solo marcar como deshabilitadas las que explícitamente tienen inventoryEnabled=false
+          Object.entries(configMap).forEach(([fId, enabled]) => {
+            if (!enabled) inventoryDisabledIds.add(fId)
+          })
+        }
+        // Familias con patrullas habilitado
+        const patrolDisabledIds = new Set<string>()
+        if (patrolConfigRes.ok) {
+          const data = await patrolConfigRes.json()
+          const configMap = data.data ?? {}
+          // Solo marcar como deshabilitadas las que explícitamente tienen patrolsEnabled=false
+          Object.entries(configMap).forEach(([fId, enabled]) => {
+            if (!enabled) patrolDisabledIds.add(fId)
+          })
+        }
+
+        if (viewerIsSuperAdmin) {
+          const familiesRes = await fetch('/api/families?includeInactive=false&scope=all')
+          if (familiesRes.ok) {
+            const familiesData = await familiesRes.json()
+            const families = (familiesData.data ?? familiesData ?? []).filter(
+              (f: FamilyOption) => f.isActive
+            )
+            setAllFamilies(families)
+            // Filtrar por módulo habilitado (familias sin config = habilitadas por defecto)
+            setTicketFamilies(
+              families.filter(
+                (f: FamilyOption) => ticketEnabledIds.size === 0 || ticketEnabledIds.has(f.id)
+              )
+            )
+            setInventoryFamilies(
+              families.filter((f: FamilyOption) => !inventoryDisabledIds.has(f.id))
+            )
+            setPatrolFamilies(families.filter((f: FamilyOption) => !patrolDisabledIds.has(f.id)))
+          }
+        } else {
+          // Admin Normal: cargar familias por módulo (solo las que puede gestionar)
+          const [ticketRes, inventoryRes, patrolRes, allRes] = await Promise.all([
+            fetch('/api/families?includeInactive=false&module=tickets'),
+            fetch('/api/families?includeInactive=false&module=inventory'),
+            fetch('/api/families?includeInactive=false&module=patrols'),
+            fetch('/api/families?includeInactive=false&scope=all'), // Todas las familias activas para mostrar read-only
+          ])
+          const parseFamilies = async (res: Response) => {
+            if (!res.ok) return [] as FamilyOption[]
+            const data = await res.json()
+            return ((data.data ?? []) as FamilyOption[]).filter(f => f.isActive)
+          }
+          const tFamilies = await parseFamilies(ticketRes)
+          const iFamilies = await parseFamilies(inventoryRes)
+          const pFamilies = await parseFamilies(patrolRes)
+          const allActiveFamilies = await parseFamilies(allRes)
+
+          // Filtrar por módulo habilitado en la familia
+          const filteredTicket = allActiveFamilies.filter(
+            f => ticketEnabledIds.size === 0 || ticketEnabledIds.has(f.id)
+          )
+          const filteredInventory = allActiveFamilies.filter(f => !inventoryDisabledIds.has(f.id))
+          const filteredPatrol = allActiveFamilies.filter(f => !patrolDisabledIds.has(f.id))
+
+          setTicketFamilies(filteredTicket)
+          setInventoryFamilies(filteredInventory)
+          setPatrolFamilies(filteredPatrol)
+          setAllFamilies(allActiveFamilies)
+          // Guardar scope IDs por módulo (para calcular read-only)
+          setAdminTicketScopeIds(tFamilies.map(f => f.id))
+          setAdminInventoryScopeIds(iFamilies.map(f => f.id))
+          setAdminPatrolScopeIds(pFamilies.map(f => f.id))
+          setAdminScopeIds(tFamilies.map(f => f.id))
         }
 
         // Fetch viewer's admin scope if viewer is ADMIN (not super)
@@ -392,7 +493,8 @@ export function EditUserModal({
           }
         }
 
-        if ((user as any).canManageInventory) {
+        // Cargar familias de inventario siempre (pueden existir asignaciones previas)
+        {
           const res = await fetch(`/api/inventory/managers/${user.id}/families`)
           if (res.ok) {
             const data = await res.json()
@@ -403,8 +505,8 @@ export function EditUserModal({
           }
         }
 
-        // Cargar familias de rondas si tiene el módulo habilitado
-        if ((user as any).patrolsEnabled) {
+        // Cargar familias de rondas siempre (pueden existir asignaciones previas)
+        {
           const res = await fetch(`/api/patrol-family-assignments?userId=${user.id}`)
           if (res.ok) {
             const data = await res.json()
@@ -718,7 +820,7 @@ export function EditUserModal({
                       role={formData.role}
                       enabled={formData.ticketsEnabled}
                       onToggle={v => setFormData(p => ({ ...p, ticketsEnabled: v }))}
-                      families={allFamilies}
+                      families={ticketFamilies}
                       assignedFamilyIds={
                         formData.role === 'TECHNICIAN'
                           ? technicianFamilyIds
@@ -731,7 +833,7 @@ export function EditUserModal({
                           ? ((user.department as any)?.familyId ?? null)
                           : null
                       }
-                      readOnlyFamilyIds={adminScopeReadOnlyIds}
+                      readOnlyFamilyIds={ticketReadOnlyIds}
                       onAssignFamily={
                         formData.role === 'TECHNICIAN'
                           ? handleAssignTechnicianFamily
@@ -764,14 +866,14 @@ export function EditUserModal({
                             formData.role === 'TECHNICIAN' ? v : p.canManageInventory,
                         }))
                       }
-                      families={allFamilies}
+                      families={inventoryFamilies}
                       assignedFamilyIds={inventoryFamilyIds}
                       nativeFamilyId={
                         user && typeof user.department === 'object'
                           ? ((user.department as any)?.familyId ?? null)
                           : null
                       }
-                      readOnlyFamilyIds={adminScopeReadOnlyIds}
+                      readOnlyFamilyIds={inventoryReadOnlyIds}
                       onAssignFamily={handleAssignInventoryFamily}
                       onUnassignFamily={handleUnassignInventoryFamily}
                       options={{
@@ -792,14 +894,14 @@ export function EditUserModal({
                       role={formData.role}
                       enabled={formData.patrolsEnabled}
                       onToggle={v => setFormData(p => ({ ...p, patrolsEnabled: v }))}
-                      families={allFamilies}
+                      families={patrolFamilies}
                       assignedFamilyIds={patrolFamilyIds}
                       nativeFamilyId={
                         user && typeof user.department === 'object'
                           ? ((user.department as any)?.familyId ?? null)
                           : null
                       }
-                      readOnlyFamilyIds={adminScopeReadOnlyIds}
+                      readOnlyFamilyIds={patrolReadOnlyIds}
                       onAssignFamily={handleAssignPatrolFamily}
                       onUnassignFamily={handleUnassignPatrolFamily}
                       loading={loadingFamilies}

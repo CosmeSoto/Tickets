@@ -43,14 +43,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     })
 
     if (!viewer?.isSuperAdmin && familyIds.length > 0) {
-      // Verify all requested familyIds are in the admin's scope
-      const { getUserFamilyScope } = await import('@/lib/auth/admin-scope')
-      const scope = await getUserFamilyScope(session.user.id, 'ADMIN', false)
-      const allowedFamilyIds = scope.familyIds ? new Set(scope.familyIds) : new Set()
-      const unauthorized = familyIds.filter(id => !allowedFamilyIds.has(id))
+      // Verify all requested familyIds are in the admin's INVENTORY scope (not general scope)
+      const { getModuleFamilyIds } = await import('@/lib/auth/admin-scope')
+      const inventoryFamilyIds = await getModuleFamilyIds(session.user.id, 'inventory')
+      const allowedFamilyIds = new Set(inventoryFamilyIds)
+      const unauthorized = familyIds.filter((id: string) => !allowedFamilyIds.has(id))
       if (unauthorized.length > 0) {
         return NextResponse.json(
-          { error: 'No tienes acceso a algunas de las familias solicitadas' },
+          {
+            error:
+              'No tienes acceso a algunas de las familias solicitadas en el módulo de inventario',
+          },
           { status: 403 }
         )
       }

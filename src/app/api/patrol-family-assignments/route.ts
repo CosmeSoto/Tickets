@@ -54,31 +54,28 @@ export async function POST(request: NextRequest) {
     if (!userId || !familyId)
       return NextResponse.json({ error: 'userId y familyId son requeridos' }, { status: 400 })
 
-    // Validar que el usuario existe y tiene patrolsEnabled
+    // Validar que el usuario existe
     const user = await prisma.users.findUnique({
       where: { id: userId },
       select: { id: true, patrolsEnabled: true, role: true },
     })
     if (!user) return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
-    if (!user.patrolsEnabled)
-      return NextResponse.json(
-        { error: 'El usuario no tiene el módulo de rondas habilitado' },
-        { status: 400 }
-      )
 
-    // RBAC: ADMIN can only assign families they have access to
+    // RBAC: ADMIN can only assign patrol families they have access to
     const viewer = await prisma.users.findUnique({
       where: { id: session.user.id },
       select: { isSuperAdmin: true },
     })
 
     if (!viewer?.isSuperAdmin) {
-      // Verify requested familyId is in the admin's scope
-      const { getUserFamilyScope } = await import('@/lib/auth/admin-scope')
-      const scope = await getUserFamilyScope(session.user.id, 'ADMIN', false)
-      const allowedFamilyIds = scope.familyIds ? new Set(scope.familyIds) : new Set()
-      if (!allowedFamilyIds.has(familyId)) {
-        return NextResponse.json({ error: 'No tienes acceso a esta familia' }, { status: 403 })
+      // Verify requested familyId is in the admin's PATROL scope (not general scope)
+      const { getModuleFamilyIds } = await import('@/lib/auth/admin-scope')
+      const patrolFamilyIds = await getModuleFamilyIds(session.user.id, 'patrols')
+      if (!patrolFamilyIds.includes(familyId)) {
+        return NextResponse.json(
+          { error: 'No tienes acceso a esta familia en el módulo de rondas' },
+          { status: 403 }
+        )
       }
     }
 

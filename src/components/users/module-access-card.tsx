@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, Search, RefreshCw } from 'lucide-react'
+import { ChevronDown, Search, RefreshCw, Lock } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
@@ -221,7 +221,8 @@ export function ModuleAccessCard({
                           key={family.id}
                           className={cn(
                             'flex items-center justify-between rounded-md border px-2.5 py-1.5',
-                            isNative && 'bg-primary/5 border-primary/20'
+                            isNative && 'bg-primary/5 border-primary/20',
+                            isReadOnly && !isNative && 'opacity-50 bg-muted/20'
                           )}
                         >
                           <div className='flex items-center gap-2'>
@@ -254,6 +255,9 @@ export function ModuleAccessCard({
                               >
                                 Nativa
                               </Badge>
+                            )}
+                            {isReadOnly && !isNative && (
+                              <Lock className='h-3 w-3 text-muted-foreground' />
                             )}
                             {isSaving && (
                               <RefreshCw className='h-3 w-3 animate-spin text-muted-foreground' />
