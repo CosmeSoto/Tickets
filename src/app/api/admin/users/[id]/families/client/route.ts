@@ -34,10 +34,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       select: { isSuperAdmin: true },
     })
     if (!viewer?.isSuperAdmin) {
-      const adminAccess = await prisma.admin_family_assignments.findFirst({
-        where: { adminId: session.user.id, familyId, isActive: true },
-      })
-      if (!adminAccess) {
+      // Verify the admin has access to this family (admin_family_assignments + native family)
+      const { getUserFamilyScope } = await import('@/lib/auth/admin-scope')
+      const scope = await getUserFamilyScope(session.user.id, 'ADMIN', false)
+      if (scope.familyIds && !scope.familyIds.includes(familyId)) {
         return NextResponse.json({ error: 'No tienes acceso a esta familia' }, { status: 403 })
       }
     }

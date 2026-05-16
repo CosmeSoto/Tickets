@@ -21,7 +21,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'familyIds debe ser un array' }, { status: 400 })
     }
 
-    // Verify target user has canManageInventory=true AND inventoryEnabled=true
+    // Verify target user exists
     const targetUser = await prisma.users.findUnique({
       where: { id: userId },
       select: {
@@ -34,18 +34,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     })
     if (!targetUser) {
       return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
-    }
-    if (!targetUser.canManageInventory) {
-      return NextResponse.json(
-        { error: 'El usuario no tiene permisos de gestión de inventario' },
-        { status: 400 }
-      )
-    }
-    if (!targetUser.inventoryEnabled) {
-      return NextResponse.json(
-        { error: 'El usuario no tiene el módulo de inventario habilitado' },
-        { status: 400 }
-      )
     }
 
     // RBAC: ADMIN can only assign families they have access to
