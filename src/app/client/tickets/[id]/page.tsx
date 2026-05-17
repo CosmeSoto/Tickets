@@ -65,6 +65,7 @@ export default function ClientTicketDetailPage() {
   const [timelineKey, setTimelineKey] = useState(0)
   const [fileKey, setFileKey] = useState(0)
   const [editForm, setEditForm] = useState({ title: '', description: '' })
+  const [showRatingModal, setShowRatingModal] = useState(false)
 
   const ticketId = params.id as string
 
@@ -270,7 +271,7 @@ export default function ClientTicketDetailPage() {
                   <Button
                     size='sm'
                     className='mt-2 bg-amber-600 hover:bg-amber-700 text-white'
-                    onClick={() => setActiveTab('rating')}
+                    onClick={() => setShowRatingModal(true)}
                   >
                     <Star className='h-4 w-4 mr-2' />
                     Calificar
@@ -282,12 +283,9 @@ export default function ClientTicketDetailPage() {
 
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className='grid w-full grid-cols-3'>
+            <TabsList className='grid w-full grid-cols-2'>
               <TabsTrigger value='timeline'>Historial</TabsTrigger>
               <TabsTrigger value='files'>Archivos</TabsTrigger>
-              {(ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') && (
-                <TabsTrigger value='rating'>Calificar</TabsTrigger>
-              )}
             </TabsList>
             <TabsContent value='timeline' className='space-y-4'>
               <TicketTimeline
@@ -309,30 +307,26 @@ export default function ClientTicketDetailPage() {
                 refreshKey={fileKey}
               />
             </TabsContent>
-            {(ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') && (
-              <TabsContent value='rating' className='space-y-4'>
-                <TicketRatingSystem
-                  ticketId={ticket.id}
-                  technicianId={ticket.assignee?.id}
-                  canRate={ticket.status === 'RESOLVED' || ticket.status === 'CLOSED'}
-                  showTechnicianStats={false}
-                  mode='client'
-                  onRatingSubmitted={() => {
-                    setTicket(prev =>
-                      prev
-                        ? { ...prev, status: 'CLOSED', closedAt: new Date().toISOString() }
-                        : prev
-                    )
-                    setTimelineKey(k => k + 1)
-                  }}
-                />
-              </TabsContent>
-            )}
           </Tabs>
         </div>
 
         {/* Sidebar */}
         <div className='space-y-4'>
+          {/* Calificación */}
+          <TicketRatingSystem
+            ticketId={ticket.id}
+            technicianId={ticket.assignee?.id}
+            canRate={ticket.status === 'RESOLVED' || ticket.status === 'CLOSED'}
+            showTechnicianStats={false}
+            mode='client'
+            onRatingSubmitted={() => {
+              setTicket(prev =>
+                prev ? { ...prev, status: 'CLOSED', closedAt: new Date().toISOString() } : prev
+              )
+              setTimelineKey(k => k + 1)
+            }}
+          />
+
           <Card>
             <CardHeader className='pb-2'>
               <CardTitle className='text-sm font-semibold'>Detalles</CardTitle>
@@ -411,6 +405,40 @@ export default function ClientTicketDetailPage() {
             >
               {deleting ? 'Eliminando...' : 'Eliminar'}
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Modal de Calificación */}
+      <AlertDialog open={showRatingModal} onOpenChange={setShowRatingModal}>
+        <AlertDialogContent className='max-w-2xl'>
+          <AlertDialogHeader>
+            <AlertDialogTitle className='flex items-center gap-2'>
+              <Star className='h-5 w-5 text-amber-600' />
+              Califica el servicio
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Tu opinión ayuda a mejorar la calidad de nuestro soporte.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className='max-h-[60vh] overflow-y-auto'>
+            <TicketRatingSystem
+              ticketId={ticket.id}
+              technicianId={ticket.assignee?.id}
+              canRate={ticket.status === 'RESOLVED' || ticket.status === 'CLOSED'}
+              showTechnicianStats={false}
+              mode='client'
+              onRatingSubmitted={() => {
+                setShowRatingModal(false)
+                setTicket(prev =>
+                  prev ? { ...prev, status: 'CLOSED', closedAt: new Date().toISOString() } : prev
+                )
+                setTimelineKey(k => k + 1)
+              }}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cerrar</AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
