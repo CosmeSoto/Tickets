@@ -282,9 +282,12 @@ export default function ClientTicketDetailPage() {
 
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className='grid w-full grid-cols-2'>
+            <TabsList className='grid w-full grid-cols-3'>
               <TabsTrigger value='timeline'>Historial</TabsTrigger>
               <TabsTrigger value='files'>Archivos</TabsTrigger>
+              {(ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') && (
+                <TabsTrigger value='rating'>Calificar</TabsTrigger>
+              )}
             </TabsList>
             <TabsContent value='timeline' className='space-y-4'>
               <TicketTimeline
@@ -306,6 +309,25 @@ export default function ClientTicketDetailPage() {
                 refreshKey={fileKey}
               />
             </TabsContent>
+            {(ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') && (
+              <TabsContent value='rating' className='space-y-4'>
+                <TicketRatingSystem
+                  ticketId={ticket.id}
+                  technicianId={ticket.assignee?.id}
+                  canRate={ticket.status === 'RESOLVED' || ticket.status === 'CLOSED'}
+                  showTechnicianStats={false}
+                  mode='client'
+                  onRatingSubmitted={() => {
+                    setTicket(prev =>
+                      prev
+                        ? { ...prev, status: 'CLOSED', closedAt: new Date().toISOString() }
+                        : prev
+                    )
+                    setTimelineKey(k => k + 1)
+                  }}
+                />
+              </TabsContent>
+            )}
           </Tabs>
         </div>
 
@@ -371,21 +393,6 @@ export default function ClientTicketDetailPage() {
               )}
             </CardContent>
           </Card>
-
-          {/* Calificación */}
-          <TicketRatingSystem
-            ticketId={ticket.id}
-            technicianId={ticket.assignee?.id}
-            canRate={ticket.status === 'RESOLVED' || ticket.status === 'CLOSED'}
-            showTechnicianStats={false}
-            mode='client'
-            onRatingSubmitted={() => {
-              setTicket(prev =>
-                prev ? { ...prev, status: 'CLOSED', closedAt: new Date().toISOString() } : prev
-              )
-              setTimelineKey(k => k + 1)
-            }}
-          />
         </div>
       </div>
 
