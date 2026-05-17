@@ -312,21 +312,6 @@ export default function ClientTicketDetailPage() {
 
         {/* Sidebar */}
         <div className='space-y-4'>
-          {/* Calificación */}
-          <TicketRatingSystem
-            ticketId={ticket.id}
-            technicianId={ticket.assignee?.id}
-            canRate={ticket.status === 'RESOLVED' || ticket.status === 'CLOSED'}
-            showTechnicianStats={false}
-            mode='client'
-            onRatingSubmitted={() => {
-              setTicket(prev =>
-                prev ? { ...prev, status: 'CLOSED', closedAt: new Date().toISOString() } : prev
-              )
-              setTimelineKey(k => k + 1)
-            }}
-          />
-
           <Card>
             <CardHeader className='pb-2'>
               <CardTitle className='text-sm font-semibold'>Detalles</CardTitle>
@@ -387,6 +372,21 @@ export default function ClientTicketDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Calificación */}
+          <TicketRatingSystem
+            ticketId={ticket.id}
+            technicianId={ticket.assignee?.id}
+            canRate={ticket.status === 'RESOLVED' || ticket.status === 'CLOSED'}
+            showTechnicianStats={false}
+            mode='client'
+            onRatingSubmitted={() => {
+              setTicket(prev =>
+                prev ? { ...prev, status: 'CLOSED', closedAt: new Date().toISOString() } : prev
+              )
+              setTimelineKey(k => k + 1)
+            }}
+          />
         </div>
       </div>
 
