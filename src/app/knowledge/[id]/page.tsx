@@ -207,13 +207,15 @@ export default function KnowledgeDetailPage() {
       }
     >
       {article && (
-        <div className='space-y-6'>
-          {/* Header del artículo */}
-          <Card>
-            <CardHeader>
-              <div className='flex items-start justify-between gap-4'>
-                <div className='flex-1 space-y-3'>
-                  <div className='flex items-center gap-2 flex-wrap'>
+        <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
+          {/* Contenido principal */}
+          <div className='lg:col-span-2 space-y-6'>
+            {/* Metadata */}
+            <Card>
+              <CardContent className='p-6'>
+                <div className='space-y-4'>
+                  {/* Categoría y tags */}
+                  <div className='flex flex-wrap gap-2'>
                     {article.category && (
                       <Badge
                         variant='outline'
@@ -225,183 +227,60 @@ export default function KnowledgeDetailPage() {
                         {article.category.name}
                       </Badge>
                     )}
-                    {article.isPublished ? (
-                      <Badge className='bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300'>
-                        Publicado
-                      </Badge>
-                    ) : (
-                      <Badge variant='secondary'>Borrador</Badge>
-                    )}
-                  </div>
-
-                  <CardTitle className='text-2xl'>{article.title}</CardTitle>
-
-                  {article.summary && (
-                    <CardDescription className='text-base'>{article.summary}</CardDescription>
-                  )}
-
-                  {/* Tags */}
-                  {article.tags && article.tags.length > 0 && (
-                    <div className='flex flex-wrap gap-2'>
-                      {article.tags.map((tag, index) => (
+                    {article.tags &&
+                      article.tags.length > 0 &&
+                      article.tags.map((tag, index) => (
                         <Badge key={index} variant='secondary'>
                           <Tag className='h-3 w-3 mr-1' />
                           {tag}
                         </Badge>
                       ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Stats */}
-                <div className='flex flex-col items-end gap-2 text-sm text-muted-foreground'>
-                  <div className='flex items-center gap-1'>
-                    <Eye className='h-4 w-4' />
-                    <span>{article.views} vistas</span>
                   </div>
-                  <div className='flex items-center gap-3'>
-                    <div className='flex items-center gap-1 text-green-600 dark:text-green-400'>
-                      <ThumbsUp className='h-4 w-4' />
-                      <span>{article.helpfulVotes}</span>
-                    </div>
-                    <div className='flex items-center gap-1 text-red-600 dark:text-red-400'>
-                      <ThumbsDown className='h-4 w-4' />
-                      <span>{article.notHelpfulVotes}</span>
-                    </div>
+
+                  <Separator />
+
+                  {/* Título y resumen */}
+                  <div>
+                    <h1 className='text-2xl font-bold mb-2'>{article.title}</h1>
+                    {article.summary && <p className='text-muted-foreground'>{article.summary}</p>}
                   </div>
-                  {(article.helpfulPercentage ?? 0) > 0 && (
-                    <Badge variant='secondary'>{article.helpfulPercentage}% útil</Badge>
-                  )}
                 </div>
-              </div>
-
-              <Separator className='my-4' />
-
-              {/* Metadata */}
-              <div className='flex items-center justify-between text-sm text-muted-foreground'>
-                {article.author && (
-                  <div className='flex items-center gap-2'>
-                    <Avatar className='h-8 w-8'>
-                      <AvatarImage src={article.author.avatar || undefined} />
-                      <AvatarFallback>
-                        {article.author.name?.charAt(0).toUpperCase() || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <div className='font-medium text-foreground'>
-                        {article.author.name || article.author.email}
-                      </div>
-                      <div className='text-xs'>Autor</div>
-                    </div>
-                  </div>
-                )}
-                <div className='flex items-center gap-1'>
-                  <Calendar className='h-4 w-4' />
-                  <span>
-                    Publicado{' '}
-                    {formatDistanceToNow(new Date(article.createdAt), {
-                      addSuffix: true,
-                      locale: es,
-                    })}
-                  </span>
-                </div>
-              </div>
-            </CardHeader>
-          </Card>
-
-          {/* Contenido del artículo */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Contenido</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className='prose prose-sm max-w-none dark:prose-invert'>
-                <ReactMarkdown>{article.content}</ReactMarkdown>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Sistema de votación */}
-          <Card>
-            <CardHeader>
-              <CardTitle>¿Te resultó útil este artículo?</CardTitle>
-              <CardDescription>
-                Tu feedback nos ayuda a mejorar la base de conocimientos
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className='flex items-center gap-4'>
-                <Button
-                  variant={userVote === true ? 'default' : 'outline'}
-                  size='lg'
-                  onClick={() => handleVote(true)}
-                  disabled={voting}
-                  className='flex-1'
-                >
-                  <ThumbsUp className='h-5 w-5 mr-2' />
-                  Sí, fue útil
-                  {userVote === true && ' ✓'}
-                </Button>
-                <Button
-                  variant={userVote === false ? 'default' : 'outline'}
-                  size='lg'
-                  onClick={() => handleVote(false)}
-                  disabled={voting}
-                  className='flex-1'
-                >
-                  <ThumbsDown className='h-5 w-5 mr-2' />
-                  No fue útil
-                  {userVote === false && ' ✓'}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Artículo fuente (si existe) */}
-          {article.sourceTicket && (
-            <Card>
-              <CardHeader>
-                <CardTitle className='text-sm'>Artículo creado desde ticket</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Button
-                  variant='outline'
-                  onClick={() => router.push(`/tickets/${article.sourceTicket?.id}`)}
-                >
-                  Ver ticket original: {article.sourceTicket.title}
-                </Button>
               </CardContent>
             </Card>
-          )}
 
-          {/* Artículos similares */}
-          {similarArticles.length > 0 && (
+            {/* Contenido del artículo */}
             <Card>
-              <CardHeader>
-                <CardTitle>Artículos Relacionados</CardTitle>
-                <CardDescription>Otros artículos que podrían interesarte</CardDescription>
-              </CardHeader>
-              <CardContent className='space-y-3'>
-                {similarArticles.map(similar => (
-                  <div
-                    key={similar.id}
-                    onClick={() => router.push(`/knowledge/${similar.id}`)}
-                    className='p-3 rounded-lg border hover:bg-accent transition-colors cursor-pointer'
-                  >
-                    <div className='font-medium text-sm line-clamp-2 mb-1'>{similar.title}</div>
-                    <div className='flex items-center space-x-2 text-xs text-muted-foreground'>
-                      <div className='flex items-center space-x-1'>
-                        <Eye className='h-3 w-3' />
-                        <span>{similar.views}</span>
-                      </div>
-                      <span>•</span>
-                      <span>{similar.helpfulPercentage}% útil</span>
-                    </div>
-                  </div>
-                ))}
+              <CardContent className='p-6 sm:p-8'>
+                <div className='prose prose-slate max-w-none dark:prose-invert'>
+                  <ReactMarkdown>{article.content}</ReactMarkdown>
+                </div>
               </CardContent>
             </Card>
-          )}
+
+            {/* Artículos similares */}
+            {similarArticles.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Artículos Relacionados</CardTitle>
+                  <CardDescription>Otros artículos que podrían interesarte</CardDescription>
+                </CardHeader>
+                <CardContent className='space-y-3'>
+                  {similarArticles.map(similar => (
+                    <div
+                      key={similar.id}
+                      onClick={() => router.push(`/knowledge/${similar.id}`)}
+                      className='p-3 rounded-lg border hover:bg-accent transition-colors cursor-pointer'
+                    >
+                      <div className='font-medium text-sm line-clamp-2 mb-1'>{similar.title}</div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* Sidebar (solo para admins/tecnicos o info simple para clientes) */}
+          <div className='space-y-6'>{/* Si es cliente, no mostramos sidebar adicional */}</div>
         </div>
       )}
     </ModuleLayout>
