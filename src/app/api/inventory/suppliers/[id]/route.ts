@@ -3,7 +3,14 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { randomUUID } from 'crypto'
 import prisma from '@/lib/prisma'
-import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
+import {
+  assertInventoryResourceManage,
+  assertInventoryResourceRead,
+  assertInventoryManageByFamily,
+  InventoryAccessError,
+  toInventoryAccessUser,
+  inventoryAccessToResponse,
+} from '@/lib/inventory/inventory-resource-access'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -19,11 +26,14 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    if (!(await canManageInventory(session.user.id, session.user.role))) {
-      return inventoryForbidden()
-    }
-
     const { id } = await params
+
+    try {
+      await assertInventoryResourceRead(toInventoryAccessUser(session.user), 'SUPPLIER', id)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
+    }
 
     const supplier = await prisma.suppliers.findUnique({
       where: { id },
@@ -60,10 +70,6 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    if (!(await canManageInventory(session.user.id, session.user.role))) {
-      return inventoryForbidden()
-    }
-
     const { id } = await params
 
     const existing = await prisma.suppliers.findUnique({ where: { id } })
@@ -71,8 +77,26 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: 'Proveedor no encontrado' }, { status: 404 })
     }
 
+    const user = toInventoryAccessUser(session.user)
+    try {
+      await assertInventoryResourceManage(user, 'SUPPLIER', id)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
+    }
+
     const body = await request.json()
     const { name, typeId, taxId, email, phone, address, website, contactName, familyId } = body
+
+    const targetFamilyId = familyId !== undefined ? familyId : existing.familyId
+    if (targetFamilyId) {
+      try {
+        await assertInventoryManageByFamily(user, targetFamilyId)
+      } catch (err) {
+        if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+        throw err
+      }
+    }
 
     // Validar nombre
     if (!name || !name.trim()) {
@@ -154,7 +178,10 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     const role = session.user.role
     const isSuperAdmin = (session.user as any).isSuperAdmin === true
     if (role !== 'ADMIN' && !isSuperAdmin) {
-      return inventoryForbidden()
+      return NextResponse.json(
+        { error: 'Solo el administrador puede desactivar proveedores' },
+        { status: 403 }
+      )
     }
 
     const { id } = await params
@@ -226,7 +253,10 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
     const role = session.user.role
     const isSuperAdmin = (session.user as any).isSuperAdmin === true
     if (role !== 'ADMIN' && !isSuperAdmin) {
-      return inventoryForbidden()
+      return NextResponse.json(
+        { error: 'Solo el administrador puede eliminar proveedores' },
+        { status: 403 }
+      )
     }
 
     const { id } = await params

@@ -43,7 +43,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     // Verificar permisos
     const isAdmin = session.user.role === 'ADMIN'
     const isRequester = decommissionRequest.requestedById === session.user.id
-    const canManage = (session.user as any).canManageInventory === true
+    const canManage = await (
+      await import('@/lib/inventory/inventory-session')
+    ).resolveCanManageInventory(session.user.id, session.user.role)
 
     if (!isAdmin && !isRequester && !canManage) {
       return NextResponse.json(

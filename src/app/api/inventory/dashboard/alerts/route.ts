@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
+import { getInventorySessionContext } from '@/lib/inventory/inventory-session'
 
 /**
  * GET /api/inventory/dashboard/alerts
@@ -17,12 +18,13 @@ export async function GET(request: NextRequest) {
 
     const user = session.user as any
     const role = user.role
+    const canManageFromDb = (await getInventorySessionContext(session.user)).canManageInventory
 
     // Construir scope de familias según rol del usuario
     const familyScope: any = {}
 
     if (role === 'CLIENT') {
-      if (!user.canManageInventory) {
+      if (!canManageFromDb) {
         return NextResponse.json({
           lowStockConsumables: 0,
           maintenanceDue: 0,

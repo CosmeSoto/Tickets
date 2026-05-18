@@ -34,14 +34,9 @@ export async function GET(request: NextRequest) {
       familyFilter = { OR: [{ familyId }, { familyId: null }] }
     } else if (isAdmin && !(user as any).isSuperAdmin) {
       // Admin Normal sin familyId explícito: aplicar scope de inventario
-      const { getInventoryScope, buildInventoryFamilyWhere } =
-        await import('@/lib/inventory/scope-filter')
-      const scope = await getInventoryScope(
-        user.id,
-        user.role,
-        false,
-        (user as any).canManageInventory === true
-      )
+      const { buildInventoryFamilyWhere } = await import('@/lib/inventory/scope-filter')
+      const { getInventorySessionContext } = await import('@/lib/inventory/inventory-session')
+      const scope = (await getInventorySessionContext(user)).scope
       familyFilter = buildInventoryFamilyWhere(scope.familyIds, true) // includeGlobal=true para bodegas compartidas
     }
 

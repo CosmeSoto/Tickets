@@ -2,13 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { canManageInventory } from '@/lib/inventory-access'
 import { randomUUID } from 'crypto'
+import {
+  assertInventoryFamilyRoute,
+  InventoryAccessError,
+  toInventoryAccessUser,
+  inventoryAccessToResponse,
+} from '@/lib/inventory/inventory-resource-access'
 
 /**
  * GET /api/inventory/families/[familyId]
  * Retorna el detalle de una familia con sus tipos activos relacionados.
- * Requiere sesión activa con canManageInventory o rol ADMIN.
  */
 export async function GET(
   _request: NextRequest,
@@ -21,18 +25,14 @@ export async function GET(
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    const { user } = session
-    const isAdmin = user.role === 'ADMIN'
-    const isManager = await canManageInventory(user.id, user.role)
-
-    if (!isAdmin && !isManager) {
-      return NextResponse.json(
-        { error: 'No tienes permiso para acceder al inventario' },
-        { status: 403 }
-      )
-    }
-
     const { familyId } = await params
+
+    try {
+      await assertInventoryFamilyRoute(toInventoryAccessUser(session.user), familyId, 'read')
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
+    }
 
     const family = await prisma.families.findUnique({
       where: { id: familyId },
@@ -63,9 +63,8 @@ export async function GET(
 }
 
 /**
- * PUT /api/inventory/families/[id]
- * Edita una familia de inventario.
- * Solo ADMIN.
+ * PUT /api/inventory/families/[familyId]
+ * Edita una familia de inventario. Solo ADMIN.
  */
 export async function PUT(
   request: NextRequest,
@@ -121,7 +120,7 @@ export async function PUT(
 
     return NextResponse.json({ family })
   } catch (err) {
-    console.error('[PUT /api/inventory/families/[id]]', err)
+    console.error('[PUT /api/inventory/families/[familyId]]', err)
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Error al editar la familia' },
       { status: 500 }
@@ -130,9 +129,8 @@ export async function PUT(
 }
 
 /**
- * PATCH /api/inventory/families/[id]
- * Alterna el estado activo/inactivo de una familia.
- * Solo ADMIN.
+ * PATCH /api/inventory/families/[familyId]
+ * Alterna el estado activo/inactivo de una familia. Solo ADMIN.
  */
 export async function PATCH(
   _request: NextRequest,
@@ -184,9 +182,8 @@ export async function PATCH(
 }
 
 /**
- * DELETE /api/inventory/families/[id]
- * Elimina una familia si no tiene tipos de activo asignados.
- * Solo ADMIN.
+ * DELETE /api/inventory/families/[familyId]
+ * Elimina una familia si no tiene tipos de activo asignados. Solo ADMIN.
  */
 export async function DELETE(
   _request: NextRequest,

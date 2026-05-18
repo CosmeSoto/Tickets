@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import { getInventorySessionContext } from '@/lib/inventory/inventory-session'
 
 /**
  * GET /api/inventory/dashboard/stats
@@ -16,6 +17,7 @@ export async function GET(request: NextRequest) {
 
     const user = session.user as any
     const role = user.role
+    const canManageFromDb = (await getInventorySessionContext(session.user)).canManageInventory
 
     // Construir scope de familias según rol del usuario
     const familyScope: any = {}
@@ -23,7 +25,7 @@ export async function GET(request: NextRequest) {
 
     if (role === 'CLIENT') {
       // Clientes solo ven equipos asignados a ellos
-      if (!user.canManageInventory) {
+      if (!canManageFromDb) {
         return NextResponse.json({
           totalEquipment: 0,
           equipmentByStatus: {},
@@ -80,7 +82,7 @@ export async function GET(request: NextRequest) {
     // Scope separado para asset_requests y delivery_acts (TECHNICIAN/CLIENT con familyId)
     if (role === 'TECHNICIAN' && user.familyId) {
       requestScope.familyId = user.familyId
-    } else if (role === 'CLIENT' && user.canManageInventory && user.familyId) {
+    } else if (role === 'CLIENT' && canManageFromDb && user.familyId) {
       requestScope.familyId = user.familyId
     }
 

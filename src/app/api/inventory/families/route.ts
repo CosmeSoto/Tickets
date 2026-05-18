@@ -17,8 +17,8 @@ export async function GET(request: NextRequest) {
     const { user } = session
     const isAdmin = user.role === 'ADMIN'
     const isSuperAdmin = (user as any).isSuperAdmin === true
-    const userCanManageInventory = (user as any).canManageInventory === true
-    const isManager = !isAdmin && (await canManageInventory(user.id, user.role))
+    const managesInventory = await canManageInventory(user.id, user.role)
+    const isManager = !isAdmin && managesInventory
     const includeInactive =
       isAdmin && isSuperAdmin && request.nextUrl.searchParams.get('includeInactive') === 'true'
 
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
             user.id,
             user.role,
             isSuperAdmin,
-            userCanManageInventory
+            managesInventory
           )
           const families = await prisma.families.findMany({
             where: {

@@ -16,7 +16,11 @@ export async function POST(req: NextRequest) {
 
     const role = session.user.role
     const canManage =
-      role === 'ADMIN' || role === 'TECHNICIAN' || (session.user as any).canManageInventory
+      role === 'ADMIN' ||
+      role === 'TECHNICIAN' ||
+      (await import('@/lib/inventory/inventory-session').then(m =>
+        m.resolveCanManageInventory(session.user.id, session.user.role)
+      ))
 
     if (!canManage) {
       return NextResponse.json(

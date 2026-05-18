@@ -3,18 +3,26 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import {
+  getInventorySessionContext,
+  hasInventoryModuleAccess,
+} from '@/lib/inventory/inventory-session'
+import {
+  assertInventoryManageByFamily,
+  InventoryAccessError,
+  inventoryAccessToResponse,
+} from '@/lib/inventory/inventory-resource-access'
 
 /**
  * GET /api/inventory/sales
- * Lista todas las solicitudes de venta — solo ADMIN y SUPER_ADMIN
+ * Lista solicitudes de venta — admin, super admin o gestor con scope de familia
  */
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-  const role = session.user.role
-  const isSuperAdmin = (session.user as any).isSuperAdmin === true
-  if (role !== 'ADMIN' && !isSuperAdmin) {
+  const ctx = await getInventorySessionContext(session.user)
+  if (!hasInventoryModuleAccess(ctx)) {
     return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
   }
 
@@ -24,22 +32,13 @@ export async function GET(req: NextRequest) {
   const limit = parseInt(searchParams.get('limit') ?? '20')
   const skip = (page - 1) * limit
 
-  const where: any = status ? { status: status as any } : {}
+  const where: Record<string, unknown> = status ? { status } : {}
 
-  // Admin Normal: filtrar ventas por scope de inventario (a través de equipment.type.familyId)
-  if (role === 'ADMIN' && !isSuperAdmin) {
-    const { getInventoryScope } = await import('@/lib/inventory/scope-filter')
-    const scope = await getInventoryScope(
-      session.user.id,
-      role,
-      false,
-      (session.user as any).canManageInventory === true
-    )
-    if (scope.familyIds && scope.familyIds.length > 0) {
-      where.equipment = { type: { familyId: { in: scope.familyIds } } }
-    } else if (scope.noAccess) {
-      return NextResponse.json({ sales: [], total: 0, page, limit, totalPages: 0 })
-    }
+  const { scope } = ctx
+  if (scope.familyIds && scope.familyIds.length > 0) {
+    where.equipment = { type: { familyId: { in: scope.familyIds } } }
+  } else if (scope.noAccess) {
+    return NextResponse.json({ sales: [], total: 0, page, limit, totalPages: 0 })
   }
 
   const [sales, total] = await Promise.all([
@@ -75,15 +74,14 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST /api/inventory/sales
- * Crea una solicitud de venta — solo ADMIN y SUPER_ADMIN
+ * Crea una solicitud de venta — admin, super admin o gestor en scope de familia del equipo
  */
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-  const role = session.user.role
-  const isSuperAdmin = (session.user as any).isSuperAdmin === true
-  if (role !== 'ADMIN' && !isSuperAdmin) {
+  const ctx = await getInventorySessionContext(session.user)
+  if (!hasInventoryModuleAccess(ctx)) {
     return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
   }
 
@@ -105,10 +103,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Faltan campos obligatorios' }, { status: 400 })
   }
 
-  // Verificar que el equipo existe y no está ya vendido
   const equipment = await prisma.equipment.findUnique({
     where: { id: equipmentId },
-    select: { id: true, code: true, status: true, sale: true },
+    select: {
+      id: true,
+      code: true,
+      status: true,
+      sale: true,
+      type: { select: { familyId: true } },
+    },
   })
 
   if (!equipment) return NextResponse.json({ error: 'Equipo no encontrado' }, { status: 404 })
@@ -120,6 +123,13 @@ export async function POST(req: NextRequest) {
       { error: 'Ya existe una solicitud de venta para este equipo' },
       { status: 409 }
     )
+  }
+
+  try {
+    await assertInventoryManageByFamily(ctx.user, equipment.type?.familyId)
+  } catch (err) {
+    if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+    throw err
   }
 
   const sale = await prisma.equipment_sales.create({
@@ -144,7 +154,6 @@ export async function POST(req: NextRequest) {
     },
   })
 
-  // Audit log
   await prisma.audit_logs.create({
     data: {
       id: randomUUID(),

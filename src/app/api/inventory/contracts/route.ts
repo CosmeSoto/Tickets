@@ -29,14 +29,8 @@ export async function GET(req: NextRequest) {
   // Admin Normal: resolver scope de inventario si no se pasa familyId explícito
   let scopeFamilyIds: string[] | undefined = undefined
   if (!familyId && session.user.role === 'ADMIN' && !(session.user as any).isSuperAdmin) {
-    const { getInventoryScope } = await import('@/lib/inventory/scope-filter')
-    const scope = await getInventoryScope(
-      session.user.id,
-      session.user.role,
-      false,
-      (session.user as any).canManageInventory === true
-    )
-    scopeFamilyIds = scope.familyIds
+    const { getInventorySessionContext } = await import('@/lib/inventory/inventory-session')
+    scopeFamilyIds = (await getInventorySessionContext(session.user)).scope.familyIds
   }
 
   // Construir filtro de familia para equipment (a través de type)

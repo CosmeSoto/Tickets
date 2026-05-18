@@ -24,13 +24,8 @@ export async function GET() {
       })
     } else {
       // Admin Normal: solo configs de sus familias de inventario
-      const { getInventoryScope } = await import('@/lib/inventory/scope-filter')
-      const scope = await getInventoryScope(
-        session.user.id,
-        session.user.role,
-        false,
-        (session.user as any).canManageInventory === true
-      )
+      const { getInventorySessionContext } = await import('@/lib/inventory/inventory-session')
+      const scope = (await getInventorySessionContext(session.user)).scope
       if (scope.familyIds && scope.familyIds.length > 0) {
         configs = await prisma.inventory_family_config.findMany({
           where: { familyId: { in: scope.familyIds } },

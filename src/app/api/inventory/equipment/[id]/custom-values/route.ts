@@ -3,6 +3,13 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { CustomFieldsService } from '@/lib/services/custom-fields.service'
 import { ZodError, z } from 'zod'
+import {
+  assertInventoryResourceManage,
+  assertInventoryResourceRead,
+  InventoryAccessError,
+  toInventoryAccessUser,
+  inventoryAccessToResponse,
+} from '@/lib/inventory/inventory-resource-access'
 
 // Schema de validación
 const setCustomValueSchema = z.object({
@@ -30,6 +37,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const { id: equipmentId } = await params
 
+    try {
+      await assertInventoryResourceRead(
+        toInventoryAccessUser(session.user),
+        'EQUIPMENT',
+        equipmentId
+      )
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
+    }
+
     const valuesWithDefinitions =
       await CustomFieldsService.getCustomValuesWithDefinitions(equipmentId)
 
@@ -54,15 +72,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    // Solo usuarios con permisos de gestión pueden establecer valores
-    if (!session.user.canManageInventory && session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'No tienes permisos para modificar valores personalizados' },
-        { status: 403 }
+    const { id: equipmentId } = await params
+
+    try {
+      await assertInventoryResourceManage(
+        toInventoryAccessUser(session.user),
+        'EQUIPMENT',
+        equipmentId
       )
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
     }
 
-    const { id: equipmentId } = await params
     const body = await request.json()
 
     // Validar datos
@@ -104,15 +126,19 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    // Solo usuarios con permisos de gestión pueden establecer valores
-    if (!session.user.canManageInventory && session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'No tienes permisos para modificar valores personalizados' },
-        { status: 403 }
+    const { id: equipmentId } = await params
+
+    try {
+      await assertInventoryResourceManage(
+        toInventoryAccessUser(session.user),
+        'EQUIPMENT',
+        equipmentId
       )
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
     }
 
-    const { id: equipmentId } = await params
     const body = await request.json()
 
     // Validar datos

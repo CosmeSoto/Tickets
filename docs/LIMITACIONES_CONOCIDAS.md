@@ -35,18 +35,18 @@ Documento de transparencia para operación, auditoría y roadmap. Actualizado: m
 
 ## Inventario (en curso — mayo 2026)
 
-| #   | Tema                                                               | Estado        | Notas                                 |
-| --- | ------------------------------------------------------------------ | ------------- | ------------------------------------- |
-| I1  | Helper `inventory-resource-access.ts`                              | **Hecho**     | Assert por tipo de recurso y contrato |
-| I2  | P0 IDOR (equipo POST, asignaciones, consumibles, licencias, pagos) | **Hecho**     | Ver `docs/MANUAL_INVENTARIO.md` §6    |
-| I3  | P1 rutas `[id]` restantes (modelos, lotes, bodegas)                | **Pendiente** | Aplicar mismo patrón                  |
-| I4  | JWT `canManageInventory` vs BD                                     | **Pendiente** | Unificar en listados y ventas         |
+| #   | Tema                                                               | Estado    | Notas                                 |
+| --- | ------------------------------------------------------------------ | --------- | ------------------------------------- |
+| I1  | Helper `inventory-resource-access.ts`                              | **Hecho** | Assert por tipo de recurso y contrato |
+| I2  | P0 IDOR (equipo POST, asignaciones, consumibles, licencias, pagos) | **Hecho** | Ver `docs/MANUAL_INVENTARIO.md` §6    |
+| I3  | P1 rutas `[id]` (modelos, lotes, bodegas, proveedores, ventas)     | **Hecho** | `inventory-resource-access.ts`        |
+| I4  | JWT `canManageInventory` vs BD                                     | **Hecho** | `inventory-session.ts` en listados P1 |
 
 ---
 
 ## Recomendación antes de módulo Inventarios
 
-Los módulos **Tickets** y **Rondas** están en **v1 production-ready**. **Inventario** arrancó endurecimiento P0; completar P1 antes de auditoría externa estricta del módulo completo.
+Los módulos **Tickets** y **Rondas** están en **v1 production-ready**. **Inventario** tiene P0 y P1 de acceso aplicados; queda P2 (catálogos globales) para auditoría externa estricta del módulo completo.
 
 ---
 

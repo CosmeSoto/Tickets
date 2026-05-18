@@ -36,13 +36,8 @@ export async function GET(request: NextRequest) {
     const isSuperAdmin = (session.user as any).isSuperAdmin === true
     let scopeFamilyIds: string[] | undefined = undefined
     if (!isSuperAdmin) {
-      const { getInventoryScope } = await import('@/lib/inventory/scope-filter')
-      const scope = await getInventoryScope(
-        session.user.id,
-        session.user.role,
-        false,
-        (session.user as any).canManageInventory === true
-      )
+      const { getInventorySessionContext } = await import('@/lib/inventory/inventory-session')
+      const scope = (await getInventorySessionContext(session.user)).scope
       scopeFamilyIds = scope.familyIds
       if (scope.noAccess) {
         return NextResponse.json({ data: [], message: 'Sin acceso a familias de inventario' })

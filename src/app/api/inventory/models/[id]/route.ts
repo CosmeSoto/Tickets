@@ -14,10 +14,15 @@ import {
   deleteModel,
   type UpdateModelInput,
 } from '@/lib/services/equipment-models.service'
-import { canManageInventory } from '@/lib/inventory-access'
 import { z } from 'zod'
+import {
+  assertInventoryResourceManage,
+  assertInventoryResourceRead,
+  InventoryAccessError,
+  toInventoryAccessUser,
+  inventoryAccessToResponse,
+} from '@/lib/inventory/inventory-resource-access'
 
-// Validation schema
 const updateModelSchema = z.object({
   brand: z.string().min(1).max(100).optional(),
   model: z.string().min(1).max(200).optional(),
@@ -30,10 +35,6 @@ const updateModelSchema = z.object({
   isActive: z.boolean().optional(),
 })
 
-/**
- * GET /api/inventory/models/[id]
- * Get equipment model by ID
- */
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
@@ -43,30 +44,24 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // Check inventory access
-    const hasAccess = await canManageInventory(session.user.id, session.user.role)
-    if (!hasAccess) {
-      return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
+    try {
+      await assertInventoryResourceRead(toInventoryAccessUser(session.user), 'MODEL', id)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
     }
 
     const model = await getModelById(id)
-
     return NextResponse.json(model)
   } catch (error: any) {
     console.error('Error getting model:', error)
-
-    if (error.message.includes('no encontrado')) {
+    if (error.message?.includes('no encontrado')) {
       return NextResponse.json({ error: error.message }, { status: 404 })
     }
-
     return NextResponse.json({ error: error.message || 'Error al obtener modelo' }, { status: 500 })
   }
 }
 
-/**
- * PUT /api/inventory/models/[id]
- * Update equipment model
- */
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
@@ -76,38 +71,29 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // Check inventory access
-    const hasAccess = await canManageInventory(session.user.id, session.user.role)
-    if (!hasAccess) {
-      return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
+    try {
+      await assertInventoryResourceManage(toInventoryAccessUser(session.user), 'MODEL', id)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
     }
 
     const body = await request.json()
-
-    // Validate input
     const validationResult = updateModelSchema.safeParse(body)
     if (!validationResult.success) {
       return NextResponse.json(
-        {
-          error: 'Datos inválidos',
-          details: validationResult.error.errors,
-        },
+        { error: 'Datos inválidos', details: validationResult.error.errors },
         { status: 400 }
       )
     }
 
-    const data: UpdateModelInput = validationResult.data
-
-    const model = await updateModel(id, data)
-
+    const model = await updateModel(id, validationResult.data as UpdateModelInput)
     return NextResponse.json(model)
   } catch (error: any) {
     console.error('Error updating model:', error)
-
-    if (error.message.includes('no encontrado')) {
+    if (error.message?.includes('no encontrado')) {
       return NextResponse.json({ error: error.message }, { status: 404 })
     }
-
     return NextResponse.json(
       { error: error.message || 'Error al actualizar modelo' },
       { status: 500 }
@@ -115,10 +101,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   }
 }
 
-/**
- * DELETE /api/inventory/models/[id]
- * Delete equipment model (soft delete)
- */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -131,26 +113,23 @@ export async function DELETE(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // Check inventory access
-    const hasAccess = await canManageInventory(session.user.id, session.user.role)
-    if (!hasAccess) {
-      return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
+    try {
+      await assertInventoryResourceManage(toInventoryAccessUser(session.user), 'MODEL', id)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
     }
 
     await deleteModel(id)
-
     return NextResponse.json({ success: true })
   } catch (error: any) {
     console.error('Error deleting model:', error)
-
-    if (error.message.includes('no encontrado')) {
+    if (error.message?.includes('no encontrado')) {
       return NextResponse.json({ error: error.message }, { status: 404 })
     }
-
-    if (error.message.includes('equipos asociados')) {
+    if (error.message?.includes('equipos asociados')) {
       return NextResponse.json({ error: error.message }, { status: 409 })
     }
-
     return NextResponse.json(
       { error: error.message || 'Error al eliminar modelo' },
       { status: 500 }

@@ -16,6 +16,11 @@ export type InventoryResourceKind =
   | 'CONSUMABLE'
   | 'CONTRACT'
   | 'ASSIGNMENT'
+  | 'MODEL'
+  | 'BATCH'
+  | 'WAREHOUSE'
+  | 'SUPPLIER'
+  | 'SALE'
 
 export interface InventoryAccessUser {
   id: string
@@ -85,8 +90,60 @@ export async function getResourceFamilyId(
       })
       return a?.equipment?.type?.familyId ?? null
     }
+    case 'MODEL': {
+      const model = await prisma.equipment_models.findUnique({
+        where: { id: resourceId },
+        select: { type: { select: { familyId: true } } },
+      })
+      return model?.type?.familyId ?? null
+    }
+    case 'BATCH': {
+      const batch = await prisma.equipment_batches.findUnique({
+        where: { id: resourceId },
+        select: { model: { select: { type: { select: { familyId: true } } } } },
+      })
+      return batch?.model?.type?.familyId ?? null
+    }
+    case 'WAREHOUSE': {
+      const wh = await prisma.warehouses.findUnique({
+        where: { id: resourceId },
+        select: { familyId: true },
+      })
+      return wh?.familyId ?? null
+    }
+    case 'SUPPLIER': {
+      const sup = await prisma.suppliers.findUnique({
+        where: { id: resourceId },
+        select: { familyId: true },
+      })
+      return sup?.familyId ?? null
+    }
+    case 'SALE': {
+      const sale = await prisma.equipment_sales.findUnique({
+        where: { id: resourceId },
+        select: { equipment: { select: { type: { select: { familyId: true } } } } },
+      })
+      return sale?.equipment?.type?.familyId ?? null
+    }
     default:
       return null
+  }
+}
+
+/** Acceso a rutas parametrizadas por familyId (ej. /families/[familyId]) */
+export async function assertInventoryFamilyRoute(
+  user: InventoryAccessUser,
+  familyId: string,
+  mode: 'read' | 'manage'
+): Promise<void> {
+  const manages = await canManageInventory(user.id, user.role)
+  if (user.role !== 'ADMIN' && !manages) {
+    throw new InventoryAccessError('No tienes permiso para acceder al inventario', 403)
+  }
+  if (mode === 'read') {
+    await assertInventoryReadByFamily(user, familyId)
+  } else {
+    await assertInventoryManageByFamily(user, familyId)
   }
 }
 

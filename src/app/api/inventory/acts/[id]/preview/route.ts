@@ -31,12 +31,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const userId = session.user.id
     const userRole = session.user.role
     const isAdmin = userRole === 'ADMIN'
-    const canManage = (session.user as any).canManageInventory === true
+    const canManage = await (
+      await import('@/lib/inventory/inventory-session')
+    ).resolveCanManageInventory(session.user.id, session.user.role)
     const isParticipant =
       (act.delivererInfo as any)?.id === userId || (act.receiverInfo as any)?.id === userId
 
     if (!isAdmin && !canManage && !isParticipant) {
-      return NextResponse.json({ error: 'Sin permisos para previsualizar este PDF' }, { status: 403 })
+      return NextResponse.json(
+        { error: 'Sin permisos para previsualizar este PDF' },
+        { status: 403 }
+      )
     }
 
     if (act.status !== 'ACCEPTED') {

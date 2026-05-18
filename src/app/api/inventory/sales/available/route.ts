@@ -3,6 +3,10 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { SalesManagerService } from '@/lib/services/sales-manager.service'
 import { applyEquipmentFamilyFilter, createUserContext } from '@/lib/middleware/family-filter'
+import {
+  getInventorySessionContext,
+  hasInventoryModuleAccess,
+} from '@/lib/inventory/inventory-session'
 
 /**
  * GET /api/inventory/sales/available
@@ -15,8 +19,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // Verificar permisos
-    if (!session.user.canManageInventory && session.user.role !== 'ADMIN') {
+    const ctx = await getInventorySessionContext(session.user)
+    if (!hasInventoryModuleAccess(ctx)) {
       return NextResponse.json(
         { error: 'No tiene permisos para ver equipos disponibles' },
         { status: 403 }

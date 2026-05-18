@@ -14,6 +14,7 @@ import {
   type CreateBatchInput,
 } from '@/lib/services/equipment-batches.service'
 import { canManageInventory } from '@/lib/inventory-access'
+import { getInventorySessionContext } from '@/lib/inventory/inventory-session'
 import { invalidateCache } from '@/lib/api-cache'
 import { z } from 'zod'
 
@@ -83,11 +84,11 @@ export async function GET(request: NextRequest) {
 
     const role = session.user.role
     const userId = session.user.id
-    const isSuperAdmin = (session.user as any).isSuperAdmin === true
-    const userCanManageInventory = (session.user as any).canManageInventory === true
+    const invCtx = await getInventorySessionContext(session.user)
+    const isSuperAdmin = invCtx.user.isSuperAdmin
 
     // Solo ADMIN y gestores pueden ver lotes
-    if (role !== 'ADMIN' && !userCanManageInventory) {
+    if (role !== 'ADMIN' && !invCtx.canManageInventory) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
     }
 
@@ -103,7 +104,7 @@ export async function GET(request: NextRequest) {
       } else {
         allowedFamilyIds = [] // Sin acceso
       }
-    } else if (role !== 'ADMIN' && userCanManageInventory) {
+    } else if (role !== 'ADMIN' && invCtx.canManageInventory) {
       // Gestor: solo sus familias de inventario
       const assignments = await prisma.inventory_manager_families.findMany({
         where: { managerId: userId },

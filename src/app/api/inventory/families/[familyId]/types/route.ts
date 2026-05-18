@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { canManageInventory } from '@/lib/inventory-access'
+import {
+  assertInventoryFamilyRoute,
+  InventoryAccessError,
+  toInventoryAccessUser,
+  inventoryAccessToResponse,
+} from '@/lib/inventory/inventory-resource-access'
 
 /**
  * GET /api/inventory/families/[id]/types
@@ -20,18 +25,14 @@ export async function GET(
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    const { user } = session
-    const isAdmin = user.role === 'ADMIN'
-    const isManager = await canManageInventory(user.id, user.role)
-
-    if (!isAdmin && !isManager) {
-      return NextResponse.json(
-        { error: 'No tienes permiso para acceder al inventario' },
-        { status: 403 }
-      )
-    }
-
     const { familyId } = await params
+
+    try {
+      await assertInventoryFamilyRoute(toInventoryAccessUser(session.user), familyId, 'read')
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
+    }
 
     const family = await prisma.families.findUnique({
       where: { id: familyId },

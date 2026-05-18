@@ -14,10 +14,7 @@ import { notifyAdmins } from '@/lib/api/notify'
  *
  * Body: { notes?: string }
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
@@ -25,7 +22,9 @@ export async function POST(
   const isAdmin = session.user.role === 'ADMIN'
 
   // Solo gestores (canManageInventory) o admins pueden elevar
-  const canManage = (session.user as any).canManageInventory === true
+  const canManage = await (
+    await import('@/lib/inventory/inventory-session')
+  ).resolveCanManageInventory(session.user.id, session.user.role)
   if (!isAdmin && !canManage) {
     return NextResponse.json(
       { error: 'Solo gestores de inventario o administradores pueden elevar solicitudes de baja' },
@@ -37,14 +36,22 @@ export async function POST(
   const body = await request.json()
   const { notes } = body
 
-  const decommissionRequest = await prisma.decommission_requests.findUnique({
+  const decommissionRequest = (await prisma.decommission_requests.findUnique({
     where: { id: requestId },
     include: {
-      equipment: { select: { id: true, code: true, brand: true, model: true, type: { select: { familyId: true } } } },
+      equipment: {
+        select: {
+          id: true,
+          code: true,
+          brand: true,
+          model: true,
+          type: { select: { familyId: true } },
+        },
+      },
       license: { select: { id: true, name: true, licenseType: { select: { familyId: true } } } },
       requester: { select: { id: true, name: true } },
     },
-  }) as any
+  })) as any
 
   if (!decommissionRequest) {
     return NextResponse.json({ error: 'Solicitud no encontrada' }, { status: 404 })
@@ -55,15 +62,18 @@ export async function POST(
   const allowedStatuses = isAdmin ? ['PENDING', 'TECHNICAL_REVIEW'] : ['TECHNICAL_REVIEW']
   if (!allowedStatuses.includes(decommissionRequest.status)) {
     return NextResponse.json(
-      { error: `La solicitud está en estado "${decommissionRequest.status}". ${isAdmin ? 'Solo se puede elevar desde PENDING o TECHNICAL_REVIEW.' : 'Solo se puede elevar desde TECHNICAL_REVIEW.'}` },
+      {
+        error: `La solicitud está en estado "${decommissionRequest.status}". ${isAdmin ? 'Solo se puede elevar desde PENDING o TECHNICAL_REVIEW.' : 'Solo se puede elevar desde TECHNICAL_REVIEW.'}`,
+      },
       { status: 409 }
     )
   }
 
   // Verificar que el gestor pertenece a la familia del activo
-  const familyId = decommissionRequest.assetType === 'EQUIPMENT'
-    ? decommissionRequest.equipment?.type?.familyId
-    : decommissionRequest.license?.licenseType?.familyId
+  const familyId =
+    decommissionRequest.assetType === 'EQUIPMENT'
+      ? decommissionRequest.equipment?.type?.familyId
+      : decommissionRequest.license?.licenseType?.familyId
 
   if (!isAdmin && familyId) {
     const isManager = await isManagerOfFamily(session.user.id, familyId)
@@ -75,9 +85,10 @@ export async function POST(
     }
   }
 
-  const assetName = decommissionRequest.assetType === 'EQUIPMENT'
-    ? `${decommissionRequest.equipment?.code} — ${decommissionRequest.equipment?.brand} ${decommissionRequest.equipment?.model}`
-    : decommissionRequest.license?.name ?? 'Activo'
+  const assetName =
+    decommissionRequest.assetType === 'EQUIPMENT'
+      ? `${decommissionRequest.equipment?.code} — ${decommissionRequest.equipment?.brand} ${decommissionRequest.equipment?.model}`
+      : (decommissionRequest.license?.name ?? 'Activo')
 
   const managerName = session.user.name || session.user.email || 'Gestor'
 
@@ -99,17 +110,19 @@ export async function POST(
     { metadata: { link: `/inventory/acts?tab=decommission` } }
   )
 
-  await prisma.audit_logs.create({
-    data: {
-      id: randomUUID(),
-      action: 'DECOMMISSION_ELEVATED',
-      entityType: 'inventory',
-      entityId: requestId,
-      userId: session.user.id,
-      details: { notes: notes?.trim(), assetName, familyId },
-      createdAt: new Date(),
-    },
-  }).catch(() => {})
+  await prisma.audit_logs
+    .create({
+      data: {
+        id: randomUUID(),
+        action: 'DECOMMISSION_ELEVATED',
+        entityType: 'inventory',
+        entityId: requestId,
+        userId: session.user.id,
+        details: { notes: notes?.trim(), assetName, familyId },
+        createdAt: new Date(),
+      },
+    })
+    .catch(() => {})
 
   return NextResponse.json({
     message: 'Solicitud elevada al administrador para aprobación',

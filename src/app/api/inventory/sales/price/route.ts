@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { SalesManagerService } from '@/lib/services/sales-manager.service'
+import {
+  getInventorySessionContext,
+  hasInventoryModuleAccess,
+} from '@/lib/inventory/inventory-session'
 
 /**
  * PATCH /api/inventory/sales/price
@@ -14,8 +18,8 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // Verificar permisos
-    if (!session.user.canManageInventory && session.user.role !== 'ADMIN') {
+    const ctx = await getInventorySessionContext(session.user)
+    if (!hasInventoryModuleAccess(ctx)) {
       return NextResponse.json(
         { error: 'No tiene permisos para gestionar ventas' },
         { status: 403 }

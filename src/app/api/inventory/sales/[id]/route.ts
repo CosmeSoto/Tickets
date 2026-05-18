@@ -3,24 +3,41 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import {
+  assertInventoryResourceManage,
+  assertInventoryResourceRead,
+  InventoryAccessError,
+  toInventoryAccessUser,
+  inventoryAccessToResponse,
+} from '@/lib/inventory/inventory-resource-access'
+import {
+  getInventorySessionContext,
+  hasInventoryModuleAccess,
+} from '@/lib/inventory/inventory-session'
 
 type Params = { params: Promise<{ id: string }> }
 
 /**
  * GET /api/inventory/sales/[id]
- * Detalle de una venta — solo ADMIN y SUPER_ADMIN
+ * Detalle de una venta — admin, super admin o gestor con scope de familia
  */
 export async function GET(_req: NextRequest, { params }: Params) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-  const role = session.user.role
-  const isSuperAdmin = (session.user as any).isSuperAdmin === true
-  if (role !== 'ADMIN' && !isSuperAdmin) {
+  const ctx = await getInventorySessionContext(session.user)
+  if (!hasInventoryModuleAccess(ctx)) {
     return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
   }
 
   const { id } = await params
+
+  try {
+    await assertInventoryResourceRead(ctx.user, 'SALE', id)
+  } catch (err) {
+    if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+    throw err
+  }
 
   const sale = await prisma.equipment_sales.findUnique({
     where: { id },
@@ -54,20 +71,27 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 /**
  * PATCH /api/inventory/sales/[id]
- * Aprobar o rechazar una solicitud de venta — solo ADMIN y SUPER_ADMIN
+ * Aprobar o rechazar una solicitud de venta
  * Body: { action: 'approve' | 'reject', rejectionReason?: string }
  */
 export async function PATCH(req: NextRequest, { params }: Params) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-  const role = session.user.role
-  const isSuperAdmin = (session.user as any).isSuperAdmin === true
-  if (role !== 'ADMIN' && !isSuperAdmin) {
+  const ctx = await getInventorySessionContext(session.user)
+  if (!hasInventoryModuleAccess(ctx)) {
     return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
   }
 
   const { id } = await params
+
+  try {
+    await assertInventoryResourceManage(ctx.user, 'SALE', id)
+  } catch (err) {
+    if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+    throw err
+  }
+
   const body = await req.json()
   const { action, rejectionReason } = body
 
@@ -86,7 +110,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   if (action === 'approve') {
-    // Transacción: aprobar venta + cambiar estado del equipo a SOLD
     const [updatedSale] = await prisma.$transaction([
       prisma.equipment_sales.update({
         where: { id },
@@ -115,37 +138,36 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     })
 
     return NextResponse.json(updatedSale)
-  } else {
-    // Rechazar
-    if (!rejectionReason?.trim()) {
-      return NextResponse.json({ error: 'Debes indicar el motivo del rechazo' }, { status: 400 })
-    }
-
-    const updatedSale = await prisma.equipment_sales.update({
-      where: { id },
-      data: {
-        status: 'REJECTED',
-        rejectionReason: rejectionReason.trim(),
-        approvedById: session.user.id,
-        approvedAt: new Date(),
-      },
-    })
-
-    await prisma.audit_logs.create({
-      data: {
-        id: randomUUID(),
-        action: 'EQUIPMENT_SALE_REJECTED',
-        entityType: 'equipment',
-        entityId: sale.equipmentId,
-        userId: session.user.id,
-        details: {
-          descripcion: `Venta rechazada para ${sale.equipment.code}`,
-          motivo: rejectionReason,
-        },
-        createdAt: new Date(),
-      },
-    })
-
-    return NextResponse.json(updatedSale)
   }
+
+  if (!rejectionReason?.trim()) {
+    return NextResponse.json({ error: 'Debes indicar el motivo del rechazo' }, { status: 400 })
+  }
+
+  const updatedSale = await prisma.equipment_sales.update({
+    where: { id },
+    data: {
+      status: 'REJECTED',
+      rejectionReason: rejectionReason.trim(),
+      approvedById: session.user.id,
+      approvedAt: new Date(),
+    },
+  })
+
+  await prisma.audit_logs.create({
+    data: {
+      id: randomUUID(),
+      action: 'EQUIPMENT_SALE_REJECTED',
+      entityType: 'equipment',
+      entityId: sale.equipmentId,
+      userId: session.user.id,
+      details: {
+        descripcion: `Venta rechazada para ${sale.equipment.code}`,
+        motivo: rejectionReason,
+      },
+      createdAt: new Date(),
+    },
+  })
+
+  return NextResponse.json(updatedSale)
 }

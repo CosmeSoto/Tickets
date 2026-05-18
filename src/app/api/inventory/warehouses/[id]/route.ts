@@ -2,18 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { canManageInventory } from '@/lib/inventory-access'
 import { randomUUID } from 'crypto'
+import {
+  assertInventoryResourceManage,
+  assertInventoryResourceRead,
+  assertInventoryManageByFamily,
+  InventoryAccessError,
+  toInventoryAccessUser,
+  inventoryAccessToResponse,
+} from '@/lib/inventory/inventory-resource-access'
 
 /**
  * GET /api/inventory/warehouses/[id]
  * Retorna el detalle de una bodega.
  * Requiere sesión activa con canManageInventory o rol ADMIN.
  */
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
 
@@ -21,18 +25,14 @@ export async function GET(
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    const { user } = session
-    const isAdmin = user.role === 'ADMIN'
-    const isManager = await canManageInventory(user.id, user.role)
-
-    if (!isAdmin && !isManager) {
-      return NextResponse.json(
-        { error: 'No tienes permiso para acceder al inventario' },
-        { status: 403 }
-      )
-    }
-
     const { id } = await params
+
+    try {
+      await assertInventoryResourceRead(toInventoryAccessUser(session.user), 'WAREHOUSE', id)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
+    }
 
     const warehouse = await prisma.warehouses.findUnique({
       where: { id },
@@ -49,10 +49,7 @@ export async function GET(
 
     return NextResponse.json({ warehouse })
   } catch {
-    return NextResponse.json(
-      { error: 'Error al obtener la bodega' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al obtener la bodega' }, { status: 500 })
   }
 }
 
@@ -61,22 +58,12 @@ export async function GET(
  * Edita una bodega.
  * Solo ADMIN.
  */
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
-
-    if (session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'Solo el administrador puede gestionar bodegas' },
-        { status: 403 }
-      )
     }
 
     const { id } = await params
@@ -86,8 +73,25 @@ export async function PUT(
       return NextResponse.json({ error: 'Bodega no encontrada' }, { status: 404 })
     }
 
+    const user = toInventoryAccessUser(session.user)
+    try {
+      await assertInventoryResourceManage(user, 'WAREHOUSE', id)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
+    }
+
     const body = await request.json()
     const { name, location, description, managerId, familyId } = body
+
+    if (familyId !== undefined && familyId !== null) {
+      try {
+        await assertInventoryManageByFamily(user, familyId)
+      } catch (err) {
+        if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+        throw err
+      }
+    }
 
     if (managerId !== undefined && managerId !== null) {
       const managerExists = await prisma.users.findUnique({ where: { id: managerId } })
@@ -128,10 +132,7 @@ export async function PUT(
 
     return NextResponse.json({ warehouse })
   } catch {
-    return NextResponse.json(
-      { error: 'Error al editar la bodega' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al editar la bodega' }, { status: 500 })
   }
 }
 
@@ -152,13 +153,6 @@ export async function PATCH(
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    if (session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'Solo el administrador puede gestionar bodegas' },
-        { status: 403 }
-      )
-    }
-
     const { id } = await params
 
     const existing = await prisma.warehouses.findUnique({
@@ -171,12 +165,21 @@ export async function PATCH(
       return NextResponse.json({ error: 'Bodega no encontrada' }, { status: 404 })
     }
 
+    try {
+      await assertInventoryResourceManage(toInventoryAccessUser(session.user), 'WAREHOUSE', id)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
+    }
+
     // Si se intenta desactivar, verificar que no tenga activos
     if (existing.isActive) {
       const total = existing._count.equipment + existing._count.consumables
       if (total > 0) {
         return NextResponse.json(
-          { error: `No se puede desactivar: la bodega tiene ${total} activo(s) almacenado(s). Reasígnalos primero.` },
+          {
+            error: `No se puede desactivar: la bodega tiene ${total} activo(s) almacenado(s). Reasígnalos primero.`,
+          },
           { status: 409 }
         )
       }
@@ -204,9 +207,6 @@ export async function PATCH(
 
     return NextResponse.json({ warehouse })
   } catch {
-    return NextResponse.json(
-      { error: 'Error al cambiar el estado de la bodega' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al cambiar el estado de la bodega' }, { status: 500 })
   }
 }

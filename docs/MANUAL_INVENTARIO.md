@@ -54,13 +54,14 @@ flowchart TB
   S1 --> FF[hasAccessToEquipment - equipos]
 ```
 
-| Archivo                                          | Uso                                                                                    |
-| ------------------------------------------------ | -------------------------------------------------------------------------------------- |
-| `src/lib/inventory/inventory-resource-access.ts` | **Nuevo** — assert por recurso ID (equipo, licencia, consumible, contrato, asignación) |
-| `src/lib/inventory-access.ts`                    | `canManageInventory`, `canManageAsset`                                                 |
-| `src/lib/inventory/family-access.ts`             | Listas y scope por familia                                                             |
-| `src/lib/inventory/scope-filter.ts`              | Filtros en listados                                                                    |
-| `src/lib/middleware/family-filter.ts`            | Acceso a equipo por ID                                                                 |
+| Archivo                                          | Uso                                                                                                                |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `src/lib/inventory/inventory-resource-access.ts` | Assert por recurso ID (equipo, licencia, consumible, contrato, asignación, modelo, lote, bodega, proveedor, venta) |
+| `src/lib/inventory/inventory-session.ts`         | `canManageInventory` y scope siempre desde BD (no JWT)                                                             |
+| `src/lib/inventory-access.ts`                    | `canManageInventory`, `canManageAsset`                                                                             |
+| `src/lib/inventory/family-access.ts`             | Listas y scope por familia                                                                                         |
+| `src/lib/inventory/scope-filter.ts`              | Filtros en listados                                                                                                |
+| `src/lib/middleware/family-filter.ts`            | Acceso a equipo por ID                                                                                             |
 
 ### Patrón recomendado en rutas `[id]`
 
@@ -113,11 +114,16 @@ flowchart LR
 - `licenses/[id]` — GET/PUT/PATCH/DELETE con `canManageAsset`
 - Rutas de pagos de contrato bajo `/api/inventory/contracts/...`
 
-### Pendiente (P1+)
+### Hecho (P1 — mayo 2026)
 
-- `models/[id]`, `batches/[id]`, `warehouses/[id]`, `suppliers/[id]`
-- Reemplazar `session.user.canManageInventory` por `await canManageInventory()` en listados
-- `sales/[id]` con scope de admin
+- `models/[id]`, `batches/[id]`, `warehouses/[id]`, `suppliers/[id]`, `families/[familyId]`
+- `sales` y `sales/[id]` — scope por familia del equipo; gestores con `canManageInventory` en BD
+- `inventory-session.ts` — listados y dashboard dejan de usar `session.user.canManageInventory` del JWT
+- `equipment/[id]/custom-values` — assert por equipo
+
+### Pendiente (P2+)
+
+- Rutas de catálogo global (tipos, unidades, supplier-types) con política explícita
 - Manual de usuario detallado por submódulo
 
 Ver [`LIMITACIONES_CONOCIDAS.md`](./LIMITACIONES_CONOCIDAS.md).

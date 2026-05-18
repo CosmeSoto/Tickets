@@ -20,7 +20,8 @@ export async function GET(req: NextRequest) {
 
   const { role, id: userId } = session.user as { role: string; id: string }
   const isSuperAdmin = (session.user as any).isSuperAdmin === true
-  const userCanManageInventory = (session.user as any).canManageInventory === true
+  const { getInventorySessionContext } = await import('@/lib/inventory/inventory-session')
+  const userCanManageInventory = (await getInventorySessionContext(session.user)).canManageInventory
 
   const { searchParams } = req.nextUrl
   const familyIdParam = searchParams.get('familyId') ?? undefined
