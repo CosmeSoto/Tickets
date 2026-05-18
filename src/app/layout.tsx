@@ -9,6 +9,7 @@ import { Toaster } from '@/components/ui/toaster'
 import { Toaster as SonnerToaster } from 'sonner'
 import { ThemeScript } from '@/components/theme-script'
 import { SessionTimeoutMonitor } from '@/components/auth/session-timeout-monitor'
+import { GlobalFavicon } from '@/components/common/global-favicon'
 
 const inter = Inter({
   subsets: ['latin'],
