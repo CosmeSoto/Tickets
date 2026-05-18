@@ -666,7 +666,7 @@ export function LandingPageCMSTab({ isSuperAdmin = false }: { isSuperAdmin?: boo
                     isSuperAdmin && setContent({ ...content, footerText: e.target.value })
                   }
                   disabled={!isSuperAdmin}
-                  placeholder='© 2024 Mi Empresa. Todos los derechos reservados.'
+                  placeholder='© 2025 Mi Empresa. Todos los derechos reservados.'
                 />
                 <p className='text-xs text-muted-foreground'>
                   Se muestra en la parte inferior del footer
@@ -882,7 +882,7 @@ export function LandingPageCMSTab({ isSuperAdmin = false }: { isSuperAdmin?: boo
                       return null
                     })()}
                     <p className='text-xs text-muted-foreground'>
-                      {content.footerText || '© 2024'}
+                      {content.footerText || '© 2025'}
                     </p>
                   </div>
                 </div>

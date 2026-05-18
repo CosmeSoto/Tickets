@@ -41,7 +41,7 @@ export async function GET() {
         socialLinkedin: '',
         socialWhatsapp: '',
         scheduleText: '',
-        footerText: '© 2024 Sistema de Tickets',
+        footerText: '© 2025 Sistema de Tickets',
         footerLinksJson: '',
         metaTitle: 'Sistema de Tickets - Soporte Técnico',
         metaDescription: 'Sistema profesional de gestión de tickets',

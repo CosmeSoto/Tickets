@@ -796,7 +796,7 @@ model landing_page_content {
   socialLinkedin      String?  @map("social_linkedin")
   socialWhatsapp      String?  @map("social_whatsapp")
   scheduleText        String?  @map("schedule_text")
-  footerText          String   @default("© 2024 Sistema de Tickets. Todos los derechos reservados.") @map("footer_text")
+  footerText          String   @default("© 2025 Sistema de Tickets. Todos los derechos reservados.") @map("footer_text")
   footerLinksJson     String?  @map("footer_links_json")
   metaTitle           String   @default("Sistema de Tickets - Gestión Integral de Operaciones") @map("meta_title")
   metaDescription     String   @default("Sistema profesional de gestión de tickets de soporte técnico") @map("meta_description")
