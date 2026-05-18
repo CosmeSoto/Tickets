@@ -44,6 +44,20 @@ export class BackupService {
   private static readonly MAX_BACKUP_SIZE = 1024 * 1024 * 1024 // 1GB
   private static readonly COMPRESSION_LEVEL = 6
 
+  private static async ensureBackupDirectory() {
+    try {
+      await mkdir(this.BACKUP_DIR, { recursive: true, mode: 0o755 })
+      console.log(`Directorio de backups asegurado: ${this.BACKUP_DIR}`)
+    } catch (error) {
+      console.error('Error al crear directorio de backups:', error)
+      // Intentar usar una ruta alternativa si la principal falla
+      const altDir = join('/tmp', 'sistema-tickets-backups')
+      console.log(`Intentando usar directorio alternativo: ${altDir}`)
+      await mkdir(altDir, { recursive: true, mode: 0o755 })
+      ;(this as any).BACKUP_DIR = altDir
+    }
+  }
+
   static async createBackup(
     type: 'manual' | 'automatic' = 'manual',
     options?: { module?: BackupModuleId | null }
@@ -88,7 +102,7 @@ export class BackupService {
 
     try {
       // Crear directorio de backups si no existe
-      await mkdir(this.BACKUP_DIR, { recursive: true })
+      await this.ensureBackupDirectory()
 
       // Obtener configuración
       const config = await this.getBackupConfig()
