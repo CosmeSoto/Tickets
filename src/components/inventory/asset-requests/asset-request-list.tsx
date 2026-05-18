@@ -14,7 +14,7 @@ import {
 import { AssetRequestStatusBadge } from './asset-request-status-badge'
 import { AssetTypeBadge } from './asset-type-badge'
 import { FamilyBadge } from '@/components/inventory/family-badge'
-import { Eye, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Eye, ChevronLeft, ChevronRight, Clock, AlertCircle } from 'lucide-react'
 import { AssetRequestStatus, AssetType } from '@prisma/client'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -31,6 +31,7 @@ interface AssetRequest {
   requesterName: string
   createdAt: string
   updatedAt: string
+  slaDeadline?: string | null
 }
 
 interface AssetRequestListProps {
@@ -64,6 +65,7 @@ export function AssetRequestList({
               <TableHead>Familia</TableHead>
               <TableHead>Solicitante</TableHead>
               <TableHead>Estado</TableHead>
+              <TableHead>SLA</TableHead>
               <TableHead>Creada</TableHead>
               <TableHead className='text-right'>Acciones</TableHead>
             </TableRow>
@@ -71,13 +73,13 @@ export function AssetRequestList({
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={8} className='text-center'>
+                <TableCell colSpan={9} className='text-center'>
                   Cargando...
                 </TableCell>
               </TableRow>
             ) : requests.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className='text-center text-muted-foreground'>
+                <TableCell colSpan={9} className='text-center text-muted-foreground'>
                   No hay solicitudes
                 </TableCell>
               </TableRow>
@@ -95,6 +97,26 @@ export function AssetRequestList({
                   <TableCell>{request.requesterName}</TableCell>
                   <TableCell>
                     <AssetRequestStatusBadge status={request.status} />
+                  </TableCell>
+                  <TableCell>
+                    {request.slaDeadline ? (
+                      <div className='flex items-center gap-1'>
+                        {new Date(request.slaDeadline) < new Date() &&
+                        ['PENDING', 'UNDER_REVIEW', 'APPROVED'].includes(request.status) ? (
+                          <AlertCircle className='h-3 w-3 text-red-500' />
+                        ) : (
+                          <Clock className='h-3 w-3 text-muted-foreground' />
+                        )}
+                        <span className='text-xs'>
+                          {formatDistanceToNow(new Date(request.slaDeadline), {
+                            addSuffix: true,
+                            locale: es,
+                          })}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className='text-xs text-muted-foreground'>-</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     {formatDistanceToNow(new Date(request.createdAt), {

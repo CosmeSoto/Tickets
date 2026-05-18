@@ -6,7 +6,16 @@ import { Separator } from '@/components/ui/separator'
 import { AssetRequestStatusBadge } from './asset-request-status-badge'
 import { AssetTypeBadge } from './asset-type-badge'
 import { FamilyBadge } from '@/components/inventory/family-badge'
-import { Calendar, User, Package, FileText, MessageSquare } from 'lucide-react'
+import {
+  Calendar,
+  User,
+  Package,
+  FileText,
+  MessageSquare,
+  Clock,
+  CheckCircle,
+  XCircle,
+} from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { AssetRequestStatus, AssetType } from '@prisma/client'
@@ -45,6 +54,15 @@ interface AssetRequestDetail {
   reviewComments: ReviewComment[]
   createdAt: string
   updatedAt: string
+  slaDeadline?: string | null
+  slaMetrics?: {
+    responseDeadline?: string | null
+    resolutionDeadline?: string | null
+    firstResponseAt?: string | null
+    fulfilledAt?: string | null
+    responseSLAMet?: boolean | null
+    resolutionSLAMet?: boolean | null
+  } | null
 }
 
 interface AssetRequestDetailProps {
@@ -92,6 +110,29 @@ export function AssetRequestDetail({ request }: AssetRequestDetailProps) {
                 <p className='font-medium'>{request.quantity}</p>
               </div>
             </div>
+            {request.slaDeadline && (
+              <div className='space-y-1'>
+                <p className='text-sm text-muted-foreground'>SLA</p>
+                <div className='flex items-center gap-2'>
+                  <Clock className='h-4 w-4 text-muted-foreground' />
+                  <div className='flex items-center gap-2'>
+                    <p className='font-medium'>
+                      {format(
+                        new Date(request.slaDeadline),
+                        "d 'de' MMMM 'de' yyyy 'a las' HH:mm",
+                        { locale: es }
+                      )}
+                    </p>
+                    {request.slaMetrics?.resolutionSLAMet !== undefined &&
+                      (request.slaMetrics.resolutionSLAMet ? (
+                        <CheckCircle className='h-4 w-4 text-green-500' />
+                      ) : (
+                        <XCircle className='h-4 w-4 text-red-500' />
+                      ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {request.neededBy && (

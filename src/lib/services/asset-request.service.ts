@@ -25,6 +25,7 @@ import { EmailService } from '@/lib/services/email/email-service'
 import { createModuleCache, getSetting } from '@/lib/api-cache'
 import { getAccessibleFamilyIds } from '@/lib/inventory/family-access'
 import { validateReviewerComment } from '@/lib/validations/inventory/asset-request'
+import { SLAService } from './sla-service'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -59,6 +60,7 @@ export interface AssetRequestRow {
   requesterName: string
   createdAt: string
   updatedAt: string
+  slaDeadline?: string | null
 }
 
 export interface AssetRequestDetail {
@@ -86,6 +88,15 @@ export interface AssetRequestDetail {
   reviewComments: ReviewComment[]
   createdAt: string
   updatedAt: string
+  slaDeadline?: string | null
+  slaMetrics?: {
+    responseDeadline?: string | null
+    resolutionDeadline?: string | null
+    firstResponseAt?: string | null
+    fulfilledAt?: string | null
+    responseSLAMet?: boolean | null
+    resolutionSLAMet?: boolean | null
+  } | null
 }
 
 export interface ReviewComment {
@@ -291,6 +302,7 @@ export class AssetRequestService {
             requesterId: true,
             createdAt: true,
             updatedAt: true,
+            slaDeadline: true,
             family: {
               select: { name: true },
             },
@@ -317,6 +329,7 @@ export class AssetRequestService {
         requesterName: r.requester.name,
         createdAt: r.createdAt.toISOString(),
         updatedAt: r.updatedAt.toISOString(),
+        slaDeadline: r.slaDeadline?.toISOString() || null,
       }))
 
       return {
@@ -419,10 +432,13 @@ export class AssetRequestService {
     // 7. Enviar notificaciones a Family Admins y Super Admin
     await this.notifyRequestCreated(request.id, request.code, request.family.name)
 
-    // 8. Invalidar caché
+    // 8. Asignar SLA
+    await SLAService.assignSLAToAssetRequest(request.id)
+
+    // 9. Invalidar caché
     await cache.invalidate()
 
-    // 9. Retornar detalle
+    // 10. Retornar detalle
     const detail = await this.getRequestDetail(request.id, userId, userRole, isSuperAdmin)
     if (!detail) {
       throw new Error('REQUEST_NOT_FOUND')
@@ -449,6 +465,7 @@ export class AssetRequestService {
         requester: { select: { name: true } },
         reviewedBy: { select: { name: true } },
         fulfilledBy: { select: { name: true } },
+        asset_request_sla_metrics: true,
       },
     })
 
@@ -504,6 +521,20 @@ export class AssetRequestService {
       reviewComments,
       createdAt: request.createdAt.toISOString(),
       updatedAt: request.updatedAt.toISOString(),
+      slaDeadline: request.slaDeadline?.toISOString() || null,
+      slaMetrics: request.asset_request_sla_metrics
+        ? {
+            responseDeadline:
+              request.asset_request_sla_metrics.responseDeadline?.toISOString() || null,
+            resolutionDeadline:
+              request.asset_request_sla_metrics.resolutionDeadline?.toISOString() || null,
+            firstResponseAt:
+              request.asset_request_sla_metrics.firstResponseAt?.toISOString() || null,
+            fulfilledAt: request.asset_request_sla_metrics.fulfilledAt?.toISOString() || null,
+            responseSLAMet: request.asset_request_sla_metrics.responseSLAMet,
+            resolutionSLAMet: request.asset_request_sla_metrics.resolutionSLAMet,
+          }
+        : null,
     }
   }
 
@@ -628,10 +659,20 @@ export class AssetRequestService {
       comment
     )
 
-    // 10. Invalidar caché
+    // 10. Registrar SLA según el nuevo estado
+    if (newStatus === 'UNDER_REVIEW') {
+      // Primera respuesta (cuando pasa a UNDER_REVIEW)
+      await SLAService.recordFirstResponseToAssetRequest(requestId)
+    }
+    if (newStatus === 'FULFILLED') {
+      // Cumplimiento (cuando pasa a FULFILLED)
+      await SLAService.recordFulfillment(requestId)
+    }
+
+    // 11. Invalidar caché
     await cache.invalidate(requestId)
 
-    // 11. Retornar detalle actualizado
+    // 12. Retornar detalle actualizado
     const detail = await this.getRequestDetail(requestId, userId, userRole, isSuperAdmin)
     if (!detail) {
       throw new Error('REQUEST_NOT_FOUND')
@@ -814,10 +855,13 @@ export class AssetRequestService {
       comment
     )
 
-    // 9. Invalidar caché
+    // 9. Registrar SLA de cumplimiento
+    await SLAService.recordFulfillment(requestId)
+
+    // 10. Invalidar caché
     await cache.invalidate(requestId)
 
-    // 10. Retornar detalle actualizado
+    // 11. Retornar detalle actualizado
     const detail = await this.getRequestDetail(requestId, userId, userRole, isSuperAdmin)
     if (!detail) {
       throw new Error('REQUEST_NOT_FOUND')

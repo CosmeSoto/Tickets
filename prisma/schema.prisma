@@ -683,25 +683,26 @@ model webhook_logs {
 }
 
 model sla_policies {
-  id                  String               @id @default(uuid())
-  name                String               @db.VarChar(100)
-  description         String?
-  categoryId          String?              @map("category_id")
-  familyId            String?              @map("family_id")
-  priority            String               @db.VarChar(20)
-  responseTimeHours   Int                  @map("response_time_hours")
-  resolutionTimeHours Int                  @map("resolution_time_hours")
-  businessHoursOnly   Boolean              @default(false) @map("business_hours_only")
-  businessHoursStart  String               @default("09:00:00") @map("business_hours_start") @db.VarChar(8)
-  businessHoursEnd    String               @default("18:00:00") @map("business_hours_end") @db.VarChar(8)
-  businessDays        String               @default("MON,TUE,WED,THU,FRI") @map("business_days") @db.VarChar(50)
-  isActive            Boolean              @default(true) @map("is_active")
-  createdAt           DateTime             @default(now()) @map("created_at")
-  updatedAt           DateTime             @default(now()) @updatedAt @map("updated_at")
-  category            categories?          @relation("SLAPolicyCategory", fields: [categoryId], references: [id])
-  family              families?            @relation(fields: [familyId], references: [id])
-  sla_violations      sla_violations[]
-  ticket_sla_metrics  ticket_sla_metrics[]
+  id                      String                      @id @default(uuid())
+  name                    String                      @db.VarChar(100)
+  description             String?
+  categoryId              String?                     @map("category_id")
+  familyId                String?                     @map("family_id")
+  priority                String                      @db.VarChar(20)
+  responseTimeHours       Int                         @map("response_time_hours")
+  resolutionTimeHours     Int                         @map("resolution_time_hours")
+  businessHoursOnly       Boolean                     @default(false) @map("business_hours_only")
+  businessHoursStart      String                      @default("09:00:00") @map("business_hours_start") @db.VarChar(8)
+  businessHoursEnd        String                      @default("18:00:00") @map("business_hours_end") @db.VarChar(8)
+  businessDays            String                      @default("MON,TUE,WED,THU,FRI") @map("business_days") @db.VarChar(50)
+  isActive                Boolean                     @default(true) @map("is_active")
+  createdAt               DateTime                    @default(now()) @map("created_at")
+  updatedAt               DateTime                    @default(now()) @updatedAt @map("updated_at")
+  category                categories?                 @relation("SLAPolicyCategory", fields: [categoryId], references: [id])
+  family                  families?                   @relation(fields: [familyId], references: [id])
+  sla_violations          sla_violations[]
+  ticket_sla_metrics      ticket_sla_metrics[]
+  asset_request_sla_metrics asset_request_sla_metrics[]
 
   @@index([isActive, categoryId, priority])
   @@index([isActive, familyId, priority])
@@ -709,20 +710,23 @@ model sla_policies {
 }
 
 model sla_violations {
-  id            String       @id @default(uuid())
-  ticketId      String       @map("ticket_id")
-  slaPolicyId   String       @map("sla_policy_id")
-  violationType String       @map("violation_type") @db.VarChar(50)
-  expectedAt    DateTime     @map("expected_at")
-  actualAt      DateTime?    @map("actual_at")
-  isResolved    Boolean      @default(false) @map("is_resolved")
-  severity      String       @default("MEDIUM") @db.VarChar(20)
-  notifiedAt    DateTime?    @map("notified_at")
-  createdAt     DateTime     @default(now()) @map("created_at")
-  sla_policy    sla_policies @relation(fields: [slaPolicyId], references: [id])
-  ticket        tickets      @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  id             String           @id @default(uuid())
+  ticketId       String?          @map("ticket_id")
+  assetRequestId String?          @map("asset_request_id")
+  slaPolicyId    String           @map("sla_policy_id")
+  violationType  String           @map("violation_type") @db.VarChar(50)
+  expectedAt     DateTime         @map("expected_at")
+  actualAt       DateTime?        @map("actual_at")
+  isResolved     Boolean          @default(false) @map("is_resolved")
+  severity       String           @default("MEDIUM") @db.VarChar(20)
+  notifiedAt     DateTime?        @map("notified_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  sla_policy     sla_policies     @relation(fields: [slaPolicyId], references: [id])
+  ticket         tickets?         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  asset_requests asset_requests? @relation(fields: [assetRequestId], references: [id], onDelete: Cascade)
 
   @@index([ticketId, isResolved])
+  @@index([assetRequestId, isResolved])
   @@index([slaPolicyId, createdAt(sort: Desc)])
   @@map("sla_violations")
 }
@@ -2191,13 +2195,13 @@ enum AssetType {
 }
 
 model asset_requests {
-  id               String             @id @default(uuid())
+  id               String                     @id @default(uuid())
 
   /// Código único — formato AR-{YEAR}-{SEQUENCE}
-  code             String             @unique @db.VarChar(30)
+  code             String                     @unique @db.VarChar(30)
 
   /// Tipo de activo solicitado
-  assetType        AssetType          @map("asset_type")
+  assetType        AssetType                  @map("asset_type")
 
   /// Descripción de la necesidad (min 10 chars)
   description      String
@@ -2206,45 +2210,50 @@ model asset_requests {
   justification    String
 
   /// Cantidad requerida (default 1)
-  quantity         Int                @default(1)
+  quantity         Int                        @default(1)
 
   /// Fecha estimada de necesidad (opcional)
-  neededBy         DateTime?          @map("needed_by")
+  neededBy         DateTime?                  @map("needed_by")
 
   /// Referencia opcional a un activo del catálogo
-  assetId          String?            @map("asset_id")
-  assetEntityType  String?            @map("asset_entity_type") @db.VarChar(20)
+  assetId          String?                    @map("asset_id")
+  assetEntityType  String?                    @map("asset_entity_type") @db.VarChar(20)
 
   /// Familia a la que pertenece la solicitud
-  familyId         String             @map("family_id")
+  familyId         String                     @map("family_id")
 
   /// Solicitante
-  requesterId      String             @map("requester_id")
+  requesterId      String                     @map("requester_id")
 
   /// Estado del ciclo de vida
-  status           AssetRequestStatus @default(PENDING)
+  status           AssetRequestStatus         @default(PENDING)
 
   /// Comentario del Super Admin al aprobar/rechazar (obligatorio, min 10 chars)
-  reviewerComment  String?            @map("reviewer_comment")
-  reviewedById     String?            @map("reviewed_by_id")
-  reviewedAt       DateTime?          @map("reviewed_at")
+  reviewerComment  String?                    @map("reviewer_comment")
+  reviewedById     String?                    @map("reviewed_by_id")
+  reviewedAt       DateTime?                  @map("reviewed_at")
 
   /// Entrega (FULFILLED)
-  fulfilledById    String?            @map("fulfilled_by_id")
-  fulfilledAt      DateTime?          @map("fulfilled_at")
+  fulfilledById    String?                    @map("fulfilled_by_id")
+  fulfilledAt      DateTime?                  @map("fulfilled_at")
 
   /// Comentarios internos de revisión — JSON array
   /// Cada entrada: { id, userId, userName, userRole, comment, createdAt }
-  reviewComments   Json               @default("[]") @map("review_comments")
+  reviewComments   Json                       @default("[]") @map("review_comments")
 
-  createdAt        DateTime           @default(now()) @map("created_at")
-  updatedAt        DateTime           @updatedAt @map("updated_at")
+  /// SLA - Deadline de resolución
+  slaDeadline      DateTime?                  @map("sla_deadline")
+
+  createdAt        DateTime                   @default(now()) @map("created_at")
+  updatedAt        DateTime                   @updatedAt @map("updated_at")
 
   // Relaciones
-  family           families           @relation(fields: [familyId], references: [id])
-  requester        users              @relation("AssetRequestRequester", fields: [requesterId], references: [id])
-  reviewedBy       users?             @relation("AssetRequestReviewer", fields: [reviewedById], references: [id])
-  fulfilledBy      users?             @relation("AssetRequestFulfiller", fields: [fulfilledById], references: [id])
+  family           families                   @relation(fields: [familyId], references: [id])
+  requester        users                      @relation("AssetRequestRequester", fields: [requesterId], references: [id])
+  reviewedBy       users?                     @relation("AssetRequestReviewer", fields: [reviewedById], references: [id])
+  fulfilledBy      users?                     @relation("AssetRequestFulfiller", fields: [fulfilledById], references: [id])
+  asset_request_sla_metrics  asset_request_sla_metrics?
+  sla_violations   sla_violations[]
 
   // Índices de performance
   @@index([familyId, status, createdAt(sort: Desc)])
@@ -2254,8 +2263,34 @@ model asset_requests {
   @@index([familyId, createdAt(sort: Desc)])
   @@index([reviewedById])
   @@index([fulfilledById])
+  @@index([slaDeadline])
 
   @@map("asset_requests")
+}
+
+/// Métricas SLA para solicitudes de activos — similar a ticket_sla_metrics
+model asset_request_sla_metrics {
+  id                    String       @id @default(uuid())
+  assetRequestId        String       @unique @map("asset_request_id")
+  slaPolicyId           String       @map("sla_policy_id")
+  responseDeadline      DateTime?    @map("response_deadline")
+  resolutionDeadline    DateTime?    @map("resolution_deadline")
+  firstResponseAt       DateTime?    @map("first_response_at")
+  fulfilledAt           DateTime?    @map("fulfilled_at")
+  responseSLAMet        Boolean?     @map("response_sla_met")
+  resolutionSLAMet      Boolean?     @map("resolution_sla_met")
+  responseTimeMinutes   Int?         @map("response_time_minutes")
+  fulfillmentTimeMinutes Int?        @map("fulfillment_time_minutes")
+  businessHoursElapsed  Int?         @map("business_hours_elapsed")
+  createdAt             DateTime     @default(now()) @map("created_at")
+  updatedAt             DateTime     @updatedAt @map("updated_at")
+
+  sla_policy            sla_policies @relation(fields: [slaPolicyId], references: [id])
+  asset_requests        asset_requests @relation(fields: [assetRequestId], references: [id], onDelete: Cascade)
+
+  @@index([assetRequestId])
+  @@index([responseDeadline, resolutionDeadline])
+  @@map("asset_request_sla_metrics")
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
