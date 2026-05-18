@@ -5,6 +5,11 @@ import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
+import { requireInventoryCatalogRead } from '@/lib/inventory/inventory-catalog-access'
+import {
+  InventoryAccessError,
+  inventoryAccessToResponse,
+} from '@/lib/inventory/inventory-resource-access'
 
 /**
  * @deprecated Este endpoint está deprecado y será eliminado el 2026-06-08.
@@ -17,6 +22,8 @@ export async function GET(request: NextRequest) {
     if (!session?.user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
+
+    await requireInventoryCatalogRead(session.user)
 
     const includeInactive = request.nextUrl.searchParams.get('includeInactive') === 'true'
     const isAdmin = session.user.role === 'ADMIN'
@@ -31,10 +38,14 @@ export async function GET(request: NextRequest) {
     response.headers.set('X-Deprecated', 'true')
     response.headers.set('X-Deprecated-Date', '2026-06-08')
     response.headers.set('X-Deprecated-Replacement', 'Atributos de consumable_types')
-    response.headers.set('Warning', '299 - "Este endpoint está deprecado. Las unidades ahora son atributos de tipos de consumibles"')
-    
+    response.headers.set(
+      'Warning',
+      '299 - "Este endpoint está deprecado. Las unidades ahora son atributos de tipos de consumibles"'
+    )
+
     return response
   } catch (error) {
+    if (error instanceof InventoryAccessError) return inventoryAccessToResponse(error)
     console.error('Error en GET /api/inventory/units-of-measure:', error)
     return NextResponse.json({ error: 'Error al obtener unidades de medida' }, { status: 500 })
   }
@@ -47,22 +58,38 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    if (!await canManageInventory(session.user.id, session.user.role)) {
+    if (!(await canManageInventory(session.user.id, session.user.role))) {
       return inventoryForbidden()
     }
 
     const { code, name, symbol, description, order } = await request.json()
     if (!code || !name || !symbol) {
-      return NextResponse.json({ error: 'Código, nombre y símbolo son requeridos' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Código, nombre y símbolo son requeridos' },
+        { status: 400 }
+      )
     }
 
-    const existing = await prisma.units_of_measure.findUnique({ where: { code: code.toUpperCase() } })
+    const existing = await prisma.units_of_measure.findUnique({
+      where: { code: code.toUpperCase() },
+    })
     if (existing) {
-      return NextResponse.json({ error: 'Ya existe una unidad de medida con este código' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Ya existe una unidad de medida con este código' },
+        { status: 400 }
+      )
     }
 
     const unit = await prisma.units_of_measure.create({
-      data: { id: randomUUID(), code: code.toUpperCase(), name, symbol, description, order: order || 999, isActive: true },
+      data: {
+        id: randomUUID(),
+        code: code.toUpperCase(),
+        name,
+        symbol,
+        description,
+        order: order || 999,
+        isActive: true,
+      },
     })
 
     await AuditServiceComplete.log({
@@ -71,15 +98,19 @@ export async function POST(request: NextRequest) {
       entityId: unit.id,
       userId: session.user.id,
       details: { code: unit.code, name: unit.name, symbol },
-      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+      ipAddress:
+        request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
     }).catch(err => console.error('[AUDIT] Error registrando creación de unidad de medida:', err))
 
     const response = NextResponse.json(unit, { status: 201 })
     response.headers.set('X-Deprecated', 'true')
     response.headers.set('X-Deprecated-Date', '2026-06-08')
-    response.headers.set('Warning', '299 - "Este endpoint está deprecado. Las unidades ahora son atributos de tipos de consumibles"')
-    
+    response.headers.set(
+      'Warning',
+      '299 - "Este endpoint está deprecado. Las unidades ahora son atributos de tipos de consumibles"'
+    )
+
     return response
   } catch (error) {
     console.error('Error en POST /api/inventory/units-of-measure:', error)

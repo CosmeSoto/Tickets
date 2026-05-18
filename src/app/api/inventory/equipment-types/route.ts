@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { canManageInventory } from '@/lib/inventory-access'
+import {
+  buildCatalogFamilyWhere,
+  requireInventoryCatalogRead,
+} from '@/lib/inventory/inventory-catalog-access'
+import {
+  InventoryAccessError,
+  inventoryAccessToResponse,
+} from '@/lib/inventory/inventory-resource-access'
 
 /**
  * GET /api/inventory/equipment-types
@@ -18,41 +25,17 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    const { role, id: userId } = session.user as { role: string; id: string }
-    const isAdmin = role === 'ADMIN'
-
-    if (!isAdmin) {
-      const allowed = await canManageInventory(userId, role)
-      if (!allowed) {
-        return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
-      }
-    }
-
+    const ctx = await requireInventoryCatalogRead(session.user)
+    const isAdmin = ctx.user.role === 'ADMIN'
     const { searchParams } = req.nextUrl
     const familyId = searchParams.get('familyId') ?? undefined
     const includeInactive = isAdmin && searchParams.get('includeInactive') === 'true'
-    const isSuperAdmin = (session.user as any).isSuperAdmin === true
-
-    // Admin Normal sin familyId explícito: filtrar por scope de inventario
-    let effectiveFamilyFilter: any = {}
-    if (familyId) {
-      effectiveFamilyFilter = { OR: [{ familyId }, { familyId: null }] }
-    } else if (isAdmin && !isSuperAdmin) {
-      const { getModuleFamilyIds } = await import('@/lib/auth/admin-scope')
-      const inventoryFamilyIds = await getModuleFamilyIds(userId, 'inventory')
-      if (inventoryFamilyIds.length > 0) {
-        effectiveFamilyFilter = {
-          OR: [{ familyId: { in: inventoryFamilyIds } }, { familyId: null }],
-        }
-      } else {
-        effectiveFamilyFilter = { familyId: null } // Solo globales
-      }
-    }
+    const familyFilter = buildCatalogFamilyWhere(ctx, familyId, true)
 
     const types = await prisma.equipment_types.findMany({
       where: {
         ...(includeInactive ? {} : { isActive: true }),
-        ...effectiveFamilyFilter,
+        ...familyFilter,
       },
       orderBy: [{ order: 'asc' }, { name: 'asc' }],
       select: {
@@ -68,6 +51,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ types })
   } catch (err) {
+    if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
     console.error('[GET /api/inventory/equipment-types]', err)
     return NextResponse.json({ error: 'Error al obtener tipos de equipo' }, { status: 500 })
   }

@@ -121,10 +121,15 @@ flowchart LR
 - `inventory-session.ts` — listados y dashboard dejan de usar `session.user.canManageInventory` del JWT
 - `equipment/[id]/custom-values` — assert por equipo
 
-### Pendiente (P2+)
+### Hecho (P2 — mayo 2026)
 
-- Rutas de catálogo global (tipos, unidades, supplier-types) con política explícita
+- `inventory-catalog-access.ts` — lectura catálogo, scope en listados, escritura global vs por familia
+- `supplier-types`, `consumable-types`, `license-types`, `equipment-types` (GET), `units-of-measure` (GET)
+
+### Pendiente
+
 - Manual de usuario detallado por submódulo
+- POST/PUT en `equipment-types` si se expone creación desde API
 
 Ver [`LIMITACIONES_CONOCIDAS.md`](./LIMITACIONES_CONOCIDAS.md).
 
