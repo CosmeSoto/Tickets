@@ -14,10 +14,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Obtener configuración del sistema
-    const settings = await prisma.system_settings.findFirst({
-      where: { id: 'default' },
+    const maxFileSizeSetting = await prisma.system_settings.findFirst({
+      where: { key: 'maxFileSize' },
     })
-    const maxFileSize = (settings as any)?.max_file_size || 10 // Default 10MB
+    const maxFileSize = maxFileSizeSetting ? parseInt(maxFileSizeSetting.value) : 10 // Default 10MB
 
     const formData = await request.formData()
     const file = formData.get('file') as File
@@ -73,9 +73,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('Error uploading file:', error)
-    return NextResponse.json(
-      { error: 'Error al subir archivo' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al subir archivo' }, { status: 500 })
   }
 }

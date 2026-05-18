@@ -10,7 +10,7 @@ interface ImageUploaderProps {
   label: string
   currentUrl?: string
   onUpload: (url: string) => void
-  type: 'logo-light' | 'logo-dark' | 'hero-bg'
+  type: 'logo-light' | 'logo-dark' | 'hero-bg' | 'favicon'
 }
 
 export function ImageUploader({ label, currentUrl, onUpload, type }: ImageUploaderProps) {
@@ -116,64 +116,57 @@ export function ImageUploader({ label, currentUrl, onUpload, type }: ImageUpload
   }
 
   return (
-    <div className="space-y-2">
+    <div className='space-y-2'>
       <Label>{label}</Label>
-      
+
       {preview ? (
-        <div className="relative border rounded-lg p-3 bg-muted/50">
-          <div className="flex items-center space-x-3">
-            <div className="relative w-16 h-16 bg-white dark:bg-gray-800 rounded border flex items-center justify-center overflow-hidden flex-shrink-0">
-              <img
-                src={preview}
-                alt="Preview"
-                className="max-w-full max-h-full object-contain"
-              />
+        <div className='relative border rounded-lg p-3 bg-muted/50'>
+          <div className='flex items-center space-x-3'>
+            <div className='relative w-16 h-16 bg-white dark:bg-gray-800 rounded border flex items-center justify-center overflow-hidden flex-shrink-0'>
+              <img src={preview} alt='Preview' className='max-w-full max-h-full object-contain' />
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium">Imagen cargada</p>
-              <p className="text-xs text-muted-foreground truncate">{preview}</p>
+            <div className='flex-1 min-w-0'>
+              <p className='text-sm font-medium'>Imagen cargada</p>
+              <p className='text-xs text-muted-foreground truncate'>{preview}</p>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleRemove}
-              disabled={uploading}
-            >
-              <X className="h-4 w-4" />
+            <Button variant='ghost' size='sm' onClick={handleRemove} disabled={uploading}>
+              <X className='h-4 w-4' />
             </Button>
           </div>
         </div>
       ) : (
-        <div className="flex items-center space-x-2">
+        <div className='flex items-center space-x-2'>
           <Button
-            variant="outline"
-            size="sm"
+            variant='outline'
+            size='sm'
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="flex-1"
+            className='flex-1'
           >
             {uploading ? (
               <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Loader2 className='h-4 w-4 mr-2 animate-spin' />
                 Subiendo...
               </>
             ) : (
               <>
-                <Upload className="h-4 w-4 mr-2" />
+                <Upload className='h-4 w-4 mr-2' />
                 Seleccionar Imagen
               </>
             )}
           </Button>
-          <span className="text-xs text-muted-foreground">JPG, PNG, WebP, SVG (máx. {maxFileSize}MB)</span>
+          <span className='text-xs text-muted-foreground'>
+            JPG, PNG, WebP, SVG (máx. {maxFileSize}MB)
+          </span>
         </div>
       )}
 
       <input
         ref={fileInputRef}
-        type="file"
-        accept="image/jpeg,image/jpg,image/png,image/webp,image/svg+xml"
+        type='file'
+        accept='image/jpeg,image/jpg,image/png,image/webp,image/svg+xml'
         onChange={handleFileSelect}
-        className="hidden"
+        className='hidden'
         disabled={uploading}
       />
     </div>

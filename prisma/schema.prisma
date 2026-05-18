@@ -786,6 +786,7 @@ model landing_page_content {
   companyTagline      String   @default("Gestión Integral de Operaciones") @map("company_tagline")
   companyLogoLightUrl String?  @map("company_logo_light_url")
   companyLogoDarkUrl  String?  @map("company_logo_dark_url")
+  faviconUrl          String?  @map("favicon_url")
   contactEmail        String?  @map("contact_email")
   contactPhone        String?  @map("contact_phone")
   contactAddress      String?  @map("contact_address")
