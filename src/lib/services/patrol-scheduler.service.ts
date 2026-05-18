@@ -282,7 +282,7 @@ export class PatrolSchedulerService {
     const alreadyNotified = await prisma.notifications.findMany({
       where: {
         type: 'PATROL_ASSIGNED',
-        metadata: { path: ['reminderFor'], array_contains: patrolIds },
+        createdAt: { gte: new Date(now.getTime() - 24 * 60 * 60 * 1000) },
       },
       select: { metadata: true },
     })
@@ -291,7 +291,9 @@ export class PatrolSchedulerService {
     const notifiedIds = new Set<string>()
     for (const n of alreadyNotified) {
       const meta = n.metadata as any
-      if (meta?.reminderFor) notifiedIds.add(meta.reminderFor)
+      if (meta?.type === 'upcoming_reminder' && patrolIds.includes(meta.reminderFor)) {
+        notifiedIds.add(meta.reminderFor)
+      }
     }
 
     let sent = 0

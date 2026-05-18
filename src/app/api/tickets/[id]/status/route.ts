@@ -6,6 +6,7 @@ import { NotificationService } from '@/lib/services/notification-service'
 import { randomUUID } from 'crypto'
 import { invalidateCache } from '@/lib/api-cache'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
+import { canAccessTicket } from '@/lib/tickets/ticket-access'
 
 // Transiciones válidas por rol
 const TRANSITIONS: Record<string, Record<string, string[]>> = {
@@ -44,7 +45,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     // Obtener ticket actual
     const ticket = await prisma.tickets.findUnique({
       where: { id: ticketId },
-      select: { id: true, status: true, assigneeId: true, clientId: true, title: true },
+      select: {
+        id: true,
+        status: true,
+        assigneeId: true,
+        clientId: true,
+        familyId: true,
+        title: true,
+      },
     })
 
     if (!ticket) {
@@ -54,6 +62,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const role = session.user.role
     const isSuperAdmin = (session.user as any).isSuperAdmin ?? false
     const currentStatus = ticket.status
+
+    const access = await canAccessTicket(
+      { id: session.user.id, role, isSuperAdmin },
+      ticket,
+      'status'
+    )
+    if (!access.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: access.reason ?? 'No tienes permiso para cambiar el estado de este ticket',
+        },
+        { status: 403 }
+      )
+    }
 
     // SUPER ADMIN: NO TIENE RESTRICCIONES DE NINGÚN TIPO
     if (isSuperAdmin) {

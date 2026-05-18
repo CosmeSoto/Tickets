@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma'
 import { auditTaskChange } from '@/lib/audit'
 import { calculateDuration, validateTimeRange, combineDateAndTime } from '@/lib/time-utils'
 import { NotificationService } from '@/lib/services/notification-service'
+import { canAccessTicket } from '@/lib/tickets/ticket-access'
 
 /**
  * PATCH /api/tickets/[id]/resolution-plan/tasks/[taskId]
@@ -47,14 +48,21 @@ export async function PATCH(
       )
     }
 
-    // Verificar permisos
-    const isAdmin = session.user.role === 'ADMIN'
-    const isAssignedTechnician =
-      session.user.role === 'TECHNICIAN' && task.plan.ticket.assigneeId === session.user.id
-
-    if (!isAdmin && !isAssignedTechnician) {
+    const access = await canAccessTicket(
+      {
+        id: session.user.id,
+        role: session.user.role,
+        isSuperAdmin: (session.user as any).isSuperAdmin === true,
+      },
+      task.plan.ticket,
+      'update'
+    )
+    if (!access.allowed) {
       return NextResponse.json(
-        { success: false, message: 'No tienes permiso para actualizar esta tarea' },
+        {
+          success: false,
+          message: access.reason ?? 'No tienes permiso para actualizar esta tarea',
+        },
         { status: 403 }
       )
     }
@@ -313,14 +321,18 @@ export async function DELETE(
       )
     }
 
-    // Verificar permisos
-    const isAdmin = session.user.role === 'ADMIN'
-    const isAssignedTechnician =
-      session.user.role === 'TECHNICIAN' && task.plan.ticket.assigneeId === session.user.id
-
-    if (!isAdmin && !isAssignedTechnician) {
+    const access = await canAccessTicket(
+      {
+        id: session.user.id,
+        role: session.user.role,
+        isSuperAdmin: (session.user as any).isSuperAdmin === true,
+      },
+      task.plan.ticket,
+      'update'
+    )
+    if (!access.allowed) {
       return NextResponse.json(
-        { success: false, message: 'No tienes permiso para eliminar esta tarea' },
+        { success: false, message: access.reason ?? 'No tienes permiso para eliminar esta tarea' },
         { status: 403 }
       )
     }

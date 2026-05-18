@@ -255,7 +255,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       const earliestStart = new Date(
         patrol.scheduledStart.getTime() - gracePeriodMinutes * 60 * 1000
       )
-      const latestStart = patrol.scheduledEnd
+      const latestStart = new Date(patrol.scheduledStart.getTime() + gracePeriodMinutes * 60 * 1000)
 
       if (now < earliestStart) {
         const minutesUntilStart = Math.ceil(
@@ -273,7 +273,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       if (now > latestStart) {
         return NextResponse.json(
           {
-            error: 'El horario programado para esta ronda ya finalizó.',
+            error: 'La ventana permitida para iniciar esta ronda ya finalizó.',
             code: 'TOO_LATE',
           },
           { status: 422 }

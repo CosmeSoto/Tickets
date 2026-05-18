@@ -16,7 +16,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
 import { FileInputWithCamera } from '@/components/common/file-input-with-camera'
-import { compressImageFile, fileToBase64 } from '@/lib/utils/image-utils'
+import { compressImageFile } from '@/lib/utils/image-utils'
 
 interface PatrolIncidentButtonProps {
   patrolId: string
@@ -79,12 +79,8 @@ export function PatrolIncidentButton({
       })
       return
     }
-
     setSubmitting(true)
     try {
-      // Convertir foto a base64 si existe
-      const photoBase64 = photoFile ? await fileToBase64(photoFile) : undefined
-
       const res = await fetch('/api/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -96,22 +92,31 @@ export function PatrolIncidentButton({
           source: 'PATROL',
           checkInId,
           patrolId,
-          ...(photoBase64 && {
-            photoBase64,
-            photoMimeType: photoFile!.type,
-            photoName: photoFile!.name,
-          }),
         }),
       })
 
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Error al crear el incidente')
+      const payload = await res.json()
+      if (!res.ok) {
+        throw new Error(payload.message ?? payload.error ?? 'Error al crear el incidente')
+      }
+
+      const ticket = payload.data ?? payload
+      if (!ticket?.id) throw new Error('El servidor no devolvió el ticket creado')
+
+      if (photoFile) {
+        const attachmentData = new FormData()
+        attachmentData.append('file', photoFile)
+        await fetch(`/api/tickets/${ticket.id}/attachments`, {
+          method: 'POST',
+          body: attachmentData,
+        }).catch(() => {})
+      }
 
       toast({
         title: 'Incidente reportado',
-        description: `Ticket creado: ${data.ticketCode ?? data.id}`,
+        description: `Ticket creado: ${ticket.ticketCode ?? ticket.id}`,
       })
-      onIncidentCreated?.(data.id)
+      onIncidentCreated?.(ticket.id)
       setOpen(false)
       // Reset form
       setTitle('')

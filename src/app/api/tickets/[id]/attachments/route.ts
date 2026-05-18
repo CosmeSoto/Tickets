@@ -2,6 +2,26 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { FileService } from '@/lib/services/file-service'
+import prisma from '@/lib/prisma'
+import { canAccessTicket } from '@/lib/tickets/ticket-access'
+
+async function getTicketAccess(session: any, ticketId: string) {
+  const ticket = await prisma.tickets.findUnique({
+    where: { id: ticketId },
+    select: { id: true, clientId: true, assigneeId: true, familyId: true, status: true },
+  })
+  if (!ticket) return { ticket: null, access: null }
+  const access = await canAccessTicket(
+    {
+      id: session.user.id,
+      role: session.user.role,
+      isSuperAdmin: (session.user as any).isSuperAdmin === true,
+    },
+    ticket,
+    'comment'
+  )
+  return { ticket, access }
+}
 
 /**
  * POST /api/tickets/[id]/attachments
@@ -15,10 +35,7 @@ import { FileService } from '@/lib/services/file-service'
  *   - Archivo único: el objeto attachment
  *   - Múltiples: { results: [...], succeeded: N, failed: N }
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
@@ -26,6 +43,15 @@ export async function POST(
     }
 
     const { id: ticketId } = await params
+    const { ticket, access } = await getTicketAccess(session, ticketId)
+    if (!ticket) return NextResponse.json({ error: 'Ticket no encontrado' }, { status: 404 })
+    if (!access?.allowed) {
+      return NextResponse.json(
+        { error: access?.reason ?? 'No tienes permiso para adjuntar archivos a este ticket' },
+        { status: 403 }
+      )
+    }
+
     const formData = await request.formData()
 
     // Detectar si es carga masiva (campo "files[]") o individual (campo "file")
@@ -34,14 +60,10 @@ export async function POST(
 
     if (multipleFiles.length > 0) {
       // ── Carga masiva ──────────────────────────────────────────────────────
-      const results = await FileService.uploadMultiple(
-        multipleFiles,
-        ticketId,
-        session.user.id
-      )
+      const results = await FileService.uploadMultiple(multipleFiles, ticketId, session.user.id)
 
-      const succeeded = results.filter((r) => r.success).length
-      const failed = results.filter((r) => !r.success).length
+      const succeeded = results.filter(r => r.success).length
+      const failed = results.filter(r => !r.success).length
 
       return NextResponse.json(
         { results, succeeded, failed },
@@ -73,10 +95,7 @@ export async function POST(
  * GET /api/tickets/[id]/attachments
  * Lista todos los archivos adjuntos de un ticket.
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
@@ -84,6 +103,15 @@ export async function GET(
     }
 
     const { id: ticketId } = await params
+    const { ticket, access } = await getTicketAccess(session, ticketId)
+    if (!ticket) return NextResponse.json({ error: 'Ticket no encontrado' }, { status: 404 })
+    if (!access?.allowed) {
+      return NextResponse.json(
+        { error: access?.reason ?? 'No tienes permiso para ver los adjuntos de este ticket' },
+        { status: 403 }
+      )
+    }
+
     const attachments = await FileService.getFilesByTicket(ticketId)
     return NextResponse.json(attachments)
   } catch (error) {

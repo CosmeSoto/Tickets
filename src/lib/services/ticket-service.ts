@@ -222,6 +222,8 @@ export class TicketService {
         ticketCode = await TicketCodeService.generateCode(familyId, new Date().getFullYear())
       }
 
+      await assertTechnicianActiveInFamily(data.assigneeId, familyId)
+
       // Extraer campos propios del servicio antes de pasar a Prisma
       const {
         ticketCode: _tc,

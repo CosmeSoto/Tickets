@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { z } from 'zod'
 import { NotificationService } from '@/lib/services/notification-service'
+import { canAccessTicket } from '@/lib/tickets/ticket-access'
 
 const ratingSchema = z.object({
   rating: z.number().min(1).max(5),
@@ -21,17 +22,11 @@ const ratingSchema = z.object({
  * GET /api/tickets/[id]/rating
  * Obtiene la calificación de un ticket
  */
-export async function GET(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
-      return NextResponse.json(
-        { success: false, error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
     }
 
     const params = await context.params
@@ -44,24 +39,26 @@ export async function GET(
         id: true,
         clientId: true,
         assigneeId: true,
+        familyId: true,
       },
     })
 
     if (!ticket) {
-      return NextResponse.json(
-        { success: false, error: 'Ticket no encontrado' },
-        { status: 404 }
-      )
+      return NextResponse.json({ success: false, error: 'Ticket no encontrado' }, { status: 404 })
     }
 
-    // Verificar permisos
-    const isAdmin = session.user.role === 'ADMIN'
-    const isClient = ticket.clientId === session.user.id
-    const isTechnician = ticket.assigneeId === session.user.id
-
-    if (!isAdmin && !isClient && !isTechnician) {
+    const access = await canAccessTicket(
+      {
+        id: session.user.id,
+        role: session.user.role,
+        isSuperAdmin: (session.user as any).isSuperAdmin === true,
+      },
+      ticket,
+      'view'
+    )
+    if (!access.allowed) {
       return NextResponse.json(
-        { success: false, error: 'No tienes permisos para ver esta calificación' },
+        { success: false, error: access.reason ?? 'No tienes permisos para ver esta calificación' },
         { status: 403 }
       )
     }
@@ -139,17 +136,11 @@ export async function GET(
  * POST /api/tickets/[id]/rating
  * Crea una calificación para un ticket
  */
-export async function POST(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
-      return NextResponse.json(
-        { success: false, error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
     }
 
     const params = await context.params
@@ -180,20 +171,26 @@ export async function POST(
         status: true,
         clientId: true,
         assigneeId: true,
+        familyId: true,
       },
     })
 
     if (!ticket) {
-      return NextResponse.json(
-        { success: false, error: 'Ticket no encontrado' },
-        { status: 404 }
-      )
+      return NextResponse.json({ success: false, error: 'Ticket no encontrado' }, { status: 404 })
     }
 
-    // Solo el cliente puede calificar su propio ticket
-    if (ticket.clientId !== session.user.id) {
+    const access = await canAccessTicket(
+      {
+        id: session.user.id,
+        role: session.user.role,
+        isSuperAdmin: (session.user as any).isSuperAdmin === true,
+      },
+      ticket,
+      'rate'
+    )
+    if (!access.allowed || ticket.clientId !== session.user.id) {
       return NextResponse.json(
-        { success: false, error: 'Solo el cliente puede calificar este ticket' },
+        { success: false, error: access.reason ?? 'Solo el cliente puede calificar este ticket' },
         { status: 403 }
       )
     }
@@ -291,7 +288,6 @@ export async function POST(
           ticketId,
         }).catch(() => {})
       }
-
     }
 
     // Notificar al administrador sobre la nueva calificación

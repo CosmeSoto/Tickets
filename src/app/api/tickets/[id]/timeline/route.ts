@@ -11,6 +11,7 @@ import {
   TICKET_FIELD_LABELS,
   TICKET_ACTION_LABELS,
 } from '@/lib/constants/ticket-labels'
+import { canAccessTicket } from '@/lib/tickets/ticket-access'
 
 /**
  * GET /api/tickets/[id]/timeline
@@ -33,6 +34,8 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
         id: true,
         clientId: true,
         assigneeId: true,
+        familyId: true,
+        status: true,
       },
     })
 
@@ -42,15 +45,18 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
       return NextResponse.json({ success: true, data: [], deleted: true })
     }
 
-    // Verificar permisos
-    const isAdmin = session.user.role === 'ADMIN'
-    const isTechnician = session.user.role === 'TECHNICIAN'
-    const isOwner = ticket.clientId === session.user.id
-    const isAssignee = ticket.assigneeId === session.user.id
-
-    if (!isAdmin && !isTechnician && !isOwner && !isAssignee) {
+    const access = await canAccessTicket(
+      {
+        id: session.user.id,
+        role: session.user.role,
+        isSuperAdmin: (session.user as any).isSuperAdmin === true,
+      },
+      ticket,
+      'view'
+    )
+    if (!access.allowed) {
       return NextResponse.json(
-        { success: false, error: 'No tienes permisos para ver este timeline' },
+        { success: false, error: access.reason ?? 'No tienes permisos para ver este timeline' },
         { status: 403 }
       )
     }

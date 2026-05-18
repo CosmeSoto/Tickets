@@ -11,18 +11,13 @@ import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit
 import { NotificationService } from '@/lib/services/notification-service'
 import { FileService } from '@/lib/services/file-service'
 import { TicketEvents } from '@/lib/ticket-events'
+import { canAccessTicket } from '@/lib/tickets/ticket-access'
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
-      return NextResponse.json(
-        { success: false, message: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
     }
 
     const { id: ticketId } = await params
@@ -51,7 +46,7 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
-          message: 'El contenido del comentario es requerido'
+          message: 'El contenido del comentario es requerido',
         },
         { status: 400 }
       )
@@ -60,38 +55,38 @@ export async function POST(
     // Verificar que el ticket existe
     const ticket = await prisma.tickets.findUnique({
       where: { id: ticketId },
-      select: { id: true, assigneeId: true, clientId: true, status: true, title: true },
+      select: {
+        id: true,
+        assigneeId: true,
+        clientId: true,
+        familyId: true,
+        status: true,
+        title: true,
+      },
     })
 
     if (!ticket) {
-      return NextResponse.json(
-        { success: false, message: 'Ticket no encontrado' },
-        { status: 404 }
-      )
+      return NextResponse.json({ success: false, message: 'Ticket no encontrado' }, { status: 404 })
     }
 
-    // Verificar acceso: cliente del ticket, técnico asignado, colaborador o admin
-    const isAdmin = session.user.role === 'ADMIN'
-    const isClient = ticket.clientId === session.user.id
-    const isAssignee = ticket.assigneeId === session.user.id
-
-    let isCollaborator = false
-    if (session.user.role === 'TECHNICIAN' && !isAssignee) {
-      const collab = await prisma.ticket_collaborators.findUnique({
-        where: { ticketId_collaboratorId: { ticketId, collaboratorId: session.user.id } },
-      })
-      isCollaborator = !!collab
-    }
-
-    if (!isAdmin && !isClient && !isAssignee && !isCollaborator) {
+    const access = await canAccessTicket(
+      {
+        id: session.user.id,
+        role: session.user.role,
+        isSuperAdmin: (session.user as any).isSuperAdmin === true,
+      },
+      ticket,
+      'comment'
+    )
+    if (!access.allowed) {
       return NextResponse.json(
-        { success: false, message: 'No tienes acceso a este ticket' },
+        { success: false, message: access.reason ?? 'No tienes acceso a este ticket' },
         { status: 403 }
       )
     }
 
     // Colaboradores y clientes no pueden hacer comentarios internos
-    if (commentData.isInternal && (isClient || isCollaborator)) {
+    if (commentData.isInternal && (access.isClient || access.isCollaborator)) {
       commentData.isInternal = false
     }
 
@@ -104,7 +99,7 @@ export async function POST(
         content: commentData.content,
         isInternal: commentData.isInternal || false,
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       },
       include: {
         users: {
@@ -112,14 +107,19 @@ export async function POST(
             id: true,
             name: true,
             email: true,
-            role: true
-          }
-        }
-      }
+            role: true,
+          },
+        },
+      },
     })
 
     // Subir archivos adjuntos del comentario
-    const uploadedAttachments: { id: string; originalName: string; mimeType: string; size: number }[] = []
+    const uploadedAttachments: {
+      id: string
+      originalName: string
+      mimeType: string
+      size: number
+    }[] = []
     for (const file of commentData.files) {
       try {
         const attachment = await FileService.uploadFile({
@@ -140,21 +140,26 @@ export async function POST(
     }
 
     // Registrar en historial del ticket para que aparezca en el timeline
-    await prisma.ticket_history.create({
-      data: {
-        id: randomUUID(),
-        ticketId,
-        userId: session.user.id,
-        action: 'comment_added',
-        comment: newComment.content,
-        field: commentData.isInternal ? 'internal_comment' : 'comment',
-        // Guardar IDs de adjuntos en newValue como JSON para recuperarlos en el timeline
-        newValue: uploadedAttachments.length > 0 ? JSON.stringify(uploadedAttachments.map(a => a.id)) : null,
-        createdAt: new Date(),
-      }
-    }).catch(err => {
-      console.error('[COMMENT] Error registrando en historial:', err)
-    })
+    await prisma.ticket_history
+      .create({
+        data: {
+          id: randomUUID(),
+          ticketId,
+          userId: session.user.id,
+          action: 'comment_added',
+          comment: newComment.content,
+          field: commentData.isInternal ? 'internal_comment' : 'comment',
+          // Guardar IDs de adjuntos en newValue como JSON para recuperarlos en el timeline
+          newValue:
+            uploadedAttachments.length > 0
+              ? JSON.stringify(uploadedAttachments.map(a => a.id))
+              : null,
+          createdAt: new Date(),
+        },
+      })
+      .catch(err => {
+        console.error('[COMMENT] Error registrando en historial:', err)
+      })
 
     // ⭐ AUDITORÍA: Registrar creación de comentario (no crítico, en paralelo)
     const sideEffects: Promise<any>[] = [
@@ -177,12 +182,12 @@ export async function POST(
           authorName: newComment.users.name,
           authorRole: newComment.users.role,
           isInternal: newComment.isInternal,
-          contentPreview: newComment.content.substring(0, 100)
+          contentPreview: newComment.content.substring(0, 100),
         },
-        request: request
+        request: request,
       }).catch(err => {
         console.error('[AUDIT] Error registrando auditoría de comentario:', err)
-      })
+      }),
     ]
 
     // Registrar primera respuesta en SLA si es un técnico/admin
@@ -202,11 +207,11 @@ export async function POST(
         author: {
           id: newComment.users.id,
           name: newComment.users.name,
-          role: newComment.users.role
+          role: newComment.users.role,
         },
         content: newComment.content.substring(0, 200),
         isInternal: newComment.isInternal,
-        createdAt: newComment.createdAt
+        createdAt: newComment.createdAt,
       }).catch(err => {
         console.error('[WEBHOOK] Error disparando evento COMMENT_ADDED:', err)
       })
@@ -222,29 +227,31 @@ export async function POST(
     // Email al cliente o técnico según quien comentó (también en paralelo)
     if (!newComment.isInternal) {
       sideEffects.push(
-        prisma.tickets.findUnique({
-          where: { id: ticketId },
-          include: {
-            users_tickets_clientIdTousers: { select: { id: true, name: true, email: true } },
-            users_tickets_assigneeIdTousers: { select: { id: true, name: true, email: true } }
-          }
-        }).then(async (ticketWithUsers) => {
-          if (!ticketWithUsers) return
-          let recipient = null
-          let recipientRole = ''
-          if (session.user.role === 'CLIENT') {
-            if (ticketWithUsers.users_tickets_assigneeIdTousers) {
-              recipient = ticketWithUsers.users_tickets_assigneeIdTousers
-              recipientRole = 'técnico'
+        prisma.tickets
+          .findUnique({
+            where: { id: ticketId },
+            include: {
+              users_tickets_clientIdTousers: { select: { id: true, name: true, email: true } },
+              users_tickets_assigneeIdTousers: { select: { id: true, name: true, email: true } },
+            },
+          })
+          .then(async ticketWithUsers => {
+            if (!ticketWithUsers) return
+            let recipient = null
+            let recipientRole = ''
+            if (session.user.role === 'CLIENT') {
+              if (ticketWithUsers.users_tickets_assigneeIdTousers) {
+                recipient = ticketWithUsers.users_tickets_assigneeIdTousers
+                recipientRole = 'técnico'
+              }
+            } else {
+              recipient = ticketWithUsers.users_tickets_clientIdTousers
+              recipientRole = 'cliente'
             }
-          } else {
-            recipient = ticketWithUsers.users_tickets_clientIdTousers
-            recipientRole = 'cliente'
-          }
-          if (!recipient) return
-          const authorName = newComment.users.name
-          const authorRole = session.user.role === 'CLIENT' ? 'cliente' : 'técnico'
-          const emailBody = `
+            if (!recipient) return
+            const authorName = newComment.users.name
+            const authorRole = session.user.role === 'CLIENT' ? 'cliente' : 'técnico'
+            const emailBody = `
             <h2>Nuevo Comentario en tu Ticket</h2>
             <p>Hola ${recipient.name},</p>
             <p>Se ha agregado un nuevo comentario en el ticket <strong>#${ticketId.substring(0, 8)}</strong>.</p>
@@ -262,15 +269,19 @@ export async function POST(
               </a>
             </div>
           `
-          await EmailService.queueEmail({
-            to: recipient.email,
-            subject: `Nuevo comentario en Ticket #${ticketId.substring(0, 8)} - ${ticketWithUsers.title}`,
-            html: emailBody,
-            text: `Nuevo comentario de ${authorName} (${authorRole}) en ticket #${ticketId.substring(0, 8)}:\n\n${newComment.content}`,
-          } as any, session.user.id)
-        }).catch(err => {
-          console.error('[API] Error sending email for new comment:', err)
-        })
+            await EmailService.queueEmail(
+              {
+                to: recipient.email,
+                subject: `Nuevo comentario en Ticket #${ticketId.substring(0, 8)} - ${ticketWithUsers.title}`,
+                html: emailBody,
+                text: `Nuevo comentario de ${authorName} (${authorRole}) en ticket #${ticketId.substring(0, 8)}:\n\n${newComment.content}`,
+              } as any,
+              session.user.id
+            )
+          })
+          .catch(err => {
+            console.error('[API] Error sending email for new comment:', err)
+          })
       )
     }
 
@@ -288,9 +299,9 @@ export async function POST(
         content: newComment.content,
         isInternal: newComment.isInternal,
         createdAt: newComment.createdAt.toISOString(),
-        user: newComment.users
+        user: newComment.users,
       },
-      message: 'Comentario agregado exitosamente'
+      message: 'Comentario agregado exitosamente',
     })
   } catch (error) {
     console.error('Error in comments API:', error)
@@ -298,7 +309,7 @@ export async function POST(
       {
         success: false,
         message: 'Error al agregar comentario',
-        error: error instanceof Error ? error.message : 'Error desconocido'
+        error: error instanceof Error ? error.message : 'Error desconocido',
       },
       { status: 500 }
     )

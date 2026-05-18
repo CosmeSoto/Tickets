@@ -228,11 +228,55 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (ticketData.source === 'PATROL') {
+      if (!ticketData.checkInId) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'El check-in es requerido para reportar incidentes de ronda',
+          },
+          { status: 400 }
+        )
+      }
+
+      const checkIn = await prisma.patrol_check_ins.findUnique({
+        where: { id: ticketData.checkInId },
+        select: {
+          id: true,
+          validationResult: true,
+          patrol: {
+            select: {
+              id: true,
+              agentId: true,
+              familyId: true,
+            },
+          },
+        },
+      })
+      if (!checkIn || checkIn.validationResult !== 'VALID') {
+        return NextResponse.json(
+          { success: false, message: 'Check-in de ronda no válido' },
+          { status: 400 }
+        )
+      }
+      if (checkIn.patrol.agentId !== session.user.id) {
+        return NextResponse.json(
+          { success: false, message: 'Solo el agente de la ronda puede reportar este incidente' },
+          { status: 403 }
+        )
+      }
+
+      ticketData.familyId = checkIn.patrol.familyId
+    }
+
     if (!ticketData.categoryId) {
       // Si viene de una patrulla sin categoría configurada, buscar una categoría por defecto
       if (ticketData.source === 'PATROL') {
         const defaultCategory = await prisma.categories.findFirst({
-          where: { level: 1 },
+          where: {
+            level: 1,
+            ...(ticketData.familyId ? { departments: { familyId: ticketData.familyId } } : {}),
+          },
           orderBy: { createdAt: 'asc' },
         })
         if (defaultCategory) {
@@ -261,6 +305,7 @@ export async function POST(request: NextRequest) {
     // Verificar que la categoría existe
     const category = await prisma.categories.findUnique({
       where: { id: ticketData.categoryId },
+      include: { departments: { select: { familyId: true } } },
     })
 
     if (!category) {
@@ -271,6 +316,31 @@ export async function POST(request: NextRequest) {
         },
         { status: 400 }
       )
+    }
+
+    const categoryFamilyId = category.departments?.familyId ?? null
+    if (ticketData.familyId && categoryFamilyId && ticketData.familyId !== categoryFamilyId) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'La categoría seleccionada no pertenece a la familia indicada',
+        },
+        { status: 400 }
+      )
+    }
+
+    const requestedFamilyId = ticketData.familyId ?? categoryFamilyId
+    if (requestedFamilyId && ticketData.source !== 'PATROL') {
+      const ticketConfig = await prisma.ticket_family_config.findUnique({
+        where: { familyId: requestedFamilyId },
+        select: { ticketsEnabled: true },
+      })
+      if (ticketConfig && !ticketConfig.ticketsEnabled) {
+        return NextResponse.json(
+          { success: false, message: 'Los tickets no están habilitados para esta familia' },
+          { status: 403 }
+        )
+      }
     }
 
     // Determinar el clientId basado en el rol del usuario
@@ -378,23 +448,50 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Crear nuevo ticket usando TicketService (maneja familyId, ticketCode, codeIsManual)
-    // Validar que el familyId está dentro del scope del admin (si es Admin Normal)
-    if (
-      ticketData.familyId &&
-      session.user.role === 'ADMIN' &&
-      !(session.user as any).isSuperAdmin
-    ) {
-      const { getUserFamilyScope } = await import('@/lib/auth/admin-scope')
-      const scope = await getUserFamilyScope(session.user.id, 'ADMIN', false)
-      if (scope.familyIds && !scope.familyIds.includes(ticketData.familyId)) {
-        return NextResponse.json(
-          { success: false, message: 'No tienes permiso para crear tickets en esta familia' },
-          { status: 403 }
-        )
+    // Validar que la familia efectiva está dentro del alcance del usuario.
+    // Los incidentes de patrulla no dependen de ticketsEnabled, pero sí de categoría/familia coherente.
+    if (requestedFamilyId && ticketData.source !== 'PATROL') {
+      if (session.user.role === 'ADMIN' && !(session.user as any).isSuperAdmin) {
+        const { getUserFamilyScope } = await import('@/lib/auth/admin-scope')
+        const scope = await getUserFamilyScope(session.user.id, 'ADMIN', false)
+        if (scope.familyIds && !scope.familyIds.includes(requestedFamilyId)) {
+          return NextResponse.json(
+            { success: false, message: 'No tienes permiso para crear tickets en esta familia' },
+            { status: 403 }
+          )
+        }
+      } else if (session.user.role !== 'ADMIN') {
+        const [user, clientAssignments, technicianAssignments] = await Promise.all([
+          prisma.users.findUnique({
+            where: { id: session.user.id },
+            select: { departments: { select: { familyId: true } } },
+          }),
+          prisma.client_family_assignments.findMany({
+            where: { clientId: session.user.id, isActive: true },
+            select: { familyId: true },
+          }),
+          session.user.role === 'TECHNICIAN'
+            ? prisma.technician_family_assignments.findMany({
+                where: { technicianId: session.user.id, isActive: true },
+                select: { familyId: true },
+              })
+            : Promise.resolve([]),
+        ])
+        const allowedFamilyIds = new Set<string>([
+          ...clientAssignments.map(a => a.familyId),
+          ...technicianAssignments.map(a => a.familyId),
+        ])
+        if (user?.departments?.familyId) allowedFamilyIds.add(user.departments.familyId)
+        if (!allowedFamilyIds.has(requestedFamilyId)) {
+          return NextResponse.json(
+            { success: false, message: 'No tienes permiso para crear tickets en esta familia' },
+            { status: 403 }
+          )
+        }
       }
     }
 
+    // Crear nuevo ticket usando TicketService (maneja familyId, ticketCode, codeIsManual)
     const newTicket = (await TicketService.createTicket({
       title: ticketData.title,
       description: ticketData.description,
@@ -403,11 +500,14 @@ export async function POST(request: NextRequest) {
       clientId,
       categoryId: ticketData.categoryId,
       // Para técnicos: usar resolvedAssigneeId (resultado del escalamiento)
-      // Para admin/cliente: usar el assigneeId del body si se especificó
+      // Para admin: usar el assigneeId del body si se especificó
+      // Para clientes: nunca aceptar assigneeId enviado desde el navegador
       assigneeId:
         session.user.role === 'TECHNICIAN'
           ? resolvedAssigneeId
-          : ticketData.assigneeId || undefined,
+          : session.user.role === 'ADMIN'
+            ? ticketData.assigneeId || undefined
+            : undefined,
       ...(ticketData.ticketCode &&
         session.user.role === 'ADMIN' && { ticketCode: ticketData.ticketCode }),
       isAdmin: session.user.role === 'ADMIN',

@@ -58,6 +58,12 @@ interface DashboardData {
     open: number
     inProgress: number
   }
+  recentIncidents?: Array<{
+    id: string
+    title: string
+    reportedBy: string
+    ticketCode?: string | null
+  }>
 }
 
 export default function PatrolDashboardPage() {

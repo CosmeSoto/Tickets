@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { TicketEvents } from '@/lib/ticket-events'
 import prisma from '@/lib/prisma'
+import { canAccessTicket } from '@/lib/tickets/ticket-access'
 
 /**
  * GET /api/tickets/[id]/events
@@ -18,14 +19,23 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const ticket = await prisma.tickets.findUnique({
     where: { id: ticketId },
-    select: { id: true, clientId: true },
+    select: { id: true, clientId: true, assigneeId: true, familyId: true, status: true },
   })
 
   if (!ticket) {
     return new Response('Not Found', { status: 404 })
   }
 
-  if (session.user.role === 'CLIENT' && ticket.clientId !== session.user.id) {
+  const access = await canAccessTicket(
+    {
+      id: session.user.id,
+      role: session.user.role,
+      isSuperAdmin: (session.user as any).isSuperAdmin === true,
+    },
+    ticket,
+    'view'
+  )
+  if (!access.allowed) {
     return new Response('Forbidden', { status: 403 })
   }
 

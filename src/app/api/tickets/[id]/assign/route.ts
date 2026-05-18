@@ -3,12 +3,19 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import { assertTechnicianActiveInFamily } from '@/lib/tickets/assignee-validation'
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+    if (session.user.role !== 'ADMIN') {
+      return NextResponse.json(
+        { success: false, message: 'Solo un administrador puede asignar tickets manualmente' },
+        { status: 403 }
+      )
     }
 
     const { id: ticketId } = await params
@@ -31,6 +38,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       select: {
         clientId: true,
         assigneeId: true,
+        familyId: true,
         users_tickets_assigneeIdTousers: {
           select: { id: true, name: true, email: true },
         },
@@ -47,6 +55,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       )
     }
 
+    if (currentTicket.familyId && !(session.user as any).isSuperAdmin) {
+      const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
+      const scope = await getAdminFamilyScope(session.user.id, false)
+      if (scope.familyIds && !scope.familyIds.includes(currentTicket.familyId)) {
+        return NextResponse.json(
+          { success: false, message: 'No tienes permiso para asignar tickets de esta familia' },
+          { status: 403 }
+        )
+      }
+    }
+
     // Bloquear asignación al propio solicitante del ticket.
     // Un técnico o admin que creó el ticket como cliente no puede ser asignado como resolutor.
     if (assignmentData.assigneeId && assignmentData.assigneeId === currentTicket.clientId) {
@@ -57,6 +76,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         },
         { status: 400 }
       )
+    }
+
+    try {
+      await assertTechnicianActiveInFamily(assignmentData.assigneeId, currentTicket.familyId)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Asignación inválida'
+      return NextResponse.json({ success: false, message }, { status: 400 })
     }
 
     // Actualizar asignación en base de datos
@@ -162,6 +188,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!session) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
+    if (session.user.role !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'Solo un administrador puede ejecutar asignación automática' },
+        { status: 403 }
+      )
+    }
 
     const { id: ticketId } = await params
     const url = new URL(request.url)
@@ -177,11 +209,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         // Obtener el clientId del ticket para excluirlo de candidatos
         const ticket = await prisma.tickets.findUnique({
           where: { id: ticketId },
-          select: { clientId: true },
+          select: { clientId: true, familyId: true },
         })
 
         if (!ticket) {
           return NextResponse.json({ error: 'Ticket no encontrado' }, { status: 404 })
+        }
+        if (ticket.familyId && !(session.user as any).isSuperAdmin) {
+          const { getAdminFamilyScope } = await import('@/lib/auth/admin-scope')
+          const scope = await getAdminFamilyScope(session.user.id, false)
+          if (scope.familyIds && !scope.familyIds.includes(ticket.familyId)) {
+            return NextResponse.json(
+              { error: 'No tienes permiso para asignar tickets de esta familia' },
+              { status: 403 }
+            )
+          }
         }
 
         const result = await AssignmentService.autoAssignTicket(

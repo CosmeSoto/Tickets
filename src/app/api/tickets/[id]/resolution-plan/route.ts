@@ -6,6 +6,7 @@ import { auditResolutionPlanChange } from '@/lib/audit'
 import { EmailService } from '@/lib/services/email/email-service'
 import { randomUUID } from 'crypto'
 import { NotificationService } from '@/lib/services/notification-service'
+import { canAccessTicket } from '@/lib/tickets/ticket-access'
 
 /**
  * GET /api/tickets/[id]/resolution-plan
@@ -31,6 +32,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         id: true,
         assigneeId: true,
         clientId: true,
+        familyId: true,
+        status: true,
       },
     })
 
@@ -38,15 +41,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ success: false, message: 'Ticket no encontrado' }, { status: 404 })
     }
 
-    // Verificar permisos: Admin, Técnico asignado, o el solicitante del ticket
-    const isAdmin = session.user.role === 'ADMIN'
-    const isAssignedTechnician =
-      session.user.role === 'TECHNICIAN' && ticket.assigneeId === session.user.id
-    const isRequester = ticket.clientId === session.user.id
-
-    if (!isAdmin && !isAssignedTechnician && !isRequester) {
+    const access = await canAccessTicket(
+      {
+        id: session.user.id,
+        role: session.user.role,
+        isSuperAdmin: (session.user as any).isSuperAdmin === true,
+      },
+      ticket,
+      'view'
+    )
+    if (!access.allowed) {
       return NextResponse.json(
-        { success: false, message: 'No tienes permiso para ver este plan' },
+        { success: false, message: access.reason ?? 'No tienes permiso para ver este plan' },
         { status: 403 }
       )
     }
@@ -189,16 +195,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ success: false, message: 'Ticket no encontrado' }, { status: 404 })
     }
 
-    // Verificar permisos: Admin o Técnico ASIGNADO (no colaboradores)
-    const isAdmin = session.user.role === 'ADMIN'
-    const isAssignedTechnician =
-      session.user.role === 'TECHNICIAN' && ticket.assigneeId === session.user.id
-
-    if (!isAdmin && !isAssignedTechnician) {
+    const access = await canAccessTicket(
+      {
+        id: session.user.id,
+        role: session.user.role,
+        isSuperAdmin: (session.user as any).isSuperAdmin === true,
+      },
+      ticket,
+      'update'
+    )
+    if (!access.allowed) {
       return NextResponse.json(
         {
           success: false,
-          message: 'Solo el técnico asignado o un administrador puede crear planes de resolución',
+          message:
+            access.reason ??
+            'Solo el técnico asignado o un administrador puede crear planes de resolución',
         },
         { status: 403 }
       )
@@ -503,14 +515,18 @@ export async function DELETE(
       )
     }
 
-    // Verificar permisos
-    const isAdmin = session.user.role === 'ADMIN'
-    const isAssignedTechnician =
-      session.user.role === 'TECHNICIAN' && existingPlan.ticket.assigneeId === session.user.id
-
-    if (!isAdmin && !isAssignedTechnician) {
+    const access = await canAccessTicket(
+      {
+        id: session.user.id,
+        role: session.user.role,
+        isSuperAdmin: (session.user as any).isSuperAdmin === true,
+      },
+      existingPlan.ticket,
+      'update'
+    )
+    if (!access.allowed) {
       return NextResponse.json(
-        { success: false, message: 'No tienes permiso para eliminar este plan' },
+        { success: false, message: access.reason ?? 'No tienes permiso para eliminar este plan' },
         { status: 403 }
       )
     }
@@ -596,14 +612,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       )
     }
 
-    // Verificar permisos
-    const isAdmin = session.user.role === 'ADMIN'
-    const isAssignedTechnician =
-      session.user.role === 'TECHNICIAN' && existingPlan.ticket.assigneeId === session.user.id
-
-    if (!isAdmin && !isAssignedTechnician) {
+    const access = await canAccessTicket(
+      {
+        id: session.user.id,
+        role: session.user.role,
+        isSuperAdmin: (session.user as any).isSuperAdmin === true,
+      },
+      existingPlan.ticket,
+      'update'
+    )
+    if (!access.allowed) {
       return NextResponse.json(
-        { success: false, message: 'No tienes permiso para actualizar este plan' },
+        { success: false, message: access.reason ?? 'No tienes permiso para actualizar este plan' },
         { status: 403 }
       )
     }

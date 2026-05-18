@@ -14,6 +14,7 @@ import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
 import { NotificationType } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import { checkPatrolModuleAccess } from '@/lib/patrol/patrol-helpers'
+import { checkPatrolFamilyAccess } from '@/lib/patrol/patrol-access'
 
 const createScheduleSchema = z.object({
   familyId: z.string().uuid(),
@@ -124,6 +125,17 @@ export async function POST(request: NextRequest) {
 
     const start = new Date(data.scheduledStart)
     const end = new Date(data.scheduledEnd)
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+
+    const hasFamilyAccess = await checkPatrolFamilyAccess(
+      session.user.id,
+      data.familyId,
+      session.user.role,
+      isSuperAdmin
+    )
+    if (!hasFamilyAccess) {
+      return NextResponse.json({ error: 'No tienes acceso a esta área' }, { status: 403 })
+    }
 
     // Validar que scheduledEnd > scheduledStart
     if (end <= start) {
@@ -133,7 +145,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validar que el agente tiene patrolsEnabled y no es ADMIN
+    // Validar que el agente tiene patrolsEnabled, no es ADMIN y pertenece al área de rondas
     const agent = await prisma.users.findUnique({
       where: { id: data.agentId },
       select: { id: true, name: true, role: true, patrolsEnabled: true },
@@ -145,9 +157,25 @@ export async function POST(request: NextRequest) {
         { status: 422 }
       )
     }
+    if (!['TECHNICIAN', 'CLIENT'].includes(agent.role)) {
+      return NextResponse.json(
+        { error: 'Solo técnicos o clientes pueden ser agentes de ronda' },
+        { status: 422 }
+      )
+    }
     if (!agent.patrolsEnabled) {
       return NextResponse.json(
         { error: 'El usuario seleccionado no tiene el módulo de patrullas habilitado' },
+        { status: 422 }
+      )
+    }
+    const agentFamilyAssignment = await prisma.patrol_family_assignments.findUnique({
+      where: { userId_familyId: { userId: data.agentId, familyId: data.familyId } },
+      select: { isActive: true },
+    })
+    if (!agentFamilyAssignment?.isActive) {
+      return NextResponse.json(
+        { error: 'El agente no está asignado al área de rondas seleccionada' },
         { status: 422 }
       )
     }
@@ -155,11 +183,17 @@ export async function POST(request: NextRequest) {
     // Validar que la ruta existe y está activa
     const route = await prisma.patrol_routes.findUnique({
       where: { id: data.routeId },
-      select: { id: true, name: true, isActive: true },
+      select: { id: true, name: true, familyId: true, isActive: true },
     })
     if (!route) return NextResponse.json({ error: 'Ruta no encontrada' }, { status: 404 })
     if (!route.isActive) {
       return NextResponse.json({ error: 'La ruta está desactivada' }, { status: 422 })
+    }
+    if (route.familyId !== data.familyId) {
+      return NextResponse.json(
+        { error: 'La ruta no pertenece al área seleccionada' },
+        { status: 422 }
+      )
     }
 
     // Verificar solapamiento de patrullas para el mismo agente en el mismo horario
