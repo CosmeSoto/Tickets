@@ -12,6 +12,11 @@ import { NotificationService } from '@/lib/services/notification-service'
 import { invalidateCache } from '@/lib/api-cache'
 import { translateFieldNames } from '@/lib/constants/ticket-labels'
 import { assertTechnicianActiveInFamily } from '@/lib/tickets/assignee-validation'
+import {
+  assertTicketAccess,
+  TicketAccessError,
+  toTicketAccessUser,
+} from '@/lib/tickets/ticket-access'
 
 // Helper: invalida caché de tickets y dashboard cuando un ticket cambia
 async function invalidateTicketCaches() {
@@ -136,12 +141,25 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
       return NextResponse.json({ success: false, message: 'Ticket no encontrado' }, { status: 404 })
     }
 
-    // Verificar permisos
-    if (session.user.role === 'CLIENT' && ticket.clientId !== session.user.id) {
-      return NextResponse.json(
-        { success: false, message: 'No tienes permisos para ver este ticket' },
-        { status: 403 }
+    try {
+      await assertTicketAccess(
+        toTicketAccessUser(session.user),
+        {
+          id: ticket.id,
+          clientId: ticket.clientId,
+          assigneeId: ticket.assigneeId,
+          familyId: ticket.familyId,
+        },
+        'read'
       )
+    } catch (err) {
+      if (err instanceof TicketAccessError) {
+        return NextResponse.json(
+          { success: false, message: err.message },
+          { status: err.statusCode }
+        )
+      }
+      throw err
     }
 
     // Transformar la respuesta para que sea compatible con el frontend
@@ -200,18 +218,31 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
       return NextResponse.json({ success: false, message: 'Ticket no encontrado' }, { status: 404 })
     }
 
+    try {
+      await assertTicketAccess(
+        toTicketAccessUser(session.user),
+        {
+          id: existingTicket.id,
+          clientId: existingTicket.clientId,
+          assigneeId: existingTicket.assigneeId,
+          familyId: existingTicket.familyId,
+        },
+        'write'
+      )
+    } catch (err) {
+      if (err instanceof TicketAccessError) {
+        return NextResponse.json(
+          { success: false, message: err.message },
+          { status: err.statusCode }
+        )
+      }
+      throw err
+    }
+
     // CONTROL DE PERMISOS POR ROL
     const filteredUpdates: any = {}
 
     if (session.user.role === 'CLIENT') {
-      // Cliente solo puede editar sus propios tickets
-      if (existingTicket.clientId !== session.user.id) {
-        return NextResponse.json(
-          { success: false, message: 'No tienes permisos para editar este ticket' },
-          { status: 403 }
-        )
-      }
-
       // Cliente solo puede editar título y descripción, y SOLO si el ticket está en estado OPEN
       if (existingTicket.status !== 'OPEN') {
         return NextResponse.json(

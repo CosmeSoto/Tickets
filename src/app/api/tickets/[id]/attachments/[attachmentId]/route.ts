@@ -3,6 +3,11 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { FileService } from '@/lib/services/file-service'
 import prisma from '@/lib/prisma'
+import {
+  assertTicketAccessById,
+  TicketAccessError,
+  toTicketAccessUser,
+} from '@/lib/tickets/ticket-access'
 
 export async function GET(
   request: NextRequest,
@@ -30,61 +35,13 @@ export async function GET(
       return NextResponse.json({ error: 'Archivo no encontrado' }, { status: 404 })
     }
 
-    // Verificar permisos
-    const ticket = await prisma.tickets.findUnique({
-      where: { id: ticketId },
-      select: {
-        clientId: true,
-        assigneeId: true,
-        familyId: true,
-      },
-    })
-
-    if (!ticket) {
-      return NextResponse.json({ error: 'Ticket no encontrado' }, { status: 404 })
-    }
-
-    const isSuperAdmin = (session.user as any).isSuperAdmin ?? false
-    let isAuthorized =
-      isSuperAdmin ||
-      session.user.role === 'ADMIN' ||
-      ticket.clientId === session.user.id ||
-      ticket.assigneeId === session.user.id
-
-    // If not yet authorized and user is a technician, check if they have access to the ticket's family
-    if (!isAuthorized && session.user.role === 'TECHNICIAN') {
-      // Check if technician is assigned to the ticket's family
-      const techFamilies = await prisma.technician_family_assignments.findMany({
-        where: { technicianId: session.user.id, isActive: true },
-        select: { familyId: true },
-      })
-      const techFamilyIds = techFamilies.map(a => a.familyId)
-
-      // Check if ticket's family is in technician's families, OR ticket is unassigned and technician has any family access
-      if (techFamilyIds.length > 0) {
-        const hasFamilyAccess = ticket.familyId ? techFamilyIds.includes(ticket.familyId) : true
-        const canAccessUnassigned = ticket.assigneeId === null
-        isAuthorized = hasFamilyAccess && canAccessUnassigned
-      } else {
-        // If technician has no family assignments, still allow access if ticket is unassigned
-        isAuthorized = ticket.assigneeId === null
+    try {
+      await assertTicketAccessById(toTicketAccessUser(session.user), ticketId, 'read')
+    } catch (err) {
+      if (err instanceof TicketAccessError) {
+        return NextResponse.json({ error: err.message }, { status: err.statusCode })
       }
-    }
-
-    if (!isAuthorized) {
-      // Verificar si es colaborador del ticket
-      const isCollaborator = await prisma.ticket_collaborators
-        .findUnique({
-          where: { ticketId_collaboratorId: { ticketId, collaboratorId: session.user.id } },
-        })
-        .catch(() => null)
-
-      if (!isCollaborator) {
-        return NextResponse.json(
-          { error: 'No tienes permiso para acceder a este archivo' },
-          { status: 403 }
-        )
-      }
+      throw err
     }
 
     // Obtener el archivo del servicio

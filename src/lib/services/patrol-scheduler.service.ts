@@ -198,6 +198,21 @@ export class PatrolSchedulerService {
     return occurrences
   }
 
+  /**
+   * Expone el cálculo de ocurrencias para validar solapamientos al crear/editar schedules.
+   */
+  static calculateOccurrencesForOverlap(
+    schedule: {
+      scheduledStart: Date
+      scheduledEnd: Date
+      recurrence: PatrolRecurrence
+      recurrenceDays: number[]
+    },
+    horizonDays = 30
+  ): Array<{ start: Date; end: Date }> {
+    return PatrolSchedulerService.calculateOccurrences(schedule, horizonDays)
+  }
+
   // ── Regeneración periódica de patrullas ────────────────────────────────────
 
   /**
@@ -249,14 +264,11 @@ export class PatrolSchedulerService {
     // Obtener configuraciones de familia para conocer el tiempo de recordatorio
     const familyConfigs = await prisma.patrol_family_config.findMany({
       where: { patrolsEnabled: true },
-      select: { familyId: true, reminderMinutesBefore: true },
+      select: { familyId: true, gracePeriodMinutes: true },
     })
 
-    // Usar el mayor reminderMinutesBefore como ventana de búsqueda (default 5 min)
     const maxReminderMinutes =
-      familyConfigs.length > 0
-        ? Math.max(...familyConfigs.map(c => c.reminderMinutesBefore ?? 5))
-        : 5
+      familyConfigs.length > 0 ? Math.max(...familyConfigs.map(c => c.gracePeriodMinutes ?? 5)) : 5
     const reminderWindowMs = maxReminderMinutes * 60 * 1000
     const windowEnd = new Date(now.getTime() + reminderWindowMs)
 
@@ -279,13 +291,18 @@ export class PatrolSchedulerService {
 
     // Verificar cuáles ya recibieron recordatorio (evitar duplicados)
     const patrolIds = upcomingPatrols.map(p => p.id)
-    const alreadyNotified = await prisma.notifications.findMany({
-      where: {
-        type: 'PATROL_ASSIGNED',
-        metadata: { path: ['reminderFor'], array_contains: patrolIds },
-      },
-      select: { metadata: true },
-    })
+    const alreadyNotified =
+      patrolIds.length > 0
+        ? await prisma.notifications.findMany({
+            where: {
+              type: 'PATROL_ASSIGNED',
+              OR: patrolIds.map(patrolId => ({
+                metadata: { path: ['reminderFor'], equals: patrolId },
+              })),
+            },
+            select: { metadata: true },
+          })
+        : []
 
     // Extraer IDs ya notificados del metadata
     const notifiedIds = new Set<string>()

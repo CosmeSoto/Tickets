@@ -105,13 +105,20 @@ export function PatrolIncidentButton({
       })
 
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Error al crear el incidente')
+      if (!res.ok) {
+        throw new Error(data.message ?? data.error ?? 'Error al crear el incidente')
+      }
+
+      const ticket = data.data ?? data
+      const ticketId = ticket?.id ?? data.id
+      const ticketCode = ticket?.ticketCode ?? data.ticketCode
 
       toast({
         title: 'Incidente reportado',
-        description: `Ticket creado: ${data.ticketCode ?? data.id}`,
+        description: data.warning ? data.warning : `Ticket creado: ${ticketCode ?? ticketId}`,
+        variant: data.warning ? 'default' : 'default',
       })
-      onIncidentCreated?.(data.id)
+      if (ticketId) onIncidentCreated?.(ticketId)
       setOpen(false)
       // Reset form
       setTitle('')

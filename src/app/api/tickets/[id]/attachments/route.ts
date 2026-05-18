@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { FileService } from '@/lib/services/file-service'
+import {
+  assertTicketAccessById,
+  TicketAccessError,
+  toTicketAccessUser,
+} from '@/lib/tickets/ticket-access'
 
 /**
  * POST /api/tickets/[id]/attachments
@@ -15,10 +20,7 @@ import { FileService } from '@/lib/services/file-service'
  *   - Archivo único: el objeto attachment
  *   - Múltiples: { results: [...], succeeded: N, failed: N }
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
@@ -26,6 +28,16 @@ export async function POST(
     }
 
     const { id: ticketId } = await params
+
+    try {
+      await assertTicketAccessById(toTicketAccessUser(session.user), ticketId, 'comment')
+    } catch (err) {
+      if (err instanceof TicketAccessError) {
+        return NextResponse.json({ error: err.message }, { status: err.statusCode })
+      }
+      throw err
+    }
+
     const formData = await request.formData()
 
     // Detectar si es carga masiva (campo "files[]") o individual (campo "file")
@@ -34,14 +46,10 @@ export async function POST(
 
     if (multipleFiles.length > 0) {
       // ── Carga masiva ──────────────────────────────────────────────────────
-      const results = await FileService.uploadMultiple(
-        multipleFiles,
-        ticketId,
-        session.user.id
-      )
+      const results = await FileService.uploadMultiple(multipleFiles, ticketId, session.user.id)
 
-      const succeeded = results.filter((r) => r.success).length
-      const failed = results.filter((r) => !r.success).length
+      const succeeded = results.filter(r => r.success).length
+      const failed = results.filter(r => !r.success).length
 
       return NextResponse.json(
         { results, succeeded, failed },
@@ -73,10 +81,7 @@ export async function POST(
  * GET /api/tickets/[id]/attachments
  * Lista todos los archivos adjuntos de un ticket.
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
@@ -84,6 +89,16 @@ export async function GET(
     }
 
     const { id: ticketId } = await params
+
+    try {
+      await assertTicketAccessById(toTicketAccessUser(session.user), ticketId, 'read')
+    } catch (err) {
+      if (err instanceof TicketAccessError) {
+        return NextResponse.json({ error: err.message }, { status: err.statusCode })
+      }
+      throw err
+    }
+
     const attachments = await FileService.getFilesByTicket(ticketId)
     return NextResponse.json(attachments)
   } catch (error) {

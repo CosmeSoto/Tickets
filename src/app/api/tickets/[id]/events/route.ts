@@ -3,6 +3,11 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { TicketEvents } from '@/lib/ticket-events'
 import prisma from '@/lib/prisma'
+import {
+  assertTicketAccess,
+  TicketAccessError,
+  toTicketAccessUser,
+} from '@/lib/tickets/ticket-access'
 
 /**
  * GET /api/tickets/[id]/events
@@ -18,15 +23,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const ticket = await prisma.tickets.findUnique({
     where: { id: ticketId },
-    select: { id: true, clientId: true },
+    select: { id: true, clientId: true, assigneeId: true, familyId: true },
   })
 
   if (!ticket) {
     return new Response('Not Found', { status: 404 })
   }
 
-  if (session.user.role === 'CLIENT' && ticket.clientId !== session.user.id) {
-    return new Response('Forbidden', { status: 403 })
+  try {
+    await assertTicketAccess(toTicketAccessUser(session.user), ticket, 'read')
+  } catch (err) {
+    if (err instanceof TicketAccessError) {
+      return new Response(err.message, { status: err.statusCode })
+    }
+    throw err
   }
 
   const encoder = new TextEncoder()

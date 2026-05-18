@@ -14,6 +14,13 @@ import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
 import { NotificationType } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import { checkPatrolModuleAccess } from '@/lib/patrol/patrol-helpers'
+import {
+  assertScheduleAgent,
+  assertScheduleFamilyAccess,
+  assertScheduleRoute,
+  assertNoAgentScheduleOverlap,
+  ScheduleValidationError,
+} from '@/lib/patrol/schedule-validation'
 
 const createScheduleSchema = z.object({
   familyId: z.string().uuid(),
@@ -124,8 +131,8 @@ export async function POST(request: NextRequest) {
 
     const start = new Date(data.scheduledStart)
     const end = new Date(data.scheduledEnd)
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
 
-    // Validar que scheduledEnd > scheduledStart
     if (end <= start) {
       return NextResponse.json(
         { error: 'La hora de fin debe ser posterior a la hora de inicio' },
@@ -133,54 +140,36 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validar que el agente tiene patrolsEnabled y no es ADMIN
-    const agent = await prisma.users.findUnique({
-      where: { id: data.agentId },
-      select: { id: true, name: true, role: true, patrolsEnabled: true },
-    })
-    if (!agent) return NextResponse.json({ error: 'Agente no encontrado' }, { status: 404 })
-    if (agent.role === 'ADMIN') {
-      return NextResponse.json(
-        { error: 'Los administradores no pueden ser asignados como agentes de ronda' },
-        { status: 422 }
-      )
-    }
-    if (!agent.patrolsEnabled) {
-      return NextResponse.json(
-        { error: 'El usuario seleccionado no tiene el módulo de patrullas habilitado' },
-        { status: 422 }
-      )
+    try {
+      await assertScheduleFamilyAccess({
+        userId: session.user.id,
+        role: session.user.role,
+        isSuperAdmin,
+        familyId: data.familyId,
+      })
+      await assertScheduleRoute({ routeId: data.routeId, familyId: data.familyId })
+      await assertScheduleAgent({ agentId: data.agentId, familyId: data.familyId })
+      await assertNoAgentScheduleOverlap({
+        agentId: data.agentId,
+        scheduledStart: start,
+        scheduledEnd: end,
+        recurrence: data.recurrence,
+        recurrenceDays: data.recurrenceDays,
+      })
+    } catch (err) {
+      if (err instanceof ScheduleValidationError) {
+        return NextResponse.json(
+          { error: err.message, ...(err.code ? { code: err.code } : {}) },
+          { status: err.statusCode }
+        )
+      }
+      throw err
     }
 
-    // Validar que la ruta existe y está activa
     const route = await prisma.patrol_routes.findUnique({
       where: { id: data.routeId },
-      select: { id: true, name: true, isActive: true },
+      select: { name: true },
     })
-    if (!route) return NextResponse.json({ error: 'Ruta no encontrada' }, { status: 404 })
-    if (!route.isActive) {
-      return NextResponse.json({ error: 'La ruta está desactivada' }, { status: 422 })
-    }
-
-    // Verificar solapamiento de patrullas para el mismo agente en el mismo horario
-    // Para recurrencias, solo verificamos la primera ocurrencia (el día de inicio)
-    const overlap = await prisma.patrols.findFirst({
-      where: {
-        agentId: data.agentId,
-        status: { in: ['PENDING', 'IN_PROGRESS'] },
-        scheduledStart: { lt: end },
-        scheduledEnd: { gt: start },
-      },
-    })
-    if (overlap) {
-      return NextResponse.json(
-        {
-          error: 'El agente ya tiene una patrulla programada en ese horario',
-          code: 'SCHEDULE_OVERLAP',
-        },
-        { status: 409 }
-      )
-    }
 
     // Crear schedule
     const schedule = await prisma.patrol_schedules.create({
@@ -204,7 +193,7 @@ export async function POST(request: NextRequest) {
       userId: data.agentId,
       type: NotificationType.PATROL_ASSIGNED,
       title: 'Nueva ronda asignada',
-      message: `Se te ha asignado la ruta "${route.name}" programada para ${start.toLocaleString('es-EC', { timeZone: 'America/Guayaquil' })}.`,
+      message: `Se te ha asignado la ruta "${route?.name ?? 'Ronda'}" programada para ${start.toLocaleString('es-EC', { timeZone: 'America/Guayaquil' })}.`,
       metadata: { scheduleId: schedule.id, routeId: data.routeId, familyId: data.familyId },
     })
 

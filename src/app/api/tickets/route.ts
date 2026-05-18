@@ -8,6 +8,13 @@ import { EmailService } from '@/lib/services/email/email-service'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 import { NotificationService } from '@/lib/services/notification-service'
 import { TicketService } from '@/lib/services/ticket-service'
+import { getUserFamilyScope } from '@/lib/auth/admin-scope'
+import {
+  assertValidPatrolIncident,
+  PatrolIncidentValidationError,
+} from '@/lib/tickets/patrol-incident-validation'
+import { assertTechnicianActiveInFamily } from '@/lib/tickets/assignee-validation'
+import { FileService } from '@/lib/services/file-service'
 
 export async function GET(request: NextRequest) {
   try {
@@ -258,9 +265,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Verificar que la categoría existe
     const category = await prisma.categories.findUnique({
       where: { id: ticketData.categoryId },
+      include: { departments: { select: { familyId: true } } },
     })
 
     if (!category) {
@@ -270,6 +277,86 @@ export async function POST(request: NextRequest) {
           message: 'Categoría no encontrada',
         },
         { status: 400 }
+      )
+    }
+
+    const categoryFamilyId = category.departments?.familyId ?? null
+    const isPatrolSource = ticketData.source === 'PATROL'
+    let effectiveFamilyId: string | null = ticketData.familyId ?? categoryFamilyId
+
+    if (isPatrolSource) {
+      if (!ticketData.checkInId || !ticketData.familyId) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'Las incidencias de patrulla requieren checkInId y familyId',
+          },
+          { status: 400 }
+        )
+      }
+      try {
+        const validated = await assertValidPatrolIncident({
+          userId: session.user.id,
+          checkInId: ticketData.checkInId,
+          familyId: ticketData.familyId,
+          patrolId: ticketData.patrolId,
+        })
+        effectiveFamilyId = validated.familyId
+        ticketData.familyId = validated.familyId
+      } catch (err) {
+        if (err instanceof PatrolIncidentValidationError) {
+          return NextResponse.json(
+            { success: false, message: err.message },
+            { status: err.statusCode }
+          )
+        }
+        throw err
+      }
+    } else if (
+      ticketData.familyId &&
+      categoryFamilyId &&
+      ticketData.familyId !== categoryFamilyId
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'La familia del ticket no coincide con la familia de la categoría',
+        },
+        { status: 422 }
+      )
+    }
+
+    if (effectiveFamilyId) {
+      const familyConfig = await prisma.ticket_family_config.findUnique({
+        where: { familyId: effectiveFamilyId },
+        select: { ticketsEnabled: true },
+      })
+      if (familyConfig && !familyConfig.ticketsEnabled && !isPatrolSource) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'Los tickets están deshabilitados para esta área',
+          },
+          { status: 403 }
+        )
+      }
+    }
+
+    const isSuperAdmin = (session.user as { isSuperAdmin?: boolean }).isSuperAdmin === true
+    if (!isSuperAdmin && effectiveFamilyId) {
+      const scope = await getUserFamilyScope(session.user.id, session.user.role, false)
+      if (scope.familyIds && !scope.familyIds.includes(effectiveFamilyId)) {
+        return NextResponse.json(
+          { success: false, message: 'No tienes permiso para crear tickets en esta familia' },
+          { status: 403 }
+        )
+      }
+    }
+
+    if (session.user.role === 'CLIENT' && ticketData.assigneeId) {
+      return NextResponse.json(
+        { success: false, message: 'Los clientes no pueden asignar técnicos al crear un ticket' },
+        { status: 403 }
       )
     }
 
@@ -378,19 +465,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Crear nuevo ticket usando TicketService (maneja familyId, ticketCode, codeIsManual)
-    // Validar que el familyId está dentro del scope del admin (si es Admin Normal)
-    if (
-      ticketData.familyId &&
-      session.user.role === 'ADMIN' &&
-      !(session.user as any).isSuperAdmin
-    ) {
-      const { getUserFamilyScope } = await import('@/lib/auth/admin-scope')
-      const scope = await getUserFamilyScope(session.user.id, 'ADMIN', false)
-      if (scope.familyIds && !scope.familyIds.includes(ticketData.familyId)) {
+    if (resolvedAssigneeId && effectiveFamilyId) {
+      try {
+        await assertTechnicianActiveInFamily(resolvedAssigneeId, effectiveFamilyId)
+      } catch (err) {
         return NextResponse.json(
-          { success: false, message: 'No tienes permiso para crear tickets en esta familia' },
-          { status: 403 }
+          {
+            success: false,
+            message: err instanceof Error ? err.message : 'Técnico no válido para esta familia',
+          },
+          { status: 422 }
         )
       }
     }
@@ -512,6 +596,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    let attachmentWarning: string | undefined
+    if (ticketData.photoBase64 && ticketData.photoMimeType) {
+      try {
+        await FileService.uploadBase64Attachment({
+          ticketId: newTicket.id,
+          uploadedBy: session.user.id,
+          base64: ticketData.photoBase64,
+          mimeType: ticketData.photoMimeType,
+          originalName: ticketData.photoName || 'evidencia-patrulla.jpg',
+        })
+      } catch (photoErr) {
+        console.error('[tickets] Error subiendo evidencia de patrulla:', photoErr)
+        attachmentWarning =
+          'El ticket se creó pero no se pudo adjuntar la foto. Puedes subirla desde el detalle del ticket.'
+      }
+    }
+
     // Mapear los datos para que coincidan con lo que espera el frontend
     const mappedTicket = {
       ...newTicket,
@@ -524,7 +625,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: mappedTicket,
-      message: 'Ticket creado exitosamente',
+      id: mappedTicket.id,
+      ticketCode: (mappedTicket as { ticketCode?: string }).ticketCode,
+      message: attachmentWarning ?? 'Ticket creado exitosamente',
+      ...(attachmentWarning ? { warning: attachmentWarning } : {}),
     })
   } catch (error) {
     console.error('Error creating ticket:', error)

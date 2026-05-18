@@ -4,24 +4,28 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { auditTaskChange } from '@/lib/audit'
 import { randomUUID } from 'crypto'
-import { calculateDuration, validateTimeRange, combineDateAndTime, formatDuration } from '@/lib/time-utils'
+import {
+  calculateDuration,
+  validateTimeRange,
+  combineDateAndTime,
+  formatDuration,
+} from '@/lib/time-utils'
 import { NotificationService } from '@/lib/services/notification-service'
+import {
+  assertTicketAccess,
+  TicketAccessError,
+  toTicketAccessUser,
+} from '@/lib/tickets/ticket-access'
 
 /**
  * POST /api/tickets/[id]/resolution-plan/tasks
  * Crea una nueva tarea en el plan de resolución
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
-      return NextResponse.json(
-        { success: false, message: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
     }
 
     const { id: ticketId } = await params
@@ -49,8 +53,8 @@ export async function POST(
     const plan = await prisma.resolution_plans.findFirst({
       where: { ticketId },
       include: {
-        ticket: true
-      }
+        ticket: true,
+      },
     })
 
     if (!plan) {
@@ -60,27 +64,35 @@ export async function POST(
       )
     }
 
-    // Verificar permisos
-    const isAdmin = session.user.role === 'ADMIN'
-    const isAssignedTechnician = 
-      session.user.role === 'TECHNICIAN' && 
-      plan.ticket.assigneeId === session.user.id
-
-    if (!isAdmin && !isAssignedTechnician) {
-      return NextResponse.json(
-        { success: false, message: 'No tienes permiso para agregar tareas' },
-        { status: 403 }
+    try {
+      await assertTicketAccess(
+        toTicketAccessUser(session.user),
+        {
+          id: plan.ticket.id,
+          clientId: plan.ticket.clientId,
+          assigneeId: plan.ticket.assigneeId,
+          familyId: plan.ticket.familyId,
+        },
+        'resolution_plan'
       )
+    } catch (err) {
+      if (err instanceof TicketAccessError) {
+        return NextResponse.json(
+          { success: false, message: err.message },
+          { status: err.statusCode }
+        )
+      }
+      throw err
     }
 
     // Calcular duración si hay horarios
     let estimatedHours = body.estimatedHours || null
     let dueDate = body.dueDate ? new Date(body.dueDate) : null
-    
+
     if (body.startTime && body.endTime) {
       // Calcular duración automáticamente
       estimatedHours = calculateDuration(body.startTime, body.endTime)
-      
+
       // Combinar fecha y hora de inicio para dueDate
       if (body.dueDate) {
         dueDate = combineDateAndTime(body.dueDate, body.startTime)
@@ -104,17 +116,17 @@ export async function POST(
         dueDate,
         notes: body.notes?.trim() || null,
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       },
       include: {
         assignee: {
           select: {
             id: true,
             name: true,
-            email: true
-          }
-        }
-      }
+            email: true,
+          },
+        },
+      },
     })
 
     // Actualizar contador de tareas en el plan
@@ -122,25 +134,19 @@ export async function POST(
       where: { id: plan.id },
       data: {
         totalTasks: { increment: 1 },
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     })
 
     // Auditoría
-    await auditTaskChange(
-      task.id,
-      plan.id,
-      session.user.id,
-      'created',
-      {
-        title: task.title,
-        priority: task.priority,
-        assignedTo: task.assignedTo,
-        startTime: task.startTime,
-        endTime: task.endTime,
-        estimatedHours: task.estimatedHours
-      }
-    )
+    await auditTaskChange(task.id, plan.id, session.user.id, 'created', {
+      title: task.title,
+      priority: task.priority,
+      assignedTo: task.assignedTo,
+      startTime: task.startTime,
+      endTime: task.endTime,
+      estimatedHours: task.estimatedHours,
+    })
 
     // Crear notificación para el cliente si la tarea tiene fecha programada
     if (task.dueDate) {
@@ -149,9 +155,9 @@ export async function POST(
         const formattedDate = startDate.toLocaleDateString('es-ES', {
           day: '2-digit',
           month: 'short',
-          year: 'numeric'
+          year: 'numeric',
         })
-        
+
         // Construir mensaje de horario
         let timeInfo = ''
         if (task.startTime && task.endTime && task.estimatedHours) {
@@ -200,9 +206,9 @@ export async function POST(
         completedAt: task.completedAt?.toISOString() || null,
         notes: task.notes,
         createdAt: task.createdAt.toISOString(),
-        updatedAt: task.updatedAt.toISOString()
+        updatedAt: task.updatedAt.toISOString(),
       },
-      message: 'Tarea creada exitosamente'
+      message: 'Tarea creada exitosamente',
     })
   } catch (error) {
     console.error('[API] Error in resolution task POST:', error)
@@ -210,7 +216,7 @@ export async function POST(
       {
         success: false,
         message: 'Error al crear la tarea',
-        error: error instanceof Error ? error.message : 'Error desconocido'
+        error: error instanceof Error ? error.message : 'Error desconocido',
       },
       { status: 500 }
     )

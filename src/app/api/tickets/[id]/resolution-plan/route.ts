@@ -6,6 +6,11 @@ import { auditResolutionPlanChange } from '@/lib/audit'
 import { EmailService } from '@/lib/services/email/email-service'
 import { randomUUID } from 'crypto'
 import { NotificationService } from '@/lib/services/notification-service'
+import {
+  assertTicketAccess,
+  TicketAccessError,
+  toTicketAccessUser,
+} from '@/lib/tickets/ticket-access'
 
 /**
  * GET /api/tickets/[id]/resolution-plan
@@ -31,6 +36,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         id: true,
         assigneeId: true,
         clientId: true,
+        familyId: true,
       },
     })
 
@@ -38,17 +44,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ success: false, message: 'Ticket no encontrado' }, { status: 404 })
     }
 
-    // Verificar permisos: Admin, Técnico asignado, o el solicitante del ticket
-    const isAdmin = session.user.role === 'ADMIN'
-    const isAssignedTechnician =
-      session.user.role === 'TECHNICIAN' && ticket.assigneeId === session.user.id
-    const isRequester = ticket.clientId === session.user.id
-
-    if (!isAdmin && !isAssignedTechnician && !isRequester) {
-      return NextResponse.json(
-        { success: false, message: 'No tienes permiso para ver este plan' },
-        { status: 403 }
-      )
+    try {
+      await assertTicketAccess(toTicketAccessUser(session.user), ticket, 'read')
+    } catch (err) {
+      if (err instanceof TicketAccessError) {
+        return NextResponse.json(
+          { success: false, message: err.message },
+          { status: err.statusCode }
+        )
+      }
+      throw err
     }
 
     // Buscar plan de resolución
@@ -180,28 +185,31 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       )
     }
 
-    // Verificar que el ticket existe
     const ticket = await prisma.tickets.findUnique({
       where: { id: ticketId },
+      select: { id: true, clientId: true, assigneeId: true, familyId: true },
     })
 
     if (!ticket) {
       return NextResponse.json({ success: false, message: 'Ticket no encontrado' }, { status: 404 })
     }
 
-    // Verificar permisos: Admin o Técnico ASIGNADO (no colaboradores)
-    const isAdmin = session.user.role === 'ADMIN'
-    const isAssignedTechnician =
-      session.user.role === 'TECHNICIAN' && ticket.assigneeId === session.user.id
-
-    if (!isAdmin && !isAssignedTechnician) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'Solo el técnico asignado o un administrador puede crear planes de resolución',
-        },
-        { status: 403 }
-      )
+    try {
+      await assertTicketAccess(toTicketAccessUser(session.user), ticket, 'resolution_plan')
+    } catch (err) {
+      if (err instanceof TicketAccessError) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              err.statusCode === 403
+                ? 'Solo el técnico asignado o un administrador puede crear planes de resolución'
+                : err.message,
+          },
+          { status: err.statusCode }
+        )
+      }
+      throw err
     }
 
     // Verificar que no exista ya un plan
@@ -503,16 +511,25 @@ export async function DELETE(
       )
     }
 
-    // Verificar permisos
-    const isAdmin = session.user.role === 'ADMIN'
-    const isAssignedTechnician =
-      session.user.role === 'TECHNICIAN' && existingPlan.ticket.assigneeId === session.user.id
-
-    if (!isAdmin && !isAssignedTechnician) {
-      return NextResponse.json(
-        { success: false, message: 'No tienes permiso para eliminar este plan' },
-        { status: 403 }
+    try {
+      await assertTicketAccess(
+        toTicketAccessUser(session.user),
+        {
+          id: existingPlan.ticket.id,
+          clientId: existingPlan.ticket.clientId,
+          assigneeId: existingPlan.ticket.assigneeId,
+          familyId: existingPlan.ticket.familyId,
+        },
+        'resolution_plan'
       )
+    } catch (err) {
+      if (err instanceof TicketAccessError) {
+        return NextResponse.json(
+          { success: false, message: err.message },
+          { status: err.statusCode }
+        )
+      }
+      throw err
     }
 
     // Eliminar todas las tareas primero
@@ -596,16 +613,25 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       )
     }
 
-    // Verificar permisos
-    const isAdmin = session.user.role === 'ADMIN'
-    const isAssignedTechnician =
-      session.user.role === 'TECHNICIAN' && existingPlan.ticket.assigneeId === session.user.id
-
-    if (!isAdmin && !isAssignedTechnician) {
-      return NextResponse.json(
-        { success: false, message: 'No tienes permiso para actualizar este plan' },
-        { status: 403 }
+    try {
+      await assertTicketAccess(
+        toTicketAccessUser(session.user),
+        {
+          id: existingPlan.ticket.id,
+          clientId: existingPlan.ticket.clientId,
+          assigneeId: existingPlan.ticket.assigneeId,
+          familyId: existingPlan.ticket.familyId,
+        },
+        'resolution_plan'
       )
+    } catch (err) {
+      if (err instanceof TicketAccessError) {
+        return NextResponse.json(
+          { success: false, message: err.message },
+          { status: err.statusCode }
+        )
+      }
+      throw err
     }
 
     // Preparar datos de actualización

@@ -3,34 +3,60 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import {
+  assertTicketAccessById,
+  TicketAccessError,
+  toTicketAccessUser,
+} from '@/lib/tickets/ticket-access'
+import { assertTechnicianActiveInFamily } from '@/lib/tickets/assignee-validation'
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+      return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
+    }
+
+    if (session.user.role !== 'ADMIN') {
+      return NextResponse.json(
+        { success: false, message: 'Solo los administradores pueden asignar tickets manualmente' },
+        { status: 403 }
+      )
     }
 
     const { id: ticketId } = await params
     const assignmentData = await request.json()
 
-    // Validaciones
     if (assignmentData.assigneeId !== null && typeof assignmentData.assigneeId !== 'string') {
       return NextResponse.json(
-        {
-          success: false,
-          message: 'ID del técnico inválido',
-        },
+        { success: false, message: 'ID del técnico inválido' },
         { status: 400 }
       )
     }
 
-    // Obtener el ticket actual para comparar
+    let ticketAccess
+    try {
+      ticketAccess = await assertTicketAccessById(
+        toTicketAccessUser(session.user),
+        ticketId,
+        'assign'
+      )
+    } catch (err) {
+      if (err instanceof TicketAccessError) {
+        return NextResponse.json(
+          { success: false, message: err.message },
+          { status: err.statusCode }
+        )
+      }
+      throw err
+    }
+
     const currentTicket = await prisma.tickets.findUnique({
       where: { id: ticketId },
       select: {
         clientId: true,
         assigneeId: true,
+        familyId: true,
         users_tickets_assigneeIdTousers: {
           select: { id: true, name: true, email: true },
         },
@@ -38,17 +64,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     })
 
     if (!currentTicket) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'Ticket no encontrado',
-        },
-        { status: 404 }
-      )
+      return NextResponse.json({ success: false, message: 'Ticket no encontrado' }, { status: 404 })
     }
 
-    // Bloquear asignación al propio solicitante del ticket.
-    // Un técnico o admin que creó el ticket como cliente no puede ser asignado como resolutor.
     if (assignmentData.assigneeId && assignmentData.assigneeId === currentTicket.clientId) {
       return NextResponse.json(
         {
@@ -59,7 +77,23 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       )
     }
 
-    // Actualizar asignación en base de datos
+    if (assignmentData.assigneeId) {
+      try {
+        await assertTechnicianActiveInFamily(
+          assignmentData.assigneeId,
+          currentTicket.familyId ?? ticketAccess.familyId ?? undefined
+        )
+      } catch (err) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: err instanceof Error ? err.message : 'Técnico no válido para esta familia',
+          },
+          { status: 422 }
+        )
+      }
+    }
+
     const updatedTicket = await prisma.tickets.update({
       where: { id: ticketId },
       data: {
@@ -69,24 +103,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       },
       include: {
         users_tickets_assigneeIdTousers: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-          },
+          select: { id: true, name: true, email: true, role: true },
         },
         users_tickets_clientIdTousers: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
+          select: { id: true, name: true, email: true },
         },
       },
     })
 
-    // Crear entrada en el historial
     const oldAssigneeName = currentTicket.users_tickets_assigneeIdTousers?.name || 'Sin asignar'
     const newAssigneeName = updatedTicket.users_tickets_assigneeIdTousers?.name || 'Sin asignar'
 
@@ -103,7 +127,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       },
     })
 
-    // Enviar notificaciones si se asignó a un técnico
     if (assignmentData.assigneeId && assignmentData.assigneeId !== currentTicket.assigneeId) {
       const { NotificationService } = await import('@/lib/services/notification-service')
       await NotificationService.notifyTicketAssigned(ticketId, assignmentData.assigneeId).catch(
@@ -115,12 +138,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       const { triggerTicketAssignedToTechnicianEmail, triggerTicketAssignedToClientEmail } =
         await import('@/lib/email-triggers')
 
-      // Ejecutar en background sin esperar
       void triggerTicketAssignedToTechnicianEmail(ticketId)
       void triggerTicketAssignedToClientEmail(ticketId)
     }
 
-    // Notificar al técnico anterior cuando es desasignado
     if (!assignmentData.assigneeId && currentTicket.assigneeId) {
       const { NotificationService } = await import('@/lib/services/notification-service')
       await NotificationService.push({
@@ -136,9 +157,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     return NextResponse.json({
       success: true,
-      data: {
-        ticket: updatedTicket,
-      },
+      data: { ticket: updatedTicket },
       message: assignmentData.assigneeId
         ? 'Ticket asignado exitosamente'
         : 'Asignación removida exitosamente',
@@ -163,21 +182,34 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    if (session.user.role !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'Solo los administradores pueden ejecutar asignación automática' },
+        { status: 403 }
+      )
+    }
+
     const { id: ticketId } = await params
     const url = new URL(request.url)
     const mode = url.searchParams.get('mode')
 
-    // Si es asignación automática
     if (mode === 'auto') {
-      const body = await request.json()
+      try {
+        await assertTicketAccessById(toTicketAccessUser(session.user), ticketId, 'assign')
+      } catch (err) {
+        if (err instanceof TicketAccessError) {
+          return NextResponse.json({ error: err.message }, { status: err.statusCode })
+        }
+        throw err
+      }
 
+      const body = await request.json()
       const { AssignmentService } = await import('@/lib/services/assignment-service')
 
       try {
-        // Obtener el clientId del ticket para excluirlo de candidatos
         const ticket = await prisma.tickets.findUnique({
           where: { id: ticketId },
-          select: { clientId: true },
+          select: { clientId: true, familyId: true },
         })
 
         if (!ticket) {
@@ -190,23 +222,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             workloadBalance: body.workloadBalance !== false,
             skillMatch: body.skillMatch !== false,
           },
-          ticket.clientId // excluir al solicitante
+          ticket.clientId
         )
 
         return NextResponse.json(result)
       } catch (error) {
         const msg = error instanceof Error ? error.message : 'Error en asignación automática'
         console.error('[AUTO-ASSIGN] Error:', msg)
-
-        // Determinar código HTTP según el tipo de error
         const isNotFound = msg.includes('no encontrado') || msg.includes('not found')
-        const status = isNotFound ? 404 : 400
-
-        return NextResponse.json({ error: msg }, { status })
+        return NextResponse.json({ error: msg }, { status: isNotFound ? 404 : 400 })
       }
     }
 
-    // Para otros tipos de POST, redirigir a PATCH
     return NextResponse.json(
       { error: 'Método no soportado para este tipo de asignación' },
       { status: 405 }

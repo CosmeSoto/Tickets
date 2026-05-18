@@ -5,6 +5,11 @@ import prisma from '@/lib/prisma'
 import { auditTaskChange } from '@/lib/audit'
 import { calculateDuration, validateTimeRange, combineDateAndTime } from '@/lib/time-utils'
 import { NotificationService } from '@/lib/services/notification-service'
+import {
+  assertTicketAccess,
+  TicketAccessError,
+  toTicketAccessUser,
+} from '@/lib/tickets/ticket-access'
 
 /**
  * PATCH /api/tickets/[id]/resolution-plan/tasks/[taskId]
@@ -47,16 +52,25 @@ export async function PATCH(
       )
     }
 
-    // Verificar permisos
-    const isAdmin = session.user.role === 'ADMIN'
-    const isAssignedTechnician =
-      session.user.role === 'TECHNICIAN' && task.plan.ticket.assigneeId === session.user.id
-
-    if (!isAdmin && !isAssignedTechnician) {
-      return NextResponse.json(
-        { success: false, message: 'No tienes permiso para actualizar esta tarea' },
-        { status: 403 }
+    try {
+      await assertTicketAccess(
+        toTicketAccessUser(session.user),
+        {
+          id: task.plan.ticket.id,
+          clientId: task.plan.ticket.clientId,
+          assigneeId: task.plan.ticket.assigneeId,
+          familyId: task.plan.ticket.familyId,
+        },
+        'resolution_plan'
       )
+    } catch (err) {
+      if (err instanceof TicketAccessError) {
+        return NextResponse.json(
+          { success: false, message: err.message },
+          { status: err.statusCode }
+        )
+      }
+      throw err
     }
 
     // Preparar datos de actualización
@@ -313,16 +327,25 @@ export async function DELETE(
       )
     }
 
-    // Verificar permisos
-    const isAdmin = session.user.role === 'ADMIN'
-    const isAssignedTechnician =
-      session.user.role === 'TECHNICIAN' && task.plan.ticket.assigneeId === session.user.id
-
-    if (!isAdmin && !isAssignedTechnician) {
-      return NextResponse.json(
-        { success: false, message: 'No tienes permiso para eliminar esta tarea' },
-        { status: 403 }
+    try {
+      await assertTicketAccess(
+        toTicketAccessUser(session.user),
+        {
+          id: task.plan.ticket.id,
+          clientId: task.plan.ticket.clientId,
+          assigneeId: task.plan.ticket.assigneeId,
+          familyId: task.plan.ticket.familyId,
+        },
+        'resolution_plan'
       )
+    } catch (err) {
+      if (err instanceof TicketAccessError) {
+        return NextResponse.json(
+          { success: false, message: err.message },
+          { status: err.statusCode }
+        )
+      }
+      throw err
     }
 
     const wasCompleted = task.status === 'completed'

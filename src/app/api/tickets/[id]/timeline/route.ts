@@ -11,6 +11,11 @@ import {
   TICKET_FIELD_LABELS,
   TICKET_ACTION_LABELS,
 } from '@/lib/constants/ticket-labels'
+import {
+  assertTicketAccess,
+  TicketAccessError,
+  toTicketAccessUser,
+} from '@/lib/tickets/ticket-access'
 
 /**
  * GET /api/tickets/[id]/timeline
@@ -33,26 +38,21 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
         id: true,
         clientId: true,
         assigneeId: true,
+        familyId: true,
       },
     })
 
     if (!ticket) {
-      // Ticket eliminado — devolver array vacío en lugar de 404
-      // para que el cliente detenga el polling silenciosamente
       return NextResponse.json({ success: true, data: [], deleted: true })
     }
 
-    // Verificar permisos
-    const isAdmin = session.user.role === 'ADMIN'
-    const isTechnician = session.user.role === 'TECHNICIAN'
-    const isOwner = ticket.clientId === session.user.id
-    const isAssignee = ticket.assigneeId === session.user.id
-
-    if (!isAdmin && !isTechnician && !isOwner && !isAssignee) {
-      return NextResponse.json(
-        { success: false, error: 'No tienes permisos para ver este timeline' },
-        { status: 403 }
-      )
+    try {
+      await assertTicketAccess(toTicketAccessUser(session.user), ticket, 'read')
+    } catch (err) {
+      if (err instanceof TicketAccessError) {
+        return NextResponse.json({ success: false, error: err.message }, { status: err.statusCode })
+      }
+      throw err
     }
 
     // Obtener historial del ticket (más reciente primero)

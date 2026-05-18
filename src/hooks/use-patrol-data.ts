@@ -62,6 +62,7 @@ export interface PatrolData {
   familyConfig?: {
     requirePhotoOnStart: boolean
     requirePhotoOnEnd: boolean
+    patrolIncidentCategoryId?: string | null
   }
 }
 

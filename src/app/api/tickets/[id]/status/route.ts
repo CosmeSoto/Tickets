@@ -6,6 +6,11 @@ import { NotificationService } from '@/lib/services/notification-service'
 import { randomUUID } from 'crypto'
 import { invalidateCache } from '@/lib/api-cache'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
+import {
+  assertTicketAccess,
+  TicketAccessError,
+  toTicketAccessUser,
+} from '@/lib/tickets/ticket-access'
 
 // Transiciones válidas por rol
 const TRANSITIONS: Record<string, Record<string, string[]>> = {
@@ -44,7 +49,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     // Obtener ticket actual
     const ticket = await prisma.tickets.findUnique({
       where: { id: ticketId },
-      select: { id: true, status: true, assigneeId: true, clientId: true, title: true },
+      select: {
+        id: true,
+        status: true,
+        assigneeId: true,
+        clientId: true,
+        familyId: true,
+        title: true,
+      },
     })
 
     if (!ticket) {
@@ -53,6 +65,20 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const role = session.user.role
     const isSuperAdmin = (session.user as any).isSuperAdmin ?? false
+
+    if (!isSuperAdmin) {
+      try {
+        await assertTicketAccess(toTicketAccessUser(session.user), ticket, 'write')
+      } catch (err) {
+        if (err instanceof TicketAccessError) {
+          return NextResponse.json(
+            { success: false, message: err.message },
+            { status: err.statusCode }
+          )
+        }
+        throw err
+      }
+    }
     const currentStatus = ticket.status
 
     // SUPER ADMIN: NO TIENE RESTRICCIONES DE NINGÚN TIPO

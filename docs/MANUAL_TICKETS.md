@@ -26,6 +26,8 @@ Versión actual · Abril 2026 · Última actualización: configuración de ticke
     - [Dónde se configura cada parámetro](#dónde-se-configura-cada-parámetro)
 13. [Notificaciones y alertas](#13-notificaciones-y-alertas)
 14. [Referencia de estados y transiciones](#14-referencia-de-estados-y-transiciones)
+15. [Seguridad y alcance por familia](#15-seguridad-y-alcance-por-familia)
+16. [Integración con rondas (incidencias)](#16-integración-con-rondas-incidencias)
 
 ---
 
@@ -35,13 +37,13 @@ El módulo de tickets es el núcleo del sistema de soporte. Permite a los usuari
 
 **Conceptos clave:**
 
-| Concepto | Descripción |
-|----------|-------------|
-| **Ticket** | Una solicitud de soporte creada por un cliente |
-| **Área / Familia** | El equipo responsable de atender los tickets (ej: Mantenimiento, TI, Servicios Generales) |
-| **Categoría** | Clasificación del tipo de problema (hasta 4 niveles jerárquicos) |
-| **SLA** | Acuerdo de nivel de servicio — tiempo máximo para responder y resolver |
-| **Código de ticket** | Identificador único legible (ej: `TI-2026-0001`) |
+| Concepto             | Descripción                                                                               |
+| -------------------- | ----------------------------------------------------------------------------------------- |
+| **Ticket**           | Una solicitud de soporte creada por un cliente                                            |
+| **Área / Familia**   | El equipo responsable de atender los tickets (ej: Mantenimiento, TI, Servicios Generales) |
+| **Categoría**        | Clasificación del tipo de problema (hasta 4 niveles jerárquicos)                          |
+| **SLA**              | Acuerdo de nivel de servicio — tiempo máximo para responder y resolver                    |
+| **Código de ticket** | Identificador único legible (ej: `TI-2026-0001`)                                          |
 
 ---
 
@@ -49,58 +51,58 @@ El módulo de tickets es el núcleo del sistema de soporte. Permite a los usuari
 
 ### Los cuatro roles del sistema
 
-| Rol | Quién es | Qué ve |
-|-----|----------|--------|
-| **Cliente** | Usuario final que reporta problemas | Solo sus propios tickets |
-| **Técnico** | Personal de soporte que resuelve tickets | Tickets de sus áreas asignadas |
-| **Admin** | Responsable de un conjunto de áreas | Tickets y configuración de sus áreas asignadas |
-| **Super Admin** | Administrador principal del sistema | Todo, sin restricciones |
+| Rol             | Quién es                                 | Qué ve                                         |
+| --------------- | ---------------------------------------- | ---------------------------------------------- |
+| **Cliente**     | Usuario final que reporta problemas      | Solo sus propios tickets                       |
+| **Técnico**     | Personal de soporte que resuelve tickets | Tickets de sus áreas asignadas                 |
+| **Admin**       | Responsable de un conjunto de áreas      | Tickets y configuración de sus áreas asignadas |
+| **Super Admin** | Administrador principal del sistema      | Todo, sin restricciones                        |
 
 > ℹ️ Técnicamente, Super Admin y Admin son el mismo rol (`ADMIN`) en la base de datos. La diferencia es el campo `isSuperAdmin = true/false`. Se asigna al crear o editar el usuario.
 
 ### Admin normal vs Super Admin — diferencias concretas
 
-| Capacidad | Admin normal | Super Admin |
-|-----------|:-----------:|:-----------:|
-| Ver tickets de sus áreas asignadas | ✅ | ✅ (todas) |
-| Ver tickets de áreas NO asignadas | ❌ | ✅ |
-| Configurar tickets por área | ✅ (sus áreas) | ✅ (todas) |
-| Ver reportes | ✅ (sus áreas) | ✅ (todas) |
-| Gestionar usuarios | ✅ | ✅ |
-| Crear otro Super Admin | ❌ | ✅ |
-| Ver auditoría del sistema | ❌ | ✅ |
-| Configurar email / SMTP | ❌ | ✅ |
-| Configurar seguridad (sesión, contraseñas) | ❌ | ✅ |
-| Configurar OAuth (Google, etc.) | ❌ | ✅ |
-| Editar políticas SLA globales | ❌ | ✅ |
-| Cambiar nombre del sistema | ❌ | ✅ |
-| Editar logos e identidad de la empresa | ❌ | ✅ |
-| Editar SEO de la página pública | ❌ | ✅ |
+| Capacidad                                  |  Admin normal  | Super Admin |
+| ------------------------------------------ | :------------: | :---------: |
+| Ver tickets de sus áreas asignadas         |       ✅       | ✅ (todas)  |
+| Ver tickets de áreas NO asignadas          |       ❌       |     ✅      |
+| Configurar tickets por área                | ✅ (sus áreas) | ✅ (todas)  |
+| Ver reportes                               | ✅ (sus áreas) | ✅ (todas)  |
+| Gestionar usuarios                         |       ✅       |     ✅      |
+| Crear otro Super Admin                     |       ❌       |     ✅      |
+| Ver auditoría del sistema                  |       ❌       |     ✅      |
+| Configurar email / SMTP                    |       ❌       |     ✅      |
+| Configurar seguridad (sesión, contraseñas) |       ❌       |     ✅      |
+| Configurar OAuth (Google, etc.)            |       ❌       |     ✅      |
+| Editar políticas SLA globales              |       ❌       |     ✅      |
+| Cambiar nombre del sistema                 |       ❌       |     ✅      |
+| Editar logos e identidad de la empresa     |       ❌       |     ✅      |
+| Editar SEO de la página pública            |       ❌       |     ✅      |
 
 **¿Qué pasa si un Admin no tiene áreas asignadas?**  
 Por compatibilidad, un admin sin ninguna asignación tiene acceso total (igual que Super Admin). Esto es para que un admin recién creado pueda trabajar. En cuanto se le asigna al menos un área, queda restringido a esas áreas.
 
 ### Tabla de permisos completa
 
-| Acción | Cliente | Técnico | Admin | SuperAdmin |
-|--------|:-------:|:-------:|:-----:|:----------:|
-| Ver sus propios tickets | ✅ | — | — | — |
-| Ver todos los tickets | — | ✅ (sus áreas) | ✅ (sus áreas) | ✅ (todos) |
-| Crear ticket | ✅ | — | ✅ | ✅ |
-| Editar título/descripción | ✅ (solo OPEN) | — | ✅ | ✅ |
-| Cambiar estado | — | ✅ (limitado) | ✅ | ✅ |
-| Cambiar prioridad | — | ✅ | ✅ | ✅ |
-| Asignar técnico | — | Solo sí mismo | ✅ | ✅ |
-| Eliminar ticket | ✅ (OPEN sin técnico) | — | ✅ | ✅ |
-| Comentar (público) | ✅ | ✅ | ✅ | ✅ |
-| Comentar (interno) | — | ✅ | ✅ | ✅ |
-| Ver comentarios internos | — | ✅ | ✅ | ✅ |
-| Calificar servicio | ✅ | — | — | — |
-| Crear artículo de conocimiento | — | ✅ | ✅ | ✅ |
-| Configurar área | — | — | ✅ (sus áreas) | ✅ |
-| Ver reportes | — | — | ✅ (sus áreas) | ✅ |
-| Ver auditoría | — | — | — | ✅ |
-| Exportar datos | — | ✅ (sus tickets) | ✅ | ✅ |
+| Acción                         |        Cliente        |     Técnico      |     Admin      | SuperAdmin |
+| ------------------------------ | :-------------------: | :--------------: | :------------: | :--------: |
+| Ver sus propios tickets        |          ✅           |        —         |       —        |     —      |
+| Ver todos los tickets          |           —           |  ✅ (sus áreas)  | ✅ (sus áreas) | ✅ (todos) |
+| Crear ticket                   |          ✅           |        —         |       ✅       |     ✅     |
+| Editar título/descripción      |    ✅ (solo OPEN)     |        —         |       ✅       |     ✅     |
+| Cambiar estado                 |           —           |  ✅ (limitado)   |       ✅       |     ✅     |
+| Cambiar prioridad              |           —           |        ✅        |       ✅       |     ✅     |
+| Asignar técnico                |           —           |  Solo sí mismo   |       ✅       |     ✅     |
+| Eliminar ticket                | ✅ (OPEN sin técnico) |        —         |       ✅       |     ✅     |
+| Comentar (público)             |          ✅           |        ✅        |       ✅       |     ✅     |
+| Comentar (interno)             |           —           |        ✅        |       ✅       |     ✅     |
+| Ver comentarios internos       |           —           |        ✅        |       ✅       |     ✅     |
+| Calificar servicio             |          ✅           |        —         |       —        |     —      |
+| Crear artículo de conocimiento |           —           |        ✅        |       ✅       |     ✅     |
+| Configurar área                |           —           |        —         | ✅ (sus áreas) |     ✅     |
+| Ver reportes                   |           —           |        —         | ✅ (sus áreas) |     ✅     |
+| Ver auditoría                  |           —           |        —         |       —        |     ✅     |
+| Exportar datos                 |           —           | ✅ (sus tickets) |       ✅       |     ✅     |
 
 ---
 
@@ -126,13 +128,13 @@ CLIENTE crea ticket
 
 **Estados:**
 
-| Estado | Código | Descripción |
-|--------|--------|-------------|
-| Abierto | `OPEN` | Ticket creado, esperando técnico |
-| En Progreso | `IN_PROGRESS` | Técnico está trabajando en él |
-| En Espera | `ON_HOLD` | Pausado (esperando información del cliente u otro sistema) |
-| Resuelto | `RESOLVED` | Técnico marcó como resuelto, esperando calificación del cliente |
-| Cerrado | `CLOSED` | Cliente calificó o se cerró automáticamente tras el plazo |
+| Estado      | Código        | Descripción                                                     |
+| ----------- | ------------- | --------------------------------------------------------------- |
+| Abierto     | `OPEN`        | Ticket creado, esperando técnico                                |
+| En Progreso | `IN_PROGRESS` | Técnico está trabajando en él                                   |
+| En Espera   | `ON_HOLD`     | Pausado (esperando información del cliente u otro sistema)      |
+| Resuelto    | `RESOLVED`    | Técnico marcó como resuelto, esperando calificación del cliente |
+| Cerrado     | `CLOSED`      | Cliente calificó o se cerró automáticamente tras el plazo       |
 
 **Transiciones permitidas por técnico:**
 
@@ -173,6 +175,7 @@ RESOLVED → IN_PROGRESS  (reabrir si es necesario)
 #### Calificar un ticket resuelto
 
 Cuando un técnico marca tu ticket como **Resuelto**:
+
 1. Aparece un banner destacado en el ticket: "Tu ticket ha sido resuelto"
 2. Ir al tab **Calificación**
 3. Evaluar de 1 a 5 estrellas las siguientes dimensiones:
@@ -210,6 +213,7 @@ Para crear uno: en el campo de comentario, activar el toggle **Solo equipo** (í
 #### Crear artículo de conocimiento
 
 Cuando un ticket llega a estado `RESUELTO` o `CERRADO`:
+
 1. Aparece el botón **Crear Artículo**
 2. El sistema pre-genera un borrador con: descripción del problema, plan de resolución, solución aplicada (comentarios públicos del técnico), y métricas del ticket
 3. Revisar el contenido generado y ajustar si es necesario
@@ -224,6 +228,7 @@ Cuando un ticket llega a estado `RESUELTO` o `CERRADO`:
 #### Gestión de tickets
 
 En **Gestión de Tickets** el admin tiene acceso completo:
+
 - Ver todos los tickets de sus familias asignadas
 - Crear tickets manualmente especificando el cliente
 - Editar cualquier campo (título, descripción, estado, prioridad, categoría, técnico)
@@ -239,25 +244,25 @@ La configuración está en **Tickets → Configuración** en el menú lateral. T
 
 **Tab "Por área"** — configuración individual por cada área de soporte:
 
-| Campo | Descripción |
-|-------|-------------|
-| Switch en la lista | Activa/desactiva la recepción de tickets en esa área |
-| Prefijo de código | Prefijo para los códigos (ej: `TI` → `TI-2026-0001`) |
-| Alerta de volumen | Notifica cuando los tickets abiertos superen N |
-| Tickets habilitados | Toggle para habilitar/deshabilitar el área |
-| Asignación respeta el área | Solo auto-asigna técnicos de esa área |
-| Área por defecto del sistema | Esta área recibe tickets sin área asignada |
-| Horario laboral | Entrada, salida y días laborales (botones L M X J V S D) |
-| Tiempos SLA de referencia | Tarjetas visuales por prioridad (solo lectura aquí) |
+| Campo                        | Descripción                                              |
+| ---------------------------- | -------------------------------------------------------- |
+| Switch en la lista           | Activa/desactiva la recepción de tickets en esa área     |
+| Prefijo de código            | Prefijo para los códigos (ej: `TI` → `TI-2026-0001`)     |
+| Alerta de volumen            | Notifica cuando los tickets abiertos superen N           |
+| Tickets habilitados          | Toggle para habilitar/deshabilitar el área               |
+| Asignación respeta el área   | Solo auto-asigna técnicos de esa área                    |
+| Área por defecto del sistema | Esta área recibe tickets sin área asignada               |
+| Horario laboral              | Entrada, salida y días laborales (botones L M X J V S D) |
+| Tiempos SLA de referencia    | Tarjetas visuales por prioridad (solo lectura aquí)      |
 
 **Tab "Reglas generales"** — configuración que aplica a todo el sistema:
 
-| Campo | Descripción |
-|-------|-------------|
-| Área por defecto | Área fallback cuando no se puede determinar el área del ticket |
-| Límite de tickets por usuario | Máximo de tickets abiertos simultáneos por usuario |
-| Cierre automático | Días tras resolución sin calificación antes del cierre automático |
-| Asignación automática | Activa/desactiva la asignación automática al técnico con menor carga |
+| Campo                         | Descripción                                                          |
+| ----------------------------- | -------------------------------------------------------------------- |
+| Área por defecto              | Área fallback cuando no se puede determinar el área del ticket       |
+| Límite de tickets por usuario | Máximo de tickets abiertos simultáneos por usuario                   |
+| Cierre automático             | Días tras resolución sin calificación antes del cierre automático    |
+| Asignación automática         | Activa/desactiva la asignación automática al técnico con menor carga |
 
 > 💡 Hay **un solo botón "Guardar cambios"** en el header que guarda todo lo que hayas modificado en ambos tabs.
 
@@ -267,16 +272,16 @@ La configuración está en **Tickets → Configuración** en el menú lateral. T
 
 ### Diferencias
 
-| Aspecto | Público | Interno (Solo equipo) |
-|---------|---------|----------------------|
-| Visible para cliente | ✅ | ❌ |
-| Visible para técnico | ✅ | ✅ |
-| Visible para admin | ✅ | ✅ |
-| Aparece en JSON de la API para clientes | ❌ (filtrado en backend) | ❌ |
-| Incluido en artículos de conocimiento | ✅ | ❌ |
-| Dispara notificación email al cliente | ✅ | ❌ |
-| Color en el historial | Gris neutro | Ámbar / naranja |
-| Ícono | 💬 | 🔒 |
+| Aspecto                                 | Público                  | Interno (Solo equipo) |
+| --------------------------------------- | ------------------------ | --------------------- |
+| Visible para cliente                    | ✅                       | ❌                    |
+| Visible para técnico                    | ✅                       | ✅                    |
+| Visible para admin                      | ✅                       | ✅                    |
+| Aparece en JSON de la API para clientes | ❌ (filtrado en backend) | ❌                    |
+| Incluido en artículos de conocimiento   | ✅                       | ❌                    |
+| Dispara notificación email al cliente   | ✅                       | ❌                    |
+| Color en el historial                   | Gris neutro              | Ámbar / naranja       |
+| Ícono                                   | 💬                       | 🔒                    |
 
 ### Seguridad
 
@@ -303,6 +308,7 @@ Si `allowedFromFamilies` está vacío, cualquier cliente del sistema puede crear
 ### ¿Qué hace el switch de habilitar/deshabilitar en la lista de áreas?
 
 El switch controla si esa área **puede recibir tickets nuevos**. Si está desactivado:
+
 - Los clientes **no pueden crear** tickets en esa área
 - Los tickets existentes **no se borran** ni se afectan
 - Es útil para áreas sin personal disponible temporalmente
@@ -312,6 +318,7 @@ El switch controla si esa área **puede recibir tickets nuevos**. Si está desac
 Es el **área de último recurso** (fallback). Cuando el sistema no puede determinar a qué área pertenece un ticket — por ejemplo, si la categoría seleccionada no tiene área asignada — el ticket se envía automáticamente a esta área.
 
 **Aclaraciones importantes:**
+
 - Solo **una** área puede ser la por defecto a la vez
 - No significa que reciba todos los tickets de otras áreas — solo los que quedan "sin área determinada"
 - Si no hay área por defecto configurada, los tickets sin área quedan sin asignar (pueden perderse)
@@ -343,6 +350,7 @@ Nivel 1 — Principal      (ej: "Hardware")
 Al seleccionar una familia en el formulario de creación de ticket, el selector de categorías muestra **solo las categorías de esa familia** (filtrado automático).
 
 En la vista de Gestión de Categorías, el administrador puede:
+
 - Ver categorías filtradas por área (combobox) y nivel
 - Alternar entre vista tabla y vista árbol jerárquico
 - Crear, editar y eliminar categorías (respetando permisos de familia)
@@ -363,11 +371,11 @@ El SLA (Service Level Agreement) define los tiempos máximos para responder y re
 ### Tiempos por defecto
 
 | Prioridad | Respuesta | Resolución |
-|-----------|-----------|------------|
-| Urgente | 1h | 4h |
-| Alta | 2h | 8h |
-| Media | 4h | 24h |
-| Baja | 8h | 48h |
+| --------- | --------- | ---------- |
+| Urgente   | 1h        | 4h         |
+| Alta      | 2h        | 8h         |
+| Media     | 4h        | 24h        |
+| Baja      | 8h        | 48h        |
 
 > Los tiempos globales se editan en **Configuración del Sistema → tab SLA** (solo SuperAdmin).
 
@@ -388,12 +396,12 @@ Cuando una política SLA tiene **"Solo horas hábiles"** activo, el sistema desc
 
 **Ejemplo práctico** — Horario: 09:00–18:00, Lun–Vie, política de resolución: 4 horas:
 
-| Ticket llega | Deadline de resolución |
-|---|---|
-| Viernes 17:00 | Lunes 12:00 (1h el viernes + 3h el lunes) |
-| Viernes 18:00 | Lunes 13:00 (0h el viernes + 4h el lunes) |
-| Lunes 10:00 | Lunes 14:00 (4h corridas dentro del horario) |
-| Lunes 16:00 | Martes 11:00 (2h el lunes + 2h el martes) |
+| Ticket llega  | Deadline de resolución                       |
+| ------------- | -------------------------------------------- |
+| Viernes 17:00 | Lunes 12:00 (1h el viernes + 3h el lunes)    |
+| Viernes 18:00 | Lunes 13:00 (0h el viernes + 4h el lunes)    |
+| Lunes 10:00   | Lunes 14:00 (4h corridas dentro del horario) |
+| Lunes 16:00   | Martes 11:00 (2h el lunes + 2h el martes)    |
 
 El algoritmo avanza hora a hora, saltando días no laborales y horas fuera del rango configurado.
 
@@ -402,6 +410,7 @@ El algoritmo avanza hora a hora, saltando días no laborales y horas fuera del r
 ### Violaciones de SLA
 
 Si un ticket supera el tiempo de respuesta o resolución configurado:
+
 1. Se registra una violación en `sla_violations` con severidad (LOW/MEDIUM/HIGH/CRITICAL)
 2. El cron de SLA envía alertas al técnico asignado
 3. Las violaciones aparecen en el reporte de **Cumplimiento SLA**
@@ -414,12 +423,12 @@ La base de conocimientos almacena soluciones documentadas basadas en tickets res
 
 ### Visibilidad por rol
 
-| Rol | Artículos visibles |
-|-----|-------------------|
-| Cliente | Solo de las familias de sus tickets históricos |
-| Técnico | Solo de sus familias asignadas |
-| Admin | Solo de sus familias asignadas |
-| SuperAdmin | Todos |
+| Rol        | Artículos visibles                             |
+| ---------- | ---------------------------------------------- |
+| Cliente    | Solo de las familias de sus tickets históricos |
+| Técnico    | Solo de sus familias asignadas                 |
+| Admin      | Solo de sus familias asignadas                 |
+| SuperAdmin | Todos                                          |
 
 ### Filtros
 
@@ -448,6 +457,7 @@ El cron `auto-close-tickets` se ejecuta diariamente y cierra automáticamente lo
 **N (plazo)**: Configurado en `system_settings.autoCloseDays` (default: **3 días**).
 
 Cuando se cierra automáticamente:
+
 - El cliente recibe una notificación: "Tu ticket fue cerrado automáticamente. Aún puedes calificarlo desde el detalle."
 - El técnico recibe notificación para promover el ticket a artículo de conocimiento
 
@@ -459,17 +469,18 @@ Cuando se cierra automáticamente:
 
 En las secciones **Mis Tickets** (cliente), **Mis Tickets Asignados** (técnico) y **Gestión de Tickets** (admin), el botón **Exportar** (junto al título de la tabla) descarga los tickets **con los filtros activos en pantalla**:
 
-| Formato | Contenido |
-|---------|-----------|
-| **CSV** | Texto plano separado por comas, compatible con Excel/Google Sheets. Incluye BOM UTF-8. |
-| **Excel** | Archivo `.xlsx` con anchos de columna automáticos. |
-| **PDF** | Ventana de impresión del navegador, genera PDF profesional en A4 horizontal. |
+| Formato   | Contenido                                                                              |
+| --------- | -------------------------------------------------------------------------------------- |
+| **CSV**   | Texto plano separado por comas, compatible con Excel/Google Sheets. Incluye BOM UTF-8. |
+| **Excel** | Archivo `.xlsx` con anchos de columna automáticos.                                     |
+| **PDF**   | Ventana de impresión del navegador, genera PDF profesional en A4 horizontal.           |
 
 **Columnas exportadas**: Código, Título, Estado, Prioridad, Cliente, Técnico, Categoría, Área, Fecha creación, Fecha actualización.
 
 ### Desde reportes (Admin)
 
 Los reportes tienen sus propios botones **CSV** y **PDF** para cada tab:
+
 - Resumen Ejecutivo: KPIs por familia
 - Rendimiento de Técnicos: tickets/resoluciones/tiempos por técnico
 - Tendencias Temporales: evolución de volumen de tickets
@@ -484,11 +495,11 @@ Cada exportación queda registrada en auditoría automáticamente.
 
 ### Dónde se pueden adjuntar archivos
 
-| Lugar | Quién puede |
-|-------|-------------|
-| Formulario de creación de ticket | Cliente, Admin |
+| Lugar                                   | Quién puede    |
+| --------------------------------------- | -------------- |
+| Formulario de creación de ticket        | Cliente, Admin |
 | Tab "Archivos" en el detalle del ticket | Técnico, Admin |
-| Botón 📎 en el historial/comentarios | Técnico, Admin |
+| Botón 📎 en el historial/comentarios    | Técnico, Admin |
 
 ### Carga masiva
 
@@ -498,29 +509,30 @@ Se pueden seleccionar y subir **múltiples archivos a la vez**. El sistema los p
 
 Las imágenes se comprimen automáticamente en el servidor antes de guardarse:
 
-| Tipo original | Resultado | Calidad |
-|---|---|---|
-| JPEG / JPG | JPEG progresivo | 82% |
-| PNG | WebP | 85% |
-| WebP | WebP | 85% |
-| GIF | Sin cambios | — |
-| PDF / Office | Sin cambios | — |
+| Tipo original | Resultado       | Calidad |
+| ------------- | --------------- | ------- |
+| JPEG / JPG    | JPEG progresivo | 82%     |
+| PNG           | WebP            | 85%     |
+| WebP          | WebP            | 85%     |
+| GIF           | Sin cambios     | —       |
+| PDF / Office  | Sin cambios     | —       |
 
 Todas las imágenes se redimensionan a máximo **1920px de ancho** (sin ampliar las que ya son más pequeñas). El ahorro típico es del 40–70% en tamaño.
 
 ### Límites por ticket
 
-| Límite | Valor |
-|--------|-------|
-| Tamaño máximo por archivo | 10 MB (antes de compresión) |
-| Archivos máximos por ticket | 10 archivos |
-| Almacenamiento total por ticket | 50 MB |
+| Límite                          | Valor                       |
+| ------------------------------- | --------------------------- |
+| Tamaño máximo por archivo       | 10 MB (antes de compresión) |
+| Archivos máximos por ticket     | 10 archivos                 |
+| Almacenamiento total por ticket | 50 MB                       |
 
 Si se supera cualquier límite, el servidor devuelve un error claro indicando cuál se excedió.
 
 ### Cámara en móvil
 
 Al acceder desde un dispositivo móvil con cámara, aparecen dos botones en las zonas de adjuntos:
+
 - 📷 **Cámara** — abre directamente la cámara trasera para tomar una foto en el momento
 - 📎 **Galería / Archivo** — abre la galería o el explorador de archivos
 
@@ -575,22 +587,22 @@ Configuración del Sistema    ← email, seguridad, OAuth, SLA global
 
 ### Dónde se configura cada parámetro
 
-| Configuración | Ubicación en el menú | Acceso |
-|---|---|---|
-| Habilitar/deshabilitar área para tickets | Tickets → Configuración → tab "Por área" | Admin |
-| Prefijo de código, horario laboral, alertas | Tickets → Configuración → tab "Por área" → [seleccionar área] | Admin |
-| **Días laborales** | Tickets → Configuración → tab "Por área" → Horario laboral → botones **L M X J V S D** | Admin |
-| Área por defecto del sistema | Tickets → Configuración → tab "Reglas generales" | Admin |
-| Límite de tickets por usuario | Tickets → Configuración → tab "Reglas generales" | Admin |
-| **Plazo de cierre automático (días)** | Tickets → Configuración → tab "Reglas generales" | Admin |
-| Asignación automática global | Tickets → Configuración → tab "Reglas generales" | Admin |
-| **Políticas SLA globales (tiempos por prioridad)** | Configuración del Sistema → tab **SLA** | SuperAdmin |
-| Notificaciones globales | Configuración del Sistema → tab Notificaciones | Admin |
-| Email / SMTP | Configuración del Sistema → tab Email | SuperAdmin |
-| Seguridad (sesión, contraseñas) | Configuración del Sistema → tab Seguridad | SuperAdmin |
-| OAuth (Google, etc.) | Configuración del Sistema → tab OAuth | SuperAdmin |
-| Página pública (hero, servicios, logos, SEO) | Página Pública (menú lateral) | Admin / SuperAdmin |
-| Notificaciones personales | Configuración personal → Notificaciones | Todos |
+| Configuración                                      | Ubicación en el menú                                                                   | Acceso             |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------ |
+| Habilitar/deshabilitar área para tickets           | Tickets → Configuración → tab "Por área"                                               | Admin              |
+| Prefijo de código, horario laboral, alertas        | Tickets → Configuración → tab "Por área" → [seleccionar área]                          | Admin              |
+| **Días laborales**                                 | Tickets → Configuración → tab "Por área" → Horario laboral → botones **L M X J V S D** | Admin              |
+| Área por defecto del sistema                       | Tickets → Configuración → tab "Reglas generales"                                       | Admin              |
+| Límite de tickets por usuario                      | Tickets → Configuración → tab "Reglas generales"                                       | Admin              |
+| **Plazo de cierre automático (días)**              | Tickets → Configuración → tab "Reglas generales"                                       | Admin              |
+| Asignación automática global                       | Tickets → Configuración → tab "Reglas generales"                                       | Admin              |
+| **Políticas SLA globales (tiempos por prioridad)** | Configuración del Sistema → tab **SLA**                                                | SuperAdmin         |
+| Notificaciones globales                            | Configuración del Sistema → tab Notificaciones                                         | Admin              |
+| Email / SMTP                                       | Configuración del Sistema → tab Email                                                  | SuperAdmin         |
+| Seguridad (sesión, contraseñas)                    | Configuración del Sistema → tab Seguridad                                              | SuperAdmin         |
+| OAuth (Google, etc.)                               | Configuración del Sistema → tab OAuth                                                  | SuperAdmin         |
+| Página pública (hero, servicios, logos, SEO)       | Página Pública (menú lateral)                                                          | Admin / SuperAdmin |
+| Notificaciones personales                          | Configuración personal → Notificaciones                                                | Todos              |
 
 ### Parámetros clave de `ticket_family_config`
 
@@ -622,36 +634,38 @@ autoCloseDays          → Días tras resolución sin calificación antes del ci
 
 ### Tipos de notificaciones de tickets
 
-| Evento | Cliente | Técnico | Admin |
-|--------|---------|---------|-------|
-| Ticket creado | ✅ | — | ✅ (in-app) |
-| Ticket asignado | — | ✅ (email + in-app) | — |
-| Comentario público agregado | ✅ (email + in-app) | ✅ (in-app) | — |
-| Estado cambiado | ✅ (in-app) | — | — |
-| Ticket resuelto | ✅ (email + in-app) | — | ✅ (email) |
-| Ticket cerrado por cliente | — | ✅ (in-app) | — |
-| SLA próximo a vencer | — | ✅ | ✅ |
-| Violación de SLA | — | ✅ | ✅ |
+| Evento                      | Cliente             | Técnico             | Admin       |
+| --------------------------- | ------------------- | ------------------- | ----------- |
+| Ticket creado               | ✅                  | —                   | ✅ (in-app) |
+| Ticket asignado             | —                   | ✅ (email + in-app) | —           |
+| Comentario público agregado | ✅ (email + in-app) | ✅ (in-app)         | —           |
+| Estado cambiado             | ✅ (in-app)         | —                   | —           |
+| Ticket resuelto             | ✅ (email + in-app) | —                   | ✅ (email)  |
+| Ticket cerrado por cliente  | —                   | ✅ (in-app)         | —           |
+| SLA próximo a vencer        | —                   | ✅                  | ✅          |
+| Violación de SLA            | —                   | ✅                  | ✅          |
 
 ### Configuración de sonido
 
 Las notificaciones en tiempo real (SSE) pueden reproducir un tono de alerta al llegar:
+
 - **Activar/desactivar**: Configuración → Notificaciones → "Sonido de notificaciones"
 - El sonido requiere **una interacción previa del usuario** (política del navegador). Si llegas a la página y hay notificaciones pendientes, el tono suena al primer clic.
 - El tono es corto y discreto (880Hz → 660Hz, 0.4s).
 
 ### Notificaciones en móvil
 
-| Escenario | Comportamiento |
-|---|---|
-| App abierta en primer plano | Tono de sonido + vibración (100ms–50ms–100ms) |
-| App en segundo plano / minimizada | Notificación nativa del SO (si el permiso está activado) |
-| Pantalla bloqueada | Notificación nativa del SO (si el permiso está activado) |
-| App cerrada | Sin notificación (requeriría servidor push — no implementado) |
+| Escenario                         | Comportamiento                                                |
+| --------------------------------- | ------------------------------------------------------------- |
+| App abierta en primer plano       | Tono de sonido + vibración (100ms–50ms–100ms)                 |
+| App en segundo plano / minimizada | Notificación nativa del SO (si el permiso está activado)      |
+| Pantalla bloqueada                | Notificación nativa del SO (si el permiso está activado)      |
+| App cerrada                       | Sin notificación (requeriría servidor push — no implementado) |
 
 **Vibración**: Se activa automáticamente en dispositivos móviles cuando llega una notificación, independientemente de si el sonido está activado o no.
 
 **Notificaciones nativas del SO**: Para recibirlas cuando la app está en segundo plano:
+
 1. Ir a **Configuración → Notificaciones**
 2. En la sección "Notificaciones cuando la app está en segundo plano", hacer clic en **Activar**
 3. El navegador mostrará un diálogo de permiso — aceptar
@@ -681,25 +695,96 @@ CLOSED      → Ticket finalizado (calificado o auto-cerrado)
 
 ### Quién puede hacer cada transición
 
-| Transición | Cliente | Técnico | Admin |
-|------------|:-------:|:-------:|:-----:|
-| OPEN → IN_PROGRESS | — | ✅ | ✅ |
-| IN_PROGRESS → ON_HOLD | — | ✅ | ✅ |
-| ON_HOLD → IN_PROGRESS | — | ✅ | ✅ |
-| IN_PROGRESS → RESOLVED | — | ✅ | ✅ |
-| RESOLVED → IN_PROGRESS | — | ✅ | ✅ |
-| RESOLVED → CLOSED | Solo vía calificación | — | ✅ |
-| Cualquier → CLOSED | — | — | ✅ (directo) |
+| Transición             |        Cliente        | Técnico |    Admin     |
+| ---------------------- | :-------------------: | :-----: | :----------: |
+| OPEN → IN_PROGRESS     |           —           |   ✅    |      ✅      |
+| IN_PROGRESS → ON_HOLD  |           —           |   ✅    |      ✅      |
+| ON_HOLD → IN_PROGRESS  |           —           |   ✅    |      ✅      |
+| IN_PROGRESS → RESOLVED |           —           |   ✅    |      ✅      |
+| RESOLVED → IN_PROGRESS |           —           |   ✅    |      ✅      |
+| RESOLVED → CLOSED      | Solo vía calificación |    —    |      ✅      |
+| Cualquier → CLOSED     |           —           |    —    | ✅ (directo) |
 
 ### Códigos de error comunes
 
-| Error | Causa | Solución |
-|-------|-------|---------|
-| "Solo puedes editar tickets OPEN" | El cliente intenta editar un ticket en progreso | Usar comentarios para agregar información |
-| "Los técnicos no pueden cerrar tickets directamente" | Técnico intenta CLOSED | Dejar que el cliente califique o pedir al admin |
-| "No tienes acceso a este ticket" | Cliente intenta ver ticket de otro cliente | Verificar que el ID sea correcto |
-| "Solo puedes eliminar tickets OPEN sin técnico asignado" | Condición de eliminación no cumplida | El ticket ya fue asignado; pedir al admin que lo elimine |
+| Error                                                    | Causa                                           | Solución                                                 |
+| -------------------------------------------------------- | ----------------------------------------------- | -------------------------------------------------------- |
+| "Solo puedes editar tickets OPEN"                        | El cliente intenta editar un ticket en progreso | Usar comentarios para agregar información                |
+| "Los técnicos no pueden cerrar tickets directamente"     | Técnico intenta CLOSED                          | Dejar que el cliente califique o pedir al admin          |
+| "No tienes acceso a este ticket"                         | Cliente intenta ver ticket de otro cliente      | Verificar que el ID sea correcto                         |
+| "Solo puedes eliminar tickets OPEN sin técnico asignado" | Condición de eliminación no cumplida            | El ticket ya fue asignado; pedir al admin que lo elimine |
 
 ---
 
-*Para actualizar, editar `docs/MANUAL_TICKETS.md`.*
+## 15. Seguridad y alcance por familia
+
+Desde mayo 2026, el acceso a tickets por ID está centralizado en `src/lib/tickets/ticket-access.ts` y se aplica en detalle, comentarios, adjuntos, timeline, SSE, estado, colaboradores, calificación y asignación.
+
+### Matriz de acceso (resumen)
+
+| Acción                         | Cliente |                Técnico                | Admin normal | Super Admin |
+| ------------------------------ | :-----: | :-----------------------------------: | :----------: | :---------: |
+| Ver ticket propio / asignado   |   ✅    |                  ✅                   | ✅ (familia) |     ✅      |
+| Ver ticket de otra familia     |   ❌    |                  ❌                   |      ❌      |     ✅      |
+| Comentar                       | Propio  | Asignado / colaborador / cola familia |   Familia    |     ✅      |
+| Cambiar estado                 |   ❌    |        Asignado / colaborador         |   Familia    |     ✅      |
+| Asignar técnico                |   ❌    |                  ❌                   | ✅ (familia) |     ✅      |
+| Crear con `assigneeId` en body |   ❌    |        Escalamiento automático        |      ✅      |     ✅      |
+
+### Flujo de autorización en API
+
+```mermaid
+flowchart TD
+  A[Request con ticketId] --> B{Sesión válida?}
+  B -->|No| C[401]
+  B -->|Sí| D[Cargar ticket]
+  D --> E{Existe?}
+  E -->|No| F[404]
+  E -->|Sí| G[ticket-access.ts]
+  G --> H{Super Admin?}
+  H -->|Sí| I[Permitir]
+  H -->|No| J{Rol + familia + asignación}
+  J -->|OK| I
+  J -->|No| K[403]
+```
+
+### Creación de tickets (validaciones)
+
+```mermaid
+flowchart LR
+  POST["POST /api/tickets"] --> V1[Familia vs categoría]
+  V1 --> V2[ticketsEnabled por familia]
+  V2 --> V3[Scope del usuario]
+  V3 --> V4{source=PATROL?}
+  V4 -->|Sí| V5[checkInId + agente + ronda IN_PROGRESS]
+  V4 -->|No| V6[Cliente sin assigneeId]
+  V5 --> CREATE[Crear ticket]
+  V6 --> CREATE
+  CREATE --> FOTO{photoBase64?}
+  FOTO -->|Sí| ADJ[Adjunto vía FileService]
+  FOTO -->|No| DONE[Respuesta]
+  ADJ -->|Error| WARN[warning en respuesta]
+  ADJ -->|OK| DONE
+```
+
+### Archivos clave
+
+| Archivo                                  | Responsabilidad                             |
+| ---------------------------------------- | ------------------------------------------- |
+| `src/lib/tickets/ticket-access.ts`       | Reglas de lectura/escritura/asignación      |
+| `src/lib/tickets/assignee-validation.ts` | Técnico activo en familia del ticket        |
+| `src/lib/auth/admin-scope.ts`            | Familias visibles por admin/técnico/cliente |
+
+---
+
+## 16. Integración con rondas (incidencias)
+
+Los incidentes de patrulla crean tickets con `source=PATROL` y `checkInId`. El servidor valida que el check-in pertenezca al agente y a la ronda en progreso; no se acepta un `familyId` arbitrario.
+
+La foto de evidencia es **opcional** en la UI. Si se envía, se adjunta después de crear el ticket; si falla la subida, el ticket queda creado y la API devuelve un `warning`.
+
+Ver manual completo: [`docs/MANUAL_RONDAS.md`](./MANUAL_RONDAS.md).
+
+---
+
+_Para actualizar, editar `docs/MANUAL_TICKETS.md`. Ver también `docs/LIMITACIONES_CONOCIDAS.md`._

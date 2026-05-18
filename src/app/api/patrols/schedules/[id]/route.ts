@@ -12,6 +12,12 @@ import prisma from '@/lib/prisma'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
 import { checkPatrolFamilyAccess, canDeletePatrolResource } from '@/lib/patrol/patrol-access'
 import { PatrolSchedulerService } from '@/lib/services/patrol-scheduler.service'
+import {
+  assertScheduleAgent,
+  assertScheduleRoute,
+  assertNoAgentScheduleOverlap,
+  ScheduleValidationError,
+} from '@/lib/patrol/schedule-validation'
 
 const patchScheduleSchema = z.object({
   familyId: z.string().uuid().optional(),
@@ -127,33 +133,48 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }
     }
 
-    // Si cambia el agente, validar que tenga patrolsEnabled
-    if (updateData.agentId) {
-      const agent = await prisma.users.findUnique({
-        where: { id: updateData.agentId },
-        select: { id: true, patrolsEnabled: true },
-      })
-      if (!agent?.patrolsEnabled) {
-        return NextResponse.json(
-          { error: 'El usuario seleccionado no tiene el módulo de patrullas habilitado' },
-          { status: 422 }
+    const targetFamilyId = data.familyId ?? existing.familyId
+    const targetRouteId = data.routeId ?? existing.routeId
+    const targetAgentId = data.agentId ?? existing.agentId
+    const targetStart = updateData.scheduledStart ?? existing.scheduledStart
+    const targetEnd = updateData.scheduledEnd ?? existing.scheduledEnd
+    const targetRecurrence = data.recurrence ?? existing.recurrence
+    const targetRecurrenceDays = data.recurrenceDays ?? existing.recurrenceDays
+
+    try {
+      await assertScheduleRoute({ routeId: targetRouteId, familyId: targetFamilyId })
+      await assertScheduleAgent({ agentId: targetAgentId, familyId: targetFamilyId })
+
+      const slotChanged =
+        updateData.agentId !== undefined ||
+        updateData.scheduledStart !== undefined ||
+        updateData.scheduledEnd !== undefined ||
+        updateData.recurrence !== undefined ||
+        updateData.recurrenceDays !== undefined
+
+      if (slotChanged) {
+        await assertNoAgentScheduleOverlap(
+          {
+            agentId: targetAgentId,
+            scheduledStart: targetStart,
+            scheduledEnd: targetEnd,
+            recurrence: targetRecurrence,
+            recurrenceDays: targetRecurrenceDays,
+          },
+          { excludeScheduleId: id }
         )
       }
-    }
-
-    // Si cambia la ruta, validar que exista y esté activa
-    if (updateData.routeId) {
-      const route = await prisma.patrol_routes.findUnique({
-        where: { id: updateData.routeId },
-        select: { id: true, isActive: true },
-      })
-      if (!route?.isActive) {
-        return NextResponse.json({ error: 'La ruta no está activa' }, { status: 422 })
+    } catch (err) {
+      if (err instanceof ScheduleValidationError) {
+        return NextResponse.json(
+          { error: err.message, ...(err.code ? { code: err.code } : {}) },
+          { status: err.statusCode }
+        )
       }
+      throw err
     }
 
     // Si cambia la familia, verificar acceso a la nueva familia
-    const targetFamilyId = data.familyId || existing.familyId
     if (targetFamilyId !== existing.familyId) {
       const hasAccessNew = await checkPatrolFamilyAccess(
         session.user.id,

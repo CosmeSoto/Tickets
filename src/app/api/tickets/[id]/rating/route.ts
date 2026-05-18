@@ -5,6 +5,11 @@ import prisma from '@/lib/prisma'
 import { randomUUID } from 'crypto'
 import { z } from 'zod'
 import { NotificationService } from '@/lib/services/notification-service'
+import {
+  assertTicketAccess,
+  TicketAccessError,
+  toTicketAccessUser,
+} from '@/lib/tickets/ticket-access'
 
 const ratingSchema = z.object({
   rating: z.number().min(1).max(5),
@@ -21,17 +26,11 @@ const ratingSchema = z.object({
  * GET /api/tickets/[id]/rating
  * Obtiene la calificación de un ticket
  */
-export async function GET(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
-      return NextResponse.json(
-        { success: false, error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
     }
 
     const params = await context.params
@@ -44,26 +43,21 @@ export async function GET(
         id: true,
         clientId: true,
         assigneeId: true,
+        familyId: true,
       },
     })
 
     if (!ticket) {
-      return NextResponse.json(
-        { success: false, error: 'Ticket no encontrado' },
-        { status: 404 }
-      )
+      return NextResponse.json({ success: false, error: 'Ticket no encontrado' }, { status: 404 })
     }
 
-    // Verificar permisos
-    const isAdmin = session.user.role === 'ADMIN'
-    const isClient = ticket.clientId === session.user.id
-    const isTechnician = ticket.assigneeId === session.user.id
-
-    if (!isAdmin && !isClient && !isTechnician) {
-      return NextResponse.json(
-        { success: false, error: 'No tienes permisos para ver esta calificación' },
-        { status: 403 }
-      )
+    try {
+      await assertTicketAccess(toTicketAccessUser(session.user), ticket, 'read')
+    } catch (err) {
+      if (err instanceof TicketAccessError) {
+        return NextResponse.json({ success: false, error: err.message }, { status: err.statusCode })
+      }
+      throw err
     }
 
     // Obtener calificación
@@ -139,17 +133,11 @@ export async function GET(
  * POST /api/tickets/[id]/rating
  * Crea una calificación para un ticket
  */
-export async function POST(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
-      return NextResponse.json(
-        { success: false, error: 'No autorizado' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
     }
 
     const params = await context.params
@@ -184,10 +172,7 @@ export async function POST(
     })
 
     if (!ticket) {
-      return NextResponse.json(
-        { success: false, error: 'Ticket no encontrado' },
-        { status: 404 }
-      )
+      return NextResponse.json({ success: false, error: 'Ticket no encontrado' }, { status: 404 })
     }
 
     // Solo el cliente puede calificar su propio ticket
@@ -291,7 +276,6 @@ export async function POST(
           ticketId,
         }).catch(() => {})
       }
-
     }
 
     // Notificar al administrador sobre la nueva calificación

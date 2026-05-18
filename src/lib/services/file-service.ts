@@ -264,6 +264,87 @@ export class FileService {
     return attachment
   }
 
+  /**
+   * Sube un adjunto desde datos base64 (p. ej. foto de incidencia de patrulla).
+   */
+  static async uploadBase64Attachment(params: {
+    ticketId: string
+    uploadedBy: string
+    base64: string
+    mimeType: string
+    originalName: string
+    skipHistory?: boolean
+  }) {
+    const raw = params.base64.replace(/^data:[^;]+;base64,/, '')
+    const buffer = Buffer.from(raw, 'base64') as Buffer
+
+    if (buffer.length > MAX_FILE_SIZE_BYTES) {
+      throw new Error(`El archivo supera el límite de ${MAX_FILE_SIZE_BYTES / (1024 * 1024)}MB`)
+    }
+
+    if (!ALLOWED_TYPES.includes(params.mimeType)) {
+      throw new Error('Tipo de archivo no permitido')
+    }
+
+    const quota = await this.checkTicketQuota(params.ticketId)
+    if (!quota.ok) throw new Error(quota.error)
+
+    const ticket = await prisma.tickets.findUnique({ where: { id: params.ticketId } })
+    if (!ticket) throw new Error('Ticket no encontrado')
+
+    let finalBuffer = buffer
+    let finalExt = params.originalName.split('.').pop()?.toLowerCase() || 'jpg'
+    let compressed = false
+
+    if (IMAGE_TYPES.has(params.mimeType)) {
+      const result = await compressImage(buffer, params.mimeType, params.originalName)
+      finalBuffer = result.buffer
+      finalExt = result.ext
+      compressed = result.compressed
+    }
+
+    const uploadDir = getUploadDir('tickets', params.ticketId)
+    if (!existsSync(uploadDir)) await mkdir(uploadDir, { recursive: true })
+
+    const uniqueFilename = `${randomUUID()}.${finalExt}`
+    const filePath = getUploadDir('tickets', params.ticketId, uniqueFilename)
+    await writeFile(filePath, finalBuffer)
+
+    const attachment = await prisma.attachments.create({
+      data: {
+        id: randomUUID(),
+        filename: uniqueFilename,
+        originalName: params.originalName,
+        mimeType: compressed
+          ? finalExt === 'webp'
+            ? 'image/webp'
+            : 'image/jpeg'
+          : params.mimeType,
+        size: finalBuffer.length,
+        path: filePath,
+        ticketId: params.ticketId,
+        uploadedBy: params.uploadedBy,
+        createdAt: new Date(),
+      },
+    })
+
+    if (!params.skipHistory) {
+      await prisma.ticket_history.create({
+        data: {
+          id: randomUUID(),
+          action: 'file_uploaded',
+          comment: `Evidencia de patrulla: ${params.originalName}`,
+          newValue: attachment.id,
+          ticketId: params.ticketId,
+          userId: params.uploadedBy,
+          createdAt: new Date(),
+        },
+      })
+    }
+
+    return attachment
+  }
+
   // ── Carga masiva ─────────────────────────────────────────────────────────────
 
   /**
