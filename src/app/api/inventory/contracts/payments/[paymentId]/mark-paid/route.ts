@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { ContractPaymentService } from '@/lib/services/contract-payment.service'
+import {
+  assertContractPaymentAccess,
+  InventoryAccessError,
+  toInventoryAccessUser,
+  inventoryAccessToResponse,
+} from '@/lib/inventory/inventory-resource-access'
 
 /**
  * POST /api/inventory/contracts/payments/[paymentId]/mark-paid
@@ -16,6 +22,13 @@ export async function POST(
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    try {
+      await assertContractPaymentAccess(toInventoryAccessUser(session.user), paymentId, 'write')
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
     }
 
     const body = await request.json()

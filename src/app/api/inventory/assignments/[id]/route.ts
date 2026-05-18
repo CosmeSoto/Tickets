@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { AssignmentService } from '@/lib/services/assignment.service'
+import {
+  assertInventoryResourceManage,
+  assertInventoryResourceRead,
+  InventoryAccessError,
+  toInventoryAccessUser,
+  inventoryAccessToResponse,
+} from '@/lib/inventory/inventory-resource-access'
+import { hasAccessToEquipment } from '@/lib/middleware/family-filter'
+import { UserRole } from '@prisma/client'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -16,10 +25,20 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
     if (session.user.role === 'CLIENT') {
-      return NextResponse.json({ error: 'No tienes permisos para devolver equipos' }, { status: 403 })
+      return NextResponse.json(
+        { error: 'No tienes permisos para devolver equipos' },
+        { status: 403 }
+      )
     }
 
     const { id } = await params
+
+    try {
+      await assertInventoryResourceManage(toInventoryAccessUser(session.user), 'ASSIGNMENT', id)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
+    }
     const body = await request.json()
     const { returnDate, observations, condition } = body
 
@@ -67,8 +86,35 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       assignment.assignment.receiverId === session.user.id ||
       assignment.assignment.delivererId === session.user.id
 
-    if (session.user.role === 'CLIENT' && !isInvolved) {
-      return NextResponse.json({ error: 'No tienes permisos para ver esta asignación' }, { status: 403 })
+    if (session.user.role === 'CLIENT') {
+      if (!isInvolved) {
+        return NextResponse.json(
+          { error: 'No tienes permisos para ver esta asignación' },
+          { status: 403 }
+        )
+      }
+      return NextResponse.json(assignment)
+    }
+
+    const equipmentId = assignment.assignment.equipmentId
+    const user = toInventoryAccessUser(session.user)
+    try {
+      if (session.user.role === 'TECHNICIAN' || session.user.role === 'ADMIN') {
+        const hasEq = await hasAccessToEquipment(
+          user.id,
+          user.role as UserRole,
+          user.isSuperAdmin,
+          equipmentId
+        )
+        if (!hasEq) {
+          await assertInventoryResourceRead(user, 'ASSIGNMENT', id)
+        }
+      } else {
+        await assertInventoryResourceRead(user, 'ASSIGNMENT', id)
+      }
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
     }
 
     return NextResponse.json(assignment)

@@ -3,6 +3,12 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { ContractPaymentService } from '@/lib/services/contract-payment.service'
 import { prisma } from '@/lib/prisma'
+import {
+  assertContractAccess,
+  InventoryAccessError,
+  toInventoryAccessUser,
+  inventoryAccessToResponse,
+} from '@/lib/inventory/inventory-resource-access'
 
 /**
  * POST /api/inventory/contracts/[id]/payments/generate
@@ -14,6 +20,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    try {
+      await assertContractAccess(toInventoryAccessUser(session.user), id, 'write')
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
     }
 
     // Obtener contrato

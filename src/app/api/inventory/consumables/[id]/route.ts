@@ -5,16 +5,19 @@ import { ConsumableService } from '@/lib/services/consumable.service'
 import { updateConsumableSchema } from '@/lib/validations/inventory/consumable'
 import { ZodError } from 'zod'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
-import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
 import prisma from '@/lib/prisma'
+import {
+  assertInventoryResourceManage,
+  assertInventoryResourceRead,
+  InventoryAccessError,
+  toInventoryAccessUser,
+  inventoryAccessToResponse,
+} from '@/lib/inventory/inventory-resource-access'
 
 /**
  * GET /api/inventory/consumables/[id]
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
@@ -27,7 +30,9 @@ export async function GET(
       include: {
         consumableType: true,
         unitOfMeasure: true,
-        assignedEquipment: { select: { id: true, code: true, brand: true, model: true, serialNumber: true } },
+        assignedEquipment: {
+          select: { id: true, code: true, brand: true, model: true, serialNumber: true },
+        },
         supplier: { select: { id: true, name: true, taxId: true } },
         movements: {
           include: {
@@ -42,6 +47,13 @@ export async function GET(
     })
     if (!consumable) {
       return NextResponse.json({ error: 'Consumible no encontrado' }, { status: 404 })
+    }
+
+    try {
+      await assertInventoryResourceRead(toInventoryAccessUser(session.user), 'CONSUMABLE', id)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
     }
 
     const totalStockValue =
@@ -59,26 +71,29 @@ export async function GET(
 /**
  * PUT /api/inventory/consumables/[id]
  */
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
-    if (!await canManageInventory(session.user.id, session.user.role)) {
-      return inventoryForbidden()
-    }
-
     const { id } = await params
+
+    try {
+      await assertInventoryResourceManage(toInventoryAccessUser(session.user), 'CONSUMABLE', id)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
+    }
     const body = await request.json()
     const { supplierId, ...rest } = body
 
     // Validar supplierId si se provee
     if (supplierId !== undefined && supplierId !== null) {
-      const supplierExists = await prisma.suppliers.findUnique({ where: { id: supplierId }, select: { id: true } })
+      const supplierExists = await prisma.suppliers.findUnique({
+        where: { id: supplierId },
+        select: { id: true },
+      })
       if (!supplierExists) {
         return NextResponse.json({ error: 'El proveedor especificado no existe' }, { status: 400 })
       }
@@ -98,7 +113,8 @@ export async function PUT(
       entityId: id,
       userId: session.user.id,
       details: { updatedFields: Object.keys(updatePayload) },
-      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+      ipAddress:
+        request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
     }).catch(err => console.error('[AUDIT] Error registrando actualización de consumible:', err))
 
@@ -124,11 +140,14 @@ export async function DELETE(
     if (!session?.user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
-    if (session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Solo ADMIN puede eliminar consumibles' }, { status: 403 })
-    }
-
     const { id } = await params
+
+    try {
+      await assertInventoryResourceManage(toInventoryAccessUser(session.user), 'CONSUMABLE', id)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
+    }
     const existing = await ConsumableService.getConsumableById(id)
     await ConsumableService.deleteConsumable(id, session.user.id)
 
@@ -138,7 +157,8 @@ export async function DELETE(
       entityId: id,
       userId: session.user.id,
       details: { name: existing?.name, type: existing?.consumableType?.name },
-      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+      ipAddress:
+        request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
     }).catch(err => console.error('[AUDIT] Error registrando eliminación de consumible:', err))
 

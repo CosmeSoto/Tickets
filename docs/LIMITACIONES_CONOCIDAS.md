@@ -33,9 +33,20 @@ Documento de transparencia para operación, auditoría y roadmap. Actualizado: m
 
 ---
 
+## Inventario (en curso — mayo 2026)
+
+| #   | Tema                                                               | Estado        | Notas                                 |
+| --- | ------------------------------------------------------------------ | ------------- | ------------------------------------- |
+| I1  | Helper `inventory-resource-access.ts`                              | **Hecho**     | Assert por tipo de recurso y contrato |
+| I2  | P0 IDOR (equipo POST, asignaciones, consumibles, licencias, pagos) | **Hecho**     | Ver `docs/MANUAL_INVENTARIO.md` §6    |
+| I3  | P1 rutas `[id]` restantes (modelos, lotes, bodegas)                | **Pendiente** | Aplicar mismo patrón                  |
+| I4  | JWT `canManageInventory` vs BD                                     | **Pendiente** | Unificar en listados y ventas         |
+
+---
+
 ## Recomendación antes de módulo Inventarios
 
-Los módulos **Tickets** y **Rondas** están en estado **v1 production-ready** para documentación, operación interna y auditoría de permisos en capa API. Ejecutar `npx prisma generate` tras cada migración y `npm test -- ticket-access` en CI.
+Los módulos **Tickets** y **Rondas** están en **v1 production-ready**. **Inventario** arrancó endurecimiento P0; completar P1 antes de auditoría externa estricta del módulo completo.
 
 ---
 

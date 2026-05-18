@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { ContractPaymentService } from '@/lib/services/contract-payment.service'
+import {
+  assertContractAccess,
+  InventoryAccessError,
+  toInventoryAccessUser,
+  inventoryAccessToResponse,
+} from '@/lib/inventory/inventory-resource-access'
 
 /**
  * GET /api/inventory/contracts/[id]/payments
@@ -13,6 +19,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    try {
+      await assertContractAccess(toInventoryAccessUser(session.user), id, 'read')
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
     }
 
     const { searchParams } = new URL(request.url)
@@ -44,6 +57,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    try {
+      await assertContractAccess(toInventoryAccessUser(session.user), id, 'write')
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
     }
 
     const body = await request.json()

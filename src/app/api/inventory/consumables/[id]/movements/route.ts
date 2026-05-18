@@ -8,15 +8,19 @@ import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit
 import prisma from '@/lib/prisma'
 import { NotificationService } from '@/lib/services/notification-service'
 import { randomUUID } from 'crypto'
+import {
+  assertInventoryResourceManage,
+  assertInventoryResourceRead,
+  InventoryAccessError,
+  toInventoryAccessUser,
+  inventoryAccessToResponse,
+} from '@/lib/inventory/inventory-resource-access'
 
 /**
  * GET /api/inventory/consumables/[id]/movements
  * Historial de movimientos de un consumible
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
@@ -24,6 +28,14 @@ export async function GET(
     }
 
     const { id } = await params
+
+    try {
+      await assertInventoryResourceRead(toInventoryAccessUser(session.user), 'CONSUMABLE', id)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
+    }
+
     const limit = parseInt(request.nextUrl.searchParams.get('limit') || '50')
     const movements = await ConsumableService.getConsumableMovements(id, limit)
 
@@ -33,7 +45,6 @@ export async function GET(
     return NextResponse.json({ error: 'Error al obtener movimientos' }, { status: 500 })
   }
 }
-
 
 /**
  * POST /api/inventory/consumables/[id]/movements
@@ -50,6 +61,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     const { id } = await params
+
+    try {
+      await assertInventoryResourceManage(toInventoryAccessUser(session.user), 'CONSUMABLE', id)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
+    }
     const body = await request.json()
     const validatedData = createStockMovementSchema.parse({
       ...body,
@@ -69,7 +87,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         quantity: validatedData.quantity,
         reason: validatedData.reason,
       },
-      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+      ipAddress:
+        request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
     }).catch(err => console.error('[AUDIT] Error registrando movimiento de stock:', err))
 
@@ -133,18 +152,20 @@ async function checkLowStockAndNotify(consumableId: string) {
     }).catch(() => {})
 
     // Email en cola
-    await prisma.email_queue.create({
-      data: {
-        id: randomUUID(),
-        toEmail: admin.email,
-        subject: title,
-        body: generateLowStockEmail(consumable, admin.name, isOutOfStock),
-        status: 'pending',
-        attempts: 0,
-        maxAttempts: 3,
-        scheduledAt: new Date(),
-      },
-    }).catch(() => {})
+    await prisma.email_queue
+      .create({
+        data: {
+          id: randomUUID(),
+          toEmail: admin.email,
+          subject: title,
+          body: generateLowStockEmail(consumable, admin.name, isOutOfStock),
+          status: 'pending',
+          attempts: 0,
+          maxAttempts: 3,
+          scheduledAt: new Date(),
+        },
+      })
+      .catch(() => {})
   }
 }
 
@@ -172,9 +193,10 @@ function generateLowStockEmail(consumable: any, adminName: string, isOutOfStock:
     <div class="header"><h2>${icon} ${urgency}: ${consumable.name}</h2></div>
     <div class="content">
       <p>Hola ${adminName},</p>
-      <p>${isOutOfStock
-        ? `El consumible <strong>"${consumable.name}"</strong> se ha <strong>agotado completamente</strong>. Se requiere reabastecimiento inmediato.`
-        : `El consumible <strong>"${consumable.name}"</strong> tiene <strong>stock por debajo del mínimo</strong>.`
+      <p>${
+        isOutOfStock
+          ? `El consumible <strong>"${consumable.name}"</strong> se ha <strong>agotado completamente</strong>. Se requiere reabastecimiento inmediato.`
+          : `El consumible <strong>"${consumable.name}"</strong> tiene <strong>stock por debajo del mínimo</strong>.`
       }</p>
       <div class="info-box">
         <p><strong>Consumible:</strong> ${consumable.name}</p>

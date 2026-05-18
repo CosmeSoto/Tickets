@@ -5,17 +5,20 @@ import { LicenseService } from '@/lib/services/license.service'
 import { updateLicenseSchema, assignLicenseSchema } from '@/lib/validations/inventory/license'
 import { ZodError } from 'zod'
 import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
-import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
+import {
+  assertInventoryResourceManage,
+  assertInventoryResourceRead,
+  InventoryAccessError,
+  toInventoryAccessUser,
+  inventoryAccessToResponse,
+} from '@/lib/inventory/inventory-resource-access'
 import prisma from '@/lib/prisma'
 import { getRenewalAlertStatus } from '@/lib/inventory/renewal-alert'
 
 /**
  * GET /api/inventory/licenses/[id]
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
@@ -23,6 +26,14 @@ export async function GET(
     }
 
     const { id } = await params
+
+    try {
+      await assertInventoryResourceRead(toInventoryAccessUser(session.user), 'LICENSE', id)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
+    }
+
     const license = await LicenseService.getLicenseById(id, session.user.role)
     if (!license) {
       return NextResponse.json({ error: 'Licencia no encontrada' }, { status: 404 })
@@ -60,31 +71,47 @@ export async function GET(
 /**
  * PUT /api/inventory/licenses/[id]
  */
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
-    if (!await canManageInventory(session.user.id, session.user.role)) {
-      return inventoryForbidden()
+    const { id } = await params
+
+    try {
+      await assertInventoryResourceManage(toInventoryAccessUser(session.user), 'LICENSE', id)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
     }
 
-    const { id } = await params
     const body = await request.json()
-    const { supplierId, renewalCost, renewalDate, invoiceNumber, purchaseOrderNumber, licenseScope, contractType, ...rest } = body
+    const {
+      supplierId,
+      renewalCost,
+      renewalDate,
+      invoiceNumber,
+      purchaseOrderNumber,
+      licenseScope,
+      contractType,
+      ...rest
+    } = body
 
     // Validar renewalCost
     if (renewalCost !== undefined && renewalCost !== null && renewalCost < 0) {
-      return NextResponse.json({ error: 'El costo de renovación no puede ser negativo' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'El costo de renovación no puede ser negativo' },
+        { status: 400 }
+      )
     }
 
     // Validar supplierId
     if (supplierId !== undefined && supplierId !== null) {
-      const supplierExists = await prisma.suppliers.findUnique({ where: { id: supplierId }, select: { id: true } })
+      const supplierExists = await prisma.suppliers.findUnique({
+        where: { id: supplierId },
+        select: { id: true },
+      })
       if (!supplierExists) {
         return NextResponse.json({ error: 'El proveedor especificado no existe' }, { status: 400 })
       }
@@ -105,7 +132,10 @@ export async function PUT(
       }
       if (hasEquipment && hasUser) {
         return NextResponse.json(
-          { error: 'Una licencia individual no puede estar asignada a equipo y usuario simultáneamente' },
+          {
+            error:
+              'Una licencia individual no puede estar asignada a equipo y usuario simultáneamente',
+          },
           { status: 422 }
         )
       }
@@ -129,7 +159,8 @@ export async function PUT(
       entityId: id,
       userId: session.user.id,
       details: { updatedFields: Object.keys(updatePayload) },
-      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+      ipAddress:
+        request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
     }).catch(err => console.error('[AUDIT] Error registrando actualización de licencia:', err))
 
@@ -155,11 +186,15 @@ export async function DELETE(
     if (!session?.user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
-    if (session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Solo ADMIN puede eliminar licencias' }, { status: 403 })
+    const { id } = await params
+
+    try {
+      await assertInventoryResourceManage(toInventoryAccessUser(session.user), 'LICENSE', id)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
     }
 
-    const { id } = await params
     const existing = await LicenseService.getLicenseById(id, 'ADMIN')
     await LicenseService.deleteLicense(id, session.user.id)
 
@@ -169,7 +204,8 @@ export async function DELETE(
       entityId: id,
       userId: session.user.id,
       details: { name: existing?.name, typeId: existing?.typeId },
-      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+      ipAddress:
+        request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
     }).catch(err => console.error('[AUDIT] Error registrando eliminación de licencia:', err))
 
@@ -184,25 +220,28 @@ export async function DELETE(
  * PATCH /api/inventory/licenses/[id]
  * Asignar/desasignar licencia o cerrar contrato
  */
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
-    if (!await canManageInventory(session.user.id, session.user.role)) {
-      return inventoryForbidden()
-    }
-
     const { id } = await params
+
+    try {
+      await assertInventoryResourceManage(toInventoryAccessUser(session.user), 'LICENSE', id)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
+    }
     const body = await request.json()
 
     // Cerrar contrato: marcar como vencido
     if (body.isActive === false) {
-      const existing = await prisma.software_licenses.findUnique({ where: { id }, select: { id: true, name: true } })
+      const existing = await prisma.software_licenses.findUnique({
+        where: { id },
+        select: { id: true, name: true },
+      })
       if (!existing) {
         return NextResponse.json({ error: 'Contrato no encontrado' }, { status: 404 })
       }
@@ -216,7 +255,8 @@ export async function PATCH(
         entityId: id,
         userId: session.user.id,
         details: { action: 'CONTRACT_CLOSED', name: existing.name },
-        ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+        ipAddress:
+          request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
         userAgent: request.headers.get('user-agent') || 'unknown',
       }).catch(() => {})
       return NextResponse.json(closed)
@@ -231,7 +271,8 @@ export async function PATCH(
         entityId: id,
         userId: session.user.id,
         details: { name: license.name },
-        ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+        ipAddress:
+          request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
         userAgent: request.headers.get('user-agent') || 'unknown',
       }).catch(err => console.error('[AUDIT] Error registrando desasignación:', err))
 
@@ -239,11 +280,15 @@ export async function PATCH(
     }
 
     const validatedData = assignLicenseSchema.parse(body)
-    const license = await LicenseService.assignLicense(id, {
-      assignedToEquipment: validatedData.assignedToEquipment || undefined,
-      assignedToUser: validatedData.assignedToUser || undefined,
-      assignedToDepartment: validatedData.assignedToDepartment || undefined,
-    }, session.user.id)
+    const license = await LicenseService.assignLicense(
+      id,
+      {
+        assignedToEquipment: validatedData.assignedToEquipment || undefined,
+        assignedToUser: validatedData.assignedToUser || undefined,
+        assignedToDepartment: validatedData.assignedToDepartment || undefined,
+      },
+      session.user.id
+    )
 
     await AuditServiceComplete.log({
       action: AuditActionsComplete.LICENSE_ASSIGNED,
@@ -256,7 +301,8 @@ export async function PATCH(
         assignedToUser: validatedData.assignedToUser,
         assignedToDepartment: validatedData.assignedToDepartment,
       },
-      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+      ipAddress:
+        request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
     }).catch(err => console.error('[AUDIT] Error registrando asignación:', err))
 

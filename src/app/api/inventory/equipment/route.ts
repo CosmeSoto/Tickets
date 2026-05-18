@@ -3,6 +3,13 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import {
+  assertInventoryManageByFamily,
+  InventoryAccessError,
+  toInventoryAccessUser,
+  inventoryAccessToResponse,
+} from '@/lib/inventory/inventory-resource-access'
+import { canManageInventory, inventoryForbidden } from '@/lib/inventory-access'
 
 const createEquipmentSchema = z.object({
   code: z.string().min(1, 'El código es requerido'),
@@ -65,6 +72,17 @@ export async function POST(request: NextRequest) {
 
     if (!model) {
       return NextResponse.json({ error: 'Modelo no encontrado' }, { status: 404 })
+    }
+
+    if (!(await canManageInventory(session.user.id, session.user.role))) {
+      return inventoryForbidden()
+    }
+
+    try {
+      await assertInventoryManageByFamily(toInventoryAccessUser(session.user), model.type.familyId)
+    } catch (err) {
+      if (err instanceof InventoryAccessError) return inventoryAccessToResponse(err)
+      throw err
     }
 
     // Crear el equipo
