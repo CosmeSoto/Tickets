@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { FamilyService } from '@/lib/services/family.service'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
+import { prisma } from '@/lib/prisma'
 
 // GET /api/families/[id] — Detalle de familia con ambas configs
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

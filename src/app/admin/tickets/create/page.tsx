@@ -379,7 +379,7 @@ export default function CreateTicketPage() {
                           <Button
                             type='button'
                             variant={clientId === session?.user?.id ? 'default' : 'ghost'}
-                            size='xs'
+                            size='sm'
                             onClick={() => {
                               if (session?.user?.id) {
                                 setValue('clientId', session.user.id)
