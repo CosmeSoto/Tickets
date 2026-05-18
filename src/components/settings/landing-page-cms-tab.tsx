@@ -33,6 +33,7 @@ import {
   Linkedin,
   MessageCircle,
   Link2,
+  X,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { ImageUploader } from './image-uploader'
@@ -53,6 +54,7 @@ interface LandingContent {
   companyTagline: string
   companyLogoLightUrl?: string
   companyLogoDarkUrl?: string
+  faviconUrl?: string
   contactEmail?: string
   contactPhone?: string
   contactAddress?: string
@@ -107,6 +109,7 @@ export function LandingPageCMSTab({ isSuperAdmin = false }: { isSuperAdmin?: boo
           companyTagline: data.companyTagline || '',
           companyLogoLightUrl: data.companyLogoLightUrl || '',
           companyLogoDarkUrl: data.companyLogoDarkUrl || '',
+          faviconUrl: data.faviconUrl || '',
           contactEmail: data.contactEmail || '',
           contactPhone: data.contactPhone || '',
           contactAddress: data.contactAddress || '',
@@ -439,7 +442,16 @@ export function LandingPageCMSTab({ isSuperAdmin = false }: { isSuperAdmin?: boo
 
               <Separator />
 
-              <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
+              <div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
+                <ImageUploader
+                  label='Favicon'
+                  currentUrl={content.faviconUrl}
+                  onUpload={url => {
+                    if (!isSuperAdmin) return
+                    setContent({ ...content, faviconUrl: url })
+                  }}
+                  type='favicon'
+                />
                 <ImageUploader
                   label='Logo Tema Claro'
                   currentUrl={content.companyLogoLightUrl}
@@ -664,25 +676,154 @@ export function LandingPageCMSTab({ isSuperAdmin = false }: { isSuperAdmin?: boo
               <Separator />
 
               <div className='space-y-3'>
-                <div className='flex items-center gap-2'>
-                  <Link2 className='h-4 w-4 text-muted-foreground' />
-                  <Label className='text-sm font-medium'>Enlaces del Footer</Label>
+                <div className='flex items-center justify-between flex-wrap gap-2'>
+                  <div className='flex items-center gap-2'>
+                    <Link2 className='h-4 w-4 text-muted-foreground' />
+                    <Label className='text-sm font-medium'>Enlaces del Footer</Label>
+                  </div>
+                  {isSuperAdmin && (
+                    <div className='flex gap-2'>
+                      <Button
+                        size='sm'
+                        variant='outline'
+                        onClick={() => {
+                          const exampleLinks = [
+                            { label: 'Política de Privacidad', url: '/privacidad' },
+                            { label: 'Términos de Uso', url: '/terminos' },
+                            { label: 'Preguntas Frecuentes', url: '/help/center' },
+                          ]
+                          setContent({
+                            ...content,
+                            footerLinksJson: JSON.stringify(exampleLinks, null, 2),
+                          })
+                        }}
+                      >
+                        Cargar Ejemplo
+                      </Button>
+                      <Button
+                        size='sm'
+                        variant='outline'
+                        onClick={() => {
+                          let currentLinks: { label: string; url: string }[] = []
+                          try {
+                            if (content.footerLinksJson) {
+                              currentLinks = JSON.parse(content.footerLinksJson)
+                            }
+                          } catch {}
+                          currentLinks.push({ label: '', url: '' })
+                          setContent({
+                            ...content,
+                            footerLinksJson: JSON.stringify(currentLinks, null, 2),
+                          })
+                        }}
+                      >
+                        Agregar Enlace
+                      </Button>
+                    </div>
+                  )}
                 </div>
                 <p className='text-xs text-muted-foreground'>
-                  Agrega enlaces adicionales que aparecerán en el footer (formato JSON). Ejemplo:
-                  Políticas de privacidad, Términos de uso, etc.
+                  Agrega enlaces adicionales que aparecerán en el footer. Ejemplo: Políticas de
+                  privacidad, Términos de uso, etc.
                 </p>
-                <Textarea
-                  id='footerLinksJson'
-                  value={content.footerLinksJson || ''}
-                  onChange={e =>
-                    isSuperAdmin && setContent({ ...content, footerLinksJson: e.target.value })
-                  }
-                  disabled={!isSuperAdmin}
-                  placeholder='[{"label": "Política de Privacidad", "url": "/privacidad"}, {"label": "Términos de Uso", "url": "/terminos"}]'
-                  rows={4}
-                  className='font-mono text-xs'
-                />
+
+                {(() => {
+                  let links: { label: string; url: string }[] = []
+                  try {
+                    if (content.footerLinksJson) {
+                      links = JSON.parse(content.footerLinksJson)
+                    }
+                  } catch {}
+
+                  const exampleJson = JSON.stringify(
+                    [
+                      { label: 'Política de Privacidad', url: '/privacidad' },
+                      { label: 'Términos de Uso', url: '/terminos' },
+                      { label: 'Preguntas Frecuentes', url: '/help/center' },
+                    ],
+                    null,
+                    2
+                  )
+
+                  return (
+                    <div className='space-y-3'>
+                      {links.map((link, index) => (
+                        <div key={index} className='flex gap-2 items-start'>
+                          <div className='flex-1 grid grid-cols-1 md:grid-cols-2 gap-2'>
+                            <div className='space-y-1'>
+                              <Label className='text-xs'>Texto del Enlace</Label>
+                              <Input
+                                value={link.label}
+                                onChange={e => {
+                                  if (!isSuperAdmin) return
+                                  const newLinks = [...links]
+                                  newLinks[index].label = e.target.value
+                                  setContent({
+                                    ...content,
+                                    footerLinksJson: JSON.stringify(newLinks, null, 2),
+                                  })
+                                }}
+                                disabled={!isSuperAdmin}
+                                placeholder='Política de Privacidad'
+                              />
+                            </div>
+                            <div className='space-y-1'>
+                              <Label className='text-xs'>URL</Label>
+                              <Input
+                                value={link.url}
+                                onChange={e => {
+                                  if (!isSuperAdmin) return
+                                  const newLinks = [...links]
+                                  newLinks[index].url = e.target.value
+                                  setContent({
+                                    ...content,
+                                    footerLinksJson: JSON.stringify(newLinks, null, 2),
+                                  })
+                                }}
+                                disabled={!isSuperAdmin}
+                                placeholder='/privacidad'
+                              />
+                            </div>
+                          </div>
+                          {isSuperAdmin && (
+                            <Button
+                              variant='ghost'
+                              size='sm'
+                              className='mt-6'
+                              onClick={() => {
+                                const newLinks = links.filter((_, i) => i !== index)
+                                setContent({
+                                  ...content,
+                                  footerLinksJson: JSON.stringify(newLinks, null, 2),
+                                })
+                              }}
+                            >
+                              <X className='h-4 w-4' />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+
+                      <details className='mt-4'>
+                        <summary className='text-xs text-muted-foreground cursor-pointer'>
+                          Ver JSON crudo
+                        </summary>
+                        <Textarea
+                          id='footerLinksJson'
+                          value={content.footerLinksJson || exampleJson}
+                          onChange={e =>
+                            isSuperAdmin &&
+                            setContent({ ...content, footerLinksJson: e.target.value })
+                          }
+                          disabled={!isSuperAdmin}
+                          placeholder={exampleJson}
+                          rows={6}
+                          className='font-mono text-xs mt-2'
+                        />
+                      </details>
+                    </div>
+                  )
+                })()}
               </div>
 
               <Separator />
@@ -715,6 +856,31 @@ export function LandingPageCMSTab({ isSuperAdmin = false }: { isSuperAdmin?: boo
                         <MessageCircle className='h-4 w-4 text-muted-foreground' />
                       )}
                     </div>
+                    {/* Vista previa de enlaces */}
+                    {(() => {
+                      let links: { label: string; url: string }[] = []
+                      try {
+                        if (content.footerLinksJson) {
+                          links = JSON.parse(content.footerLinksJson)
+                        }
+                      } catch {}
+
+                      if (links.length > 0) {
+                        return (
+                          <div className='flex flex-wrap items-center justify-center gap-x-4 gap-y-1'>
+                            {links.map((link, index) => (
+                              <span
+                                key={index}
+                                className='text-xs text-muted-foreground hover:text-foreground cursor-pointer'
+                              >
+                                {link.label || 'Enlace sin nombre'}
+                              </span>
+                            ))}
+                          </div>
+                        )
+                      }
+                      return null
+                    })()}
                     <p className='text-xs text-muted-foreground'>
                       {content.footerText || '© 2024'}
                     </p>
