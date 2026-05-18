@@ -11,12 +11,57 @@ import {
 export async function getAdminStats(userId: string, isSuperAdmin: boolean) {
   const now = new Date()
 
-  // Scope de familias para Admin Normal (tickets)
+  // Resolver TODO el scope del admin en una sola operación (evita queries redundantes)
   let ticketFamilyFilter: Record<string, any> = {}
+  let adminFamilyIds: string[] = []
+  let inventoryTypeFilter: Record<string, any> = {}
+
   if (!isSuperAdmin) {
-    const { getUserFamilyScope, buildFamilyFilter } = await import('@/lib/auth/admin-scope')
-    const scope = await getUserFamilyScope(userId, 'ADMIN', false)
-    ticketFamilyFilter = buildFamilyFilter(scope)
+    // Una sola query para obtener: departamento del admin + asignaciones de tickets + asignaciones de inventario
+    const [adminUser, ticketAssignments, inventoryAssignments] = await Promise.all([
+      prisma.users.findUnique({
+        where: { id: userId },
+        select: { departments: { select: { familyId: true } } },
+      }),
+      prisma.admin_family_assignments.findMany({
+        where: { adminId: userId, isActive: true },
+        select: { familyId: true },
+      }),
+      prisma.inventory_manager_families.findMany({
+        where: { managerId: userId },
+        select: { familyId: true },
+      }),
+    ])
+
+    const nativeFamilyId = adminUser?.departments?.familyId ?? null
+    const ticketFamilyIds = ticketAssignments.map(a => a.familyId)
+    if (nativeFamilyId && !ticketFamilyIds.includes(nativeFamilyId)) {
+      ticketFamilyIds.push(nativeFamilyId)
+    }
+    adminFamilyIds = ticketFamilyIds
+
+    // Filtro de tickets
+    if (ticketFamilyIds.length > 0) {
+      ticketFamilyFilter = { familyId: { in: ticketFamilyIds } }
+    } else {
+      ticketFamilyFilter = { familyId: '__NONE__' }
+    }
+
+    // Filtro de inventario (por typeId)
+    const invFamilyIds = inventoryAssignments.map(a => a.familyId)
+    if (nativeFamilyId && !invFamilyIds.includes(nativeFamilyId)) {
+      invFamilyIds.push(nativeFamilyId)
+    }
+    if (invFamilyIds.length > 0) {
+      const typesInScope = await prisma.equipment_types.findMany({
+        where: { familyId: { in: invFamilyIds } },
+        select: { id: true },
+      })
+      const typeIds = typesInScope.map(t => t.id)
+      inventoryTypeFilter = typeIds.length > 0 ? { typeId: { in: typeIds } } : { id: '__NONE__' }
+    } else {
+      inventoryTypeFilter = { id: '__NONE__' }
+    }
   }
 
   const [
@@ -150,24 +195,8 @@ export async function getAdminStats(userId: string, isSuperAdmin: boolean) {
   }
 
   try {
-    // Scope de familias para inventario (Admin Normal)
-    let inventoryFamilyFilter: Record<string, any> = {}
-    if (!isSuperAdmin) {
-      const { getModuleFamilyIds } = await import('@/lib/auth/admin-scope')
-      const invFamilyIds = await getModuleFamilyIds(userId, 'inventory')
-      if (invFamilyIds.length > 0) {
-        // Filtrar equipos por tipo → familia
-        const typesInScope = await prisma.equipment_types.findMany({
-          where: { familyId: { in: invFamilyIds } },
-          select: { id: true },
-        })
-        const typeIds = typesInScope.map(t => t.id)
-        inventoryFamilyFilter =
-          typeIds.length > 0 ? { typeId: { in: typeIds } } : { id: '__NONE__' }
-      } else {
-        inventoryFamilyFilter = { id: '__NONE__' }
-      }
-    }
+    // Usar el filtro de inventario pre-computado (ya resuelto arriba)
+    const inventoryFamilyFilter = inventoryTypeFilter
 
     const [
       totalAssets,
@@ -205,7 +234,6 @@ export async function getAdminStats(userId: string, isSuperAdmin: boolean) {
   }
 
   let assignedFamilies: any[] = []
-  let adminFamilyIds: string[] = []
 
   if (isSuperAdmin) {
     const allFamilies = await prisma.families.findMany({
@@ -215,33 +243,15 @@ export async function getAdminStats(userId: string, isSuperAdmin: boolean) {
     assignedFamilies = await enrichFamiliesWithModules(allFamilies)
     stats.isSuperAdmin = true
   } else {
-    const adminFamilies = await prisma.admin_family_assignments.findMany({
-      where: { adminId: userId, isActive: true },
-      select: {
-        family: { select: { id: true, name: true, code: true, color: true, icon: true } },
-      },
-    })
-    const familyMap = new Map<string, any>()
-    adminFamilies.forEach(a => {
-      if (a.family) familyMap.set(a.family.id, a.family)
-    })
-
-    const adminUser = await prisma.users.findUnique({
-      where: { id: userId },
-      select: {
-        departments: {
-          select: {
-            family: { select: { id: true, name: true, code: true, color: true, icon: true } },
-          },
-        },
-      },
-    })
-    if (adminUser?.departments?.family) {
-      familyMap.set(adminUser.departments.family.id, adminUser.departments.family)
-    }
-
-    assignedFamilies = await enrichFamiliesWithModules(Array.from(familyMap.values()))
-    adminFamilyIds = Array.from(familyMap.keys())
+    // Usar adminFamilyIds ya resuelto arriba (evita queries redundantes)
+    const familiesData =
+      adminFamilyIds.length > 0
+        ? await prisma.families.findMany({
+            where: { id: { in: adminFamilyIds }, isActive: true },
+            select: { id: true, name: true, code: true, color: true, icon: true },
+          })
+        : []
+    assignedFamilies = await enrichFamiliesWithModules(familiesData)
     stats.isSuperAdmin = false
 
     if (stats.familyMetrics && adminFamilyIds.length > 0) {

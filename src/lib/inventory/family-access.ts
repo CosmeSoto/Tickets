@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { getModuleFamilyIds } from '@/lib/auth/admin-scope'
 
 /**
  * Retorna los IDs de familias accesibles para un usuario según su rol:
@@ -23,10 +24,21 @@ export async function getAccessibleFamilyIds(
 
   // Admin normal: familias de inventario asignadas + nativa
   if (role === 'ADMIN') {
-    const { getModuleFamilyIds } = await import('@/lib/auth/admin-scope')
-    const inventoryFamilyIds = await getModuleFamilyIds(userId, 'inventory')
-    if (inventoryFamilyIds.length === 0) {
-      // Admin sin asignaciones de inventario: solo su familia nativa
+    try {
+      const inventoryFamilyIds = await getModuleFamilyIds(userId, 'inventory')
+      if (inventoryFamilyIds.length === 0) {
+        // Admin sin asignaciones de inventario: solo su familia nativa
+        const user = await prisma.users.findUnique({
+          where: { id: userId },
+          select: { departments: { select: { familyId: true } } },
+        })
+        const nativeFamilyId = user?.departments?.familyId
+        return nativeFamilyId ? [nativeFamilyId] : []
+      }
+      return inventoryFamilyIds
+    } catch (error) {
+      console.error('[getAccessibleFamilyIds] Error loading inventory scope:', error)
+      // Fallback: solo familia nativa
       const user = await prisma.users.findUnique({
         where: { id: userId },
         select: { departments: { select: { familyId: true } } },
@@ -34,7 +46,6 @@ export async function getAccessibleFamilyIds(
       const nativeFamilyId = user?.departments?.familyId
       return nativeFamilyId ? [nativeFamilyId] : []
     }
-    return inventoryFamilyIds
   }
 
   // Gestor de inventario (cualquier rol): sus familias asignadas

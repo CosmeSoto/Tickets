@@ -321,7 +321,7 @@ export class AssetRequestService {
         id: r.id,
         code: r.code,
         assetType: r.assetType,
-        description: r.description.substring(0, 100), // Truncar a 100 chars
+        description: r.description.substring(0, 100),
         familyId: r.familyId,
         familyName: r.family.name,
         status: r.status,

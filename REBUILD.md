@@ -54,6 +54,17 @@ docker compose -f docker-compose.prod.yml --env-file .env.production down -v
 
 El contenedor ejecuta `prisma db push` automáticamente al iniciar — sincroniza el schema sin historial de migraciones.
 
+```bash
+# Asegúrate de que los contenedores estén corriendo::
+docker-compose -f docker-compose.dev.yml up -d
+
+# Ejecuta migraciones dentro del contenedor de la app:
+docker-compose -f docker-compose.dev.yml exec app npx prisma migrate dev --name add_sla_to_asset_requests
+
+# Si prefieres usar db push (solo para desarrollo, sin migraciones históricas):
+docker-compose -f docker-compose.dev.yml exec app npx prisma db push
+```
+
 ### Producción
 
 El entrypoint ejecuta `prisma migrate deploy` automáticamente. Para crear una migración nueva:

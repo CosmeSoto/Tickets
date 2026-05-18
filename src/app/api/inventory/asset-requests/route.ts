@@ -56,13 +56,20 @@ export async function GET(request: NextRequest) {
       filters,
       session.user.id,
       session.user.role,
-      session.user.isSuperAdmin || false
+      (session.user as any).isSuperAdmin === true
     )
 
     return NextResponse.json(result)
   } catch (error) {
     console.error('[API] Error listing asset requests:', error)
-    return NextResponse.json({ error: 'Error al listar solicitudes' }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'Error al listar solicitudes'
+    return NextResponse.json(
+      {
+        error: message,
+        details: process.env.NODE_ENV === 'development' ? String(error) : undefined,
+      },
+      { status: 500 }
+    )
   }
 }
 
@@ -104,7 +111,7 @@ export async function POST(request: NextRequest) {
       validatedData,
       session.user.id,
       session.user.role,
-      session.user.isSuperAdmin || false,
+      (session.user as any).isSuperAdmin === true,
       ipAddress
     )
 

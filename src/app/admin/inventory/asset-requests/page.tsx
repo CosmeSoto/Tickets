@@ -31,6 +31,7 @@ interface AssetRequest {
   requesterName: string
   createdAt: string
   updatedAt: string
+  slaDeadline?: string | null
 }
 
 interface ListResponse {
