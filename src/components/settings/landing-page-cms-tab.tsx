@@ -688,9 +688,9 @@ export function LandingPageCMSTab({ isSuperAdmin = false }: { isSuperAdmin?: boo
                         variant='outline'
                         onClick={() => {
                           const exampleLinks = [
-                            { label: 'Política de Privacidad', url: '/privacidad' },
-                            { label: 'Términos de Uso', url: '/terminos' },
-                            { label: 'Preguntas Frecuentes', url: '/help/center' },
+                            { label: 'Política de Privacidad', url: '/help/privacy' },
+                            { label: 'Términos de Uso', url: '/help/terms' },
+                            { label: 'Centro de Ayuda', url: '/help/center' },
                           ]
                           setContent({
                             ...content,
