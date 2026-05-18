@@ -72,9 +72,20 @@ export class BackupService {
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
     const isTicketsModule = moduleKey === 'tickets'
+    let usePrismaBackup = false
+
+    // Verificar si pg_dump está disponible
+    try {
+      await execAsync('which pg_dump')
+    } catch {
+      usePrismaBackup = true
+    }
+
     const filename = isTicketsModule
       ? `backup-tickets-${timestamp}.json`
-      : `backup-${timestamp}.sql`
+      : usePrismaBackup
+        ? `backup-${timestamp}.json`
+        : `backup-${timestamp}.sql`
     const filepath = join(this.BACKUP_DIR, filename)
 
     // Verificar espacio en disco disponible
@@ -198,10 +209,13 @@ export class BackupService {
       let compressed = false
       let encrypted = false
 
+      let finalFilename = filename
+
       // Aplicar compresión si está habilitada
       if (config.compression) {
         try {
           finalFilepath = await this.compressFile(filepath)
+          finalFilename = filename + '.gz'
           compressed = true
           console.log('Backup comprimido exitosamente')
         } catch (compressionError) {
@@ -215,6 +229,7 @@ export class BackupService {
       if (config.encryption) {
         try {
           finalFilepath = await this.encryptFile(finalFilepath)
+          finalFilename = finalFilename + '.enc'
           encrypted = true
           console.log('Backup encriptado (placeholder)')
         } catch (encryptionError) {
@@ -229,6 +244,7 @@ export class BackupService {
       await prisma.backups.update({
         where: { id: backupRecord.id },
         data: {
+          filename: finalFilename,
           filepath: finalFilepath,
           size: finalStats.size,
           status: 'completed',
@@ -849,6 +865,7 @@ export class BackupService {
       // ── Descifrar si el archivo está encriptado (.enc) ──────────────────────
       let workingFilepath = backup.filepath
       let decryptedTempPath: string | null = null
+      let decompressedTempPath: string | null = null
 
       if (backup.filepath.endsWith('.enc')) {
         console.log('Backup encriptado detectado, descifrando...')
@@ -864,20 +881,72 @@ export class BackupService {
         }
       }
 
-      // Detectar formato del archivo de trabajo (ya descifrado si aplica)
-      const isSqlBackup = workingFilepath.endsWith('.sql') || workingFilepath.endsWith('.sql.gz')
+      // Descomprimir si es gzip, incluso si la extensión no es .gz
+      let isGzipped = false
+      try {
+        const { stdout } = await execAsync(`file -b "${workingFilepath}"`)
+        isGzipped = stdout.includes('gzip compressed')
+      } catch {}
+
+      if (isGzipped || workingFilepath.endsWith('.gz')) {
+        console.log('Backup comprimido detectado, descomprimiendo...')
+        const decompressedPath = workingFilepath.replace(/\.gz$/, '') + '.temp'
+        await execAsync(`gunzip -c "${workingFilepath}" > "${decompressedPath}"`)
+        decompressedTempPath = decompressedPath
+        workingFilepath = decompressedPath
+      }
+
+      // Detectar formato del archivo leyendo su contenido (no solo la extensión)
+      let isSqlBackup = false
+      let isJsonBackup = false
+
+      try {
+        const { stdout: head } = await execAsync(`head -c 200 "${workingFilepath}"`)
+
+        if (head.trim().startsWith('{')) {
+          isJsonBackup = true
+          console.log('Detectado formato JSON por contenido')
+        } else if (
+          head.toUpperCase().includes('POSTGRES') ||
+          head.toUpperCase().includes('CREATE TABLE')
+        ) {
+          isSqlBackup = true
+          console.log('Detectado formato SQL por contenido')
+        } else {
+          // Fallback a la extensión
+          isSqlBackup = workingFilepath.endsWith('.sql')
+          isJsonBackup = workingFilepath.endsWith('.json')
+        }
+      } catch {
+        // Si no podemos leer el encabezado, usar la extensión
+        isSqlBackup = workingFilepath.endsWith('.sql')
+        isJsonBackup = workingFilepath.endsWith('.json')
+      }
+
+      console.log(
+        `Formato detectado: ${isSqlBackup ? 'SQL' : isJsonBackup ? 'JSON' : 'Desconocido'}`
+      )
 
       try {
         if (isSqlBackup) {
           await this.restoreFromSQL({ ...backup, filepath: workingFilepath })
-        } else {
+        } else if (isJsonBackup) {
           await this.restoreFromJSON({ ...backup, filepath: workingFilepath })
+        } else {
+          throw new Error('No se pudo detectar el formato del backup')
         }
       } finally {
-        // Limpiar archivo descifrado temporal (nunca dejar datos sin cifrar en disco)
+        // Limpiar archivos temporales
         if (decryptedTempPath) {
           try {
             await unlink(decryptedTempPath)
+          } catch {
+            /* ignorar */
+          }
+        }
+        if (decompressedTempPath) {
+          try {
+            await unlink(decompressedTempPath)
           } catch {
             /* ignorar */
           }
@@ -908,25 +977,17 @@ export class BackupService {
   }
 
   /**
-   * Restaura un backup SQL usando psql (el método correcto para backups pg_dump).
+   * Restaura un backup SQL usando psql.
    */
   private static async restoreFromSQL(backup: {
     id: string
     filename: string
     filepath: string
   }): Promise<void> {
+    console.log('[RESTORE] Iniciando restauración SQL...')
+
     const databaseUrl = process.env.DATABASE_URL
     if (!databaseUrl) throw new Error('DATABASE_URL no configurada')
-
-    // Verificar que psql esté disponible
-    try {
-      await execAsync('which psql')
-    } catch {
-      throw new Error(
-        'psql no está disponible en el sistema. No se puede restaurar un backup SQL sin psql. ' +
-          'Instala postgresql-client o usa un backup en formato JSON.'
-      )
-    }
 
     const url = new URL(databaseUrl)
     const dbConfig = {
@@ -941,27 +1002,41 @@ export class BackupService {
 
     // Descomprimir si es necesario
     if (backup.filepath.endsWith('.gz')) {
+      console.log('[RESTORE] Descomprimiendo backup...')
       const decompressedPath = backup.filepath.replace('.gz', '')
-      console.log('Descomprimiendo backup...')
       await execAsync(`gunzip -c "${backup.filepath}" > "${decompressedPath}"`)
       sourceFile = decompressedPath
     }
 
-    console.log(`Restaurando backup SQL: ${backup.filename}`)
+    console.log(`[RESTORE] Archivo de backup: ${sourceFile}`)
+    console.log(`[RESTORE] Conectando a ${dbConfig.host}:${dbConfig.port}/${dbConfig.database}`)
 
     try {
+      // Intentar con psql directamente
+      console.log('[RESTORE] Intentando con psql...')
+      await execAsync('which psql')
+      console.log('[RESTORE] psql está disponible')
+
       const command = `PGPASSWORD="${dbConfig.password}" psql -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database} -f "${sourceFile}" --single-transaction`
 
-      const { stderr } = await execAsync(command, {
-        timeout: 600000, // 10 minutos
+      const { stderr, stdout } = await execAsync(command, {
+        timeout: 600000,
         maxBuffer: 1024 * 1024 * 100,
       })
 
+      if (stdout) console.log('[RESTORE] Salida:', stdout)
       if (stderr && !stderr.includes('NOTICE') && !stderr.includes('WARNING')) {
-        console.warn('Advertencias durante la restauración SQL:', stderr)
+        console.warn('[RESTORE] Advertencias:', stderr)
       }
 
-      console.log('Restauración SQL completada exitosamente')
+      console.log('[RESTORE] Restauración SQL completada exitosamente!')
+      return
+    } catch (psqlError) {
+      console.error('[RESTORE] Error con psql:', psqlError)
+      throw new Error(
+        'No se pudo restaurar el backup. Asegúrate de que el contenedor de la app tenga postgresql-client instalado. ' +
+          'Si usas Docker, reconstruye el contenedor con: docker compose -f docker-compose.dev.yml up --build'
+      )
     } finally {
       // Limpiar archivo descomprimido temporal
       if (sourceFile !== backup.filepath) {
@@ -1519,6 +1594,77 @@ export class BackupService {
     } catch (error) {
       console.error('Error en backup alternativo:', error)
       throw error
+    }
+  }
+
+  static async importBackupFromFile(
+    fileBuffer: Buffer,
+    originalFilename: string
+  ): Promise<BackupInfo> {
+    await this.ensureBackupDirectory()
+
+    let filename = originalFilename
+    let isTicketsModule = false
+
+    if (filename.includes('tickets') && filename.endsWith('.json')) {
+      isTicketsModule = true
+    }
+
+    if (!filename.startsWith('backup-')) {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+      const ext = filename.split('.').pop() || 'sql'
+      filename = isTicketsModule
+        ? `backup-tickets-imported-${timestamp}.json`
+        : `backup-imported-${timestamp}.${ext}`
+    }
+
+    const filepath = join(this.BACKUP_DIR, filename)
+    await writeFile(filepath, fileBuffer)
+
+    const stats = await stat(filepath)
+
+    if (stats.size === 0) {
+      await unlink(filepath)
+      throw new Error('El archivo de backup está vacío')
+    }
+
+    const backupRecord = await prisma.backups.create({
+      data: {
+        id: randomUUID(),
+        filename,
+        filepath,
+        size: stats.size,
+        type: 'manual',
+        status: 'completed',
+        module: isTicketsModule ? 'tickets' : null,
+        createdAt: new Date(),
+      },
+    })
+
+    await prisma.audit_logs.create({
+      data: {
+        id: randomUUID(),
+        action: 'backup_imported',
+        entityType: 'System',
+        entityId: backupRecord.id,
+        createdAt: new Date(),
+        details: {
+          filename,
+          originalFilename,
+          size: stats.size,
+          importedAt: new Date(),
+        },
+      },
+    })
+
+    return {
+      id: backupRecord.id,
+      filename: backupRecord.filename,
+      size: stats.size,
+      createdAt: backupRecord.createdAt,
+      type: 'manual',
+      status: 'completed',
+      module: isTicketsModule ? 'tickets' : null,
     }
   }
 

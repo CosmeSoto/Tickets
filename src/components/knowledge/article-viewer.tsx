@@ -7,12 +7,12 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
-import { 
-  ThumbsUp, 
-  ThumbsDown, 
-  Eye, 
-  Calendar, 
-  User, 
+import {
+  ThumbsUp,
+  ThumbsDown,
+  Eye,
+  Calendar,
+  User,
   Loader2,
   AlertCircle,
   Edit,
@@ -37,11 +37,20 @@ interface ArticleViewerProps {
   showActions?: boolean
 }
 
-export function ArticleViewer({
-  articleId,
-  onVote,
-  showActions = true,
-}: ArticleViewerProps) {
+function filterArticleContent(content: string): string {
+  const sectionsToRemove = ['## 📊 Métricas de Resolución', '## ⭐ Calificación del Cliente']
+
+  let filteredContent = content
+
+  sectionsToRemove.forEach(sectionStart => {
+    const sectionRegex = new RegExp(`${sectionStart}[\\s\\S]*?(?=## |$)`, 'g')
+    filteredContent = filteredContent.replace(sectionRegex, '')
+  })
+
+  return filteredContent
+}
+
+export function ArticleViewer({ articleId, onVote, showActions = true }: ArticleViewerProps) {
   const router = useRouter()
   const { data: session } = useSession()
   const { getArticle, voteArticle, deleteArticle, loading } = useKnowledge()
@@ -70,17 +79,17 @@ export function ArticleViewer({
       if (success) {
         setUserVote(isHelpful)
         toast.success('Voto registrado')
-        
+
         // Actualizar estadísticas localmente
         setArticle(prev => {
           if (!prev) return prev
-          
+
           const wasHelpful = userVote === true
           const wasNotHelpful = userVote === false
-          
+
           let newHelpfulVotes = prev.helpfulVotes
           let newNotHelpfulVotes = prev.notHelpfulVotes
-          
+
           if (wasHelpful && !isHelpful) {
             newHelpfulVotes--
             newNotHelpfulVotes++
@@ -94,14 +103,14 @@ export function ArticleViewer({
               newNotHelpfulVotes++
             }
           }
-          
+
           return {
             ...prev,
             helpfulVotes: newHelpfulVotes,
             notHelpfulVotes: newNotHelpfulVotes,
           }
         })
-        
+
         onVote?.(isHelpful)
       }
     } catch (error) {
@@ -113,7 +122,7 @@ export function ArticleViewer({
 
   const handleDelete = async () => {
     if (!article) return
-    
+
     if (!confirm('¿Estás seguro de eliminar este artículo?')) return
 
     const success = await deleteArticle(article.id)
@@ -127,9 +136,9 @@ export function ArticleViewer({
 
   const handleShare = async () => {
     if (!article) return
-    
+
     const url = `${window.location.origin}/knowledge/${article.id}`
-    
+
     if (navigator.share) {
       try {
         await navigator.share({
@@ -148,8 +157,8 @@ export function ArticleViewer({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className='flex items-center justify-center py-12'>
+        <Loader2 className='h-8 w-8 animate-spin text-muted-foreground' />
       </div>
     )
   }
@@ -157,17 +166,13 @@ export function ArticleViewer({
   if (!article) {
     return (
       <Card>
-        <CardContent className="flex flex-col items-center justify-center py-12">
-          <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
-          <p className="text-lg font-medium">Artículo no encontrado</p>
-          <p className="text-sm text-muted-foreground mt-2">
+        <CardContent className='flex flex-col items-center justify-center py-12'>
+          <AlertCircle className='h-12 w-12 text-muted-foreground mb-4' />
+          <p className='text-lg font-medium'>Artículo no encontrado</p>
+          <p className='text-sm text-muted-foreground mt-2'>
             El artículo que buscas no existe o ha sido eliminado
           </p>
-          <Button
-            variant="outline"
-            className="mt-4"
-            onClick={() => router.push('/knowledge')}
-          >
+          <Button variant='outline' className='mt-4' onClick={() => router.push('/knowledge')}>
             Volver a artículos
           </Button>
         </CardContent>
@@ -179,20 +184,20 @@ export function ArticleViewer({
   const canDelete = session?.user?.role === 'ADMIN' || session?.user?.id === article.authorId
 
   return (
-    <div className="space-y-6">
+    <div className='space-y-6'>
       {/* Header */}
       <Card>
         <CardHeader>
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1">
-              <h1 className="text-3xl font-bold mb-3">{article.title}</h1>
-              
+          <div className='flex items-start justify-between gap-4'>
+            <div className='flex-1'>
+              <h1 className='text-3xl font-bold mb-3'>{article.title}</h1>
+
               {/* Categoría y Tags */}
-              <div className="flex flex-wrap gap-2 mb-4">
+              <div className='flex flex-wrap gap-2 mb-4'>
                 {article.category && (
                   <Badge
-                    variant="outline"
-                    className="text-sm"
+                    variant='outline'
+                    className='text-sm'
                     style={{
                       borderColor: article.category.color,
                       color: article.category.color,
@@ -201,28 +206,26 @@ export function ArticleViewer({
                     {article.category.name}
                   </Badge>
                 )}
-                {article.tags.map((tag) => (
-                  <Badge key={tag} variant="secondary">
+                {article.tags.map(tag => (
+                  <Badge key={tag} variant='secondary'>
                     {tag}
                   </Badge>
                 ))}
               </div>
 
               {/* Autor y Fecha */}
-              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <div className='flex items-center gap-4 text-sm text-muted-foreground'>
                 {article.author && (
-                  <div className="flex items-center gap-2">
-                    <Avatar className="h-8 w-8">
+                  <div className='flex items-center gap-2'>
+                    <Avatar className='h-8 w-8'>
                       <AvatarImage src={article.author.avatar} />
-                      <AvatarFallback>
-                        {article.author.name.charAt(0).toUpperCase()}
-                      </AvatarFallback>
+                      <AvatarFallback>{article.author.name.charAt(0).toUpperCase()}</AvatarFallback>
                     </Avatar>
                     <span>{article.author.name}</span>
                   </div>
                 )}
-                <div className="flex items-center gap-1">
-                  <Calendar className="h-4 w-4" />
+                <div className='flex items-center gap-1'>
+                  <Calendar className='h-4 w-4' />
                   <span>
                     {formatDistanceToNow(new Date(article.createdAt), {
                       addSuffix: true,
@@ -230,8 +233,8 @@ export function ArticleViewer({
                     })}
                   </span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <Eye className="h-4 w-4" />
+                <div className='flex items-center gap-1'>
+                  <Eye className='h-4 w-4' />
                   <span>{article.views} vistas</span>
                 </div>
               </div>
@@ -239,35 +242,25 @@ export function ArticleViewer({
 
             {/* Acciones */}
             {showActions && (
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={handleShare}
-                  title="Compartir"
-                >
-                  <Share2 className="h-4 w-4" />
+              <div className='flex items-center gap-2'>
+                <Button variant='outline' size='icon' onClick={handleShare} title='Compartir'>
+                  <Share2 className='h-4 w-4' />
                 </Button>
-                
+
                 {canEdit && (
                   <Button
-                    variant="outline"
-                    size="icon"
+                    variant='outline'
+                    size='icon'
                     onClick={() => router.push(`/knowledge/${article.id}/edit`)}
-                    title="Editar"
+                    title='Editar'
                   >
-                    <Edit className="h-4 w-4" />
+                    <Edit className='h-4 w-4' />
                   </Button>
                 )}
-                
+
                 {canDelete && (
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={handleDelete}
-                    title="Eliminar"
-                  >
-                    <Trash2 className="h-4 w-4" />
+                  <Button variant='outline' size='icon' onClick={handleDelete} title='Eliminar'>
+                    <Trash2 className='h-4 w-4' />
                   </Button>
                 )}
               </div>
@@ -278,12 +271,9 @@ export function ArticleViewer({
 
       {/* Contenido */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="prose prose-slate dark:prose-invert max-w-none">
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              rehypePlugins={[rehypeRaw, rehypeSanitize]}
-            >
+        <CardContent className='pt-6'>
+          <div className='prose prose-slate dark:prose-invert max-w-none'>
+            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw, rehypeSanitize]}>
               {article.content}
             </ReactMarkdown>
           </div>
@@ -294,12 +284,12 @@ export function ArticleViewer({
       {article.sourceTicket && (
         <Card>
           <CardHeader>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <FileText className="h-4 w-4" />
+            <div className='flex items-center gap-2 text-sm text-muted-foreground'>
+              <FileText className='h-4 w-4' />
               <span>Creado desde el ticket:</span>
               <Button
-                variant="link"
-                className="p-0 h-auto"
+                variant='link'
+                className='p-0 h-auto'
                 onClick={() => router.push(`/tickets/${article.sourceTicket!.id}`)}
               >
                 {article.sourceTicket.title}
@@ -312,27 +302,27 @@ export function ArticleViewer({
       {/* Votación y Estadísticas */}
       <Card>
         <CardHeader>
-          <h3 className="text-lg font-semibold">¿Te fue útil este artículo?</h3>
+          <h3 className='text-lg font-semibold'>¿Te fue útil este artículo?</h3>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className='space-y-6'>
           {/* Botones de votación */}
-          <div className="flex items-center gap-4">
+          <div className='flex items-center gap-4'>
             <Button
               variant={userVote === true ? 'default' : 'outline'}
               onClick={() => handleVote(true)}
               disabled={voting}
-              className="flex-1"
+              className='flex-1'
             >
-              <ThumbsUp className="h-4 w-4 mr-2" />
+              <ThumbsUp className='h-4 w-4 mr-2' />
               Útil
             </Button>
             <Button
               variant={userVote === false ? 'default' : 'outline'}
               onClick={() => handleVote(false)}
               disabled={voting}
-              className="flex-1"
+              className='flex-1'
             >
-              <ThumbsDown className="h-4 w-4 mr-2" />
+              <ThumbsDown className='h-4 w-4 mr-2' />
               No útil
             </Button>
           </div>
@@ -349,18 +339,16 @@ export function ArticleViewer({
       </Card>
 
       {/* Crear ticket si no resuelve */}
-      <Card className="bg-muted/50">
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
+      <Card className='bg-muted/50'>
+        <CardContent className='pt-6'>
+          <div className='flex items-center justify-between'>
             <div>
-              <h4 className="font-medium mb-1">¿No resolvió tu problema?</h4>
-              <p className="text-sm text-muted-foreground">
+              <h4 className='font-medium mb-1'>¿No resolvió tu problema?</h4>
+              <p className='text-sm text-muted-foreground'>
                 Crea un ticket y nuestro equipo te ayudará
               </p>
             </div>
-            <Button onClick={() => router.push('/tickets/new')}>
-              Crear Ticket
-            </Button>
+            <Button onClick={() => router.push('/tickets/new')}>Crear Ticket</Button>
           </div>
         </CardContent>
       </Card>

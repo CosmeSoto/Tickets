@@ -1,12 +1,22 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Database, RotateCcw, AlertTriangle, Eye, Download, Shield, Activity } from 'lucide-react'
+import {
+  Database,
+  RotateCcw,
+  AlertTriangle,
+  Eye,
+  Download,
+  Shield,
+  Activity,
+  Upload,
+  X,
+} from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 interface BackupInfo {
@@ -42,6 +52,10 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
   const [restoreProgress, setRestoreProgress] = useState(0)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [showConfirmation, setShowConfirmation] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
   const completedBackups = backups.filter(b => b.status === 'completed')
@@ -187,13 +201,195 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
       minute: '2-digit',
     })
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setSelectedFile(file)
+    }
+  }
+
+  const handleUpload = async () => {
+    if (!selectedFile) return
+
+    setUploading(true)
+    const formData = new FormData()
+    formData.append('file', selectedFile)
+
+    try {
+      const response = await fetch('/api/admin/backups/import', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (response.ok) {
+        toast({
+          title: 'Backup Importado',
+          description: 'El backup se ha importado correctamente',
+        })
+        setSelectedFile(null)
+        if (fileInputRef.current) {
+          fileInputRef.current.value = ''
+        }
+        onRefresh()
+      } else {
+        const error = await response.json()
+        throw new Error(error.error || 'Error al importar el backup')
+      }
+    } catch (error) {
+      toast({
+        title: 'Error al Importar',
+        description: error instanceof Error ? error.message : 'Error desconocido',
+        variant: 'destructive',
+      })
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const clearSelectedFile = () => {
+    setSelectedFile(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+
+    const file = e.dataTransfer.files?.[0]
+    if (file) {
+      setSelectedFile(file)
+    }
+  }
+
   return (
     <div className='space-y-6'>
       {/* Header */}
       <div>
         <h2 className='text-2xl font-bold text-foreground'>Restauración de Backups</h2>
-        <p className='text-muted-foreground'>Restaura la base de datos desde un backup existente</p>
+        <p className='text-muted-foreground'>Importa y restaura backups desde archivos</p>
       </div>
+
+      {/* Sección de Importación */}
+      <Card>
+        <CardHeader>
+          <CardTitle className='flex items-center space-x-2 text-base'>
+            <Upload className='h-4 w-4 text-primary' />
+            <span>Importar Backup</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div
+            className={`border-2 border-dashed rounded-lg p-4 transition-all ${
+              isDragging
+                ? 'border-primary bg-primary/10'
+                : selectedFile
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border hover:border-primary/50 hover:bg-muted/50'
+            }`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <input
+              ref={fileInputRef}
+              type='file'
+              accept='.sql,.sql.gz,.json,.json.gz'
+              onChange={handleFileSelect}
+              className='hidden'
+            />
+            <div className='flex flex-col sm:flex-row items-center justify-between gap-3'>
+              <div className='flex items-center space-x-3'>
+                <Upload
+                  className={`h-5 w-5 ${isDragging ? 'text-primary animate-bounce' : 'text-muted-foreground'}`}
+                />
+                <div>
+                  {selectedFile ? (
+                    <div>
+                      <p className='font-medium text-sm'>{selectedFile.name}</p>
+                      <p className='text-xs text-muted-foreground'>
+                        {formatFileSize(selectedFile.size)}
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className='font-medium text-sm'>
+                        {isDragging
+                          ? 'Suelta el archivo aquí'
+                          : 'Arrastra y suelta un archivo aquí, o haz clic para seleccionar'}
+                      </p>
+                      <p className='text-xs text-muted-foreground mt-1'>
+                        Formatos: .sql, .sql.gz, .json, .json.gz
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className='flex gap-2'>
+                {selectedFile && (
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    onClick={e => {
+                      e.stopPropagation()
+                      clearSelectedFile()
+                    }}
+                  >
+                    <X className='h-4 w-4 mr-1' />
+                    Cancelar
+                  </Button>
+                )}
+                {selectedFile && (
+                  <Button
+                    size='sm'
+                    onClick={e => {
+                      e.stopPropagation()
+                      handleUpload()
+                    }}
+                    disabled={uploading}
+                  >
+                    {uploading ? (
+                      <>
+                        <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2' />
+                        Importando...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className='h-4 w-4 mr-1' />
+                        Importar
+                      </>
+                    )}
+                  </Button>
+                )}
+                {!selectedFile && (
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    onClick={e => {
+                      e.stopPropagation()
+                      fileInputRef.current?.click()
+                    }}
+                  >
+                    Seleccionar
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Advertencia de Seguridad */}
       <Alert className='border-destructive/40 bg-destructive/10'>

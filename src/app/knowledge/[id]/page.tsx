@@ -18,6 +18,7 @@ import {
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -27,6 +28,19 @@ import { Separator } from '@/components/ui/separator'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useToast } from '@/hooks/use-toast'
 import type { Article } from '@/hooks/use-knowledge'
+
+function filterArticleContent(content: string): string {
+  const sectionsToRemove = ['## 📊 Métricas de Resolución', '## ⭐ Calificación del Cliente']
+
+  let filteredContent = content
+
+  sectionsToRemove.forEach(sectionStart => {
+    const sectionRegex = new RegExp(`${sectionStart}[\\s\\S]*?(?=## |$)`, 'g')
+    filteredContent = filteredContent.replace(sectionRegex, '')
+  })
+
+  return filteredContent
+}
 
 export default function KnowledgeDetailPage() {
   const { data: session, status } = useSession()
@@ -251,8 +265,10 @@ export default function KnowledgeDetailPage() {
             {/* Contenido del artículo */}
             <Card>
               <CardContent className='p-6 sm:p-8'>
-                <div className='prose prose-slate max-w-none dark:prose-invert'>
-                  <ReactMarkdown>{article.content}</ReactMarkdown>
+                <div className='markdown-body'>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {filterArticleContent(article.content)}
+                  </ReactMarkdown>
                 </div>
               </CardContent>
             </Card>
