@@ -38,6 +38,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
+import { NewsVisibilitySelector } from '@/components/news/news-visibility-selector'
 
 type NewsType =
   | 'NEWS'
@@ -763,157 +764,20 @@ export default function AdminNewsPage() {
 
               <Separator />
 
-              <div className='space-y-4'>
-                <h3 className='text-sm font-semibold'>Visibilidad</h3>
-                <p className='text-xs text-muted-foreground'>
-                  Selecciona quién puede ver esta noticia (si no seleccionas nada, se ve por todos)
-                </p>
-
-                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
-                  {/* Roles */}
-                  <div className='space-y-2'>
-                    <Label className='text-sm'>Por Roles</Label>
-                    <Input
-                      placeholder='Buscar rol...'
-                      value={roleSearch}
-                      onChange={e => setRoleSearch(e.target.value)}
-                      className='mb-2'
-                    />
-                    <div className='space-y-2 border rounded-lg p-3 max-h-40 overflow-y-auto'>
-                      {ROLE_OPTIONS.filter(role =>
-                        role.label.toLowerCase().includes(roleSearch.toLowerCase())
-                      ).map(role => (
-                        <div key={role.value} className='flex items-center gap-2'>
-                          <Checkbox
-                            id={`role-${role.value}`}
-                            checked={formData.roles.includes(role.value)}
-                            onCheckedChange={checked => {
-                              setFormData(prev => ({
-                                ...prev,
-                                roles: checked
-                                  ? [...prev.roles, role.value]
-                                  : prev.roles.filter(r => r !== role.value),
-                              }))
-                            }}
-                          />
-                          <Label htmlFor={`role-${role.value}`} className='text-sm cursor-pointer'>
-                            {role.label}
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Familias */}
-                  <div className='space-y-2'>
-                    <Label className='text-sm'>Por Familias</Label>
-                    <Input
-                      placeholder='Buscar familia...'
-                      value={familySearch}
-                      onChange={e => setFamilySearch(e.target.value)}
-                      className='mb-2'
-                    />
-                    <div className='space-y-2 border rounded-lg p-3 max-h-40 overflow-y-auto'>
-                      {families
-                        .filter(family =>
-                          family.name.toLowerCase().includes(familySearch.toLowerCase())
-                        )
-                        .map(family => (
-                          <div key={family.id} className='space-y-1'>
-                            <div className='flex items-center gap-2'>
-                              <Checkbox
-                                id={`family-${family.id}`}
-                                checked={formData.familyIds.includes(family.id)}
-                                onCheckedChange={checked => {
-                                  setFormData(prev => ({
-                                    ...prev,
-                                    familyIds: checked
-                                      ? [...prev.familyIds, family.id]
-                                      : prev.familyIds.filter(id => id !== family.id),
-                                  }))
-                                }}
-                              />
-                              <Label
-                                htmlFor={`family-${family.id}`}
-                                className='text-sm cursor-pointer font-medium'
-                              >
-                                {family.name}
-                              </Label>
-                            </div>
-                            {/* Departamentos de esta familia */}
-                            {family.departments.length > 0 && (
-                              <div className='ml-6 space-y-1'>
-                                {family.departments.map(dept => (
-                                  <div key={dept.id} className='flex items-center gap-2'>
-                                    <Checkbox
-                                      id={`dept-${dept.id}`}
-                                      checked={formData.departmentIds.includes(dept.id)}
-                                      onCheckedChange={checked => {
-                                        setFormData(prev => ({
-                                          ...prev,
-                                          departmentIds: checked
-                                            ? [...prev.departmentIds, dept.id]
-                                            : prev.departmentIds.filter(id => id !== dept.id),
-                                        }))
-                                      }}
-                                    />
-                                    <Label
-                                      htmlFor={`dept-${dept.id}`}
-                                      className='text-sm cursor-pointer text-muted-foreground'
-                                    >
-                                      {dept.name}
-                                    </Label>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-
-                  {/* Usuarios */}
-                  <div className='space-y-2 lg:col-span-2'>
-                    <Label className='text-sm'>Por Usuarios</Label>
-                    <Input
-                      placeholder='Buscar usuario...'
-                      value={userSearch}
-                      onChange={e => setUserSearch(e.target.value)}
-                      className='mb-2'
-                    />
-                    <div className='space-y-2 border rounded-lg p-3 max-h-40 overflow-y-auto grid grid-cols-2 gap-2'>
-                      {users
-                        .filter(
-                          user =>
-                            user.name.toLowerCase().includes(userSearch.toLowerCase()) ||
-                            user.email.toLowerCase().includes(userSearch.toLowerCase())
-                        )
-                        .map(user => (
-                          <div key={user.id} className='flex items-center gap-2'>
-                            <Checkbox
-                              id={`user-${user.id}`}
-                              checked={formData.userIds.includes(user.id)}
-                              onCheckedChange={checked => {
-                                setFormData(prev => ({
-                                  ...prev,
-                                  userIds: checked
-                                    ? [...prev.userIds, user.id]
-                                    : prev.userIds.filter(id => id !== user.id),
-                                }))
-                              }}
-                            />
-                            <Label
-                              htmlFor={`user-${user.id}`}
-                              className='text-sm cursor-pointer truncate'
-                            >
-                              {user.name}
-                            </Label>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <NewsVisibilitySelector
+                families={families}
+                users={users}
+                selectedRoles={formData.roles}
+                selectedFamilyIds={formData.familyIds}
+                selectedDepartmentIds={formData.departmentIds}
+                selectedUserIds={formData.userIds}
+                onRolesChange={roles => setFormData(prev => ({ ...prev, roles }))}
+                onFamilyIdsChange={familyIds => setFormData(prev => ({ ...prev, familyIds }))}
+                onDepartmentIdsChange={departmentIds =>
+                  setFormData(prev => ({ ...prev, departmentIds }))
+                }
+                onUserIdsChange={userIds => setFormData(prev => ({ ...prev, userIds }))}
+              />
             </div>
             <DialogFooter>
               <Button
