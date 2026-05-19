@@ -88,10 +88,10 @@ export function AttachmentsField({ files, onChange, maxFileSizeMB = 10 }: Attach
           <FileInputWithCamera accept={ACCEPTED} multiple onChange={addFiles}>
             {({ openFile, openCamera, showCamera }) => (
               <div
-                className='flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border px-4 py-6 text-muted-foreground cursor-pointer hover:border-primary/50 hover:bg-accent/30 transition-colors'
+                className='flex flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-border px-3 py-3 text-muted-foreground cursor-pointer hover:border-primary/50 hover:bg-accent/30 transition-colors'
                 onClick={openFile}
               >
-                <Upload className='h-6 w-6 opacity-40' />
+                <Upload className='h-5 w-5 opacity-40' />
                 <p className='text-sm'>
                   Arrastra archivos o <span className='text-primary font-medium'>haz clic</span>
                 </p>
