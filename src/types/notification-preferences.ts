@@ -1,6 +1,7 @@
 /**
  * Tipos unificados para preferencias de notificaciones
  * Soporta 3 niveles: básico, intermedio y avanzado
+ * Aplica a todos los módulos del sistema: Tickets, Inventario, Rondas, Noticias
  */
 
 export interface NotificationPreferences {
@@ -9,16 +10,22 @@ export interface NotificationPreferences {
   pushNotifications: boolean
 
   // ===== NIVEL INTERMEDIO (Técnicos/Admins) =====
+  /** Actualizaciones generales: tickets, inventario, rondas, noticias */
   ticketUpdates: boolean
   systemAlerts: boolean
   weeklyReport: boolean
 
   // ===== NIVEL AVANZADO (Opcional para todos) =====
   soundEnabled: boolean
+  /** Nuevos registros creados en el sistema (tickets, solicitudes, incidencias) */
   ticketCreated: boolean
+  /** Asignaciones: tickets, tareas de ronda, equipos de inventario */
   ticketAssigned: boolean
+  /** Cambios de estado en cualquier módulo */
   statusChanged: boolean
+  /** Nuevos comentarios o notas en registros que sigues */
   newComments: boolean
+  /** Actualizaciones en registros que sigues */
   ticketUpdated: boolean
 
   // Horarios silenciosos

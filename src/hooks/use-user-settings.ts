@@ -16,13 +16,18 @@ export interface UserSettings {
   soundEnabled: boolean
   emailNotifications: boolean
   pushNotifications: boolean
+  /** Actualizaciones de actividad: tickets, inventario, rondas, noticias */
   ticketUpdates: boolean
   systemAlerts: boolean
   weeklyReport: boolean
+  /** Nuevos registros creados en cualquier módulo */
   ticketCreated: boolean
+  /** Asignaciones de tickets, tareas, equipos */
   ticketAssigned: boolean
+  /** Cambios de estado en cualquier módulo */
   statusChanged: boolean
   newComments: boolean
+  /** Actualizaciones en registros que sigues */
   ticketUpdated: boolean
   quietHours: { enabled: boolean; startTime: string; endTime: string }
   autoAssignEnabled: boolean
@@ -127,7 +132,9 @@ export function useUserSettings() {
       loadSettings()
     }
 
-    return () => { unsub() }
+    return () => {
+      unsub()
+    }
   }, [status])
 
   /** Actualiza settings localmente + persiste en la BD */

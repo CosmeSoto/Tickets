@@ -565,7 +565,7 @@ export function RoleDashboardLayout({
 
                 {/* Ver Página Pública — visible para todos los roles */}
                 <Link
-                  href='/'
+                  href='/?preview=true'
                   target='_blank'
                   rel='noopener noreferrer'
                   title='Ver Página Pública'

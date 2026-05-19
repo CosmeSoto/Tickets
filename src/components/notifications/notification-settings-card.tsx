@@ -10,11 +10,12 @@ import {
   Clock,
   Save,
   RefreshCw,
-  Ticket,
+  Activity,
   User,
   MessageCircle,
   AlertCircle,
   Smartphone,
+  FilePlus,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -223,11 +224,11 @@ export function NotificationSettingsCard({
               <div className='flex items-center justify-between'>
                 <div className='space-y-0.5'>
                   <Label className='text-base flex items-center space-x-2'>
-                    <Ticket className='h-4 w-4 text-blue-600 dark:text-blue-400' />
-                    <span>Actualizaciones de tickets</span>
+                    <Activity className='h-4 w-4 text-blue-600 dark:text-blue-400' />
+                    <span>Actualizaciones de actividad</span>
                   </Label>
                   <p className='text-sm text-muted-foreground'>
-                    Notificaciones cuando hay cambios en tus tickets
+                    Cambios en tickets, inventario, rondas y otros módulos
                   </p>
                 </div>
                 <Switch
@@ -245,7 +246,7 @@ export function NotificationSettingsCard({
                     <span>Nuevos comentarios</span>
                   </Label>
                   <p className='text-sm text-muted-foreground'>
-                    Cuando alguien comenta en tus tickets
+                    Cuando alguien comenta en registros que sigues
                   </p>
                 </div>
                 <Switch
@@ -263,7 +264,7 @@ export function NotificationSettingsCard({
                     <span>Cambios de estado</span>
                   </Label>
                   <p className='text-sm text-muted-foreground'>
-                    Cuando cambia el estado de tus tickets
+                    Cuando cambia el estado de tus registros o asignaciones
                   </p>
                 </div>
                 <Switch
@@ -327,11 +328,11 @@ export function NotificationSettingsCard({
               <div className='flex items-center justify-between'>
                 <div className='space-y-0.5'>
                   <Label className='text-base flex items-center space-x-2'>
-                    <Ticket className='h-4 w-4 text-blue-600 dark:text-blue-400' />
-                    <span>Tickets creados</span>
+                    <FilePlus className='h-4 w-4 text-blue-600 dark:text-blue-400' />
+                    <span>Nuevos registros</span>
                   </Label>
                   <p className='text-sm text-muted-foreground'>
-                    Cuando se crea un nuevo ticket en el sistema
+                    Cuando se crean tickets, solicitudes de inventario o incidencias de ronda
                   </p>
                 </div>
                 <Switch
@@ -346,9 +347,11 @@ export function NotificationSettingsCard({
                 <div className='space-y-0.5'>
                   <Label className='text-base flex items-center space-x-2'>
                     <User className='h-4 w-4 text-green-600 dark:text-green-400' />
-                    <span>Tickets asignados</span>
+                    <span>Asignaciones</span>
                   </Label>
-                  <p className='text-sm text-muted-foreground'>Cuando te asignan un ticket</p>
+                  <p className='text-sm text-muted-foreground'>
+                    Cuando te asignan tickets, tareas o equipos
+                  </p>
                 </div>
                 <Switch
                   checked={preferences.ticketAssigned}
@@ -365,7 +368,7 @@ export function NotificationSettingsCard({
                     <span>Cambios de estado</span>
                   </Label>
                   <p className='text-sm text-muted-foreground'>
-                    Cuando cambia el estado de un ticket
+                    Cuando cambia el estado de un registro en cualquier módulo
                   </p>
                 </div>
                 <Switch
@@ -383,7 +386,7 @@ export function NotificationSettingsCard({
                     <span>Nuevos comentarios</span>
                   </Label>
                   <p className='text-sm text-muted-foreground'>
-                    Cuando alguien comenta en un ticket que sigues
+                    Cuando alguien comenta en un registro que sigues
                   </p>
                 </div>
                 <Switch

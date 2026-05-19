@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Loader2 } from 'lucide-react'
 import * as Icons from 'lucide-react'
@@ -66,14 +66,19 @@ const defaultContent: LandingContent = {
 export default function HomePage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [content, setContent] = useState<LandingContent | null>(null)
   const [services, setServices] = useState<Service[]>([])
   const [forSaleItems, setForSaleItems] = useState<PublicEquipmentItem[]>([])
   const [forSaleEnabled, setForSaleEnabled] = useState(true)
   const [loading, setLoading] = useState(true)
 
-  // Redirigir usuarios autenticados al dashboard
+  // Permitir vista previa de la página pública para usuarios autenticados
+  const isPreview = searchParams.get('preview') === 'true'
+
+  // Redirigir usuarios autenticados al dashboard (excepto en modo preview)
   useEffect(() => {
+    if (isPreview) return
     if (status === 'authenticated' && session?.user) {
       const dest =
         session.user.role === 'ADMIN'
@@ -83,7 +88,7 @@ export default function HomePage() {
             : '/client'
       router.replace(dest)
     }
-  }, [status, session, router])
+  }, [status, session, router, isPreview])
 
   useEffect(() => {
     // Fetch landing page content and services
