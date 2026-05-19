@@ -44,10 +44,26 @@ Documento de transparencia para operación, auditoría y roadmap. Actualizado: m
 
 ---
 
+## Noticias y Comunicados (nuevo — mayo 2026)
+
+| #   | Tema                                                | Estado        | Notas                                                                                                                 |
+| --- | --------------------------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------- |
+| N1  | Modelo de datos completo                            | **Hecho**     | 8 tablas: news, news_roles, news_users, news_departments, news_views, news_reactions, news_comments, news_attachments |
+| N2  | Integración con sistema de módulos                  | **Hecho**     | `newsEnabled` en users, módulo en system_modules                                                                      |
+| N3  | API admin y usuario                                 | **Hecho**     | CRUD completo + feed personalizado                                                                                    |
+| N4  | Integración con dashboards                          | **Hecho**     | NewsFeed al principio de Admin, FamilyAdmin y Client dashboards                                                       |
+| N5  | Sistema de backups                                  | **Hecho**     | Módulo `news` en BACKUP_MODULE_REGISTRY                                                                               |
+| N6  | Documentación técnica                               | **Hecho**     | `docs/MANUAL_NOTICIAS.md` completo                                                                                    |
+| N7  | Filtros, paginación y exportación en administración | **Pendiente** | Usar hooks comunes (use-module-data, use-export, etc.)                                                                |
+
+---
+
 ## Recomendación antes de módulo Inventarios
 
 Los módulos **Tickets** y **Rondas** están en **v1 production-ready**. **Inventario** tiene P0 y P1 de acceso aplicados; queda P2 (catálogos globales) para auditoría externa estricta del módulo completo.
 
+**Noticias y Comunicados**: Módulo nuevo con funcionalidad completa (modelo, API, UI, backups, documentación). Pendiente: filtros avanzados, paginación y exportación en la administración.
+
 ---
 
-_Ver [`MANUAL_TICKETS.md`](./MANUAL_TICKETS.md) y [`MANUAL_RONDAS.md`](./MANUAL_RONDAS.md)._
+_Ver [`MANUAL_TICKETS.md`](./MANUAL_TICKETS.md), [`MANUAL_RONDAS.md`](./MANUAL_RONDAS.md) y [`MANUAL_NOTICIAS.md`](./MANUAL_NOTICIAS.md)._

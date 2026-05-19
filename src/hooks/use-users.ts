@@ -33,6 +33,7 @@ export interface UserData {
   ticketsEnabled?: boolean
   inventoryEnabled?: boolean
   patrolsEnabled?: boolean
+  newsEnabled?: boolean
   isSuperAdmin?: boolean
   lastLogin?: string
   createdAt: string

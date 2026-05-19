@@ -28,6 +28,8 @@ import { useUnifiedDashboard } from '@/hooks/use-unified-dashboard'
 import { getPriorityColor, getStatusColor } from '@/lib/utils/ticket-utils'
 import { useEffect, useState } from 'react'
 import { AssignedFamiliesPanel } from '@/components/dashboard/assigned-families-panel'
+import { NewsFeed } from '@/components/news'
+import { useUserModules } from '@/hooks/use-user-modules'
 
 interface SystemMetrics {
   responseTime: string
@@ -49,6 +51,7 @@ interface SystemMetrics {
 }
 
 export default function ClientDashboard() {
+  const { news: hasNews } = useUserModules()
   const {
     userName,
     isLoading,
@@ -129,6 +132,9 @@ export default function ClientDashboard() {
           </AlertDescription>
         </Alert>
       )}
+
+      {/* NewsFeed - Noticias y Comunicados */}
+      {hasNews && <NewsFeed />}
 
       {/* 1. Contexto del usuario — áreas de soporte */}
       {/* {(stats.assignedFamilies?.length > 0 || stats.inventoryFamilies?.length > 0) && (

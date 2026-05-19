@@ -37,6 +37,7 @@ import {
   MapPin,
   ClipboardList,
   AlertTriangle,
+  Newspaper,
 } from 'lucide-react'
 import { Notifications } from '@/components/ui/notifications'
 import { Button } from '@/components/ui/button'
@@ -112,6 +113,12 @@ const navigationByRole: Record<string, NavItem[]> = {
         { name: 'Reportes', href: '/admin/patrols/reports', icon: BarChart3 },
         { name: 'Configuración', href: '/admin/settings/patrols', icon: Settings },
       ],
+    },
+    {
+      name: 'Noticias',
+      href: '/admin/news',
+      icon: Newspaper,
+      children: [{ name: 'Gestión de Noticias', href: '/admin/news', icon: Newspaper }],
     },
     { name: 'Familias', href: '/admin/families', icon: Layers },
     { name: 'Usuarios', href: '/admin/users', icon: Users },
@@ -361,7 +368,12 @@ export function RoleDashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   // Módulos activos — debe estar antes de cualquier return condicional
-  const { tickets: hasTickets, inventory: hasInventory, patrols: hasPatrols } = useUserModules()
+  const {
+    tickets: hasTickets,
+    inventory: hasInventory,
+    patrols: hasPatrols,
+    news: hasNews,
+  } = useUserModules()
 
   if (!session) {
     return null
@@ -391,6 +403,7 @@ export function RoleDashboardLayout({
       if (item.href === '/admin/tickets' || item.name === 'Tickets') return hasTickets
       if (item.href === '/inventory' || item.name === 'Inventario') return hasInventory
       if (item.href === '/admin/patrols' || item.name === 'Rondas') return hasPatrols
+      if (item.href === '/admin/news' || item.name === 'Noticias') return hasNews
       return true
     })
     navigation = adminNav

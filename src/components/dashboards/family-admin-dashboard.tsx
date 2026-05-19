@@ -15,6 +15,8 @@ import {
   CheckCircle,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { NewsFeed } from '@/components/news'
+import { useUserModules } from '@/hooks/use-user-modules'
 
 interface FamilyAdminStats {
   totalEquipment: number
@@ -26,6 +28,7 @@ interface FamilyAdminStats {
 }
 
 export function FamilyAdminDashboard({ userId }: { userId: string }) {
+  const { news: hasNews } = useUserModules()
   const [stats, setStats] = useState<FamilyAdminStats>({
     totalEquipment: 0,
     availableEquipment: 0,
@@ -100,6 +103,9 @@ export function FamilyAdminDashboard({ userId }: { userId: string }) {
           Gestiona el inventario y solicitudes de tus familias asignadas
         </p>
       </div>
+
+      {/* Noticias y Comunicados */}
+      {hasNews && <NewsFeed />}
 
       {/* Estadísticas Principales */}
       <div className='grid gap-4 md:grid-cols-2 lg:grid-cols-3'>

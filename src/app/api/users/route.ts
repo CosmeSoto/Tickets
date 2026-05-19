@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
+import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { UserService } from '@/lib/services/user-service'
@@ -17,6 +17,7 @@ const createUserSchema = z.object({
   ticketsEnabled: z.boolean().optional(),
   inventoryEnabled: z.boolean().optional(),
   patrolsEnabled: z.boolean().optional(),
+  newsEnabled: z.boolean().optional(),
   canManageInventory: z.boolean().optional(),
 })
 
@@ -213,6 +214,7 @@ export async function GET(request: NextRequest) {
         ticketsEnabled: true,
         inventoryEnabled: true,
         patrolsEnabled: true,
+        newsEnabled: true,
         isSuperAdmin: true,
         createdAt: true,
         lastLogin: true,

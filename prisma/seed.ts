@@ -32,7 +32,7 @@ async function main() {
   const deptMap = await seedDepartments(familyMap)
 
   // 5. USUARIO ADMINISTRADOR
-  await seedAdmin(deptMap.get('Administración')!)
+  const adminId = await seedAdmin(deptMap.get('Administración')!)
 
   // 6. CONFIGURACIÓN DEL SITIO
   await seedSiteConfig()
@@ -89,11 +89,6 @@ async function main() {
 
   // 20. MÓDULOS DEL SISTEMA
   await seedSystemModules()
-
-  console.log('\n🎉 Seed completado exitosamente!')
-  console.log('\n📋 Credenciales de acceso:')
-  console.log('   Email: internet.freecom@gmail.com')
-  console.log('   Contraseña: admin123')
 }
 
 // ============================================
@@ -526,6 +521,7 @@ async function seedAdmin(deptAdminId: string): Promise<string> {
       inventoryEnabled: true,
       canManageInventory: true,
       ticketsEnabled: true,
+      newsEnabled: true,
     },
     create: {
       id: randomUUID(),
@@ -541,6 +537,7 @@ async function seedAdmin(deptAdminId: string): Promise<string> {
       inventoryEnabled: true,
       canManageInventory: true,
       ticketsEnabled: true,
+      newsEnabled: true,
       createdAt: now,
       updatedAt: now,
     },
@@ -1001,6 +998,19 @@ async function seedSystemModules() {
       requiresManager: false,
       familyScoped: true,
     },
+    {
+      key: 'news',
+      name: 'Noticias y Comunicados',
+      description: 'Gestión de noticias y comunicados internos',
+      icon: 'Newspaper',
+      isActive: true,
+      order: 4,
+      defaultForAdmin: true,
+      defaultForTech: false,
+      defaultForClient: false,
+      requiresManager: false,
+      familyScoped: false,
+    },
   ]
 
   for (const mod of modules) {
@@ -1010,7 +1020,7 @@ async function seedSystemModules() {
       create: mod,
     })
   }
-  console.log('✅ Módulos del sistema (tickets, inventory, patrols)')
+  console.log('✅ Módulos del sistema (tickets, inventory, patrols, news)')
 }
 
 // ============================================

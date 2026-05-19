@@ -38,6 +38,19 @@ const FALLBACK_MODULES = [
     requiresManager: true,
     familyScoped: true,
   },
+  {
+    key: 'news',
+    name: 'Noticias y Comunicados',
+    description: 'Gestión de noticias, anuncios y comunicados internos',
+    icon: 'Newspaper',
+    isActive: true,
+    order: 4,
+    defaultForAdmin: true,
+    defaultForTech: false,
+    defaultForClient: false,
+    requiresManager: false,
+    familyScoped: false,
+  },
 ]
 
 export async function GET() {

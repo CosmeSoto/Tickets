@@ -9,6 +9,9 @@
  *     equipment/
  *       {equipmentId}/
  *         {uuid}.{ext}          ← adjuntos de equipos
+ *     news/
+ *       {newsId}/
+ *         {uuid}.{ext}          ← archivos de noticias
  *     avatars/
  *       {uuid}.{ext}            ← avatares de usuarios
  *     landing/
@@ -66,6 +69,12 @@ export interface UploadFileData {
   ticketId: string
   uploadedBy: string
   skipHistory?: boolean
+}
+
+export interface UploadNewsFileData {
+  file: File
+  newsId: string
+  uploadedBy: string
 }
 
 export interface FileValidationResult {
@@ -513,6 +522,93 @@ export class FileService {
     const sizes = ['B', 'KB', 'MB', 'GB']
     const i = Math.floor(Math.log(bytes) / Math.log(k))
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
+  }
+
+  // ── Métodos para Noticias ──────────────────────────────────────────────────────
+
+  static async uploadNewsFile(data: UploadNewsFileData) {
+    const { file, newsId, uploadedBy } = data
+
+    // 1. Validar archivo
+    const validation = await this.validateFile(file)
+    if (!validation.isValid) throw new Error(validation.error)
+
+    // 2. Verificar que la noticia existe
+    const news = await prisma.news.findUnique({ where: { id: newsId } })
+    if (!news) throw new Error('Noticia no encontrada')
+
+    // 3. Leer buffer original
+    const originalBuffer = Buffer.from(await file.arrayBuffer()) as Buffer
+
+    // 4. Comprimir si es imagen comprimible
+    let finalBuffer = originalBuffer
+    let finalExt = file.name.split('.').pop()?.toLowerCase() || 'bin'
+    let compressed = false
+
+    if (IMAGE_TYPES.has(file.type)) {
+      const result = await compressImage(originalBuffer, file.type, file.name)
+      finalBuffer = result.buffer
+      finalExt = result.ext
+      compressed = result.compressed
+    }
+
+    // 5. Organizar en subdirectorio por noticia
+    const uploadDir = getUploadDir('news', newsId)
+    if (!existsSync(uploadDir)) await mkdir(uploadDir, { recursive: true })
+
+    const uniqueFilename = `${randomUUID()}.${finalExt}`
+    const filePath = getUploadDir('news', newsId, uniqueFilename)
+
+    // 6. Guardar en disco
+    await writeFile(filePath, finalBuffer)
+
+    // 7. Registrar en BD
+    const attachment = await prisma.news_attachments.create({
+      data: {
+        id: randomUUID(),
+        filename: uniqueFilename,
+        originalName: file.name,
+        mimeType: compressed ? (finalExt === 'webp' ? 'image/webp' : 'image/jpeg') : file.type,
+        size: finalBuffer.length,
+        path: filePath,
+        newsId,
+        uploadedById: uploadedBy,
+        createdAt: new Date(),
+      },
+    })
+
+    return attachment
+  }
+
+  static async getFilesByNews(newsId: string) {
+    const attachments = await prisma.news_attachments.findMany({
+      where: { newsId },
+      include: {
+        uploadedBy: { select: { id: true, name: true, email: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+    return attachments
+  }
+
+  static async deleteNewsFile(fileId: string, userId: string) {
+    const attachment = await prisma.news_attachments.findUnique({
+      where: { id: fileId },
+    })
+
+    if (!attachment) throw new Error('Archivo no encontrado')
+
+    // Eliminar archivo físico
+    try {
+      if (existsSync(attachment.path)) await unlink(attachment.path)
+    } catch {
+      console.warn('[FileService] No se pudo eliminar el archivo físico:', attachment.path)
+    }
+
+    // Eliminar registro BD
+    await prisma.news_attachments.delete({ where: { id: fileId } })
+
+    return { success: true }
   }
 
   /** Constantes expuestas para uso en frontend */

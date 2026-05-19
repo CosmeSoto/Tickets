@@ -1,4 +1,4 @@
-import prisma from '@/lib/prisma'
+import { prisma } from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { randomUUID } from 'crypto'
@@ -45,6 +45,7 @@ export interface CreateUserData {
   ticketsEnabled?: boolean
   inventoryEnabled?: boolean
   patrolsEnabled?: boolean
+  newsEnabled?: boolean
   canManageInventory?: boolean
   assignedCategories?: {
     categoryId: string
@@ -68,6 +69,7 @@ export interface UpdateUserData {
   ticketsEnabled?: boolean
   inventoryEnabled?: boolean
   patrolsEnabled?: boolean
+  newsEnabled?: boolean
   isSuperAdmin?: boolean
   assignedCategories?: {
     categoryId: string
@@ -226,6 +228,7 @@ export class UserService {
         ticketsEnabled: true,
         inventoryEnabled: true,
         patrolsEnabled: true,
+        newsEnabled: true,
         lastLogin: true,
         createdAt: true,
         updatedAt: true,
@@ -266,6 +269,7 @@ export class UserService {
           ticketsEnabled: data.ticketsEnabled ?? true,
           inventoryEnabled: data.inventoryEnabled ?? false,
           patrolsEnabled: data.patrolsEnabled ?? false,
+          newsEnabled: data.newsEnabled ?? false,
           canManageInventory: data.canManageInventory ?? false,
           isEmailVerified: false,
           createdAt: new Date(),
@@ -413,6 +417,7 @@ export class UserService {
     if (data.ticketsEnabled !== undefined) updateData.ticketsEnabled = data.ticketsEnabled
     if (data.inventoryEnabled !== undefined) updateData.inventoryEnabled = data.inventoryEnabled
     if (data.patrolsEnabled !== undefined) updateData.patrolsEnabled = data.patrolsEnabled
+    if (data.newsEnabled !== undefined) updateData.newsEnabled = data.newsEnabled
     if (data.isSuperAdmin !== undefined) updateData.isSuperAdmin = data.isSuperAdmin
 
     // Manejar departmentId explícitamente

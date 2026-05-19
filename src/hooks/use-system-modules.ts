@@ -62,6 +62,19 @@ const FALLBACK: SystemModule[] = [
     requiresManager: false,
     familyScoped: true,
   },
+  {
+    key: 'news',
+    name: 'Noticias y Comunicados',
+    description: 'Gestión de noticias y comunicados internos',
+    icon: 'Newspaper',
+    isActive: true,
+    order: 4,
+    defaultForAdmin: true,
+    defaultForTech: false,
+    defaultForClient: false,
+    requiresManager: false,
+    familyScoped: false,
+  },
 ]
 
 export function useSystemModules() {
@@ -101,6 +114,11 @@ export function getModuleRoleDescription(moduleKey: string, role: string): strin
       TECHNICIAN: 'Supervisar rondas y ejecutar patrullas asignadas',
       CLIENT: 'Ejecutar rondas de seguridad asignadas como agente',
     },
+    news: {
+      ADMIN: 'Ver noticias y comunicados del sistema',
+      TECHNICIAN: 'Ver noticias y comunicados del sistema',
+      CLIENT: 'Ver noticias y comunicados del sistema',
+    },
   }
   return descriptions[moduleKey]?.[role] ?? 'Acceso al módulo'
 }
@@ -113,6 +131,7 @@ export function getModuleEmoji(moduleKey: string): string {
     tickets: '🎫',
     inventory: '📦',
     patrols: '🛡️',
+    news: '📰',
     contracts: '📄',
     reports: '📊',
     knowledge: '📚',

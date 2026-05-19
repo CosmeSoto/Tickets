@@ -135,6 +135,7 @@ model departments {
   family      families?           @relation(fields: [familyId], references: [id])
   licenses    software_licenses[]
   users       users[]
+  news_departments news_departments[]
 
   @@index([isActive, order])
   @@index([familyId])
@@ -439,6 +440,7 @@ model users {
   ticketsEnabled                                    Boolean                         @default(true)
   inventoryEnabled                                  Boolean                         @default(false)
   patrolsEnabled                                    Boolean                         @default(false) @map("patrols_enabled")
+  newsEnabled                                       Boolean                         @default(false) @map("news_enabled")
   lastLogin                                         DateTime?
   oauthProvider                                     String?
   oauthId                                           String?
@@ -505,6 +507,13 @@ model users {
   patrolsAsAgent                                    patrols[]                       @relation("PatrolAgentExecution")
   patrolSchedulesAsAgent                            patrol_schedules[]              @relation("PatrolAgent")
   patrolCheckIns                                    patrol_check_ins[]              @relation("PatrolCheckInAgent")
+  news_created                                      news[]                          @relation("NewsCreator")
+  news_updated                                      news[]                          @relation("NewsUpdater")
+  news_users                                        news_users[]
+  news_views                                        news_views[]
+  news_reactions                                    news_reactions[]
+  news_comments                                     news_comments[]
+  news_attachments_uploaded                         news_attachments[]              @relation("NewsAttachmentUploader")
 
   @@index([departmentId])
   @@index([name, email])
@@ -1571,6 +1580,7 @@ model families {
   patrolRoutes                patrol_routes[]
   patrolSchedules             patrol_schedules[]
   patrols                     patrols[]
+  news_families               news_families[]
 
   @@index([isActive, order])
   @@map("families")
@@ -2573,4 +2583,199 @@ model patrol_photos {
   @@index([capturedAt(sort: Desc)])
   @@index([deletedAt])
   @@map("patrol_photos")
+}
+
+// ============================================
+// NEWS AND COMMUNICATIONS MODULE
+// ============================================
+
+enum NewsType {
+  NEWS
+  ANNOUNCEMENT
+  EVENT
+  BIRTHDAY
+  HOLIDAY
+  ALERT
+  INTERNAL_AD
+  RECOGNITION
+}
+
+enum NewsPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum NewsStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model news {
+  id             String       @id @default(uuid())
+  title          String       @db.VarChar(200)
+  slug           String       @unique @db.VarChar(200)
+  content        String
+  summary        String?      @db.VarChar(500)
+  imageUrl       String?      @map("image_url")
+  type           NewsType     @default(NEWS)
+  priority       NewsPriority @default(MEDIUM)
+  status         NewsStatus   @default(DRAFT)
+  startDate      DateTime?    @map("start_date")
+  endDate        DateTime?    @map("end_date")
+  isFeatured     Boolean      @default(false) @map("is_featured")
+  allowComments  Boolean      @default(false) @map("allow_comments")
+  allowReactions Boolean      @default(true) @map("allow_reactions")
+  views          Int          @default(0)
+  createdById    String       @map("created_by_id")
+  updatedById    String?      @map("updated_by_id")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  createdBy      users        @relation("NewsCreator", fields: [createdById], references: [id])
+  updatedBy      users?       @relation("NewsUpdater", fields: [updatedById], references: [id])
+  news_roles     news_roles[]
+  news_users     news_users[]
+  news_departments news_departments[]
+  news_families  news_families[]
+  news_views     news_views[]
+  news_reactions news_reactions[]
+  news_comments  news_comments[]
+  news_attachments news_attachments[]
+
+  @@index([type, status])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([isFeatured, status])
+  @@index([startDate, endDate])
+  @@map("news")
+}
+
+model news_roles {
+  id        String   @id @default(uuid())
+  newsId    String   @map("news_id")
+  role      UserRole
+  createdAt DateTime @default(now()) @map("created_at")
+
+  news      news     @relation(fields: [newsId], references: [id], onDelete: Cascade)
+
+  @@unique([newsId, role])
+  @@index([newsId])
+  @@index([role])
+  @@map("news_roles")
+}
+
+model news_users {
+  id        String   @id @default(uuid())
+  newsId    String   @map("news_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  news      news     @relation(fields: [newsId], references: [id], onDelete: Cascade)
+  user      users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([newsId, userId])
+  @@index([newsId])
+  @@index([userId])
+  @@map("news_users")
+}
+
+model news_departments {
+  id           String      @id @default(uuid())
+  newsId       String      @map("news_id")
+  departmentId String      @map("department_id")
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  news         news        @relation(fields: [newsId], references: [id], onDelete: Cascade)
+  departments  departments @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([newsId, departmentId])
+  @@index([newsId])
+  @@index([departmentId])
+  @@map("news_departments")
+}
+
+model news_families {
+  id        String    @id @default(uuid())
+  newsId    String    @map("news_id")
+  familyId  String    @map("family_id")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  news      news      @relation(fields: [newsId], references: [id], onDelete: Cascade)
+  families  families  @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@unique([newsId, familyId])
+  @@index([newsId])
+  @@index([familyId])
+  @@map("news_families")
+}
+
+model news_views {
+  id        String   @id @default(uuid())
+  newsId    String   @map("news_id")
+  userId    String   @map("user_id")
+  viewedAt  DateTime @default(now()) @map("viewed_at")
+
+  news      news     @relation(fields: [newsId], references: [id], onDelete: Cascade)
+  user      users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([newsId, userId])
+  @@index([newsId])
+  @@index([userId])
+  @@index([viewedAt(sort: Desc)])
+  @@map("news_views")
+}
+
+model news_reactions {
+  id        String   @id @default(uuid())
+  newsId    String   @map("news_id")
+  userId    String   @map("user_id")
+  reaction  String   @db.VarChar(20)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  news      news     @relation(fields: [newsId], references: [id], onDelete: Cascade)
+  user      users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([newsId, userId])
+  @@index([newsId])
+  @@index([userId])
+  @@map("news_reactions")
+}
+
+model news_comments {
+  id        String         @id @default(uuid())
+  newsId    String         @map("news_id")
+  userId    String         @map("user_id")
+  content   String
+  parentId  String?        @map("parent_id")
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  news      news           @relation(fields: [newsId], references: [id], onDelete: Cascade)
+  user      users          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent    news_comments? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   news_comments[] @relation("CommentReplies")
+
+  @@index([newsId, createdAt(sort: Desc)])
+  @@index([userId])
+  @@map("news_comments")
+}
+
+model news_attachments {
+  id           String   @id @default(uuid())
+  newsId       String   @map("news_id")
+  filename     String
+  originalName String   @map("original_name")
+  mimeType     String   @map("mime_type")
+  size         Int
+  path         String
+  uploadedById String   @map("uploaded_by_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  news         news     @relation(fields: [newsId], references: [id], onDelete: Cascade)
+  uploadedBy   users    @relation("NewsAttachmentUploader", fields: [uploadedById], references: [id])
+
+  @@index([newsId])
+  @@map("news_attachments")
 }

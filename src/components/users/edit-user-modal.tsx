@@ -46,6 +46,7 @@ interface EditUserData {
   ticketsEnabled: boolean
   inventoryEnabled: boolean
   patrolsEnabled: boolean
+  newsEnabled: boolean
   isSuperAdmin: boolean
   avatar?: File
 }
@@ -77,6 +78,7 @@ export function EditUserModal({
     ticketsEnabled: true,
     inventoryEnabled: false,
     patrolsEnabled: false,
+    newsEnabled: false,
     isSuperAdmin: false,
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -589,6 +591,7 @@ export function EditUserModal({
           ticketsEnabled: formData.ticketsEnabled,
           inventoryEnabled: formData.inventoryEnabled,
           patrolsEnabled: formData.patrolsEnabled,
+          newsEnabled: formData.newsEnabled,
           isSuperAdmin: formData.role === 'ADMIN' ? formData.isSuperAdmin : false,
         }),
       })
@@ -880,6 +883,23 @@ export function EditUserModal({
                       loading={loadingFamilies}
                       disabled={loading}
                     />
+
+                    {/* Noticias — simple toggle */}
+                    <div className='flex items-center justify-between rounded-lg border px-3 py-2.5'>
+                      <div>
+                        <p className='text-sm font-medium flex items-center gap-2'>
+                          📰 Noticias y Comunicados
+                        </p>
+                        <p className='text-xs text-muted-foreground'>
+                          Permite al usuario ver el módulo de noticias
+                        </p>
+                      </div>
+                      <Switch
+                        checked={formData.newsEnabled}
+                        onCheckedChange={v => setFormData(p => ({ ...p, newsEnabled: v }))}
+                        disabled={loading}
+                      />
+                    </div>
                   </div>
                 </div>
               )}
@@ -893,6 +913,7 @@ export function EditUserModal({
                   ticketsEnabled={formData.ticketsEnabled}
                   inventoryEnabled={formData.inventoryEnabled}
                   patrolsEnabled={formData.patrolsEnabled}
+                  newsEnabled={formData.newsEnabled}
                 />
               )}
               {/* Para Super Admin: acceso total, no necesita panel */}
@@ -904,6 +925,7 @@ export function EditUserModal({
                   ticketsEnabled={true}
                   inventoryEnabled={true}
                   patrolsEnabled={true}
+                  newsEnabled={true}
                 />
               )}
             </div>

@@ -5,7 +5,7 @@
 
 import prisma from '@/lib/prisma'
 
-export type BackupModuleId = 'tickets'
+export type BackupModuleId = 'tickets' | 'news' | 'patrols'
 
 export interface BackupModuleDefinition {
   id: BackupModuleId
@@ -20,6 +20,18 @@ export const BACKUP_MODULE_REGISTRY: Record<BackupModuleId, BackupModuleDefiniti
     label: 'Tickets',
     description:
       'Tickets, comentarios, adjuntos, historial, colaboradores, calificaciones, planes de resolución, enlaces a conocimiento y notificaciones ligadas al ticket.',
+  },
+  news: {
+    id: 'news',
+    label: 'Noticias y Comunicados',
+    description:
+      'Noticias, comunicados, reacciones, comentarios, visualizaciones, roles de visibilidad, usuarios asignados y adjuntos del módulo de noticias.',
+  },
+  patrols: {
+    id: 'patrols',
+    label: 'Rondas y Patrullajes',
+    description:
+      'Rondas, rutas, checkpoints, programaciones, ejecuciones, incidentes, fotos, reportes y configuraciones del módulo de rondas y patrullajes.',
   },
 }
 
@@ -139,4 +151,144 @@ export async function exportTicketsModuleData(): Promise<Record<TicketsModuleTab
     ticket_knowledge_articles: ticket_knowledge_articles as unknown[],
     notifications: notifications as unknown[],
   } as Record<TicketsModuleTable, unknown[]>
+}
+
+/** Orden de inserción respetando FKs del módulo news. */
+export const NEWS_MODULE_RESTORE_ORDER = [
+  'news',
+  'news_roles',
+  'news_users',
+  'news_departments',
+  'news_views',
+  'news_reactions',
+  'news_comments',
+  'news_attachments',
+] as const
+
+export type NewsModuleTable = (typeof NEWS_MODULE_RESTORE_ORDER)[number]
+
+const EMPTY_NEWS_PAYLOAD: Record<NewsModuleTable, unknown[]> = {
+  news: [],
+  news_roles: [],
+  news_users: [],
+  news_departments: [],
+  news_views: [],
+  news_reactions: [],
+  news_comments: [],
+  news_attachments: [],
+}
+
+/**
+ * Exporta solo datos del módulo news (JSON). */
+export async function exportNewsModuleData(): Promise<Record<NewsModuleTable, unknown[]>> {
+  const news = await prisma.news.findMany()
+  const newsIds = news.map(n => n.id)
+
+  if (newsIds.length === 0) {
+    return { ...EMPTY_NEWS_PAYLOAD }
+  }
+
+  const [
+    news_roles,
+    news_users,
+    news_departments,
+    news_views,
+    news_reactions,
+    news_comments,
+    news_attachments,
+  ] = await Promise.all([
+    prisma.news_roles.findMany({ where: { newsId: { in: newsIds } } }),
+    prisma.news_users.findMany({ where: { newsId: { in: newsIds } } }),
+    prisma.news_departments.findMany({ where: { newsId: { in: newsIds } } }),
+    prisma.news_views.findMany({ where: { newsId: { in: newsIds } } }),
+    prisma.news_reactions.findMany({ where: { newsId: { in: newsIds } } }),
+    prisma.news_comments.findMany({ where: { newsId: { in: newsIds } } }),
+    prisma.news_attachments.findMany({ where: { newsId: { in: newsIds } } }),
+  ])
+
+  return {
+    news: news as unknown[],
+    news_roles: news_roles as unknown[],
+    news_users: news_users as unknown[],
+    news_departments: news_departments as unknown[],
+    news_views: news_views as unknown[],
+    news_reactions: news_reactions as unknown[],
+    news_comments: news_comments as unknown[],
+    news_attachments: news_attachments as unknown[],
+  } as Record<NewsModuleTable, unknown[]>
+}
+
+/** Orden de inserción respetando FKs del módulo patrols. */
+export const PATROLS_MODULE_RESTORE_ORDER = [
+  'patrol_family_config',
+  'patrol_family_assignments',
+  'patrol_checkpoints',
+  'patrol_routes',
+  'patrol_route_checkpoints',
+  'patrol_schedules',
+  'patrols',
+  'patrol_check_ins',
+  'patrol_photos',
+] as const
+
+export type PatrolsModuleTable = (typeof PATROLS_MODULE_RESTORE_ORDER)[number]
+
+const EMPTY_PATROLS_PAYLOAD: Record<PatrolsModuleTable, unknown[]> = {
+  patrol_family_config: [],
+  patrol_family_assignments: [],
+  patrol_checkpoints: [],
+  patrol_routes: [],
+  patrol_route_checkpoints: [],
+  patrol_schedules: [],
+  patrols: [],
+  patrol_check_ins: [],
+  patrol_photos: [],
+}
+
+/**
+ * Exporta solo datos del módulo patrols (JSON). */
+export async function exportPatrolsModuleData(): Promise<Record<PatrolsModuleTable, unknown[]>> {
+  const [
+    patrol_family_config,
+    patrol_family_assignments,
+    patrol_checkpoints,
+    patrol_routes,
+    patrol_schedules,
+    patrols,
+  ] = await Promise.all([
+    prisma.patrol_family_config.findMany(),
+    prisma.patrol_family_assignments.findMany(),
+    prisma.patrol_checkpoints.findMany(),
+    prisma.patrol_routes.findMany(),
+    prisma.patrol_schedules.findMany(),
+    prisma.patrols.findMany(),
+  ])
+
+  const routeIds = patrol_routes.map(r => r.id)
+  const scheduleIds = patrol_schedules.map(s => s.id)
+  const patrolIds = patrols.map(p => p.id)
+
+  const [patrol_route_checkpoints, patrol_check_ins, patrol_photos] = await Promise.all([
+    routeIds.length > 0
+      ? prisma.patrol_route_checkpoints.findMany({ where: { routeId: { in: routeIds } } })
+      : [],
+    patrolIds.length > 0
+      ? prisma.patrol_check_ins.findMany({ where: { patrolId: { in: patrolIds } } })
+      : [],
+    patrolIds.length > 0
+      ? prisma.patrol_photos.findMany({ where: { patrolId: { in: patrolIds } } })
+      : [],
+  ])
+
+  return {
+    patrol_family_config,
+    patrol_family_assignments,
+    patrol_checkpoints,
+    patrol_routes,
+    patrol_route_checkpoints,
+    patrol_schedules,
+    patrols,
+    patrol_check_ins,
+    patrol_photos,
+  } as Record<PatrolsModuleTable, unknown[]>
 }

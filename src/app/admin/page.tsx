@@ -44,12 +44,13 @@ import {
 } from '@/components/ui/table'
 import { useTableSort } from '@/hooks/common/use-table-sort'
 import { SortableTableHead } from '@/components/ui/sortable-table-head'
+import { NewsFeed } from '@/components/news'
 
 export default function AdminDashboard() {
+  const { news: hasNews, tickets: hasTickets, inventory: hasInventory } = useUserModules()
   const router = useRouter()
   const { data: session } = useSession()
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
-  const { tickets: hasTickets, inventory: hasInventory } = useUserModules()
 
   const {
     userName,
@@ -143,6 +144,9 @@ export default function AdminDashboard() {
           </AlertDescription>
         </Alert>
       )}
+
+      {/* NewsFeed - Noticias y Comunicados */}
+      {hasNews && <NewsFeed />}
 
       {/* 1. Contexto del usuario — familias y acceso */}
       {stats.assignedFamilies !== undefined && (

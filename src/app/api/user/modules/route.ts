@@ -40,6 +40,7 @@ export async function GET(request: Request) {
   let ticketsEnabled = true
   let inventoryEnabled = false
   let patrolsEnabled = false
+  let newsEnabled = false
 
   if (targetUserId && targetUserId !== session.user.id) {
     const targetUser = await prisma.users.findUnique({
@@ -52,6 +53,7 @@ export async function GET(request: Request) {
         ticketsEnabled: true,
         inventoryEnabled: true,
         patrolsEnabled: true,
+        newsEnabled: true,
       },
     })
     if (!targetUser) return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
@@ -62,6 +64,7 @@ export async function GET(request: Request) {
     ticketsEnabled = targetUser.ticketsEnabled ?? true
     inventoryEnabled = targetUser.inventoryEnabled ?? false
     patrolsEnabled = targetUser.patrolsEnabled ?? false
+    newsEnabled = targetUser.newsEnabled ?? false
   } else {
     // Cargar flags del usuario actual desde DB (la sesión puede estar desactualizada)
     const currentUser = await prisma.users.findUnique({
@@ -71,6 +74,7 @@ export async function GET(request: Request) {
         inventoryEnabled: true,
         canManageInventory: true,
         patrolsEnabled: true,
+        newsEnabled: true,
       },
     })
     if (currentUser) {
@@ -78,6 +82,7 @@ export async function GET(request: Request) {
       inventoryEnabled = currentUser.inventoryEnabled ?? false
       canManageInventory = currentUser.canManageInventory ?? false
       patrolsEnabled = currentUser.patrolsEnabled ?? false
+      newsEnabled = currentUser.newsEnabled ?? false
     }
   }
 
@@ -204,7 +209,7 @@ export async function GET(request: Request) {
     if (familyIds.length === 0) {
       // Super Admin sin familias: acceso total
       if (role === 'ADMIN' && isSuperAdmin) {
-        return { tickets: true, inventory: true, patrols: true, families: [] }
+        return { tickets: true, inventory: true, patrols: true, news: true, families: [] }
       }
       // Admin normal sin familias asignadas: respetar flags del usuario
       if (role === 'ADMIN') {
@@ -212,6 +217,7 @@ export async function GET(request: Request) {
           tickets: ticketsEnabled,
           inventory: inventoryEnabled || canManageInventory,
           patrols: patrolsEnabled,
+          news: newsEnabled,
           families: [],
         }
       }
@@ -221,6 +227,7 @@ export async function GET(request: Request) {
         tickets: ticketsEnabled,
         inventory: inventoryEnabled || canManageInventory,
         patrols: patrolsEnabled,
+        news: newsEnabled,
         families: [],
       }
     }
@@ -365,6 +372,7 @@ export async function GET(request: Request) {
           ? true
           : inventoryFamilyIds.has(f.id) && (inventoryEnabled || canManageInventory),
         patrols: isSuperAdmin ? true : patrolFamilyIds.has(f.id) && patrolsEnabled,
+        news: isSuperAdmin ? true : newsEnabled,
       },
     }))
 
@@ -378,7 +386,7 @@ export async function GET(request: Request) {
      * | Technician     | ticketsEnabled Y alguna familia tiene tickets ON           | inventoryEnabled O canManageInventory                   |
      * | Client         | ticketsEnabled del usuario                                 | inventoryEnabled O canManageInventory                   |
      *
-     * El flag del usuario (ticketsEnabled, inventoryEnabled, patrolsEnabled) actúa como PERMISO.
+     * El flag del usuario (ticketsEnabled, inventoryEnabled, patrolsEnabled, newsEnabled) actúa como PERMISO.
      * La config de la familia determina DISPONIBILIDAD.
      * El módulo se muestra si el usuario tiene permiso Y al menos una familia lo tiene activo,
      * O si el usuario tiene permiso aunque no haya config de familia (para no bloquear acceso).
@@ -386,23 +394,28 @@ export async function GET(request: Request) {
     let resolvedTickets: boolean
     let resolvedInventory: boolean
     let resolvedPatrols: boolean
+    let resolvedNews: boolean
 
     if (role === 'ADMIN' && isSuperAdmin) {
       resolvedTickets = true
       resolvedInventory = true
       resolvedPatrols = true
+      resolvedNews = true
     } else {
       // Para todos los roles (incluido admin normal):
       // El flag del usuario es el permiso. Si tiene familias asignadas para ese módulo, lo ve.
       resolvedTickets = ticketsEnabled && ticketFamilyIds.size > 0
       resolvedInventory = (inventoryEnabled || canManageInventory) && inventoryFamilyIds.size > 0
       resolvedPatrols = patrolsEnabled && patrolFamilyIds.size > 0
+      // Noticias es global, no requiere familias - solo el flag del usuario
+      resolvedNews = newsEnabled
     }
 
     return {
       tickets: resolvedTickets,
       inventory: resolvedInventory,
       patrols: resolvedPatrols,
+      news: resolvedNews,
       families: enrichedFamilies,
     }
   })

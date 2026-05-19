@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { Package, FileText, AlertCircle, CheckCircle, Clock } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
+import { NewsFeed } from '@/components/news'
 
 interface ClientStats {
   assignedEquipment: number
@@ -83,6 +84,9 @@ export function ClientDashboard({ userId }: { userId: string }) {
           Bienvenido, aquí puedes ver tus equipos y solicitudes
         </p>
       </div>
+
+      {/* Noticias y Comunicados */}
+      <NewsFeed />
 
       {/* Estadísticas */}
       <div className={`grid gap-4 md:grid-cols-2 lg:grid-cols-${canRequestAssets ? '4' : '3'}`}>

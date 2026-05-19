@@ -7,16 +7,23 @@ interface UserModules {
   tickets: boolean
   inventory: boolean
   patrols: boolean
+  news: boolean
   families: Array<{
     id: string
     name: string
     code: string
     color?: string | null
-    modules: { tickets: boolean; inventory: boolean; patrols: boolean }
+    modules: { tickets: boolean; inventory: boolean; patrols: boolean; news: boolean }
   }>
 }
 
-const DEFAULT: UserModules = { tickets: false, inventory: false, patrols: false, families: [] }
+const DEFAULT: UserModules = {
+  tickets: false,
+  inventory: false,
+  patrols: false,
+  news: false,
+  families: [],
+}
 
 /** Caché en memoria: cada página remontaba RoleDashboardLayout y repetía GET /api/user/modules. */
 const MODULES_MEMORY_TTL_MS = 120_000
