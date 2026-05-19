@@ -26,20 +26,24 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { ArticleVote } from '@/components/knowledge/article-vote'
 import { useToast } from '@/hooks/use-toast'
 import type { Article } from '@/hooks/use-knowledge'
 
 function filterArticleContent(content: string): string {
-  const sectionsToRemove = ['## 📊 Métricas de Resolución', '## ⭐ Calificación del Cliente']
+  // Remover secciones de métricas y calificaciones para clientes
+  // Busca encabezados que contengan estas palabras clave (con o sin emojis, ## o ###)
+  const patterns = [
+    /#{2,3}\s*📊?\s*Métricas de Resolución[\s\S]*?(?=#{2,3}\s|$)/gi,
+    /#{2,3}\s*⭐?\s*Calificación del Cliente[\s\S]*?(?=#{2,3}\s|$)/gi,
+  ]
 
   let filteredContent = content
-
-  sectionsToRemove.forEach(sectionStart => {
-    const sectionRegex = new RegExp(`${sectionStart}[\\s\\S]*?(?=## |$)`, 'g')
-    filteredContent = filteredContent.replace(sectionRegex, '')
+  patterns.forEach(pattern => {
+    filteredContent = filteredContent.replace(pattern, '')
   })
 
-  return filteredContent
+  return filteredContent.trim()
 }
 
 export default function KnowledgeDetailPage() {
@@ -272,6 +276,15 @@ export default function KnowledgeDetailPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Sistema de votación */}
+            <ArticleVote
+              articleId={article.id}
+              helpfulVotes={article.helpfulVotes}
+              notHelpfulVotes={article.notHelpfulVotes}
+              userVote={article.userVote}
+              onVoteChange={loadArticle}
+            />
 
             {/* Artículos similares */}
             {similarArticles.length > 0 && (
