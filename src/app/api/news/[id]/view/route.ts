@@ -9,11 +9,12 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 interface Params {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 export async function POST(request: NextRequest, { params }: Params) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     const news = await prisma.news.findUnique({
-      where: { id: params.id },
+      where: { id: id },
     })
 
     if (!news) {
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     const existingView = await prisma.news_views.findUnique({
       where: {
         newsId_userId: {
-          newsId: params.id,
+          newsId: id,
           userId: session.user.id,
         },
       },
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     if (!existingView) {
       await prisma.news_views.create({
         data: {
-          newsId: params.id,
+          newsId: id,
           userId: session.user.id,
         },
       })

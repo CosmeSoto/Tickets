@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { Input } from '@/components/ui/input'
+import { SerialNumberInput } from '@/components/ui/serial-number-input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -448,7 +449,7 @@ export function EquipmentAssetForm({
           N° de Serie del Fabricante{' '}
           <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
         </Label>
-        <Input
+        <SerialNumberInput
           value={serialNumber}
           onChange={e => setSerialNumber(e.target.value)}
           placeholder='Ej: SN-ABC-12345'

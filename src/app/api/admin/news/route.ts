@@ -191,8 +191,7 @@ export async function POST(request: NextRequest) {
       entityType: 'NEWS',
       entityId: news.id,
       userId: session.user.id,
-      userEmail: session.user.email,
-      details: { title: data.title, type: data.type },
+      metadata: { title: data.title, type: data.type },
     })
 
     return NextResponse.json({ news })

@@ -10,11 +10,12 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 interface Params {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 export async function POST(request: NextRequest, { params }: Params) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     const news = await prisma.news.findUnique({
-      where: { id: params.id },
+      where: { id: id },
       select: { allowComments: true },
     })
 
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     const comment = await prisma.news_comments.create({
       data: {
-        newsId: params.id,
+        newsId: id,
         userId: session.user.id,
         content: content.trim(),
         parentId: parentId || null,

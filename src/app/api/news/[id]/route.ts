@@ -12,7 +12,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 interface Params {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 /**
@@ -20,6 +20,7 @@ interface Params {
  */
 export async function GET(request: NextRequest, { params }: Params) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 
     const news = await prisma.news.findUnique({
       where: {
-        id: params.id,
+        id: id,
         status: 'PUBLISHED',
         AND: [
           {

@@ -7,6 +7,7 @@ import { Loader2, Plus, ImageIcon, Building, AlertCircle, Warehouse, Tag } from 
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { SerialNumberInput } from '@/components/ui/serial-number-input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -451,7 +452,7 @@ export function EquipmentForm({ equipment, onSuccess, onCancel }: EquipmentFormP
               <Label htmlFor='serialNumber'>
                 Número de Serie <span className='text-destructive'>*</span>
               </Label>
-              <Input
+              <SerialNumberInput
                 id='serialNumber'
                 {...register('serialNumber')}
                 placeholder='SN-LAP-2024-001'

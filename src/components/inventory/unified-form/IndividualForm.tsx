@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { SerialNumberInput } from '@/components/ui/serial-number-input'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -83,7 +84,11 @@ export function IndividualForm({
         {/* Número de Serie */}
         <div className='space-y-2'>
           <Label htmlFor='serialNumber'>Número de Serie</Label>
-          <Input id='serialNumber' {...register('serialNumber')} placeholder='SN123456' />
+          <SerialNumberInput
+            id='serialNumber'
+            {...register('serialNumber')}
+            placeholder='SN123456'
+          />
         </div>
 
         {/* Modelo */}

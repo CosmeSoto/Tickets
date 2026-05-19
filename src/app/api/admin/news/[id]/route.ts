@@ -12,7 +12,7 @@ import { prisma } from '@/lib/prisma'
 import { createAuditLog } from '@/lib/audit'
 
 interface Params {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 /**
@@ -20,6 +20,7 @@ interface Params {
  */
 export async function GET(request: NextRequest, { params }: Params) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     }
 
     const news = await prisma.news.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         createdBy: {
           select: {
@@ -106,6 +107,7 @@ export async function GET(request: NextRequest, { params }: Params) {
  */
 export async function PUT(request: NextRequest, { params }: Params) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
@@ -118,7 +120,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
     const data = await request.json()
     const existingNews = await prisma.news.findUnique({
-      where: { id: params.id },
+      where: { id: id },
     })
 
     if (!existingNews) {
@@ -139,7 +141,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
     }
 
     const news = await prisma.news.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         title: data.title,
         slug,
@@ -178,33 +180,33 @@ export async function PUT(request: NextRequest, { params }: Params) {
     })
 
     if (data.roles !== undefined) {
-      await prisma.news_roles.deleteMany({ where: { newsId: params.id } })
+      await prisma.news_roles.deleteMany({ where: { newsId: id } })
       await prisma.news_roles.createMany({
-        data: data.roles.map((role: string) => ({ newsId: params.id, role })),
+        data: data.roles.map((role: string) => ({ newsId: id, role })),
       })
     }
 
     if (data.userIds !== undefined) {
-      await prisma.news_users.deleteMany({ where: { newsId: params.id } })
+      await prisma.news_users.deleteMany({ where: { newsId: id } })
       await prisma.news_users.createMany({
-        data: data.userIds.map((userId: string) => ({ newsId: params.id, userId })),
+        data: data.userIds.map((userId: string) => ({ newsId: id, userId })),
       })
     }
 
     if (data.departmentIds !== undefined) {
-      await prisma.news_departments.deleteMany({ where: { newsId: params.id } })
+      await prisma.news_departments.deleteMany({ where: { newsId: id } })
       await prisma.news_departments.createMany({
         data: data.departmentIds.map((departmentId: string) => ({
-          newsId: params.id,
+          newsId: id,
           departmentId,
         })),
       })
     }
 
     if (data.familyIds !== undefined) {
-      await prisma.news_families.deleteMany({ where: { newsId: params.id } })
+      await prisma.news_families.deleteMany({ where: { newsId: id } })
       await prisma.news_families.createMany({
-        data: data.familyIds.map((familyId: string) => ({ newsId: params.id, familyId })),
+        data: data.familyIds.map((familyId: string) => ({ newsId: id, familyId })),
       })
     }
 
@@ -213,8 +215,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
       entityType: 'NEWS',
       entityId: news.id,
       userId: session.user.id,
-      userEmail: session.user.email,
-      details: { title: data.title || existingNews.title },
+      metadata: { title: data.title || existingNews.title },
     })
 
     return NextResponse.json({ news })
@@ -229,6 +230,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
  */
 export async function DELETE(request: NextRequest, { params }: Params) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
@@ -240,7 +242,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     }
 
     const existingNews = await prisma.news.findUnique({
-      where: { id: params.id },
+      where: { id: id },
     })
 
     if (!existingNews) {
@@ -248,16 +250,15 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     }
 
     await prisma.news.delete({
-      where: { id: params.id },
+      where: { id: id },
     })
 
     await createAuditLog({
       action: 'DELETE',
       entityType: 'NEWS',
-      entityId: params.id,
+      entityId: id,
       userId: session.user.id,
-      userEmail: session.user.email,
-      details: { title: existingNews.title },
+      metadata: { title: existingNews.title },
     })
 
     return NextResponse.json({ success: true })
