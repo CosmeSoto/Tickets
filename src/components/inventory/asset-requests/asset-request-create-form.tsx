@@ -176,9 +176,9 @@ export function AssetRequestCreateForm({ onSuccess, onCancel }: AssetRequestCrea
                       ))}
                     </SelectContent>
                   </Select>
-                  <FormDescription>
+                  {/* <FormDescription>
                     Selecciona la familia a la que pertenece el activo
-                  </FormDescription>
+                  </FormDescription> */}
                   <FormMessage />
                 </FormItem>
               )}
@@ -208,11 +208,11 @@ export function AssetRequestCreateForm({ onSuccess, onCancel }: AssetRequestCrea
                 <FormItem>
                   <FormLabel>Justificación *</FormLabel>
                   <FormControl>
-                    <Textarea placeholder='Explica por qué necesitas este activo...' {...field} />
+                    <Textarea placeholder='Mínimo 20 caracteres. Explica el propósito y la necesidad' {...field} />
                   </FormControl>
-                  <FormDescription>
-                    Mínimo 20 caracteres. Explica el propósito y la necesidad.
-                  </FormDescription>
+                  {/* <FormDescription>
+                    Explica por qué necesitas este activo...
+                  </FormDescription> */}
                   <FormMessage />
                 </FormItem>
               )}

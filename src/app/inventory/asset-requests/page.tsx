@@ -137,7 +137,7 @@ export default function AssetRequestsPage() {
                 <div className='relative flex-1'>
                   <Search className='absolute left-2 top-2.5 h-4 w-4 text-muted-foreground' />
                   <Input
-                    placeholder='Buscar por código o descripción...'
+                    placeholder='Buscar..'
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleSearch()}
