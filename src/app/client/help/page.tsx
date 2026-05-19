@@ -101,12 +101,17 @@ const faqs: FAQ[] = [
   },
 ]
 
+interface HelpConfig {
+  supportEmail: string
+}
+
 export default function ClientHelpPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [expandedFaq, setExpandedFaq] = useState<string | null>(null)
+  const [config, setConfig] = useState<HelpConfig | null>(null)
 
   useEffect(() => {
     if (status === 'loading') return
@@ -121,6 +126,22 @@ export default function ClientHelpPage() {
       return
     }
   }, [session, status, router])
+
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const response = await fetch('/api/config/help')
+        if (response.ok) {
+          const data = await response.json()
+          setConfig(data.data)
+        }
+      } catch (error) {
+        console.error('Error loading help config:', error)
+      }
+    }
+
+    loadConfig()
+  }, [])
 
   const categories = Array.from(new Set(faqs.map(faq => faq.category)))
 
@@ -270,12 +291,21 @@ export default function ClientHelpPage() {
                 Si no encuentras la respuesta que buscas, nuestro equipo de soporte está listo para
                 ayudarte.
               </p>
-              <Button className='w-full' asChild>
-                <Link href='/client/tickets/create'>
-                  <MessageSquare className='h-4 w-4 mr-2' />
-                  Contactar Soporte
-                </Link>
-              </Button>
+              {config?.supportEmail ? (
+                <Button className='w-full' asChild>
+                  <a href={`mailto:${config.supportEmail}`}>
+                    <Mail className='h-4 w-4 mr-2' />
+                    Contactar Soporte
+                  </a>
+                </Button>
+              ) : (
+                <Button className='w-full' asChild>
+                  <Link href='/client/tickets/create'>
+                    <MessageSquare className='h-4 w-4 mr-2' />
+                    Contactar Soporte
+                  </Link>
+                </Button>
+              )}
             </CardContent>
           </Card>
         </div>

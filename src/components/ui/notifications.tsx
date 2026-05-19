@@ -3,30 +3,25 @@
 import { useState } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
-import { 
-  Bell, 
-  X, 
-  Check, 
-  CheckCheck, 
-  Trash2, 
-  Info, 
-  CheckCircle, 
-  AlertTriangle, 
+import {
+  Bell,
+  X,
+  Check,
+  CheckCheck,
+  Trash2,
+  Info,
+  CheckCircle,
+  AlertTriangle,
   ExternalLink,
   ChevronDown,
   ChevronUp,
-  Clock
+  Clock,
 } from 'lucide-react'
 import { Badge } from './badge'
 import { Button } from './button'
 import { Card, CardContent, CardHeader, CardTitle } from './card'
 import { Alert, AlertDescription } from './alert'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from './tooltip'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip'
 import { cn } from '@/lib/utils'
 import { useNotifications, type NotificationData } from '@/hooks/use-notifications'
 
@@ -40,30 +35,67 @@ interface NotificationsProps {
 function getNotificationIcon(type: string) {
   switch (type) {
     case 'ERROR':
-    case 'CRITICAL': return <AlertTriangle className="h-4 w-4 text-red-600" />
-    case 'WARNING': return <Clock className="h-4 w-4 text-orange-600" />
-    case 'SUCCESS': return <CheckCircle className="h-4 w-4 text-green-600" />
-    default: return <Info className="h-4 w-4 text-blue-600" />
+    case 'CRITICAL':
+      return <AlertTriangle className='h-4 w-4 text-red-600' />
+    case 'WARNING':
+      return <Clock className='h-4 w-4 text-orange-600' />
+    case 'SUCCESS':
+      return <CheckCircle className='h-4 w-4 text-green-600' />
+    default:
+      return <Info className='h-4 w-4 text-blue-600' />
   }
 }
 
 function getNotificationColor(type: string) {
   switch (type) {
     case 'ERROR':
-    case 'CRITICAL': return 'border-l-red-500 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-950/60'
-    case 'WARNING': return 'border-l-orange-500 bg-orange-50 dark:bg-orange-950/40 hover:bg-orange-100 dark:hover:bg-orange-950/60'
-    case 'SUCCESS': return 'border-l-green-500 bg-green-50 dark:bg-green-950/40 hover:bg-green-100 dark:hover:bg-green-950/60'
-    default: return 'border-l-blue-500 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-950/60'
+    case 'CRITICAL':
+      return 'border-l-red-500 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-950/60'
+    case 'WARNING':
+      return 'border-l-orange-500 bg-orange-50 dark:bg-orange-950/40 hover:bg-orange-100 dark:hover:bg-orange-950/60'
+    case 'SUCCESS':
+      return 'border-l-green-500 bg-green-50 dark:bg-green-950/40 hover:bg-green-100 dark:hover:bg-green-950/60'
+    default:
+      return 'border-l-blue-500 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-950/60'
   }
 }
 
 function getNotificationBadge(type: string) {
   switch (type) {
     case 'ERROR':
-    case 'CRITICAL': return <Badge variant="destructive" className="text-xs">Crítico</Badge>
-    case 'WARNING': return <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">Atención</Badge>
-    case 'SUCCESS': return <Badge variant="default" className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Éxito</Badge>
-    default: return <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">Info</Badge>
+    case 'CRITICAL':
+      return (
+        <Badge variant='destructive' className='text-xs'>
+          Crítico
+        </Badge>
+      )
+    case 'WARNING':
+      return (
+        <Badge
+          variant='secondary'
+          className='text-xs bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
+        >
+          Atención
+        </Badge>
+      )
+    case 'SUCCESS':
+      return (
+        <Badge
+          variant='default'
+          className='text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+        >
+          Éxito
+        </Badge>
+      )
+    default:
+      return (
+        <Badge
+          variant='secondary'
+          className='text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+        >
+          Info
+        </Badge>
+      )
   }
 }
 
@@ -77,11 +109,7 @@ function formatTimeAgo(date: string | Date) {
   return `${Math.floor(hours / 24)}d`
 }
 
-export function Notifications({ 
-  className, 
-  variant = 'bell', 
-  maxVisible = 5 
-}: NotificationsProps) {
+export function Notifications({ className, variant = 'bell', maxVisible = 5 }: NotificationsProps) {
   const { data: session } = useSession()
   const [isOpen, setIsOpen] = useState(false)
   const [expanded, setExpanded] = useState(false)
@@ -105,8 +133,11 @@ export function Notifications({
     if (!notification.isRead) markAsRead(notification.id)
     if (variant === 'bell') setIsOpen(false)
     // Navegar si hay cualquier destino disponible
-    const hasDestination = notification.ticketId || notification.metadata?.link ||
-      notification.metadata?.actId || notification.metadata?.maintenanceId ||
+    const hasDestination =
+      notification.ticketId ||
+      notification.metadata?.link ||
+      notification.metadata?.actId ||
+      notification.metadata?.maintenanceId ||
       notification.metadata?.equipmentId
     if (hasDestination) navigateToTicket(notification)
   }
@@ -120,16 +151,16 @@ export function Notifications({
   // ── BELL VARIANT ──────────────────────────────────────────────────────────
   if (variant === 'bell') {
     return (
-      <div className="relative">
+      <div className='relative'>
         <Button
-          variant="ghost"
-          size="sm"
+          variant='ghost'
+          size='sm'
           onClick={() => setIsOpen(!isOpen)}
-          className={cn("relative p-2 hover:bg-muted", className)}
+          className={cn('relative p-2 hover:bg-muted', className)}
         >
-          <Bell className="h-5 w-5" />
+          <Bell className='h-5 w-5' />
           {unreadCount > 0 && (
-            <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs bg-red-500 text-white border-2 border-background">
+            <Badge className='absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs bg-red-500 text-white border-2 border-background'>
               {unreadCount > 9 ? '9+' : unreadCount}
             </Badge>
           )}
@@ -137,50 +168,62 @@ export function Notifications({
 
         {isOpen && (
           <>
-            <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-            <Card className="absolute right-0 top-full mt-2 w-80 max-h-96 z-50 shadow-xl border-2">
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-semibold">
+            <div className='fixed inset-0 z-40' onClick={() => setIsOpen(false)} />
+            <Card className='absolute right-0 top-full mt-2 w-80 max-h-96 z-50 shadow-xl border-2'>
+              <CardHeader className='pb-2'>
+                <div className='flex items-center justify-between'>
+                  <CardTitle className='text-sm font-semibold'>
                     Notificaciones
                     {unreadCount > 0 && (
-                      <Badge variant="secondary" className="ml-2 text-xs">
+                      <Badge variant='secondary' className='ml-2 text-xs'>
                         {unreadCount} nuevas
                       </Badge>
                     )}
                   </CardTitle>
-                  <div className="flex items-center space-x-1">
+                  <div className='flex items-center space-x-1'>
                     {unreadCount > 0 && (
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button variant="ghost" size="sm" onClick={markAllAsRead} className="h-7 w-7 p-0">
-                              <CheckCheck className="h-3 w-3" />
+                            <Button
+                              variant='ghost'
+                              size='sm'
+                              onClick={markAllAsRead}
+                              className='h-7 w-7 p-0'
+                            >
+                              <CheckCheck className='h-3 w-3' />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent><p>Marcar todas como leídas</p></TooltipContent>
+                          <TooltipContent>
+                            <p>Marcar todas como leídas</p>
+                          </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
                     )}
-                    <Button variant="ghost" size="sm" onClick={() => setIsOpen(false)} className="h-7 w-7 p-0">
-                      <X className="h-3 w-3" />
+                    <Button
+                      variant='ghost'
+                      size='sm'
+                      onClick={() => setIsOpen(false)}
+                      className='h-7 w-7 p-0'
+                    >
+                      <X className='h-3 w-3' />
                     </Button>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="p-0">
+              <CardContent className='p-0'>
                 {loading && notifications.length === 0 ? (
-                  <div className="p-4 text-center text-sm text-muted-foreground">
-                    <div className="animate-pulse">Cargando...</div>
+                  <div className='p-4 text-center text-sm text-muted-foreground'>
+                    <div className='animate-pulse'>Cargando...</div>
                   </div>
                 ) : notifications.length === 0 ? (
-                  <div className="p-6 text-center text-sm text-muted-foreground">
-                    <Bell className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                  <div className='p-6 text-center text-sm text-muted-foreground'>
+                    <Bell className='h-8 w-8 mx-auto mb-2 text-gray-300' />
                     <div>No hay notificaciones</div>
                   </div>
                 ) : (
-                  <div className="max-h-64 overflow-y-auto">
-                    {visibleNotifications.map((n) => (
+                  <div className='max-h-64 overflow-y-auto'>
+                    {visibleNotifications.map(n => (
                       <BellNotificationItem
                         key={n.id}
                         notification={n}
@@ -192,14 +235,14 @@ export function Notifications({
                   </div>
                 )}
                 {/* Footer: enlace a página completa */}
-                <div className="border-t border-border p-2">
+                <div className='border-t border-border p-2'>
                   <Link
                     href={`/${session.user.role?.toLowerCase()}/notifications`}
                     onClick={() => setIsOpen(false)}
-                    className="flex items-center justify-center w-full px-3 py-2 text-xs font-medium text-primary hover:bg-primary/5 rounded-md transition-colors"
+                    className='flex items-center justify-center w-full px-3 py-2 text-xs font-medium text-primary hover:bg-primary/5 rounded-md transition-colors'
                   >
                     Ver todas las notificaciones
-                    <ExternalLink className="h-3 w-3 ml-1.5" />
+                    <ExternalLink className='h-3 w-3 ml-1.5' />
                   </Link>
                 </div>
               </CardContent>
@@ -215,66 +258,93 @@ export function Notifications({
     if (notifications.length === 0) return null
 
     return (
-      <div className={cn("space-y-3", className)}>
-        {visibleNotifications.map((n) => (
-          <Alert
+      <div className={cn('space-y-2', className)}>
+        {visibleNotifications.map(n => (
+          <div
             key={n.id}
             className={cn(
-              "border-l-4 cursor-pointer transition-all duration-200 hover:shadow-md",
-              getNotificationColor(n.type)
+              'flex items-center gap-3 p-3 rounded-lg border transition-all duration-200 cursor-pointer hover:shadow-sm',
+              !n.isRead ? 'bg-primary/5 border-primary/20' : 'bg-card border-border',
+              n.type === 'ERROR' || n.type === 'CRITICAL'
+                ? 'border-l-2 border-l-red-500'
+                : n.type === 'WARNING'
+                  ? 'border-l-2 border-l-orange-500'
+                  : n.type === 'SUCCESS'
+                    ? 'border-l-2 border-l-green-500'
+                    : 'border-l-2 border-l-blue-500'
             )}
             onClick={() => handleAction(n)}
           >
-            <div className="flex items-start justify-between w-full">
-              <div className="flex items-start space-x-3 flex-1 min-w-0">
-                {getNotificationIcon(n.type)}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center space-x-2 mb-1">
-                    <div className="font-semibold text-sm text-foreground truncate">{n.title}</div>
-                    {getNotificationBadge(n.type)}
-                    <div className="text-xs text-muted-foreground">{formatTimeAgo(n.createdAt)}</div>
-                  </div>
-                  <AlertDescription className="text-sm text-foreground/80 mb-2 leading-relaxed">
-                    {n.message}
-                  </AlertDescription>
-                  {n.ticketId && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-xs font-medium"
-                      onClick={(e) => { e.stopPropagation(); handleAction(n) }}
-                    >
-                      Ver ticket
-                      <ExternalLink className="h-3 w-3 ml-1" />
-                    </Button>
+            <div className='flex-shrink-0'>{getNotificationIcon(n.type)}</div>
+
+            <div className='flex-1 min-w-0'>
+              <div className='flex items-center gap-2 mb-0.5'>
+                <span
+                  className={cn(
+                    'text-sm font-medium truncate',
+                    !n.isRead ? 'text-foreground' : 'text-muted-foreground'
                   )}
-                </div>
+                >
+                  {n.title}
+                </span>
+                <span className='text-xs text-muted-foreground'>{formatTimeAgo(n.createdAt)}</span>
+                {!n.isRead && (
+                  <span className='w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0' />
+                )}
               </div>
+
+              <p className='text-xs text-muted-foreground line-clamp-1'>{n.message}</p>
+            </div>
+
+            <div
+              className='flex items-center gap-1 flex-shrink-0'
+              onClick={e => e.stopPropagation()}
+            >
+              {n.ticketId && (
+                <Button
+                  variant='ghost'
+                  size='sm'
+                  className='h-7 px-2 text-xs'
+                  onClick={e => {
+                    e.stopPropagation()
+                    handleAction(n)
+                  }}
+                >
+                  Ver
+                </Button>
+              )}
+
               <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => handleDismiss(n.id, e)}
-                className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground ml-2 flex-shrink-0"
-                title="Descartar"
+                variant='ghost'
+                size='sm'
+                onClick={e => handleDismiss(n.id, e)}
+                className='h-7 w-7 p-0 text-muted-foreground hover:text-foreground'
+                title='Descartar'
               >
-                <X className="h-3 w-3" />
+                <X className='h-3 w-3' />
               </Button>
             </div>
-          </Alert>
+          </div>
         ))}
 
         {hasMoreNotifications && (
-          <div className="flex justify-center">
+          <div className='flex justify-center pt-1'>
             <Button
-              variant="ghost"
-              size="sm"
+              variant='ghost'
+              size='sm'
               onClick={() => setExpanded(!expanded)}
-              className="text-xs text-muted-foreground hover:text-foreground"
+              className='text-xs text-muted-foreground hover:text-foreground'
             >
               {expanded ? (
-                <><ChevronUp className="h-3 w-3 mr-1" />Mostrar menos</>
+                <>
+                  <ChevronUp className='h-3 w-3 mr-1' />
+                  Mostrar menos
+                </>
               ) : (
-                <><ChevronDown className="h-3 w-3 mr-1" />Ver {notifications.length - maxVisible} más</>
+                <>
+                  <ChevronDown className='h-3 w-3 mr-1' />
+                  Ver {notifications.length - maxVisible} más
+                </>
               )}
             </Button>
           </div>
@@ -298,54 +368,77 @@ function BellNotificationItem({
   onMarkRead: (id: string) => void
   onDismiss: (id: string, e: React.MouseEvent) => void
 }) {
-  const isClickable = !!(n.ticketId || n.metadata?.link || n.metadata?.actId ||
-    n.metadata?.maintenanceId || n.metadata?.equipmentId)
+  const isClickable = !!(
+    n.ticketId ||
+    n.metadata?.link ||
+    n.metadata?.actId ||
+    n.metadata?.maintenanceId ||
+    n.metadata?.equipmentId
+  )
 
   return (
     <div
       className={cn(
-        "p-3 border-b border-gray-100 transition-colors border-l-4",
+        'p-3 border-b border-gray-100 transition-colors border-l-4',
         getNotificationColor(n.type),
-        !n.isRead && "bg-primary/5",
-        isClickable && "hover:bg-muted/70 cursor-pointer"
+        !n.isRead && 'bg-primary/5',
+        isClickable && 'hover:bg-muted/70 cursor-pointer'
       )}
       onClick={isClickable ? () => onAction(n) : undefined}
     >
-      <div className="flex items-start justify-between space-x-2">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center space-x-2 mb-1">
+      <div className='flex items-start justify-between space-x-2'>
+        <div className='flex-1 min-w-0'>
+          <div className='flex items-center space-x-2 mb-1'>
             {getNotificationIcon(n.type)}
-            <div className="text-sm font-medium text-foreground truncate">{n.title}</div>
+            <div className='text-sm font-medium text-foreground truncate'>{n.title}</div>
             {getNotificationBadge(n.type)}
-            {isClickable && <ExternalLink className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
-            {!n.isRead && <div className="w-2 h-2 bg-primary rounded-full flex-shrink-0" />}
+            {isClickable && (
+              <ExternalLink className='h-3 w-3 text-muted-foreground flex-shrink-0' />
+            )}
+            {!n.isRead && <div className='w-2 h-2 bg-primary rounded-full flex-shrink-0' />}
           </div>
-          <div className="text-xs text-muted-foreground mb-2 leading-relaxed line-clamp-2">
+          <div className='text-xs text-muted-foreground mb-2 leading-relaxed line-clamp-2'>
             {n.message}
           </div>
-          <div className="flex items-center justify-between">
-            <div className="text-xs text-muted-foreground font-medium">{formatTimeAgo(n.createdAt)}</div>
-            <div className="flex items-center space-x-1" onClick={(e) => e.stopPropagation()}>
+          <div className='flex items-center justify-between'>
+            <div className='text-xs text-muted-foreground font-medium'>
+              {formatTimeAgo(n.createdAt)}
+            </div>
+            <div className='flex items-center space-x-1' onClick={e => e.stopPropagation()}>
               {!n.isRead && (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant="ghost" size="sm" onClick={() => onMarkRead(n.id)} className="h-6 w-6 p-0 text-muted-foreground hover:text-primary">
-                        <Check className="h-3 w-3" />
+                      <Button
+                        variant='ghost'
+                        size='sm'
+                        onClick={() => onMarkRead(n.id)}
+                        className='h-6 w-6 p-0 text-muted-foreground hover:text-primary'
+                      >
+                        <Check className='h-3 w-3' />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent><p>Marcar como leída</p></TooltipContent>
+                    <TooltipContent>
+                      <p>Marcar como leída</p>
+                    </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               )}
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="ghost" size="sm" onClick={(e) => onDismiss(n.id, e)} className="h-6 w-6 p-0 text-muted-foreground hover:text-red-600">
-                      <Trash2 className="h-3 w-3" />
+                    <Button
+                      variant='ghost'
+                      size='sm'
+                      onClick={e => onDismiss(n.id, e)}
+                      className='h-6 w-6 p-0 text-muted-foreground hover:text-red-600'
+                    >
+                      <Trash2 className='h-3 w-3' />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent><p>Eliminar notificación</p></TooltipContent>
+                  <TooltipContent>
+                    <p>Eliminar notificación</p>
+                  </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             </div>

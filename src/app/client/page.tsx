@@ -131,7 +131,7 @@ export default function ClientDashboard() {
       )}
 
       {/* 1. Contexto del usuario — áreas de soporte */}
-      {(stats.assignedFamilies?.length > 0 || stats.inventoryFamilies?.length > 0) && (
+      {/* {(stats.assignedFamilies?.length > 0 || stats.inventoryFamilies?.length > 0) && (
         <div className='mb-8'>
           <AssignedFamiliesPanel
             families={stats.assignedFamilies ?? []}
@@ -140,7 +140,7 @@ export default function ClientDashboard() {
             role='CLIENT'
           />
         </div>
-      )}
+      )} */}
 
       {/* 2. Módulo Tickets */}
       <TicketsStatsSection stats={stats} role='CLIENT' />
@@ -425,7 +425,28 @@ export default function ClientDashboard() {
                   </div>
                 </div>
 
-                <div className='flex flex-col space-y-3 p-4 bg-blue-50 dark:bg-blue-500/10 rounded-lg border border-blue-200 dark:border-blue-500/30'>
+                <div className='flex flex-col space-y-3 p-4 bg-purple-50 dark:bg-purple-500/10 rounded-lg border border-purple-200 dark:border-purple-500/30'>
+                  <div className='flex items-center justify-between'>
+                    <div className='flex items-center space-x-2'>
+                      <User className='h-4 w-4 text-purple-600 dark:text-purple-400' />
+                      <p className='text-sm font-semibold text-foreground'>Horario de Soporte</p>
+                    </div>
+                    <Badge
+                      variant='default'
+                      className='bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-500/20 dark:text-purple-300 dark:border-purple-500/40 text-xs'
+                    >
+                      {systemMetrics.schedule.days}
+                    </Badge>
+                  </div>
+                  <div className='space-y-1'>
+                    <p className='text-lg font-bold text-purple-700 dark:text-purple-300'>
+                      {systemMetrics.schedule.hours}
+                    </p>
+                    <p className='text-xs text-muted-foreground'>Atención personalizada</p>
+                  </div>
+                </div>
+
+                {/* <div className='flex flex-col space-y-3 p-4 bg-blue-50 dark:bg-blue-500/10 rounded-lg border border-blue-200 dark:border-blue-500/30'>
                   <div className='flex items-center justify-between'>
                     <div className='flex items-center space-x-2'>
                       <Activity className='h-4 w-4 text-blue-600 dark:text-blue-400' />
@@ -450,29 +471,8 @@ export default function ClientDashboard() {
                     <p className='text-lg font-bold text-blue-700 dark:text-blue-300'>24/7</p>
                     <p className='text-xs text-muted-foreground'>Sistema operativo continuamente</p>
                   </div>
-                </div>
-
-                <div className='flex flex-col space-y-3 p-4 bg-purple-50 dark:bg-purple-500/10 rounded-lg border border-purple-200 dark:border-purple-500/30'>
-                  <div className='flex items-center justify-between'>
-                    <div className='flex items-center space-x-2'>
-                      <User className='h-4 w-4 text-purple-600 dark:text-purple-400' />
-                      <p className='text-sm font-semibold text-foreground'>Horario de Soporte</p>
-                    </div>
-                    <Badge
-                      variant='default'
-                      className='bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-500/20 dark:text-purple-300 dark:border-purple-500/40 text-xs'
-                    >
-                      {systemMetrics.schedule.days}
-                    </Badge>
-                  </div>
-                  <div className='space-y-1'>
-                    <p className='text-lg font-bold text-purple-700 dark:text-purple-300'>
-                      {systemMetrics.schedule.hours}
-                    </p>
-                    <p className='text-xs text-muted-foreground'>Atención personalizada</p>
-                  </div>
-                </div>
-
+                </div> 
+                
                 <div className='flex flex-col space-y-3 p-4 bg-yellow-50 dark:bg-yellow-500/10 rounded-lg border border-yellow-200 dark:border-yellow-500/30'>
                   <div className='flex items-center justify-between'>
                     <div className='flex items-center space-x-2'>
@@ -507,7 +507,7 @@ export default function ClientDashboard() {
                         : 'Sin calificaciones aún'}
                     </p>
                   </div>
-                </div>
+                </div> */}
               </div>
             )}
           </CardContent>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import { randomUUID } from 'crypto'
 
 export async function GET() {
   try {
@@ -162,10 +163,81 @@ export async function PUT(request: NextRequest) {
       },
     })
 
+    // Sincronizar también con las otras configuraciones
+    const syncPromises: any[] = []
+
+    if (body.contactEmail !== undefined) {
+      syncPromises.push(
+        prisma.system_settings.upsert({
+          where: { key: 'supportEmail' },
+          update: { value: body.contactEmail || '', updatedAt: new Date() },
+          create: {
+            id: randomUUID(),
+            key: 'supportEmail',
+            value: body.contactEmail || '',
+            description: 'Email de contacto para soporte técnico',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        })
+      )
+
+      syncPromises.push(
+        prisma.system_settings.upsert({
+          where: { key: 'help.support_email' },
+          update: { value: body.contactEmail || '', updatedAt: new Date() },
+          create: {
+            id: randomUUID(),
+            key: 'help.support_email',
+            value: body.contactEmail || '',
+            description: 'Email de contacto para soporte técnico',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        })
+      )
+    }
+
+    if (body.companyName !== undefined) {
+      syncPromises.push(
+        prisma.system_settings.upsert({
+          where: { key: 'systemName' },
+          update: { value: body.companyName || '', updatedAt: new Date() },
+          create: {
+            id: randomUUID(),
+            key: 'systemName',
+            value: body.companyName || '',
+            description: 'Nombre del sistema',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        })
+      )
+
+      syncPromises.push(
+        prisma.system_settings.upsert({
+          where: { key: 'help.company_name' },
+          update: { value: body.companyName || '', updatedAt: new Date() },
+          create: {
+            id: randomUUID(),
+            key: 'help.company_name',
+            value: body.companyName || '',
+            description: 'Nombre de la empresa',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        })
+      )
+    }
+
+    if (syncPromises.length > 0) {
+      await Promise.all(syncPromises)
+    }
+
     // Invalidar caché de landing page
     try {
       const { invalidateCache } = await import('@/lib/api-cache')
-      await invalidateCache('landing:page')
+      await Promise.all([invalidateCache('landing:page'), invalidateCache('admin:settings')])
     } catch {
       /* Redis no disponible */
     }

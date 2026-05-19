@@ -9,8 +9,15 @@
  */
 
 import {
-  Ticket, CheckCircle, AlertCircle, Users, Clock,
-  Activity, FileText, Calendar, ArrowRight,
+  Ticket,
+  CheckCircle,
+  AlertCircle,
+  Users,
+  Clock,
+  Activity,
+  FileText,
+  Calendar,
+  ArrowRight,
 } from 'lucide-react'
 import Link from 'next/link'
 import { SymmetricStatsCard } from '@/components/shared/stats-card'
@@ -83,7 +90,9 @@ export function TicketsStatsSection({ stats, role, isLoading }: TicketsStatsSect
           <Skeleton className='h-8 w-28' />
         </div>
         <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
-          {[...Array(4)].map((_, i) => <Skeleton key={i} className='h-28 rounded-xl' />)}
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className='h-28 rounded-xl' />
+          ))}
         </div>
       </div>
     )
@@ -95,7 +104,8 @@ export function TicketsStatsSection({ stats, role, isLoading }: TicketsStatsSect
   if (role === 'ADMIN') {
     const resolutionRate = stats.resolutionRate ?? 0
     const hasUrgent = (stats.urgentTickets ?? 0) > 0
-    const healthStatus = resolutionRate >= 85 ? 'success' : resolutionRate >= 70 ? 'warning' : 'error'
+    const healthStatus =
+      resolutionRate >= 85 ? 'success' : resolutionRate >= 70 ? 'warning' : 'error'
 
     return (
       <div className='mb-8'>
@@ -188,8 +198,17 @@ export function TicketsStatsSection({ stats, role, isLoading }: TicketsStatsSect
                 value={`${stats.resolutionPlans.efficiency}%`}
                 icon={Activity}
                 color='purple'
-                status={stats.resolutionPlans.efficiency >= 90 ? 'success' : stats.resolutionPlans.efficiency >= 70 ? 'normal' : 'warning'}
-                badge={{ text: `${stats.resolutionPlans.taskCompletionRate}% tareas`, variant: 'default' }}
+                status={
+                  stats.resolutionPlans.efficiency >= 90
+                    ? 'success'
+                    : stats.resolutionPlans.efficiency >= 70
+                      ? 'normal'
+                      : 'warning'
+                }
+                badge={{
+                  text: `${stats.resolutionPlans.taskCompletionRate}% tareas`,
+                  variant: 'default',
+                }}
               />
             </div>
           </>
@@ -257,8 +276,17 @@ export function TicketsStatsSection({ stats, role, isLoading }: TicketsStatsSect
             icon={Activity}
             color='orange'
             role='TECHNICIAN'
-            status={(stats.satisfactionScore ?? 0) >= 4.5 ? 'success' : (stats.satisfactionScore ?? 0) >= 4 ? 'normal' : 'warning'}
-            badge={{ text: `${Math.floor((stats.satisfactionScore ?? 0) * 20)}%`, variant: 'default' }}
+            status={
+              (stats.satisfactionScore ?? 0) >= 4.5
+                ? 'success'
+                : (stats.satisfactionScore ?? 0) >= 4
+                  ? 'normal'
+                  : 'warning'
+            }
+            badge={{
+              text: `${Math.floor((stats.satisfactionScore ?? 0) * 20)}%`,
+              variant: 'default',
+            }}
           />
         </div>
 
@@ -271,17 +299,47 @@ export function TicketsStatsSection({ stats, role, isLoading }: TicketsStatsSect
               <div className='h-px flex-1 bg-border' />
             </div>
             <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
-              <SymmetricStatsCard title='Planes Creados' value={stats.myResolutionPlans.total} icon={FileText} color='blue' role='TECHNICIAN' badge={{ text: 'Total', variant: 'secondary' }} />
-              <SymmetricStatsCard title='Tiempo Estimado' value={`${stats.myResolutionPlans.avgEstimatedHours}h`} icon={Calendar} color='green' role='TECHNICIAN' badge={{ text: 'Promedio', variant: 'default' }} />
-              <SymmetricStatsCard title='Tiempo Real' value={`${stats.myResolutionPlans.avgActualHours}h`} icon={Clock} color='orange' role='TECHNICIAN' badge={{ text: 'Promedio', variant: 'default' }} />
+              <SymmetricStatsCard
+                title='Planes Creados'
+                value={stats.myResolutionPlans.total}
+                icon={FileText}
+                color='blue'
+                role='TECHNICIAN'
+                badge={{ text: 'Total', variant: 'secondary' }}
+              />
+              <SymmetricStatsCard
+                title='Tiempo Estimado'
+                value={`${stats.myResolutionPlans.avgEstimatedHours}h`}
+                icon={Calendar}
+                color='green'
+                role='TECHNICIAN'
+                badge={{ text: 'Promedio', variant: 'default' }}
+              />
+              <SymmetricStatsCard
+                title='Tiempo Real'
+                value={`${stats.myResolutionPlans.avgActualHours}h`}
+                icon={Clock}
+                color='orange'
+                role='TECHNICIAN'
+                badge={{ text: 'Promedio', variant: 'default' }}
+              />
               <SymmetricStatsCard
                 title='Mi Eficiencia'
                 value={`${stats.myResolutionPlans.efficiency}%`}
                 icon={Activity}
                 color='purple'
                 role='TECHNICIAN'
-                status={stats.myResolutionPlans.efficiency >= 90 ? 'success' : stats.myResolutionPlans.efficiency >= 70 ? 'normal' : 'warning'}
-                badge={{ text: `${stats.myResolutionPlans.taskCompletionRate}% tareas`, variant: 'default' }}
+                status={
+                  stats.myResolutionPlans.efficiency >= 90
+                    ? 'success'
+                    : stats.myResolutionPlans.efficiency >= 70
+                      ? 'normal'
+                      : 'warning'
+                }
+                badge={{
+                  text: `${stats.myResolutionPlans.taskCompletionRate}% tareas`,
+                  variant: 'default',
+                }}
               />
             </div>
           </>
@@ -294,63 +352,63 @@ export function TicketsStatsSection({ stats, role, isLoading }: TicketsStatsSect
   const hasOpenTickets = (stats.openTickets ?? 0) > 0
   const hasToRate = (stats.ticketsToRate ?? 0) > 0
 
-  return (
-    <div className='mb-8'>
-      {/* Header */}
-      <div className='flex items-center justify-between mb-4'>
-        <div className='flex items-center gap-2'>
-          <Ticket className='h-5 w-5 text-muted-foreground' />
-          <h3 className='text-sm font-semibold text-foreground'>Mis Tickets</h3>
-          {hasToRate && (
-            <Badge variant='outline' className='text-xs h-5 px-1.5 border-amber-400 text-amber-700'>
-              {stats.ticketsToRate} por calificar
-            </Badge>
-          )}
-        </div>
-        <Button variant='ghost' size='sm' asChild>
-          <Link href={ticketsLink} className='gap-1 text-xs'>
-            Ver tickets <ArrowRight className='h-3 w-3' />
-          </Link>
-        </Button>
-      </div>
+  // return (
+  //   <div className='mb-8'>
+  //     {/* Header */}
+  //     <div className='flex items-center justify-between mb-4'>
+  //       <div className='flex items-center gap-2'>
+  //         <Ticket className='h-5 w-5 text-muted-foreground' />
+  //         <h3 className='text-sm font-semibold text-foreground'>Mis Tickets</h3>
+  //         {hasToRate && (
+  //           <Badge variant='outline' className='text-xs h-5 px-1.5 border-amber-400 text-amber-700'>
+  //             {stats.ticketsToRate} por calificar
+  //           </Badge>
+  //         )}
+  //       </div>
+  //       <Button variant='ghost' size='sm' asChild>
+  //         <Link href={ticketsLink} className='gap-1 text-xs'>
+  //           Ver tickets <ArrowRight className='h-3 w-3' />
+  //         </Link>
+  //       </Button>
+  //     </div>
 
-      {/* Cards */}
-      <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
-        <SymmetricStatsCard
-          title='Total Tickets'
-          value={stats.totalTickets ?? 0}
-          icon={Ticket}
-          color='blue'
-          role='CLIENT'
-          trend={{ value: stats.thisMonthTickets ?? 0, label: 'este mes', isPositive: true }}
-        />
-        <SymmetricStatsCard
-          title='Abiertos'
-          value={stats.openTickets ?? 0}
-          icon={AlertCircle}
-          color='orange'
-          role='CLIENT'
-          status={hasOpenTickets ? 'warning' : 'normal'}
-          badge={hasOpenTickets ? { text: 'Requieren atención', variant: 'outline' } : undefined}
-        />
-        <SymmetricStatsCard
-          title='Resueltos'
-          value={stats.resolvedTickets ?? 0}
-          icon={CheckCircle}
-          color='green'
-          role='CLIENT'
-          status='success'
-        />
-        <SymmetricStatsCard
-          title='Mi Satisfacción'
-          value={`${stats.satisfactionRating ?? 0}/5`}
-          icon={Activity}
-          color='purple'
-          role='CLIENT'
-          status={(stats.satisfactionRating ?? 0) >= 4.5 ? 'success' : (stats.satisfactionRating ?? 0) >= 4 ? 'normal' : 'warning'}
-          badge={{ text: `${Math.floor((stats.satisfactionRating ?? 0) * 20)}%`, variant: 'default' }}
-        />
-      </div>
-    </div>
-  )
+  //     {/* Cards */}
+  //     <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
+  //       <SymmetricStatsCard
+  //         title='Total Tickets'
+  //         value={stats.totalTickets ?? 0}
+  //         icon={Ticket}
+  //         color='blue'
+  //         role='CLIENT'
+  //         trend={{ value: stats.thisMonthTickets ?? 0, label: 'este mes', isPositive: true }}
+  //       />
+  //       <SymmetricStatsCard
+  //         title='Abiertos'
+  //         value={stats.openTickets ?? 0}
+  //         icon={AlertCircle}
+  //         color='orange'
+  //         role='CLIENT'
+  //         status={hasOpenTickets ? 'warning' : 'normal'}
+  //         badge={hasOpenTickets ? { text: 'Requieren atención', variant: 'outline' } : undefined}
+  //       />
+  //       <SymmetricStatsCard
+  //         title='Resueltos'
+  //         value={stats.resolvedTickets ?? 0}
+  //         icon={CheckCircle}
+  //         color='green'
+  //         role='CLIENT'
+  //         status='success'
+  //       />
+  //       <SymmetricStatsCard
+  //         title='Mi Satisfacción'
+  //         value={`${stats.satisfactionRating ?? 0}/5`}
+  //         icon={Activity}
+  //         color='purple'
+  //         role='CLIENT'
+  //         status={(stats.satisfactionRating ?? 0) >= 4.5 ? 'success' : (stats.satisfactionRating ?? 0) >= 4 ? 'normal' : 'warning'}
+  //         badge={{ text: `${Math.floor((stats.satisfactionRating ?? 0) * 20)}%`, variant: 'default' }}
+  //       />
+  //     </div>
+  //   </div>
+  // )
 }

@@ -105,6 +105,7 @@ export default function CreateTicketPage() {
 
   // Estados para archivos
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [isDragging, setIsDragging] = useState(false)
 
   const {
     register,
@@ -140,12 +141,12 @@ export default function CreateTicketPage() {
   }, [session, status, router])
 
   // Manejar selección de archivos
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || [])
-    if (files.length === 0) return
+  const processFiles = (files: FileList | File[]) => {
+    const newFiles = Array.from(files)
+    if (newFiles.length === 0) return
 
     // Verificar límite de archivos (máximo 5)
-    if (selectedFiles.length + files.length > 5) {
+    if (selectedFiles.length + newFiles.length > 5) {
       toast({
         title: 'Límite excedido',
         description: 'Máximo 5 archivos permitidos',
@@ -155,7 +156,7 @@ export default function CreateTicketPage() {
     }
 
     // Verificar tamaño de archivos (máximo 10MB cada uno)
-    const oversizedFiles = files.filter(file => file.size > 10 * 1024 * 1024)
+    const oversizedFiles = newFiles.filter(file => file.size > 10 * 1024 * 1024)
     if (oversizedFiles.length > 0) {
       toast({
         title: 'Archivo muy grande',
@@ -165,7 +166,33 @@ export default function CreateTicketPage() {
       return
     }
 
-    setSelectedFiles(prev => [...prev, ...files])
+    setSelectedFiles(prev => [...prev, ...newFiles])
+  }
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || [])
+    processFiles(files)
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      processFiles(e.dataTransfer.files)
+    }
   }
 
   const removeFile = (index: number) => {
@@ -486,16 +513,16 @@ export default function CreateTicketPage() {
                         <Label htmlFor='title'>Título del Ticket *</Label>
                         <Input
                           id='title'
-                          placeholder='Describe brevemente el problema o solicitud'
+                          // placeholder='Describe brevemente el problema o solicitud'
                           {...register('title')}
                           className={errors.title ? 'border-red-500' : ''}
                         />
                         {errors.title && (
                           <p className='text-sm text-destructive'>{errors.title.message}</p>
                         )}
-                        <p className='text-xs text-muted-foreground'>
+                        {/* <p className='text-xs text-muted-foreground'>
                           Usa un título claro y descriptivo que resuma el problema
-                        </p>
+                        </p> */}
                       </div>
 
                       {/* Descripción */}
@@ -503,7 +530,7 @@ export default function CreateTicketPage() {
                         <Label htmlFor='description'>Descripción Detallada *</Label>
                         <Textarea
                           id='description'
-                          placeholder='Proporciona todos los detalles relevantes sobre el problema o solicitud. Incluye pasos para reproducir el problema, mensajes de error, etc.'
+                          // placeholder='Proporciona todos los detalles relevantes sobre el problema o solicitud. Incluye pasos para reproducir el problema, mensajes de error, etc.'
                           rows={6}
                           {...register('description')}
                           className={errors.description ? 'border-red-500' : ''}
@@ -524,12 +551,12 @@ export default function CreateTicketPage() {
                         </Label>
                         <Input
                           id='location'
-                          placeholder='Ej: Oficina 201, Piso 3, Sala de Reuniones A...'
+                          // placeholder='Ej: Oficina 201, Piso 3, Sala de Reuniones A...'
                           {...register('location')}
                         />
-                        <p className='text-xs text-muted-foreground'>
+                        {/* <p className='text-xs text-muted-foreground'>
                           Indica dónde debe acercarse el técnico para atender el problema.
-                        </p>
+                        </p> */}
                       </div>
 
                       {/* Prioridad */}
@@ -615,17 +642,28 @@ export default function CreateTicketPage() {
                       {/* Archivos Adjuntos */}
                       <div className='space-y-2'>
                         <Label>Archivos Adjuntos (Opcional)</Label>
-                        <FileInputWithCamera
-                          accept='image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt'
-                          multiple
-                          onChange={handleFileSelect}
+                        <div
+                          onDragOver={handleDragOver}
+                          onDragLeave={handleDragLeave}
+                          onDrop={handleDrop}
+                          className={`border-2 rounded-lg p-4 transition-all ${
+                            isDragging
+                              ? 'border-primary bg-primary/5 dark:bg-primary/10'
+                              : 'border-dashed border-border'
+                          }`}
                         >
-                          {({ openFile, openCamera, showCamera }) => (
-                            <div className='border-2 border-dashed border-border rounded-lg p-4'>
+                          <FileInputWithCamera
+                            accept='image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt'
+                            multiple
+                            onChange={handleFileSelect}
+                          >
+                            {({ openFile, openCamera, showCamera }) => (
                               <div className='flex flex-col items-center gap-3'>
                                 <Upload className='h-8 w-8 text-muted-foreground' />
                                 <p className='text-sm text-muted-foreground text-center'>
-                                  Arrastra archivos aquí o usa los botones
+                                  {isDragging
+                                    ? 'Suelta los archivos aquí'
+                                    : 'Arrastra archivos aquí o usa los botones'}
                                 </p>
                                 <div className='flex items-center gap-2 flex-wrap justify-center'>
                                   {showCamera && (
@@ -653,9 +691,9 @@ export default function CreateTicketPage() {
                                   Máximo 5 archivos, 10MB cada uno
                                 </p>
                               </div>
-                            </div>
-                          )}
-                        </FileInputWithCamera>
+                            )}
+                          </FileInputWithCamera>
+                        </div>
 
                         {/* Lista de archivos seleccionados */}
                         {selectedFiles.length > 0 && (
@@ -820,39 +858,18 @@ export default function CreateTicketPage() {
               </Card>
             )}
 
-            {/* Consejos */}
-            <Card>
-              <CardHeader>
-                <CardTitle className='flex items-center text-sm'>
-                  <Info className='h-4 w-4 mr-2' />
-                  Consejos para un Buen Ticket
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className='space-y-3 text-sm'>
-                  <div className='flex items-start space-x-2'>
-                    <CheckCircle className='h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0' />
-                    <p>Usa un título claro que resuma el problema o solicitud</p>
-                  </div>
-                  <div className='flex items-start space-x-2'>
-                    <CheckCircle className='h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0' />
-                    <p>Describe con detalle qué ocurrió, cuándo y dónde</p>
-                  </div>
-                  <div className='flex items-start space-x-2'>
-                    <CheckCircle className='h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0' />
-                    <p>Indica si el problema es recurrente o puntual</p>
-                  </div>
-                  <div className='flex items-start space-x-2'>
-                    <CheckCircle className='h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0' />
-                    <p>Adjunta fotos, capturas o documentos de respaldo si aplica</p>
-                  </div>
-                  <div className='flex items-start space-x-2'>
-                    <CheckCircle className='h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0' />
-                    <p>Selecciona la prioridad según el impacto real en tu trabajo</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Consejos compactos */}
+            <div className='border rounded-lg p-3 bg-muted/20'>
+              <p className='text-xs font-semibold text-muted-foreground mb-1.5'>
+                💡 Consejos rápidos:
+              </p>
+              <ul className='text-xs text-muted-foreground space-y-0.5'>
+                <li>• Título claro y descriptivo</li>
+                <li>• Describe con detalles el problema</li>
+                <li>• Adjunta fotos/capturas si aplica</li>
+                <li>• Prioridad según impacto real</li>
+              </ul>
+            </div>
 
             {/* Información Adicional */}
             <Alert>

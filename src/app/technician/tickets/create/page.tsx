@@ -46,22 +46,44 @@ export default function TechnicianCreateTicketPage() {
         </Button>
       }
     >
-      <CreateTicketForm
-        familiesEndpoint='/api/families?asClient=true'
-        clientId={session.user.id}
-        afterSuccessHref='/technician/tickets'
-        cancelHref='/technician/tickets'
-        submitLabel='Crear Ticket'
-        cardTitle='Crear Ticket de Soporte'
-        cardDescription='Describe el problema con el mayor detalle posible para agilizar la resolución'
-        infoAlert={
-          <>
-            Estás creando una solicitud como <strong>{session.user.name}</strong>. El ticket será
-            asignado a otro técnico o administrador — no puedes atender tus propias solicitudes.
-          </>
-        }
-        // No se envía clientId ni assigneeId — el servidor los infiere para TECHNICIAN
-      />
+      <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
+        {/* Formulario Principal */}
+        <div className='lg:col-span-2'>
+          <CreateTicketForm
+            familiesEndpoint='/api/families?asClient=true'
+            clientId={session.user.id}
+            afterSuccessHref='/technician/tickets'
+            cancelHref='/technician/tickets'
+            submitLabel='Crear Ticket'
+            cardTitle='Crear Ticket de Soporte'
+            cardDescription='Describe el problema con el mayor detalle posible para agilizar la resolución'
+            showTips={false}
+            infoAlert={
+              <>
+                Estás creando una solicitud como <strong>{session.user.name}</strong>. El ticket
+                será asignado a otro técnico o administrador — no puedes atender tus propias
+                solicitudes.
+              </>
+            }
+            // No se envía clientId ni assigneeId — el servidor los infiere para TECHNICIAN
+          />
+        </div>
+
+        {/* Sidebar */}
+        <div className='space-y-6'>
+          {/* Consejos compactos */}
+          <div className='border rounded-lg p-3 bg-muted/20'>
+            <p className='text-xs font-semibold text-muted-foreground mb-1.5'>
+              💡 Consejos rápidos:
+            </p>
+            <ul className='text-xs text-muted-foreground space-y-0.5'>
+              <li>• Usa un título claro y descriptivo</li>
+              <li>• Describe el problema con detalles</li>
+              <li>• Adjunta fotos o capturas si aplica</li>
+            </ul>
+          </div>
+        </div>
+      </div>
     </ModuleLayout>
   )
 }

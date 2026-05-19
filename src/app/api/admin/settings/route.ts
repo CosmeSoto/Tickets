@@ -175,21 +175,98 @@ export async function PUT(request: NextRequest) {
           stringValue = value as string
         }
 
-        return prisma.system_settings.upsert({
-          where: { key },
-          update: { value: stringValue, updatedAt: new Date() },
-          create: {
-            id: randomUUID(),
-            key,
-            value: stringValue,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        })
+        const promises: any[] = []
+
+        // Actualizar la configuración general
+        promises.push(
+          prisma.system_settings.upsert({
+            where: { key },
+            update: { value: stringValue, updatedAt: new Date() },
+            create: {
+              id: randomUUID(),
+              key,
+              value: stringValue,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          })
+        )
+
+        // Si es supportEmail o systemName, también actualizar la configuración de ayuda
+        if (key === 'supportEmail') {
+          promises.push(
+            prisma.system_settings.upsert({
+              where: { key: 'help.support_email' },
+              update: { value: stringValue, updatedAt: new Date() },
+              create: {
+                id: randomUUID(),
+                key: 'help.support_email',
+                value: stringValue,
+                description: 'Email de contacto para soporte técnico',
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              },
+            })
+          )
+        }
+
+        if (key === 'systemName') {
+          promises.push(
+            prisma.system_settings.upsert({
+              where: { key: 'help.company_name' },
+              update: { value: stringValue, updatedAt: new Date() },
+              create: {
+                id: randomUUID(),
+                key: 'help.company_name',
+                value: stringValue,
+                description: 'Nombre de la empresa',
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              },
+            })
+          )
+        }
+
+        return promises
       })
+      .flat()
       .filter(Boolean) // Remove null entries
 
     await Promise.all(updatePromises)
+
+    // Sincronizar también con la landing page
+    const landingPageUpdates: any = {}
+    if (validatedData.supportEmail !== undefined) {
+      landingPageUpdates.contactEmail = validatedData.supportEmail
+    }
+    if (validatedData.systemName !== undefined) {
+      landingPageUpdates.companyName = validatedData.systemName
+    }
+
+    if (Object.keys(landingPageUpdates).length > 0) {
+      await prisma.landing_page_content.upsert({
+        where: { id: 'default' },
+        update: landingPageUpdates,
+        create: {
+          id: 'default',
+          heroTitle: 'Gestión Integral de Operaciones',
+          heroSubtitle: 'Tickets, inventario, rondas en una sola plataforma',
+          heroCtaPrimary: 'Crear Ticket de Soporte',
+          heroCtaPrimaryUrl: '/login',
+          heroCtaSecondary: 'Ver Servicios',
+          heroCtaSecondaryUrl: '#servicios',
+          servicesTitle: 'Nuestros Servicios',
+          servicesSubtitle: 'Ofrecemos soporte técnico integral',
+          servicesEnabled: true,
+          companyName: landingPageUpdates.companyName || 'Sistema de Tickets',
+          companyTagline: 'Gestión Integral de Operaciones',
+          footerText: `© ${new Date().getFullYear()} ${landingPageUpdates.companyName || 'Sistema de Tickets'}`,
+          metaTitle: 'Sistema de Tickets - Soporte Técnico',
+          metaDescription: 'Sistema profesional de gestión de tickets',
+          ...landingPageUpdates,
+        },
+      })
+    }
 
     // NUEVO: Limpiar caché de configuración de seguridad
     try {
@@ -220,6 +297,7 @@ export async function PUT(request: NextRequest) {
       await Promise.all([
         invalidateCache('admin:settings'),
         invalidateCache('config:session-timeout'),
+        invalidateCache('landing:page'),
         invalidateSettings(Object.keys(validatedData)),
       ])
     } catch {

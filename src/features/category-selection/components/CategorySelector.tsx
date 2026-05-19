@@ -138,6 +138,7 @@ export function CategorySelector({
     selectionStartTime: null,
     interactionMethod: null,
   })
+  const [showManualNavigation, setShowManualNavigation] = useState(false)
 
   const [categoryMetadata, setCategoryMetadata] = useState<CategoryMetadata | null>(null)
   const [confidenceScore, setConfidenceScore] = useState<number>(0)
@@ -491,7 +492,7 @@ export function CategorySelector({
           onResultSelect={handleSearchResultSelect}
           results={searchResults}
           isLoading={isSearching}
-          placeholder='Escribe palabras clave para buscar...'
+          placeholder='Buscar...'
         />
       </div>
 
@@ -519,65 +520,46 @@ export function CategorySelector({
 
       {/* Main selection area */}
       {!state.showConfirmation ? (
-        <Tabs
-          value={state.mode}
-          onValueChange={value => handleModeToggle(value as 'full' | 'stepByStep')}
-          className='w-full'
-          aria-label='Modo de navegación de categorías'
-        >
-          <TabsList className='grid w-full grid-cols-2' role='tablist'>
-            <TabsTrigger
-              value='full'
-              role='tab'
-              aria-label='Vista completa de todas las categorías'
-              className='text-sm'
-            >
-              Vista Completa
-            </TabsTrigger>
-            <TabsTrigger
-              value='stepByStep'
-              role='tab'
-              aria-label='Navegación paso a paso guiada'
-              className='text-sm'
-            >
-              Paso a Paso
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value='full' className='mt-3' role='tabpanel'>
-            <CategoryTree
-              categories={categories}
-              selectedPath={state.selectedPath}
-              onSelect={handleTreeSelect}
-              mode='full'
-            />
-          </TabsContent>
-
-          <TabsContent value='stepByStep' className='mt-3' role='tabpanel'>
-            <StepByStepNavigator
-              categories={categories}
-              currentLevel={state.selectedPath.length}
-              selectedPath={state.selectedPath}
-              onNext={handleTreeSelect}
-              onBack={() => {
-                const newPath = state.selectedPath.slice(0, -1)
-                setState(prev => ({ ...prev, selectedPath: newPath }))
-                if (newPath.length > 0) {
-                  onChange(newPath[newPath.length - 1])
-                }
-                setAnnouncement('Retrocediendo al nivel anterior')
-              }}
-              onComplete={() => {
-                setState(prev => ({ ...prev, showConfirmation: true }))
-                setAnnouncement('Selección completada. Revisa el resumen de tu categoría.')
-              }}
-            />
-          </TabsContent>
-        </Tabs>
+        <div className='space-y-3'>
+          {/* Show manual navigation only if user wants it */}
+          {!showManualNavigation ? (
+            <div className='space-y-2'>
+              {/* If there are suggestions, they will be shown above */}
+              {/* Button to show manual navigation */}
+              <Button
+                type='button'
+                variant='ghost'
+                size='sm'
+                onClick={() => setShowManualNavigation(true)}
+                className='w-full text-muted-foreground text-xs h-7'
+              >
+                No encuentras la categoría? Busca en el árbol completo
+              </Button>
+            </div>
+          ) : (
+            <div className='space-y-2'>
+              <Button
+                type='button'
+                variant='ghost'
+                size='sm'
+                onClick={() => setShowManualNavigation(false)}
+                className='w-full text-muted-foreground text-xs h-7'
+              >
+                Volver a sugerencias
+              </Button>
+              <CategoryTree
+                categories={categories}
+                selectedPath={state.selectedPath}
+                onSelect={handleTreeSelect}
+                mode='full'
+              />
+            </div>
+          )}
+        </div>
       ) : selectedCategory ? (
         <section aria-label='Resumen de categoría seleccionada' className='space-y-3'>
-          {/* Confidence indicator - compact */}
-          <Alert
+          {/* Confidence indicator - very compact */}
+          {/* <Alert
             className={cn(confidenceIndicator.bgColor, confidenceIndicator.borderColor, 'py-2')}
             role='status'
             aria-live='polite'
@@ -586,7 +568,7 @@ export function CategorySelector({
             <AlertDescription className={cn(confidenceIndicator.color, 'text-sm')}>
               {confidenceIndicator.message}
             </AlertDescription>
-          </Alert>
+          </Alert> */}
 
           {categoryMetadata && (
             <>
@@ -603,7 +585,7 @@ export function CategorySelector({
               />
 
               {/* Knowledge base: artículos relacionados + búsqueda en un solo bloque */}
-              <RelatedArticles
+              {/* <RelatedArticles
                 categoryId={selectedCategory.id}
                 ticketTitle={ticketTitle}
                 ticketDescription={ticketDescription}
@@ -612,7 +594,7 @@ export function CategorySelector({
                     articleViewed: articleId,
                   })
                 }}
-              />
+              /> */}
             </>
           )}
         </section>

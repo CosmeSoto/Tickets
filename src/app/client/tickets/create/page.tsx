@@ -69,18 +69,38 @@ function CreateClientTicketContent() {
         </Button>
       }
     >
-      <CreateTicketForm
-        familiesEndpoint='/api/families'
-        clientId={session.user.id}
-        afterSuccessHref='/client/tickets'
-        cancelHref='/client/tickets'
-        submitLabel='Crear Ticket'
-        cardTitle='Nueva Solicitud de Soporte'
-        cardDescription='Completa el formulario con los detalles de tu problema o solicitud'
-        extraData={{
-          ...(equipmentId ? { equipmentId } : {}),
-        }}
-      />
+      <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
+        {/* Formulario Principal */}
+        <div className='lg:col-span-2'>
+          <CreateTicketForm
+            familiesEndpoint='/api/families'
+            clientId={session.user.id}
+            afterSuccessHref='/client/tickets'
+            cancelHref='/client/tickets'
+            submitLabel='Crear Ticket'
+            cardTitle='Nueva Solicitud de Soporte'
+            showTips={false}
+            extraData={{
+              ...(equipmentId ? { equipmentId } : {}),
+            }}
+          />
+        </div>
+
+        {/* Sidebar */}
+        <div className='space-y-6'>
+          {/* Consejos compactos */}
+          <div className='border rounded-lg p-3 bg-muted/20'>
+            <p className='text-xs font-semibold text-muted-foreground mb-1.5'>
+              💡 Consejos rápidos:
+            </p>
+            <ul className='text-xs text-muted-foreground space-y-0.5'>
+              <li>• Usa un título claro y descriptivo</li>
+              <li>• Describe el problema con detalles</li>
+              <li>• Adjunta fotos o capturas si aplica</li>
+            </ul>
+          </div>
+        </div>
+      </div>
     </ModuleLayout>
   )
 }

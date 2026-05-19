@@ -19,7 +19,8 @@ import {
   HelpCircle,
   ExternalLink,
   Star,
-  Clock
+  Clock,
+  Mail,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -46,8 +47,8 @@ const helpCategories = [
     articles: [
       { title: 'Cómo crear tu primer ticket', views: 1250, rating: 4.8 },
       { title: 'Navegando por el dashboard', views: 980, rating: 4.6 },
-      { title: 'Configuración inicial de perfil', views: 750, rating: 4.7 }
-    ]
+      { title: 'Configuración inicial de perfil', views: 750, rating: 4.7 },
+    ],
   },
   {
     id: 'tickets',
@@ -58,8 +59,8 @@ const helpCategories = [
     articles: [
       { title: 'Estados de tickets explicados', views: 2100, rating: 4.9 },
       { title: 'Prioridades y escalación', views: 1800, rating: 4.5 },
-      { title: 'Adjuntar archivos y capturas', views: 1200, rating: 4.4 }
-    ]
+      { title: 'Adjuntar archivos y capturas', views: 1200, rating: 4.4 },
+    ],
   },
   {
     id: 'account',
@@ -70,8 +71,8 @@ const helpCategories = [
     articles: [
       { title: 'Cambiar contraseña y seguridad', views: 950, rating: 4.7 },
       { title: 'Configurar notificaciones', views: 800, rating: 4.3 },
-      { title: 'Personalizar preferencias', views: 650, rating: 4.5 }
-    ]
+      { title: 'Personalizar preferencias', views: 650, rating: 4.5 },
+    ],
   },
   {
     id: 'collaboration',
@@ -82,9 +83,9 @@ const helpCategories = [
     articles: [
       { title: 'Comentarios y comunicación', views: 1100, rating: 4.6 },
       { title: 'Asignación de tickets', views: 900, rating: 4.4 },
-      { title: 'Seguimiento de progreso', views: 700, rating: 4.2 }
-    ]
-  }
+      { title: 'Seguimiento de progreso', views: 700, rating: 4.2 },
+    ],
+  },
 ]
 
 const popularArticles = [
@@ -92,7 +93,7 @@ const popularArticles = [
   { title: 'Entendiendo las prioridades', category: 'Tickets', views: 2800, rating: 4.8 },
   { title: 'Configurar notificaciones por email', category: 'Cuenta', views: 2400, rating: 4.7 },
   { title: 'Adjuntar archivos grandes', category: 'Tickets', views: 2100, rating: 4.6 },
-  { title: 'Cambiar mi contraseña', category: 'Cuenta', views: 1900, rating: 4.5 }
+  { title: 'Cambiar mi contraseña', category: 'Cuenta', views: 1900, rating: 4.5 },
 ]
 
 export default function HelpCenterPage() {
@@ -125,27 +126,27 @@ export default function HelpCenterPage() {
       <div className='max-w-6xl mx-auto space-y-8'>
         {/* Búsqueda */}
         <Card>
-          <CardContent className="pt-6">
-            <div className="text-center space-y-4">
-              <div className="flex justify-center">
-                <div className="p-3 bg-blue-100 rounded-full">
-                  <HelpCircle className="h-8 w-8 text-blue-600" />
+          <CardContent className='pt-6'>
+            <div className='text-center space-y-4'>
+              <div className='flex justify-center'>
+                <div className='p-3 bg-blue-100 rounded-full'>
+                  <HelpCircle className='h-8 w-8 text-blue-600' />
                 </div>
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-foreground">¿En qué podemos ayudarte?</h2>
-                <p className="text-muted-foreground mt-2">Busca en nuestra base de conocimientos</p>
+                <h2 className='text-2xl font-bold text-foreground'>¿En qué podemos ayudarte?</h2>
+                <p className='text-muted-foreground mt-2'>Busca en nuestra base de conocimientos</p>
               </div>
-              <div className="max-w-2xl mx-auto">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
+              <div className='max-w-2xl mx-auto'>
+                <div className='relative'>
+                  <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5' />
                   <Input
-                    placeholder="Buscar artículos, guías, tutoriales..."
+                    placeholder='Buscar artículos, guías, tutoriales...'
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 pr-4 h-12 text-lg"
+                    onChange={e => setSearchQuery(e.target.value)}
+                    className='pl-10 pr-4 h-12 text-lg'
                   />
-                  <Button className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                  <Button className='absolute right-2 top-1/2 transform -translate-y-1/2'>
                     Buscar
                   </Button>
                 </div>
@@ -155,28 +156,37 @@ export default function HelpCenterPage() {
         </Card>
 
         {/* Accesos Rápidos */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-            <CardContent className="pt-6">
-              <div className="text-center space-y-3">
-                <div className="flex justify-center">
-                  <div className="p-3 bg-green-100 rounded-full">
-                    <MessageCircle className="h-6 w-6 text-green-600" />
+        <div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
+          <Card className='hover:shadow-lg transition-shadow cursor-pointer'>
+            <CardContent className='pt-6'>
+              <div className='text-center space-y-3'>
+                <div className='flex justify-center'>
+                  <div className='p-3 bg-green-100 rounded-full'>
+                    <MessageCircle className='h-6 w-6 text-green-600' />
                   </div>
                 </div>
-                <h3 className="font-semibold">Contactar Soporte</h3>
-                <p className="text-sm text-muted-foreground">Habla directamente con nuestro equipo</p>
+                <h3 className='font-semibold'>Contactar Soporte</h3>
+                <p className='text-sm text-muted-foreground'>
+                  Habla directamente con nuestro equipo
+                </p>
                 {config?.chatEnabled && config.chatUrl ? (
-                  <Button variant="outline" size="sm" asChild>
-                    <a href={config.chatUrl} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="h-4 w-4 mr-2" />
+                  <Button variant='outline' size='sm' asChild>
+                    <a href={config.chatUrl} target='_blank' rel='noopener noreferrer'>
+                      <ExternalLink className='h-4 w-4 mr-2' />
                       Abrir Chat
                     </a>
                   </Button>
+                ) : config?.supportEmail ? (
+                  <Button variant='outline' size='sm' asChild>
+                    <a href={`mailto:${config.supportEmail}`}>
+                      <Mail className='h-4 w-4 mr-2' />
+                      Contactar por Email
+                    </a>
+                  </Button>
                 ) : (
-                  <Button variant="outline" size="sm" asChild>
-                    <Link href="/help/contact">
-                      <MessageCircle className="h-4 w-4 mr-2" />
+                  <Button variant='outline' size='sm' asChild>
+                    <Link href='/help/contact'>
+                      <MessageCircle className='h-4 w-4 mr-2' />
                       Contactar
                     </Link>
                   </Button>
@@ -185,19 +195,23 @@ export default function HelpCenterPage() {
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-            <CardContent className="pt-6">
-              <div className="text-center space-y-3">
-                <div className="flex justify-center">
-                  <div className="p-3 bg-purple-100 rounded-full">
-                    <Video className="h-6 w-6 text-purple-600" />
+          <Card className='hover:shadow-lg transition-shadow cursor-pointer'>
+            <CardContent className='pt-6'>
+              <div className='text-center space-y-3'>
+                <div className='flex justify-center'>
+                  <div className='p-3 bg-purple-100 rounded-full'>
+                    <Video className='h-6 w-6 text-purple-600' />
                   </div>
                 </div>
-                <h3 className="font-semibold">Video Tutoriales</h3>
-                <p className="text-sm text-muted-foreground">Aprende viendo paso a paso</p>
-                <Button variant="outline" size="sm" asChild>
-                  <a href={config?.videoTutorialsUrl || '#'} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="h-4 w-4 mr-2" />
+                <h3 className='font-semibold'>Video Tutoriales</h3>
+                <p className='text-sm text-muted-foreground'>Aprende viendo paso a paso</p>
+                <Button variant='outline' size='sm' asChild>
+                  <a
+                    href={config?.videoTutorialsUrl || '#'}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                  >
+                    <ExternalLink className='h-4 w-4 mr-2' />
                     Ver Videos
                   </a>
                 </Button>
@@ -205,19 +219,23 @@ export default function HelpCenterPage() {
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-            <CardContent className="pt-6">
-              <div className="text-center space-y-3">
-                <div className="flex justify-center">
-                  <div className="p-3 bg-orange-100 rounded-full">
-                    <FileText className="h-6 w-6 text-orange-600" />
+          <Card className='hover:shadow-lg transition-shadow cursor-pointer'>
+            <CardContent className='pt-6'>
+              <div className='text-center space-y-3'>
+                <div className='flex justify-center'>
+                  <div className='p-3 bg-orange-100 rounded-full'>
+                    <FileText className='h-6 w-6 text-orange-600' />
                   </div>
                 </div>
-                <h3 className="font-semibold">Documentación</h3>
-                <p className="text-sm text-muted-foreground">Guías técnicas detalladas</p>
-                <Button variant="outline" size="sm" asChild>
-                  <a href={config?.documentationUrl || '#'} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="h-4 w-4 mr-2" />
+                <h3 className='font-semibold'>Documentación</h3>
+                <p className='text-sm text-muted-foreground'>Guías técnicas detalladas</p>
+                <Button variant='outline' size='sm' asChild>
+                  <a
+                    href={config?.documentationUrl || '#'}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                  >
+                    <ExternalLink className='h-4 w-4 mr-2' />
                     Leer Docs
                   </a>
                 </Button>
@@ -228,39 +246,42 @@ export default function HelpCenterPage() {
 
         {/* Categorías de Ayuda */}
         <div>
-          <h2 className="text-xl font-bold text-foreground mb-6">Categorías de Ayuda</h2>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {helpCategories.map((category) => {
+          <h2 className='text-xl font-bold text-foreground mb-6'>Categorías de Ayuda</h2>
+          <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
+            {helpCategories.map(category => {
               const Icon = category.icon
               return (
-                <Card key={category.id} className="hover:shadow-lg transition-shadow">
+                <Card key={category.id} className='hover:shadow-lg transition-shadow'>
                   <CardHeader>
-                    <CardTitle className="flex items-center space-x-3">
+                    <CardTitle className='flex items-center space-x-3'>
                       <div className={`p-2 rounded-lg ${category.color}`}>
-                        <Icon className="h-5 w-5" />
+                        <Icon className='h-5 w-5' />
                       </div>
                       <span>{category.title}</span>
                     </CardTitle>
                     <CardDescription>{category.description}</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-3">
+                    <div className='space-y-3'>
                       {category.articles.map((article, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 hover:bg-muted rounded cursor-pointer">
-                          <div className="flex-1">
-                            <h4 className="text-sm font-medium text-foreground">{article.title}</h4>
-                            <div className="flex items-center space-x-3 mt-1">
-                              <div className="flex items-center text-xs text-muted-foreground">
-                                <Clock className="h-3 w-3 mr-1" />
+                        <div
+                          key={index}
+                          className='flex items-center justify-between p-2 hover:bg-muted rounded cursor-pointer'
+                        >
+                          <div className='flex-1'>
+                            <h4 className='text-sm font-medium text-foreground'>{article.title}</h4>
+                            <div className='flex items-center space-x-3 mt-1'>
+                              <div className='flex items-center text-xs text-muted-foreground'>
+                                <Clock className='h-3 w-3 mr-1' />
                                 {article.views} vistas
                               </div>
-                              <div className="flex items-center text-xs text-muted-foreground">
-                                <Star className="h-3 w-3 mr-1 fill-current text-yellow-400" />
+                              <div className='flex items-center text-xs text-muted-foreground'>
+                                <Star className='h-3 w-3 mr-1 fill-current text-yellow-400' />
                                 {article.rating}
                               </div>
                             </div>
                           </div>
-                          <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                          <ExternalLink className='h-4 w-4 text-muted-foreground' />
                         </div>
                       ))}
                     </div>
@@ -278,28 +299,33 @@ export default function HelpCenterPage() {
             <CardDescription>Los artículos más consultados por la comunidad</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
+            <div className='space-y-3'>
               {popularArticles.map((article, index) => (
-                <div key={index} className="flex items-center justify-between p-3 hover:bg-muted rounded cursor-pointer">
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-600 rounded-full text-sm font-bold">
+                <div
+                  key={index}
+                  className='flex items-center justify-between p-3 hover:bg-muted rounded cursor-pointer'
+                >
+                  <div className='flex items-center space-x-4'>
+                    <div className='flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-600 rounded-full text-sm font-bold'>
                       {index + 1}
                     </div>
                     <div>
-                      <h4 className="font-medium text-foreground">{article.title}</h4>
-                      <div className="flex items-center space-x-4 mt-1">
-                        <Badge variant="outline" className="text-xs">
+                      <h4 className='font-medium text-foreground'>{article.title}</h4>
+                      <div className='flex items-center space-x-4 mt-1'>
+                        <Badge variant='outline' className='text-xs'>
                           {article.category}
                         </Badge>
-                        <span className="text-xs text-muted-foreground">{article.views} vistas</span>
-                        <div className="flex items-center text-xs text-muted-foreground">
-                          <Star className="h-3 w-3 mr-1 fill-current text-yellow-400" />
+                        <span className='text-xs text-muted-foreground'>
+                          {article.views} vistas
+                        </span>
+                        <div className='flex items-center text-xs text-muted-foreground'>
+                          <Star className='h-3 w-3 mr-1 fill-current text-yellow-400' />
                           {article.rating}
                         </div>
                       </div>
                     </div>
                   </div>
-                  <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                  <ExternalLink className='h-4 w-4 text-muted-foreground' />
                 </div>
               ))}
             </div>
@@ -307,21 +333,34 @@ export default function HelpCenterPage() {
         </Card>
 
         {/* Footer de Ayuda */}
-        <Card className="bg-muted">
-          <CardContent className="pt-6">
-            <div className="text-center space-y-4">
-              <h3 className="text-lg font-semibold text-foreground">¿No encontraste lo que buscabas?</h3>
-              <p className="text-muted-foreground">Nuestro equipo de soporte está aquí para ayudarte</p>
-              <div className="flex justify-center space-x-4">
-                <Button asChild>
-                  <Link href="/help/contact">
-                    <MessageCircle className="h-4 w-4 mr-2" />
-                    Contactar Soporte
-                  </Link>
-                </Button>
-                <Button variant="outline" asChild>
-                  <Link href="/tickets/create">
-                    <FileText className="h-4 w-4 mr-2" />
+        <Card className='bg-muted'>
+          <CardContent className='pt-6'>
+            <div className='text-center space-y-4'>
+              <h3 className='text-lg font-semibold text-foreground'>
+                ¿No encontraste lo que buscabas?
+              </h3>
+              <p className='text-muted-foreground'>
+                Nuestro equipo de soporte está aquí para ayudarte
+              </p>
+              <div className='flex justify-center space-x-4'>
+                {config?.supportEmail ? (
+                  <Button asChild>
+                    <a href={`mailto:${config.supportEmail}`}>
+                      <Mail className='h-4 w-4 mr-2' />
+                      Contactar Soporte
+                    </a>
+                  </Button>
+                ) : (
+                  <Button asChild>
+                    <Link href='/help/contact'>
+                      <MessageCircle className='h-4 w-4 mr-2' />
+                      Contactar Soporte
+                    </Link>
+                  </Button>
+                )}
+                <Button variant='outline' asChild>
+                  <Link href='/tickets/create'>
+                    <FileText className='h-4 w-4 mr-2' />
                     Crear Ticket
                   </Link>
                 </Button>

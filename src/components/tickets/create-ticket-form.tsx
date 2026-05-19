@@ -80,6 +80,8 @@ export interface CreateTicketFormProps {
   cardTitle?: string
   /** Texto de la descripción de la card */
   cardDescription?: string
+  /** Mostrar consejos para crear un buen ticket */
+  showTips?: boolean
 }
 
 const PRIORITY_LABELS: Record<string, string> = {
@@ -115,6 +117,7 @@ export function CreateTicketForm({
   submitLabel = 'Crear Ticket',
   cardTitle = 'Nueva Solicitud de Soporte',
   cardDescription = 'Completa el formulario con los detalles de tu problema o solicitud',
+  showTips = true,
 }: CreateTicketFormProps) {
   const { data: session } = useSession()
   const router = useRouter()
@@ -130,6 +133,7 @@ export function CreateTicketForm({
   const prevFamilyIdRef = useRef<string | null>(null)
 
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [isDragging, setIsDragging] = useState(false)
 
   const {
     register,
@@ -182,11 +186,18 @@ export function CreateTicketForm({
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || [])
     if (!files.length) return
-    if (selectedFiles.length + files.length > 5) {
+    processFiles(files)
+  }
+
+  const removeFile = (index: number) => setSelectedFiles(prev => prev.filter((_, i) => i !== index))
+
+  const processFiles = (files: FileList | File[]) => {
+    const newFiles = Array.from(files)
+    if (selectedFiles.length + newFiles.length > 5) {
       toast({ title: 'Límite excedido', description: 'Máximo 5 archivos', variant: 'destructive' })
       return
     }
-    if (files.some(f => f.size > 10 * 1024 * 1024)) {
+    if (newFiles.some(f => f.size > 10 * 1024 * 1024)) {
       toast({
         title: 'Archivo muy grande',
         description: 'Máximo 10MB por archivo',
@@ -194,10 +205,29 @@ export function CreateTicketForm({
       })
       return
     }
-    setSelectedFiles(prev => [...prev, ...files])
+    setSelectedFiles(prev => [...prev, ...newFiles])
   }
 
-  const removeFile = (index: number) => setSelectedFiles(prev => prev.filter((_, i) => i !== index))
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      processFiles(e.dataTransfer.files)
+    }
+  }
 
   const uploadFiles = async (ticketId: string) => {
     for (const file of selectedFiles) {
@@ -295,7 +325,7 @@ export function CreateTicketForm({
               </Label>
               <Input
                 id='title'
-                placeholder='Describe brevemente tu problema o solicitud'
+                // placeholder='Describe brevemente tu problema o solicitud'
                 {...register('title')}
                 className={errors.title ? 'border-destructive' : ''}
               />
@@ -309,7 +339,7 @@ export function CreateTicketForm({
               </Label>
               <Textarea
                 id='description'
-                placeholder='Proporciona todos los detalles: qué ocurre, desde cuándo, pasos para reproducirlo, mensajes de error...'
+                // placeholder='Proporciona todos los detalles: qué ocurre, desde cuándo, pasos para reproducirlo, mensajes de error...'
                 rows={4}
                 {...register('description')}
                 className={errors.description ? 'border-destructive' : ''}
@@ -328,12 +358,12 @@ export function CreateTicketForm({
               </Label>
               <Input
                 id='location'
-                placeholder='Ej: Oficina 201, Piso 3, Sala de Reuniones A...'
+                // placeholder='Ej: Oficina 201, Piso 3, Sala de Reuniones A...'
                 {...register('location')}
               />
-              <p className='text-xs text-muted-foreground'>
+              {/* <p className='text-xs text-muted-foreground'>
                 Indica dónde debe acercarse el técnico para atender el problema.
-              </p>
+              </p> */}
             </div>
 
             {/* ── Prioridad ───────────────────────────────────────────── */}
@@ -380,6 +410,20 @@ export function CreateTicketForm({
               )}
             </div>
 
+            {/* Consejos compactos */}
+            {showTips && (
+              <div className='border rounded-lg p-3 bg-muted/20'>
+                <p className='text-xs font-semibold text-muted-foreground mb-1.5'>
+                  💡 Consejos rápidos:
+                </p>
+                <ul className='text-xs text-muted-foreground space-y-0.5'>
+                  <li>• Usa un título claro y descriptivo</li>
+                  <li>• Describe el problema con detalles</li>
+                  <li>• Adjunta fotos o capturas si aplica</li>
+                </ul>
+              </div>
+            )}
+
             <Separator />
 
             {/* ── Área de soporte ─────────────────────────────────────── */}
@@ -403,9 +447,9 @@ export function CreateTicketForm({
                   Área de soporte
                   <span className='text-muted-foreground font-normal text-xs'>(opcional)</span>
                 </Label>
-                <p className='text-xs text-muted-foreground'>
+                {/* <p className='text-xs text-muted-foreground'>
                   Selecciona el equipo que debe atender tu solicitud.
-                </p>
+                </p> */}
                 <FamilyCombobox
                   families={availableFamilies}
                   value={selectedFamilyId ?? ''}
@@ -438,10 +482,10 @@ export function CreateTicketForm({
                 <Tag className='h-4 w-4' />
                 Categoría <span className='text-destructive'>*</span>
               </Label>
-              <p className='text-xs text-muted-foreground'>
+              {/* <p className='text-xs text-muted-foreground'>
                 Selecciona la categoría que mejor describa tu problema. Usa la búsqueda (Ctrl+K)
                 para encontrarla rápidamente.
-              </p>
+              </p> */}
               <div className='border rounded-lg p-3 bg-muted/30'>
                 <CategorySelectorWrapper
                   value={selectedCategoryId}
@@ -463,18 +507,29 @@ export function CreateTicketForm({
                 Archivos Adjuntos{' '}
                 <span className='text-muted-foreground font-normal text-xs'>(opcional)</span>
               </Label>
-              <FileInputWithCamera
-                accept='image/*,.pdf,.doc,.docx,.txt'
-                multiple
-                onChange={handleFileSelect}
+              <div
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`border-2 rounded-lg px-4 py-3 transition-all ${
+                  isDragging
+                    ? 'border-primary bg-primary/5 dark:bg-primary/10'
+                    : 'border-dashed border-border'
+                }`}
               >
-                {({ openFile, openCamera, showCamera }) => (
-                  <div className='border-2 border-dashed border-border rounded-lg px-4 py-3'>
+                <FileInputWithCamera
+                  accept='image/*,.pdf,.doc,.docx,.txt'
+                  multiple
+                  onChange={handleFileSelect}
+                >
+                  {({ openFile, openCamera, showCamera }) => (
                     <div className='flex items-center justify-between gap-4 flex-wrap'>
                       <div className='flex items-center gap-3'>
                         <Upload className='h-5 w-5 text-muted-foreground flex-shrink-0' />
                         <p className='text-xs text-muted-foreground'>
-                          Máximo 5 archivos, 10MB cada uno
+                          {isDragging
+                            ? 'Suelta los archivos aquí'
+                            : 'Máximo 5 archivos, 10MB cada uno'}
                         </p>
                       </div>
                       <div className='flex items-center gap-2'>
@@ -495,9 +550,9 @@ export function CreateTicketForm({
                         </Button>
                       </div>
                     </div>
-                  </div>
-                )}
-              </FileInputWithCamera>
+                  )}
+                </FileInputWithCamera>
+              </div>
               {selectedFiles.length > 0 && (
                 <FilePreviewList files={selectedFiles} onRemove={removeFile} />
               )}
