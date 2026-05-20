@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Plus, Newspaper, Trash2, Edit, Eye, CheckCircle2, XCircle } from 'lucide-react'
@@ -39,6 +39,8 @@ import { es } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { NewsVisibilitySelector } from '@/components/news/news-visibility-selector'
+import { NewsDetail } from '@/components/news/news-detail'
+import type { NewsDetailItem } from '@/components/news/news-detail'
 
 type NewsType =
   | 'NEWS'
@@ -147,11 +149,14 @@ export default function AdminNewsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const { toast } = useToast()
+  const accessChecked = useRef(false)
 
+  const [hasAccess, setHasAccess] = useState<boolean | null>(null)
   const [news, setNews] = useState<NewsItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
+  const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null)
   const [users, setUsers] = useState<UserOption[]>([])
   const [departments, setDepartments] = useState<DepartmentOption[]>([])
 
@@ -196,19 +201,68 @@ export default function AdminNewsPage() {
 
   useEffect(() => {
     if (status === 'loading') return
+    if (accessChecked.current) return // Evitar re-ejecución cuando session se actualiza
 
     if (!session) {
       router.push('/login')
       return
     }
 
-    if (session.user.role !== 'ADMIN' && !(session.user as any).isSuperAdmin) {
-      router.push('/unauthorized')
+    accessChecked.current = true
+
+    // Admin y SuperAdmin siempre tienen acceso
+    if (session.user.role === 'ADMIN' || (session.user as any).isSuperAdmin) {
+      setHasAccess(true)
+      loadNews()
+      loadUsersAndDepartments()
       return
     }
 
-    loadNews()
-    loadUsersAndDepartments()
+    // Para no-admins, verificar newsEnabled directamente
+    const checkAccess = async () => {
+      try {
+        // Verificar directamente con el endpoint de usuario (sin cache de módulos)
+        const res = await fetch(`/api/users/${session.user.id}`)
+        if (res.ok) {
+          const data = await res.json()
+          if (data.user?.newsEnabled || data.newsEnabled) {
+            setHasAccess(true)
+            loadNews()
+            loadUsersAndDepartments()
+            return
+          }
+        }
+      } catch {}
+
+      // Fallback: verificar módulos
+      try {
+        const res = await fetch(`/api/user/modules?_t=${Date.now()}`)
+        if (res.ok) {
+          const modules = await res.json()
+          if (modules.news) {
+            setHasAccess(true)
+            loadNews()
+            loadUsersAndDepartments()
+            return
+          }
+        }
+      } catch {}
+
+      // Último fallback: verificar en la sesión
+      if ((session.user as any).newsEnabled) {
+        setHasAccess(true)
+        loadNews()
+        loadUsersAndDepartments()
+        return
+      }
+
+      // Sin acceso — volver al dashboard
+      setHasAccess(false)
+      const dest = session.user.role === 'TECHNICIAN' ? '/technician' : '/client'
+      router.replace(dest)
+    }
+
+    checkAccess()
   }, [session, status, router])
 
   const loadUsersAndDepartments = async () => {
@@ -258,7 +312,7 @@ export default function AdminNewsPage() {
       const response = await fetch(`/api/admin/news?${params.toString()}`)
       if (!response.ok) throw new Error('Error al cargar noticias')
       const data = await response.json()
-      setNews(data.news)
+      setNews(data.news || [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al cargar noticias')
     } finally {
@@ -273,17 +327,29 @@ export default function AdminNewsPage() {
       const url = editingNews ? `/api/admin/news/${editingNews.id}` : '/api/admin/news'
       const method = editingNews ? 'PUT' : 'POST'
 
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          startDate: formData.startDate?.toISOString() || null,
-          endDate: formData.endDate?.toISOString() || null,
-        }),
-      })
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 30_000) // 30s timeout
 
-      if (!response.ok) throw new Error('Error al guardar noticia')
+      let response: Response
+      try {
+        response = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...formData,
+            startDate: formData.startDate?.toISOString() || null,
+            endDate: formData.endDate?.toISOString() || null,
+          }),
+          signal: controller.signal,
+        })
+      } finally {
+        clearTimeout(timeout)
+      }
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.error || 'Error al guardar noticia')
+      }
       const result = await response.json()
       const newsId = result.news?.id
 
@@ -460,27 +526,42 @@ export default function AdminNewsPage() {
     {
       key: 'actions',
       title: 'Acciones',
-      render: (item: NewsItem) => (
-        <div className='flex gap-2'>
-          <Button variant='ghost' size='sm' onClick={() => handleEdit(item)}>
-            <Edit className='h-4 w-4' />
-          </Button>
-          <Button
-            variant='ghost'
-            size='sm'
-            onClick={() => {
-              setDeletingNews(item)
-              setDeleteDialogOpen(true)
-            }}
-          >
-            <Trash2 className='h-4 w-4 text-destructive' />
-          </Button>
-        </div>
-      ),
+      render: (item: NewsItem) => {
+        const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
+        const isOwner = item.createdBy.id === session?.user?.id
+        const canModify = isSuperAdmin || isOwner
+
+        return (
+          <div className='flex gap-2'>
+            {canModify && (
+              <Button variant='ghost' size='sm' onClick={() => handleEdit(item)}>
+                <Edit className='h-4 w-4' />
+              </Button>
+            )}
+            {canModify && (
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={() => {
+                  setDeletingNews(item)
+                  setDeleteDialogOpen(true)
+                }}
+              >
+                <Trash2 className='h-4 w-4 text-destructive' />
+              </Button>
+            )}
+            {!canModify && <span className='text-xs text-muted-foreground px-2'>Solo lectura</span>}
+          </div>
+        )
+      },
     },
   ]
 
-  if (!session || (session.user.role !== 'ADMIN' && !(session.user as any).isSuperAdmin)) {
+  if (!session || hasAccess === null) {
+    return null
+  }
+
+  if (hasAccess === false) {
     return null
   }
 
@@ -550,6 +631,9 @@ export default function AdminNewsPage() {
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           onRefresh={loadNews}
+          onRowClick={item => {
+            setSelectedNews(item)
+          }}
           emptyState={{
             icon: <Newspaper className='h-10 w-10 text-muted-foreground mx-auto mb-3' />,
             title: 'No hay noticias',
@@ -790,11 +874,32 @@ export default function AdminNewsPage() {
               >
                 Cancelar
               </Button>
-              <Button type='submit'>{editingNews ? 'Actualizar' : 'Crear'}</Button>
+              <Button type='submit' disabled={uploadingImage}>
+                {uploadingImage ? 'Guardando...' : editingNews ? 'Actualizar' : 'Crear'}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de detalle unificado */}
+      {selectedNews && (
+        <NewsDetail
+          news={selectedNews as unknown as NewsDetailItem}
+          isOpen={!!selectedNews}
+          onClose={() => setSelectedNews(null)}
+          mode='manage'
+          onEdit={item => {
+            setSelectedNews(null)
+            handleEdit(item as unknown as NewsItem)
+          }}
+          onDelete={item => {
+            setSelectedNews(null)
+            setDeletingNews(item as unknown as NewsItem)
+            setDeleteDialogOpen(true)
+          }}
+        />
+      )}
 
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className='sm:max-w-[425px]' aria-describedby={undefined}>

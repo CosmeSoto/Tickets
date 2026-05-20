@@ -103,11 +103,11 @@ export function NewsFeed({ className }: NewsFeedProps) {
       if (selectedPeriod) params.set('period', selectedPeriod)
 
       const response = await fetch(`/api/news?${params.toString()}`)
-      if (!response.ok) throw new Error('Error al cargar noticias')
       const data = await response.json()
-      setNews(data.news)
-    } catch (error) {
-      console.error('Error loading news:', error)
+      setNews(data.news || [])
+    } catch {
+      // Silencioso — no romper la UI si el endpoint falla
+      setNews([])
     } finally {
       setLoading(false)
     }
@@ -141,9 +141,11 @@ export function NewsFeed({ className }: NewsFeedProps) {
     }
   }
 
-  const featuredNews = news.filter(n => n.isFeatured)
-  const regularNews = news.filter(n => !n.isFeatured)
-  const urgentNews = news.filter(n => n.priority === 'URGENT')
+  const sortByDate = (a: any, b: any) =>
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  const urgentNews = news.filter(n => n.priority === 'URGENT').sort(sortByDate)
+  const featuredNews = news.filter(n => n.isFeatured && n.priority !== 'URGENT').sort(sortByDate)
+  const regularNews = news.filter(n => !n.isFeatured && n.priority !== 'URGENT').sort(sortByDate)
 
   return (
     <div className={className}>
@@ -236,7 +238,7 @@ export function NewsFeed({ className }: NewsFeedProps) {
                         <AlertTriangle className='h-4 w-4' />
                         Alertas Urgentes
                       </h4>
-                      <div className='grid gap-3'>
+                      <div className='grid gap-4'>
                         {urgentNews.map(item => (
                           <NewsCard
                             key={item.id}
@@ -256,7 +258,7 @@ export function NewsFeed({ className }: NewsFeedProps) {
                         <Star className='h-4 w-4 text-yellow-500' />
                         Destacados
                       </h4>
-                      <div className='grid gap-3'>
+                      <div className='grid gap-4'>
                         {featuredNews.map(item => (
                           <NewsCard
                             key={item.id}
@@ -277,7 +279,7 @@ export function NewsFeed({ className }: NewsFeedProps) {
                           ? 'Más noticias'
                           : 'Noticias'}
                       </h4>
-                      <div className='grid gap-3'>
+                      <div className='grid gap-4'>
                         {regularNews.map(item => (
                           <NewsCard
                             key={item.id}

@@ -1,6 +1,9 @@
 /**
  * API: User - News Feed
  * GET /api/news
+ *
+ * Devuelve noticias publicadas visibles para el usuario actual.
+ * Resiliente: nunca devuelve 500 — si algo falla, devuelve array vacío.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -8,56 +11,18 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-/**
- * GET - Obtener noticias visibles para el usuario actual
- */
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-
     if (!session?.user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+      return NextResponse.json({ news: [] })
     }
 
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type')
     const period = searchParams.get('period')
 
-    const now = new Date()
-    let dateFilter: any = {}
-
-    if (period === 'today') {
-      const startOfDay = new Date(now.setHours(0, 0, 0, 0))
-      const endOfDay = new Date(now.setHours(23, 59, 59, 999))
-      dateFilter = {
-        OR: [{ startDate: null }, { startDate: { lte: endOfDay } }],
-      }
-    } else if (period === 'week') {
-      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-      dateFilter = {
-        OR: [{ startDate: null }, { startDate: { lte: now } }],
-      }
-    } else if (period === 'month') {
-      const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-      dateFilter = {
-        OR: [{ startDate: null }, { startDate: { lte: now } }],
-      }
-    }
-
-    const where: any = {
-      status: 'PUBLISHED',
-      AND: [
-        dateFilter,
-        {
-          OR: [{ endDate: null }, { endDate: { gte: new Date() } }],
-        },
-      ],
-    }
-
-    if (type) {
-      where.type = type
-    }
-
+    // Obtener usuario desde DB
     const user = await prisma.users.findUnique({
       where: { id: session.user.id },
       select: {
@@ -65,69 +30,68 @@ export async function GET(request: NextRequest) {
         role: true,
         departmentId: true,
         newsEnabled: true,
-        departments: {
-          select: {
-            familyId: true,
-          },
-        },
+        departments: { select: { familyId: true } },
       },
     })
 
+    // Si el usuario no existe, devolver vacío
     if (!user) {
-      return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
-    }
-
-    if (user.newsEnabled === false) {
       return NextResponse.json({ news: [] })
     }
 
-    const userFamilyId = (user.departments as any)?.familyId
+    // ── Construir filtro WHERE ────────────────────────────────────────────────
+    const andConditions: any[] = [{ OR: [{ endDate: null }, { endDate: { gte: new Date() } }] }]
 
-    let visibilityFilter: any = {
-      OR: [
-        { news_roles: { none: {} }, news_users: { none: {} }, news_departments: { none: {} } },
-        { news_roles: { some: { role: user.role } } },
-        { news_users: { some: { userId: user.id } } },
-        ...(user.departmentId
-          ? [{ news_departments: { some: { departmentId: user.departmentId } } }]
-          : []),
-      ],
+    if (period === 'today') {
+      const endOfDay = new Date()
+      endOfDay.setHours(23, 59, 59, 999)
+      andConditions.push({ OR: [{ startDate: null }, { startDate: { lte: endOfDay } }] })
+    } else if (period === 'week' || period === 'month') {
+      andConditions.push({ OR: [{ startDate: null }, { startDate: { lte: new Date() } }] })
     }
 
-    try {
-      const test = await prisma.news_families.count()
-      visibilityFilter = {
-        OR: [
-          {
-            news_roles: { none: {} },
-            news_users: { none: {} },
-            news_departments: { none: {} },
-            news_families: { none: {} },
-          },
-          { news_roles: { some: { role: user.role } } },
-          { news_users: { some: { userId: user.id } } },
-          ...(user.departmentId
-            ? [{ news_departments: { some: { departmentId: user.departmentId } } }]
-            : []),
-          ...(userFamilyId ? [{ news_families: { some: { familyId: userFamilyId } } }] : []),
-        ],
-      }
-    } catch (e) {
-      console.log('news_families relation not yet synced, skipping for now')
+    // Filtro de visibilidad: la noticia es visible si:
+    // - No tiene restricciones (ningún rol, usuario, departamento, familia asignado)
+    // - O el usuario cumple alguna de las restricciones
+    const userFamilyId = user.departments?.familyId
+    const visibilityConditions: any[] = [
+      // Sin restricciones = visible para todos
+      {
+        news_roles: { none: {} },
+        news_users: { none: {} },
+        news_departments: { none: {} },
+        news_families: { none: {} },
+      },
+      // Restricción por rol
+      { news_roles: { some: { role: user.role } } },
+      // Restricción por usuario específico
+      { news_users: { some: { userId: user.id } } },
+    ]
+
+    if (user.departmentId) {
+      visibilityConditions.push({ news_departments: { some: { departmentId: user.departmentId } } })
+    }
+    if (userFamilyId) {
+      visibilityConditions.push({ news_families: { some: { familyId: userFamilyId } } })
     }
 
-    where.AND.push(visibilityFilter)
+    andConditions.push({ OR: visibilityConditions })
 
+    const where: any = {
+      status: 'PUBLISHED',
+      AND: andConditions,
+    }
+
+    if (type) {
+      where.type = type
+    }
+
+    // ── Query ─────────────────────────────────────────────────────────────────
     const news = await prisma.news.findMany({
       where,
       include: {
         createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            avatar: true,
-          },
+          select: { id: true, name: true, email: true, avatar: true },
         },
         news_roles: true,
         news_users: true,
@@ -141,11 +105,7 @@ export async function GET(request: NextRequest) {
           select: { id: true, reaction: true },
         },
         _count: {
-          select: {
-            news_views: true,
-            news_reactions: true,
-            news_comments: true,
-          },
+          select: { news_views: true, news_reactions: true, news_comments: true },
         },
       },
       orderBy: [{ isFeatured: 'desc' }, { priority: 'desc' }, { createdAt: 'desc' }],
@@ -153,7 +113,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ news })
   } catch (error) {
-    console.error('Error obteniendo noticias:', error)
-    return NextResponse.json({ error: 'Error al obtener noticias' }, { status: 500 })
+    // Nunca devolver 500 — el feed de noticias no debe romper la página
+    console.error('[/api/news] Error:', error)
+    return NextResponse.json({ news: [] })
   }
 }

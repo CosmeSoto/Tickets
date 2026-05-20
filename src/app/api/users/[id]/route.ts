@@ -147,7 +147,21 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // Actualizar el usuario
     const user = await UserService.updateUser(targetId, validatedData)
 
-    // Registrar auditoría de cambios
+    // Invalidar caché ANTES de emitir eventos SSE para evitar race conditions
+    // (el usuario recibe session_refresh, hace reload, y el cache ya está limpio)
+    try {
+      const { invalidateCache } = await import('@/lib/api-cache')
+      await Promise.all([
+        invalidateCache(`auth:user:${targetId}`),
+        invalidateCache(`perm:inv:${targetId}`),
+        invalidateCache(`user:settings:${targetId}`),
+        invalidateCache(`user:modules:${targetId}`),
+      ])
+    } catch {
+      /* Redis no disponible */
+    }
+
+    // Registrar auditoría de cambios y emitir notificaciones SSE
     try {
       // Detectar cambios importantes comparando valores anteriores con nuevos
       const changes: Record<string, { old: any; new: any }> = {}
@@ -251,13 +265,19 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         })
       }
 
-      // Si cambian ticketsEnabled, inventoryEnabled, patrolsEnabled o newsEnabled, notificar para refrescar navegación
-      if (
-        validatedData.ticketsEnabled !== undefined ||
-        validatedData.inventoryEnabled !== undefined ||
-        validatedData.patrolsEnabled !== undefined ||
-        validatedData.newsEnabled !== undefined
-      ) {
+      // Si cambian ticketsEnabled, inventoryEnabled, patrolsEnabled o newsEnabled,
+      // notificar SOLO si realmente hubo un cambio (evitar reloads innecesarios)
+      const modulesActuallyChanged =
+        (validatedData.ticketsEnabled !== undefined &&
+          validatedData.ticketsEnabled !== (currentUser as any).ticketsEnabled) ||
+        (validatedData.inventoryEnabled !== undefined &&
+          validatedData.inventoryEnabled !== (currentUser as any).inventoryEnabled) ||
+        (validatedData.patrolsEnabled !== undefined &&
+          validatedData.patrolsEnabled !== (currentUser as any).patrolsEnabled) ||
+        (validatedData.newsEnabled !== undefined &&
+          validatedData.newsEnabled !== (currentUser as any).newsEnabled)
+
+      if (modulesActuallyChanged) {
         NotificationEvents.emit(targetId, {
           type: 'session_refresh',
           reason: 'modules_changed',
@@ -303,19 +323,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     } catch (auditError) {
       console.error('Error registrando auditoría:', auditError)
-    }
-
-    // Invalidar caché de auth para que el JWT callback lea datos frescos
-    try {
-      const { invalidateCache } = await import('@/lib/api-cache')
-      await Promise.all([
-        invalidateCache(`auth:user:${targetId}`),
-        invalidateCache(`perm:inv:${targetId}`),
-        invalidateCache(`user:settings:${targetId}`),
-        invalidateCache(`user:modules:${targetId}`), // módulos activos pueden cambiar con rol/permisos
-      ])
-    } catch {
-      /* Redis no disponible */
     }
 
     return NextResponse.json({

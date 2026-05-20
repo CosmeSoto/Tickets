@@ -351,6 +351,7 @@ export function EditUserModal({
         ticketsEnabled: (user as any).ticketsEnabled ?? true,
         inventoryEnabled: (user as any).inventoryEnabled ?? false,
         patrolsEnabled: (user as any).patrolsEnabled ?? false,
+        newsEnabled: (user as any).newsEnabled ?? false,
         isSuperAdmin: user.isSuperAdmin ?? false,
         avatar: undefined,
       })

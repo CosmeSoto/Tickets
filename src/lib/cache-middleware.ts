@@ -22,8 +22,8 @@ export function createCacheMiddleware(options: CacheMiddlewareOptions = {}) {
     ttl = 300, // 5 minutes default
     varyBy = ['accept', 'authorization'],
     skipCache = () => false,
-    generateKey = (req) => `http-cache:${req.url}`,
-    headers = {}
+    generateKey = req => `http-cache:${req.url}`,
+    headers = {},
   } = options
 
   return async function cacheMiddleware(
@@ -55,16 +55,16 @@ export function createCacheMiddleware(options: CacheMiddlewareOptions = {}) {
           headers: {
             ...cached.headers,
             'X-Cache': 'HIT',
-            'X-Cache-Key': cacheKey
-          }
+            'X-Cache-Key': cacheKey,
+          },
         })
-        
+
         return response
       }
 
       // Execute handler and cache response
       const response = await handler(req)
-      
+
       // Only cache successful responses
       if (response.status >= 200 && response.status < 300) {
         const responseHeaders: Record<string, string> = {}
@@ -73,13 +73,13 @@ export function createCacheMiddleware(options: CacheMiddlewareOptions = {}) {
         })
 
         const body = await response.text()
-        
+
         await cacheService.set(
           cacheKey,
           {
             status: response.status,
             headers: responseHeaders,
-            body
+            body,
           },
           { ttl, prefix: 'http' }
         )
@@ -93,8 +93,8 @@ export function createCacheMiddleware(options: CacheMiddlewareOptions = {}) {
             'X-Cache': 'MISS',
             'X-Cache-Key': cacheKey,
             'Cache-Control': `public, max-age=${ttl}`,
-            'Vary': varyBy.join(', ')
-          }
+            Vary: varyBy.join(', '),
+          },
         })
 
         return cachedResponse
@@ -111,22 +111,19 @@ export function createCacheMiddleware(options: CacheMiddlewareOptions = {}) {
 /**
  * API Response Cache Decorator
  */
-export function CacheResponse(options: {
-  ttl?: number
-  tags?: string[]
-  varyBy?: string[]
-  condition?: (req: NextRequest, res: any) => boolean
-} = {}) {
+export function CacheResponse(
+  options: {
+    ttl?: number
+    tags?: string[]
+    varyBy?: string[]
+    condition?: (req: NextRequest, res: any) => boolean
+  } = {}
+) {
   return function (target: any, propertyName: string, descriptor: PropertyDescriptor) {
     const method = descriptor.value
 
     descriptor.value = async function (req: NextRequest, ...args: any[]) {
-      const {
-        ttl = 300,
-        tags = [],
-        varyBy = ['authorization'],
-        condition = () => true
-      } = options
+      const { ttl = 300, tags = [], varyBy = ['authorization'], condition = () => true } = options
 
       // Generate cache key
       const url = new URL(req.url)
@@ -136,23 +133,23 @@ export function CacheResponse(options: {
 
       try {
         // Check cache first
-        const cached = await cacheService.get(cacheKey, { 
+        const cached = await cacheService.get(cacheKey, {
           prefix: 'api',
-          tags 
+          tags,
         })
 
         if (cached) {
           return NextResponse.json(cached, {
             headers: {
               'X-Cache': 'HIT',
-              'Cache-Control': `public, max-age=${ttl}`
-            }
+              'Cache-Control': `public, max-age=${ttl}`,
+            },
           })
         }
 
         // Execute method
         const response = await method.call(this, req, ...args)
-        
+
         // Extract JSON data from response
         let data
         if (response instanceof NextResponse) {
@@ -163,10 +160,10 @@ export function CacheResponse(options: {
 
         // Cache if condition is met
         if (condition(req, data)) {
-          await cacheService.set(cacheKey, data, { 
-            ttl, 
+          await cacheService.set(cacheKey, data, {
+            ttl,
             prefix: 'api',
-            tags 
+            tags,
           })
         }
 
@@ -174,8 +171,8 @@ export function CacheResponse(options: {
           headers: {
             'X-Cache': 'MISS',
             'Cache-Control': `public, max-age=${ttl}`,
-            'Vary': varyBy.join(', ')
-          }
+            Vary: varyBy.join(', '),
+          },
         })
       } catch (error) {
         console.error('API cache error:', error)
@@ -200,25 +197,21 @@ export function setStaticCacheHeaders(response: NextResponse, maxAge: number = 3
  * Dynamic Content Cache Headers
  */
 export function setDynamicCacheHeaders(
-  response: NextResponse, 
+  response: NextResponse,
   options: {
     maxAge?: number
     staleWhileRevalidate?: number
     mustRevalidate?: boolean
   } = {}
 ) {
-  const {
-    maxAge = 300,
-    staleWhileRevalidate = 600,
-    mustRevalidate = false
-  } = options
+  const { maxAge = 300, staleWhileRevalidate = 600, mustRevalidate = false } = options
 
   let cacheControl = `public, max-age=${maxAge}`
-  
+
   if (staleWhileRevalidate > 0) {
     cacheControl += `, stale-while-revalidate=${staleWhileRevalidate}`
   }
-  
+
   if (mustRevalidate) {
     cacheControl += ', must-revalidate'
   }
@@ -235,7 +228,7 @@ export function generateETag(content: string): string {
   let hash = 0
   for (let i = 0; i < content.length; i++) {
     const char = content.charCodeAt(i)
-    hash = ((hash << 5) - hash) + char
+    hash = (hash << 5) - hash + char
     hash = hash & hash // Convert to 32-bit integer
   }
   return `"${Math.abs(hash).toString(16)}"`
@@ -244,17 +237,17 @@ export function generateETag(content: string): string {
 export function handleETag(req: NextRequest, content: string): NextResponse | null {
   const etag = generateETag(content)
   const ifNoneMatch = req.headers.get('if-none-match')
-  
+
   if (ifNoneMatch === etag) {
     return new NextResponse(null, {
       status: 304,
       headers: {
-        'ETag': etag,
-        'Cache-Control': 'public, max-age=300'
-      }
+        ETag: etag,
+        'Cache-Control': 'public, max-age=300',
+      },
     })
   }
-  
+
   return null
 }
 
@@ -262,10 +255,12 @@ export function handleETag(req: NextRequest, content: string): NextResponse | nu
  * Compression Headers
  */
 export function setCompressionHeaders(response: NextResponse, contentType: string) {
-  if (contentType.includes('text/') || 
-      contentType.includes('application/json') || 
-      contentType.includes('application/javascript') ||
-      contentType.includes('text/css')) {
+  if (
+    contentType.includes('text/') ||
+    contentType.includes('application/json') ||
+    contentType.includes('application/javascript') ||
+    contentType.includes('text/css')
+  ) {
     response.headers.set('Content-Encoding', 'gzip')
     response.headers.set('Vary', 'Accept-Encoding')
   }
@@ -294,16 +289,13 @@ export class CacheInvalidation {
    * Invalidate all caches for a specific entity
    */
   static async invalidateEntity(entity: string) {
-    const patterns = [
-      `api:*${entity}*`,
-      `http:*${entity}*`
-    ]
-    
+    const patterns = [`api:*${entity}*`, `http:*${entity}*`]
+
     let totalInvalidated = 0
     for (const pattern of patterns) {
       totalInvalidated += await cacheService.clear(pattern)
     }
-    
+
     return totalInvalidated
   }
 
@@ -326,5 +318,5 @@ export default {
   generateETag,
   handleETag,
   setCompressionHeaders,
-  CacheInvalidation
+  CacheInvalidation,
 }

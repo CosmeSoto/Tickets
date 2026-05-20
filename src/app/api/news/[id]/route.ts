@@ -33,6 +33,7 @@ export async function GET(request: NextRequest, { params }: Params) {
         id: true,
         role: true,
         departmentId: true,
+        isSuperAdmin: true,
       },
     })
 
@@ -130,9 +131,20 @@ export async function GET(request: NextRequest, { params }: Params) {
       }
     }
 
+    // Filtrar comentarios ocultos para usuarios que no son creador ni superadmin
+    const canSeeHidden = user.isSuperAdmin || news.createdById === user.id
+    if (!canSeeHidden && news.news_comments) {
+      ;(news as any).news_comments = (news.news_comments as any[])
+        .filter((c: any) => !c.isHidden)
+        .map((c: any) => ({
+          ...c,
+          replies: (c.replies || []).filter((r: any) => !r.isHidden),
+        }))
+    }
+
     return NextResponse.json({ news })
   } catch (error) {
-    console.error('Error obteniendo noticia:', error)
-    return NextResponse.json({ error: 'Error al obtener noticia' }, { status: 500 })
+    console.error('[/api/news/[id]] Error:', error)
+    return NextResponse.json({ news: null, error: 'Error al obtener noticia' }, { status: 404 })
   }
 }

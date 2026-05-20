@@ -9,8 +9,20 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || session.user.role !== 'ADMIN') {
+    if (!session) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    // Permitir admin o usuarios con newsEnabled
+    if (session.user.role !== 'ADMIN') {
+      const { prisma } = await import('@/lib/prisma')
+      const user = await prisma.users.findUnique({
+        where: { id: session.user.id },
+        select: { newsEnabled: true },
+      })
+      if (!user?.newsEnabled) {
+        return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+      }
     }
 
     const { attachmentId } = await params

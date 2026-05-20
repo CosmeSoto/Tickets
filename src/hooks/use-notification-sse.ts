@@ -46,7 +46,9 @@ function playTone(ctx: AudioContext) {
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4)
     osc.start(ctx.currentTime)
     osc.stop(ctx.currentTime + 0.4)
-  } catch { /* silencioso */ }
+  } catch {
+    /* silencioso */
+  }
 }
 
 function flushPending(ctx: AudioContext) {
@@ -69,9 +71,12 @@ function handleGesture(e: Event) {
   }
 
   if (audioCtx.state === 'suspended') {
-    audioCtx.resume().then(() => flushPending(audioCtx!)).catch(() => {
-      audioCtx = null
-    })
+    audioCtx
+      .resume()
+      .then(() => flushPending(audioCtx!))
+      .catch(() => {
+        audioCtx = null
+      })
   } else if (audioCtx.state === 'running') {
     flushPending(audioCtx)
   }
@@ -107,7 +112,9 @@ function vibrateDevice() {
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       navigator.vibrate([100, 50, 100])
     }
-  } catch { /* silencioso — algunos navegadores bloquean vibrate */ }
+  } catch {
+    /* silencioso — algunos navegadores bloquean vibrate */
+  }
 }
 
 // ── Notificación nativa del navegador ────────────────────────────────────────
@@ -135,7 +142,9 @@ function showBrowserNotification(notification: SSENotification) {
 
     // Auto-cerrar después de 8 segundos
     setTimeout(() => n.close(), 8000)
-  } catch { /* silencioso */ }
+  } catch {
+    /* silencioso */
+  }
 }
 
 /**
@@ -166,13 +175,20 @@ export function getNotificationPermission(): 'granted' | 'denied' | 'default' | 
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function useNotificationSSE({ onNotification, sound = true }: UseNotificationSSEOptions = {}) {
+export function useNotificationSSE({
+  onNotification,
+  sound = true,
+}: UseNotificationSSEOptions = {}) {
   const { data: session, status } = useSession()
   const onNotificationRef = useRef(onNotification)
-  useEffect(() => { onNotificationRef.current = onNotification }, [onNotification])
+  useEffect(() => {
+    onNotificationRef.current = onNotification
+  }, [onNotification])
 
   const soundEnabled = useRef(sound)
-  useEffect(() => { soundEnabled.current = sound }, [sound])
+  useEffect(() => {
+    soundEnabled.current = sound
+  }, [sound])
 
   const connect = useCallback(() => {
     if (status !== 'authenticated' || !session?.user?.id) return
@@ -184,12 +200,17 @@ export function useNotificationSSE({ onNotification, sound = true }: UseNotifica
     const doConnect = () => {
       es = new EventSource('/api/notifications/stream')
 
-      es.onmessage = (e) => {
+      es.onmessage = e => {
         try {
           const data = JSON.parse(e.data)
 
           if (data.type === 'session_refresh') {
-            window.location.reload()
+            // Invalidar cache local de módulos antes del reload
+            window.dispatchEvent(new CustomEvent('modules-updated'))
+            // Dar un breve momento para que el evento se procese, luego reload
+            setTimeout(() => {
+              window.location.reload()
+            }, 100)
             return
           }
 
@@ -205,11 +226,15 @@ export function useNotificationSSE({ onNotification, sound = true }: UseNotifica
 
             // 4. Callback para actualizar la UI
             onNotificationRef.current?.(data.notification)
-            window.dispatchEvent(new CustomEvent('notification-received', {
-              detail: data.notification,
-            }))
+            window.dispatchEvent(
+              new CustomEvent('notification-received', {
+                detail: data.notification,
+              })
+            )
           }
-        } catch { /* ignorar mensajes malformados */ }
+        } catch {
+          /* ignorar mensajes malformados */
+        }
       }
 
       es.onerror = () => {
@@ -220,7 +245,9 @@ export function useNotificationSSE({ onNotification, sound = true }: UseNotifica
         retryTimeout = setTimeout(doConnect, delay)
       }
 
-      es.onopen = () => { retries = 0 }
+      es.onopen = () => {
+        retries = 0
+      }
     }
 
     doConnect()

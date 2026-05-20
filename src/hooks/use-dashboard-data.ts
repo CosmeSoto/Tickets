@@ -7,9 +7,9 @@
 
 import { useState, useEffect, useCallback } from 'react'
 
-/** El endpoint de stats puede ser pesado en cold start; 10s provocaba aborts falsos. */
-const DASHBOARD_FETCH_TIMEOUT_MS = 30_000
-const DASHBOARD_SINGLE_FETCH_TIMEOUT_MS = 25_000
+/** El endpoint de stats puede ser pesado en cold start; timeout generoso para evitar aborts falsos. */
+const DASHBOARD_FETCH_TIMEOUT_MS = 45_000
+const DASHBOARD_SINGLE_FETCH_TIMEOUT_MS = 40_000
 
 type Role = 'ADMIN' | 'TECHNICIAN' | 'CLIENT'
 
@@ -152,7 +152,8 @@ export function useDashboardData(role: Role): UseDashboardDataReturn {
           setRecentActivity(statsData.recentActivity)
         }
       } else {
-        throw new Error(`Error al cargar estadísticas: ${statsResponse.status}`)
+        console.warn('Error al cargar estadísticas:', statsResponse.status)
+        // No lanzar error — mostrar dashboard con datos parciales
       }
 
       // Procesar tickets

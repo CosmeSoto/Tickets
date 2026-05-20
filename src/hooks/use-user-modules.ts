@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 
 interface UserModules {
@@ -25,8 +25,8 @@ const DEFAULT: UserModules = {
   families: [],
 }
 
-/** Caché en memoria: cada página remontaba RoleDashboardLayout y repetía GET /api/user/modules. */
-const MODULES_MEMORY_TTL_MS = 120_000
+/** Caché en memoria: evita repetir GET /api/user/modules en cada remontaje. */
+const MODULES_MEMORY_TTL_MS = 30_000 // 30 segundos (reducido de 120s para detectar cambios más rápido)
 
 type ModulesMemoryEntry = { userId: string; data: UserModules; at: number }
 let modulesMemoryCache: ModulesMemoryEntry | null = null
@@ -36,6 +36,7 @@ export function useUserModules() {
   const [modules, setModules] = useState<UserModules>(DEFAULT)
   const [loading, setLoading] = useState(true)
   const userId = session?.user?.id
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const load = useCallback(
     async (bypassCache = false) => {
@@ -84,6 +85,28 @@ export function useUserModules() {
   useEffect(() => {
     load()
   }, [load])
+
+  // Polling cada 30s como fallback si el SSE no entrega el evento
+  useEffect(() => {
+    if (status !== 'authenticated' || !userId) return
+
+    pollRef.current = setInterval(() => {
+      // Solo recargar si el cache expiró (evita requests innecesarios)
+      const now = Date.now()
+      const expired =
+        !modulesMemoryCache ||
+        modulesMemoryCache.userId !== userId ||
+        now - modulesMemoryCache.at >= MODULES_MEMORY_TTL_MS
+
+      if (expired) {
+        load(false)
+      }
+    }, MODULES_MEMORY_TTL_MS)
+
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current)
+    }
+  }, [status, userId, load])
 
   // Recargar con bypass de cache cuando cambian permisos/módulos
   useEffect(() => {

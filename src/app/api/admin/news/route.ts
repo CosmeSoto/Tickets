@@ -21,7 +21,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    if (session.user.role !== 'ADMIN' && !session.user.isSuperAdmin) {
+    // Leer siempre desde DB para tener datos frescos (sesión puede estar desactualizada)
+    const dbUser = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: { newsEnabled: true, isSuperAdmin: true, role: true },
+    })
+
+    if (!dbUser) {
+      return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
+    }
+
+    const isSuperAdmin = dbUser.isSuperAdmin === true
+    const isAdmin = dbUser.role === 'ADMIN'
+    const hasNewsAccess = dbUser.newsEnabled === true || isAdmin
+
+    if (!hasNewsAccess) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 
@@ -32,11 +46,16 @@ export async function GET(request: NextRequest) {
 
     const where: any = {}
 
-    if (status) {
+    // Super Admin ve todo; los demás solo ven sus propias noticias
+    if (!isSuperAdmin) {
+      where.createdById = session.user.id
+    }
+
+    if (status && status !== 'all') {
       where.status = status
     }
 
-    if (type) {
+    if (type && type !== 'all') {
       where.type = type
     }
 
@@ -112,8 +131,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ news })
   } catch (error) {
-    console.error('Error obteniendo noticias:', error)
-    return NextResponse.json({ error: 'Error al obtener noticias' }, { status: 500 })
+    console.error('[/api/admin/news GET] Error:', error)
+    // No devolver 500 — devolver array vacío para no romper la UI
+    return NextResponse.json({ news: [] })
   }
 }
 
@@ -129,7 +149,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (session.user.role !== 'ADMIN' && !session.user.isSuperAdmin) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+      // Permitir acceso a usuarios con newsEnabled (gestores de noticias)
+      const userHasNewsAccess = await prisma.users.findUnique({
+        where: { id: session.user.id },
+        select: { newsEnabled: true },
+      })
+      if (!userHasNewsAccess?.newsEnabled) {
+        return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+      }
     }
 
     const data = await request.json()

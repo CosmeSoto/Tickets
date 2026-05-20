@@ -7,8 +7,19 @@ import { prisma } from '@/lib/prisma'
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || session.user.role !== 'ADMIN') {
+    if (!session) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    // Permitir admin o usuarios con newsEnabled
+    if (session.user.role !== 'ADMIN') {
+      const user = await prisma.users.findUnique({
+        where: { id: session.user.id },
+        select: { newsEnabled: true },
+      })
+      if (!user?.newsEnabled) {
+        return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+      }
     }
 
     const { id: newsId } = await params
@@ -39,8 +50,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || session.user.role !== 'ADMIN') {
+    if (!session) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    // Permitir admin o usuarios con newsEnabled
+    if (session.user.role !== 'ADMIN') {
+      const user = await prisma.users.findUnique({
+        where: { id: session.user.id },
+        select: { newsEnabled: true },
+      })
+      if (!user?.newsEnabled) {
+        return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+      }
     }
 
     const { id: newsId } = await params

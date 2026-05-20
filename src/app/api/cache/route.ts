@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cacheService } from '@/lib/cache'
 import { cacheManagementService } from '@/services/cached-services'
-import { CacheInvalidation } from '@/middleware/cache-middleware'
+import { CacheInvalidation } from '@/lib/cache-middleware'
 import { ApiResponse } from '@/lib/api-response'
 
 /**
@@ -21,11 +21,11 @@ export async function GET(req: NextRequest) {
       case 'stats':
         const stats = cacheService.getStats()
         const hitRatio = cacheService.getHitRatio()
-        
+
         return ApiResponse.success({
           stats,
           hitRatio: Math.round(hitRatio * 100),
-          status: hitRatio > 0.7 ? 'healthy' : hitRatio > 0.5 ? 'warning' : 'poor'
+          status: hitRatio > 0.7 ? 'healthy' : hitRatio > 0.5 ? 'warning' : 'poor',
         })
 
       case 'health':
@@ -37,9 +37,9 @@ export async function GET(req: NextRequest) {
           stats: cacheService.getStats(),
           hitRatio: Math.round(cacheService.getHitRatio() * 100),
           uptime: process.uptime(),
-          memory: process.memoryUsage()
+          memory: process.memoryUsage(),
         }
-        
+
         return ApiResponse.success(overview)
     }
   } catch (error) {
@@ -60,30 +60,30 @@ export async function POST(req: NextRequest) {
       case 'clear':
         if (pattern) {
           const cleared = await cacheService.clear(pattern)
-          return ApiResponse.success({ 
+          return ApiResponse.success({
             message: `Cleared ${cleared} cache entries`,
-            cleared 
+            cleared,
           })
         } else {
           const cleared = await cacheManagementService.clearAllCaches()
-          return ApiResponse.success({ 
+          return ApiResponse.success({
             message: `Cleared all caches (${cleared} entries)`,
-            cleared 
+            cleared,
           })
         }
 
       case 'invalidate':
         if (entity) {
           const invalidated = await cacheManagementService.invalidateEntity(entity)
-          return ApiResponse.success({ 
+          return ApiResponse.success({
             message: `Invalidated ${invalidated} cache entries for ${entity}`,
-            invalidated 
+            invalidated,
           })
         } else if (tags && Array.isArray(tags)) {
           const invalidated = await cacheService.invalidateByTags(tags)
-          return ApiResponse.success({ 
+          return ApiResponse.success({
             message: `Invalidated ${invalidated} cache entries by tags`,
-            invalidated 
+            invalidated,
           })
         } else {
           return ApiResponse.error('Entity or tags required for invalidation', 400)
@@ -91,21 +91,21 @@ export async function POST(req: NextRequest) {
 
       case 'warmup':
         await cacheManagementService.warmUpCaches()
-        return ApiResponse.success({ 
-          message: 'Cache warm-up completed successfully' 
+        return ApiResponse.success({
+          message: 'Cache warm-up completed successfully',
         })
 
       case 'reset-stats':
         cacheService.resetStats()
-        return ApiResponse.success({ 
-          message: 'Cache statistics reset successfully' 
+        return ApiResponse.success({
+          message: 'Cache statistics reset successfully',
         })
 
       case 'purge-expired':
         const purgeResult = await CacheInvalidation.purgeExpired()
-        return ApiResponse.success({ 
+        return ApiResponse.success({
           message: 'Expired cache entries purged',
-          stats: purgeResult 
+          stats: purgeResult,
         })
 
       default:
@@ -128,15 +128,15 @@ export async function DELETE(req: NextRequest) {
 
     if (key) {
       const deleted = await cacheService.delete(key)
-      return ApiResponse.success({ 
+      return ApiResponse.success({
         message: deleted ? 'Cache entry deleted' : 'Cache entry not found',
-        deleted 
+        deleted,
       })
     } else if (pattern) {
       const cleared = await cacheService.clear(pattern)
-      return ApiResponse.success({ 
+      return ApiResponse.success({
         message: `Cleared ${cleared} cache entries matching pattern`,
-        cleared 
+        cleared,
       })
     } else {
       return ApiResponse.error('Key or pattern required', 400)
@@ -159,14 +159,14 @@ export async function PUT(req: NextRequest) {
       return ApiResponse.error('Key and value required', 400)
     }
 
-    const success = await cacheService.set(key, value, { 
+    const success = await cacheService.set(key, value, {
       ttl: ttl || 3600,
-      tags: tags || []
+      tags: tags || [],
     })
 
-    return ApiResponse.success({ 
+    return ApiResponse.success({
       message: success ? 'Cache entry updated' : 'Failed to update cache entry',
-      success 
+      success,
     })
   } catch (error) {
     console.error('Cache PUT error:', error)

@@ -394,6 +394,7 @@ export const authOptions: NextAuthOptions = {
                   inventoryEnabled: true,
                   canRequestAssets: true,
                   patrolsEnabled: true,
+                  newsEnabled: true,
                 },
               })
               token.canManageInventory = dbUser?.canManageInventory ?? false
@@ -402,6 +403,7 @@ export const authOptions: NextAuthOptions = {
               token.inventoryEnabled = dbUser?.inventoryEnabled ?? true
               token.canRequestAssets = dbUser?.canRequestAssets ?? false
               token.patrolsEnabled = dbUser?.patrolsEnabled ?? false
+              token.newsEnabled = dbUser?.newsEnabled ?? false
             } catch {
               token.canManageInventory = false
               token.isSuperAdmin = false
@@ -409,6 +411,7 @@ export const authOptions: NextAuthOptions = {
               token.inventoryEnabled = true
               token.canRequestAssets = false
               token.patrolsEnabled = false
+              token.newsEnabled = false
             }
           }
         }
@@ -430,6 +433,7 @@ export const authOptions: NextAuthOptions = {
                   inventoryEnabled: true,
                   canRequestAssets: true,
                   patrolsEnabled: true,
+                  newsEnabled: true,
                   departmentId: true,
                   departments: { select: { name: true } },
                 },
@@ -446,6 +450,7 @@ export const authOptions: NextAuthOptions = {
               token.inventoryEnabled = dbUser.inventoryEnabled ?? true
               token.canRequestAssets = dbUser.canRequestAssets ?? false
               token.patrolsEnabled = dbUser.patrolsEnabled ?? false
+              token.newsEnabled = dbUser.newsEnabled ?? false
               token.departmentId = dbUser.departmentId || undefined
               token.department = dbUser.departments?.name || undefined
             }
@@ -489,6 +494,7 @@ export const authOptions: NextAuthOptions = {
           ;(session.user as any).inventoryEnabled = (token.inventoryEnabled as boolean) ?? true
           ;(session.user as any).canRequestAssets = (token.canRequestAssets as boolean) ?? false
           session.user.patrolsEnabled = (token.patrolsEnabled as boolean) ?? false
+          ;(session.user as any).newsEnabled = (token.newsEnabled as boolean) ?? false
 
           // IMPORTANTE: Pasar loginTime a la sesión para el monitor de timeout
           if (token.loginTime) {

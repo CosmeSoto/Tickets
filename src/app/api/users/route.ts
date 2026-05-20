@@ -28,9 +28,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 401 })
     }
 
-    // SECURITY: clientes no pueden listar usuarios
+    // SECURITY: clientes no pueden listar usuarios, excepto si tienen newsEnabled (para gestión de noticias)
     if (session.user.role === 'CLIENT') {
-      return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 403 })
+      // Verificar si tiene newsEnabled para permitir listar usuarios en el contexto de noticias
+      const currentUser = await prisma.users.findUnique({
+        where: { id: session.user.id },
+        select: { newsEnabled: true },
+      })
+      if (!currentUser?.newsEnabled) {
+        return NextResponse.json({ success: false, message: 'No autorizado' }, { status: 403 })
+      }
     }
 
     const { searchParams } = new URL(request.url)

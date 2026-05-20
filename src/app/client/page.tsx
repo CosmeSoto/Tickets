@@ -133,8 +133,10 @@ export default function ClientDashboard() {
         </Alert>
       )}
 
-      {/* NewsFeed - Noticias y Comunicados */}
-      {hasNews && <NewsFeed />}
+      {/* NewsFeed - Noticias y Comunicados (visible para todos los usuarios) */}
+      <div className='mb-8'>
+        <NewsFeed />
+      </div>
 
       {/* 1. Contexto del usuario — áreas de soporte */}
       {/* {(stats.assignedFamilies?.length > 0 || stats.inventoryFamilies?.length > 0) && (

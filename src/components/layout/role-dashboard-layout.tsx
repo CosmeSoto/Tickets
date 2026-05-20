@@ -161,6 +161,12 @@ const navigationByRole: Record<string, NavItem[]> = {
         { name: 'Reportes', href: '/admin/patrols/reports', icon: BarChart3 },
       ],
     },
+    {
+      name: 'Noticias',
+      href: '/admin/news',
+      icon: Newspaper,
+      children: [{ name: 'Gestión de Noticias', href: '/admin/news', icon: Newspaper }],
+    },
   ],
 
   // Técnico CON gestión de inventario: tickets + inventario operativo de sus familias
@@ -199,6 +205,12 @@ const navigationByRole: Record<string, NavItem[]> = {
         { name: 'Reportes', href: '/admin/patrols/reports', icon: BarChart3 },
       ],
     },
+    {
+      name: 'Noticias',
+      href: '/admin/news',
+      icon: Newspaper,
+      children: [{ name: 'Gestión de Noticias', href: '/admin/news', icon: Newspaper }],
+    },
   ],
 
   // Cliente: sus tickets + sus equipos asignados + mantenimientos
@@ -230,6 +242,12 @@ const navigationByRole: Record<string, NavItem[]> = {
       icon: Shield,
       children: [{ name: 'Patrullas Activas', href: '/patrol', icon: MapPin }],
     },
+    {
+      name: 'Noticias',
+      href: '/admin/news',
+      icon: Newspaper,
+      children: [{ name: 'Gestión de Noticias', href: '/admin/news', icon: Newspaper }],
+    },
   ],
 
   // Cliente CON gestión de inventario: tickets + inventario operativo de sus familias
@@ -256,6 +274,12 @@ const navigationByRole: Record<string, NavItem[]> = {
         { name: 'Actas', href: '/inventory/acts', icon: FileText },
         { name: 'Reportes', href: '/inventory/reports', icon: BarChart3 },
       ],
+    },
+    {
+      name: 'Noticias',
+      href: '/admin/news',
+      icon: Newspaper,
+      children: [{ name: 'Gestión de Noticias', href: '/admin/news', icon: Newspaper }],
     },
   ],
 }
@@ -427,6 +451,10 @@ export function RoleDashboardLayout({
         item.name === 'Mis Rondas'
       ) {
         return hasPatrols
+      }
+      // Ocultar Noticias si el usuario no tiene newsEnabled
+      if (item.href === '/admin/news' || item.name === 'Noticias') {
+        return hasNews
       }
       return true
     })

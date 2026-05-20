@@ -3,7 +3,6 @@
 import {
   Newspaper,
   Calendar,
-  Users,
   AlertTriangle,
   Gift,
   PartyPopper,
@@ -13,12 +12,11 @@ import {
   Eye,
   MessageSquare,
   ThumbsUp,
-  Clock,
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
@@ -120,83 +118,84 @@ export function NewsCard({
   return (
     <Card
       className={cn(
-        'cursor-pointer transition-all hover:shadow-md',
+        'cursor-pointer transition-all hover:shadow-md py-0',
         isViewed && 'opacity-70',
-        isUrgent && 'border-red-500 border-2',
-        isFeatured && 'border-yellow-500 border-2',
+        isUrgent && 'border-red-500 border',
+        isFeatured && 'border-yellow-500 border',
         className
       )}
       onClick={onClick}
     >
-      <CardHeader className='pb-3'>
-        <div className='flex items-start justify-between gap-2'>
-          <div className='flex-1'>
-            <div className='flex items-center gap-2 mb-2 flex-wrap'>
-              <Badge variant='secondary' className='flex items-center gap-1'>
+      <CardContent className='p-4'>
+        <div className='flex items-start gap-4'>
+          {/* Imagen miniatura */}
+          {news.imageUrl && (
+            <div className='w-20 h-20 rounded-md overflow-hidden flex-shrink-0 bg-muted/30 flex items-center justify-center'>
+              <img src={news.imageUrl} alt={news.title} className='w-full h-full object-contain' />
+            </div>
+          )}
+
+          {/* Contenido */}
+          <div className='flex-1 min-w-0'>
+            <div className='flex items-center gap-1.5 mb-1 flex-wrap'>
+              <Badge variant='secondary' className='text-[10px] px-1.5 py-0 h-5 gap-0.5'>
                 {typeIcons[news.type]}
                 {typeLabels[news.type]}
               </Badge>
-              <Badge className={priorityColors[news.priority]}>
+              <Badge className={cn(priorityColors[news.priority], 'text-[10px] px-1.5 py-0 h-5')}>
                 {priorityLabels[news.priority]}
               </Badge>
               {isFeatured && (
-                <Badge className='bg-yellow-100 text-yellow-800 flex items-center gap-1'>
-                  <Star className='h-3 w-3' />
-                  Destacado
+                <Badge className='bg-yellow-100 text-yellow-800 text-[10px] px-1.5 py-0 h-5'>
+                  ⭐ Destacado
                 </Badge>
               )}
               {isUrgent && (
-                <Badge className='bg-red-100 text-red-800 flex items-center gap-1'>
-                  <AlertTriangle className='h-3 w-3' />
-                  Urgente
+                <Badge className='bg-red-100 text-red-800 text-[10px] px-1.5 py-0 h-5'>
+                  ⚠ Urgente
                 </Badge>
               )}
-              {!isViewed && <Badge className='bg-blue-500 text-white'>Nuevo</Badge>}
+              {!isViewed && (
+                <Badge className='bg-blue-500 text-white text-[10px] px-1.5 py-0 h-5'>Nuevo</Badge>
+              )}
             </div>
-            <CardTitle className='text-lg line-clamp-2'>{news.title}</CardTitle>
+
+            <h4 className='font-semibold text-sm line-clamp-1'>{news.title}</h4>
             {news.summary && (
-              <CardDescription className='line-clamp-2 mt-1'>{news.summary}</CardDescription>
+              <p className='text-xs text-muted-foreground line-clamp-1 mt-0.5'>{news.summary}</p>
             )}
-          </div>
-          {news.imageUrl && (
-            <div className='w-24 h-24 rounded-lg overflow-hidden flex-shrink-0'>
-              <img src={news.imageUrl} alt={news.title} className='w-full h-full object-cover' />
+
+            {/* Footer: autor + stats */}
+            <div className='flex items-center justify-between mt-2'>
+              <div className='flex items-center gap-2'>
+                <Avatar className='h-5 w-5'>
+                  <AvatarImage src={news.createdBy.avatar || ''} />
+                  <AvatarFallback className='text-[9px]'>
+                    {news.createdBy.name.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <span className='text-xs text-muted-foreground'>{news.createdBy.name}</span>
+                <span className='text-[10px] text-muted-foreground'>· {timeAgo}</span>
+              </div>
+              <div className='flex items-center gap-2 text-[10px] text-muted-foreground'>
+                <span className='flex items-center gap-0.5'>
+                  <Eye className='h-3 w-3' />
+                  {news._count.news_views}
+                </span>
+                {news.allowReactions && (
+                  <span className='flex items-center gap-0.5'>
+                    <ThumbsUp className='h-3 w-3' />
+                    {news._count.news_reactions}
+                  </span>
+                )}
+                {news.allowComments && (
+                  <span className='flex items-center gap-0.5'>
+                    <MessageSquare className='h-3 w-3' />
+                    {news._count.news_comments}
+                  </span>
+                )}
+              </div>
             </div>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className='flex items-center justify-between'>
-          <div className='flex items-center gap-3'>
-            <Avatar className='h-8 w-8'>
-              <AvatarImage src={news.createdBy.avatar || ''} />
-              <AvatarFallback>{news.createdBy.name.charAt(0).toUpperCase()}</AvatarFallback>
-            </Avatar>
-            <div className='text-sm'>
-              <p className='font-medium'>{news.createdBy.name}</p>
-              <p className='text-muted-foreground flex items-center gap-1'>
-                <Clock className='h-3 w-3' />
-                {timeAgo}
-              </p>
-            </div>
-          </div>
-          <div className='flex items-center gap-4 text-sm text-muted-foreground'>
-            <span className='flex items-center gap-1'>
-              <Eye className='h-4 w-4' />
-              {news._count.news_views}
-            </span>
-            {news.allowReactions && (
-              <span className='flex items-center gap-1'>
-                <ThumbsUp className='h-4 w-4' />
-                {news._count.news_reactions}
-              </span>
-            )}
-            {news.allowComments && (
-              <span className='flex items-center gap-1'>
-                <MessageSquare className='h-4 w-4' />
-                {news._count.news_comments}
-              </span>
-            )}
           </div>
         </div>
       </CardContent>

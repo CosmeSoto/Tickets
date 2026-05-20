@@ -15,6 +15,50 @@ interface Params {
   params: Promise<{ id: string }>
 }
 
+/** Verifica si el usuario tiene acceso a gestión de noticias (admin o newsEnabled) */
+async function hasNewsManagementAccess(session: any): Promise<boolean> {
+  if (session.user.role === 'ADMIN' || session.user.isSuperAdmin) return true
+  const user = await prisma.users.findUnique({
+    where: { id: session.user.id },
+    select: { newsEnabled: true },
+  })
+  return user?.newsEnabled === true
+}
+
+/** Verifica si el usuario puede modificar una noticia específica (es el creador o es SuperAdmin) */
+async function canModifyNews(
+  session: any,
+  newsId: string
+): Promise<{ allowed: boolean; reason?: string }> {
+  const isSuperAdmin = (session.user as any).isSuperAdmin === true
+
+  // Verificar desde DB (más fiable que la sesión)
+  const dbUser = await prisma.users.findUnique({
+    where: { id: session.user.id },
+    select: { isSuperAdmin: true, newsEnabled: true },
+  })
+
+  if (dbUser?.isSuperAdmin) return { allowed: true }
+
+  // Verificar que tiene acceso al módulo
+  if (session.user.role !== 'ADMIN' && !dbUser?.newsEnabled) {
+    return { allowed: false, reason: 'No autorizado' }
+  }
+
+  // Verificar que es el creador
+  const news = await prisma.news.findUnique({
+    where: { id: newsId },
+    select: { createdById: true },
+  })
+
+  if (!news) return { allowed: false, reason: 'Noticia no encontrada' }
+  if (news.createdById !== session.user.id) {
+    return { allowed: false, reason: 'Solo puedes modificar noticias que tú creaste' }
+  }
+
+  return { allowed: true }
+}
+
 /**
  * GET - Obtener una noticia por ID
  */
@@ -27,7 +71,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    if (session.user.role !== 'ADMIN' && !session.user.isSuperAdmin) {
+    if (!(await hasNewsManagementAccess(session))) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 
@@ -114,8 +158,9 @@ export async function PUT(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    if (session.user.role !== 'ADMIN' && !session.user.isSuperAdmin) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+    const access = await canModifyNews(session, id)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.reason || 'No autorizado' }, { status: 403 })
     }
 
     const data = await request.json()
@@ -237,8 +282,9 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    if (session.user.role !== 'ADMIN' && !session.user.isSuperAdmin) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+    const access = await canModifyNews(session, id)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.reason || 'No autorizado' }, { status: 403 })
     }
 
     const existingNews = await prisma.news.findUnique({

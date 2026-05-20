@@ -105,7 +105,7 @@ export function FamilyAdminDashboard({ userId }: { userId: string }) {
       </div>
 
       {/* Noticias y Comunicados */}
-      {hasNews && <NewsFeed />}
+      <NewsFeed />
 
       {/* Estadísticas Principales */}
       <div className='grid gap-4 md:grid-cols-2 lg:grid-cols-3'>

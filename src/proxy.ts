@@ -10,11 +10,11 @@ const rateLimitStore = new Map<string, { count: number; resetTime: number }>()
 // Límites diferenciados por tipo de endpoint
 const RATE_LIMITS = {
   // Endpoints de autenticación — más restrictivos (prevenir brute force)
-  auth:        { window: 15 * 60 * 1000, max: 30 },
+  auth: { window: 15 * 60 * 1000, max: 30 },
   // APIs normales autenticadas — por usuario, límite generoso
-  authenticated: { window: 60 * 1000, max: 300 },   // 300 req/min por usuario
+  authenticated: { window: 60 * 1000, max: 300 }, // 300 req/min por usuario
   // APIs públicas sin sesión — por IP
-  public:      { window: 60 * 1000, max: 60 },       // 60 req/min por IP
+  public: { window: 60 * 1000, max: 60 }, // 60 req/min por IP
 }
 
 // Rutas excluidas del rate limiting (SSE, streams, endpoints de config pública)
@@ -22,14 +22,17 @@ const RATE_LIMIT_EXCLUDED = [
   '/api/notifications/stream',
   '/api/auth/',
   '/api/config/session-timeout', // consultado cada 2 min por todos los usuarios
-  '/api/families',               // datos de referencia — cacheados en Redis, se leen en cada página
-  '/api/inventory/families',     // ídem para el endpoint de inventario
-  '/api/inventory/suppliers',    // datos de referencia — consultado frecuentemente en formularios
-  '/api/users',                  // datos de referencia — cacheados en Redis, queries pesadas
-  '/api/departments',            // datos de referencia — cacheados en Redis
+  '/api/families', // datos de referencia — cacheados en Redis, se leen en cada página
+  '/api/inventory/families', // ídem para el endpoint de inventario
+  '/api/inventory/suppliers', // datos de referencia — consultado frecuentemente en formularios
+  '/api/users', // datos de referencia — cacheados en Redis, queries pesadas
+  '/api/departments', // datos de referencia — cacheados en Redis
 ]
 
-function getRateLimitKey(request: NextRequest, userId?: string): { key: string; limits: { window: number; max: number } } {
+function getRateLimitKey(
+  request: NextRequest,
+  userId?: string
+): { key: string; limits: { window: number; max: number } } {
   const path = request.nextUrl.pathname
 
   // Excluir rutas específicas
@@ -38,7 +41,9 @@ function getRateLimitKey(request: NextRequest, userId?: string): { key: string; 
   }
 
   const forwarded = request.headers.get('x-forwarded-for')
-  const ip = forwarded ? forwarded.split(',')[0].trim() : request.headers.get('x-real-ip') || 'unknown'
+  const ip = forwarded
+    ? forwarded.split(',')[0].trim()
+    : request.headers.get('x-real-ip') || 'unknown'
 
   // Si hay usuario autenticado, usar userId como clave (más justo en entornos con proxy)
   if (userId) {
@@ -49,7 +54,10 @@ function getRateLimitKey(request: NextRequest, userId?: string): { key: string; 
   return { key: `rl:ip:${ip}`, limits: RATE_LIMITS.public }
 }
 
-function checkRateLimit(key: string, limits: { window: number; max: number }): { allowed: boolean; remaining: number; resetTime: number } {
+function checkRateLimit(
+  key: string,
+  limits: { window: number; max: number }
+): { allowed: boolean; remaining: number; resetTime: number } {
   if (!key) return { allowed: true, remaining: 999, resetTime: 0 }
 
   const now = Date.now()
@@ -72,12 +80,15 @@ function checkRateLimit(key: string, limits: { window: number; max: number }): {
 
 // Limpiar entradas expiradas cada 5 minutos para evitar memory leaks
 if (typeof setInterval !== 'undefined') {
-  setInterval(() => {
-    const now = Date.now()
-    for (const [key, record] of rateLimitStore.entries()) {
-      if (now > record.resetTime) rateLimitStore.delete(key)
-    }
-  }, 5 * 60 * 1000)
+  setInterval(
+    () => {
+      const now = Date.now()
+      for (const [key, record] of rateLimitStore.entries()) {
+        if (now > record.resetTime) rateLimitStore.delete(key)
+      }
+    },
+    5 * 60 * 1000
+  )
 }
 
 export async function proxy(request: NextRequest) {
@@ -85,8 +96,10 @@ export async function proxy(request: NextRequest) {
   const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   const path = request.nextUrl.pathname
   const method = request.method
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 
-             request.headers.get('x-real-ip') || 'unknown'
+  const ip =
+    request.headers.get('x-forwarded-for')?.split(',')[0] ||
+    request.headers.get('x-real-ip') ||
+    'unknown'
 
   // Log middleware start
   ApplicationLogger.child({ requestId, component: 'middleware' }).debug(
@@ -115,7 +128,9 @@ export async function proxy(request: NextRequest) {
       try {
         const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
         userId = token?.sub ?? undefined
-      } catch { /* sin token — usar IP */ }
+      } catch {
+        /* sin token — usar IP */
+      }
 
       const { key, limits } = getRateLimitKey(request, userId)
       const { allowed, remaining, resetTime } = checkRateLimit(key, limits)
@@ -220,13 +235,10 @@ export async function proxy(request: NextRequest) {
     const userRole = token.role as string
     const userId = token.sub as string
 
-    ApplicationLogger.authorizationCheck(
-      userId,
-      path,
-      'access',
-      true,
-      { requestId, metadata: { role: userRole } }
-    )
+    ApplicationLogger.authorizationCheck(userId, path, 'access', true, {
+      requestId,
+      metadata: { role: userRole },
+    })
 
     // Helper: dashboard por rol
     const dashboardForRole = (role: string) => {
@@ -240,14 +252,19 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL(dashboardForRole(userRole), request.url))
     }
 
-    if (path.startsWith('/admin') && userRole !== 'ADMIN') {
-      ApplicationLogger.securityEvent(
-        'insufficient_privileges',
-        'medium',
-        { userId, userRole, requiredRole: 'ADMIN', path, ip },
-        { requestId }
-      )
-      return NextResponse.redirect(new URL(dashboardForRole(userRole), request.url))
+    if (path.startsWith('/admin') && userRole !== 'ADMIN' && !(token as any).isSuperAdmin) {
+      // Excepción: usuarios con newsEnabled pueden acceder a /admin/news
+      if (path.startsWith('/admin/news') && token.newsEnabled === true) {
+        // Permitir acceso a gestión de noticias
+      } else {
+        ApplicationLogger.securityEvent(
+          'insufficient_privileges',
+          'medium',
+          { userId, userRole, requiredRole: 'ADMIN', path, ip },
+          { requestId }
+        )
+        return NextResponse.redirect(new URL(dashboardForRole(userRole), request.url))
+      }
     }
 
     if (path.startsWith('/technician') && userRole !== 'TECHNICIAN') {
@@ -282,11 +299,11 @@ export async function proxy(request: NextRequest) {
         const canManage = (token as any).canManageInventory === true
         if (!canManage) {
           const clientAllowed = [
-            '/inventory',                    // lista de equipos asignados
-            '/inventory/equipment',          // detalle de equipo
-            '/inventory/licenses',           // sus licencias
-            '/inventory/acts',               // sus actas
-            '/inventory/maintenance',        // sus mantenimientos
+            '/inventory', // lista de equipos asignados
+            '/inventory/equipment', // detalle de equipo
+            '/inventory/licenses', // sus licencias
+            '/inventory/acts', // sus actas
+            '/inventory/maintenance', // sus mantenimientos
           ]
           const isAllowed = clientAllowed.some(r => path === r || path.startsWith(r + '/'))
           if (!isAllowed) {

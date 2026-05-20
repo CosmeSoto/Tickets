@@ -116,6 +116,20 @@ export async function GET(request: NextRequest) {
 
     // ── Clientes: solo las familias explícitamente asignadas ────────────────
     if (session.user.role === 'CLIENT') {
+      // Excepción: usuarios con newsEnabled y scope=all pueden ver todas las familias (para gestión de noticias)
+      const scopeAll = searchParams.get('scope') === 'all'
+      if (scopeAll) {
+        const clientUser = await prisma.users.findUnique({
+          where: { id: session.user.id },
+          select: { newsEnabled: true },
+        })
+        if (clientUser?.newsEnabled) {
+          // Devolver todas las familias activas (igual que un admin)
+          const allFamilies = await FamilyService.findAll(false)
+          return NextResponse.json({ success: true, data: allFamilies })
+        }
+      }
+
       const [user, clientAssignments] = await Promise.all([
         prisma.users.findUnique({
           where: { id: session.user.id },
@@ -169,6 +183,19 @@ export async function GET(request: NextRequest) {
 
     // ── Técnicos: todas las familias habilitadas para tickets ────────────────
     if (session.user.role !== 'ADMIN') {
+      // Excepción: usuarios con newsEnabled y scope=all pueden ver todas las familias (para gestión de noticias)
+      const scopeAll = searchParams.get('scope') === 'all'
+      if (scopeAll) {
+        const techUser = await prisma.users.findUnique({
+          where: { id: session.user.id },
+          select: { newsEnabled: true },
+        })
+        if (techUser?.newsEnabled) {
+          const allFamilies = await FamilyService.findAll(false)
+          return NextResponse.json({ success: true, data: allFamilies })
+        }
+      }
+
       const user = await prisma.users.findUnique({
         where: { id: session.user.id },
         select: { departments: { select: { familyId: true } } },
