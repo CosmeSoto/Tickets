@@ -37,14 +37,6 @@ export async function seedWarehouses(prisma: PrismaClient, familyMap: Map<string
       isActive: true,
     },
     {
-      name: 'Bodega de Consumibles TI',
-      location: 'Edificio A - Piso 2 - Sala 202',
-      description: 'Almacén de consumibles: tóner, papel, cables, etc.',
-      familyId: techFamilyId,
-      managerId: admin.id,
-      isActive: true,
-    },
-    {
       name: 'Bodega de Equipos en Reparación',
       location: 'Edificio A - Piso 1 - Taller',
       description: 'Equipos en proceso de reparación o mantenimiento',

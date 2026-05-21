@@ -24,7 +24,7 @@ import {
 } from '@/lib/inventory/inventory-resource-access'
 
 const updateModelSchema = z.object({
-  brand: z.string().min(1).max(100).optional(),
+  brandId: z.string().uuid().optional(),
   model: z.string().min(1).max(200).optional(),
   sku: z.string().max(100).optional(),
   typeId: z.string().uuid().optional(),

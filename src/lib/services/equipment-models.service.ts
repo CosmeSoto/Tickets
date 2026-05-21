@@ -7,7 +7,7 @@ import prisma from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 
 export interface CreateModelInput {
-  brand: string
+  brandId: string
   model: string
   sku?: string
   typeId: string
@@ -19,7 +19,7 @@ export interface CreateModelInput {
 }
 
 export interface UpdateModelInput {
-  brand?: string
+  brandId?: string
   model?: string
   sku?: string
   typeId?: string
@@ -32,7 +32,7 @@ export interface UpdateModelInput {
 
 export interface ModelWithStock {
   id: string
-  brand: string
+  brandId: string | null
   model: string
   sku: string | null
   typeId: string
@@ -43,6 +43,10 @@ export interface ModelWithStock {
   isActive: boolean
   createdAt: Date
   updatedAt: Date
+  brand?: {
+    id: string
+    name: string
+  } | null
   type: {
     id: string
     name: string
@@ -73,10 +77,19 @@ export async function createModel(data: CreateModelInput) {
       throw new Error('El tipo de equipo no existe')
     }
 
+    // Verificar que la marca existe
+    const brandExists = await prisma.equipment_brands.findUnique({
+      where: { id: data.brandId },
+    })
+
+    if (!brandExists) {
+      throw new Error('La marca no existe')
+    }
+
     // Verificar que no exista el mismo modelo
     const existingModel = await prisma.equipment_models.findFirst({
       where: {
-        brand: data.brand,
+        brandId: data.brandId,
         model: data.model,
         typeId: data.typeId,
       },
@@ -89,7 +102,7 @@ export async function createModel(data: CreateModelInput) {
     // Crear el modelo
     const model = await prisma.equipment_models.create({
       data: {
-        brand: data.brand,
+        brandId: data.brandId,
         model: data.model,
         sku: data.sku,
         typeId: data.typeId,
@@ -99,6 +112,12 @@ export async function createModel(data: CreateModelInput) {
         isActive: data.isActive ?? true,
       },
       include: {
+        brand: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         type: {
           select: {
             id: true,
@@ -124,6 +143,12 @@ export async function getModelById(id: string) {
     const model = await prisma.equipment_models.findUnique({
       where: { id },
       include: {
+        brand: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         type: {
           select: {
             id: true,
@@ -163,6 +188,12 @@ export async function getModelsByType(typeId: string) {
         isActive: true,
       },
       include: {
+        brand: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         type: {
           select: {
             id: true,
@@ -171,7 +202,7 @@ export async function getModelsByType(typeId: string) {
           },
         },
       },
-      orderBy: [{ brand: 'asc' }, { model: 'asc' }],
+      orderBy: [{ model: 'asc' }],
     })
 
     return models
@@ -206,11 +237,22 @@ export async function updateModel(id: string, data: UpdateModelInput) {
       }
     }
 
+    // Si se actualiza brandId, verificar que existe
+    if (data.brandId) {
+      const brandExists = await prisma.equipment_brands.findUnique({
+        where: { id: data.brandId },
+      })
+
+      if (!brandExists) {
+        throw new Error('La marca no existe')
+      }
+    }
+
     // Actualizar el modelo
     const model = await prisma.equipment_models.update({
       where: { id },
       data: {
-        brand: data.brand,
+        brandId: data.brandId,
         model: data.model,
         sku: data.sku,
         typeId: data.typeId,
@@ -220,6 +262,12 @@ export async function updateModel(id: string, data: UpdateModelInput) {
         isActive: data.isActive,
       },
       include: {
+        brand: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         type: {
           select: {
             id: true,
@@ -275,12 +323,18 @@ export async function searchModels(query: string, limit = 20) {
       where: {
         isActive: true,
         OR: [
-          { brand: { contains: query, mode: 'insensitive' } },
+          { brand: { name: { contains: query, mode: 'insensitive' } } },
           { model: { contains: query, mode: 'insensitive' } },
           { sku: { contains: query, mode: 'insensitive' } },
         ],
       },
       include: {
+        brand: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         type: {
           select: {
             id: true,
@@ -289,7 +343,7 @@ export async function searchModels(query: string, limit = 20) {
           },
         },
       },
-      orderBy: [{ brand: 'asc' }, { model: 'asc' }],
+      orderBy: [{ model: 'asc' }],
       take: limit,
     })
 
@@ -308,6 +362,12 @@ export async function getModelWithStock(id: string): Promise<ModelWithStock> {
     const model = await prisma.equipment_models.findUnique({
       where: { id },
       include: {
+        brand: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         type: {
           select: {
             id: true,
@@ -355,16 +415,18 @@ export async function listModels(params: {
   page?: number
   limit?: number
   typeId?: string
+  brandId?: string
   familyId?: string
   isActive?: boolean
   search?: string
 }) {
   try {
-    const { page = 1, limit = 50, typeId, familyId, isActive = true, search } = params
+    const { page = 1, limit = 50, typeId, brandId, familyId, isActive = true, search } = params
 
     const where: Prisma.equipment_modelsWhereInput = {
       isActive,
       ...(typeId && { typeId }),
+      ...(brandId && { brandId }),
       ...(familyId && {
         type: {
           familyId,
@@ -372,7 +434,7 @@ export async function listModels(params: {
       }),
       ...(search && {
         OR: [
-          { brand: { contains: search, mode: 'insensitive' } },
+          { brand: { name: { contains: search, mode: 'insensitive' } } },
           { model: { contains: search, mode: 'insensitive' } },
           { sku: { contains: search, mode: 'insensitive' } },
         ],
@@ -383,6 +445,12 @@ export async function listModels(params: {
       prisma.equipment_models.findMany({
         where,
         include: {
+          brand: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
           type: {
             select: {
               id: true,
@@ -398,7 +466,7 @@ export async function listModels(params: {
             },
           },
         },
-        orderBy: [{ brand: 'asc' }, { model: 'asc' }],
+        orderBy: [{ model: 'asc' }],
         skip: (page - 1) * limit,
         take: limit,
       }),

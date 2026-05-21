@@ -6,10 +6,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Package, FileKey, Box } from 'lucide-react'
+import { Package, FileKey, Box, Tag } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { TypeSection } from './type-section'
+import { BrandSection } from './brand-section'
 import { AttributeManagerDialog } from './attribute-manager-dialog'
 import { TypeFormDialog } from './type-form-dialog'
 import {
@@ -21,6 +22,7 @@ import {
   type TypeKind,
   type CreateTypeData,
 } from '@/hooks/inventory/use-type-management'
+import { useBrandManagement } from '@/hooks/inventory/use-brand-management'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -36,6 +38,41 @@ export function CatalogsTab({ familyId, familyColor }: CatalogsTabProps) {
   const equipmentTypes = useTypeManagement<EquipmentType>('equipment', familyId)
   const licenseTypes = useTypeManagement<LicenseType>('license', familyId)
   const consumableTypes = useTypeManagement<ConsumableType>('consumable', familyId)
+  // Hook para Marcas
+  const equipmentBrands = useBrandManagement({ familyId })
+
+  // Efecto para cargar datos al montar el componente
+  useEffect(() => {
+    if (familyId) {
+      equipmentTypes.loadTypes()
+      licenseTypes.loadTypes()
+      consumableTypes.loadTypes()
+      equipmentBrands.loadBrands()
+    }
+  }, [familyId])
+
+  // Handlers para Marcas
+  const handleCreateBrand = async () => {
+    await equipmentBrands.loadBrands()
+  }
+
+  const handleEditBrand = async (brand: any) => {
+    await equipmentBrands.loadBrands()
+  }
+
+  const handleDeleteBrand = async (brandId: string) => {
+    const success = await equipmentBrands.deleteBrand(brandId)
+    if (success) {
+      await equipmentBrands.loadBrands()
+    }
+  }
+
+  const handleToggleBrandActive = async (brandId: string) => {
+    await equipmentBrands.toggleActive(
+      brandId,
+      !equipmentBrands.brands.find(b => b.id === brandId)?.isActive
+    )
+  }
 
   // Estado para el diálogo de atributos
   const [attributeDialogOpen, setAttributeDialogOpen] = useState(false)
@@ -154,6 +191,32 @@ export function CatalogsTab({ familyId, familyColor }: CatalogsTabProps) {
 
   return (
     <div className='space-y-6'>
+      {/* Equipment Brands */}
+      <Card>
+        <CardHeader>
+          <CardTitle className='flex items-center gap-2'>
+            <Tag className='h-5 w-5' />
+            Marcas
+          </CardTitle>
+          <CardDescription>Catálogo de marcas de equipos (Dell, Apple, HP, etc.)</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <BrandSection
+            brands={equipmentBrands.brands}
+            loading={equipmentBrands.loading}
+            saving={equipmentBrands.saving}
+            familyId={familyId}
+            familyColor={familyColor}
+            onCreateBrand={handleCreateBrand}
+            onEditBrand={handleEditBrand}
+            onDeleteBrand={handleDeleteBrand}
+            onToggleActive={handleToggleBrandActive}
+          />
+        </CardContent>
+      </Card>
+
+      <Separator />
+
       {/* Equipment Types */}
       <Card>
         <CardHeader>

@@ -19,6 +19,8 @@ const equipmentTypeUpdateSchema = z.object({
   familyId: z.string().uuid().optional().nullable(),
   isActive: z.boolean().optional(),
   order: z.number().int().min(0).optional(),
+  // Configuración de atributos
+  trackMaintenance: z.boolean().optional(),
 })
 
 /**

@@ -1,36 +1,34 @@
 /**
- * API Routes: Equipment Models
- * GET /api/inventory/models - List models
- * POST /api/inventory/models - Create model
+ * API Routes: Equipment Brands
+ * GET /api/inventory/brands - List brands
+ * POST /api/inventory/brands - Create brand
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import {
-  createModel,
-  listModels,
-  type CreateModelInput,
-} from '@/lib/services/equipment-models.service'
+  createBrand,
+  listBrands,
+  type CreateBrandInput,
+} from '@/lib/services/equipment-brands.service'
 import { canManageInventory } from '@/lib/inventory-access'
 import { z } from 'zod'
 
 // Validation schema
-const createModelSchema = z.object({
-  brandId: z.string().uuid(),
-  model: z.string().min(1).max(200),
-  sku: z.string().max(100).optional(),
-  typeId: z.string().uuid(),
-  specifications: z.record(z.any()).optional(),
-  defaultAccessories: z.array(z.string()).optional(),
-  standardPrice: z.number().positive().optional(),
-  modelPhotoUrl: z.string().url().optional(),
+const createBrandSchema = z.object({
+  code: z.string().min(1).max(50),
+  name: z.string().min(1).max(100),
+  description: z.string().optional(),
+  logoUrl: z.string().url().optional(),
   isActive: z.boolean().optional(),
+  order: z.number().int().min(0).optional(),
+  familyId: z.string().uuid().optional(),
 })
 
 /**
- * GET /api/inventory/models
- * List equipment models with pagination and filters
+ * GET /api/inventory/brands
+ * List equipment brands with pagination and filters
  */
 export async function GET(request: NextRequest) {
   try {
@@ -50,17 +48,13 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const page = parseInt(searchParams.get('page') || '1', 10)
     const limit = parseInt(searchParams.get('limit') || '50', 10)
-    const typeId = searchParams.get('typeId') || undefined
-    const brandId = searchParams.get('brandId') || undefined
     const familyId = searchParams.get('familyId') || undefined
     const isActive = searchParams.get('isActive') !== 'false'
     const search = searchParams.get('search') || undefined
 
-    const result = await listModels({
+    const result = await listBrands({
       page,
       limit,
-      typeId,
-      brandId,
       familyId,
       isActive,
       search,
@@ -68,14 +62,14 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(result)
   } catch (error: any) {
-    console.error('Error listing models:', error)
-    return NextResponse.json({ error: error.message || 'Error al listar modelos' }, { status: 500 })
+    console.error('Error listing brands:', error)
+    return NextResponse.json({ error: error.message || 'Error al listar marcas' }, { status: 500 })
   }
 }
 
 /**
- * POST /api/inventory/models
- * Create a new equipment model
+ * POST /api/inventory/brands
+ * Create a new equipment brand
  */
 export async function POST(request: NextRequest) {
   try {
@@ -94,7 +88,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
 
     // Validate input
-    const validationResult = createModelSchema.safeParse(body)
+    const validationResult = createBrandSchema.safeParse(body)
     if (!validationResult.success) {
       return NextResponse.json(
         {
@@ -105,18 +99,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const data: CreateModelInput = validationResult.data
+    const data: CreateBrandInput = validationResult.data
 
-    const model = await createModel(data)
+    const brand = await createBrand(data)
 
-    return NextResponse.json(model, { status: 201 })
+    return NextResponse.json(brand, { status: 201 })
   } catch (error: any) {
-    console.error('Error creating model:', error)
+    console.error('Error creating brand:', error)
 
     if (error.message.includes('Ya existe')) {
       return NextResponse.json({ error: error.message }, { status: 409 })
     }
 
-    return NextResponse.json({ error: error.message || 'Error al crear modelo' }, { status: 500 })
+    return NextResponse.json({ error: error.message || 'Error al crear marca' }, { status: 500 })
   }
 }

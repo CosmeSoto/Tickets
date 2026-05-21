@@ -3,10 +3,10 @@ import bcrypt from 'bcryptjs'
 import { randomUUID } from 'crypto'
 import { seedCustomFields } from './seeds/custom-fields.seed'
 import { seedInventoryTypes } from './seeds/inventory-types.seed'
+import { seedEquipmentBrands } from './seeds/equipment-brands.seed'
 import { seedCategories, seedCategoriesOtherFamilies } from './seeds/categories.seed'
 import { seedAttributes } from './seeds/attributes.seed'
 import { seedWarehouses } from './seeds/warehouses.seed'
-import { seedEquipmentModels } from './seeds/equipment-models.seed'
 
 const prisma = new PrismaClient()
 const now = new Date()
@@ -49,8 +49,8 @@ async function main() {
   // 10. TIPOS DE INVENTARIO (equipos, licencias, consumibles)
   await seedInventoryTypes(prisma, familyMap)
 
-  // 11. CATÁLOGO DE MODELOS DE EQUIPOS (requiere tipos de equipo)
-  await seedEquipmentModels(prisma)
+  // 11. MARCAS DE EQUIPOS
+  await seedEquipmentBrands(prisma, familyMap)
 
   // 13. UNIDADES DE MEDIDA
   await seedUnitsOfMeasure()

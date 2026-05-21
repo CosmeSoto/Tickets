@@ -60,10 +60,8 @@ export function TypeFormDialog({
     familyId: '',
     isActive: true,
     // Equipment specific
-    requiresSerial: false,
-    requiresModel: false,
     trackMaintenance: false,
-    // License specific
+    // License specific (defaults for new licenses)
     requiresKey: false,
     allowMultipleAssignments: false,
     maxAssignments: null,
@@ -84,8 +82,6 @@ export function TypeFormDialog({
         familyId: initialData.familyId,
         isActive: initialData.isActive,
         // Equipment specific
-        requiresSerial: (initialData as any).requiresSerial || false,
-        requiresModel: (initialData as any).requiresModel || false,
         trackMaintenance: (initialData as any).trackMaintenance || false,
         // License specific
         requiresKey: (initialData as any).requiresKey || false,
@@ -104,8 +100,6 @@ export function TypeFormDialog({
         description: '',
         familyId: '',
         isActive: true,
-        requiresSerial: false,
-        requiresModel: false,
         trackMaintenance: false,
         requiresKey: false,
         allowMultipleAssignments: false,
@@ -232,34 +226,6 @@ export function TypeFormDialog({
 
               <div className='flex items-center justify-between p-3 border rounded-lg'>
                 <div>
-                  <p className='text-sm font-medium'>Requiere número de serie</p>
-                  <p className='text-xs text-muted-foreground'>
-                    Obliga a ingresar un número de serie único
-                  </p>
-                </div>
-                <Switch
-                  checked={formData.requiresSerial}
-                  onCheckedChange={v => updateField('requiresSerial', v)}
-                  disabled={saving}
-                />
-              </div>
-
-              <div className='flex items-center justify-between p-3 border rounded-lg'>
-                <div>
-                  <p className='text-sm font-medium'>Requiere modelo</p>
-                  <p className='text-xs text-muted-foreground'>
-                    Obliga a especificar marca y modelo
-                  </p>
-                </div>
-                <Switch
-                  checked={formData.requiresModel}
-                  onCheckedChange={v => updateField('requiresModel', v)}
-                  disabled={saving}
-                />
-              </div>
-
-              <div className='flex items-center justify-between p-3 border rounded-lg'>
-                <div>
                   <p className='text-sm font-medium'>Rastrear mantenimiento</p>
                   <p className='text-xs text-muted-foreground'>
                     Habilita el registro de mantenimientos preventivos
@@ -277,17 +243,17 @@ export function TypeFormDialog({
           {/* License specific fields */}
           {typeKind === 'license' && (
             <div className='space-y-3'>
-              <h4 className='font-semibold text-sm'>Configuración de Licencias</h4>
+              <h4 className='font-semibold text-sm'>Configuración por defecto</h4>
 
               <div className='flex items-center justify-between p-3 border rounded-lg'>
                 <div>
-                  <p className='text-sm font-medium'>Requiere clave de licencia</p>
+                  <p className='text-sm font-medium'>Requiere clave</p>
                   <p className='text-xs text-muted-foreground'>
-                    Obliga a ingresar una clave o serial de activación
+                    Por defecto, este tipo de licencia requiere clave
                   </p>
                 </div>
                 <Switch
-                  checked={formData.requiresKey}
+                  checked={formData.requiresKey || false}
                   onCheckedChange={v => updateField('requiresKey', v)}
                   disabled={saving}
                 />
@@ -297,39 +263,15 @@ export function TypeFormDialog({
                 <div className='flex-1'>
                   <p className='text-sm font-medium'>Permitir asignaciones múltiples</p>
                   <p className='text-xs text-muted-foreground'>
-                    Una licencia puede asignarse a varios usuarios
+                    Por defecto, este tipo de licencia permite múltiples usuarios
                   </p>
                 </div>
                 <Switch
-                  checked={formData.allowMultipleAssignments}
+                  checked={formData.allowMultipleAssignments || false}
                   onCheckedChange={v => updateField('allowMultipleAssignments', v)}
                   disabled={saving}
                 />
               </div>
-
-              {formData.allowMultipleAssignments && (
-                <div className='space-y-2 ml-4'>
-                  <Label htmlFor='maxAssignments'>Máximo de asignaciones simultáneas</Label>
-                  <Input
-                    id='maxAssignments'
-                    type='number'
-                    min={1}
-                    value={formData.maxAssignments || ''}
-                    onChange={e =>
-                      updateField(
-                        'maxAssignments',
-                        e.target.value ? parseInt(e.target.value) : null
-                      )
-                    }
-                    placeholder='Ej: 5 (dejar vacío para ilimitado)'
-                    className={errors.maxAssignments ? 'border-destructive' : ''}
-                    disabled={saving}
-                  />
-                  {errors.maxAssignments && (
-                    <p className='text-xs text-destructive'>{errors.maxAssignments}</p>
-                  )}
-                </div>
-              )}
             </div>
           )}
 

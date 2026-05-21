@@ -40,12 +40,11 @@ export interface BaseType {
 }
 
 export interface EquipmentType extends BaseType {
-  requiresSerial: boolean
-  requiresModel: boolean
   trackMaintenance: boolean
 }
 
 export interface LicenseType extends BaseType {
+  // These fields are for backward compatibility, but configuration is now per-license
   requiresKey: boolean
   allowMultipleAssignments: boolean
   maxAssignments?: number | null
@@ -68,10 +67,8 @@ export interface CreateTypeData {
   isActive?: boolean
   order?: number
   // Equipment specific
-  requiresSerial?: boolean
-  requiresModel?: boolean
   trackMaintenance?: boolean
-  // License specific
+  // License specific (for backward compatibility - configuration now per-license)
   requiresKey?: boolean
   allowMultipleAssignments?: boolean
   maxAssignments?: number | null
@@ -277,8 +274,10 @@ export function useTypeManagement<T extends AnyType = AnyType>(
 
   // Auto-load when familyId changes
   useEffect(() => {
-    loadTypes()
-  }, [loadTypes])
+    if (familyId) {
+      loadTypes()
+    }
+  }, [familyId])
 
   return {
     // Data

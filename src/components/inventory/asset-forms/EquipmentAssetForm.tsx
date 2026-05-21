@@ -12,6 +12,8 @@ import { SimpleSelect } from '@/components/ui/simple-select'
 import { ContractPicker } from '@/components/contracts/contract-picker'
 import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
 import { EquipmentTypeInlineForm } from '@/components/inventory/asset-forms/EquipmentTypeInlineForm'
+import { EquipmentModelInlineForm } from '@/components/inventory/asset-forms/EquipmentModelInlineForm'
+import { EquipmentBrandInlineForm } from '@/components/inventory/asset-forms/EquipmentBrandInlineForm'
 import { WarehouseInlineForm } from '@/components/inventory/asset-forms/WarehouseInlineForm'
 import { AssignableUserSelect } from '@/components/inventory/shared/AssignableUserSelect'
 import { MaintenanceStatusBlock } from '@/components/inventory/shared/MaintenanceStatusBlock'
@@ -46,6 +48,7 @@ interface EquipmentAssetFormProps {
   submitting: boolean
   submitError: string | null
   maxFileSizeMB?: number
+  isEditMode?: boolean
 }
 
 const ACQUISITION_MODES = [
@@ -107,16 +110,33 @@ export function EquipmentAssetForm({
   submitting,
   submitError,
   maxFileSizeMB = 10,
+  isEditMode = false,
 }: EquipmentAssetFormProps) {
   const [acquisitionMode, setAcquisitionMode] = useState<'FIXED_ASSET' | 'RENTAL' | 'LOAN'>(
     'FIXED_ASSET'
   )
   const [code, setCode] = useState('')
   const [serialNumber, setSerialNumber] = useState('')
-  const [brand, setBrand] = useState('')
-  const [model, setModel] = useState('')
+  const [selectedBrandId, setSelectedBrandId] = useState('')
+  const [brands, setBrands] = useState<Array<{ id: string; name: string; code?: string }>>([])
+  const [selectedModelId, setSelectedModelId] = useState('')
+  const [equipmentModels, setEquipmentModels] = useState<
+    Array<{ id: string; name: string; brandId?: string; model: string }>
+  >([])
   const [equipmentTypeId, setEquipmentTypeId] = useState('')
-  const [equipmentTypes, setEquipmentTypes] = useState<{ id: string; name: string }[]>([])
+  const [equipmentTypes, setEquipmentTypes] = useState<
+    Array<{
+      id: string
+      name: string
+      trackMaintenance?: boolean
+    }>
+  >([])
+  // Configuración del tipo seleccionado
+  const [selectedTypeConfig, setSelectedTypeConfig] = useState<{
+    trackMaintenance: boolean
+  }>({
+    trackMaintenance: false,
+  })
   const [condition, setCondition] = useState('NEW')
   const [equipmentStatus, setEquipmentStatus] = useState('AVAILABLE')
   const [accessories, setAccessories] = useState<string[]>([])
@@ -163,19 +183,14 @@ export function EquipmentAssetForm({
   >([])
   const [loadingTechnicians, setLoadingTechnicians] = useState(false)
 
-  // ✅ Departamentos desde contexto global — filtrados por familyId en memoria
+  // ✅ Departamentos desde contexto global — solo para referencia (no editable)
   const { departments: allDepartments } = useActiveDepartments()
   const departments = allDepartments.filter(
     (dept): dept is typeof dept & { familyId: string } => dept.familyId === familyId
   )
-  const loadingDepartments = false
 
-  // Departamento manual (AVAILABLE, MAINTENANCE, DAMAGED)
-  const [departmentId, setDepartmentId] = useState('')
-
-  // departmentId efectivo según estado
-  const effectiveDepartmentId =
-    equipmentStatus === 'ASSIGNED' ? (assignedUserDept?.id ?? '') : departmentId
+  // departmentId efectivo: solo el del usuario asignado cuando estado = ASSIGNED
+  const effectiveDepartmentId = equipmentStatus === 'ASSIGNED' ? (assignedUserDept?.id ?? '') : ''
 
   // Task 19.1: family depreciation config from API
   const [familyDepConfig, setFamilyDepConfig] = useState<FamilyDepreciationConfig | null>(null)
@@ -185,9 +200,6 @@ export function EquipmentAssetForm({
   const resolvedSections = resolveSectionsForMode(familyConfig, acquisitionMode)
   const isVisible = (s: string) => resolvedSections.visible.includes(s as never)
 
-  // Visibilidad condicional por estado — definidas después de isVisible
-  // Departamento manual: AVAILABLE, MAINTENANCE, DAMAGED (no ASSIGNED ni RETIRED)
-  const showDepartmentSelectorFlag = showDepartmentSelector(equipmentStatus)
   // Bodega: solo cuando el equipo está físicamente almacenado (AVAILABLE o DAMAGED)
   const showWarehouse = isVisible('WAREHOUSE') && showWarehouseSelector(equipmentStatus)
 
@@ -201,7 +213,51 @@ export function EquipmentAssetForm({
     fetch(`/api/inventory/warehouses?familyId=${familyId}`)
       .then(r => r.json())
       .then(d => setWarehouses(d.warehouses ?? d ?? []))
+    fetch(`/api/inventory/brands?familyId=${familyId}`)
+      .then(r => r.json())
+      .then(d => setBrands(d.brands ?? []))
   }, [familyId])
+
+  // Cargar modelos y configuración cuando se selecciona un tipo de equipo o marca
+  useEffect(() => {
+    if (!equipmentTypeId) {
+      setEquipmentModels([])
+      setSelectedModelId('')
+      setSelectedTypeConfig({
+        trackMaintenance: false,
+      })
+      return
+    }
+
+    // Cargar la configuración del tipo seleccionado
+    const selectedType = equipmentTypes.find(t => t.id === equipmentTypeId)
+    if (selectedType) {
+      setSelectedTypeConfig({
+        trackMaintenance: selectedType.trackMaintenance ?? false,
+      })
+    }
+
+    // Cargar modelos
+    const params = new URLSearchParams()
+    params.set('typeId', equipmentTypeId)
+    params.set('limit', '100')
+    if (selectedBrandId) {
+      params.set('brandId', selectedBrandId)
+    }
+
+    fetch(`/api/inventory/models?${params.toString()}`)
+      .then(r => r.json())
+      .then(d => {
+        const models = (d.models ?? d.data ?? []).map((m: any) => ({
+          id: m.id,
+          name: m.brand ? `${m.brand.name} ${m.model}` : m.model,
+          brandId: m.brandId,
+          model: m.model,
+        }))
+        setEquipmentModels(models)
+      })
+      .catch(() => setEquipmentModels([]))
+  }, [equipmentTypeId, equipmentTypes, selectedBrandId])
 
   // Task 19.1: fetch family-config depreciation defaults when familyId changes
   useEffect(() => {
@@ -355,21 +411,38 @@ export function EquipmentAssetForm({
         : 'Proveedor'
   const supplierRequired = acquisitionMode === 'RENTAL' || acquisitionMode === 'LOAN'
   const requireFinancialForNew = familyConfig.requireFinancialForNew ?? true
-  const showFinancial = isVisible('FINANCIAL') || (requireFinancialForNew && condition === 'NEW')
+  const showFinancial =
+    (isVisible('FINANCIAL') || (requireFinancialForNew && condition === 'NEW')) &&
+    acquisitionMode !== 'LOAN'
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setPriceError('')
+    if (!equipmentTypeId) return
+
+    // Validar campos obligatorios
+    if (!selectedBrandId) {
+      alert('Por favor selecciona o crea una marca')
+      return
+    }
+    if (!selectedModelId) {
+      alert('Por favor selecciona o crea un modelo de equipo')
+      return
+    }
+    if (!serialNumber.trim()) {
+      alert('Por favor ingresa el número de serie')
+      return
+    }
     if (requireFinancialForNew && condition === 'NEW' && !purchasePrice) {
       setPriceError('El precio de compra es obligatorio para activos nuevos')
       return
     }
+    const selectedModel = equipmentModels.find(m => m.id === selectedModelId)
     const payload: Record<string, unknown> = {
       acquisitionMode,
       code: code || undefined,
       serialNumber: serialNumber || undefined,
-      brand: brand || undefined,
-      model: model || undefined,
+      modelId: selectedModelId || undefined,
       typeId: equipmentTypeId || undefined,
       departmentId: effectiveDepartmentId || undefined,
       condition,
@@ -427,124 +500,198 @@ export function EquipmentAssetForm({
       </button>
 
       {/* ── 1. IDENTIFICACIÓN ─────────────────────────────────────── */}
-      {/* Marca / Modelo */}
-      <div className='grid grid-cols-2 gap-3'>
+      <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+        {/* Tipo de equipo */}
         <div className='space-y-1'>
-          <Label>Marca</Label>
-          <Input value={brand} onChange={e => setBrand(e.target.value)} placeholder='Ej: Dell' />
+          <Label>
+            Tipo de Equipo <span className='text-destructive'>*</span>
+          </Label>
+          <InlineCreateSelect
+            options={equipmentTypes}
+            value={equipmentTypeId}
+            onChange={setEquipmentTypeId}
+            placeholder='Buscar tipo de equipo...'
+            createLabel='Crear tipo de equipo'
+            createTitle='Nuevo tipo de equipo'
+            editTitle='Editar tipo de equipo'
+            deleteConfirmMessage='¿Eliminar este tipo de equipo? Solo es posible si no tiene activos asociados.'
+            createForm={({ item, onSuccess, onCancel }) => (
+              <EquipmentTypeInlineForm
+                familyId={familyId}
+                item={item}
+                onSuccess={newItem => {
+                  if (item) {
+                    setEquipmentTypes(prev => prev.map(t => (t.id === newItem.id ? newItem : t)))
+                  } else {
+                    setEquipmentTypes(prev => [...prev, newItem])
+                  }
+                  onSuccess(newItem)
+                }}
+                onCancel={onCancel}
+              />
+            )}
+            onDelete={async id => {
+              const res = await fetch(`/api/admin/equipment-types/${id}`, { method: 'DELETE' })
+              if (!res.ok) {
+                const d = await res.json()
+                throw new Error(d.error || 'Error al eliminar')
+              }
+              setEquipmentTypes(prev => prev.filter(t => t.id !== id))
+              if (equipmentTypeId === id) {
+                setEquipmentTypeId('')
+                setSelectedBrandId('')
+                setSelectedModelId('')
+              }
+            }}
+          />
         </div>
+
+        {/* Marca */}
+        {equipmentTypeId && (
+          <div className='space-y-1'>
+            <Label>
+              Marca <span className='text-destructive'>*</span>
+            </Label>
+            <InlineCreateSelect
+              options={brands}
+              value={selectedBrandId}
+              onChange={newVal => {
+                setSelectedBrandId(newVal)
+                setSelectedModelId('')
+              }}
+              placeholder='Buscar o crear marca...'
+              createLabel='Crear marca'
+              createTitle='Nueva marca'
+              editTitle='Editar marca'
+              deleteConfirmMessage='¿Eliminar esta marca? Solo es posible si no tiene activos asociados.'
+              createForm={({ item, onSuccess, onCancel }) => (
+                <EquipmentBrandInlineForm
+                  familyId={familyId}
+                  item={item}
+                  onSuccess={newItem => {
+                    if (item) {
+                      setBrands(prev => prev.map(b => (b.id === newItem.id ? newItem : b)))
+                    } else {
+                      setBrands(prev => [...prev, newItem])
+                    }
+                    setSelectedBrandId(newItem.id)
+                    onSuccess(newItem)
+                  }}
+                  onCancel={onCancel}
+                />
+              )}
+              onDelete={async id => {
+                const res = await fetch(`/api/inventory/brands/${id}`, { method: 'DELETE' })
+                if (!res.ok) {
+                  const d = await res.json()
+                  throw new Error(d.error || 'Error al eliminar')
+                }
+                setBrands(prev => prev.filter(b => b.id !== id))
+                if (selectedBrandId === id) {
+                  setSelectedBrandId('')
+                  setSelectedModelId('')
+                }
+              }}
+            />
+          </div>
+        )}
+
+        {/* Modelo de Equipo */}
+        {equipmentTypeId && selectedBrandId && (
+          <div className='space-y-1'>
+            <Label>
+              Modelo <span className='text-destructive'>*</span>
+            </Label>
+            <InlineCreateSelect
+              options={equipmentModels}
+              value={selectedModelId}
+              onChange={setSelectedModelId}
+              placeholder='Buscar o crear modelo...'
+              allowClear
+              createLabel='Crear modelo'
+              createTitle='Nuevo modelo de equipo'
+              editTitle='Editar modelo de equipo'
+              deleteConfirmMessage='¿Eliminar este modelo? Solo es posible si no tiene activos asociados.'
+              createForm={({ item, onSuccess, onCancel }) => (
+                <EquipmentModelInlineForm
+                  typeId={equipmentTypeId}
+                  familyId={familyId}
+                  item={item}
+                  initialBrandId={selectedBrandId || undefined}
+                  onSuccess={newItem => {
+                    if (item) {
+                      setEquipmentModels(prev => prev.map(t => (t.id === newItem.id ? newItem : t)))
+                    } else {
+                      setEquipmentModels(prev => [...prev, newItem])
+                    }
+                    onSuccess(newItem)
+                  }}
+                  onCancel={onCancel}
+                />
+              )}
+              onDelete={async id => {
+                const res = await fetch(`/api/inventory/models/${id}`, { method: 'DELETE' })
+                if (!res.ok) {
+                  const d = await res.json()
+                  throw new Error(d.error || 'Error al eliminar')
+                }
+                setEquipmentModels(prev => prev.filter(t => t.id !== id))
+                if (selectedModelId === id) {
+                  setSelectedModelId('')
+                }
+              }}
+            />
+          </div>
+        )}
+
+        {/* N° Serie */}
         <div className='space-y-1'>
-          <Label>Modelo</Label>
+          <Label>
+            N° de Serie del Fabricante <span className='text-destructive'>*</span>
+          </Label>
+          <SerialNumberInput
+            value={serialNumber}
+            onChange={e => setSerialNumber(e.target.value)}
+            placeholder='Ej: SN-ABC-12345'
+          />
+        </div>
+
+        {/* Código */}
+        <div className='space-y-1'>
+          <Label>
+            Código Interno{' '}
+            <span className='text-xs font-normal text-muted-foreground'>
+              (opcional — se genera automáticamente)
+            </span>
+          </Label>
           <Input
-            value={model}
-            onChange={e => setModel(e.target.value)}
-            placeholder='Ej: Latitude 5520'
+            value={code}
+            onChange={e => setCode(e.target.value)}
+            placeholder='Dejar vacío para generar automáticamente'
           />
         </div>
       </div>
 
-      {/* N° Serie */}
-      <div className='space-y-1'>
-        <Label>
-          N° de Serie del Fabricante{' '}
-          <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
-        </Label>
-        <SerialNumberInput
-          value={serialNumber}
-          onChange={e => setSerialNumber(e.target.value)}
-          placeholder='Ej: SN-ABC-12345'
-        />
-      </div>
+      {/* ── 2. DETALLES DEL EQUIPO ────────────────────────────────── */}
+      {/* Atributos por Tipo */}
+      <TypeAttributesSection
+        typeId={equipmentTypeId}
+        values={customFieldValues}
+        onChange={setCustomFieldValues}
+      />
 
-      {/* Código */}
-      <div className='space-y-1'>
-        <Label>
-          Código Interno{' '}
-          <span className='text-xs font-normal text-muted-foreground'>
-            (opcional — se genera automáticamente)
-          </span>
-        </Label>
-        <Input
-          value={code}
-          onChange={e => setCode(e.target.value)}
-          placeholder='Dejar vacío para generar automáticamente'
-        />
-      </div>
+      {/* Accesorios */}
+      <AccessoriesSection accessories={accessories} onChange={setAccessories} inline />
 
-      {/* Tipo de equipo */}
-      <div className='space-y-1'>
-        <Label>Tipo de Equipo</Label>
-        <InlineCreateSelect
-          options={equipmentTypes}
-          value={equipmentTypeId}
-          onChange={setEquipmentTypeId}
-          placeholder='Buscar tipo de equipo...'
-          createLabel='Crear tipo de equipo'
-          createTitle='Nuevo tipo de equipo'
-          editTitle='Editar tipo de equipo'
-          deleteConfirmMessage='¿Eliminar este tipo de equipo? Solo es posible si no tiene activos asociados.'
-          createForm={({ item, onSuccess, onCancel }) => (
-            <EquipmentTypeInlineForm
-              familyId={familyId}
-              item={item}
-              onSuccess={newItem => {
-                if (item) {
-                  setEquipmentTypes(prev => prev.map(t => (t.id === newItem.id ? newItem : t)))
-                } else {
-                  setEquipmentTypes(prev => [...prev, newItem])
-                }
-                onSuccess(newItem)
-              }}
-              onCancel={onCancel}
-            />
-          )}
-          onDelete={async id => {
-            const res = await fetch(`/api/admin/equipment-types/${id}`, { method: 'DELETE' })
-            if (!res.ok) {
-              const d = await res.json()
-              throw new Error(d.error || 'Error al eliminar')
-            }
-            setEquipmentTypes(prev => prev.filter(t => t.id !== id))
-          }}
-        />
-      </div>
-
-      {/* ── 2. UBICACIÓN ──────────────────────────────────────────── */}
-      {/* Departamento — visible en AVAILABLE, MAINTENANCE, DAMAGED */}
-      {showDepartmentSelectorFlag && (
-        <div className='space-y-1'>
-          <Label>Departamento</Label>
-          {loadingDepartments ? (
-            <div className='h-9 rounded-md border border-input bg-background flex items-center px-3 text-sm text-muted-foreground'>
-              Cargando departamentos...
-            </div>
-          ) : departments.length === 0 ? (
-            <div className='flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground'>
-              <AlertCircle className='h-4 w-4 shrink-0' />
-              No hay departamentos activos para esta familia
-            </div>
-          ) : (
-            <SearchableSelect
-              options={departments.map(d => ({ id: d.id, name: d.name }))}
-              value={departmentId}
-              onChange={setDepartmentId}
-              placeholder='Buscar departamento...'
-            />
-          )}
-        </div>
-      )}
-
-      {/* ── 3. ESTADO + ASIGNACIÓN ────────────────────────────────── */}
-      <div className='grid grid-cols-2 gap-3'>
+      {/* ── 3. ESTADO Y UBICACIÓN ──────────────────────────────────── */}
+      <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
         <div className='space-y-1'>
           <Label>
             Condición <span className='text-destructive'>*</span>
           </Label>
           <SimpleSelect value={condition} onChange={e => setCondition(e.target.value)}>
             <option value='NEW'>Nuevo</option>
-            <option value='LIKE_NEW'>Como Nuevo</option>
             <option value='GOOD'>Bueno</option>
-            <option value='FAIR'>Regular</option>
             <option value='POOR'>Malo</option>
           </SimpleSelect>
           {condition === 'NEW' && requireFinancialForNew && (
@@ -564,7 +711,54 @@ export function EquipmentAssetForm({
             <option value='FOR_SALE'>En venta</option>
           </SimpleSelect>
         </div>
+
+        {/* Bodega — solo AVAILABLE y DAMAGED */}
+        {showWarehouse && (
+          <div className='space-y-1'>
+            <Label>Bodega</Label>
+            <InlineCreateSelect
+              options={warehouses}
+              value={warehouseId}
+              onChange={setWarehouseId}
+              placeholder='Buscar bodega...'
+              allowClear
+              createLabel='Crear bodega'
+              createTitle='Nueva bodega'
+              editTitle='Editar bodega'
+              deleteConfirmMessage='¿Eliminar esta bodega? Solo es posible si no tiene activos asociados.'
+              createForm={({ onSuccess, onCancel }) => (
+                <WarehouseInlineForm
+                  defaultFamilyId={familyId}
+                  onSuccess={item => {
+                    setWarehouses(prev => [...prev, item])
+                    onSuccess(item)
+                  }}
+                  onCancel={onCancel}
+                />
+              )}
+              onDelete={async id => {
+                const res = await fetch(`/api/inventory/warehouses/${id}`, { method: 'DELETE' })
+                if (!res.ok) {
+                  const d = await res.json()
+                  throw new Error(d.error || 'Error al eliminar')
+                }
+                setWarehouses(prev => prev.filter(w => w.id !== id))
+                if (warehouseId === id) {
+                  setWarehouseId('')
+                }
+              }}
+            />
+          </div>
+        )}
       </div>
+
+      {/* Departamento — solo información automática cuando estado = ASSIGNED y hay usuario asignado */}
+      {equipmentStatus === 'ASSIGNED' && assignedUserDept && (
+        <div className='rounded-md border border-primary/30 bg-primary/5 p-3'>
+          <Label className='text-xs text-muted-foreground'>Departamento</Label>
+          <p className='font-medium'>{assignedUserDept}</p>
+        </div>
+      )}
 
       {/* Aviso para activos registrados directamente como RETIRED (históricos) */}
       {equipmentStatus === 'RETIRED' && (
@@ -637,44 +831,7 @@ export function EquipmentAssetForm({
         />
       )}
 
-      {/* Bodega — solo AVAILABLE y DAMAGED */}
-      {showWarehouse && (
-        <div className='space-y-1'>
-          <Label>Bodega</Label>
-          <InlineCreateSelect
-            options={warehouses}
-            value={warehouseId}
-            onChange={setWarehouseId}
-            placeholder='Buscar bodega...'
-            allowClear
-            createLabel='Crear bodega'
-            createTitle='Nueva bodega'
-            createForm={({ onSuccess, onCancel }) => (
-              <WarehouseInlineForm
-                defaultFamilyId={familyId}
-                onSuccess={item => {
-                  setWarehouses(prev => [...prev, item])
-                  onSuccess(item)
-                }}
-                onCancel={onCancel}
-              />
-            )}
-          />
-        </div>
-      )}
-
-      {/* ── 4. DETALLES DEL EQUIPO ────────────────────────────────── */}
-      {/* Accesorios */}
-      <AccessoriesSection accessories={accessories} onChange={setAccessories} inline />
-
-      {/* Atributos por Tipo */}
-      <TypeAttributesSection
-        typeId={equipmentTypeId}
-        values={customFieldValues}
-        onChange={setCustomFieldValues}
-      />
-
-      {/* ── 5. ADQUISICIÓN ────────────────────────────────────────── */}
+      {/* ── 4. ADQUISICIÓN ────────────────────────────────────────── */}
       {/* Modalidad */}
       <div className='space-y-1'>
         <Label>¿Cómo se adquirió este equipo?</Label>
@@ -700,14 +857,10 @@ export function EquipmentAssetForm({
         />
       </div>
 
-      {/* Contrato — RENTAL y LOAN */}
-      {(acquisitionMode === 'RENTAL' || acquisitionMode === 'LOAN') && (
+      {/* Contrato — SOLO RENTAL (NO para LOAN) */}
+      {acquisitionMode === 'RENTAL' && (
         <div className='rounded-md border border-border p-4 space-y-3'>
-          <p className='text-sm font-medium'>
-            {acquisitionMode === 'RENTAL'
-              ? 'Contrato de arrendamiento'
-              : 'Contrato del activo de tercero'}
-          </p>
+          <p className='text-sm font-medium'>Contrato de arrendamiento</p>
           <ContractPicker
             value={linkedContractId}
             onChange={setLinkedContractId}

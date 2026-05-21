@@ -465,6 +465,26 @@ export async function POST(req: NextRequest) {
       // departmentId: se establece cuando el equipo está ASSIGNED (viene del usuario receptor)
       const resolvedDepartmentId = body.departmentId ? String(body.departmentId) : undefined
 
+      // Buscar o crear el modelo de equipo
+      let equipmentModel = await prisma.equipment_models.findFirst({
+        where: {
+          brand: brand,
+          model: model,
+          typeId: typeId,
+        },
+      })
+
+      if (!equipmentModel) {
+        equipmentModel = await prisma.equipment_models.create({
+          data: {
+            id: randomUUID(),
+            brand: brand,
+            model: model,
+            typeId: typeId,
+          },
+        })
+      }
+
       asset = await prisma.equipment.create({
         data: {
           id: randomUUID(),
@@ -472,6 +492,7 @@ export async function POST(req: NextRequest) {
           serialNumber: serialNumber ?? '',
           brand: brand ?? '',
           modelDeprecated: model ?? '',
+          modelId: equipmentModel.id,
           typeId: typeId ?? '',
           departmentId: resolvedDepartmentId,
           status: (status as any) ?? 'AVAILABLE',

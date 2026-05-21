@@ -857,20 +857,23 @@ model landing_page_banners {
 }
 
 model equipment_types {
-  id          String                       @id @default(uuid())
-  code        String                       @unique
-  name        String
-  description String?
-  icon        String?
-  isActive    Boolean                      @default(true) @map("is_active")
-  order       Int                          @default(0)
-  createdAt   DateTime                     @default(now()) @map("created_at")
-  updatedAt   DateTime                     @updatedAt @map("updated_at")
-  familyId    String?                      @map("family_id")
-  equipment   equipment[]
-  models      equipment_models[]
-  family      families?                    @relation(fields: [familyId], references: [id])
-  attributes  equipment_type_attributes[]
+  id              String                       @id @default(uuid())
+  code            String                       @unique
+  name            String
+  description     String?
+  icon            String?
+  isActive        Boolean                      @default(true) @map("is_active")
+  order           Int                          @default(0)
+  createdAt       DateTime                     @default(now()) @map("created_at")
+  updatedAt       DateTime                     @updatedAt @map("updated_at")
+  familyId        String?                      @map("family_id")
+  // Configuración de mantenimiento
+  trackMaintenance Boolean                      @default(false) @map("track_maintenance")
+  // Relaciones
+  equipment       equipment[]
+  models          equipment_models[]
+  family          families?                    @relation(fields: [familyId], references: [id])
+  attributes      equipment_type_attributes[]
 
   @@index([isActive, order])
   @@index([familyId])
@@ -878,29 +881,51 @@ model equipment_types {
 }
 
 // ============================================
+// EQUIPMENT_BRANDS - Catálogo de Marcas
+// ============================================
+model equipment_brands {
+  id          String               @id @default(uuid())
+  code        String               @unique @db.VarChar(50)
+  name        String               @db.VarChar(100)
+  description String?
+  logoUrl     String?              @map("logo_url")
+  isActive    Boolean              @default(true) @map("is_active")
+  order       Int                  @default(0)
+  createdAt   DateTime             @default(now()) @map("created_at")
+  updatedAt   DateTime             @updatedAt @map("updated_at")
+  familyId    String?              @map("family_id")
+  family      families?            @relation(fields: [familyId], references: [id])
+  models      equipment_models[]
+
+  @@index([isActive, order])
+  @@index([familyId])
+  @@map("equipment_brands")
+}
+
+// ============================================
 // EQUIPMENT_MODELS - Catálogo de Modelos
 // ============================================
 model equipment_models {
-  id                String   @id @default(uuid())
-  brand             String   @db.VarChar(100)
-  model             String   @db.VarChar(200)
-  sku               String?  @unique @db.VarChar(100)
-  typeId            String   @map("type_id")
-  type              equipment_types @relation(fields: [typeId], references: [id])
-  defaultAccessories String[] @default([])
-  standardPrice     Float?   @map("standard_price")
-  modelPhotoUrl     String?  @map("model_photo_url")
-  isActive          Boolean  @default(true) @map("is_active")
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  id                String               @id @default(uuid())
+  brandId           String?              @map("brand_id")
+  brand             equipment_brands?    @relation(fields: [brandId], references: [id])
+  model             String               @db.VarChar(200)
+  sku               String?              @unique @db.VarChar(100)
+  typeId            String               @map("type_id")
+  type              equipment_types      @relation(fields: [typeId], references: [id])
+  defaultAccessories String[]            @default([])
+  standardPrice     Float?               @map("standard_price")
+  modelPhotoUrl     String?              @map("model_photo_url")
+  isActive          Boolean              @default(true) @map("is_active")
+  createdAt         DateTime             @default(now()) @map("created_at")
+  updatedAt         DateTime             @updatedAt @map("updated_at")
   
   instances         equipment[]
   batches           equipment_batches[]
-  contracts         contracts[] @relation("ContractModel")
+  contracts         contracts[]          @relation("ContractModel")
   
-  @@unique([brand, model, typeId])
   @@index([typeId, isActive])
-  @@index([brand, model])
+  @@index([brandId])
   @@map("equipment_models")
 }
 
@@ -1559,6 +1584,7 @@ model families {
   consumableTypes             consumable_types[]
   departments                 departments[]
   equipmentTypes              equipment_types[]
+  equipmentBrands             equipment_brands[]
   formConfig                  inventory_family_config?
   managerFamilies             inventory_manager_families[]
   knowledge_articles          knowledge_articles[]

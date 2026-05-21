@@ -206,11 +206,11 @@ export function useInventorySettings() {
 
   useEffect(() => {
     loadFamilies()
-  }, [loadFamilies])
+  }, [])
 
   useEffect(() => {
     if (selectedFamilyId) loadConfig(selectedFamilyId)
-  }, [selectedFamilyId, loadConfig])
+  }, [selectedFamilyId])
 
   // ── Toggle inventory for a family ──
   const handleToggleInventory = useCallback(

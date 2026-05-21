@@ -29,33 +29,6 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
   if (computerType) {
     const computerAttrs = [
       {
-        attributeName: 'marca',
-        attributeLabel: 'Marca',
-        attributeType: 'text',
-        isRequired: true,
-        isVisible: true,
-        order: 1,
-        helpText: 'Ej: Dell, HP, Lenovo',
-      },
-      {
-        attributeName: 'modelo',
-        attributeLabel: 'Modelo',
-        attributeType: 'text',
-        isRequired: true,
-        isVisible: true,
-        order: 2,
-        helpText: 'Ej: OptiPlex 7090',
-      },
-      // {
-      //   attributeName: 'numero_serie',
-      //   attributeLabel: 'Número de Serie',
-      //   attributeType: 'text',
-      //   isRequired: false,
-      //   isVisible: true,
-      //   order: 3,
-      //   helpText: 'Número de serie del fabricante',
-      // },
-      {
         attributeName: 'procesador',
         attributeLabel: 'Procesador',
         attributeType: 'text',
@@ -148,33 +121,6 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
   // Atributos para Laptop
   if (laptopType) {
     const laptopAttrs = [
-      {
-        attributeName: 'marca',
-        attributeLabel: 'Marca',
-        attributeType: 'text',
-        isRequired: true,
-        isVisible: true,
-        order: 1,
-        helpText: 'Ej: Dell, HP, Lenovo',
-      },
-      {
-        attributeName: 'modelo',
-        attributeLabel: 'Modelo',
-        attributeType: 'text',
-        isRequired: true,
-        isVisible: true,
-        order: 2,
-        helpText: 'Ej: Latitude 5420',
-      },
-      {
-        attributeName: 'numero_serie',
-        attributeLabel: 'Número de Serie',
-        attributeType: 'text',
-        isRequired: false,
-        isVisible: true,
-        order: 3,
-        helpText: 'Número de serie del fabricante',
-      },
       {
         attributeName: 'procesador',
         attributeLabel: 'Procesador',
@@ -277,33 +223,6 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
   // Atributos para Impresora
   if (printerType) {
     const printerAttrs = [
-      {
-        attributeName: 'marca',
-        attributeLabel: 'Marca',
-        attributeType: 'text',
-        isRequired: true,
-        isVisible: true,
-        order: 1,
-        helpText: 'Ej: HP, Canon, Epson',
-      },
-      {
-        attributeName: 'modelo',
-        attributeLabel: 'Modelo',
-        attributeType: 'text',
-        isRequired: true,
-        isVisible: true,
-        order: 2,
-        helpText: 'Ej: LaserJet Pro M404dn',
-      },
-      {
-        attributeName: 'numero_serie',
-        attributeLabel: 'Número de Serie',
-        attributeType: 'text',
-        isRequired: false,
-        isVisible: true,
-        order: 3,
-        helpText: 'Número de serie del fabricante',
-      },
       {
         attributeName: 'tipo_impresora',
         attributeLabel: 'Tipo de Impresora',
@@ -834,31 +753,6 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
   if (acUnitType) {
     const acAttrs = [
       {
-        attributeName: 'fabricante',
-        attributeLabel: 'Fabricante',
-        attributeType: 'text',
-        isRequired: true,
-        isVisible: true,
-        order: 1,
-        helpText: 'Ej: Carrier, Trane, Daikin',
-      },
-      {
-        attributeName: 'modelo',
-        attributeLabel: 'Modelo',
-        attributeType: 'text',
-        isRequired: true,
-        isVisible: true,
-        order: 2,
-      },
-      {
-        attributeName: 'numero_serie',
-        attributeLabel: 'Número de Serie',
-        attributeType: 'text',
-        isRequired: false,
-        isVisible: true,
-        order: 3,
-      },
-      {
         attributeName: 'capacidad',
         attributeLabel: 'Capacidad (BTU)',
         attributeType: 'number',
@@ -933,31 +827,6 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
   // Atributos para Generador
   if (generatorType) {
     const generatorAttrs = [
-      {
-        attributeName: 'fabricante',
-        attributeLabel: 'Fabricante',
-        attributeType: 'text',
-        isRequired: true,
-        isVisible: true,
-        order: 1,
-        helpText: 'Ej: Caterpillar, Cummins, Kohler',
-      },
-      {
-        attributeName: 'modelo',
-        attributeLabel: 'Modelo',
-        attributeType: 'text',
-        isRequired: true,
-        isVisible: true,
-        order: 2,
-      },
-      {
-        attributeName: 'numero_serie',
-        attributeLabel: 'Número de Serie',
-        attributeType: 'text',
-        isRequired: false,
-        isVisible: true,
-        order: 3,
-      },
       {
         attributeName: 'potencia',
         attributeLabel: 'Potencia (kW)',
@@ -1041,31 +910,6 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
   // Atributos para Cámara IP
   if (cameraType) {
     const cameraAttrs = [
-      {
-        attributeName: 'marca',
-        attributeLabel: 'Marca',
-        attributeType: 'text',
-        isRequired: true,
-        isVisible: true,
-        order: 1,
-        helpText: 'Ej: Hikvision, Dahua, Axis',
-      },
-      {
-        attributeName: 'modelo',
-        attributeLabel: 'Modelo',
-        attributeType: 'text',
-        isRequired: true,
-        isVisible: true,
-        order: 2,
-      },
-      {
-        attributeName: 'numero_serie',
-        attributeLabel: 'Número de Serie',
-        attributeType: 'text',
-        isRequired: false,
-        isVisible: true,
-        order: 3,
-      },
       {
         attributeName: 'resolucion',
         attributeLabel: 'Resolución',
@@ -1157,31 +1001,6 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
   // Atributos para Herramienta Eléctrica
   if (powerToolType) {
     const toolAttrs = [
-      {
-        attributeName: 'marca',
-        attributeLabel: 'Marca',
-        attributeType: 'text',
-        isRequired: true,
-        isVisible: true,
-        order: 1,
-        helpText: 'Ej: DeWalt, Makita, Bosch',
-      },
-      {
-        attributeName: 'modelo',
-        attributeLabel: 'Modelo',
-        attributeType: 'text',
-        isRequired: true,
-        isVisible: true,
-        order: 2,
-      },
-      {
-        attributeName: 'numero_serie',
-        attributeLabel: 'Número de Serie',
-        attributeType: 'text',
-        isRequired: false,
-        isVisible: true,
-        order: 3,
-      },
       {
         attributeName: 'tipo_herramienta',
         attributeLabel: 'Tipo de Herramienta',

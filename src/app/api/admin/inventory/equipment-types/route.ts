@@ -18,6 +18,8 @@ const equipmentTypeSchema = z.object({
   familyId: z.string().uuid('ID de familia inválido').optional().nullable(),
   isActive: z.boolean().default(true),
   order: z.number().int().min(0).optional().default(999),
+  // Configuración de atributos
+  trackMaintenance: z.boolean().default(false),
 })
 
 /**
@@ -132,6 +134,8 @@ export async function POST(request: NextRequest) {
         familyId: validation.data.familyId || null,
         isActive: validation.data.isActive,
         order: validation.data.order ?? 999,
+        // Configuración de atributos
+        trackMaintenance: validation.data.trackMaintenance ?? false,
       },
       include: {
         family: {

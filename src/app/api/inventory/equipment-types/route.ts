@@ -46,6 +46,8 @@ export async function GET(req: NextRequest) {
         familyId: true,
         isActive: true,
         order: true,
+        // Campos de configuración
+        trackMaintenance: true,
       },
     })
 

@@ -190,7 +190,7 @@ export function AttributeFormDialog({
                     setFormData(prev => ({ ...prev, attributeName: e.target.value }))
                     validateName(e.target.value)
                   }}
-                  placeholder='ej: numero_serie'
+                  placeholder='ej: modelo'
                   className={nameError ? 'border-destructive' : ''}
                   disabled={saving || isEditing}
                 />
@@ -210,7 +210,7 @@ export function AttributeFormDialog({
                   id='attr-label'
                   value={formData.attributeLabel}
                   onChange={e => setFormData(prev => ({ ...prev, attributeLabel: e.target.value }))}
-                  placeholder='ej: Número de Serie'
+                  placeholder='ej: Modelo'
                   disabled={saving}
                 />
               </div>
