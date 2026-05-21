@@ -93,3 +93,42 @@ export function getRenewalAlertClass(isExpired: boolean): string {
     ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
     : 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
 }
+
+// ── Condición del equipo ──────────────────────────────────────────────────
+
+const ASSET_CONDITION_COLORS: Record<string, string> = {
+  NEW: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+  GOOD: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+  FAIR: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
+  POOR: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+}
+
+const ASSET_CONDITION_LABELS: Record<string, string> = {
+  NEW: 'Nuevo',
+  GOOD: 'Bueno',
+  FAIR: 'Regular',
+  POOR: 'Malo',
+}
+
+export function getAssetConditionColor(condition: string): string {
+  return (
+    ASSET_CONDITION_COLORS[condition] ??
+    'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+  )
+}
+
+export function getAssetConditionLabel(condition: string): string {
+  return ASSET_CONDITION_LABELS[condition] ?? condition
+}
+
+// ── Tipo de propiedad ─────────────────────────────────────────────────────
+
+const ACQUISITION_MODE_LABELS: Record<string, string> = {
+  FIXED_ASSET: 'Activo Propio',
+  RENTAL: 'Arrendamiento',
+  LEASE: 'Arrendamiento Financiero',
+}
+
+export function getAcquisitionModeLabel(mode: string): string {
+  return ACQUISITION_MODE_LABELS[mode] ?? mode
+}

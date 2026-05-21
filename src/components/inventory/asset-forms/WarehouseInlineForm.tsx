@@ -18,7 +18,10 @@ interface Props {
   onCancel: () => void
 }
 
-interface Family { id: string; name: string }
+interface Family {
+  id: string
+  name: string
+}
 
 export function WarehouseInlineForm({ defaultFamilyId, onSuccess, onCancel }: Props) {
   const { toast } = useToast()
@@ -36,7 +39,10 @@ export function WarehouseInlineForm({ defaultFamilyId, onSuccess, onCancel }: Pr
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    if (!name.trim()) { setError('El nombre es obligatorio'); return }
+    if (!name.trim()) {
+      setError('El nombre es obligatorio')
+      return
+    }
     setLoading(true)
     try {
       const res = await fetch('/api/inventory/warehouses', {
@@ -50,7 +56,6 @@ export function WarehouseInlineForm({ defaultFamilyId, onSuccess, onCancel }: Pr
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error al crear')
-      toast({ title: 'Bodega creada', description: data.name })
       onSuccess({
         id: data.id,
         name: data.name,
@@ -64,33 +69,51 @@ export function WarehouseInlineForm({ defaultFamilyId, onSuccess, onCancel }: Pr
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-1">
-        <Label>Nombre <span className="text-destructive">*</span></Label>
-        <Input value={name} onChange={e => setName(e.target.value)} placeholder="Ej: Bodega Principal, Almacén TI..." autoFocus />
+    <form onSubmit={handleSubmit} className='space-y-4'>
+      <div className='space-y-1'>
+        <Label>
+          Nombre <span className='text-destructive'>*</span>
+        </Label>
+        <Input
+          value={name}
+          onChange={e => setName(e.target.value)}
+          placeholder='Ej: Bodega Principal, Almacén TI...'
+          autoFocus
+        />
       </div>
-      <div className="space-y-1">
+      <div className='space-y-1'>
         <Label>Ubicación</Label>
-        <Input value={location} onChange={e => setLocation(e.target.value)} placeholder="Ej: Piso 2, Edificio A" />
+        <Input
+          value={location}
+          onChange={e => setLocation(e.target.value)}
+          placeholder='Ej: Piso 2, Edificio A'
+        />
       </div>
-      <div className="space-y-1">
-        <Label>Familia <span className="text-xs font-normal text-muted-foreground">(opcional — vacío = bodega compartida)</span></Label>
+      <div className='space-y-1'>
+        <Label>
+          Familia{' '}
+          <span className='text-xs font-normal text-muted-foreground'>
+            (opcional — vacío = bodega compartida)
+          </span>
+        </Label>
         <SearchableSelect
           options={families}
           value={familyId}
           onChange={setFamilyId}
-          placeholder="Compartida (todas las familias)"
+          placeholder='Compartida (todas las familias)'
         />
-        <p className="text-xs text-muted-foreground">
-          Si asignas una familia, esta bodega aparecerá primero al crear activos de esa familia.
-          Las bodegas sin familia son visibles para todas.
+        <p className='text-xs text-muted-foreground'>
+          Si asignas una familia, esta bodega aparecerá primero al crear activos de esa familia. Las
+          bodegas sin familia son visibles para todas.
         </p>
       </div>
-      {error && <p className="text-sm text-destructive">{error}</p>}
-      <div className="flex justify-end gap-2 pt-1">
-        <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>Cancelar</Button>
-        <Button type="submit" disabled={loading}>
-          {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+      {error && <p className='text-sm text-destructive'>{error}</p>}
+      <div className='flex justify-end gap-2 pt-1'>
+        <Button type='button' variant='outline' onClick={onCancel} disabled={loading}>
+          Cancelar
+        </Button>
+        <Button type='submit' disabled={loading}>
+          {loading && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
           Crear bodega
         </Button>
       </div>

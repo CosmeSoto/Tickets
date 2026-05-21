@@ -86,12 +86,13 @@ export async function createModel(data: CreateModelInput) {
       throw new Error('La marca no existe')
     }
 
-    // Verificar que no exista el mismo modelo
+    // Verificar que no exista el mismo modelo (solo activos)
     const existingModel = await prisma.equipment_models.findFirst({
       where: {
         brandId: data.brandId,
         model: data.model,
         typeId: data.typeId,
+        isActive: true,
       },
     })
 
@@ -286,7 +287,7 @@ export async function updateModel(id: string, data: UpdateModelInput) {
 }
 
 /**
- * Elimina un modelo (soft delete)
+ * Elimina un modelo completamente (hard delete)
  */
 export async function deleteModel(id: string) {
   try {
@@ -301,10 +302,9 @@ export async function deleteModel(id: string) {
       )
     }
 
-    // Soft delete
-    await prisma.equipment_models.update({
+    // Hard delete - eliminar completamente de la base de datos
+    await prisma.equipment_models.delete({
       where: { id },
-      data: { isActive: false },
     })
 
     return { success: true }

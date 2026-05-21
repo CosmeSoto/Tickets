@@ -13,15 +13,18 @@ import {
   toInventoryAccessUser,
 } from '@/lib/inventory/inventory-resource-access'
 
-export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ typeId: string }> }
+) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    const { id } = await params
+    const { typeId } = await params
     const user = toInventoryAccessUser(session.user)
     const { name, description, icon, order, isActive, familyId } = await request.json()
 
-    const existing = await prisma.consumable_types.findUnique({ where: { id } })
+    const existing = await prisma.consumable_types.findUnique({ where: { id: typeId } })
     if (!existing) {
       return NextResponse.json({ error: 'Tipo de consumible no encontrado' }, { status: 404 })
     }
@@ -33,7 +36,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const updated = await prisma.consumable_types.update({
-      where: { id },
+      where: { id: typeId },
       data: {
         ...(name !== undefined && { name }),
         ...(description !== undefined && { description }),
@@ -48,7 +51,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     await AuditServiceComplete.log({
       action: AuditActionsComplete.CONSUMABLE_TYPE_UPDATED,
       entityType: 'inventory',
-      entityId: id,
+      entityId: typeId,
       userId: session.user.id,
       details: { name: updated.name, code: updated.code },
       oldValues: {
@@ -74,7 +77,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     return NextResponse.json(updated)
   } catch (error: any) {
-    console.error('Error en PUT /api/inventory/consumable-types/[id]:', error)
+    console.error('Error en PUT /api/inventory/consumable-types/[typeId]:', error)
     return NextResponse.json(
       {
         error:
@@ -89,31 +92,31 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ typeId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     await assertGlobalCatalogDelete(toInventoryAccessUser(session.user))
 
-    const { id } = await params
+    const { typeId } = await params
 
-    const existing = await prisma.consumable_types.findUnique({ where: { id } })
+    const existing = await prisma.consumable_types.findUnique({ where: { id: typeId } })
     if (!existing) {
       return NextResponse.json({ error: 'Tipo de consumible no encontrado' }, { status: 404 })
     }
 
-    const count = await prisma.consumables.count({ where: { typeId: id } })
+    const count = await prisma.consumables.count({ where: { typeId: typeId } })
     if (count > 0) {
       const updated = await prisma.consumable_types.update({
-        where: { id },
+        where: { id: typeId },
         data: { isActive: false },
       })
 
       await AuditServiceComplete.log({
         action: AuditActionsComplete.CONSUMABLE_TYPE_UPDATED,
         entityType: 'inventory',
-        entityId: id,
+        entityId: typeId,
         userId: session.user.id,
         details: {
           name: existing.name,
@@ -136,12 +139,12 @@ export async function DELETE(
       })
     }
 
-    await prisma.consumable_types.delete({ where: { id } })
+    await prisma.consumable_types.delete({ where: { id: typeId } })
 
     await AuditServiceComplete.log({
       action: AuditActionsComplete.CONSUMABLE_TYPE_DELETED,
       entityType: 'inventory',
-      entityId: id,
+      entityId: typeId,
       userId: session.user.id,
       details: { name: existing.name, code: existing.code },
       ipAddress:
@@ -154,7 +157,7 @@ export async function DELETE(
     return NextResponse.json({ message: 'Tipo eliminado permanentemente' })
   } catch (error: any) {
     if (error instanceof InventoryAccessError) return inventoryAccessToResponse(error)
-    console.error('Error en DELETE /api/inventory/consumable-types/[id]:', error)
+    console.error('Error en DELETE /api/inventory/consumable-types/[typeId]:', error)
     const message =
       error?.code === 'P2003'
         ? 'No se puede eliminar: hay registros que dependen de este tipo'

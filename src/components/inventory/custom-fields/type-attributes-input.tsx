@@ -71,7 +71,7 @@ export function TypeAttributesInput({
       setIsLoading(true)
 
       // Determinar el endpoint según el tipo de activo
-      const endpoint = `/api/admin/inventory/${assetType}-types/${typeId}/attributes`
+      const endpoint = `/api/inventory/${assetType}-types/${typeId}/attributes`
 
       const response = await fetch(endpoint)
       if (!response.ok) {

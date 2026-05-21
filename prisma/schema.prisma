@@ -1030,6 +1030,7 @@ model equipment {
   totalUnits            Float?                  @map("total_units")
   usedUnits             Float?                  @map("used_units")
   saleListingPrice      Float?                  @map("sale_listing_price")
+  estimatedPrice        Float?                  @map("estimated_price")
   contractStartDate     DateTime?               @map("contract_start_date")
   contractEndDate       DateTime?               @map("contract_end_date")
   contractRenewalCost   Float?                  @map("contract_renewal_cost")

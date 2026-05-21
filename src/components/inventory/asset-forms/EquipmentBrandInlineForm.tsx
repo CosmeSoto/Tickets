@@ -69,7 +69,6 @@ export function EquipmentBrandInlineForm({ familyId, item, onSuccess, onCancel }
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error al guardar')
-      toast({ title: isEdit ? 'Marca actualizada' : 'Marca creada', description: data.name })
       onSuccess({ id: data.id, name: data.name })
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error desconocido')

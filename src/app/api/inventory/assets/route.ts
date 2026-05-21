@@ -56,8 +56,8 @@ export async function GET(req: NextRequest) {
     const mapped = items.map(item => ({
       id: item.id,
       name: item.model
-        ? `${item.model.brand} ${item.model.model}`
-        : `${item.brand} ${item.modelDeprecated}`,
+        ? `${item.model.brand?.name ?? ''} ${item.model.model}`.trim()
+        : `${(item as any).brand ?? ''} ${(item as any).modelDeprecated ?? ''}`.trim(),
       subtype: 'EQUIPMENT' as const,
       familyId: item.type?.familyId ?? '',
       family: {
@@ -68,6 +68,7 @@ export async function GET(req: NextRequest) {
       status: item.status,
       code: item.code,
       acquisitionMode: (item as any).acquisitionMode ?? (item as any).ownershipType ?? undefined,
+      condition: (item as any).condition ?? undefined,
       createdAt: item.createdAt.toISOString(),
     }))
     const filtered = mapped.filter(
@@ -207,7 +208,7 @@ export async function GET(req: NextRequest) {
   const mappedEquipment: UnifiedAsset[] = equipmentItems.map(item => ({
     id: item.id,
     name: item.model
-      ? `${item.model.brand} ${item.model.model}`
+      ? `${item.model.brand?.name ?? ''} ${item.model.model}`.trim()
       : `${(item as any).brand ?? ''} ${(item as any).modelDeprecated ?? ''}`.trim(),
     subtype: 'EQUIPMENT' as const,
     familyId: item.type?.family?.id ?? '',
@@ -218,7 +219,8 @@ export async function GET(req: NextRequest) {
     },
     status: item.status ?? 'ACTIVE',
     code: (item as any).code ?? undefined,
-    acquisitionMode: (item as any).acquisitionMode ?? undefined,
+    acquisitionMode: (item as any).acquisitionMode ?? (item as any).ownershipType ?? undefined,
+    condition: (item as any).condition ?? undefined,
     createdAt: item.createdAt.toISOString(),
   }))
 
@@ -320,10 +322,11 @@ export async function POST(req: NextRequest) {
       // EQUIPMENT
       code,
       serialNumber,
-      brand,
-      model,
+      brandId,
+      modelId,
       typeId,
       warehouseId,
+      estimatedPrice,
       purchaseDate,
       purchasePrice,
       invoiceNumber,
@@ -425,8 +428,8 @@ export async function POST(req: NextRequest) {
       // Validar campos obligatorios
       if (!typeId)
         return NextResponse.json({ error: 'El tipo de equipo es obligatorio' }, { status: 400 })
-      if (!brand) return NextResponse.json({ error: 'La marca es obligatoria' }, { status: 400 })
-      if (!model) return NextResponse.json({ error: 'El modelo es obligatorio' }, { status: 400 })
+      if (!brandId) return NextResponse.json({ error: 'La marca es obligatoria' }, { status: 400 })
+      if (!modelId) return NextResponse.json({ error: 'El modelo es obligatorio' }, { status: 400 })
 
       const resolvedEquipmentWarehouseId = warehouseId ?? defaultWarehouseId
       const {
@@ -465,24 +468,14 @@ export async function POST(req: NextRequest) {
       // departmentId: se establece cuando el equipo está ASSIGNED (viene del usuario receptor)
       const resolvedDepartmentId = body.departmentId ? String(body.departmentId) : undefined
 
-      // Buscar o crear el modelo de equipo
-      let equipmentModel = await prisma.equipment_models.findFirst({
-        where: {
-          brand: brand,
-          model: model,
-          typeId: typeId,
-        },
+      // Obtener el modelo (ya debe existir, porque el frontend lo crea inline)
+      const equipmentModel = await prisma.equipment_models.findUnique({
+        where: { id: modelId },
+        include: { brand: true },
       })
 
       if (!equipmentModel) {
-        equipmentModel = await prisma.equipment_models.create({
-          data: {
-            id: randomUUID(),
-            brand: brand,
-            model: model,
-            typeId: typeId,
-          },
-        })
+        return NextResponse.json({ error: 'El modelo de equipo no existe' }, { status: 404 })
       }
 
       asset = await prisma.equipment.create({
@@ -490,9 +483,9 @@ export async function POST(req: NextRequest) {
           id: randomUUID(),
           code: resolvedCode,
           serialNumber: serialNumber ?? '',
-          brand: brand ?? '',
-          modelDeprecated: model ?? '',
-          modelId: equipmentModel.id,
+          brand: equipmentModel.brand.name ?? '',
+          modelDeprecated: equipmentModel.model ?? '',
+          modelId: modelId,
           typeId: typeId ?? '',
           departmentId: resolvedDepartmentId,
           status: (status as any) ?? 'AVAILABLE',
@@ -514,6 +507,7 @@ export async function POST(req: NextRequest) {
           accessories,
           specifications: specifications ?? undefined,
           notes: notes ?? undefined,
+          estimatedPrice: estimatedPrice ?? undefined,
           qrCode: randomUUID(),
         } as any,
       })

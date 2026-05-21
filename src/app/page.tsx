@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -63,7 +63,7 @@ const defaultContent: LandingContent = {
   footerText: `© ${new Date().getFullYear()} Sistema de Tickets`,
 }
 
-export default function HomePage() {
+function HomePageContent() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -450,5 +450,22 @@ export default function HomePage() {
         </footer>
       </div>
     </>
+  )
+}
+
+export default function HomePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className='min-h-screen flex items-center justify-center bg-background'>
+          <div className='text-center'>
+            <Loader2 className='h-10 w-10 animate-spin text-primary mx-auto mb-3' />
+            <p className='text-sm text-muted-foreground'>Cargando...</p>
+          </div>
+        </div>
+      }
+    >
+      <HomePageContent />
+    </Suspense>
   )
 }

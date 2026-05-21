@@ -8,7 +8,13 @@ import { FamilyCombobox } from '@/components/ui/family-combobox'
 import { FamilyBadge } from '@/components/inventory/family-badge'
 import { SubtypeBadge } from '@/components/inventory/subtype-badge'
 import { ExportButton } from '@/components/common/export-button'
-import { getAssetStatusColor, getAssetStatusLabel } from '@/lib/utils/inventory-utils'
+import {
+  getAssetStatusColor,
+  getAssetStatusLabel,
+  getAssetConditionColor,
+  getAssetConditionLabel,
+  getAcquisitionModeLabel,
+} from '@/lib/utils/inventory-utils'
 import { useExport } from '@/hooks/common/use-export'
 import { useTableSort } from '@/hooks/common/use-table-sort'
 import { Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
@@ -25,6 +31,8 @@ interface UnifiedAsset {
   family: { name: string; icon: string | null; color: string | null }
   status: string
   code?: string
+  acquisitionMode?: string
+  condition?: string
   createdAt: string
 }
 
@@ -54,6 +62,19 @@ const SUBTYPE_FILTER_OPTIONS: { value: AssetSubtype | ''; label: string }[] = [
 function StatusBadge({ status }: { status: string }) {
   const cls = getAssetStatusColor(status)
   const label = getAssetStatusLabel(status)
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}
+    >
+      {label}
+    </span>
+  )
+}
+
+function ConditionBadge({ condition }: { condition?: string }) {
+  if (!condition) return null
+  const cls = getAssetConditionColor(condition)
+  const label = getAssetConditionLabel(condition)
   return (
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}
@@ -186,18 +207,26 @@ export function UnifiedInventoryList({
         key: 'subtype',
         label: 'Tipo',
         format: (v: string) =>
-          (
-            ({
-              EQUIPMENT: 'Equipo',
-              MRO: 'Material / Consumible',
-              LICENSE: 'Licencia y Contrato',
-            }) as Record<string, string>
-          )[v] ?? v,
+          ({
+            EQUIPMENT: 'Equipo',
+            MRO: 'Material / Consumible',
+            LICENSE: 'Licencia y Contrato',
+          })[v] ?? v,
       },
       { key: 'family', label: 'Área', format: (v: any) => v?.name ?? '' },
       { key: 'name', label: 'Nombre' },
       { key: 'code', label: 'Código', format: (v: any, r: any) => v ?? r.id.slice(0, 8) },
       { key: 'status', label: 'Estado', format: (v: string) => getAssetStatusLabel(v) },
+      {
+        key: 'condition',
+        label: 'Condición',
+        format: (v: string) => (v ? getAssetConditionLabel(v) : ''),
+      },
+      {
+        key: 'acquisitionMode',
+        label: 'Propiedad',
+        format: (v: string) => (v ? getAcquisitionModeLabel(v) : ''),
+      },
       {
         key: 'createdAt',
         label: 'Creado',
@@ -315,6 +344,18 @@ export function UnifiedInventoryList({
               </th>
               <th
                 className='px-4 py-3 text-left font-medium text-muted-foreground hidden lg:table-cell cursor-pointer hover:bg-muted/50 transition-colors select-none'
+                onClick={() => requestSort('condition')}
+              >
+                Condición {renderSortIcon('condition')}
+              </th>
+              <th
+                className='px-4 py-3 text-left font-medium text-muted-foreground hidden lg:table-cell cursor-pointer hover:bg-muted/50 transition-colors select-none'
+                onClick={() => requestSort('acquisitionMode')}
+              >
+                Propiedad {renderSortIcon('acquisitionMode')}
+              </th>
+              <th
+                className='px-4 py-3 text-left font-medium text-muted-foreground hidden lg:table-cell cursor-pointer hover:bg-muted/50 transition-colors select-none'
                 onClick={() => requestSort('createdAt')}
               >
                 Creado {renderSortIcon('createdAt')}
@@ -324,7 +365,7 @@ export function UnifiedInventoryList({
           <tbody className='divide-y divide-border bg-card'>
             {loading ? (
               <tr>
-                <td colSpan={6} className='px-4 py-10 text-center text-muted-foreground'>
+                <td colSpan={8} className='px-4 py-10 text-center text-muted-foreground'>
                   <div className='flex items-center justify-center gap-2'>
                     <div className='h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent' />
                     Cargando…
@@ -333,7 +374,7 @@ export function UnifiedInventoryList({
               </tr>
             ) : sortedAssets.length === 0 ? (
               <tr>
-                <td colSpan={6} className='px-4 py-10 text-center text-muted-foreground'>
+                <td colSpan={8} className='px-4 py-10 text-center text-muted-foreground'>
                   No hay activos para mostrar.
                 </td>
               </tr>
@@ -358,6 +399,12 @@ export function UnifiedInventoryList({
                   </td>
                   <td className='px-4 py-3 hidden lg:table-cell'>
                     <StatusBadge status={asset.status} />
+                  </td>
+                  <td className='px-4 py-3 hidden lg:table-cell'>
+                    <ConditionBadge condition={asset.condition} />
+                  </td>
+                  <td className='px-4 py-3 text-muted-foreground text-xs hidden lg:table-cell'>
+                    {asset.acquisitionMode ? getAcquisitionModeLabel(asset.acquisitionMode) : ''}
                   </td>
                   <td className='px-4 py-3 text-muted-foreground hidden lg:table-cell'>
                     {formatDate(asset.createdAt)}

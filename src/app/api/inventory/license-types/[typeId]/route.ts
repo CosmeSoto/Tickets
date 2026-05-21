@@ -14,22 +14,25 @@ import {
 } from '@/lib/inventory/inventory-resource-access'
 
 /**
- * PUT /api/inventory/license-types/[id]
+ * PUT /api/inventory/license-types/[typeId]
  * Actualiza un tipo de licencia (ADMIN y TECHNICIAN)
  */
-export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ typeId: string }> }
+) {
   try {
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
-    const { id } = await params
+    const { typeId } = await params
     const user = toInventoryAccessUser(session.user)
     const body = await request.json()
     const { name, description, icon, order, isActive, familyId } = body
 
-    const existing = await prisma.license_types.findUnique({ where: { id } })
+    const existing = await prisma.license_types.findUnique({ where: { id: typeId } })
     if (!existing) {
       return NextResponse.json({ error: 'Tipo de licencia no encontrado' }, { status: 404 })
     }
@@ -41,7 +44,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const updated = await prisma.license_types.update({
-      where: { id },
+      where: { id: typeId },
       data: {
         ...(name !== undefined && { name }),
         ...(description !== undefined && { description }),
@@ -56,7 +59,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     await AuditServiceComplete.log({
       action: AuditActionsComplete.LICENSE_TYPE_UPDATED,
       entityType: 'inventory',
-      entityId: id,
+      entityId: typeId,
       userId: session.user.id,
       details: { name: updated.name, code: updated.code },
       oldValues: {
@@ -83,7 +86,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json(updated)
   } catch (error: any) {
     if (error instanceof InventoryAccessError) return inventoryAccessToResponse(error)
-    console.error('Error en PUT /api/inventory/license-types/[id]:', error)
+    console.error('Error en PUT /api/inventory/license-types/[typeId]:', error)
     return NextResponse.json(
       {
         error:
@@ -97,12 +100,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 /**
- * DELETE /api/inventory/license-types/[id]
+ * DELETE /api/inventory/license-types/[typeId]
  * Elimina (o desactiva) un tipo de licencia (solo ADMIN)
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ typeId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -113,27 +116,27 @@ export async function DELETE(
 
     await assertGlobalCatalogDelete(toInventoryAccessUser(session.user))
 
-    const { id } = await params
+    const { typeId } = await params
 
-    const existing = await prisma.license_types.findUnique({ where: { id } })
+    const existing = await prisma.license_types.findUnique({ where: { id: typeId } })
     if (!existing) {
       return NextResponse.json({ error: 'Tipo de licencia no encontrado' }, { status: 404 })
     }
 
     const licenseCount = await prisma.software_licenses.count({
-      where: { typeId: id },
+      where: { typeId: typeId },
     })
 
     if (licenseCount > 0) {
       const updated = await prisma.license_types.update({
-        where: { id },
+        where: { id: typeId },
         data: { isActive: false },
       })
 
       await AuditServiceComplete.log({
         action: AuditActionsComplete.LICENSE_TYPE_UPDATED,
         entityType: 'inventory',
-        entityId: id,
+        entityId: typeId,
         userId: session.user.id,
         details: {
           name: existing.name,
@@ -156,12 +159,12 @@ export async function DELETE(
       })
     }
 
-    await prisma.license_types.delete({ where: { id } })
+    await prisma.license_types.delete({ where: { id: typeId } })
 
     await AuditServiceComplete.log({
       action: AuditActionsComplete.LICENSE_TYPE_DELETED,
       entityType: 'inventory',
-      entityId: id,
+      entityId: typeId,
       userId: session.user.id,
       details: { name: existing.name, code: existing.code },
       ipAddress:
@@ -174,7 +177,7 @@ export async function DELETE(
     return NextResponse.json({ message: 'Tipo eliminado permanentemente' })
   } catch (error: any) {
     if (error instanceof InventoryAccessError) return inventoryAccessToResponse(error)
-    console.error('Error en DELETE /api/inventory/license-types/[id]:', error)
+    console.error('Error en DELETE /api/inventory/license-types/[typeId]:', error)
     const message =
       error?.code === 'P2003'
         ? 'No se puede eliminar: hay registros que dependen de este tipo'

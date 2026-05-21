@@ -175,15 +175,6 @@ export async function seedAttributes(prisma: PrismaClient, familyMap: Map<string
         order: 9,
         options: ['13.3', '14', '15.6', '17'],
       },
-      {
-        attributeName: 'resolucion',
-        attributeLabel: 'Resolución',
-        attributeType: 'select',
-        isRequired: false,
-        isVisible: true,
-        order: 10,
-        options: ['1366x768', '1920x1080', '2560x1440', '3840x2160'],
-      },
     ]
 
     for (const attr of laptopAttrs) {

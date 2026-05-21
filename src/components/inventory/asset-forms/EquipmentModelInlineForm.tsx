@@ -81,10 +81,12 @@ export function EquipmentModelInlineForm({
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error al guardar')
       const brandName = brands.find(b => b.id === brandId)?.name ?? ''
+
       toast({
         title: isEdit ? 'Modelo actualizado' : 'Modelo creado',
-        description: `${brandName} ${data.model}`,
+        description: `El modelo ${brandName} ${data.model} fue ${isEdit ? 'actualizado' : 'creado'} exitosamente`,
       })
+
       onSuccess({
         id: data.id,
         name: `${brandName} ${data.model}`,
@@ -92,7 +94,13 @@ export function EquipmentModelInlineForm({
         model: data.model,
       })
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Error desconocido')
+      const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
+      setError(errorMessage)
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive',
+      })
     } finally {
       setLoading(false)
     }

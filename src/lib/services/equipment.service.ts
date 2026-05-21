@@ -54,6 +54,7 @@ export class EquipmentService {
           location: data.location,
           notes: data.notes,
           qrCode: qrCodeId,
+          estimatedPrice: (data as any).estimatedPrice,
           ...((data as any).departmentId !== undefined && {
             departmentId: (data as any).departmentId,
           }),
@@ -328,6 +329,9 @@ export class EquipmentService {
           ...((data as any).depreciationMethod !== undefined && {
             depreciationMethod: (data as any).depreciationMethod || null,
           }),
+          ...((data as any).estimatedPrice !== undefined && {
+            estimatedPrice: (data as any).estimatedPrice ?? null,
+          }),
         } as Prisma.equipmentUpdateInput,
       })
 
@@ -347,6 +351,7 @@ export class EquipmentService {
         location: 'Ubicación',
         notes: 'Notas',
         accessories: 'Accesorios',
+        estimatedPrice: 'Precio Estimado',
       }
 
       for (const key of Object.keys(data)) {
