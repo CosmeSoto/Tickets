@@ -9,7 +9,7 @@ import { EquipmentAssetForm } from '@/components/inventory/asset-forms/Equipment
 import { MROAssetForm } from '@/components/inventory/asset-forms/MROAssetForm'
 import { LicenseAssetForm } from '@/components/inventory/asset-forms/LicenseAssetForm'
 import { useInventoryFamilies } from '@/contexts/families-context'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 
 interface UnifiedAssetFormProps {
   onSuccess?: (asset: unknown) => void
@@ -24,7 +24,6 @@ export function UnifiedAssetForm({
   defaultFamilyId,
   onStepChange,
 }: UnifiedAssetFormProps) {
-  const { toast } = useToast()
   const [step, setStep] = useState<1 | 2 | 3>(1)
 
   // Notificar al padre cuando cambia el paso
@@ -134,10 +133,8 @@ export function UnifiedAssetForm({
         const data = await res.json().catch(() => ({}))
         const errorMessage = data.error ?? 'Error al crear el activo.'
         setSubmitError(errorMessage)
-        toast({
-          title: 'Error',
-          description: errorMessage,
-          variant: 'destructive',
+        toast.error(errorMessage, {
+          description: 'Inténtalo de nuevo',
         })
         return
       }
@@ -155,20 +152,13 @@ export function UnifiedAssetForm({
         )
       }
 
-      toast({
-        title: 'Activo creado',
-        description: 'El activo fue creado exitosamente',
-      })
+      toast.success('Activo creado exitosamente')
 
-      onSuccess?.(asset)
+      setTimeout(() => onSuccess?.(asset), 1500)
     } catch {
       const errorMessage = 'Error de conexión.'
       setSubmitError(errorMessage)
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive',
-      })
+      toast.error(errorMessage)
     } finally {
       setSubmitting(false)
     }

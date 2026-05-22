@@ -9,7 +9,7 @@
  * 5. Observaciones
  */
 
-import { MapPin, Package2, Wrench, StickyNote, Tag, Warehouse } from 'lucide-react'
+import { MapPin, Package2, Wrench, StickyNote, Tag, Warehouse, Settings2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -37,10 +37,14 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
 export function EquipmentInfoCard({ equipment }: EquipmentInfoCardProps) {
   const physicalLocation = (equipment as any).physicalLocation as string | undefined
   const warehouse = (equipment as any).warehouse as { id: string; name: string } | undefined
+  const customValues = (equipment as any).customValues as
+    | Array<{ fieldName: string; fieldValue: string }>
+    | undefined
 
   const hasLocation = physicalLocation || equipment.location || warehouse
   const hasAccessories = equipment.accessories && equipment.accessories.length > 0
   const hasSpecs = equipment.specifications && Object.keys(equipment.specifications).length > 0
+  const hasCustomAttributes = customValues && customValues.length > 0
   const hasNotes = !!equipment.notes
 
   return (
@@ -69,6 +73,8 @@ export function EquipmentInfoCard({ equipment }: EquipmentInfoCardProps) {
           />
           <InfoRow label='Tipo de propiedad' value={OWNERSHIP_LABELS[equipment.ownershipType]} />
           {equipment.type?.name && <InfoRow label='Tipo de equipo' value={equipment.type.name} />}
+          <InfoRow label='Marca' value={equipment.brand} />
+          <InfoRow label='Modelo' value={equipment.model} />
           {(equipment as any).warrantyExpiration && (
             <InfoRow
               label='Garantía hasta'
@@ -111,7 +117,30 @@ export function EquipmentInfoCard({ equipment }: EquipmentInfoCardProps) {
           </>
         )}
 
-        {/* ── 3. Accesorios ── */}
+        {/* ── 3. Atributos del Tipo (Custom Fields) ── */}
+        {hasCustomAttributes && (
+          <>
+            <Separator />
+            <div className='space-y-2'>
+              <p className='text-xs font-medium text-muted-foreground flex items-center gap-1.5'>
+                <Settings2 className='h-3.5 w-3.5' />
+                Atributos
+              </p>
+              <div className='rounded-md border border-border divide-y divide-border text-sm'>
+                {customValues!.map((item, i) => (
+                  <div key={i} className='flex items-center justify-between px-3 py-1.5'>
+                    <span className='text-muted-foreground text-xs'>{item.fieldName}</span>
+                    <span className='font-medium text-xs text-right max-w-[60%] truncate'>
+                      {item.fieldValue}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ── 4. Accesorios ── */}
         {hasAccessories && (
           <>
             <Separator />
@@ -131,7 +160,7 @@ export function EquipmentInfoCard({ equipment }: EquipmentInfoCardProps) {
           </>
         )}
 
-        {/* ── 4. Especificaciones técnicas ── */}
+        {/* ── 5. Especificaciones técnicas ── */}
         {hasSpecs && (
           <>
             <Separator />
@@ -141,20 +170,22 @@ export function EquipmentInfoCard({ equipment }: EquipmentInfoCardProps) {
                 Especificaciones técnicas
               </p>
               <div className='rounded-md border border-border divide-y divide-border text-sm'>
-                {Object.entries(equipment.specifications!).reverse().map(([key, value]) => (
-                  <div key={key} className='flex items-center justify-between px-3 py-1.5'>
-                    <span className='text-muted-foreground text-xs'>{key}</span>
-                    <span className='font-medium text-xs text-right max-w-[60%] truncate'>
-                      {String(value)}
-                    </span>
-                  </div>
-                ))}
+                {Object.entries(equipment.specifications!)
+                  .reverse()
+                  .map(([key, value]) => (
+                    <div key={key} className='flex items-center justify-between px-3 py-1.5'>
+                      <span className='text-muted-foreground text-xs'>{key}</span>
+                      <span className='font-medium text-xs text-right max-w-[60%] truncate'>
+                        {String(value)}
+                      </span>
+                    </div>
+                  ))}
               </div>
             </div>
           </>
         )}
 
-        {/* ── 5. Observaciones ── */}
+        {/* ── 6. Observaciones ── */}
         {hasNotes && (
           <>
             <Separator />

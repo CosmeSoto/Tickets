@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import { extractCatchError } from '@/lib/utils/api-error'
 import type {
   EquipmentDetailResponse,
@@ -23,9 +23,13 @@ interface UseEquipmentDetailProps {
   isSuperAdmin?: boolean
 }
 
-export function useEquipmentDetail({ equipmentId, userRole, userId, isSuperAdmin = false }: UseEquipmentDetailProps) {
+export function useEquipmentDetail({
+  equipmentId,
+  userRole,
+  userId,
+  isSuperAdmin = false,
+}: UseEquipmentDetailProps) {
   const router = useRouter()
-  const { toast } = useToast()
 
   // ── Data State ──
   const [data, setData] = useState<EquipmentDetailResponse | null>(null)
@@ -82,15 +86,11 @@ export function useEquipmentDetail({ equipmentId, userRole, userId, isSuperAdmin
       const result = await response.json()
       setData(result)
     } catch (err) {
-      toast({
-        title: 'Error',
-        description: extractCatchError(err, 'No se pudo cargar el equipo'),
-        variant: 'destructive',
-      })
+      toast.error(extractCatchError(err, 'No se pudo cargar el equipo'))
     } finally {
       setLoading(false)
     }
-  }, [equipmentId, toast])
+  }, [equipmentId])
 
   // ── Load QR Code ──
   const loadQRCode = useCallback(async () => {
@@ -128,36 +128,28 @@ export function useEquipmentDetail({ equipmentId, userRole, userId, isSuperAdmin
         const error = await response.json()
         if (response.status === 409) {
           setShowDeleteDialog(false)
-          toast({
-            title: 'No se puede retirar el equipo',
-            description:
-              'El equipo tiene una asignación activa. Primero debes desasignarlo (generar acta de devolución) y luego retirarlo.',
-            variant: 'destructive',
-            duration: 8000,
-          })
+          toast.error(
+            'El equipo tiene una asignación activa. Primero debes desasignarlo (generar acta de devolución) y luego retirarlo.',
+            {
+              duration: 8000,
+            }
+          )
           return
         }
         throw new Error(error.error || 'Error al retirar equipo')
       }
 
-      toast({
-        title: 'Equipo dado de baja',
-        description: 'El equipo ha sido marcado como retirado del inventario activo.',
-      })
+      toast.success('Equipo dado de baja exitosamente')
 
-      router.push('/inventory')
+      setTimeout(() => router.push('/inventory'), 1500)
     } catch (error) {
       console.error('Error eliminando equipo:', error)
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'No se pudo retirar el equipo',
-        variant: 'destructive',
-      })
+      toast.error(error instanceof Error ? error.message : 'No se pudo retirar el equipo')
     } finally {
       setDeleting(false)
       setShowDeleteDialog(false)
     }
-  }, [equipmentId, router, toast])
+  }, [equipmentId, router])
 
   const handlePermanentDelete = useCallback(async () => {
     setPermanentDeleting(true)
@@ -171,28 +163,21 @@ export function useEquipmentDetail({ equipmentId, userRole, userId, isSuperAdmin
         throw new Error(error.error || 'Error al eliminar equipo')
       }
 
-      toast({
-        title: 'Equipo eliminado',
-        description: 'El equipo ha sido eliminado permanentemente del sistema',
-      })
+      toast.success('Equipo eliminado exitosamente')
 
-      router.push('/inventory')
+      setTimeout(() => router.push('/inventory'), 1500)
     } catch (error) {
       console.error('Error eliminando permanentemente:', error)
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'No se pudo eliminar el equipo',
-        variant: 'destructive',
-      })
+      toast.error(error instanceof Error ? error.message : 'No se pudo eliminar el equipo')
     } finally {
       setPermanentDeleting(false)
       setShowPermanentDeleteDialog(false)
     }
-  }, [equipmentId, router, toast])
+  }, [equipmentId, router])
 
   const submitAssignment = useCallback(async () => {
     if (!assignForm.receiverId) {
-      toast({ title: 'Error', description: 'Selecciona un usuario', variant: 'destructive' })
+      toast.error('Selecciona un usuario')
       return
     }
     setAssigning(true)
@@ -218,32 +203,21 @@ export function useEquipmentDetail({ equipmentId, userRole, userId, isSuperAdmin
         throw new Error(error.error || 'Error al asignar equipo')
       }
 
-      toast({
-        title: 'Equipo asignado',
-        description: 'El equipo ha sido asignado exitosamente. Se generó un acta de entrega.',
-      })
+      toast.success('Equipo asignado exitosamente')
 
       setShowAssignDialog(false)
       loadEquipmentDetail()
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'No se pudo asignar el equipo',
-        variant: 'destructive',
-      })
+      toast.error(error instanceof Error ? error.message : 'No se pudo asignar el equipo')
     } finally {
       setAssigning(false)
     }
-  }, [assignForm, equipmentId, data, toast, loadEquipmentDetail])
+  }, [assignForm, equipmentId, data, loadEquipmentDetail])
 
   const submitReturn = useCallback(async () => {
     const activeAssignment = data?.currentAssignment
     if (!activeAssignment) {
-      toast({
-        title: 'Error',
-        description: 'No hay asignación activa para devolver',
-        variant: 'destructive',
-      })
+      toast.error('No hay asignación activa para devolver')
       setShowReturnDialog(false)
       return
     }
@@ -264,10 +238,7 @@ export function useEquipmentDetail({ equipmentId, userRole, userId, isSuperAdmin
         throw new Error(error.error || 'Error al devolver equipo')
       }
 
-      toast({
-        title: 'Equipo devuelto',
-        description: 'El equipo ha sido devuelto al inventario y está disponible nuevamente.',
-      })
+      toast.success('Equipo devuelto al inventario')
 
       setShowReturnDialog(false)
       setReturnForm({
@@ -286,19 +257,15 @@ export function useEquipmentDetail({ equipmentId, userRole, userId, isSuperAdmin
       )
       await loadEquipmentDetail()
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'No se pudo devolver el equipo',
-        variant: 'destructive',
-      })
+      toast.error(error instanceof Error ? error.message : 'No se pudo devolver el equipo')
     } finally {
       setReturning(false)
     }
-  }, [data, returnForm, toast, loadEquipmentDetail])
+  }, [data, returnForm, loadEquipmentDetail])
 
   const submitMaintenance = useCallback(async () => {
     if (!maintenanceForm.description.trim()) {
-      toast({ title: 'Error', description: 'Describe el mantenimiento', variant: 'destructive' })
+      toast.error('Describe el mantenimiento')
       return
     }
     setSubmittingMaintenance(true)
@@ -321,13 +288,11 @@ export function useEquipmentDetail({ equipmentId, userRole, userId, isSuperAdmin
         throw new Error(error.error || 'Error al registrar mantenimiento')
       }
 
-      toast({
-        title: userRole === 'CLIENT' ? 'Solicitud enviada' : 'Mantenimiento registrado',
-        description:
-          userRole === 'CLIENT'
-            ? 'Tu solicitud de mantenimiento fue enviada. El equipo técnico la revisará pronto.'
-            : 'El equipo ha sido marcado en mantenimiento. El cliente asignado será notificado.',
-      })
+      toast.success(
+        userRole === 'CLIENT'
+          ? 'Solicitud enviada exitosamente'
+          : 'Mantenimiento registrado exitosamente'
+      )
 
       setShowMaintenanceDialog(false)
       setMaintenanceForm({
@@ -337,16 +302,11 @@ export function useEquipmentDetail({ equipmentId, userRole, userId, isSuperAdmin
       })
       loadEquipmentDetail()
     } catch (error) {
-      toast({
-        title: 'Error',
-        description:
-          error instanceof Error ? error.message : 'No se pudo registrar el mantenimiento',
-        variant: 'destructive',
-      })
+      toast.error(error instanceof Error ? error.message : 'No se pudo registrar el mantenimiento')
     } finally {
       setSubmittingMaintenance(false)
     }
-  }, [maintenanceForm, equipmentId, userRole, userId, toast, loadEquipmentDetail])
+  }, [maintenanceForm, equipmentId, userRole, userId, loadEquipmentDetail])
 
   const handleReportProblem = useCallback(() => {
     if (!data?.equipment) return

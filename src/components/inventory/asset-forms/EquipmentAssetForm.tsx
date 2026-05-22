@@ -20,7 +20,7 @@ import { MaintenanceStatusBlock } from '@/components/inventory/shared/Maintenanc
 import { TypeAttributesInput } from '@/components/inventory/custom-fields/type-attributes-input'
 import { AttachmentsField } from '@/components/inventory/shared/AttachmentsField'
 import { AccessoriesSection } from '@/components/inventory/shared/AccessoriesSection'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import {
   showDepartmentSelector,
   showWarehouseSelector,
@@ -50,6 +50,7 @@ interface EquipmentAssetFormProps {
   submitError: string | null
   maxFileSizeMB?: number
   isEditMode?: boolean
+  initialEquipment?: any
 }
 
 const ACQUISITION_MODES = [
@@ -112,20 +113,20 @@ export function EquipmentAssetForm({
   submitError,
   maxFileSizeMB = 10,
   isEditMode = false,
+  initialEquipment,
 }: EquipmentAssetFormProps) {
-  const { toast } = useToast()
   const [acquisitionMode, setAcquisitionMode] = useState<'FIXED_ASSET' | 'RENTAL' | 'LOAN'>(
-    'FIXED_ASSET'
+    initialEquipment?.acquisitionMode || 'FIXED_ASSET'
   )
-  const [code, setCode] = useState('')
-  const [serialNumber, setSerialNumber] = useState('')
-  const [selectedBrandId, setSelectedBrandId] = useState('')
+  const [code, setCode] = useState(initialEquipment?.code || '')
+  const [serialNumber, setSerialNumber] = useState(initialEquipment?.serialNumber || '')
+  const [selectedBrandId, setSelectedBrandId] = useState(initialEquipment?.brandId || '')
   const [brands, setBrands] = useState<Array<{ id: string; name: string; code?: string }>>([])
-  const [selectedModelId, setSelectedModelId] = useState('')
+  const [selectedModelId, setSelectedModelId] = useState(initialEquipment?.modelId || '')
   const [equipmentModels, setEquipmentModels] = useState<
     Array<{ id: string; name: string; brandId?: string; model: string }>
   >([])
-  const [equipmentTypeId, setEquipmentTypeId] = useState('')
+  const [equipmentTypeId, setEquipmentTypeId] = useState(initialEquipment?.typeId || '')
   const [equipmentTypes, setEquipmentTypes] = useState<
     Array<{
       id: string
@@ -139,40 +140,62 @@ export function EquipmentAssetForm({
   }>({
     trackMaintenance: false,
   })
-  const [condition, setCondition] = useState('NEW')
-  const [equipmentStatus, setEquipmentStatus] = useState('AVAILABLE')
-  const [accessories, setAccessories] = useState<string[]>([])
+  const [condition, setCondition] = useState(initialEquipment?.condition || 'NEW')
+  const [equipmentStatus, setEquipmentStatus] = useState(initialEquipment?.status || 'AVAILABLE')
+  const [accessories, setAccessories] = useState<string[]>(initialEquipment?.accessories || [])
   // Campos personalizados
   const [customFieldValues, setCustomFieldValues] = useState<
     Array<{ fieldName: string; fieldValue: string }>
-  >([])
-  const [supplierId, setSupplierId] = useState('')
-  const [linkedContractId, setLinkedContractId] = useState<string | null>(null)
-  const [purchaseDate, setPurchaseDate] = useState('')
-  const [purchasePrice, setPurchasePrice] = useState('')
-  const [invoiceNumber, setInvoiceNumber] = useState('')
-  const [estimatedPrice, setEstimatedPrice] = useState('')
-  const [depreciationMethod, setDepreciationMethod] = useState('LINEAR')
-  const [usefulLifeYears, setUsefulLifeYears] = useState('')
-  const [residualValue, setResidualValue] = useState('')
+  >(initialEquipment?.customValues || [])
+  const [supplierId, setSupplierId] = useState(initialEquipment?.supplierId || '')
+  const [linkedContractId, setLinkedContractId] = useState<string | null>(
+    initialEquipment?.contractId || null
+  )
+  const [purchaseDate, setPurchaseDate] = useState(
+    initialEquipment?.purchaseDate
+      ? new Date(initialEquipment.purchaseDate).toISOString().split('T')[0]
+      : ''
+  )
+  const [purchasePrice, setPurchasePrice] = useState(
+    initialEquipment?.purchasePrice != null ? String(initialEquipment.purchasePrice) : ''
+  )
+  const [invoiceNumber, setInvoiceNumber] = useState(initialEquipment?.invoiceNumber || '')
+  const [estimatedPrice, setEstimatedPrice] = useState(
+    initialEquipment?.estimatedPrice != null ? String(initialEquipment.estimatedPrice) : ''
+  )
+  const [depreciationMethod, setDepreciationMethod] = useState(
+    initialEquipment?.depreciationMethod || 'LINEAR'
+  )
+  const [usefulLifeYears, setUsefulLifeYears] = useState(
+    initialEquipment?.usefulLifeYears != null ? String(initialEquipment.usefulLifeYears) : ''
+  )
+  const [residualValue, setResidualValue] = useState(
+    initialEquipment?.residualValue != null ? String(initialEquipment.residualValue) : ''
+  )
   // Campos para método "Por Uso"
-  const [totalUnits, setTotalUnits] = useState('') // capacidad total (horas/km/ciclos)
-  const [usedUnits, setUsedUnits] = useState('') // unidades ya consumidas
+  const [totalUnits, setTotalUnits] = useState(
+    initialEquipment?.totalUnits != null ? String(initialEquipment.totalUnits) : ''
+  ) // capacidad total (horas/km/ciclos)
+  const [usedUnits, setUsedUnits] = useState(
+    initialEquipment?.usedUnits != null ? String(initialEquipment.usedUnits) : ''
+  ) // unidades ya consumidas
   const [unitLabel, setUnitLabel] = useState('horas') // etiqueta personalizable
-  const [warehouseId, setWarehouseId] = useState('')
+  const [warehouseId, setWarehouseId] = useState(initialEquipment?.warehouseId || '')
   const [warehouses, setWarehouses] = useState<
     { id: string; name: string; description?: string }[]
   >([])
-  const [assignedUserId, setAssignedUserId] = useState('')
+  const [assignedUserId, setAssignedUserId] = useState(initialEquipment?.assignedUserId || '')
   // Departamento derivado del usuario asignado (solo lectura cuando estado=ASSIGNED)
   const [assignedUserDept, setAssignedUserDept] = useState<{ id: string; name: string } | null>(
     null
   )
-  const [notes, setNotes] = useState('')
-  const [physicalLocation, setPhysicalLocation] = useState('')
+  const [notes, setNotes] = useState(initialEquipment?.notes || '')
+  const [physicalLocation, setPhysicalLocation] = useState(initialEquipment?.physicalLocation || '')
   const [attachments, setAttachments] = useState<File[]>([])
   const [priceError, setPriceError] = useState('')
-  const [saleListingPrice, setSaleListingPrice] = useState('')
+  const [saleListingPrice, setSaleListingPrice] = useState(
+    initialEquipment?.saleListingPrice != null ? String(initialEquipment.saleListingPrice) : ''
+  )
 
   // Mantenimiento
   const [maintenanceDate, setMaintenanceDate] = useState(
@@ -667,17 +690,10 @@ export function EquipmentAssetForm({
                   if (selectedModelId === id) {
                     setSelectedModelId('')
                   }
-                  toast({
-                    title: 'Modelo eliminado',
-                    description: 'El modelo fue eliminado exitosamente',
-                  })
+                  toast.success('Modelo eliminado exitosamente')
                 } catch (err: unknown) {
                   const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
-                  toast({
-                    title: 'Error',
-                    description: errorMessage,
-                    variant: 'destructive',
-                  })
+                  toast.error(errorMessage)
                   throw err
                 }
               }}
@@ -1282,7 +1298,7 @@ export function EquipmentAssetForm({
           ← Atrás
         </Button>
         <Button type='submit' disabled={submitting} className='flex-1'>
-          {submitting ? 'Guardando...' : 'Crear Activo'}
+          {submitting ? 'Guardando...' : isEditMode ? 'Guardar cambios' : 'Crear Activo'}
         </Button>
       </div>
     </form>
