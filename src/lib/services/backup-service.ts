@@ -8,8 +8,18 @@ import { Prisma } from '@prisma/client'
 import { BackupCloudService, type CloudProvider } from './backup-cloud-service'
 import {
   exportTicketsModuleData,
+  exportNewsModuleData,
+  exportPatrolsModuleData,
+  exportFamiliesModuleData,
+  exportAuditsModuleData,
+  exportConfigurationsModuleData,
   isBackupModuleId,
   TICKETS_MODULE_RESTORE_ORDER,
+  NEWS_MODULE_RESTORE_ORDER,
+  PATROLS_MODULE_RESTORE_ORDER,
+  FAMILIES_MODULE_RESTORE_ORDER,
+  AUDITS_MODULE_RESTORE_ORDER,
+  CONFIGURATIONS_MODULE_RESTORE_ORDER,
   type BackupModuleId,
 } from './backup-modules'
 
@@ -71,7 +81,14 @@ export class BackupService {
       options?.module != null && isBackupModuleId(options.module) ? options.module : null
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-    const isTicketsModule = moduleKey === 'tickets'
+    const moduleBackup =
+      moduleKey &&
+      (moduleKey === 'tickets' ||
+        moduleKey === 'news' ||
+        moduleKey === 'patrols' ||
+        moduleKey === 'families' ||
+        moduleKey === 'audits' ||
+        moduleKey === 'configurations')
     let usePrismaBackup = false
 
     // Verificar si pg_dump está disponible
@@ -81,8 +98,8 @@ export class BackupService {
       usePrismaBackup = true
     }
 
-    const filename = isTicketsModule
-      ? `backup-tickets-${timestamp}.json`
+    const filename = moduleBackup
+      ? `backup-${moduleKey}-${timestamp}.json`
       : usePrismaBackup
         ? `backup-${timestamp}.json`
         : `backup-${timestamp}.sql`
@@ -145,14 +162,36 @@ export class BackupService {
 
       console.log(`Iniciando backup: ${filename}${moduleKey ? ` (módulo: ${moduleKey})` : ''}`)
 
-      if (isTicketsModule) {
-        const moduleData = await exportTicketsModuleData()
+      if (moduleBackup) {
+        let moduleData
+        switch (moduleKey) {
+          case 'tickets':
+            moduleData = await exportTicketsModuleData()
+            break
+          case 'news':
+            moduleData = await exportNewsModuleData()
+            break
+          case 'patrols':
+            moduleData = await exportPatrolsModuleData()
+            break
+          case 'families':
+            moduleData = await exportFamiliesModuleData()
+            break
+          case 'audits':
+            moduleData = await exportAuditsModuleData()
+            break
+          case 'configurations':
+            moduleData = await exportConfigurationsModuleData()
+            break
+          default:
+            throw new Error(`Módulo no soportado: ${moduleKey}`)
+        }
         const totalRecords = Object.values(moduleData).reduce((s, rows) => s + rows.length, 0)
         const payload = JSON.stringify(
           {
             metadata: {
               version: '2.1',
-              module: 'tickets',
+              module: moduleKey,
               timestamp: new Date().toISOString(),
               method: 'prisma-module',
               tables: Object.keys(moduleData),
@@ -164,7 +203,7 @@ export class BackupService {
           2
         )
         await writeFile(filepath, payload, 'utf-8')
-        console.log(`Backup módulo tickets: ${totalRecords} registros en total`)
+        console.log(`Backup módulo ${moduleKey}: ${totalRecords} registros en total`)
       } else if (usePgDump) {
         // Usar pg_dump si está disponible
         let command = `PGPASSWORD="${dbConfig.password}" pg_dump -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database}`
@@ -1131,12 +1170,35 @@ export class BackupService {
     console.log('Tablas a restaurar:', Object.keys(mappedData))
 
     const backupModule = backupData.metadata?.module as string | undefined
-    if (backupModule === 'tickets') {
+    if (backupModule) {
+      let restoreOrder
+      switch (backupModule) {
+        case 'tickets':
+          restoreOrder = TICKETS_MODULE_RESTORE_ORDER
+          break
+        case 'news':
+          restoreOrder = NEWS_MODULE_RESTORE_ORDER
+          break
+        case 'patrols':
+          restoreOrder = PATROLS_MODULE_RESTORE_ORDER
+          break
+        case 'families':
+          restoreOrder = FAMILIES_MODULE_RESTORE_ORDER
+          break
+        case 'audits':
+          restoreOrder = AUDITS_MODULE_RESTORE_ORDER
+          break
+        case 'configurations':
+          restoreOrder = CONFIGURATIONS_MODULE_RESTORE_ORDER
+          break
+        default:
+          throw new Error(`Módulo no soportado para restauración: ${backupModule}`)
+      }
       const scoped: Record<string, any[]> = {}
-      for (const key of TICKETS_MODULE_RESTORE_ORDER) {
+      for (const key of restoreOrder) {
         scoped[key] = mappedData[key] ?? []
       }
-      await this.restoreTicketsModuleFromJSON(scoped)
+      await this.restoreModuleFromJSON(backupModule, scoped, restoreOrder)
       return
     }
 
@@ -1277,67 +1339,73 @@ export class BackupService {
   }
 
   /**
-   * Restaura solo filas del módulo tickets incluidas en el backup (no borra el resto de la BD).
+   * Restaura solo filas del módulo especificado incluidas en el backup (no borra el resto de la BD).
    */
-  private static async restoreTicketsModuleFromJSON(
-    mappedData: Record<string, any[]>
+  private static async restoreModuleFromJSON(
+    moduleId: string,
+    mappedData: Record<string, any[]>,
+    restoreOrder: readonly string[]
   ): Promise<void> {
-    const tickets = mappedData.tickets ?? []
-    const ticketIds = tickets.map((t: any) => t.id).filter(Boolean)
-
     await prisma.$transaction(
       async tx => {
         await tx.$executeRaw(Prisma.sql`SET session_replication_role = replica;`)
 
-        if (ticketIds.length > 0) {
-          await tx.notifications.deleteMany({ where: { ticketId: { in: ticketIds } } })
+        if (moduleId === 'tickets') {
+          const tickets = mappedData.tickets ?? []
+          const ticketIds = tickets.map((t: any) => t.id).filter(Boolean)
 
-          const plans = await tx.resolution_plans.findMany({
-            where: { ticketId: { in: ticketIds } },
-            select: { id: true },
-          })
-          const planIds = plans.map(p => p.id)
-          if (planIds.length > 0) {
-            await tx.resolution_tasks.deleteMany({ where: { planId: { in: planIds } } })
+          if (ticketIds.length > 0) {
+            await tx.notifications.deleteMany({ where: { ticketId: { in: ticketIds } } })
+
+            const plans = await tx.resolution_plans.findMany({
+              where: { ticketId: { in: ticketIds } },
+              select: { id: true },
+            })
+            const planIds = plans.map(p => p.id)
+            if (planIds.length > 0) {
+              await tx.resolution_tasks.deleteMany({ where: { planId: { in: planIds } } })
+            }
+            await tx.resolution_plans.deleteMany({ where: { ticketId: { in: ticketIds } } })
+
+            await tx.ticket_knowledge_articles.deleteMany({
+              where: { ticketId: { in: ticketIds } },
+            })
+
+            const articleRows = mappedData.knowledge_articles ?? []
+            const articleIds = articleRows.map((a: any) => a.id).filter(Boolean)
+            if (articleIds.length > 0) {
+              await tx.article_votes.deleteMany({ where: { articleId: { in: articleIds } } })
+              await tx.knowledge_articles.deleteMany({ where: { id: { in: articleIds } } })
+            }
+
+            await tx.ticket_ratings.deleteMany({ where: { ticketId: { in: ticketIds } } })
+            await tx.ticket_collaborators.deleteMany({ where: { ticketId: { in: ticketIds } } })
+            await tx.ticket_history.deleteMany({ where: { ticketId: { in: ticketIds } } })
+            await tx.attachments.deleteMany({ where: { ticketId: { in: ticketIds } } })
+            await tx.comments.deleteMany({ where: { ticketId: { in: ticketIds } } })
+            // Quitar vínculo ticket → artículo (FK opcional) por si hay filas fuera del backup exportado
+            await tx.knowledge_articles.updateMany({
+              where: { sourceTicketId: { in: ticketIds } },
+              data: { sourceTicketId: null },
+            })
+            // maintenance_records puede referenciar ticket sin onDelete: Cascade
+            await tx.maintenance_records.updateMany({
+              where: { ticketId: { in: ticketIds } },
+              data: { ticketId: null },
+            })
+            await tx.tickets.deleteMany({ where: { id: { in: ticketIds } } })
           }
-          await tx.resolution_plans.deleteMany({ where: { ticketId: { in: ticketIds } } })
-
-          await tx.ticket_knowledge_articles.deleteMany({
-            where: { ticketId: { in: ticketIds } },
-          })
-
-          const articleRows = mappedData.knowledge_articles ?? []
-          const articleIds = articleRows.map((a: any) => a.id).filter(Boolean)
-          if (articleIds.length > 0) {
-            await tx.article_votes.deleteMany({ where: { articleId: { in: articleIds } } })
-            await tx.knowledge_articles.deleteMany({ where: { id: { in: articleIds } } })
-          }
-
-          await tx.ticket_ratings.deleteMany({ where: { ticketId: { in: ticketIds } } })
-          await tx.ticket_collaborators.deleteMany({ where: { ticketId: { in: ticketIds } } })
-          await tx.ticket_history.deleteMany({ where: { ticketId: { in: ticketIds } } })
-          await tx.attachments.deleteMany({ where: { ticketId: { in: ticketIds } } })
-          await tx.comments.deleteMany({ where: { ticketId: { in: ticketIds } } })
-          // Quitar vínculo ticket → artículo (FK opcional) por si hay filas fuera del backup exportado
-          await tx.knowledge_articles.updateMany({
-            where: { sourceTicketId: { in: ticketIds } },
-            data: { sourceTicketId: null },
-          })
-          // maintenance_records puede referenciar ticket sin onDelete: Cascade
-          await tx.maintenance_records.updateMany({
-            where: { ticketId: { in: ticketIds } },
-            data: { ticketId: null },
-          })
-          await tx.tickets.deleteMany({ where: { id: { in: ticketIds } } })
         }
 
         await tx.$executeRaw(Prisma.sql`SET session_replication_role = DEFAULT;`)
 
-        for (const tableName of TICKETS_MODULE_RESTORE_ORDER) {
+        for (const tableName of restoreOrder) {
           const tableData = mappedData[tableName]
           if (!tableData?.length) continue
 
-          console.log(`[módulo tickets] Restaurando ${tableData.length} registros → ${tableName}`)
+          console.log(
+            `[módulo ${moduleId}] Restaurando ${tableData.length} registros → ${tableName}`
+          )
 
           try {
             const processed = tableData.map((r: any) => this.processRecordForRestore(r))
@@ -1354,7 +1422,7 @@ export class BackupService {
       { timeout: 600000 }
     )
 
-    console.log('Restauración JSON módulo tickets completada')
+    console.log(`Restauración JSON módulo ${moduleId} completada`)
   }
 
   private static processRecordForRestore(record: any): any {

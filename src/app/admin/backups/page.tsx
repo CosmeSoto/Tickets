@@ -122,14 +122,30 @@ export default function BackupsPage() {
         <div className='flex items-center gap-2'>
           <Select
             value={manualBackupScope}
-            onValueChange={v => setManualBackupScope(v as 'full' | 'tickets')}
+            onValueChange={v =>
+              setManualBackupScope(
+                v as
+                  | 'full'
+                  | 'tickets'
+                  | 'news'
+                  | 'patrols'
+                  | 'families'
+                  | 'audits'
+                  | 'configurations'
+              )
+            }
           >
-            <SelectTrigger className='w-[200px] h-9 text-xs'>
+            <SelectTrigger className='w-[220px] h-9 text-xs'>
               <SelectValue placeholder='Ámbito' />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value='full'>Completo (BD)</SelectItem>
               <SelectItem value='tickets'>Solo tickets (JSON)</SelectItem>
+              <SelectItem value='news'>Solo noticias (JSON)</SelectItem>
+              <SelectItem value='patrols'>Solo rondas (JSON)</SelectItem>
+              <SelectItem value='families'>Solo familias (JSON)</SelectItem>
+              <SelectItem value='audits'>Solo auditorías (JSON)</SelectItem>
+              <SelectItem value='configurations'>Solo configuraciones (JSON)</SelectItem>
             </SelectContent>
           </Select>
           <Button onClick={createBackup} disabled={creating} size='sm'>
@@ -284,9 +300,14 @@ export default function BackupsPage() {
                           <Badge variant='outline'>
                             {backup.type === 'manual' ? 'Manual' : 'Automático'}
                           </Badge>
-                          {backup.module === 'tickets' ? (
+                          {backup.module ? (
                             <Badge variant='secondary' className='text-xs'>
-                              Módulo tickets
+                              {backup.module === 'tickets' && 'Módulo tickets'}
+                              {backup.module === 'news' && 'Módulo noticias'}
+                              {backup.module === 'patrols' && 'Módulo rondas'}
+                              {backup.module === 'families' && 'Módulo familias'}
+                              {backup.module === 'audits' && 'Módulo auditorías'}
+                              {backup.module === 'configurations' && 'Módulo configuraciones'}
                             </Badge>
                           ) : (
                             <Badge variant='outline' className='text-xs text-muted-foreground'>

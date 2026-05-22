@@ -98,8 +98,10 @@ export function useBackups() {
   const [showCleanupDialog, setShowCleanupDialog] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [cleaning, setCleaning] = useState(false)
-  /** Ámbito del próximo backup manual (completo vs módulo tickets) */
-  const [manualBackupScope, setManualBackupScope] = useState<'full' | 'tickets'>('full')
+  /** Ámbito del próximo backup manual (completo vs módulo) */
+  const [manualBackupScope, setManualBackupScope] = useState<
+    'full' | 'tickets' | 'news' | 'patrols' | 'families' | 'audits' | 'configurations'
+  >('full')
 
   // ── Auth check ──
   useEffect(() => {
@@ -184,7 +186,7 @@ export function useBackups() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'manual',
-          ...(manualBackupScope === 'tickets' ? { module: 'tickets' } : {}),
+          ...(manualBackupScope !== 'full' ? { module: manualBackupScope } : {}),
         }),
       })
       if (response.ok) {

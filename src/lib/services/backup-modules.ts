@@ -5,7 +5,13 @@
 
 import prisma from '@/lib/prisma'
 
-export type BackupModuleId = 'tickets' | 'news' | 'patrols'
+export type BackupModuleId =
+  | 'tickets'
+  | 'news'
+  | 'patrols'
+  | 'families'
+  | 'audits'
+  | 'configurations'
 
 export interface BackupModuleDefinition {
   id: BackupModuleId
@@ -32,6 +38,22 @@ export const BACKUP_MODULE_REGISTRY: Record<BackupModuleId, BackupModuleDefiniti
     label: 'Rondas y Patrullajes',
     description:
       'Rondas, rutas, checkpoints, programaciones, ejecuciones, incidentes, fotos, reportes y configuraciones del módulo de rondas y patrullajes.',
+  },
+  families: {
+    id: 'families',
+    label: 'Familias',
+    description: 'Familias del sistema y sus configuraciones.',
+  },
+
+  audits: {
+    id: 'audits',
+    label: 'Auditorías',
+    description: 'Registros de auditoría del sistema.',
+  },
+  configurations: {
+    id: 'configurations',
+    label: 'Configuraciones del Sistema',
+    description: 'Configuraciones generales del sistema (system_settings, site_config, etc.).',
   },
 }
 
@@ -291,4 +313,76 @@ export async function exportPatrolsModuleData(): Promise<Record<PatrolsModuleTab
     patrol_check_ins,
     patrol_photos,
   } as Record<PatrolsModuleTable, unknown[]>
+}
+
+/** Orden de inserción respetando FKs del módulo families. */
+export const FAMILIES_MODULE_RESTORE_ORDER = ['families', 'departments'] as const
+
+export type FamiliesModuleTable = (typeof FAMILIES_MODULE_RESTORE_ORDER)[number]
+
+const EMPTY_FAMILIES_PAYLOAD: Record<FamiliesModuleTable, unknown[]> = {
+  families: [],
+  departments: [],
+}
+
+export async function exportFamiliesModuleData(): Promise<Record<FamiliesModuleTable, unknown[]>> {
+  const families = await prisma.families.findMany()
+  const departments = await prisma.departments.findMany()
+  return {
+    families: families as unknown[],
+    departments: departments as unknown[],
+  }
+}
+
+/** Orden de inserción respetando FKs del módulo audits. */
+export const AUDITS_MODULE_RESTORE_ORDER = ['audit_logs'] as const
+
+export type AuditsModuleTable = (typeof AUDITS_MODULE_RESTORE_ORDER)[number]
+
+const EMPTY_AUDITS_PAYLOAD: Record<AuditsModuleTable, unknown[]> = {
+  audit_logs: [],
+}
+
+export async function exportAuditsModuleData(): Promise<Record<AuditsModuleTable, unknown[]>> {
+  const audit_logs = await prisma.audit_logs.findMany()
+  return { audit_logs: audit_logs as unknown[] }
+}
+
+/** Orden de inserción respetando FKs del módulo configurations. */
+export const CONFIGURATIONS_MODULE_RESTORE_ORDER = [
+  'system_settings',
+  'system_modules',
+  'site_config',
+  'pages',
+  'oauth_configs',
+] as const
+
+export type ConfigurationsModuleTable = (typeof CONFIGURATIONS_MODULE_RESTORE_ORDER)[number]
+
+const EMPTY_CONFIGURATIONS_PAYLOAD: Record<ConfigurationsModuleTable, unknown[]> = {
+  system_settings: [],
+  system_modules: [],
+  site_config: [],
+  pages: [],
+  oauth_configs: [],
+}
+
+export async function exportConfigurationsModuleData(): Promise<
+  Record<ConfigurationsModuleTable, unknown[]>
+> {
+  const [system_settings, system_modules, site_config, pages, oauth_configs] = await Promise.all([
+    prisma.system_settings.findMany(),
+    prisma.system_modules.findMany(),
+    prisma.site_config.findMany(),
+    prisma.pages.findMany(),
+    prisma.oauth_configs.findMany(),
+  ])
+
+  return {
+    system_settings: system_settings as unknown[],
+    system_modules: system_modules as unknown[],
+    site_config: site_config as unknown[],
+    pages: pages as unknown[],
+    oauth_configs: oauth_configs as unknown[],
+  }
 }
