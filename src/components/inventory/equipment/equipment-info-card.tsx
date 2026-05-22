@@ -85,6 +85,11 @@ export function EquipmentInfoCard({ equipment }: EquipmentInfoCardProps) {
               })}
             />
           )}
+          {/* Atributos dentro de la sección de identificación */}
+          {hasCustomAttributes &&
+            customValues!.map((item, i) => (
+              <InfoRow key={i} label={item.fieldName} value={item.fieldValue} />
+            ))}
         </div>
 
         {/* ── 2. Ubicación ── */}
@@ -112,29 +117,6 @@ export function EquipmentInfoCard({ equipment }: EquipmentInfoCardProps) {
                 {equipment.location && (
                   <InfoRow label='Ubicación adicional' value={equipment.location} />
                 )}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* ── 3. Atributos del Tipo (Custom Fields) ── */}
-        {hasCustomAttributes && (
-          <>
-            <Separator />
-            <div className='space-y-2'>
-              <p className='text-xs font-medium text-muted-foreground flex items-center gap-1.5'>
-                <Settings2 className='h-3.5 w-3.5' />
-                Atributos
-              </p>
-              <div className='rounded-md border border-border divide-y divide-border text-sm'>
-                {customValues!.map((item, i) => (
-                  <div key={i} className='flex items-center justify-between px-3 py-1.5'>
-                    <span className='text-muted-foreground text-xs'>{item.fieldName}</span>
-                    <span className='font-medium text-xs text-right max-w-[60%] truncate'>
-                      {item.fieldValue}
-                    </span>
-                  </div>
-                ))}
               </div>
             </div>
           </>
