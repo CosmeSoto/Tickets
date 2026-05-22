@@ -9,7 +9,7 @@
  * 5. Observaciones
  */
 
-import { MapPin, Package2, Wrench, StickyNote, Tag, Warehouse } from 'lucide-react'
+import { MapPin, Package2, Wrench, StickyNote, Tag, Warehouse, Settings2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -40,11 +40,27 @@ export function EquipmentInfoCard({ equipment }: EquipmentInfoCardProps) {
   const customValues = (equipment as any).customValues as
     | Array<{ fieldName: string; fieldValue: string }>
     | undefined
+  const familyCustomFields = (equipment as any).type?.family?.customFields as
+    | Array<{ fieldName: string; order: number }>
+    | undefined
+
+  // Sort customValues according to familyCustomFields order
+  const sortedCustomValues = (() => {
+    if (!customValues || !familyCustomFields) return customValues
+
+    const orderMap = new Map(familyCustomFields.map((field, index) => [field.fieldName, index]))
+
+    return [...customValues].sort((a, b) => {
+      const orderA = orderMap.get(a.fieldName) ?? Infinity
+      const orderB = orderMap.get(b.fieldName) ?? Infinity
+      return orderA - orderB
+    })
+  })()
 
   const hasLocation = physicalLocation || equipment.location || warehouse
   const hasAccessories = equipment.accessories && equipment.accessories.length > 0
   const hasSpecs = equipment.specifications && Object.keys(equipment.specifications).length > 0
-  const hasCustomAttributes = customValues && customValues.length > 0
+  const hasCustomAttributes = sortedCustomValues && sortedCustomValues.length > 0
   const hasNotes = !!equipment.notes
 
   return (
@@ -85,12 +101,25 @@ export function EquipmentInfoCard({ equipment }: EquipmentInfoCardProps) {
               })}
             />
           )}
-          {/* Atributos dentro de la sección de identificación */}
-          {hasCustomAttributes &&
-            customValues!.map((item, i) => (
-              <InfoRow key={i} label={item.fieldName} value={item.fieldValue} />
-            ))}
         </div>
+
+        {/* ── 1.5 Atributos Personalizados ── */}
+        {hasCustomAttributes && (
+          <>
+            <Separator />
+            <div className='space-y-2'>
+              <p className='text-xs font-medium text-muted-foreground flex items-center gap-1.5'>
+                <Settings2 className='h-3.5 w-3.5' />
+                Atributos
+              </p>
+              <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3'>
+                {sortedCustomValues!.map((item, i) => (
+                  <InfoRow key={i} label={item.fieldName} value={item.fieldValue} />
+                ))}
+              </div>
+            </div>
+          </>
+        )}
 
         {/* ── 2. Ubicación ── */}
         {hasLocation && (
