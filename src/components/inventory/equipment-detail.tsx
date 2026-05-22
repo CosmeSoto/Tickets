@@ -152,8 +152,8 @@ export function EquipmentDetail({
           <div className='min-w-0'>
             <h1 className='text-lg font-bold truncate'>
               {equipment.type?.name || 'Sin tipo'} ·{' '}
-              {equipment.brand || equipment.brand?.name || ''}{' '}
-              {equipment.model?.model || equipment.model || ''}
+              {equipment.model?.brand?.name || equipment.brand || ''}{' '}
+              {equipment.model?.model || equipment.modelDeprecated || ''}
             </h1>
             <p className='text-xs text-muted-foreground font-mono truncate'>{equipment.code}</p>
             {equipment.status === 'FOR_SALE' && (

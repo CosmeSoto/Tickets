@@ -118,6 +118,7 @@ export function EquipmentAssetForm({
   const getInitialBrandId = () => {
     if (!initialEquipment) return ''
     if (initialEquipment.brandId) return initialEquipment.brandId
+    if (initialEquipment.model?.brandId) return initialEquipment.model.brandId
     if (initialEquipment.brand?.id) return initialEquipment.brand.id
     return ''
   }

@@ -123,13 +123,13 @@ export default function EditEquipmentPage({ params }: EditEquipmentPageProps) {
   }
 
   const getEquipmentBrand = () => {
+    if (equipment.model?.brand?.name) return equipment.model.brand.name
     if (equipment.brand) return equipment.brand
-    if (equipment.brand?.name) return equipment.brand.name
     return ''
   }
   const getEquipmentModel = () => {
     if (equipment.model?.model) return equipment.model.model
-    if (equipment.model) return equipment.model
+    if (equipment.modelDeprecated) return equipment.modelDeprecated
     return ''
   }
   const equipmentTitle = [equipment.type?.name, getEquipmentBrand(), getEquipmentModel()]
