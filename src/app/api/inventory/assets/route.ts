@@ -465,6 +465,7 @@ export async function POST(req: NextRequest) {
           ? body.specifications
           : undefined
       const notes = body.notes ? String(body.notes) : undefined
+      const customValues = Array.isArray(body.customValues) ? body.customValues : []
       // departmentId: se establece cuando el equipo está ASSIGNED (viene del usuario receptor)
       const resolvedDepartmentId = body.departmentId ? String(body.departmentId) : undefined
 
@@ -508,6 +509,7 @@ export async function POST(req: NextRequest) {
           specifications: specifications ?? undefined,
           notes: notes ?? undefined,
           estimatedPrice: estimatedPrice ?? undefined,
+          customValues,
           qrCode: randomUUID(),
         } as any,
       })
