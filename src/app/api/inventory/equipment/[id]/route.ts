@@ -8,6 +8,7 @@ import { canManageInventory, canManageAsset, inventoryForbidden } from '@/lib/in
 import { prisma } from '@/lib/prisma'
 import { calculateDepreciation, familySupportsDepreciation } from '@/lib/inventory/depreciation'
 import { hasAccessToEquipment } from '@/lib/middleware/family-filter'
+import { randomUUID } from 'crypto'
 
 /**
  * GET /api/inventory/equipment/[id]
@@ -171,7 +172,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       contractStartDate = undefined,
       contractEndDate = undefined,
       contractRenewalCost = undefined,
-      customValues = undefined,
     } = body as {
       supplierId?: string | null
       invoiceNumber?: string | null
@@ -187,7 +187,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       contractStartDate?: string | null
       contractEndDate?: string | null
       contractRenewalCost?: number | null
-      customValues?: Array<{ fieldName: string; fieldValue: string }>
     }
 
     // Validación: usefulLifeYears > 0
@@ -255,7 +254,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       financialFields.contractEndDate = contractEndDate ? new Date(contractEndDate) : null
     if ('contractRenewalCost' in body)
       financialFields.contractRenewalCost = contractRenewalCost ?? null
-    if ('customValues' in body) financialFields.customValues = customValues ?? []
 
     // Campos de depreciación solo si la familia del activo los soporta
     const currentEquipment = await prisma.equipment.findUnique({
@@ -280,6 +278,28 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         where: { id },
         data: financialFields,
       })
+    }
+
+    // Handle customValues
+    if ('customValues' in body) {
+      const customValues = Array.isArray(body.customValues) ? body.customValues : []
+
+      // Delete existing custom values
+      await prisma.equipment_custom_values.deleteMany({
+        where: { equipmentId: id },
+      })
+
+      // Create new custom values if any
+      if (customValues.length > 0) {
+        await prisma.equipment_custom_values.createMany({
+          data: customValues.map(cv => ({
+            id: randomUUID(),
+            equipmentId: id,
+            fieldName: cv.fieldName,
+            fieldValue: cv.fieldValue,
+          })),
+        })
+      }
     }
 
     // Auditoría ya se registra en EquipmentService.updateEquipment

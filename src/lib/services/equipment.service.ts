@@ -111,17 +111,7 @@ export class EquipmentService {
         where: { id },
         include: {
           supplier: { select: { id: true, name: true, taxId: true } },
-          type: {
-            include: {
-              family: {
-                include: {
-                  customFields: {
-                    orderBy: { order: 'asc' },
-                  },
-                },
-              },
-            },
-          },
+          type: { include: { family: { include: { customFields: true } } } },
           model: { include: { brand: true } },
           warehouse: true,
           customValues: true,

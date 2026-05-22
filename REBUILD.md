@@ -17,6 +17,9 @@ docker compose -f docker-compose.dev.yml logs -f app
 
 # Detener:
 docker compose -f docker-compose.dev.yml down
+
+# Resetear app:
+docker compose -f docker-compose.dev.yml restart app
 ```
 
 ### Desarrollo (solo BD + Redis, app en host)

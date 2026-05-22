@@ -48,7 +48,10 @@ export function EquipmentInfoCard({ equipment }: EquipmentInfoCardProps) {
   const sortedCustomValues = (() => {
     if (!customValues || !familyCustomFields) return customValues
 
-    const orderMap = new Map(familyCustomFields.map((field, index) => [field.fieldName, index]))
+    const sortedFamilyFields = [...familyCustomFields].sort(
+      (a, b) => (a.order ?? 0) - (b.order ?? 0)
+    )
+    const orderMap = new Map(sortedFamilyFields.map((field, index) => [field.fieldName, index]))
 
     return [...customValues].sort((a, b) => {
       const orderA = orderMap.get(a.fieldName) ?? Infinity
