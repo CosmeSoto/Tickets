@@ -9,7 +9,7 @@
  * 5. Observaciones
  */
 
-import { MapPin, Package2, Wrench, StickyNote, Tag, Warehouse, Settings2 } from 'lucide-react'
+import { MapPin, Package2, Wrench, StickyNote, Tag, Warehouse } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
