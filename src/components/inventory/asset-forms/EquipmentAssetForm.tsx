@@ -115,18 +115,56 @@ export function EquipmentAssetForm({
   isEditMode = false,
   initialEquipment,
 }: EquipmentAssetFormProps) {
+  const getInitialBrandId = () => {
+    if (!initialEquipment) return ''
+    if (initialEquipment.brandId) return initialEquipment.brandId
+    if (initialEquipment.brand?.id) return initialEquipment.brand.id
+    return ''
+  }
+  const getInitialModelId = () => {
+    if (!initialEquipment) return ''
+    if (initialEquipment.modelId) return initialEquipment.modelId
+    if (initialEquipment.model?.id) return initialEquipment.model.id
+    return ''
+  }
+  const getInitialTypeId = () => {
+    if (!initialEquipment) return ''
+    if (initialEquipment.typeId) return initialEquipment.typeId
+    if (initialEquipment.type?.id) return initialEquipment.type.id
+    return ''
+  }
+  const getInitialWarehouseId = () => {
+    if (!initialEquipment) return ''
+    if (initialEquipment.warehouseId) return initialEquipment.warehouseId
+    if (initialEquipment.warehouse?.id) return initialEquipment.warehouse.id
+    return ''
+  }
+  const getInitialSupplierId = () => {
+    if (!initialEquipment) return ''
+    if (initialEquipment.supplierId) return initialEquipment.supplierId
+    if (initialEquipment.supplier?.id) return initialEquipment.supplier.id
+    return ''
+  }
+  const getInitialAcquisitionMode = () => {
+    if (!initialEquipment) return 'FIXED_ASSET'
+    if (initialEquipment.acquisitionMode) return initialEquipment.acquisitionMode
+    if (initialEquipment.ownershipType === 'RENTAL') return 'RENTAL'
+    if (initialEquipment.ownershipType === 'LOAN') return 'LOAN'
+    return 'FIXED_ASSET'
+  }
+
   const [acquisitionMode, setAcquisitionMode] = useState<'FIXED_ASSET' | 'RENTAL' | 'LOAN'>(
-    initialEquipment?.acquisitionMode || 'FIXED_ASSET'
+    getInitialAcquisitionMode()
   )
   const [code, setCode] = useState(initialEquipment?.code || '')
   const [serialNumber, setSerialNumber] = useState(initialEquipment?.serialNumber || '')
-  const [selectedBrandId, setSelectedBrandId] = useState(initialEquipment?.brandId || '')
+  const [selectedBrandId, setSelectedBrandId] = useState(getInitialBrandId())
   const [brands, setBrands] = useState<Array<{ id: string; name: string; code?: string }>>([])
-  const [selectedModelId, setSelectedModelId] = useState(initialEquipment?.modelId || '')
+  const [selectedModelId, setSelectedModelId] = useState(getInitialModelId())
   const [equipmentModels, setEquipmentModels] = useState<
     Array<{ id: string; name: string; brandId?: string; model: string }>
   >([])
-  const [equipmentTypeId, setEquipmentTypeId] = useState(initialEquipment?.typeId || '')
+  const [equipmentTypeId, setEquipmentTypeId] = useState(getInitialTypeId())
   const [equipmentTypes, setEquipmentTypes] = useState<
     Array<{
       id: string
@@ -147,7 +185,7 @@ export function EquipmentAssetForm({
   const [customFieldValues, setCustomFieldValues] = useState<
     Array<{ fieldName: string; fieldValue: string }>
   >(initialEquipment?.customValues || [])
-  const [supplierId, setSupplierId] = useState(initialEquipment?.supplierId || '')
+  const [supplierId, setSupplierId] = useState(getInitialSupplierId())
   const [linkedContractId, setLinkedContractId] = useState<string | null>(
     initialEquipment?.contractId || null
   )
@@ -180,7 +218,7 @@ export function EquipmentAssetForm({
     initialEquipment?.usedUnits != null ? String(initialEquipment.usedUnits) : ''
   ) // unidades ya consumidas
   const [unitLabel, setUnitLabel] = useState('horas') // etiqueta personalizable
-  const [warehouseId, setWarehouseId] = useState(initialEquipment?.warehouseId || '')
+  const [warehouseId, setWarehouseId] = useState(getInitialWarehouseId())
   const [warehouses, setWarehouses] = useState<
     { id: string; name: string; description?: string }[]
   >([])
@@ -233,22 +271,28 @@ export function EquipmentAssetForm({
   const supportsDepreciation = familyCode ? familySupportsDepreciation(familyCode) : true
 
   useEffect(() => {
-    fetch(`/api/inventory/equipment-types?familyId=${familyId}`)
-      .then(r => r.json())
-      .then(d => setEquipmentTypes(d.types ?? []))
-    fetch(`/api/inventory/warehouses?familyId=${familyId}`)
-      .then(r => r.json())
-      .then(d => setWarehouses(d.warehouses ?? d ?? []))
-    fetch(`/api/inventory/brands?familyId=${familyId}`)
-      .then(r => r.json())
-      .then(d => setBrands(d.brands ?? []))
-  }, [familyId])
+    Promise.all([
+      fetch(`/api/inventory/equipment-types?familyId=${familyId}`).then(r => r.json()),
+      fetch(`/api/inventory/warehouses?familyId=${familyId}`).then(r => r.json()),
+      fetch(`/api/inventory/brands?familyId=${familyId}`).then(r => r.json()),
+    ]).then(([typesRes, warehousesRes, brandsRes]) => {
+      setEquipmentTypes(typesRes.types ?? [])
+      setWarehouses(warehousesRes.warehouses ?? warehousesRes ?? [])
+      setBrands(brandsRes.brands ?? [])
+
+      if (isEditMode && initialEquipment) {
+        if (initialEquipment.typeId) setEquipmentTypeId(initialEquipment.typeId)
+        if (initialEquipment.brandId) setSelectedBrandId(initialEquipment.brandId)
+        if (initialEquipment.modelId) setSelectedModelId(initialEquipment.modelId)
+      }
+    })
+  }, [familyId, isEditMode])
 
   // Cargar modelos y configuración cuando se selecciona un tipo de equipo o marca
   useEffect(() => {
     if (!equipmentTypeId) {
       setEquipmentModels([])
-      setSelectedModelId('')
+      if (!isEditMode) setSelectedModelId('')
       setSelectedTypeConfig({
         trackMaintenance: false,
       })
@@ -281,9 +325,14 @@ export function EquipmentAssetForm({
           model: m.model,
         }))
         setEquipmentModels(models)
+
+        if (isEditMode && initialEquipment?.modelId) {
+          const modelExists = models.some(m => m.id === initialEquipment.modelId)
+          if (modelExists) setSelectedModelId(initialEquipment.modelId)
+        }
       })
       .catch(() => setEquipmentModels([]))
-  }, [equipmentTypeId, equipmentTypes, selectedBrandId])
+  }, [equipmentTypeId, equipmentTypes, selectedBrandId, isEditMode, initialEquipment?.modelId])
 
   // Task 19.1: fetch family-config depreciation defaults when familyId changes
   useEffect(() => {

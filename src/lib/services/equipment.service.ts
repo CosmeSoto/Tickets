@@ -112,6 +112,8 @@ export class EquipmentService {
         include: {
           supplier: { select: { id: true, name: true, taxId: true } },
           type: { include: { family: true } },
+          brand: true,
+          model: true,
           warehouse: true,
           assignments: {
             include: {

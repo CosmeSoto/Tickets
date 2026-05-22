@@ -122,7 +122,17 @@ export default function EditEquipmentPage({ params }: EditEquipmentPageProps) {
     )
   }
 
-  const equipmentTitle = [equipment.type?.name, equipment.brand, equipment.model]
+  const getEquipmentBrand = () => {
+    if (equipment.brand) return equipment.brand
+    if (equipment.brand?.name) return equipment.brand.name
+    return ''
+  }
+  const getEquipmentModel = () => {
+    if (equipment.model?.model) return equipment.model.model
+    if (equipment.model) return equipment.model
+    return ''
+  }
+  const equipmentTitle = [equipment.type?.name, getEquipmentBrand(), getEquipmentModel()]
     .filter(Boolean)
     .join(' · ')
 
