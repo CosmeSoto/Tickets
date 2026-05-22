@@ -114,6 +114,7 @@ export class EquipmentService {
           type: { include: { family: true } },
           model: { include: { brand: true } },
           warehouse: true,
+          customValues: true,
           assignments: {
             include: {
               receiver: { select: { id: true, name: true, email: true } },

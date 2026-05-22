@@ -73,8 +73,8 @@ export function EquipmentInfoCard({ equipment }: EquipmentInfoCardProps) {
           />
           <InfoRow label='Tipo de propiedad' value={OWNERSHIP_LABELS[equipment.ownershipType]} />
           {equipment.type?.name && <InfoRow label='Tipo de equipo' value={equipment.type.name} />}
-          <InfoRow label='Marca' value={equipment.brand} />
-          <InfoRow label='Modelo' value={equipment.model} />
+          <InfoRow label='Marca' value={equipment.model?.brand?.name || equipment.brand} />
+          <InfoRow label='Modelo' value={equipment.model?.model || equipment.modelDeprecated} />
           {(equipment as any).warrantyExpiration && (
             <InfoRow
               label='Garantía hasta'
