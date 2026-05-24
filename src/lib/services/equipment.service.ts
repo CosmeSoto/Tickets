@@ -111,7 +111,7 @@ export class EquipmentService {
         where: { id },
         include: {
           supplier: { select: { id: true, name: true, taxId: true } },
-          type: { include: { family: { include: { customFields: true } } } },
+          type: { include: { family: true } },
           model: { include: { brand: true } },
           warehouse: true,
           customValues: true,
@@ -146,6 +146,15 @@ export class EquipmentService {
 
       if (!equipment) {
         throw new Error('Equipo no encontrado')
+      }
+
+      // Fetch family custom fields separately to avoid parsing issues
+      if (equipment.type?.family?.id) {
+        const familyCustomFields = await prisma.family_custom_fields.findMany({
+          where: { familyId: equipment.type.family.id },
+          orderBy: { order: 'asc' },
+        })
+        ;(equipment.type.family as any).customFields = familyCustomFields
       }
 
       // Obtener asignación actual
