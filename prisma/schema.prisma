@@ -1207,9 +1207,10 @@ model maintenance_records {
   cost           Float?
   partsReplaced  String[]          @map("parts_replaced")
   ticketId       String?           @map("ticket_id")
-  notes          String?
-  previousStatus EquipmentStatus?  @map("previous_status")
-  createdAt      DateTime          @default(now()) @map("created_at")
+  notes               String?
+  previousStatus      EquipmentStatus?  @map("previous_status")
+  previousDepartmentId String?           @map("previous_department_id")
+  createdAt           DateTime          @default(now()) @map("created_at")
   updatedAt      DateTime          @updatedAt @map("updated_at")
   equipment      equipment         @relation(fields: [equipmentId], references: [id])
   requestedBy    users?            @relation("MaintenanceRequester", fields: [requestedById], references: [id])

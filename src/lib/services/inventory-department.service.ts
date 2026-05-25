@@ -40,6 +40,12 @@ export class InventoryDepartmentService {
     }
 
     const equipmentDeptId: string | null = (equipment as any).departmentId ?? null
+
+    // Si el equipo no tiene departamento (está disponible, en bodega, etc.), no validamos el departamento
+    if (!equipmentDeptId) {
+      return { valid: true }
+    }
+
     const receiverDeptId: string | null = receiver.departmentId ?? null
 
     if (equipmentDeptId === receiverDeptId) {
@@ -76,8 +82,8 @@ export class InventoryDepartmentService {
 
     if (familyAssignments.length > 0) {
       const familyIds: string[] = familyAssignments.map((fa: any) => fa.familyId as string)
-      const departmentIds: string[] = familyAssignments.flatMap(
-        (fa: any) => (fa.family?.departments ?? []).map((d: any) => d.id as string)
+      const departmentIds: string[] = familyAssignments.flatMap((fa: any) =>
+        (fa.family?.departments ?? []).map((d: any) => d.id as string)
       )
       return { type: 'family', familyIds, departmentIds }
     }

@@ -2,7 +2,17 @@ import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
-import { Building2, Package, Tag, User, Calendar, Wrench, AlertTriangle } from 'lucide-react'
+import {
+  Building2,
+  Package,
+  Tag,
+  User,
+  Calendar,
+  Wrench,
+  AlertTriangle,
+  Settings2,
+  CheckCircle,
+} from 'lucide-react'
 
 const STATUS_LABELS: Record<string, string> = {
   AVAILABLE: 'Disponible',
@@ -38,10 +48,24 @@ interface PageProps {
   params: Promise<{ equipmentId: string }>
 }
 
+async function getSystemBranding() {
+  try {
+    const content = await prisma.landing_page_content.findFirst({ where: { id: 'default' } })
+    return {
+      companyName: (content as any)?.companyName || 'Sistema de Gestión de Inventario',
+      logoUrl: (content as any)?.companyLogoLightUrl || null,
+    }
+  } catch {
+    return { companyName: 'Sistema de Gestión de Inventario', logoUrl: null }
+  }
+}
+
 export default async function EquipmentPublicPage({ params }: PageProps) {
   const { equipmentId } = await params
 
-  // Obtener IP del cliente
+  // Obtener branding del sistema y IP del cliente
+  const [branding] = await Promise.all([getSystemBranding()])
+
   const headersList = await headers()
   const ip =
     headersList.get('x-forwarded-for')?.split(',')[0]?.trim() ??
@@ -77,16 +101,59 @@ export default async function EquipmentPublicPage({ params }: PageProps) {
       attachments: {
         take: 1,
       },
+      customValues: true,
     },
+  })
+
+  const verifiedDate = new Date().toLocaleDateString('es-ES', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   })
 
   if (!equipment) {
     notFound()
   }
 
-  const displayBrand = equipment.model?.brand ?? equipment.brand
+  const displayBrand = equipment.model?.brand?.name ?? equipment.brand
   const displayModel = equipment.model?.model ?? equipment.modelDeprecated
   const catalogLabel = `${displayBrand} ${displayModel}`.trim()
+
+  // Obtén campos personalizados para la familia.
+  let familyCustomFields = null
+  if (equipment.type?.family?.id) {
+    familyCustomFields = await prisma.family_custom_fields.findMany({
+      where: { familyId: equipment.type.family.id },
+      orderBy: { order: 'asc' },
+    })
+  }
+
+  // Agregar fieldLabel a los valores personalizados
+  const customValuesWithLabels = (equipment.customValues || []).map(cv => {
+    const field = familyCustomFields?.find(f => f.fieldName === (cv as any).fieldName)
+    return {
+      ...cv,
+      fieldLabel: field?.fieldLabel || (cv as any).fieldName,
+    }
+  })
+
+  // Ordenar valores personalizados por orden de familia
+  const sortedCustomValues = (() => {
+    if (!customValuesWithLabels || !familyCustomFields) return customValuesWithLabels
+
+    const sortedFamilyFields = [...familyCustomFields].sort(
+      (a, b) => (a.order ?? 0) - (b.order ?? 0)
+    )
+    const orderMap = new Map(sortedFamilyFields.map((field, index) => [field.fieldName, index]))
+
+    return [...customValuesWithLabels].sort((a, b) => {
+      const orderA = orderMap.get((a as any).fieldName) ?? Infinity
+      const orderB = orderMap.get((b as any).fieldName) ?? Infinity
+      return orderA - orderB
+    })
+  })()
 
   // Registrar escaneo en audit_logs (fire-and-forget, no bloquea el render)
   prisma.audit_logs
@@ -115,36 +182,21 @@ export default async function EquipmentPublicPage({ params }: PageProps) {
 
   const activeAssignment = equipment.assignments[0] ?? null
   const activeMaintenance = equipment.maintenanceRecords[0] ?? null
-  const photoUrl = equipment.photoUrl ?? equipment.attachments[0]?.path ?? null
+  const photoUrl =
+    equipment.photoUrl ??
+    equipment.model?.modelPhotoUrl ??
+    (equipment.attachments[0]
+      ? `/api/inventory/equipment/${equipmentId}/attachments/${equipment.attachments[0].id}?preview=true`
+      : null)
 
   const familyName = equipment.type?.family?.name ?? null
 
   return (
     <div className='min-h-screen bg-gray-50'>
-      {/* Header */}
-      <div className='bg-white border-b shadow-sm px-4 py-4'>
-        <div className='max-w-lg mx-auto flex items-center gap-3'>
-          <Building2 className='h-8 w-8 text-blue-600 shrink-0' />
-          <div>
-            <p className='font-bold text-gray-900 text-sm leading-tight'>
-              Sistema de Gestión de Activos
-            </p>
-            <p className='text-xs text-gray-500'>Información del equipo</p>
-          </div>
-        </div>
-      </div>
-
-      <div className='max-w-lg mx-auto px-4 py-6 space-y-4'>
-        {/* Foto del equipo */}
-        {photoUrl && (
-          <div className='rounded-xl overflow-hidden bg-white border shadow-sm'>
-            <img src={photoUrl} alt={catalogLabel} className='w-full h-52 object-cover' />
-          </div>
-        )}
-
+      <div className='max-w-xl mx-auto px-4 py-8 space-y-4'>
         {/* Tarjeta principal */}
         <div className='bg-white rounded-xl border shadow-sm p-5 space-y-4'>
-          {/* Nombre */}
+          {/* Nombre y tipo */}
           <div className='flex items-start gap-3'>
             <div className='p-2 bg-blue-50 rounded-lg shrink-0'>
               <Package className='h-5 w-5 text-blue-600' />
@@ -157,12 +209,20 @@ export default async function EquipmentPublicPage({ params }: PageProps) {
 
           <hr className='border-gray-100' />
 
-          {/* Código, marca, modelo, familia */}
+          {/* Código, tipo, marca, modelo, familia */}
           <div className='grid grid-cols-2 gap-3'>
             <div className='col-span-2 space-y-1'>
               <p className='text-xs text-gray-400 uppercase tracking-wide font-medium'>Código</p>
               <p className='font-mono font-semibold text-gray-800 text-sm'>{equipment.code}</p>
             </div>
+            {equipment.type?.name && (
+              <div className='space-y-1'>
+                <p className='text-xs text-gray-400 uppercase tracking-wide font-medium'>
+                  Tipo de equipo
+                </p>
+                <p className='text-sm text-gray-800'>{equipment.type.name}</p>
+              </div>
+            )}
             <div className='space-y-1'>
               <p className='text-xs text-gray-400 uppercase tracking-wide font-medium'>Marca</p>
               <p className='text-sm text-gray-800'>{displayBrand}</p>
@@ -194,6 +254,29 @@ export default async function EquipmentPublicPage({ params }: PageProps) {
               {statusLabel}
             </div>
           </div>
+
+          {/* Atributos personalizados */}
+          {sortedCustomValues && sortedCustomValues.length > 0 && (
+            <>
+              <hr className='border-gray-100' />
+              <div className='space-y-2'>
+                <p className='text-xs text-gray-400 uppercase tracking-wide font-medium flex items-center gap-1.5'>
+                  <Settings2 className='h-3.5 w-3.5' />
+                  Atributos
+                </p>
+                <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
+                  {sortedCustomValues.map((item, i) => (
+                    <div key={i} className='space-y-1'>
+                      <p className='text-xs text-gray-400 uppercase tracking-wide font-medium'>
+                        {(item as any).fieldLabel}
+                      </p>
+                      <p className='text-sm text-gray-800'>{(item as any).fieldValue}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Detalle según estado */}
@@ -283,10 +366,21 @@ export default async function EquipmentPublicPage({ params }: PageProps) {
           </div>
         )}
 
-        {/* Pie de página */}
-        <div className='text-center pt-2 pb-6'>
-          <p className='text-xs text-gray-400'>
-            Sistema de Gestión de Activos · Información pública
+        {/* Foto del equipo */}
+        {photoUrl && (
+          <div className='rounded-xl overflow-hidden bg-white border shadow-sm'>
+            <img src={photoUrl} alt={catalogLabel} className='w-full h-64 object-contain' />
+          </div>
+        )}
+
+        {/* Pie */}
+        <div className='text-center pt-2 pb-8 space-y-1'>
+          <div className='flex items-center justify-center gap-1.5 text-xs text-muted-foreground'>
+            <CheckCircle className='h-3.5 w-3.5 text-emerald-500' />
+            <span>Verificado el {verifiedDate}</span>
+          </div>
+          <p className='text-xs text-muted-foreground/50'>
+            {branding.companyName} · Sistema de Inventario
           </p>
         </div>
       </div>

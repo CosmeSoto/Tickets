@@ -85,6 +85,11 @@ export class MaintenanceService {
         select: { status: true },
       })
 
+      const equipmentFull = await tx.equipment.findUnique({
+        where: { id: data.equipmentId },
+        select: { status: true, departmentId: true },
+      })
+
       const maintenance = await tx.maintenance_records.create({
         data: {
           equipmentId: data.equipmentId,
@@ -99,6 +104,7 @@ export class MaintenanceService {
           status: 'SCHEDULED',
           notes: data.notes,
           previousStatus: equipment?.status ?? null,
+          previousDepartmentId: equipmentFull?.departmentId ?? null,
         },
         include: { equipment: true, technician: true, ticket: true },
       })
@@ -203,6 +209,11 @@ export class MaintenanceService {
       if (existing.status !== 'REQUESTED')
         throw new Error('Solo se pueden aprobar solicitudes en estado REQUESTED')
 
+      const equipmentFull = await tx.equipment.findUnique({
+        where: { id: existing.equipmentId },
+        select: { status: true, departmentId: true },
+      })
+
       const maintenance = await tx.maintenance_records.update({
         where: { id },
         data: {
@@ -211,6 +222,7 @@ export class MaintenanceService {
           technicianId: data.technicianId || userId,
           notes: data.notes,
           previousStatus: existing.equipment.status,
+          previousDepartmentId: equipmentFull?.departmentId ?? null,
         },
         include: { equipment: true, technician: true, ticket: true },
       })
@@ -327,6 +339,9 @@ export class MaintenanceService {
       if (data.returnTo === 'previous_user') {
         const lastAssignment = existing.equipment.assignments?.[0]
         if (lastAssignment) {
+          const receiver = await tx.users.findUnique({
+            where: { id: lastAssignment.receiverId },
+          })
           await tx.equipment_assignments.create({
             data: {
               equipmentId: existing.equipmentId,
@@ -341,7 +356,10 @@ export class MaintenanceService {
           })
           await tx.equipment.update({
             where: { id: existing.equipmentId },
-            data: { status: 'ASSIGNED' },
+            data: {
+              status: 'ASSIGNED',
+              departmentId: (receiver as any).departmentId ?? null,
+            },
           })
           await tx.audit_logs.create({
             data: {
@@ -362,14 +380,27 @@ export class MaintenanceService {
         } else {
           await tx.equipment.update({
             where: { id: existing.equipmentId },
-            data: { status: 'AVAILABLE' },
+            data: {
+              status: 'AVAILABLE',
+              departmentId: null,
+            },
           })
         }
       } else {
         const statusToRestore = (existing as any).previousStatus ?? 'AVAILABLE'
+        const departmentToRestore = (existing as any).previousDepartmentId ?? null
+
+        let finalDepartmentId = departmentToRestore
+        if (statusToRestore === 'AVAILABLE') {
+          finalDepartmentId = null
+        }
+
         await tx.equipment.update({
           where: { id: existing.equipmentId },
-          data: { status: statusToRestore },
+          data: {
+            status: statusToRestore,
+            departmentId: finalDepartmentId,
+          },
         })
       }
 
@@ -415,7 +446,10 @@ export class MaintenanceService {
       if (maintenance.status !== 'REQUESTED') {
         await tx.equipment.update({
           where: { id: maintenance.equipmentId },
-          data: { status: 'AVAILABLE' },
+          data: {
+            status: 'AVAILABLE',
+            departmentId: null,
+          },
         })
       }
 
