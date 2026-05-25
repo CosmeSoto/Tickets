@@ -21,12 +21,16 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { AssignableUserSelect } from '@/components/inventory/shared/AssignableUserSelect'
+import { getEquipmentDisplayName } from '@/lib/utils/equipment-display'
 import type { AssignmentForm } from '../utils/equipment-types'
 
 interface AssignmentDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   equipmentCode: string
+  equipmentTypeName?: string
+  equipmentBrandName?: string
+  equipmentModelName?: string
   /** familyId del equipo — filtra los usuarios asignables */
   familyId?: string
   form: AssignmentForm
@@ -40,19 +44,29 @@ export function AssignmentDialog({
   open,
   onOpenChange,
   equipmentCode,
+  equipmentTypeName,
+  equipmentBrandName,
+  equipmentModelName,
   familyId,
   form,
   onFormChange,
   onSubmit,
   submitting,
 }: AssignmentDialogProps) {
+  const displayName = getEquipmentDisplayName({
+    equipmentCode,
+    equipmentTypeName,
+    equipmentBrandName,
+    equipmentModelName,
+  })
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Asignar Equipo</DialogTitle>
           <DialogDescription>
-            Asigna el equipo <span className='font-semibold'>{equipmentCode}</span> a un usuario.
+            Asigna el equipo <span className='font-semibold'>{displayName}</span> a un usuario.
           </DialogDescription>
         </DialogHeader>
 

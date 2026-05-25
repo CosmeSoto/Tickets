@@ -15,14 +15,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
+import { getEquipmentDisplayName } from '@/lib/utils/equipment-display'
 
 interface SaleDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   equipmentId: string
   equipmentCode: string
-  equipmentBrand: string
-  equipmentModel: string
+  equipmentTypeName?: string
+  equipmentBrandName?: string
+  equipmentModelName?: string
   defaultAccessories?: string[]
   /** Si es true (SUPER_ADMIN), registra y aprueba en un solo paso sin solicitud */
   isSuperAdmin?: boolean
@@ -41,12 +43,19 @@ export function SaleDialog({
   onOpenChange,
   equipmentId,
   equipmentCode,
-  equipmentBrand,
-  equipmentModel,
+  equipmentTypeName,
+  equipmentBrandName,
+  equipmentModelName,
   defaultAccessories = [],
   isSuperAdmin = false,
   onSuccess,
 }: SaleDialogProps) {
+  const displayName = getEquipmentDisplayName({
+    equipmentCode,
+    equipmentTypeName,
+    equipmentBrandName,
+    equipmentModelName,
+  })
   const { toast } = useToast()
   const [submitting, setSubmitting] = useState(false)
 
@@ -121,11 +130,11 @@ export function SaleDialog({
           const err = await approveRes.json()
           throw new Error(err.error || 'Error al aprobar la venta')
         }
-        toast({ title: 'Venta registrada', description: `${equipmentCode} marcado como vendido` })
+        toast({ title: 'Venta registrada', description: `${displayName} marcado como vendido` })
       } else {
         toast({
           title: 'Solicitud enviada',
-          description: `La venta de ${equipmentCode} está pendiente de aprobación`,
+          description: `La venta de ${displayName} está pendiente de aprobación`,
         })
       }
 
@@ -151,7 +160,7 @@ export function SaleDialog({
             {isSuperAdmin ? 'Registrar Venta' : 'Solicitar Venta de Activo'}
           </DialogTitle>
           <DialogDescription>
-            {equipmentBrand} {equipmentModel} · {equipmentCode}
+            {displayName} · {equipmentCode}
             {isSuperAdmin && (
               <span className='block mt-1 text-emerald-600 dark:text-emerald-400 text-xs font-medium'>
                 Como Super Admin, la venta se registrará y aprobará de inmediato.

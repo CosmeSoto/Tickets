@@ -181,7 +181,8 @@ export function EquipmentDetail({
           canConvertToPurchase={canConvertToPurchase ?? false}
           canSell={
             (userRole === 'ADMIN' || isSuperAdmin) &&
-            !['SOLD', 'RETIRED'].includes(equipment.status) &&
+            !['SOLD', 'RETIRED', 'ASSIGNED'].includes(equipment.status) &&
+            !isAssigned &&
             !(equipment as any).sale
           }
           isSuperAdmin={isSuperAdmin}
@@ -297,6 +298,9 @@ export function EquipmentDetail({
         open={showAssignDialog}
         onOpenChange={setShowAssignDialog}
         equipmentCode={equipment.code}
+        equipmentTypeName={equipment.type?.name}
+        equipmentBrandName={equipment.model?.brand?.name || equipment.brand}
+        equipmentModelName={equipment.model?.model || equipment.modelDeprecated}
         familyId={(equipment as any).type?.family?.id}
         form={assignForm}
         onFormChange={setAssignForm}
@@ -309,6 +313,9 @@ export function EquipmentDetail({
         open={showReturnDialog}
         onOpenChange={setShowReturnDialog}
         equipmentCode={equipment.code}
+        equipmentTypeName={equipment.type?.name}
+        equipmentBrandName={equipment.model?.brand?.name || equipment.brand}
+        equipmentModelName={equipment.model?.model || equipment.modelDeprecated}
         currentAssignment={currentAssignment}
         form={returnForm}
         onFormChange={setReturnForm}
@@ -320,6 +327,9 @@ export function EquipmentDetail({
         open={showMaintenanceDialog}
         onOpenChange={setShowMaintenanceDialog}
         equipmentCode={equipment.code}
+        equipmentTypeName={equipment.type?.name}
+        equipmentBrandName={equipment.model?.brand?.name || equipment.brand}
+        equipmentModelName={equipment.model?.model || equipment.modelDeprecated}
         equipmentType={equipment.type}
         currentAssignment={currentAssignment}
         userRole={userRole}
@@ -333,8 +343,9 @@ export function EquipmentDetail({
         open={showDeleteDialog}
         onOpenChange={setShowDeleteDialog}
         equipmentCode={equipment.code}
-        equipmentBrand={equipment.brand}
-        equipmentModel={equipment.model}
+        equipmentTypeName={equipment.type?.name}
+        equipmentBrandName={equipment.model?.brand?.name || equipment.brand}
+        equipmentModelName={equipment.model?.model || equipment.modelDeprecated}
         onConfirm={handleDelete}
         deleting={deleting}
       />
@@ -343,6 +354,9 @@ export function EquipmentDetail({
         open={showPermanentDeleteDialog}
         onOpenChange={setShowPermanentDeleteDialog}
         equipmentCode={equipment.code}
+        equipmentTypeName={equipment.type?.name}
+        equipmentBrandName={equipment.model?.brand?.name || equipment.brand}
+        equipmentModelName={equipment.model?.model || equipment.modelDeprecated}
         equipmentStatus={equipment.status}
         onConfirm={handlePermanentDelete}
         deleting={permanentDeleting}
@@ -353,8 +367,9 @@ export function EquipmentDetail({
         onOpenChange={setShowDecommissionForm}
         equipmentId={equipmentId}
         equipmentCode={equipment.code}
-        equipmentBrand={equipment.brand}
-        equipmentModel={equipment.model}
+        equipmentTypeName={equipment.type?.name}
+        equipmentBrandName={equipment.model?.brand?.name || equipment.brand}
+        equipmentModelName={equipment.model?.model || equipment.modelDeprecated}
         acquisitionMode={
           (equipment as any).acquisitionMode ?? equipment.ownershipType ?? 'FIXED_ASSET'
         }
@@ -366,8 +381,9 @@ export function EquipmentDetail({
         onOpenChange={setShowConvertToPurchaseDialog}
         equipmentId={equipmentId}
         equipmentCode={equipment.code}
-        equipmentBrand={equipment.brand}
-        equipmentModel={equipment.model}
+        equipmentTypeName={equipment.type?.name}
+        equipmentBrandName={equipment.model?.brand?.name || equipment.brand}
+        equipmentModelName={equipment.model?.model || equipment.modelDeprecated}
         currentOwnershipType={equipment.ownershipType}
         onSuccess={loadEquipmentDetail}
       />
@@ -377,8 +393,9 @@ export function EquipmentDetail({
         onOpenChange={setShowSaleDialog}
         equipmentId={equipmentId}
         equipmentCode={equipment.code}
-        equipmentBrand={equipment.brand}
-        equipmentModel={equipment.model}
+        equipmentTypeName={equipment.type?.name}
+        equipmentBrandName={equipment.model?.brand?.name || equipment.brand}
+        equipmentModelName={equipment.model?.model || equipment.modelDeprecated}
         defaultAccessories={equipment.accessories ?? []}
         isSuperAdmin={isSuperAdmin}
         onSuccess={loadEquipmentDetail}

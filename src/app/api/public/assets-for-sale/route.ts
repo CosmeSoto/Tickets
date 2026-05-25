@@ -35,28 +35,53 @@ export async function GET(request?: NextRequest) {
         ? (conditionParam as EquipmentCondition)
         : undefined
 
-    const equipment = await prisma.equipment.findMany({
-      where: {
-        status: 'FOR_SALE',
-        ...(familyId ? { type: { familyId } } : {}),
-        ...(typeId ? { typeId } : {}),
-        ...(condition ? { condition } : {}),
-      },
-      ...(take ? { take } : {}),
-      include: {
-        model: { select: { id: true, brand: true, model: true } },
-        type: {
-          include: {
-            family: true,
-            attributes: true,
+    // Obtener settings para WhatsApp
+    const [equipment, settings] = await Promise.all([
+      prisma.equipment.findMany({
+        where: {
+          status: 'FOR_SALE',
+          ...(familyId ? { type: { familyId } } : {}),
+          ...(typeId ? { typeId } : {}),
+          ...(condition ? { condition } : {}),
+        },
+        ...(take ? { take } : {}),
+        include: {
+          model: { select: { id: true, brand: true, model: true } },
+          type: {
+            include: {
+              family: true,
+              attributes: true,
+            },
+          },
+          customValues: true,
+          attachments: {
+            where: {
+              mimeType: {
+                in: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'],
+              },
+            },
+            orderBy: {
+              createdAt: 'desc',
+            },
+            take: 1,
           },
         },
-        customValues: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    })
+        orderBy: {
+          createdAt: 'desc',
+        },
+      }),
+      prisma.system_settings.findMany({
+        where: {
+          key: { in: ['landing.social_whatsapp', 'contact.phone'] },
+        },
+      }),
+    ])
+
+    // Obtener WhatsApp de settings
+    const whatsAppSetting =
+      settings.find(s => s.key === 'landing.social_whatsapp') ||
+      settings.find(s => s.key === 'contact.phone')
+    const contactWhatsapp = whatsAppSetting?.value || null
 
     // Obtener todos los custom fields legacy de las familias involucradas (fallback)
     const familyIds = [...new Set(equipment.map(eq => eq.type.familyId).filter(Boolean))]
@@ -76,24 +101,30 @@ export async function GET(request?: NextRequest) {
     })
 
     // Transformar a formato PublicEquipmentItem
-    const publicItems: PublicEquipmentItem[] = equipment.map(eq => {
+    const publicItems: any[] = equipment.map(eq => {
       // Transformar customValues a un objeto key-value con labels
       const customAttributes: Record<string, { value: string; label: string; type: string }> = {}
 
       if (eq.customValues && eq.customValues.length > 0) {
         // PRIORIDAD 1: Usar atributos del nuevo sistema (por tipo)
         if (eq.type.attributes && eq.type.attributes.length > 0) {
+          // Ordenar atributos por su campo 'order' y filtrar solo visibles
+          const sortedVisibleAttributes = [...eq.type.attributes]
+            .filter((attr: any) => attr.isVisible)
+            .sort((a: any, b: any) => a.order - b.order)
+
           const typeAttributesMap = new Map(
             eq.type.attributes.map((attr: any) => [attr.attributeName, attr])
           )
 
-          eq.customValues.forEach(cv => {
-            const attrInfo = typeAttributesMap.get(cv.fieldName)
-            if (attrInfo && attrInfo.isVisible) {
-              customAttributes[cv.fieldName] = {
+          // Iterar en orden y agregar al customAttributes
+          sortedVisibleAttributes.forEach((attr: any) => {
+            const cv = eq.customValues.find(cv => cv.fieldName === attr.attributeName)
+            if (cv) {
+              customAttributes[attr.attributeName] = {
                 value: cv.fieldValue,
-                label: attrInfo.attributeLabel,
-                type: attrInfo.attributeType,
+                label: attr.attributeLabel,
+                type: attr.attributeType,
               }
             }
           })
@@ -101,28 +132,42 @@ export async function GET(request?: NextRequest) {
         // FALLBACK: Usar custom fields legacy por familia
         else if (eq.type.familyId) {
           const familyFields = legacyFieldsByFamily.get(eq.type.familyId)
+          if (familyFields) {
+            const sortedFields = [...familyFields.entries()].sort(
+              ([, a], [, b]) => a.order - b.order
+            )
 
-          eq.customValues.forEach(cv => {
-            const fieldInfo = familyFields?.get(cv.fieldName)
-            if (fieldInfo) {
-              customAttributes[cv.fieldName] = {
-                value: cv.fieldValue,
-                label: fieldInfo.fieldLabel,
-                type: fieldInfo.fieldType,
+            sortedFields.forEach(([fieldName, fieldInfo]) => {
+              const cv = eq.customValues.find(cv => cv.fieldName === fieldName)
+              if (cv) {
+                customAttributes[fieldName] = {
+                  value: cv.fieldValue,
+                  label: fieldInfo.fieldLabel,
+                  type: fieldInfo.fieldType,
+                }
               }
-            }
-          })
+            })
+          }
         }
+      }
+
+      const resolvedBrand = eq.model?.brand?.name || eq.brand
+      const resolvedModel = eq.model?.model || eq.modelDeprecated
+
+      // Obtener URL de imagen: prioriza attachments primero, luego photoUrl
+      let publicImageUrl: string | null = null
+      if (eq.attachments && eq.attachments.length > 0) {
+        publicImageUrl = `/api/public/equipment-attachments/${eq.attachments[0].id}`
+      } else if (eq.photoUrl) {
+        publicImageUrl = eq.photoUrl
       }
 
       return {
         id: eq.id,
         code: eq.code,
         serialNumber: eq.serialNumber,
-        brand: eq.brand,
-        model: eq.model
-          ? [eq.model.brand, eq.model.model].filter(Boolean).join(' ')
-          : eq.modelDeprecated,
+        brand: resolvedBrand,
+        model: resolvedModel,
         type: {
           id: eq.type.id,
           name: eq.type.name,
@@ -138,10 +183,11 @@ export async function GET(request?: NextRequest) {
         },
         condition: eq.condition,
         saleListingPrice: eq.saleListingPrice,
-        photoUrl: eq.photoUrl,
+        photoUrl: publicImageUrl,
         specifications: null,
         customAttributes, // Atributos personalizados (nuevo sistema + legacy)
         createdAt: eq.createdAt,
+        contactWhatsapp: contactWhatsapp,
       }
     })
 

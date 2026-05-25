@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Loader2, ArrowLeft } from 'lucide-react'
 import type { Equipment } from '@/types/inventory/equipment'
 import type { FamilyConfig } from '@/lib/inventory/family-config-types'
+import { getEquipmentDisplayName } from '@/lib/utils/equipment-display'
 import { toast } from 'sonner'
 
 interface EditEquipmentPageProps {
@@ -122,22 +123,15 @@ export default function EditEquipmentPage({ params }: EditEquipmentPageProps) {
     )
   }
 
-  const getEquipmentBrand = () => {
-    if (equipment.model?.brand?.name) return equipment.model.brand.name
-    if (equipment.brand) return equipment.brand
-    return ''
-  }
-  const getEquipmentModel = () => {
-    if (equipment.model?.model) return equipment.model.model
-    if (equipment.modelDeprecated) return equipment.modelDeprecated
-    return ''
-  }
-  const equipmentTitle = [equipment.type?.name, getEquipmentBrand(), getEquipmentModel()]
-    .filter(Boolean)
-    .join(' · ')
+  const equipmentTitle = getEquipmentDisplayName({
+    equipmentCode: equipment.code,
+    equipmentTypeName: equipment.type?.name,
+    equipmentBrandName: equipment.model?.brand?.name || equipment.brand,
+    equipmentModelName: equipment.model?.model || equipment.modelDeprecated,
+  })
 
   return (
-    <RoleDashboardLayout title={equipmentTitle || equipment.code} subtitle={equipment.code}>
+    <RoleDashboardLayout title={equipmentTitle} subtitle={equipment.code}>
       <div className='max-w-4xl mx-auto space-y-4'>
         <button
           type='button'

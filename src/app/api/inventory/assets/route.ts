@@ -443,6 +443,7 @@ export async function POST(req: NextRequest) {
         maintenanceType,
         maintenanceTechnicianId,
         maintenanceDescription,
+        saleListingPrice,
       } = body as {
         status?: string
         condition?: string
@@ -454,6 +455,7 @@ export async function POST(req: NextRequest) {
         maintenanceType?: string
         maintenanceTechnicianId?: string
         maintenanceDescription?: string
+        saleListingPrice?: number
       }
 
       // Extraer campos adicionales del body
@@ -511,6 +513,7 @@ export async function POST(req: NextRequest) {
           estimatedPrice: estimatedPrice ?? undefined,
           customValues,
           qrCode: randomUUID(),
+          saleListingPrice: saleListingPrice ?? null,
         } as any,
       })
 

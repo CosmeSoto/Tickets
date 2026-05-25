@@ -36,6 +36,7 @@ export interface PublicEquipmentItem {
       color: string | null
     }
   }
+  customAttributes: Record<string, { value: string; label: string; type: string }>
   contactWhatsapp: string | null
 }
 
@@ -97,7 +98,8 @@ export function PublicEquipmentCard({ item, onViewDetails }: PublicEquipmentCard
   const hasDetails =
     (item.specifications && Object.keys(item.specifications).length > 0) ||
     (item.accessories && item.accessories.length > 0) ||
-    (item.notes && item.notes.trim().length > 0)
+    (item.notes && item.notes.trim().length > 0) ||
+    (item.customAttributes && Object.keys(item.customAttributes).length > 0)
 
   return (
     <Card className='overflow-hidden hover:shadow-md transition-shadow'>
@@ -144,6 +146,18 @@ export function PublicEquipmentCard({ item, onViewDetails }: PublicEquipmentCard
             {conditionBadge.label}
           </Badge>
         </div>
+
+        {/* Atributos personalizados (todos los activos) */}
+        {item.customAttributes && Object.keys(item.customAttributes).length > 0 && (
+          <div className='space-y-1.5'>
+            {Object.entries(item.customAttributes).map(([key, attr]) => (
+              <div key={key} className='flex justify-between text-sm'>
+                <span className='text-muted-foreground'>{attr.label}:</span>
+                <span className='font-medium'>{attr.value}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Precio */}
         <div className='pt-2 border-t border-border'>

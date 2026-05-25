@@ -22,12 +22,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { getEquipmentDisplayName } from '@/lib/utils/equipment-display'
 import type { MaintenanceForm, EquipmentType, Assignment } from '../utils/equipment-types'
 
 interface MaintenanceDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   equipmentCode: string
+  equipmentTypeName?: string
+  equipmentBrandName?: string
+  equipmentModelName?: string
   equipmentType?: EquipmentType
   currentAssignment?: Assignment
   userRole: string
@@ -41,6 +45,9 @@ export function MaintenanceDialog({
   open,
   onOpenChange,
   equipmentCode,
+  equipmentTypeName,
+  equipmentBrandName,
+  equipmentModelName,
   equipmentType,
   currentAssignment,
   userRole,
@@ -49,6 +56,13 @@ export function MaintenanceDialog({
   onSubmit,
   submitting,
 }: MaintenanceDialogProps) {
+  const displayName = getEquipmentDisplayName({
+    equipmentCode,
+    equipmentTypeName,
+    equipmentBrandName,
+    equipmentModelName,
+  })
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent aria-describedby={undefined}>
@@ -58,8 +72,8 @@ export function MaintenanceDialog({
           </DialogTitle>
           <DialogDescription>
             {userRole === 'CLIENT'
-              ? `Solicita mantenimiento para el equipo ${equipmentCode}. El equipo técnico revisará tu solicitud.`
-              : `Registra un mantenimiento para el equipo ${equipmentCode}.`}
+              ? `Solicita mantenimiento para el equipo ${displayName}. El equipo técnico revisará tu solicitud.`
+              : `Registra un mantenimiento para el equipo ${displayName}.`}
             {(equipmentType as any)?.family?.name && (
               <span className='block mt-1 text-xs text-muted-foreground'>
                 Familia: <span className='font-medium'>{(equipmentType as any).family.name}</span>

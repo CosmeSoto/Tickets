@@ -105,7 +105,18 @@ function HomePageContent() {
     fetch('/api/public/assets-for-sale?limit=6')
       .then(r => r.json())
       .then(data => {
-        setForSaleItems(data.items ?? [])
+        // Flatten groups to get individual items (for landing preview)
+        const groups = data.items ?? []
+        const flattenedItems: any[] = []
+        for (const group of groups) {
+          if (group.units && group.units.length > 0) {
+            flattenedItems.push(...group.units)
+          } else {
+            flattenedItems.push(group)
+          }
+          if (flattenedItems.length >= 6) break
+        }
+        setForSaleItems(flattenedItems.slice(0, 6))
         // Check if the public sale section is enabled (default: true)
         if (data.sectionEnabled !== undefined) {
           setForSaleEnabled(data.sectionEnabled)

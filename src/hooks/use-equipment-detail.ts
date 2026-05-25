@@ -1,6 +1,6 @@
 /**
- * Custom hook for Equipment Detail module
- * Centralizes all business logic and state management
+ * Gancho personalizado para el módulo de detalles del equipo
+ * Centraliza toda la lógica empresarial y la gestión del estado.
  */
 
 'use client'
@@ -31,12 +31,12 @@ export function useEquipmentDetail({
 }: UseEquipmentDetailProps) {
   const router = useRouter()
 
-  // ── Data State ──
+  // ── Estado de datos ──
   const [data, setData] = useState<EquipmentDetailResponse | null>(null)
   const [qrCode, setQrCode] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // ── Dialog States ──
+  // ── Estados de diálogo ──
   const [showAssignDialog, setShowAssignDialog] = useState(false)
   const [showReturnDialog, setShowReturnDialog] = useState(false)
   const [showMaintenanceDialog, setShowMaintenanceDialog] = useState(false)
@@ -45,14 +45,14 @@ export function useEquipmentDetail({
   const [showDecommissionForm, setShowDecommissionForm] = useState(false)
   const [showConvertToPurchaseDialog, setShowConvertToPurchaseDialog] = useState(false)
 
-  // ── Loading States ──
+  // ── Estados de carga ──
   const [assigning, setAssigning] = useState(false)
   const [returning, setReturning] = useState(false)
   const [submittingMaintenance, setSubmittingMaintenance] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [permanentDeleting, setPermanentDeleting] = useState(false)
 
-  // ── Form States ──
+  // ── Estados del formulario ──
   const [assignForm, setAssignForm] = useState<AssignmentForm>({
     receiverId: '',
     assignmentType: 'PERMANENT',
@@ -73,7 +73,7 @@ export function useEquipmentDetail({
     scheduledDate: new Date().toISOString().split('T')[0],
   })
 
-  // ── Load Equipment Detail ──
+  // ── Detalle del equipo de carga ──
   const loadEquipmentDetail = useCallback(async () => {
     try {
       setLoading(true)
@@ -92,7 +92,7 @@ export function useEquipmentDetail({
     }
   }, [equipmentId])
 
-  // ── Load QR Code ──
+  // ── Cargar código QR ──
   const loadQRCode = useCallback(async () => {
     try {
       const response = await fetch(`/api/inventory/equipment/${equipmentId}/qr`)
@@ -106,13 +106,13 @@ export function useEquipmentDetail({
     }
   }, [equipmentId])
 
-  // ── Initial Load ──
+  // ── Carga inicial ──
   useEffect(() => {
     loadEquipmentDetail()
     loadQRCode()
   }, [loadEquipmentDetail, loadQRCode])
 
-  // ── Actions ──
+  // ── Acciones ──
   const handleEdit = useCallback(() => {
     router.push(`/inventory/equipment/${equipmentId}/edit`)
   }, [router, equipmentId])
@@ -329,7 +329,7 @@ export function useEquipmentDetail({
     link.click()
   }, [qrCode, data])
 
-  // ── Computed Values ──
+  // ── Valores calculados ──
   const equipment = data?.equipment
   const currentAssignment = data?.currentAssignment
   const history = data?.history || []
@@ -355,7 +355,7 @@ export function useEquipmentDetail({
   const canRetire = canManage && !isRetired && !isAssigned
   // SuperAdmin puede eliminar permanentemente cualquier equipo no asignado (sin importar estado)
   // Admin normal solo puede eliminar equipos RETIRED
-  const canPermanentDelete = isAdmin && (isRetired || (isSuperAdmin && !isAssigned))
+  const canPermanentDelete = isSuperAdmin && (isRetired || !isAssigned)
   const canReportProblem = userRole === 'CLIENT' && currentAssignment?.receiverId === userId
   // Conversión a activo propio: solo para RENTAL/LOAN, no retirados, con permisos de gestión
   const canConvertToPurchase =
@@ -364,7 +364,7 @@ export function useEquipmentDetail({
     (equipment?.ownershipType === 'RENTAL' || equipment?.ownershipType === 'LOAN')
 
   return {
-    // Data
+    // Datos
     data,
     equipment,
     currentAssignment,
@@ -372,10 +372,10 @@ export function useEquipmentDetail({
     maintenanceRecords,
     qrCode,
 
-    // State
+    // Estado
     loading,
 
-    // Dialog States
+    // Estados de diálogo
     showAssignDialog,
     setShowAssignDialog,
     showReturnDialog,
@@ -391,14 +391,14 @@ export function useEquipmentDetail({
     showConvertToPurchaseDialog,
     setShowConvertToPurchaseDialog,
 
-    // Loading States
+    // Estados de carga
     assigning,
     returning,
     submittingMaintenance,
     deleting,
     permanentDeleting,
 
-    // Form States
+    // Estados del formulario
     assignForm,
     setAssignForm,
     returnForm,
@@ -406,7 +406,7 @@ export function useEquipmentDetail({
     maintenanceForm,
     setMaintenanceForm,
 
-    // Computed
+    // Calculada
     isAdmin,
     isRetired,
     isAssigned,
@@ -422,7 +422,7 @@ export function useEquipmentDetail({
     hasActiveMaintenance,
     canConvertToPurchase,
 
-    // Actions
+    // Acciones
     loadEquipmentDetail,
     handleEdit,
     handleDelete,

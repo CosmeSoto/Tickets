@@ -41,10 +41,10 @@ export function EquipmentInfoCard({ equipment }: EquipmentInfoCardProps) {
     | Array<{ fieldName: string; fieldValue: string }>
     | undefined
   const familyCustomFields = (equipment as any).type?.family?.customFields as
-    | Array<{ fieldName: string; order: number }>
+    | Array<{ fieldName: string; fieldLabel: string; order: number }>
     | undefined
 
-  // Sort customValues according to familyCustomFields order
+  // Sort customValues according to familyCustomFields order and add fieldLabel
   const sortedCustomValues = (() => {
     if (!customValues || !familyCustomFields) return customValues
 
@@ -52,12 +52,18 @@ export function EquipmentInfoCard({ equipment }: EquipmentInfoCardProps) {
       (a, b) => (a.order ?? 0) - (b.order ?? 0)
     )
     const orderMap = new Map(sortedFamilyFields.map((field, index) => [field.fieldName, index]))
+    const labelMap = new Map(sortedFamilyFields.map(field => [field.fieldName, field.fieldLabel]))
 
-    return [...customValues].sort((a, b) => {
-      const orderA = orderMap.get(a.fieldName) ?? Infinity
-      const orderB = orderMap.get(b.fieldName) ?? Infinity
-      return orderA - orderB
-    })
+    return [...customValues]
+      .map(item => ({
+        ...item,
+        fieldLabel: labelMap.get(item.fieldName) || item.fieldName,
+      }))
+      .sort((a, b) => {
+        const orderA = orderMap.get(a.fieldName) ?? Infinity
+        const orderB = orderMap.get(b.fieldName) ?? Infinity
+        return orderA - orderB
+      })
   })()
 
   const hasLocation = physicalLocation || equipment.location || warehouse
@@ -117,7 +123,7 @@ export function EquipmentInfoCard({ equipment }: EquipmentInfoCardProps) {
               </p>
               <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3'>
                 {sortedCustomValues!.map((item, i) => (
-                  <InfoRow key={i} label={item.fieldName} value={item.fieldValue} />
+                  <InfoRow key={i} label={item.fieldLabel} value={item.fieldValue} />
                 ))}
               </div>
             </div>

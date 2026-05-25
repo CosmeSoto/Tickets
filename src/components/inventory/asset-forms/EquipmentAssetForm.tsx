@@ -490,7 +490,7 @@ export function EquipmentAssetForm({
 
   // Estados permitidos por condición
   const allowedStatusesByCondition: Record<string, string[]> = {
-    NEW: ['AVAILABLE', 'ASSIGNED', 'MAINTENANCE'],
+    NEW: ['AVAILABLE', 'ASSIGNED', 'MAINTENANCE', 'FOR_SALE'],
     GOOD: ['AVAILABLE', 'ASSIGNED', 'MAINTENANCE', 'FOR_SALE'],
     POOR: ['DAMAGED', 'FOR_SALE', 'RETIRED'],
   }

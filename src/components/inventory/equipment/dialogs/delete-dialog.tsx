@@ -1,5 +1,5 @@
 /**
- * Delete Dialog Component
+ * Eliminar componente de diálogo
  */
 
 import {
@@ -12,13 +12,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { getEquipmentDisplayName } from '@/lib/utils/equipment-display'
 
 interface DeleteDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   equipmentCode: string
-  equipmentBrand: string
-  equipmentModel: string
+  equipmentTypeName?: string
+  equipmentBrandName?: string
+  equipmentModelName?: string
   onConfirm: () => void
   deleting: boolean
 }
@@ -27,11 +29,19 @@ export function DeleteDialog({
   open,
   onOpenChange,
   equipmentCode,
-  equipmentBrand,
-  equipmentModel,
+  equipmentTypeName,
+  equipmentBrandName,
+  equipmentModelName,
   onConfirm,
   deleting,
 }: DeleteDialogProps) {
+  const displayName = getEquipmentDisplayName({
+    equipmentCode,
+    equipmentTypeName,
+    equipmentBrandName,
+    equipmentModelName,
+  })
+
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
@@ -40,8 +50,8 @@ export function DeleteDialog({
           <AlertDialogDescription asChild>
             <div className='space-y-2'>
               <p>
-                ¿Confirmas que el equipo <span className='font-semibold'>{equipmentCode}</span> (
-                {equipmentBrand} {equipmentModel}) ya no está en uso y debe darse de baja?
+                ¿Confirmas que el equipo <span className='font-semibold'>{displayName}</span> ya no
+                está en uso y debe darse de baja?
               </p>
               <p className='text-sm text-muted-foreground'>
                 El estado cambiará a <span className='font-medium'>Retirado</span>. El equipo dejará

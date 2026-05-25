@@ -18,14 +18,16 @@ import {
   DecommissionRequestForm,
   type AcquisitionMode,
 } from '../../decommission/DecommissionRequestForm'
+import { getEquipmentDisplayName } from '@/lib/utils/equipment-display'
 
 interface DecommissionDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   equipmentId: string
   equipmentCode: string
-  equipmentBrand: string
-  equipmentModel: string
+  equipmentTypeName?: string
+  equipmentBrandName?: string
+  equipmentModelName?: string
   /** Modo de adquisición — determina si es baja o devolución */
   acquisitionMode?: AcquisitionMode
   onSuccess: () => void
@@ -49,13 +51,20 @@ export function DecommissionDialog({
   onOpenChange,
   equipmentId,
   equipmentCode,
-  equipmentBrand,
-  equipmentModel,
+  equipmentTypeName,
+  equipmentBrandName,
+  equipmentModelName,
   acquisitionMode = 'FIXED_ASSET',
   onSuccess,
 }: DecommissionDialogProps) {
   const title = DIALOG_TITLES[acquisitionMode]
   const description = DIALOG_DESCRIPTIONS[acquisitionMode]
+  const assetName = getEquipmentDisplayName({
+    equipmentCode,
+    equipmentTypeName,
+    equipmentBrandName,
+    equipmentModelName,
+  })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -68,7 +77,7 @@ export function DecommissionDialog({
           <DecommissionRequestForm
             assetType='EQUIPMENT'
             assetId={equipmentId}
-            assetName={`${equipmentCode} — ${equipmentBrand} ${equipmentModel}`}
+            assetName={assetName}
             acquisitionMode={acquisitionMode}
             onSuccess={() => {
               onOpenChange(false)

@@ -22,12 +22,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { getEquipmentDisplayName } from '@/lib/utils/equipment-display'
 import type { ReturnForm, Assignment } from '../utils/equipment-types'
 
 interface ReturnDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   equipmentCode: string
+  equipmentTypeName?: string
+  equipmentBrandName?: string
+  equipmentModelName?: string
   currentAssignment?: Assignment
   form: ReturnForm
   onFormChange: (form: ReturnForm) => void
@@ -39,20 +43,29 @@ export function ReturnDialog({
   open,
   onOpenChange,
   equipmentCode,
+  equipmentTypeName,
+  equipmentBrandName,
+  equipmentModelName,
   currentAssignment,
   form,
   onFormChange,
   onSubmit,
   submitting,
 }: ReturnDialogProps) {
+  const displayName = getEquipmentDisplayName({
+    equipmentCode,
+    equipmentTypeName,
+    equipmentBrandName,
+    equipmentModelName,
+  })
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Devolver Equipo</DialogTitle>
           <DialogDescription>
-            Registra la devolución del equipo <span className='font-semibold'>{equipmentCode}</span>
-            .
+            Registra la devolución del equipo <span className='font-semibold'>{displayName}</span>.
             {currentAssignment && (
               <span className='block mt-1'>
                 Actualmente asignado a:{' '}

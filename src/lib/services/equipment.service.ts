@@ -148,7 +148,7 @@ export class EquipmentService {
         throw new Error('Equipo no encontrado')
       }
 
-      // Fetch family custom fields separately to avoid parsing issues
+      // Obtenga los campos personalizados de la familia por separado para evitar problemas de análisis.
       if (equipment.type?.family?.id) {
         const familyCustomFields = await prisma.family_custom_fields.findMany({
           where: { familyId: equipment.type.family.id },
@@ -343,6 +343,9 @@ export class EquipmentService {
           ...((data as any).estimatedPrice !== undefined && {
             estimatedPrice: (data as any).estimatedPrice ?? null,
           }),
+          ...((data as any).saleListingPrice !== undefined && {
+            saleListingPrice: (data as any).saleListingPrice ?? null,
+          }),
         } as Prisma.equipmentUpdateInput,
       })
 
@@ -363,6 +366,7 @@ export class EquipmentService {
         notes: 'Notas',
         accessories: 'Accesorios',
         estimatedPrice: 'Precio Estimado',
+        saleListingPrice: 'Precio de Venta',
       }
 
       for (const key of Object.keys(data)) {

@@ -172,6 +172,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       contractStartDate = undefined,
       contractEndDate = undefined,
       contractRenewalCost = undefined,
+      saleListingPrice = undefined,
     } = body as {
       supplierId?: string | null
       invoiceNumber?: string | null
@@ -187,6 +188,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       contractStartDate?: string | null
       contractEndDate?: string | null
       contractRenewalCost?: number | null
+      saleListingPrice?: number | null
     }
 
     // Validación: usefulLifeYears > 0
@@ -254,6 +256,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       financialFields.contractEndDate = contractEndDate ? new Date(contractEndDate) : null
     if ('contractRenewalCost' in body)
       financialFields.contractRenewalCost = contractRenewalCost ?? null
+    if ('saleListingPrice' in body) financialFields.saleListingPrice = saleListingPrice ?? null
 
     // Campos de depreciación solo si la familia del activo los soporta
     const currentEquipment = await prisma.equipment.findUnique({

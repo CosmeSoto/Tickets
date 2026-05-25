@@ -24,6 +24,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
+import { getEquipmentDisplayName } from '@/lib/utils/equipment-display'
 
 const DEPRECIATION_OPTIONS = [
   { value: 'LINEAR', label: 'Línea Recta — mismo monto cada año' },
@@ -36,8 +37,9 @@ interface ConvertToPurchaseDialogProps {
   onOpenChange: (open: boolean) => void
   equipmentId: string
   equipmentCode: string
-  equipmentBrand: string
-  equipmentModel: string
+  equipmentTypeName?: string
+  equipmentBrandName?: string
+  equipmentModelName?: string
   /** 'RENTAL' | 'LOAN' */
   currentOwnershipType: string
   onSuccess: () => void
@@ -48,8 +50,9 @@ export function ConvertToPurchaseDialog({
   onOpenChange,
   equipmentId,
   equipmentCode,
-  equipmentBrand,
-  equipmentModel,
+  equipmentTypeName,
+  equipmentBrandName,
+  equipmentModelName,
   currentOwnershipType,
   onSuccess,
 }: ConvertToPurchaseDialogProps) {
@@ -70,7 +73,12 @@ export function ConvertToPurchaseDialog({
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const isRental = currentOwnershipType === 'RENTAL'
-  const assetName = `${equipmentCode} — ${equipmentBrand} ${equipmentModel}`
+  const assetName = getEquipmentDisplayName({
+    equipmentCode,
+    equipmentTypeName,
+    equipmentBrandName,
+    equipmentModelName,
+  })
 
   const validate = () => {
     const e: Record<string, string> = {}
