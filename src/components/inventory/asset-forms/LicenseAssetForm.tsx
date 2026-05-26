@@ -16,7 +16,7 @@ import { TypeAttributesInput } from '@/components/inventory/custom-fields/type-a
 import type { FamilyConfig } from '@/lib/inventory/family-config-types'
 import { useFetch } from '@/hooks/common/use-fetch'
 import { useActiveDepartments } from '@/contexts/departments-context'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, Tag } from 'lucide-react'
 
 interface LicenseAssetFormProps {
   familyId: string
@@ -49,7 +49,6 @@ export function LicenseAssetForm({
   const [userId, setUserId] = useState('')
   const [departmentId, setDepartmentId] = useState('')
 
-  // ✅ Migrado a useFetch — usuarios activos (solo cuando scope=Individual)
   const { data: rawUsers } = useFetch<{ id: string; name?: string; email?: string }>('/api/users', {
     params: { limit: 200 },
     enabled: scope === 'Individual',
@@ -59,7 +58,6 @@ export function LicenseAssetForm({
     [rawUsers]
   )
 
-  // ✅ Departamentos desde contexto global — sin petición extra
   const { departments: rawDepartments } = useActiveDepartments()
   const departments: SearchableSelectOption[] = useMemo(
     () => rawDepartments.map(d => ({ id: d.id, name: d.name })),
@@ -73,27 +71,22 @@ export function LicenseAssetForm({
   const [purchaseOrderNumber, setPurchaseOrderNumber] = useState('')
   const [renewalCost, setRenewalCost] = useState('')
   const [renewalDate, setRenewalDate] = useState('')
-  // Toggle suscripción recurrente (tarea 21)
   const [hasRecurring, setHasRecurring] = useState(false)
   const [linkedContractId, setLinkedContractId] = useState<string | null>(null)
-  // Campos simples de contrato (cuando no es recurrente)
   const [contractNumber, setContractNumber] = useState('')
   const [contractStartDate, setContractStartDate] = useState('')
   const [contractEndDate, setContractEndDate] = useState('')
   const [notes, setNotes] = useState('')
   const [attachments, setAttachments] = useState<File[]>([])
 
-  // familyConfig no aplica a licencias — siempre mostramos todo
   void familyConfig
 
-  // License types siguen cargando desde API (son específicos por familia)
   useEffect(() => {
     fetch(`/api/inventory/license-types?familyId=${familyId}`)
       .then(r => r.json())
       .then(d => setLicenseTypes(d.types ?? d ?? []))
   }, [familyId])
 
-  // Cargar atributos del tipo de licencia seleccionado
   useEffect(() => {
     if (licenseTypeId) {
       fetch(`/api/inventory/license-types/${licenseTypeId}/attributes`)
@@ -153,99 +146,115 @@ export function LicenseAssetForm({
         ← Atrás
       </button>
 
-      <div className='space-y-1'>
-        <Label>
-          Nombre <span className='text-destructive'>*</span>
-        </Label>
-        <Input
-          value={name}
-          onChange={e => setName(e.target.value)}
-          required
-          placeholder='Ej: Microsoft Office 365'
-        />
+      <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+        <div className='space-y-1'>
+          <Label>
+            Nombre <span className='text-destructive'>*</span>
+          </Label>
+          <Input
+            value={name}
+            onChange={e => setName(e.target.value)}
+            required
+            placeholder='Ej: Microsoft Office 365'
+          />
+        </div>
+
+        <div className='space-y-1'>
+          <Label>
+            Tipo de Licencia / Contrato <span className='text-destructive'>*</span>
+          </Label>
+          <InlineCreateSelect
+            options={licenseTypes}
+            value={licenseTypeId}
+            onChange={setLicenseTypeId}
+            placeholder='Buscar tipo...'
+            createLabel='Crear tipo de licencia'
+            createTitle='Nuevo tipo de licencia'
+            createForm={({ onSuccess, onCancel }) => (
+              <CatalogTypeInlineForm
+                apiEndpoint='/api/inventory/license-types'
+                familyId={familyId}
+                onSuccess={item => {
+                  setLicenseTypes(prev => [...prev, item])
+                  onSuccess(item)
+                }}
+                onCancel={onCancel}
+              />
+            )}
+          />
+        </div>
+
+        <div className='space-y-1'>
+          <Label>
+            Clave de Licencia{' '}
+            <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+          </Label>
+          <Input
+            value={licenseKey}
+            onChange={e => setLicenseKey(e.target.value)}
+            placeholder='Ej: XXXXX-XXXXX-XXXXX'
+          />
+        </div>
       </div>
 
-      <div className='space-y-1'>
-        <Label>
-          Tipo de Licencia / Contrato <span className='text-destructive'>*</span>
-        </Label>
-        <InlineCreateSelect
-          options={licenseTypes}
-          value={licenseTypeId}
-          onChange={setLicenseTypeId}
-          placeholder='Buscar tipo...'
-          createLabel='Crear tipo de licencia'
-          createTitle='Nuevo tipo de licencia'
-          createForm={({ onSuccess, onCancel }) => (
-            <CatalogTypeInlineForm
-              apiEndpoint='/api/inventory/license-types'
-              familyId={familyId}
-              onSuccess={item => {
-                setLicenseTypes(prev => [...prev, item])
-                onSuccess(item)
-              }}
-              onCancel={onCancel}
+      {licenseAttributes.length > 0 && (
+        <div className='space-y-3'>
+          <Label>Atributos del Tipo</Label>
+          <TypeAttributesInput
+            attributes={licenseAttributes}
+            values={customValues}
+            onChange={setCustomValues}
+            isEditMode={false}
+          />
+        </div>
+      )}
+
+      <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
+        <div className='space-y-1'>
+          <Label>Alcance</Label>
+          <SimpleSelect value={scope} onChange={e => setScope(e.target.value as Scope)}>
+            <option value='Individual'>Individual</option>
+            <option value='Departamento'>Departamento</option>
+            <option value='Empresa'>Empresa</option>
+          </SimpleSelect>
+        </div>
+
+        <div className='space-y-1'>
+          <Label>
+            Proveedor / Vendedor <span className='text-destructive'>*</span>
+          </Label>
+          <SupplierSelect
+            value={supplierId || null}
+            onChange={v => setSupplierId(v || '')}
+            familyId={familyId}
+          />
+        </div>
+
+        {scope === 'Individual' && (
+          <div className='space-y-1'>
+            <Label>Usuario Asignado</Label>
+            <SearchableSelect
+              options={users}
+              value={userId}
+              onChange={setUserId}
+              placeholder='Buscar usuario...'
             />
-          )}
-        />
+          </div>
+        )}
+        {scope === 'Departamento' && (
+          <div className='space-y-1'>
+            <Label>Departamento Asignado</Label>
+            <SearchableSelect
+              options={departments}
+              value={departmentId}
+              onChange={setDepartmentId}
+              placeholder='Buscar departamento...'
+            />
+          </div>
+        )}
       </div>
 
-      <div className='space-y-1'>
-        <Label>
-          Clave de Licencia{' '}
-          <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
-        </Label>
-        <Input
-          value={licenseKey}
-          onChange={e => setLicenseKey(e.target.value)}
-          placeholder='Ej: XXXXX-XXXXX-XXXXX'
-        />
-      </div>
-
-      <div className='space-y-1'>
-        <Label>Alcance</Label>
-        <SimpleSelect value={scope} onChange={e => setScope(e.target.value as Scope)}>
-          <option value='Individual'>Individual</option>
-          <option value='Departamento'>Departamento</option>
-          <option value='Empresa'>Empresa</option>
-        </SimpleSelect>
-      </div>
-
-      {scope === 'Individual' && (
-        <div className='space-y-1'>
-          <Label>Usuario Asignado</Label>
-          <SearchableSelect
-            options={users}
-            value={userId}
-            onChange={setUserId}
-            placeholder='Buscar usuario...'
-          />
-        </div>
-      )}
-      {scope === 'Departamento' && (
-        <div className='space-y-1'>
-          <Label>Departamento Asignado</Label>
-          <SearchableSelect
-            options={departments}
-            value={departmentId}
-            onChange={setDepartmentId}
-            placeholder='Buscar departamento...'
-          />
-        </div>
-      )}
-
-      <div className='space-y-1'>
-        <Label>
-          Proveedor / Vendedor <span className='text-destructive'>*</span>
-        </Label>
-        <SupplierSelect
-          value={supplierId || null}
-          onChange={v => setSupplierId(v || '')}
-          familyId={familyId}
-        />
-      </div>
-
-      <div className='grid grid-cols-2 gap-3'>
+      <div className='grid grid-cols-1 md:grid-cols-3 gap-3'>
         <div className='space-y-1'>
           <Label>Fecha de Compra</Label>
           <Input type='date' value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} />
@@ -258,6 +267,22 @@ export function LicenseAssetForm({
             onChange={e => setExpirationDate(e.target.value)}
           />
         </div>
+        <div className='space-y-1'>
+          <Label>
+            Costo <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+          </Label>
+          <Input
+            type='number'
+            min='0'
+            step='0.01'
+            value={cost}
+            onChange={e => setCost(e.target.value)}
+            placeholder='0.00'
+          />
+        </div>
+      </div>
+
+      <div className='grid grid-cols-1 md:grid-cols-3 gap-3'>
         <div className='space-y-1'>
           <Label>
             Número de Factura{' '}
@@ -287,37 +312,9 @@ export function LicenseAssetForm({
           </Label>
           <Input type='date' value={renewalDate} onChange={e => setRenewalDate(e.target.value)} />
         </div>
-        <div className='space-y-1'>
-          <Label>
-            Costo <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
-          </Label>
-          <Input
-            type='number'
-            min='0'
-            step='0.01'
-            value={cost}
-            onChange={e => setCost(e.target.value)}
-            placeholder='0.00'
-          />
-        </div>
       </div>
 
-      {/* Atributos Personalizados */}
-      {licenseAttributes.length > 0 && (
-        <div className='space-y-3'>
-          <Label>Atributos del Tipo</Label>
-          <TypeAttributesInput
-            attributes={licenseAttributes}
-            values={customValues}
-            onChange={setCustomValues}
-            isEditMode={false}
-          />
-        </div>
-      )}
-
-      {/* Contrato / Suscripción */}
       <div className='rounded-lg border border-border p-4 space-y-3'>
-        {/* Toggle */}
         <label className='flex items-center gap-3 cursor-pointer select-none'>
           <button
             type='button'
