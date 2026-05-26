@@ -204,7 +204,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
 
       const body = await request.json()
-      const { AssignmentService } = await import('@/lib/services/assignment-service')
+      const { AssignmentService } = await import('@/lib/services/ticket-assignment.service')
 
       try {
         const ticket = await prisma.tickets.findUnique({

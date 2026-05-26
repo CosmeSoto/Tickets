@@ -585,11 +585,15 @@ export async function POST(req: NextRequest) {
         },
       })
     } else if (subtype === 'LICENSE') {
+      const resolvedLicenseTypeId = body.licenseTypeId || typeId
+      if (!resolvedLicenseTypeId) {
+        return NextResponse.json({ error: 'El tipo de licencia es obligatorio' }, { status: 400 })
+      }
       asset = await prisma.software_licenses.create({
         data: {
           id: randomUUID(),
           name: name ?? '',
-          typeId: typeId ?? '',
+          typeId: resolvedLicenseTypeId,
           key: key ?? undefined,
           expirationDate: expirationDate ? new Date(expirationDate) : undefined,
           supplierId: supplierId ?? undefined,

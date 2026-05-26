@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { AssignmentService } from '@/lib/services/assignment-service'
+import { AssignmentService } from '@/lib/services/ticket-assignment.service'
 
 export async function GET(request: NextRequest) {
   try {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { ReportService } from '@/lib/services/report-service'
+import { ReportService } from '@/lib/services/ticket-report.service'
 import { ExportService } from '@/lib/services/export-service'
 import { RateLimiters } from '@/lib/rate-limit'
 import { AuditServiceComplete } from '@/lib/services/audit-service-complete'
