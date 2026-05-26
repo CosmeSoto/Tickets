@@ -97,7 +97,6 @@ export function LicenseAssetForm({
       assignedToUser: scope === 'Individual' ? userId || undefined : undefined,
       assignedToDepartment: scope === 'Departamento' ? departmentId || undefined : undefined,
       supplierId: supplierId || undefined,
-      vendor: supplierId || undefined,
       purchaseDate: purchaseDate || undefined,
       expirationDate: expirationDate || undefined,
       cost: cost ? parseFloat(cost) : undefined,

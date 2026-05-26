@@ -35,6 +35,7 @@ export class LicenseService {
         expirationDate: data.expirationDate || null,
         cost: data.cost,
         vendor: data.vendor,
+        supplierId: data.supplierId,
         notes: data.notes,
         assignedToEquipment: data.assignedToEquipment || null,
         assignedToUser: data.assignedToUser || null,
@@ -144,6 +145,7 @@ export class LicenseService {
       where.OR = [
         { name: { contains: filters.search, mode: 'insensitive' } },
         { vendor: { contains: filters.search, mode: 'insensitive' } },
+        { supplier: { name: { contains: filters.search, mode: 'insensitive' } } },
         { notes: { contains: filters.search, mode: 'insensitive' } },
       ]
     }

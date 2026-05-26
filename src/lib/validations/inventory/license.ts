@@ -1,18 +1,17 @@
 import { z } from 'zod'
 
 export const createLicenseSchema = z.object({
-  name: z.string()
+  name: z
+    .string()
     .min(2, 'El nombre debe tener al menos 2 caracteres')
     .max(200, 'El nombre no puede exceder 200 caracteres'),
   typeId: z.string().min(1, 'El tipo de licencia es requerido'),
-  key: z.string()
-    .max(500, 'La clave no puede exceder 500 caracteres')
-    .optional()
-    .or(z.literal('')),
+  key: z.string().max(500, 'La clave no puede exceder 500 caracteres').optional().or(z.literal('')),
   purchaseDate: z.coerce.date().optional(),
   expirationDate: z.coerce.date().optional(),
   cost: z.number().min(0, 'El costo debe ser mayor o igual a 0').optional(),
   vendor: z.string().max(100).optional(),
+  supplierId: z.string().optional(),
   notes: z.string().max(2000).optional(),
   assignedToEquipment: z.string().optional(),
   assignedToUser: z.string().optional(),

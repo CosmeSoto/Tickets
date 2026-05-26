@@ -46,6 +46,7 @@ export async function GET(request: NextRequest) {
       where.OR = [
         { name: { contains: validatedFilters.search, mode: 'insensitive' } },
         { vendor: { contains: validatedFilters.search, mode: 'insensitive' } },
+        { supplier: { name: { contains: validatedFilters.search, mode: 'insensitive' } } },
         { notes: { contains: validatedFilters.search, mode: 'insensitive' } },
       ]
     }
