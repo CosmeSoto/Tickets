@@ -287,12 +287,10 @@ const navigationByRole: Record<string, NavItem[]> = {
 function NavItemComponent({
   item,
   pathname,
-  onNavigate,
   depth = 0,
 }: {
   item: NavItem
   pathname: string | null
-  onNavigate?: () => void
   depth?: number
 }) {
   const hasChildren = item.children && item.children.length > 0
@@ -326,11 +324,6 @@ function NavItemComponent({
     return (
       <Link
         href={item.href}
-        onClick={e => {
-          if (onNavigate) {
-            onNavigate()
-          }
-        }}
         style={{ paddingLeft: `${16 + indent}px` }}
         className={`flex items-center pr-4 py-2 text-sm font-medium rounded-lg transition-colors ${
           isActive
@@ -375,7 +368,6 @@ function NavItemComponent({
               key={child.href + child.name}
               item={child}
               pathname={pathname}
-              onNavigate={onNavigate}
               depth={depth + 1}
             />
           ))}
@@ -553,12 +545,7 @@ export function RoleDashboardLayout({
         {/* Navigation */}
         <nav className='flex-1 px-3 py-4 space-y-1 overflow-y-auto h-[calc(100vh-5rem)]'>
           {navigation.map(item => (
-            <NavItemComponent
-              key={item.name}
-              item={item}
-              pathname={pathname}
-              onNavigate={closeSidebar}
-            />
+            <NavItemComponent key={item.name} item={item} pathname={pathname} />
           ))}
         </nav>
       </aside>
