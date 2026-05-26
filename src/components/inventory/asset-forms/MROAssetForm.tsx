@@ -12,6 +12,7 @@ import { SupplierSelect } from '@/components/inventory/suppliers/SupplierSelect'
 import { CatalogTypeInlineForm } from '@/components/inventory/asset-forms/CatalogTypeInlineForm'
 import { UnitOfMeasureInlineForm } from '@/components/inventory/asset-forms/UnitOfMeasureInlineForm'
 import { WarehouseInlineForm } from '@/components/inventory/asset-forms/WarehouseInlineForm'
+import { TypeAttributesInput } from '@/components/inventory/custom-fields/type-attributes-input'
 import type { FamilyConfig } from '@/lib/inventory/family-config-types'
 
 interface MROAssetFormProps {
@@ -25,18 +26,35 @@ interface MROAssetFormProps {
 }
 
 const ACQUISITION_MODES = [
-  { value: 'FIXED_ASSET', label: 'Compra directa',           help: 'Lo adquiriste — es propiedad de la empresa.' },
-  { value: 'RENTAL',      label: 'Suministro por proveedor', help: 'El proveedor lo suministra periódicamente.' },
+  {
+    value: 'FIXED_ASSET',
+    label: 'Compra directa',
+    help: 'Lo adquiriste — es propiedad de la empresa.',
+  },
+  {
+    value: 'RENTAL',
+    label: 'Suministro por proveedor',
+    help: 'El proveedor lo suministra periódicamente.',
+  },
 ]
 
 type SelectOption = { id: string; name: string; description?: string }
 
 export function MROAssetForm({
-  familyId, familyConfig, onSubmit, onBack, submitting, submitError, maxFileSizeMB = 10,
+  familyId,
+  familyConfig,
+  onSubmit,
+  onBack,
+  submitting,
+  submitError,
+  maxFileSizeMB = 10,
 }: MROAssetFormProps) {
   const [name, setName] = useState('')
   const [consumableTypeId, setConsumableTypeId] = useState('')
   const [consumableTypes, setConsumableTypes] = useState<SelectOption[]>([])
+  const [customFieldValues, setCustomFieldValues] = useState<
+    Array<{ fieldName: string; fieldValue: string }>
+  >([])
   const [unitOfMeasureId, setUnitOfMeasureId] = useState('')
   const [unitsOfMeasure, setUnitsOfMeasure] = useState<SelectOption[]>([])
   const [acquisitionMode, setAcquisitionMode] = useState<'FIXED_ASSET' | 'RENTAL'>('FIXED_ASSET')
@@ -54,17 +72,22 @@ export function MROAssetForm({
 
   useEffect(() => {
     fetch(`/api/inventory/consumable-types?familyId=${familyId}`)
-      .then(r => r.json()).then(d => setConsumableTypes(d.types ?? d ?? []))
+      .then(r => r.json())
+      .then(d => setConsumableTypes(d.types ?? d ?? []))
     fetch('/api/inventory/units-of-measure')
-      .then(r => r.json()).then(d => {
+      .then(r => r.json())
+      .then(d => {
         const units = Array.isArray(d) ? d : (d.units ?? [])
-        setUnitsOfMeasure(units.map((u: { id: string; name: string; symbol: string }) => ({
-          id: u.id,
-          name: `${u.name} (${u.symbol})`,
-        })))
+        setUnitsOfMeasure(
+          units.map((u: { id: string; name: string; symbol: string }) => ({
+            id: u.id,
+            name: `${u.name} (${u.symbol})`,
+          }))
+        )
       })
     fetch(`/api/inventory/warehouses?familyId=${familyId}`)
-      .then(r => r.json()).then(d => setWarehouses(d.warehouses ?? d ?? []))
+      .then(r => r.json())
+      .then(d => setWarehouses(d.warehouses ?? d ?? []))
   }, [familyId])
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -81,119 +104,206 @@ export function MROAssetForm({
       costPerUnit: costPerUnit ? parseFloat(costPerUnit) : undefined,
       warehouseId: warehouseId || undefined,
       notes: notes || undefined,
+      customValues: customFieldValues.length ? customFieldValues : undefined,
     })
   }
 
+  function TypeAttributesSection({
+    typeId,
+    values,
+    onChange,
+  }: {
+    typeId: string
+    values: Array<{ fieldName: string; fieldValue: string }>
+    onChange: (values: Array<{ fieldName: string; fieldValue: string }>) => void
+  }) {
+    if (!typeId) {
+      return null
+    }
+
+    return (
+      <div className='space-y-2'>
+        <Label>Atributos del Tipo</Label>
+        <TypeAttributesInput
+          typeId={typeId}
+          assetType='consumable'
+          values={values}
+          onChange={onChange}
+        />
+      </div>
+    )
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
-      <button type="button" onClick={onBack} className="text-sm text-muted-foreground hover:text-foreground">← Atrás</button>
+    <form onSubmit={handleSubmit} className='space-y-5'>
+      <button
+        type='button'
+        onClick={onBack}
+        className='text-sm text-muted-foreground hover:text-foreground'
+      >
+        ← Atrás
+      </button>
 
       {/* ── 1. NOMBRE ─────────────────────────────────────────────── */}
-      <div className="space-y-1">
-        <Label>Nombre del material <span className="text-destructive">*</span></Label>
-        <Input value={name} onChange={e => setName(e.target.value)} required placeholder="Ej: Tornillo M6, Tóner HP 85A, Papel A4..." />
+      <div className='space-y-1'>
+        <Label>
+          Nombre del material <span className='text-destructive'>*</span>
+        </Label>
+        <Input
+          value={name}
+          onChange={e => setName(e.target.value)}
+          required
+          placeholder='Ej: Tornillo M6, Tóner HP 85A, Papel A4...'
+        />
       </div>
 
       {/* ── 2. CATEGORÍA + UNIDAD ─────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <Label>Categoría <span className="text-xs font-normal text-muted-foreground">(opcional)</span></Label>
+      <div className='grid grid-cols-2 gap-3'>
+        <div className='space-y-1'>
+          <Label>
+            Categoría <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+          </Label>
           <InlineCreateSelect
             options={consumableTypes}
             value={consumableTypeId}
             onChange={setConsumableTypeId}
-            placeholder="Ej: Lubricante, Papel..."
+            placeholder='Ej: Lubricante, Papel...'
             allowClear
-            createLabel="Crear categoría"
-            createTitle="Nueva categoría de material"
-            editTitle="Editar categoría"
-            deleteConfirmMessage="¿Eliminar esta categoría? Solo es posible si no tiene materiales asociados."
+            createLabel='Crear categoría'
+            createTitle='Nueva categoría de material'
+            editTitle='Editar categoría'
+            deleteConfirmMessage='¿Eliminar esta categoría? Solo es posible si no tiene materiales asociados.'
             createForm={({ item, onSuccess, onCancel }) => (
               <CatalogTypeInlineForm
-                apiEndpoint="/api/inventory/consumable-types"
+                apiEndpoint='/api/inventory/consumable-types'
                 familyId={familyId}
                 item={item}
-                onSuccess={(newItem) => {
-                  if (item) setConsumableTypes(prev => prev.map(t => t.id === newItem.id ? newItem : t))
+                onSuccess={newItem => {
+                  if (item)
+                    setConsumableTypes(prev => prev.map(t => (t.id === newItem.id ? newItem : t)))
                   else setConsumableTypes(prev => [...prev, newItem])
                   onSuccess(newItem)
                 }}
                 onCancel={onCancel}
               />
             )}
-            onDelete={async (id) => {
+            onDelete={async id => {
               const res = await fetch(`/api/inventory/consumable-types/${id}`, { method: 'DELETE' })
-              if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Error al eliminar') }
+              if (!res.ok) {
+                const d = await res.json()
+                throw new Error(d.error || 'Error al eliminar')
+              }
               setConsumableTypes(prev => prev.filter(t => t.id !== id))
             }}
           />
         </div>
-        <div className="space-y-1">
-          <Label>Unidad de medida <span className="text-xs font-normal text-muted-foreground">(opcional)</span></Label>
+        <div className='space-y-1'>
+          <Label>
+            Unidad de medida{' '}
+            <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+          </Label>
           <InlineCreateSelect
             options={unitsOfMeasure}
             value={unitOfMeasureId}
             onChange={setUnitOfMeasureId}
-            placeholder="Ej: Unidad, Litro, Kg..."
+            placeholder='Ej: Unidad, Litro, Kg...'
             allowClear
-            createLabel="Crear unidad"
-            createTitle="Nueva unidad de medida"
-            editTitle="Editar unidad de medida"
-            deleteConfirmMessage="¿Eliminar esta unidad de medida? Solo es posible si no tiene materiales asociados."
+            createLabel='Crear unidad'
+            createTitle='Nueva unidad de medida'
+            editTitle='Editar unidad de medida'
+            deleteConfirmMessage='¿Eliminar esta unidad de medida? Solo es posible si no tiene materiales asociados.'
             createForm={({ item, onSuccess, onCancel }) => (
               <UnitOfMeasureInlineForm
                 item={item}
-                onSuccess={(newItem) => {
-                  if (item) setUnitsOfMeasure(prev => prev.map(u => u.id === newItem.id ? newItem : u))
+                onSuccess={newItem => {
+                  if (item)
+                    setUnitsOfMeasure(prev => prev.map(u => (u.id === newItem.id ? newItem : u)))
                   else setUnitsOfMeasure(prev => [...prev, newItem])
                   onSuccess(newItem)
                 }}
                 onCancel={onCancel}
               />
             )}
-            onDelete={async (id) => {
+            onDelete={async id => {
               const res = await fetch(`/api/inventory/units-of-measure/${id}`, { method: 'DELETE' })
-              if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Error al eliminar') }
+              if (!res.ok) {
+                const d = await res.json()
+                throw new Error(d.error || 'Error al eliminar')
+              }
               setUnitsOfMeasure(prev => prev.filter(u => u.id !== id))
             }}
           />
         </div>
       </div>
 
+      <TypeAttributesSection
+        typeId={consumableTypeId}
+        values={customFieldValues}
+        onChange={setCustomFieldValues}
+      />
+
       {/* ── 3. ADQUISICIÓN ────────────────────────────────────────── */}
-      <div className="space-y-1">
+      <div className='space-y-1'>
         <Label>¿Cómo se obtiene este material?</Label>
         <SimpleSelect
           value={acquisitionMode}
           onChange={e => setAcquisitionMode(e.target.value as typeof acquisitionMode)}
           options={ACQUISITION_MODES}
         />
-        <p className="text-xs text-muted-foreground">{ACQUISITION_MODES.find(m => m.value === acquisitionMode)?.help}</p>
+        <p className='text-xs text-muted-foreground'>
+          {ACQUISITION_MODES.find(m => m.value === acquisitionMode)?.help}
+        </p>
       </div>
 
       {acquisitionMode === 'RENTAL' && (
-        <div className="space-y-1">
-          <Label>Proveedor <span className="text-destructive">*</span></Label>
-          <SupplierSelect value={supplierId || null} onChange={v => setSupplierId(v || '')} familyId={familyId} />
+        <div className='space-y-1'>
+          <Label>
+            Proveedor <span className='text-destructive'>*</span>
+          </Label>
+          <SupplierSelect
+            value={supplierId || null}
+            onChange={v => setSupplierId(v || '')}
+            familyId={familyId}
+          />
         </div>
       )}
 
       {/* ── 4. STOCK ──────────────────────────────────────────────── */}
       {isVisible('STOCK_MRO') && (
-        <fieldset className="rounded-lg border border-border p-4 space-y-3">
-          <legend className="px-2 text-sm font-semibold text-foreground">Cantidades en stock</legend>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1">
+        <fieldset className='rounded-lg border border-border p-4 space-y-3'>
+          <legend className='px-2 text-sm font-semibold text-foreground'>
+            Cantidades en stock
+          </legend>
+          <div className='grid grid-cols-3 gap-3'>
+            <div className='space-y-1'>
               <Label>Cantidad inicial</Label>
-              <Input type="number" min="0" value={initialStock} onChange={e => setInitialStock(e.target.value)} placeholder="0" />
+              <Input
+                type='number'
+                min='0'
+                value={initialStock}
+                onChange={e => setInitialStock(e.target.value)}
+                placeholder='0'
+              />
             </div>
-            <div className="space-y-1">
+            <div className='space-y-1'>
               <Label>Alerta cuando baje de</Label>
-              <Input type="number" min="0" value={minStock} onChange={e => setMinStock(e.target.value)} placeholder="0" />
+              <Input
+                type='number'
+                min='0'
+                value={minStock}
+                onChange={e => setMinStock(e.target.value)}
+                placeholder='0'
+              />
             </div>
-            <div className="space-y-1">
+            <div className='space-y-1'>
               <Label>Máximo a mantener</Label>
-              <Input type="number" min="0" value={maxStock} onChange={e => setMaxStock(e.target.value)} placeholder="0" />
+              <Input
+                type='number'
+                min='0'
+                value={maxStock}
+                onChange={e => setMaxStock(e.target.value)}
+                placeholder='0'
+              />
             </div>
           </div>
         </fieldset>
@@ -201,28 +311,41 @@ export function MROAssetForm({
 
       {/* ── 5. FINANCIERO ─────────────────────────────────────────── */}
       {isVisible('FINANCIAL') && (
-        <div className="space-y-1">
-          <Label>Precio por unidad <span className="text-xs font-normal text-muted-foreground">(opcional)</span></Label>
-          <Input type="number" min="0" step="0.01" value={costPerUnit} onChange={e => setCostPerUnit(e.target.value)} placeholder="0.00" />
+        <div className='space-y-1'>
+          <Label>
+            Precio por unidad{' '}
+            <span className='text-xs font-normal text-muted-foreground'>(opcional)</span>
+          </Label>
+          <Input
+            type='number'
+            min='0'
+            step='0.01'
+            value={costPerUnit}
+            onChange={e => setCostPerUnit(e.target.value)}
+            placeholder='0.00'
+          />
         </div>
       )}
 
       {/* ── 6. BODEGA ─────────────────────────────────────────────── */}
       {isVisible('WAREHOUSE') && (
-        <div className="space-y-1">
+        <div className='space-y-1'>
           <Label>Bodega</Label>
           <InlineCreateSelect
             options={warehouses}
             value={warehouseId}
             onChange={setWarehouseId}
-            placeholder="Buscar bodega..."
+            placeholder='Buscar bodega...'
             allowClear
-            createLabel="Crear bodega"
-            createTitle="Nueva bodega"
+            createLabel='Crear bodega'
+            createTitle='Nueva bodega'
             createForm={({ onSuccess, onCancel }) => (
               <WarehouseInlineForm
                 defaultFamilyId={familyId}
-                onSuccess={(item) => { setWarehouses(prev => [...prev, item]); onSuccess(item) }}
+                onSuccess={item => {
+                  setWarehouses(prev => [...prev, item])
+                  onSuccess(item)
+                }}
                 onCancel={onCancel}
               />
             )}
@@ -231,17 +354,29 @@ export function MROAssetForm({
       )}
 
       {/* ── 7. NOTAS Y ADJUNTOS ───────────────────────────────────── */}
-      <div className="space-y-1">
+      <div className='space-y-1'>
         <Label>Observaciones</Label>
-        <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="Notas adicionales..." />
+        <Textarea
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+          rows={3}
+          placeholder='Notas adicionales...'
+        />
       </div>
-      <FileUploadZone files={attachments} onChange={setAttachments} maxFileSizeMB={maxFileSizeMB} label="Adjuntos" />
+      <FileUploadZone
+        files={attachments}
+        onChange={setAttachments}
+        maxFileSizeMB={maxFileSizeMB}
+        label='Adjuntos'
+      />
 
-      {submitError && <p className="text-sm text-destructive">{submitError}</p>}
+      {submitError && <p className='text-sm text-destructive'>{submitError}</p>}
 
-      <div className="flex gap-3 pt-2">
-        <Button type="button" variant="outline" onClick={onBack} disabled={submitting}>← Atrás</Button>
-        <Button type="submit" disabled={submitting} className="flex-1">
+      <div className='flex gap-3 pt-2'>
+        <Button type='button' variant='outline' onClick={onBack} disabled={submitting}>
+          ← Atrás
+        </Button>
+        <Button type='submit' disabled={submitting} className='flex-1'>
           {submitting ? 'Guardando...' : 'Crear Material'}
         </Button>
       </div>
