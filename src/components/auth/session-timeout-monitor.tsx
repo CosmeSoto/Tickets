@@ -155,14 +155,15 @@ export function SessionTimeoutMonitor() {
     if (status !== 'authenticated') return
 
     // Throttle para evitar demasiadas llamadas
-    let throttleTimeout: NodeJS.Timeout | undefined
-    const handleActivity = () => {
-      if (throttleTimeout) return
+    let lastResetTime = 0
+    const THROTTLE_MS = 2000 // Throttle de 2 segundos (más flexible)
 
-      throttleTimeout = setTimeout(() => {
-        resetInactivityTimer()
-        throttleTimeout = undefined
-      }, 1000) // Throttle de 1 segundo
+    const handleActivity = (e: Event) => {
+      const now = Date.now()
+      if (now - lastResetTime < THROTTLE_MS) return
+
+      lastResetTime = now
+      resetInactivityTimer()
     }
 
     // Re-leer configuración cuando el admin guarda settings
@@ -185,9 +186,6 @@ export function SessionTimeoutMonitor() {
       window.removeEventListener('scroll', handleActivity)
       window.removeEventListener('mousemove', handleActivity)
       window.removeEventListener('settings-updated', handleSettingsUpdated)
-      if (throttleTimeout) {
-        clearTimeout(throttleTimeout)
-      }
     }
   }, [status, resetInactivityTimer, fetchSessionTimeout])
 
