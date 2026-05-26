@@ -73,7 +73,10 @@ export default function SettingsPage() {
     })
     setSaving(false)
     if (ok) {
-      toast({ title: 'Configuración guardada', description: 'Preferencias personales actualizadas' })
+      toast({
+        title: 'Configuración guardada',
+        description: 'Preferencias personales actualizadas',
+      })
     } else {
       toast({ title: 'Error al guardar', variant: 'destructive' })
     }
@@ -86,6 +89,7 @@ export default function SettingsPage() {
     <ModuleLayout
       title='Configuración'
       subtitle='Personaliza tu experiencia y configuraciones del sistema'
+      layoutShell='self'
     >
       <div className='max-w-6xl mx-auto'>
         <Tabs defaultValue='personal' className='space-y-6'>
