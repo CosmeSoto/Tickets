@@ -39,6 +39,11 @@ sudo ./start-production.sh
 # Reconstruir solo la app:
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build app
 
+# Reiniciar:
+docker compose -f docker-compose.prod.yml --env-file .env.production restart app
+docker compose -f docker-compose.prod.yml --env-file .env.production restart redis
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build redis
+
 # Ver logs:
 docker compose -f docker-compose.prod.yml --env-file .env.production logs -f app
 
