@@ -75,8 +75,6 @@ export function LicenseAssetForm({
   const [hasRecurring, setHasRecurring] = useState(false)
   const [linkedContractId, setLinkedContractId] = useState<string | null>(null)
   const [contractNumber, setContractNumber] = useState('')
-  const [contractStartDate, setContractStartDate] = useState('')
-  const [contractEndDate, setContractEndDate] = useState('')
   const [notes, setNotes] = useState('')
   const [attachments, setAttachments] = useState<File[]>([])
 
@@ -113,8 +111,6 @@ export function LicenseAssetForm({
           }
         : {
             contractNumber: contractNumber || undefined,
-            contractStartDate: contractStartDate || undefined,
-            contractEndDate: contractEndDate || undefined,
           }),
       notes: notes || undefined,
       customValues: customFieldValues.length ? customFieldValues : undefined,
@@ -363,24 +359,6 @@ export function LicenseAssetForm({
                 onChange={e => setContractNumber(e.target.value)}
                 placeholder='Ej: CONT-2024-001'
               />
-            </div>
-            <div className='grid grid-cols-2 gap-3'>
-              <div className='space-y-1'>
-                <Label>Inicio</Label>
-                <Input
-                  type='date'
-                  value={contractStartDate}
-                  onChange={e => setContractStartDate(e.target.value)}
-                />
-              </div>
-              <div className='space-y-1'>
-                <Label>Fin / Vencimiento</Label>
-                <Input
-                  type='date'
-                  value={contractEndDate}
-                  onChange={e => setContractEndDate(e.target.value)}
-                />
-              </div>
             </div>
             <div className='space-y-1'>
               <Label>
