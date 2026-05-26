@@ -10,6 +10,7 @@ import { Toaster as SonnerToaster } from 'sonner'
 import { ThemeScript } from '@/components/theme-script'
 import { SessionTimeoutMonitor } from '@/components/auth/session-timeout-monitor'
 import { GlobalFavicon } from '@/components/common/global-favicon'
+import { DynamicPageTitle } from '@/components/common/dynamic-page-title'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ToastProvider>
             <SessionProviderWrapper>
               <AppDataProvider>
+                <DynamicPageTitle defaultTitle='Sistema de Tickets - Soporte Técnico' />
                 <SessionTimeoutMonitor />
                 {children}
               </AppDataProvider>
