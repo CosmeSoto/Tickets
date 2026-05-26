@@ -625,7 +625,7 @@ function ReportSlugContent({ slug }: { slug: string }) {
     a.download = `reporte-${slug}-${new Date().toISOString().split('T')[0]}.${format}`
     document.body.appendChild(a)
     a.click()
-    document.body.removeChild(a)
+    if (a && a.parentNode) a.parentNode.removeChild(a)
     // Limpiar estado de exportación tras un breve delay
     setTimeout(() => setExporting(null), 1500)
   }

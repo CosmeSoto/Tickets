@@ -328,7 +328,7 @@ export function useDepartments(options: UseDepartmentsOptions = {}) {
       link.style.visibility = 'hidden'
       document.body.appendChild(link)
       link.click()
-      document.body.removeChild(link)
+      if (link && link.parentNode) link.parentNode.removeChild(link)
     },
   })
 

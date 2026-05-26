@@ -150,7 +150,7 @@ export default function ReturnActDetailPage({ params: paramsPromise }: PageProps
     const el = document.createElement('textarea')
     el.value = text; el.style.position = 'fixed'; el.style.opacity = '0'
     document.body.appendChild(el); el.focus(); el.select()
-    document.execCommand('copy'); document.body.removeChild(el)
+    document.execCommand('copy'); if (el && el.parentNode) el.parentNode.removeChild(el)
   }
 
   if (!session?.user) return null

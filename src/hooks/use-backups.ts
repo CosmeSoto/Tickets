@@ -279,7 +279,7 @@ export function useBackups() {
           document.body.appendChild(a)
           a.click()
           window.URL.revokeObjectURL(url)
-          document.body.removeChild(a)
+          if (a && a.parentNode) a.parentNode.removeChild(a)
         } else {
           toast({
             title: 'Error',

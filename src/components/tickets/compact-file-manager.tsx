@@ -265,7 +265,7 @@ export function CompactFileManager({
     link.download = attachment.originalName
     document.body.appendChild(link)
     link.click()
-    document.body.removeChild(link)
+    if (link && link.parentNode) link.parentNode.removeChild(link)
   }
 
   const handleDelete = async (attachment: Attachment) => {

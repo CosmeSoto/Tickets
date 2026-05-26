@@ -246,7 +246,7 @@ function triggerDownload(blob: Blob, filename: string): void {
   a.style.display = 'none'
   document.body.appendChild(a)
   a.click()
-  document.body.removeChild(a)
+  if (a && a.parentNode) a.parentNode.removeChild(a)
   // Liberar memoria después de un tick
   setTimeout(() => URL.revokeObjectURL(url), 100)
 }

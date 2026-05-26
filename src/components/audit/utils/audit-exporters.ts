@@ -54,7 +54,7 @@ export async function exportAuditReport(
       document.body.appendChild(a)
       a.click()
       window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
+      if (a && a.parentNode) a.parentNode.removeChild(a)
 
       // Construir mensaje de éxito
       let message = `✅ ${exportedRecords || 0} registros exportados`

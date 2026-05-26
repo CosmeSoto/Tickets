@@ -26,7 +26,7 @@ function downloadCSV(filename: string, rows: string[][]): void {
   a.style.display = 'none'
   document.body.appendChild(a)
   a.click()
-  document.body.removeChild(a)
+  if (a && a.parentNode) a.parentNode.removeChild(a)
 }
 
 export function exportExecutiveCSV(data: FamilyExecutiveSummary[], familyName: string): void {

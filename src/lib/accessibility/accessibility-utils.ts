@@ -363,9 +363,9 @@ export const accessibilityUtils = {
     
     document.body.appendChild(announcement)
     
-    // Remove after announcement
+    // Remove after announcement (safe remove)
     setTimeout(() => {
-      document.body.removeChild(announcement)
+      if (announcement && announcement.parentNode) announcement.parentNode.removeChild(announcement)
     }, 1000)
   },
 

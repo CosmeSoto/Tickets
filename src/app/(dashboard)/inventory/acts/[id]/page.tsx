@@ -249,7 +249,7 @@ export default function ActDetailPage({ params: paramsPromise }: PageProps) {
     el.focus()
     el.select()
     document.execCommand('copy')
-    document.body.removeChild(el)
+    if (el && el.parentNode) el.parentNode.removeChild(el)
   }
 
   if (!session?.user) return null

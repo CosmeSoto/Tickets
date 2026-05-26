@@ -54,7 +54,7 @@ export function FilePreviewModal({ isOpen, onClose, file }: FilePreviewModalProp
     link.download = file.originalName
     document.body.appendChild(link)
     link.click()
-    document.body.removeChild(link)
+    if (link && link.parentNode) link.parentNode.removeChild(link)
   }
 
   return (
