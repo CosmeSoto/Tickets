@@ -53,7 +53,7 @@ export function ModuleLayout({
   onRetry,
   className,
   contentClassName,
-  layoutShell = 'auto',
+  layoutShell = 'self',
 }: ModuleLayoutProps) {
   const setShellMeta = useDashboardShellSetter()
 

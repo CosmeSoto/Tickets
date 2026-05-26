@@ -326,7 +326,11 @@ function NavItemComponent({
     return (
       <Link
         href={item.href}
-        onClick={onNavigate}
+        onClick={e => {
+          if (onNavigate) {
+            onNavigate()
+          }
+        }}
         style={{ paddingLeft: `${16 + indent}px` }}
         className={`flex items-center pr-4 py-2 text-sm font-medium rounded-lg transition-colors ${
           isActive
