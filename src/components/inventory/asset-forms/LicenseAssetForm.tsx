@@ -42,8 +42,9 @@ export function LicenseAssetForm({
   const [name, setName] = useState('')
   const [licenseTypeId, setLicenseTypeId] = useState('')
   const [licenseTypes, setLicenseTypes] = useState<{ id: string; name: string }[]>([])
-  const [licenseAttributes, setLicenseAttributes] = useState<any[]>([])
-  const [customValues, setCustomValues] = useState<Record<string, any>>({})
+  const [customFieldValues, setCustomFieldValues] = useState<
+    Array<{ fieldName: string; fieldValue: string }>
+  >([])
   const [licenseKey, setLicenseKey] = useState('')
   const [scope, setScope] = useState<Scope>('Empresa')
   const [userId, setUserId] = useState('')
@@ -87,21 +88,6 @@ export function LicenseAssetForm({
       .then(d => setLicenseTypes(d.types ?? d ?? []))
   }, [familyId])
 
-  useEffect(() => {
-    if (licenseTypeId) {
-      fetch(`/api/inventory/license-types/${licenseTypeId}/attributes`)
-        .then(r => r.json())
-        .then(data => {
-          if (data.attributes) {
-            setLicenseAttributes(data.attributes)
-          }
-        })
-        .catch(() => setLicenseAttributes([]))
-    } else {
-      setLicenseAttributes([])
-    }
-  }, [licenseTypeId])
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const payload: Record<string, unknown> = {
@@ -131,9 +117,35 @@ export function LicenseAssetForm({
             contractEndDate: contractEndDate || undefined,
           }),
       notes: notes || undefined,
-      customValues,
+      customValues: customFieldValues.length ? customFieldValues : undefined,
     }
     onSubmit(payload)
+  }
+
+  function TypeAttributesSection({
+    typeId,
+    values,
+    onChange,
+  }: {
+    typeId: string
+    values: Array<{ fieldName: string; fieldValue: string }>
+    onChange: (values: Array<{ fieldName: string; fieldValue: string }>) => void
+  }) {
+    if (!typeId) {
+      return null
+    }
+
+    return (
+      <div className='space-y-2'>
+        <Label>Atributos del Tipo</Label>
+        <TypeAttributesInput
+          typeId={typeId}
+          assetType='license'
+          values={values}
+          onChange={onChange}
+        />
+      </div>
+    )
   }
 
   return (
@@ -197,17 +209,11 @@ export function LicenseAssetForm({
         </div>
       </div>
 
-      {licenseAttributes.length > 0 && (
-        <div className='space-y-3'>
-          <Label>Atributos del Tipo</Label>
-          <TypeAttributesInput
-            attributes={licenseAttributes}
-            values={customValues}
-            onChange={setCustomValues}
-            isEditMode={false}
-          />
-        </div>
-      )}
+      <TypeAttributesSection
+        typeId={licenseTypeId}
+        values={customFieldValues}
+        onChange={setCustomFieldValues}
+      />
 
       <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
         <div className='space-y-1'>
