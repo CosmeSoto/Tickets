@@ -34,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ToastProvider>
             <SessionProviderWrapper>
               <AppDataProvider>
+                <GlobalFavicon />
                 <DynamicPageTitle defaultTitle='Sistema de Tickets - Soporte Técnico' />
                 <SessionTimeoutMonitor />
                 {children}
