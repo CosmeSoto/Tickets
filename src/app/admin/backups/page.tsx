@@ -130,6 +130,7 @@ export default function BackupsPage() {
                   | 'news'
                   | 'patrols'
                   | 'families'
+                  | 'users'
                   | 'audits'
                   | 'configurations'
               )
@@ -144,6 +145,7 @@ export default function BackupsPage() {
               <SelectItem value='news'>Solo noticias (JSON)</SelectItem>
               <SelectItem value='patrols'>Solo rondas (JSON)</SelectItem>
               <SelectItem value='families'>Solo familias (JSON)</SelectItem>
+              <SelectItem value='users'>Solo usuarios (JSON)</SelectItem>
               <SelectItem value='audits'>Solo auditorías (JSON)</SelectItem>
               <SelectItem value='configurations'>Solo configuraciones (JSON)</SelectItem>
             </SelectContent>
@@ -306,6 +308,7 @@ export default function BackupsPage() {
                               {backup.module === 'news' && 'Módulo noticias'}
                               {backup.module === 'patrols' && 'Módulo rondas'}
                               {backup.module === 'families' && 'Módulo familias'}
+                              {backup.module === 'users' && 'Módulo usuarios'}
                               {backup.module === 'audits' && 'Módulo auditorías'}
                               {backup.module === 'configurations' && 'Módulo configuraciones'}
                             </Badge>

@@ -100,7 +100,7 @@ export function useBackups() {
   const [cleaning, setCleaning] = useState(false)
   /** Ámbito del próximo backup manual (completo vs módulo) */
   const [manualBackupScope, setManualBackupScope] = useState<
-    'full' | 'tickets' | 'news' | 'patrols' | 'families' | 'audits' | 'configurations'
+    'full' | 'tickets' | 'news' | 'patrols' | 'families' | 'users' | 'audits' | 'configurations'
   >('full')
 
   // ── Auth check ──

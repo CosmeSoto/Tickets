@@ -362,9 +362,16 @@ export function TicketTimeline({
             {metadata.planTitle && (
               <div className='flex items-start space-x-2'>
                 <FileText className='h-5 w-5 text-indigo-600 dark:text-indigo-400 mt-0.5' />
-                <p className='font-semibold text-indigo-900 dark:text-indigo-100'>
-                  {metadata.planTitle}
-                </p>
+                <div>
+                  <p className='font-semibold text-indigo-900 dark:text-indigo-100'>
+                    {metadata.planTitle}
+                  </p>
+                  {metadata.description && (
+                    <p className='text-sm text-indigo-700 dark:text-indigo-300 mt-0.5'>
+                      {metadata.description}
+                    </p>
+                  )}
+                </div>
               </div>
             )}
             <div className='grid grid-cols-2 gap-3 text-sm'>

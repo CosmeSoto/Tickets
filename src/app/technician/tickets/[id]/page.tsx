@@ -337,6 +337,7 @@ export default function TechnicianTicketDetailPage() {
             <TabsContent value='resolution' className='space-y-4'>
               <TicketResolutionTracker
                 ticketId={ticket.id}
+                ticketStatus={ticket.status}
                 canEdit={ticket.assignee?.id === session?.user?.id}
                 mode='technician'
                 onPlanChange={() => setTimelineKey(k => k + 1)}

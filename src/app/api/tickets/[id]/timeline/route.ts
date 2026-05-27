@@ -146,6 +146,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
           entry.action,
           entry.newValue,
           entry.oldValue,
+          entry.comment,
           resolutionPlan,
           attachmentMap
         ),
@@ -315,6 +316,7 @@ function parseMetadata(
   action: string,
   newValue: string | null,
   oldValue: string | null,
+  comment: string | null,
   resolutionPlan: any,
   attachmentMap?: Map<string, { id: string; originalName: string; mimeType: string; size: number }>
 ): any {
@@ -360,26 +362,48 @@ function parseMetadata(
   }
 
   // Para planes de resolución, agregar información completa del plan
-  if (action.includes('resolution_plan') && resolutionPlan) {
-    metadata.planTitle = resolutionPlan.title
-    metadata.status = resolutionPlan.status
-    metadata.totalTasks = resolutionPlan.totalTasks
-    metadata.completedTasks = resolutionPlan.completedTasks
-    metadata.estimatedHours = resolutionPlan.estimatedHours
-    metadata.actualHours = resolutionPlan.actualHours
+  if (action.includes('resolution_plan')) {
+    // Fuente 1: datos del plan actual en la BD (estado más reciente)
+    if (resolutionPlan) {
+      metadata.planTitle = resolutionPlan.title
+      metadata.status = resolutionPlan.status
+      metadata.totalTasks = resolutionPlan.totalTasks
+      metadata.completedTasks = resolutionPlan.completedTasks
+      metadata.estimatedHours = resolutionPlan.estimatedHours
+      metadata.actualHours = resolutionPlan.actualHours
 
-    if (resolutionPlan.startDate) {
-      metadata.startDate = resolutionPlan.startDate.toISOString()
+      if (resolutionPlan.startDate) {
+        metadata.startDate = resolutionPlan.startDate.toISOString()
+      }
+      if (resolutionPlan.targetDate) {
+        metadata.targetDate = resolutionPlan.targetDate.toISOString()
+      }
+      if (resolutionPlan.completedDate) {
+        metadata.completedDate = resolutionPlan.completedDate.toISOString()
+      }
     }
-    if (resolutionPlan.targetDate) {
-      metadata.targetDate = resolutionPlan.targetDate.toISOString()
+
+    // Fuente 2: metadata guardada en el campo comment del historial (snapshot al momento del evento)
+    if (comment) {
+      try {
+        const savedMeta = JSON.parse(comment)
+        // Usar datos guardados como fallback si el plan no existe o para datos del momento
+        if (!metadata.planTitle && savedMeta.planTitle) metadata.planTitle = savedMeta.planTitle
+        if (!metadata.startDate && savedMeta.startDate) metadata.startDate = savedMeta.startDate
+        if (!metadata.targetDate && savedMeta.targetDate) metadata.targetDate = savedMeta.targetDate
+        if (!metadata.estimatedHours && savedMeta.estimatedHours)
+          metadata.estimatedHours = savedMeta.estimatedHours
+        if (!metadata.status && savedMeta.status) metadata.status = savedMeta.status
+        if (savedMeta.description) metadata.description = savedMeta.description
+      } catch {
+        // comment no es JSON, ignorar
+      }
     }
-    if (resolutionPlan.completedDate) {
-      metadata.completedDate = resolutionPlan.completedDate.toISOString()
+
+    // Fallback final: usar newValue como título
+    if (!metadata.planTitle) {
+      metadata.planTitle = newValue || oldValue
     }
-  } else if (action.includes('resolution_plan')) {
-    // Si no hay plan (fue eliminado), usar el título del newValue/oldValue
-    metadata.planTitle = newValue || oldValue
   }
 
   return metadata

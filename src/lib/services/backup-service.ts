@@ -13,6 +13,7 @@ import {
   exportFamiliesModuleData,
   exportAuditsModuleData,
   exportConfigurationsModuleData,
+  exportUsersModuleData,
   isBackupModuleId,
   TICKETS_MODULE_RESTORE_ORDER,
   NEWS_MODULE_RESTORE_ORDER,
@@ -20,6 +21,7 @@ import {
   FAMILIES_MODULE_RESTORE_ORDER,
   AUDITS_MODULE_RESTORE_ORDER,
   CONFIGURATIONS_MODULE_RESTORE_ORDER,
+  USERS_MODULE_RESTORE_ORDER,
   type BackupModuleId,
 } from './backup-modules'
 
@@ -194,6 +196,9 @@ export class BackupService {
             break
           case 'configurations':
             moduleData = await exportConfigurationsModuleData()
+            break
+          case 'users':
+            moduleData = await exportUsersModuleData()
             break
           default:
             throw new Error(`Módulo no soportado: ${moduleKey}`)
@@ -1167,9 +1172,23 @@ export class BackupService {
       site_config: 'site_config',
       systemSettings: 'system_settings',
       system_settings: 'system_settings',
+      systemModules: 'system_modules',
+      system_modules: 'system_modules',
       backups: 'backups',
       verificationTokens: 'verification_tokens',
       verification_tokens: 'verification_tokens',
+      passwordResetTokens: 'password_reset_tokens',
+      password_reset_tokens: 'password_reset_tokens',
+      userSettings: 'user_settings',
+      user_settings: 'user_settings',
+      adminFamilyAssignments: 'admin_family_assignments',
+      admin_family_assignments: 'admin_family_assignments',
+      clientFamilyAssignments: 'client_family_assignments',
+      client_family_assignments: 'client_family_assignments',
+      technicianFamilyAssignments: 'technician_family_assignments',
+      technician_family_assignments: 'technician_family_assignments',
+      inventoryManagerFamilies: 'inventory_manager_families',
+      inventory_manager_families: 'inventory_manager_families',
     }
 
     // Normalizar nombres de tablas (v1 → nombre real)
@@ -1202,6 +1221,9 @@ export class BackupService {
           break
         case 'configurations':
           restoreOrder = CONFIGURATIONS_MODULE_RESTORE_ORDER
+          break
+        case 'users':
+          restoreOrder = USERS_MODULE_RESTORE_ORDER
           break
         default:
           throw new Error(`Módulo no soportado para restauración: ${backupModule}`)

@@ -10,6 +10,7 @@ export type BackupModuleId =
   | 'news'
   | 'patrols'
   | 'families'
+  | 'users'
   | 'audits'
   | 'configurations'
 
@@ -44,7 +45,12 @@ export const BACKUP_MODULE_REGISTRY: Record<BackupModuleId, BackupModuleDefiniti
     label: 'Familias',
     description: 'Familias del sistema y sus configuraciones.',
   },
-
+  users: {
+    id: 'users',
+    label: 'Usuarios',
+    description:
+      'Usuarios del sistema, sus configuraciones, preferencias de notificaciones, asignaciones, credenciales OAuth y tokens de sesión.',
+  },
   audits: {
     id: 'audits',
     label: 'Auditorías',
@@ -384,5 +390,94 @@ export async function exportConfigurationsModuleData(): Promise<
     site_config: site_config as unknown[],
     pages: pages as unknown[],
     oauth_configs: oauth_configs as unknown[],
+  }
+}
+
+/** Orden de inserción respetando FKs del módulo usuarios. */
+export const USERS_MODULE_RESTORE_ORDER = [
+  'users',
+  'user_settings',
+  'notification_preferences',
+  'accounts',
+  'sessions',
+  'oauth_accounts',
+  'password_reset_tokens',
+  'verification_tokens',
+  'technician_assignments',
+  'admin_family_assignments',
+  'client_family_assignments',
+  'technician_family_assignments',
+  'inventory_manager_families',
+] as const
+
+export type UsersModuleTable = (typeof USERS_MODULE_RESTORE_ORDER)[number]
+
+const EMPTY_USERS_PAYLOAD: Record<UsersModuleTable, unknown[]> = {
+  users: [],
+  user_settings: [],
+  notification_preferences: [],
+  accounts: [],
+  sessions: [],
+  oauth_accounts: [],
+  password_reset_tokens: [],
+  verification_tokens: [],
+  technician_assignments: [],
+  admin_family_assignments: [],
+  client_family_assignments: [],
+  technician_family_assignments: [],
+  inventory_manager_families: [],
+}
+
+export async function exportUsersModuleData(): Promise<Record<UsersModuleTable, unknown[]>> {
+  const users = await prisma.users.findMany()
+
+  if (users.length === 0) {
+    return { ...EMPTY_USERS_PAYLOAD }
+  }
+
+  const userIds = users.map(u => u.id)
+
+  const [
+    user_settings,
+    notification_preferences,
+    accounts,
+    sessions,
+    oauth_accounts,
+    password_reset_tokens,
+    verification_tokens,
+    technician_assignments,
+    admin_family_assignments,
+    client_family_assignments,
+    technician_family_assignments,
+    inventory_manager_families,
+  ] = await Promise.all([
+    prisma.user_settings.findMany({ where: { userId: { in: userIds } } }),
+    prisma.notification_preferences.findMany({ where: { userId: { in: userIds } } }),
+    prisma.accounts.findMany({ where: { userId: { in: userIds } } }),
+    prisma.sessions.findMany({ where: { userId: { in: userIds } } }),
+    prisma.oauth_accounts.findMany({ where: { userId: { in: userIds } } }),
+    prisma.password_reset_tokens.findMany({ where: { userId: { in: userIds } } }),
+    prisma.verification_tokens.findMany(),
+    prisma.technician_assignments.findMany({ where: { technicianId: { in: userIds } } }),
+    prisma.admin_family_assignments.findMany({ where: { userId: { in: userIds } } }),
+    prisma.client_family_assignments.findMany({ where: { userId: { in: userIds } } }),
+    prisma.technician_family_assignments.findMany({ where: { userId: { in: userIds } } }),
+    prisma.inventory_manager_families.findMany({ where: { userId: { in: userIds } } }),
+  ])
+
+  return {
+    users: users as unknown[],
+    user_settings: user_settings as unknown[],
+    notification_preferences: notification_preferences as unknown[],
+    accounts: accounts as unknown[],
+    sessions: sessions as unknown[],
+    oauth_accounts: oauth_accounts as unknown[],
+    password_reset_tokens: password_reset_tokens as unknown[],
+    verification_tokens: verification_tokens as unknown[],
+    technician_assignments: technician_assignments as unknown[],
+    admin_family_assignments: admin_family_assignments as unknown[],
+    client_family_assignments: client_family_assignments as unknown[],
+    technician_family_assignments: technician_family_assignments as unknown[],
+    inventory_manager_families: inventory_manager_families as unknown[],
   }
 }

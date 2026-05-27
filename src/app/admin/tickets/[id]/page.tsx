@@ -375,6 +375,7 @@ export default function AdminTicketDetailPage() {
             <TabsContent value='resolution' className='space-y-4'>
               <TicketResolutionTracker
                 ticketId={ticket.id}
+                ticketStatus={ticket.status}
                 canEdit
                 mode='admin'
                 onPlanChange={() => setTimelineKey(k => k + 1)}

@@ -12,6 +12,7 @@ import { PlanDialogs } from './resolution-plan/plan-dialogs'
 
 interface TicketResolutionTrackerProps {
   ticketId: string
+  ticketStatus?: string
   canEdit?: boolean
   mode?: 'admin' | 'technician' | 'client'
   onPlanChange?: () => void
@@ -19,11 +20,20 @@ interface TicketResolutionTrackerProps {
 
 export function TicketResolutionTracker({
   ticketId,
+  ticketStatus,
   canEdit = false,
   mode: _mode,
   onPlanChange,
 }: TicketResolutionTrackerProps) {
   const hook = useResolutionPlan(ticketId, onPlanChange)
+
+  // Calcular permisos efectivos según estado del ticket y del plan
+  const isTicketClosed = ticketStatus === 'CLOSED'
+  const isPlanCompleted = hook.plan?.status === 'completed'
+  const isPlanCancelled = hook.plan?.status === 'cancelled'
+
+  // No se puede hacer nada si el ticket está cerrado o el plan está completado/cancelado
+  const effectiveCanEdit = canEdit && !isTicketClosed && !isPlanCompleted && !isPlanCancelled
 
   if (hook.loading) {
     return (
@@ -57,7 +67,7 @@ export function TicketResolutionTracker({
               <p className='text-muted-foreground mb-4'>
                 Crea un plan para organizar las tareas necesarias para resolver este ticket
               </p>
-              {canEdit && (
+              {effectiveCanEdit && (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -94,7 +104,7 @@ export function TicketResolutionTracker({
     <div className='space-y-6'>
       <PlanSummary
         plan={hook.plan}
-        canEdit={canEdit}
+        canEdit={effectiveCanEdit}
         progress={hook.calculateProgress()}
         openPlanMenu={hook.openPlanMenu}
         setOpenPlanMenu={hook.setOpenPlanMenu}
@@ -109,7 +119,7 @@ export function TicketResolutionTracker({
 
       <TaskList
         plan={hook.plan}
-        canEdit={canEdit}
+        canEdit={effectiveCanEdit}
         showAddTask={hook.showAddTask}
         setShowAddTask={hook.setShowAddTask}
         newTask={hook.newTask}

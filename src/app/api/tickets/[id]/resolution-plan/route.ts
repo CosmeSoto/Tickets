@@ -187,11 +187,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const ticket = await prisma.tickets.findUnique({
       where: { id: ticketId },
-      select: { id: true, clientId: true, assigneeId: true, familyId: true },
+      select: { id: true, clientId: true, assigneeId: true, familyId: true, status: true },
     })
 
     if (!ticket) {
       return NextResponse.json({ success: false, message: 'Ticket no encontrado' }, { status: 404 })
+    }
+
+    // No permitir crear plan si el ticket está cerrado
+    if (ticket.status === 'CLOSED') {
+      return NextResponse.json(
+        { success: false, message: 'No se puede crear un plan para un ticket cerrado' },
+        { status: 400 }
+      )
     }
 
     try {
@@ -260,8 +268,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       status: plan.status,
     })
 
-    // Crear entrada en el historial del ticket (sin comment para evitar redundancia)
+    // Crear entrada en el historial del ticket con metadata del plan
     try {
+      const planMetadata = JSON.stringify({
+        planTitle: plan.title,
+        description: plan.description || null,
+        status: plan.status,
+        startDate: plan.startDate?.toISOString() || null,
+        targetDate: plan.targetDate?.toISOString() || null,
+        estimatedHours: plan.estimatedHours || null,
+      })
+
       await prisma.ticket_history.create({
         data: {
           id: randomUUID(),
@@ -271,7 +288,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           field: 'resolution_plan',
           oldValue: null,
           newValue: plan.title,
-          comment: null,
+          comment: planMetadata,
           createdAt: new Date(),
         },
       })
@@ -613,6 +630,25 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       )
     }
 
+    // Validar estado del ticket — no permitir cambios si está cerrado
+    if (existingPlan.ticket.status === 'CLOSED') {
+      return NextResponse.json(
+        { success: false, message: 'No se puede modificar el plan de un ticket cerrado' },
+        { status: 400 }
+      )
+    }
+
+    // Validar estado del plan — no permitir edición si está completado o cancelado
+    if (existingPlan.status === 'completed' || existingPlan.status === 'cancelled') {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'No se puede modificar un plan que ya fue completado o cancelado',
+        },
+        { status: 400 }
+      )
+    }
+
     try {
       await assertTicketAccess(
         toTicketAccessUser(session.user),
@@ -689,7 +725,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             field: 'resolution_plan',
             oldValue: existingPlan.status,
             newValue: 'completed',
-            comment: null,
+            comment: JSON.stringify({
+              planTitle: existingPlan.title,
+              description: existingPlan.description || null,
+              status: 'completed',
+              startDate: existingPlan.startDate?.toISOString() || null,
+              targetDate: existingPlan.targetDate?.toISOString() || null,
+              completedDate: (updateData.completedDate || new Date()).toISOString(),
+              estimatedHours: existingPlan.estimatedHours || null,
+              actualHours: updateData.actualHours || existingPlan.actualHours || null,
+              totalTasks,
+              completedTasks,
+            }),
             createdAt: new Date(),
           },
         })
