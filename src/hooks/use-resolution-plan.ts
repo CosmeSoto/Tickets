@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useToast } from '@/hooks/use-toast'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -73,6 +73,10 @@ export interface TaskFormData {
 export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
   const { toast } = useToast()
 
+  // Ref para onPlanChange — evita que el callback cause re-renders/loops
+  const onPlanChangeRef = useRef(onPlanChange)
+  onPlanChangeRef.current = onPlanChange
+
   // Estado del plan
   const [plan, setPlan] = useState<ResolutionPlan | null>(null)
   const [loading, setLoading] = useState(true)
@@ -117,8 +121,13 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
           const data = await response.json()
           if (data.success && data.data) {
             setPlan(data.data)
-            if (notifyChange) onPlanChange?.()
+            if (notifyChange) onPlanChangeRef.current?.()
+          } else {
+            setPlan(null)
           }
+        } else {
+          console.error('Error loading resolution plan: HTTP', response.status)
+          // No resetear plan si ya existe (evitar flash)
         }
       } catch (err) {
         console.error('Error loading resolution plan:', err)
@@ -126,7 +135,9 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
         setLoading(false)
       }
     },
-    [ticketId, onPlanChange]
+    // Solo depender de ticketId — onPlanChange se usa via ref para evitar loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ticketId]
   )
 
   useEffect(() => {
@@ -195,7 +206,7 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
       const data = await response.json()
       if (data.success) {
         setPlan(data.data)
-        onPlanChange?.()
+        onPlanChangeRef.current?.()
         setShowCreatePlan(false)
         setPlanForm({
           title: '',
@@ -286,7 +297,7 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
       const data = await response.json()
       if (data.success) {
         setPlan(data.data)
-        onPlanChange?.()
+        onPlanChangeRef.current?.()
         setShowEditPlan(false)
         toast({
           title: 'Plan actualizado',
@@ -319,7 +330,7 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
       if (data.success) {
         setPlan(null)
         setShowDeletePlan(false)
-        onPlanChange?.()
+        onPlanChangeRef.current?.()
         toast({
           title: 'Plan eliminado',
           description: 'El plan de resolución ha sido eliminado permanentemente',
@@ -349,7 +360,7 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
       const data = await response.json()
       if (data.success) {
         setPlan(data.data)
-        onPlanChange?.()
+        onPlanChangeRef.current?.()
         toast({
           title: 'Plan activado',
           description: 'El plan de resolución está ahora activo',
@@ -380,7 +391,7 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
       const data = await response.json()
       if (data.success) {
         setPlan(data.data)
-        onPlanChange?.()
+        onPlanChangeRef.current?.()
         toast({
           title: 'Plan completado',
           description: 'El plan de resolución ha sido marcado como completado exitosamente',
@@ -451,7 +462,7 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
             tasks: [...plan.tasks, data.data],
             totalTasks: plan.totalTasks + 1,
           })
-          onPlanChange?.()
+          onPlanChangeRef.current?.()
         }
         const taskTitle = newTask.title
         setNewTask({
@@ -505,7 +516,7 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
           )
           const completedTasks = updatedTasks.filter(t => t.status === 'completed').length
           setPlan({ ...plan, tasks: updatedTasks, completedTasks })
-          onPlanChange?.()
+          onPlanChangeRef.current?.()
         }
 
         const messages = {
@@ -565,7 +576,7 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
             totalTasks: remainingTasks.length,
             completedTasks,
           })
-          onPlanChange?.()
+          onPlanChangeRef.current?.()
         }
         setTaskToDelete(null)
         toast({

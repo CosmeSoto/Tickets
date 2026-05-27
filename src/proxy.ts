@@ -247,10 +247,8 @@ export async function proxy(request: NextRequest) {
       return '/client'
     }
 
-    // Solo ADMIN puede acceder a configuración del sistema
-    if (path.startsWith('/settings') && userRole !== 'ADMIN') {
-      return NextResponse.redirect(new URL(dashboardForRole(userRole), request.url))
-    }
+    // /admin/settings es la configuración del sistema (protegida por el bloque /admin abajo)
+    // /settings es la configuración personal del usuario (accesible para todos los roles)
 
     if (path.startsWith('/admin') && userRole !== 'ADMIN' && !(token as any).isSuperAdmin) {
       // Excepción: usuarios con newsEnabled pueden acceder a /admin/news

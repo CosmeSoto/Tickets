@@ -21,7 +21,8 @@ export const calculateDuration = (startTime: string, endTime: string): string =>
 }
 
 export const formatDuration = (hours?: number): string => {
-  if (!hours) return ''
+  if (hours === undefined || hours === null) return '-'
+  if (hours === 0) return '0h'
   if (hours < 1) {
     const minutes = Math.round(hours * 60)
     return `${minutes}m`
