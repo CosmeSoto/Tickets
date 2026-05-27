@@ -151,7 +151,7 @@ export function NewsFeed({ className }: NewsFeedProps) {
     <div className={className}>
       <Card>
         <CardHeader>
-          <div className='flex items-center justify-between'>
+          <div className='flex items-start justify-between gap-4 flex-wrap'>
             <div>
               <CardTitle className='flex items-center gap-2'>
                 <Newspaper className='h-5 w-5' />
@@ -159,7 +159,7 @@ export function NewsFeed({ className }: NewsFeedProps) {
               </CardTitle>
               <CardDescription>Noticias y comunicados relevantes para ti</CardDescription>
             </div>
-            <div className='flex gap-2'>
+            <div className='flex gap-2 flex-wrap justify-end'>
               <Button
                 variant={period === '' ? 'default' : 'ghost'}
                 size='sm'

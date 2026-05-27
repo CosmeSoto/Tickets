@@ -160,24 +160,30 @@ export function NewsCard({
               )}
             </div>
 
-            <h4 className='font-semibold text-sm line-clamp-1'>{news.title}</h4>
+            <h4 className='font-semibold text-sm line-clamp-2 break-words overflow-hidden'>
+              {news.title}
+            </h4>
             {news.summary && (
-              <p className='text-xs text-muted-foreground line-clamp-1 mt-0.5'>{news.summary}</p>
+              <p className='text-xs text-muted-foreground line-clamp-2 mt-0.5 break-words overflow-hidden'>
+                {news.summary}
+              </p>
             )}
 
             {/* Footer: autor + stats */}
-            <div className='flex items-center justify-between mt-2'>
-              <div className='flex items-center gap-2'>
-                <Avatar className='h-5 w-5'>
+            <div className='flex items-center justify-between mt-2 flex-wrap gap-2'>
+              <div className='flex items-center gap-2 min-w-0'>
+                <Avatar className='h-5 w-5 flex-shrink-0'>
                   <AvatarImage src={news.createdBy.avatar || ''} />
                   <AvatarFallback className='text-[9px]'>
                     {news.createdBy.name.charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                <span className='text-xs text-muted-foreground'>{news.createdBy.name}</span>
-                <span className='text-[10px] text-muted-foreground'>· {timeAgo}</span>
+                <span className='text-xs text-muted-foreground truncate'>
+                  {news.createdBy.name}
+                </span>
+                <span className='text-[10px] text-muted-foreground flex-shrink-0'>· {timeAgo}</span>
               </div>
-              <div className='flex items-center gap-2 text-[10px] text-muted-foreground'>
+              <div className='flex items-center gap-2 text-[10px] text-muted-foreground flex-shrink-0'>
                 <span className='flex items-center gap-0.5'>
                   <Eye className='h-3 w-3' />
                   {news._count.news_views}

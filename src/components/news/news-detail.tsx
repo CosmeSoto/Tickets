@@ -546,7 +546,9 @@ export function NewsDetail({
                   </Badge>
                 )}
               </div>
-              <DialogTitle className='text-xl leading-snug'>{news.title}</DialogTitle>
+              <DialogTitle className='text-xl leading-snug break-words overflow-hidden'>
+                {news.title}
+              </DialogTitle>
               <div className='flex items-center gap-3 mt-2'>
                 <Avatar className='h-7 w-7'>
                   <AvatarImage src={news.createdBy?.avatar || ''} />
