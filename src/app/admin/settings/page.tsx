@@ -365,7 +365,7 @@ function SettingsPage() {
                   id='systemDescription'
                   value={settings.systemDescription}
                   onChange={e => setSettings({ ...settings, systemDescription: e.target.value })}
-                  placeholder='Sistema de gestión de tickets de soporte técnico'
+                  placeholder='Gestión Integral de Operaciones'
                   rows={3}
                 />
               </div>

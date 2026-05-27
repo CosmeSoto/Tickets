@@ -37,8 +37,8 @@ const settingsSchema = z
 
 // Configuración por defecto
 const defaultSettings = {
-  systemName: 'Sistema de Tickets',
-  systemDescription: 'Sistema de gestión de tickets de soporte técnico',
+  systemName: 'Sistema de gestión',
+  systemDescription: 'Gestión Integral de Operaciones',
   supportEmail: 'internet.freecom@gmail.com',
   maxTicketsPerUser: 10,
   autoAssignmentEnabled: true,
