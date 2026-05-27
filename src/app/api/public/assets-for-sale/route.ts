@@ -84,12 +84,15 @@ export async function GET(request?: NextRequest) {
     const contactWhatsapp = whatsAppSetting?.value || null
 
     // Obtener todos los custom fields legacy de las familias involucradas (fallback)
-    const familyIds = [...new Set(equipment.map(eq => eq.type.familyId).filter(Boolean))]
-    const legacyCustomFields = await prisma.family_custom_fields.findMany({
-      where: {
-        familyId: { in: familyIds as string[] },
-      },
-    })
+    const familyIds = [...new Set(equipment.map(eq => eq.type?.familyId).filter(Boolean))] as string[]
+    const legacyCustomFields =
+      familyIds.length > 0
+        ? await prisma.family_custom_fields.findMany({
+            where: {
+              familyId: { in: familyIds },
+            },
+          })
+        : []
 
     // Crear un mapa de fieldName -> field info por familia (legacy)
     const legacyFieldsByFamily = new Map<string, Map<string, (typeof legacyCustomFields)[0]>>()
@@ -101,95 +104,95 @@ export async function GET(request?: NextRequest) {
     })
 
     // Transformar a formato PublicEquipmentItem
-    const publicItems: any[] = equipment.map(eq => {
-      // Transformar customValues a un objeto key-value con labels
-      const customAttributes: Record<string, { value: string; label: string; type: string }> = {}
+    const publicItems: PublicEquipmentItem[] = equipment
+      .map(eq => {
+        try {
+          if (!eq.type) {
+            throw new Error('Equipo sin relación de tipo')
+          }
 
-      if (eq.customValues && eq.customValues.length > 0) {
-        // PRIORIDAD 1: Usar atributos del nuevo sistema (por tipo)
-        if (eq.type.attributes && eq.type.attributes.length > 0) {
-          // Ordenar atributos por su campo 'order' y filtrar solo visibles
-          const sortedVisibleAttributes = [...eq.type.attributes]
-            .filter((attr: any) => attr.isVisible)
-            .sort((a: any, b: any) => a.order - b.order)
+          const customAttributes: Record<string, { value: string; label: string; type: string }> = {}
 
-          const typeAttributesMap = new Map(
-            eq.type.attributes.map((attr: any) => [attr.attributeName, attr])
-          )
+          if (eq.customValues && eq.customValues.length > 0) {
+            if (eq.type.attributes && eq.type.attributes.length > 0) {
+              const sortedVisibleAttributes = [...eq.type.attributes]
+                .filter((attr: any) => attr?.isVisible)
+                .sort((a: any, b: any) => (a?.order ?? 0) - (b?.order ?? 0))
 
-          // Iterar en orden y agregar al customAttributes
-          sortedVisibleAttributes.forEach((attr: any) => {
-            const cv = eq.customValues.find(cv => cv.fieldName === attr.attributeName)
-            if (cv) {
-              customAttributes[attr.attributeName] = {
-                value: cv.fieldValue,
-                label: attr.attributeLabel,
-                type: attr.attributeType,
+              sortedVisibleAttributes.forEach((attr: any) => {
+                const cv = eq.customValues.find(cv => cv.fieldName === attr.attributeName)
+                if (cv) {
+                  customAttributes[attr.attributeName] = {
+                    value: cv.fieldValue != null ? String(cv.fieldValue) : '',
+                    label: attr.attributeLabel,
+                    type: attr.attributeType,
+                  }
+                }
+              })
+            } else if (eq.type.familyId) {
+              const familyFields = legacyFieldsByFamily.get(eq.type.familyId)
+              if (familyFields) {
+                const sortedFields = [...familyFields.entries()].sort(
+                  ([, a], [, b]) => a.order - b.order
+                )
+
+                sortedFields.forEach(([fieldName, fieldInfo]) => {
+                  const cv = eq.customValues.find(cv => cv.fieldName === fieldName)
+                  if (cv) {
+                    customAttributes[fieldName] = {
+                      value: cv.fieldValue != null ? String(cv.fieldValue) : '',
+                      label: fieldInfo.fieldLabel,
+                      type: fieldInfo.fieldType,
+                    }
+                  }
+                })
               }
             }
-          })
-        }
-        // FALLBACK: Usar custom fields legacy por familia
-        else if (eq.type.familyId) {
-          const familyFields = legacyFieldsByFamily.get(eq.type.familyId)
-          if (familyFields) {
-            const sortedFields = [...familyFields.entries()].sort(
-              ([, a], [, b]) => a.order - b.order
-            )
-
-            sortedFields.forEach(([fieldName, fieldInfo]) => {
-              const cv = eq.customValues.find(cv => cv.fieldName === fieldName)
-              if (cv) {
-                customAttributes[fieldName] = {
-                  value: cv.fieldValue,
-                  label: fieldInfo.fieldLabel,
-                  type: fieldInfo.fieldType,
-                }
-              }
-            })
           }
+
+          const resolvedBrand = eq.model?.brand?.name || eq.brand || ''
+          const resolvedModel = eq.model?.model || eq.modelDeprecated || ''
+
+          let publicImageUrl: string | null = null
+          if (eq.attachments && eq.attachments.length > 0 && eq.attachments[0]?.id) {
+            publicImageUrl = `/api/public/equipment-attachments/${eq.attachments[0].id}`
+          } else if (eq.photoUrl) {
+            publicImageUrl = eq.photoUrl
+          }
+
+          return {
+            id: eq.id,
+            code: eq.code,
+            serialNumber: eq.serialNumber,
+            brand: resolvedBrand,
+            model: resolvedModel,
+            type: {
+              id: eq.type.id,
+              name: eq.type.name,
+              code: eq.type.code,
+              family: eq.type.family
+                ? {
+                    id: eq.type.family.id,
+                    name: eq.type.family.name,
+                    icon: eq.type.family.icon,
+                    color: eq.type.family.color,
+                  }
+                : null,
+            },
+            condition: eq.condition,
+            saleListingPrice: eq.saleListingPrice,
+            photoUrl: publicImageUrl,
+            specifications: null,
+            customAttributes,
+            createdAt: eq.createdAt,
+            contactWhatsapp,
+          }
+        } catch (error) {
+          console.error(`Error transformando equipo ${eq.id}:`, error)
+          return null
         }
-      }
-
-      const resolvedBrand = eq.model?.brand?.name || eq.brand
-      const resolvedModel = eq.model?.model || eq.modelDeprecated
-
-      // Obtener URL de imagen: prioriza attachments primero, luego photoUrl
-      let publicImageUrl: string | null = null
-      if (eq.attachments && eq.attachments.length > 0) {
-        publicImageUrl = `/api/public/equipment-attachments/${eq.attachments[0].id}`
-      } else if (eq.photoUrl) {
-        publicImageUrl = eq.photoUrl
-      }
-
-      return {
-        id: eq.id,
-        code: eq.code,
-        serialNumber: eq.serialNumber,
-        brand: resolvedBrand,
-        model: resolvedModel,
-        type: {
-          id: eq.type.id,
-          name: eq.type.name,
-          code: eq.type.code,
-          family: eq.type.family
-            ? {
-                id: eq.type.family.id,
-                name: eq.type.family.name,
-                icon: eq.type.family.icon,
-                color: eq.type.family.color,
-              }
-            : null,
-        },
-        condition: eq.condition,
-        saleListingPrice: eq.saleListingPrice,
-        photoUrl: publicImageUrl,
-        specifications: null,
-        customAttributes, // Atributos personalizados (nuevo sistema + legacy)
-        createdAt: eq.createdAt,
-        contactWhatsapp: contactWhatsapp,
-      }
-    })
+      })
+      .filter((item): item is PublicEquipmentItem => item !== null)
 
     // Agrupar equipos por modelo
     const groups = groupByModel(publicItems)

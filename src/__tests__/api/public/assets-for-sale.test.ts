@@ -94,4 +94,17 @@ describe('GET /api/public/assets-for-sale', () => {
       })
     )
   })
+
+  it('skips invalid equipment rows and still returns 200', async () => {
+    ;(prisma.equipment.findMany as jest.Mock).mockResolvedValue([
+      baseEquipmentRow({ type: null }),
+      baseEquipmentRow({ id: '2', code: 'TEST-002', type: { ...baseEquipmentRow().type, family: null, familyId: null, attributes: undefined } }),
+    ])
+
+    const res = await GET()
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.items).toBeDefined()
+    expect(Array.isArray(data.items)).toBe(true)
+  })
 })
