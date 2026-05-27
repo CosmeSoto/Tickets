@@ -270,13 +270,17 @@ function generateDescription(
   newValue: string | null,
   oldValue: string | null
 ): string {
+  // Para eventos de resolution_plan, el comment contiene metadata JSON, no texto legible
+  if (action.includes('resolution_plan') || action.includes('resolution_task')) {
+    return ''
+  }
+
   if (originalComment) {
     return originalComment.replace(
       /actualizó:\s*([a-zA-Z,\s]+)/g,
       (_, fields) => `actualizó: ${translateFieldNames(fields.split(','))}`
     )
   }
-  if (action.includes('resolution_plan')) return ''
   switch (action) {
     case 'assigned':
       return newValue ? `Asignado a ${newValue}` : 'El ticket fue asignado para su atención.'

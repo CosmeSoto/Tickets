@@ -767,7 +767,12 @@ export function TicketTimeline({
               events
                 .filter(event => canViewInternal || !event.isInternal)
                 .map(event => {
-                  const isSystemEvent = !['comment', 'file_uploaded'].includes(event.type)
+                  const isSystemEvent = ![
+                    'comment',
+                    'file_uploaded',
+                    'resolution_plan',
+                    'resolution_task',
+                  ].includes(event.type)
 
                   // ── Eventos de sistema: compactos, sin burbuja ──────────────
                   if (isSystemEvent) {
@@ -893,6 +898,12 @@ export function TicketTimeline({
 
                           {/* Archivo subido */}
                           {event.type === 'file_uploaded' && (
+                            <p className='text-sm text-muted-foreground mt-0.5'>{event.title}</p>
+                          )}
+
+                          {/* Plan de resolución / Tarea — mostrar título del evento */}
+                          {(event.type === 'resolution_plan' ||
+                            event.type === 'resolution_task') && (
                             <p className='text-sm text-muted-foreground mt-0.5'>{event.title}</p>
                           )}
 
