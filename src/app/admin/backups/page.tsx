@@ -28,13 +28,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { useRouter } from 'next/navigation'
 import {
   AlertDialog,
@@ -75,8 +68,6 @@ export default function BackupsPage() {
     setShowCleanupDialog,
     deleting,
     cleaning,
-    manualBackupScope,
-    setManualBackupScope,
     refreshData,
     createBackup,
     deleteBackup,
@@ -119,55 +110,13 @@ export default function BackupsPage() {
             Limpiar Fallidos ({failedCount})
           </Button>
         )}
-        <div className='flex items-center gap-2'>
-          <Select
-            value={manualBackupScope}
-            onValueChange={v =>
-              setManualBackupScope(
-                v as
-                  | 'full'
-                  | 'tickets'
-                  | 'news'
-                  | 'patrols'
-                  | 'families'
-                  | 'users'
-                  | 'audits'
-                  | 'configurations'
-              )
-            }
-          >
-            <SelectTrigger className='w-[220px] h-9 text-xs'>
-              <SelectValue placeholder='Ámbito' />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value='full'>Completo (BD)</SelectItem>
-              <SelectItem value='tickets'>Solo tickets (JSON)</SelectItem>
-              <SelectItem value='news'>Solo noticias (JSON)</SelectItem>
-              <SelectItem value='patrols'>Solo rondas (JSON)</SelectItem>
-              <SelectItem value='families'>Solo familias (JSON)</SelectItem>
-              <SelectItem value='users'>Solo usuarios (JSON)</SelectItem>
-              <SelectItem value='audits'>Solo auditorías (JSON)</SelectItem>
-              <SelectItem value='configurations'>Solo configuraciones (JSON)</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button onClick={createBackup} disabled={creating} size='sm'>
-            <Plus className={`h-4 w-4 mr-2 ${creating ? 'animate-spin' : ''}`} />
-            {creating ? 'Creando...' : 'Crear Backup'}
-          </Button>
-        </div>
+        <Button onClick={createBackup} disabled={creating} size='sm'>
+          <Plus className={`h-4 w-4 mr-2 ${creating ? 'animate-spin' : ''}`} />
+          {creating ? 'Creando...' : 'Crear Backup'}
+        </Button>
       </div>
     ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [
-      loading,
-      creating,
-      failedCount,
-      manualBackupScope,
-      refreshData,
-      cleanupFailedBackups,
-      createBackup,
-      setManualBackupScope,
-    ]
+    [loading, creating, failedCount, refreshData, cleanupFailedBackups, createBackup]
   )
 
   useSyncDashboardPageMeta({

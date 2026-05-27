@@ -98,14 +98,7 @@ export class BackupService {
       options?.module != null && isBackupModuleId(options.module) ? options.module : null
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-    const moduleBackup =
-      moduleKey &&
-      (moduleKey === 'tickets' ||
-        moduleKey === 'news' ||
-        moduleKey === 'patrols' ||
-        moduleKey === 'families' ||
-        moduleKey === 'audits' ||
-        moduleKey === 'configurations')
+    const moduleBackup = moduleKey && isBackupModuleId(moduleKey)
     let usePrismaBackup = false
 
     // Verificar si pg_dump está disponible
@@ -889,7 +882,7 @@ export class BackupService {
     }
   }
 
-  static async restoreBackup(backupId: string): Promise<void> {
+  static async restoreBackup(backupId: string, restoreModule?: string): Promise<void> {
     try {
       const backup = await prisma.backups.findUnique({
         where: { id: backupId },
@@ -980,14 +973,23 @@ export class BackupService {
       }
 
       console.log(
-        `Formato detectado: ${isSqlBackup ? 'SQL' : isJsonBackup ? 'JSON' : 'Desconocido'}`
+        `Formato detectado: ${isSqlBackup ? 'SQL' : isJsonBackup ? 'JSON' : 'Desconocido'}` +
+          (restoreModule
+            ? ` | Restauración selectiva: módulo "${restoreModule}"`
+            : ' | Restauración completa')
       )
 
       try {
         if (isSqlBackup) {
+          if (restoreModule) {
+            throw new Error(
+              'La restauración selectiva por módulo no está disponible para backups SQL. ' +
+                'Solo los backups JSON soportan restauración parcial.'
+            )
+          }
           await this.restoreFromSQL({ ...backup, filepath: workingFilepath })
         } else if (isJsonBackup) {
-          await this.restoreFromJSON({ ...backup, filepath: workingFilepath })
+          await this.restoreFromJSON({ ...backup, filepath: workingFilepath }, restoreModule)
         } else {
           throw new Error('No se pudo detectar el formato del backup')
         }
@@ -1021,6 +1023,7 @@ export class BackupService {
             backupId: backup.id,
             filename: backup.filename,
             method: isSqlBackup ? 'psql' : 'prisma-json',
+            restoreModule: restoreModule || 'full',
             wasEncrypted: backup.filepath.endsWith('.enc'),
             restoredAt: new Date(),
           },
@@ -1107,12 +1110,16 @@ export class BackupService {
 
   /**
    * Restaura un backup JSON generado por el método Prisma.
+   * Si se pasa restoreModule, solo restaura las tablas de ese módulo (restauración selectiva).
    */
-  private static async restoreFromJSON(backup: {
-    id: string
-    filename: string
-    filepath: string
-  }): Promise<void> {
+  private static async restoreFromJSON(
+    backup: {
+      id: string
+      filename: string
+      filepath: string
+    },
+    restoreModule?: string
+  ): Promise<void> {
     // Leer el contenido del backup
     const backupContent = await readFile(backup.filepath, 'utf-8')
 
@@ -1200,10 +1207,16 @@ export class BackupService {
 
     console.log('Tablas a restaurar:', Object.keys(mappedData))
 
+    // Determinar el módulo a restaurar:
+    // 1. Si el usuario pidió restaurar un módulo específico (restoreModule), usar ese
+    // 2. Si el backup ya es de un módulo específico (backupModule), usar ese
+    // 3. Si ninguno, restaurar todo
     const backupModule = backupData.metadata?.module as string | undefined
-    if (backupModule) {
+    const effectiveModule = restoreModule || backupModule
+
+    if (effectiveModule) {
       let restoreOrder
-      switch (backupModule) {
+      switch (effectiveModule) {
         case 'tickets':
           restoreOrder = TICKETS_MODULE_RESTORE_ORDER
           break
@@ -1226,13 +1239,24 @@ export class BackupService {
           restoreOrder = USERS_MODULE_RESTORE_ORDER
           break
         default:
-          throw new Error(`Módulo no soportado para restauración: ${backupModule}`)
+          throw new Error(`Módulo no soportado para restauración: ${effectiveModule}`)
       }
       const scoped: Record<string, any[]> = {}
       for (const key of restoreOrder) {
         scoped[key] = mappedData[key] ?? []
       }
-      await this.restoreModuleFromJSON(backupModule, scoped, restoreOrder)
+
+      // Verificar que el backup contiene datos para este módulo
+      const hasData = Object.values(scoped).some(arr => arr.length > 0)
+      if (!hasData) {
+        throw new Error(
+          `El backup no contiene datos para el módulo "${effectiveModule}". ` +
+            'Verifica que el backup incluya las tablas necesarias.'
+        )
+      }
+
+      console.log(`[RESTORE] Restauración selectiva: módulo "${effectiveModule}"`)
+      await this.restoreModuleFromJSON(effectiveModule, scoped, restoreOrder)
       return
     }
 
@@ -1417,17 +1441,34 @@ export class BackupService {
             await tx.ticket_history.deleteMany({ where: { ticketId: { in: ticketIds } } })
             await tx.attachments.deleteMany({ where: { ticketId: { in: ticketIds } } })
             await tx.comments.deleteMany({ where: { ticketId: { in: ticketIds } } })
-            // Quitar vínculo ticket → artículo (FK opcional) por si hay filas fuera del backup exportado
             await tx.knowledge_articles.updateMany({
               where: { sourceTicketId: { in: ticketIds } },
               data: { sourceTicketId: null },
             })
-            // maintenance_records puede referenciar ticket sin onDelete: Cascade
             await tx.maintenance_records.updateMany({
               where: { ticketId: { in: ticketIds } },
               data: { ticketId: null },
             })
             await tx.tickets.deleteMany({ where: { id: { in: ticketIds } } })
+          }
+        } else if (moduleId === 'users') {
+          const users = mappedData.users ?? []
+          const userIds = users.map((u: any) => u.id).filter(Boolean)
+          if (userIds.length > 0) {
+            await tx.inventory_manager_families.deleteMany({ where: { userId: { in: userIds } } })
+            await tx.technician_family_assignments.deleteMany({
+              where: { userId: { in: userIds } },
+            })
+            await tx.client_family_assignments.deleteMany({ where: { userId: { in: userIds } } })
+            await tx.admin_family_assignments.deleteMany({ where: { userId: { in: userIds } } })
+            await tx.technician_assignments.deleteMany({ where: { technicianId: { in: userIds } } })
+            await tx.password_reset_tokens.deleteMany({ where: { userId: { in: userIds } } })
+            await tx.oauth_accounts.deleteMany({ where: { userId: { in: userIds } } })
+            await tx.sessions.deleteMany({ where: { userId: { in: userIds } } })
+            await tx.accounts.deleteMany({ where: { userId: { in: userIds } } })
+            await tx.notification_preferences.deleteMany({ where: { userId: { in: userIds } } })
+            await tx.user_settings.deleteMany({ where: { userId: { in: userIds } } })
+            await tx.users.deleteMany({ where: { id: { in: userIds } } })
           }
         }
 

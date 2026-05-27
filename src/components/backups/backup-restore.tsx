@@ -7,6 +7,13 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Database,
   RotateCcw,
   AlertTriangle,
@@ -26,6 +33,8 @@ interface BackupInfo {
   createdAt: string
   type: 'manual' | 'automatic'
   status: 'completed' | 'failed' | 'in_progress'
+  /** null = backup completo */
+  module?: string | null
 }
 
 interface RestorePreview {
@@ -39,6 +48,16 @@ interface RestorePreview {
   databaseVersion: string
   createdAt: string
 }
+
+type RestoreScope =
+  | 'full'
+  | 'tickets'
+  | 'news'
+  | 'patrols'
+  | 'families'
+  | 'users'
+  | 'audits'
+  | 'configurations'
 
 interface BackupRestoreProps {
   backups: BackupInfo[]
@@ -55,6 +74,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
   const [uploading, setUploading] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [restoreScope, setRestoreScope] = useState<RestoreScope>('full')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
@@ -65,6 +85,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
       setSelectedBackup(null)
       setRestorePreview(null)
       setShowConfirmation(false)
+      setRestoreScope('full')
     }
   }, [completedBackups, selectedBackup])
 
@@ -106,7 +127,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
           variant: 'warning',
         })
       }
-    } catch (error) {
+    } catch {
       const fallbackPreview: RestorePreview = {
         tables: [{ name: 'backup_completo', recordCount: 1, size: formatFileSize(backup.size) }],
         totalRecords: 1,
@@ -128,6 +149,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
   const handleBackupSelect = (backup: BackupInfo) => {
     setSelectedBackup(backup)
     setShowConfirmation(false)
+    setRestoreScope('full')
     loadRestorePreview(backup)
   }
 
@@ -150,23 +172,32 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
         })
       }, 500)
 
+      const body: Record<string, string> = {}
+      if (restoreScope !== 'full') {
+        body.module = restoreScope
+      }
+
       const response = await fetch(`/api/admin/backups/${selectedBackup.id}/restore`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
       })
 
       clearInterval(progressInterval)
       setRestoreProgress(100)
 
       if (response.ok) {
+        const scopeLabel = restoreScope === 'full' ? 'completa' : `del módulo "${restoreScope}"`
         toast({
           title: 'Restauración Exitosa',
-          description: 'La base de datos ha sido restaurada correctamente',
+          description: `Restauración ${scopeLabel} completada correctamente`,
         })
         setTimeout(() => {
           setRestoring(false)
           setRestoreProgress(0)
           setSelectedBackup(null)
           setRestorePreview(null)
+          setRestoreScope('full')
           onRefresh()
         }, 2000)
       } else {
@@ -200,6 +231,29 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
       hour: '2-digit',
       minute: '2-digit',
     })
+
+  const getRestoreScopeLabel = (scope: RestoreScope) => {
+    switch (scope) {
+      case 'full':
+        return 'toda la base de datos'
+      case 'tickets':
+        return 'el módulo de Tickets'
+      case 'news':
+        return 'el módulo de Noticias'
+      case 'patrols':
+        return 'el módulo de Rondas'
+      case 'families':
+        return 'el módulo de Familias'
+      case 'users':
+        return 'el módulo de Usuarios'
+      case 'audits':
+        return 'el módulo de Auditorías'
+      case 'configurations':
+        return 'el módulo de Configuraciones'
+      default:
+        return scope
+    }
+  }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -273,12 +327,15 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
     }
   }
 
+  // Determinar si el backup seleccionado es parcial (solo un módulo) — no permite selección de scope
+  const isPartialBackup = !!selectedBackup?.module
+
   return (
     <div className='space-y-6'>
       {/* Header */}
       <div>
         <h2 className='text-2xl font-bold text-foreground'>Restauración de Backups</h2>
-        <p className='text-muted-foreground'>Importa y restaura backups desde archivos</p>
+        <p className='text-muted-foreground'>Selecciona un backup y elige qué módulo restaurar</p>
       </div>
 
       {/* Sección de Importación */}
@@ -395,9 +452,11 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
       <Alert className='border-destructive/40 bg-destructive/10'>
         <AlertTriangle className='h-4 w-4 text-destructive' />
         <AlertDescription className='text-destructive'>
-          <strong>¡Advertencia!</strong> La restauración de un backup reemplazará completamente
-          todos los datos actuales de la base de datos. Esta acción no se puede deshacer. Se
-          recomienda crear un backup actual antes de proceder.
+          <strong>¡Advertencia!</strong>{' '}
+          {restoreScope === 'full'
+            ? 'La restauración completa reemplazará todos los datos actuales de la base de datos. Esta acción no se puede deshacer.'
+            : `La restauración selectiva reemplazará únicamente los datos de ${getRestoreScopeLabel(restoreScope)}. Las demás tablas no se verán afectadas.`}{' '}
+          Se recomienda crear un backup actual antes de proceder.
         </AlertDescription>
       </Alert>
 
@@ -434,12 +493,23 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
                         <Database className='h-4 w-4 text-muted-foreground' />
                         <span className='font-medium text-sm'>{backup.filename}</span>
                       </div>
-                      <Badge
-                        variant={backup.type === 'manual' ? 'default' : 'secondary'}
-                        className='text-xs'
-                      >
-                        {backup.type === 'manual' ? 'Manual' : 'Automático'}
-                      </Badge>
+                      <div className='flex items-center gap-1'>
+                        {backup.module ? (
+                          <Badge variant='secondary' className='text-xs'>
+                            {backup.module}
+                          </Badge>
+                        ) : (
+                          <Badge variant='outline' className='text-xs'>
+                            Completo
+                          </Badge>
+                        )}
+                        <Badge
+                          variant={backup.type === 'manual' ? 'default' : 'secondary'}
+                          className='text-xs'
+                        >
+                          {backup.type === 'manual' ? 'Manual' : 'Auto'}
+                        </Badge>
+                      </div>
                     </div>
                     <div className='flex items-center justify-between text-xs text-muted-foreground'>
                       <span>{formatFileSize(backup.size)}</span>
@@ -492,25 +562,50 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
                   </div>
                 </div>
 
-                {/* Información del Backup */}
-                <div className='space-y-3'>
-                  <div className='flex items-center justify-between text-sm'>
-                    <span className='text-muted-foreground'>Versión de Base de Datos:</span>
-                    <Badge variant='outline'>
-                      {restorePreview.databaseVersion || 'Desconocida'}
-                    </Badge>
-                  </div>
-                  <div className='flex items-center justify-between text-sm'>
-                    <span className='text-muted-foreground'>Fecha de Creación:</span>
-                    <span className='font-medium'>
-                      {restorePreview.createdAt ? formatDate(restorePreview.createdAt) : 'N/A'}
-                    </span>
-                  </div>
+                {/* Selector de Ámbito de Restauración */}
+                <div className='space-y-2'>
+                  <label className='text-sm font-medium text-foreground'>
+                    ¿Qué deseas restaurar?
+                  </label>
+                  {isPartialBackup ? (
+                    <div className='p-3 bg-muted/50 rounded-lg border border-border'>
+                      <p className='text-sm text-muted-foreground'>
+                        Este backup contiene solo el módulo{' '}
+                        <span className='font-medium text-foreground'>{selectedBackup.module}</span>
+                        . Se restaurará únicamente ese módulo.
+                      </p>
+                    </div>
+                  ) : (
+                    <Select
+                      value={restoreScope}
+                      onValueChange={v => setRestoreScope(v as RestoreScope)}
+                    >
+                      <SelectTrigger className='w-full'>
+                        <SelectValue placeholder='Selecciona qué restaurar' />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value='full'>Restauración completa (toda la BD)</SelectItem>
+                        <SelectItem value='tickets'>Solo Tickets</SelectItem>
+                        <SelectItem value='news'>Solo Noticias</SelectItem>
+                        <SelectItem value='patrols'>Solo Rondas</SelectItem>
+                        <SelectItem value='families'>Solo Familias</SelectItem>
+                        <SelectItem value='users'>Solo Usuarios</SelectItem>
+                        <SelectItem value='audits'>Solo Auditorías</SelectItem>
+                        <SelectItem value='configurations'>Solo Configuraciones</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {!isPartialBackup && restoreScope !== 'full' && (
+                    <p className='text-xs text-muted-foreground'>
+                      Solo se restaurarán las tablas correspondientes a{' '}
+                      {getRestoreScopeLabel(restoreScope)}. El resto de la BD no se tocará.
+                    </p>
+                  )}
                 </div>
 
                 {/* Tablas */}
                 <div className='space-y-3'>
-                  <h4 className='text-sm font-medium text-foreground'>Tablas a Restaurar:</h4>
+                  <h4 className='text-sm font-medium text-foreground'>Tablas en el backup:</h4>
                   {Array.isArray(restorePreview.tables) && restorePreview.tables.length > 0 ? (
                     <div className='space-y-2 max-h-32 overflow-y-auto'>
                       {restorePreview.tables.map((table, index) => (
@@ -557,7 +652,9 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
 
                   <Button onClick={initiateRestore} disabled={restoring} variant='destructive'>
                     <RotateCcw className='h-4 w-4 mr-2' />
-                    Restaurar
+                    {restoreScope === 'full' && !isPartialBackup
+                      ? 'Restaurar Todo'
+                      : `Restaurar ${isPartialBackup ? selectedBackup.module : restoreScope}`}
                   </Button>
                 </div>
               </div>
@@ -587,8 +684,9 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
                   ¡Esta acción no se puede deshacer!
                 </p>
                 <p className='text-sm text-muted-foreground mt-2'>
-                  Se restaurará el backup &quot;{selectedBackup.filename}&quot; y se perderán todos
-                  los datos actuales de la base de datos.
+                  {restoreScope === 'full' && !isPartialBackup
+                    ? `Se restaurará el backup "${selectedBackup.filename}" y se reemplazarán TODOS los datos actuales de la base de datos.`
+                    : `Se restaurará solo ${getRestoreScopeLabel(isPartialBackup ? (selectedBackup.module as RestoreScope) : restoreScope)} del backup "${selectedBackup.filename}". Las demás tablas no se verán afectadas.`}
                 </p>
               </div>
 

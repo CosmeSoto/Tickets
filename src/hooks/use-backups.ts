@@ -98,10 +98,6 @@ export function useBackups() {
   const [showCleanupDialog, setShowCleanupDialog] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [cleaning, setCleaning] = useState(false)
-  /** Ámbito del próximo backup manual (completo vs módulo) */
-  const [manualBackupScope, setManualBackupScope] = useState<
-    'full' | 'tickets' | 'news' | 'patrols' | 'families' | 'users' | 'audits' | 'configurations'
-  >('full')
 
   // ── Auth check ──
   useEffect(() => {
@@ -184,13 +180,10 @@ export function useBackups() {
       const response = await fetch('/api/admin/backups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'manual',
-          ...(manualBackupScope !== 'full' ? { module: manualBackupScope } : {}),
-        }),
+        body: JSON.stringify({ type: 'manual' }),
       })
       if (response.ok) {
-        toast({ title: 'Éxito', description: 'Backup creado correctamente' })
+        toast({ title: 'Éxito', description: 'Backup completo creado correctamente' })
         loadBackups(false)
         loadStats()
       } else {
@@ -212,7 +205,7 @@ export function useBackups() {
     } finally {
       setCreating(false)
     }
-  }, [toast, loadBackups, loadStats, manualBackupScope])
+  }, [toast, loadBackups, loadStats])
 
   // ── Delete backup ──
   const deleteBackup = useCallback(async () => {
@@ -357,8 +350,6 @@ export function useBackups() {
     setShowCleanupDialog,
     deleting,
     cleaning,
-    manualBackupScope,
-    setManualBackupScope,
 
     // Actions
     refreshData,
