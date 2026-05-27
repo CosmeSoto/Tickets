@@ -39,7 +39,7 @@ RUN npm run build
 # ── Stage 3: runner ──────────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
 
-RUN apk add --no-cache openssl curl
+RUN apk add --no-cache openssl curl su-exec
 WORKDIR /app
 
 ENV NODE_ENV=production
@@ -82,7 +82,14 @@ RUN chmod +x ./entrypoint.sh
 # Directorio de uploads (sobreescrito por volumen en runtime)
 RUN mkdir -p public/uploads && chown nextjs:nodejs public/uploads
 
-USER nextjs
+# Directorio de backups (sobreescrito por volumen en runtime)
+RUN mkdir -p /app/backups && chown nextjs:nodejs /app/backups
+
+# Directorio de logs (sobreescrito por volumen en runtime)
+RUN mkdir -p /app/logs && chown nextjs:nodejs /app/logs
+
+# NO usar USER nextjs aquí — el entrypoint arregla permisos de volúmenes y luego baja privilegios
+# USER nextjs
 
 EXPOSE 3000
 ENV PORT=3000

@@ -11,6 +11,15 @@ echo "  NODE_ENV: ${NODE_ENV}"
 echo "  NEXTAUTH_URL: ${NEXTAUTH_URL}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
+# ── 0. Arreglar permisos de volúmenes montados ───────────────────────────────
+# Los volúmenes Docker se crean como root; asegurar que nextjs pueda escribir.
+UPLOADS_DIR="${UPLOAD_DIR:-/app/public/uploads}"
+BACKUP_DIR="${BACKUP_DIR:-/app/backups}"
+LOGS_DIR="/app/logs"
+
+mkdir -p "$UPLOADS_DIR" "$BACKUP_DIR" "$LOGS_DIR"
+chown -R nextjs:nodejs "$UPLOADS_DIR" "$BACKUP_DIR" "$LOGS_DIR" 2>/dev/null || true
+
 # ── 1. Sincronizar schema de base de datos ───────────────────────────────────
 echo "==> Sincronizando schema de base de datos..."
 $PRISMA_CLI db push --accept-data-loss || {
@@ -54,6 +63,6 @@ if [ -d "/app/public/uploads" ] && [ "$UPLOADS_DIR" != "/app/public/uploads" ]; 
   fi
 fi
 
-# ── 4. Arrancar Next.js ───────────────────────────────────────────────────────
+# ── 4. Arrancar Next.js como usuario nextjs ──────────────────────────────────
 echo "==> Iniciando servidor Next.js..."
-exec node server.js
+exec su-exec nextjs node server.js
