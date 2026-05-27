@@ -1,30 +1,25 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
+import { useLandingData } from '@/hooks/use-landing-data'
 
 interface DynamicPageTitleProps {
   defaultTitle?: string
 }
 
+/**
+ * Componente que actualiza el título de la página dinámicamente.
+ * Usa el hook compartido useLandingData para evitar requests duplicados.
+ */
 export function DynamicPageTitle({
   defaultTitle = 'Sistema de Tickets - Soporte Técnico',
 }: DynamicPageTitleProps) {
-  const [title, setTitle] = useState<string>(defaultTitle)
+  const { data, loading } = useLandingData()
 
   useEffect(() => {
-    fetch('/api/public/landing-page')
-      .then(res => res.json())
-      .then(data => {
-        if (data.content?.metaTitle) {
-          setTitle(data.content.metaTitle)
-        }
-      })
-      .catch(err => console.error('Error loading page title:', err))
-  }, [])
-
-  useEffect(() => {
-    document.title = title
-  }, [title])
+    if (loading) return
+    document.title = data.metaTitle || defaultTitle
+  }, [data.metaTitle, loading, defaultTitle])
 
   return null
 }

@@ -387,7 +387,7 @@ export function RoleDashboardLayout({
   subtitle,
   headerActions,
 }: RoleDashboardLayoutProps) {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -399,8 +399,20 @@ export function RoleDashboardLayout({
     news: hasNews,
   } = useUserModules()
 
-  if (!session) {
+  // Solo ocultar si definitivamente no hay sesión (no durante la carga/revalidación)
+  if (status === 'unauthenticated') {
     return null
+  }
+
+  // Mientras carga la sesión, mostrar el shell vacío para evitar desmontaje
+  if (status === 'loading' || !session) {
+    return (
+      <div className='min-h-screen bg-background'>
+        <div className='flex items-center justify-center h-screen'>
+          <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary' />
+        </div>
+      </div>
+    )
   }
 
   const canRequestAssets = (session.user as any)?.canRequestAssets ?? false
