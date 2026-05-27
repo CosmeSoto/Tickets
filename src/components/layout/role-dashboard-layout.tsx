@@ -288,10 +288,12 @@ function NavItemComponent({
   item,
   pathname,
   depth = 0,
+  onNavigate,
 }: {
   item: NavItem
   pathname: string | null
   depth?: number
+  onNavigate?: () => void
 }) {
   const hasChildren = item.children && item.children.length > 0
 
@@ -324,6 +326,7 @@ function NavItemComponent({
     return (
       <Link
         href={item.href}
+        onClick={onNavigate}
         style={{ paddingLeft: `${16 + indent}px` }}
         className={`flex items-center pr-4 py-2 text-sm font-medium rounded-lg transition-colors ${
           isActive
@@ -369,6 +372,7 @@ function NavItemComponent({
               item={child}
               pathname={pathname}
               depth={depth + 1}
+              onNavigate={onNavigate}
             />
           ))}
         </div>
@@ -545,7 +549,12 @@ export function RoleDashboardLayout({
         {/* Navigation */}
         <nav className='flex-1 px-3 py-4 space-y-1 overflow-y-auto h-[calc(100vh-5rem)]'>
           {navigation.map(item => (
-            <NavItemComponent key={item.name} item={item} pathname={pathname} />
+            <NavItemComponent
+              key={item.name}
+              item={item}
+              pathname={pathname}
+              onNavigate={closeSidebar}
+            />
           ))}
         </nav>
       </aside>
