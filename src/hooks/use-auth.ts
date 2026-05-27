@@ -356,11 +356,10 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
       try {
         await signOut({
           redirect: false,
-          callbackUrl: '/login',
         })
 
         if (redirect) {
-          router.push('/login')
+          window.location.href = '/login'
         }
 
         setAuthState(prev => ({
@@ -372,7 +371,7 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
       } catch (error) {
         // En caso de error, forzar redirect
         if (redirect) {
-          router.push('/login')
+          window.location.href = '/login'
         }
 
         setAuthState(prev => ({ ...prev, isLoading: false }))

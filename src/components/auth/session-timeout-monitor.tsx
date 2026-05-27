@@ -56,7 +56,9 @@ export function SessionTimeoutMonitor() {
 
     // Esperar un momento para que el usuario vea el mensaje
     setTimeout(() => {
-      signOut({ callbackUrl: '/login?reason=timeout' })
+      signOut({ redirect: false }).then(() => {
+        window.location.href = '/login?reason=timeout'
+      })
     }, 1000)
   }, [toast])
 

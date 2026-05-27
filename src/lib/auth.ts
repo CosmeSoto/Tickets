@@ -510,11 +510,13 @@ export const authOptions: NextAuthOptions = {
     },
 
     async redirect({ url, baseUrl }) {
-      // Si viene de un callback URL relativo, retornarlo tal cual
-      // para que el navegador resuelva contra el host actual (evita redirect a NEXTAUTH_URL
-      // cuando el usuario accede por IP u otro hostname)
+      // NextAuth requiere URLs absolutas como retorno.
+      // Usamos baseUrl (NEXTAUTH_URL) para construir la URL absoluta.
+      // El navegador seguirá el redirect sin importar el hostname.
+
+      // Si es una URL relativa, construir absoluta con baseUrl
       if (url.startsWith('/')) {
-        return url
+        return `${baseUrl}${url}`
       }
 
       // Si la URL contiene callbackUrl, extraerlo
@@ -523,7 +525,7 @@ export const authOptions: NextAuthOptions = {
           const urlObj = new URL(url)
           const callbackUrl = urlObj.searchParams.get('callbackUrl')
           if (callbackUrl && callbackUrl.startsWith('/')) {
-            return callbackUrl
+            return `${baseUrl}${callbackUrl}`
           }
         } catch {
           // Si falla el parse, continuar con el flujo normal
@@ -536,11 +538,11 @@ export const authOptions: NextAuthOptions = {
           return url
         }
       } catch {
-        // URL inválida, redirigir a login
+        // URL inválida
       }
 
-      // Por defecto, redirigir a login (relativo)
-      return '/login'
+      // Por defecto, redirigir al baseUrl
+      return baseUrl
     },
   },
   pages: {

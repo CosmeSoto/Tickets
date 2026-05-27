@@ -478,10 +478,8 @@ export function RoleDashboardLayout({
   }
 
   const handleLogout = async () => {
-    await signOut({
-      callbackUrl: '/login',
-      redirect: true,
-    })
+    await signOut({ redirect: false })
+    window.location.href = '/login'
   }
 
   const getInitials = (name: string) => {
