@@ -510,27 +510,37 @@ export const authOptions: NextAuthOptions = {
     },
 
     async redirect({ url, baseUrl }) {
-      // Si viene de un callback URL específico, usarlo
+      // Si viene de un callback URL relativo, retornarlo tal cual
+      // para que el navegador resuelva contra el host actual (evita redirect a NEXTAUTH_URL
+      // cuando el usuario accede por IP u otro hostname)
       if (url.startsWith('/')) {
-        return `${baseUrl}${url}`
+        return url
       }
 
       // Si la URL contiene callbackUrl, extraerlo
       if (url.includes('callbackUrl=')) {
-        const urlObj = new URL(url)
-        const callbackUrl = urlObj.searchParams.get('callbackUrl')
-        if (callbackUrl && callbackUrl.startsWith('/')) {
-          return `${baseUrl}${callbackUrl}`
+        try {
+          const urlObj = new URL(url)
+          const callbackUrl = urlObj.searchParams.get('callbackUrl')
+          if (callbackUrl && callbackUrl.startsWith('/')) {
+            return callbackUrl
+          }
+        } catch {
+          // Si falla el parse, continuar con el flujo normal
         }
       }
 
       // Si la URL es del mismo dominio, permitir
-      if (new URL(url).origin === baseUrl) {
-        return url
+      try {
+        if (new URL(url).origin === baseUrl) {
+          return url
+        }
+      } catch {
+        // URL inválida, redirigir a login
       }
 
-      // Por defecto, redirigir a baseUrl
-      return baseUrl
+      // Por defecto, redirigir a login (relativo)
+      return '/login'
     },
   },
   pages: {
@@ -572,19 +582,28 @@ export const authOptions: NextAuthOptions = {
         const userId = (session?.user?.id || token?.sub) as string
 
         if (userId) {
-          await AuditServiceComplete.log({
-            action: 'logout',
-            entityType: 'user',
-            entityId: userId,
-            userId: userId,
-            details: {
-              timestamp: new Date().toISOString(),
-              sessionDuration: session?.expires
-                ? Math.floor((new Date(session.expires).getTime() - Date.now()) / 1000)
-                : undefined,
-            },
-            result: 'SUCCESS',
+          // Verificar que el usuario existe antes de crear el log (evita FK violation)
+          const { default: prismaClient } = await import('@/lib/prisma')
+          const userExists = await prismaClient.users.findUnique({
+            where: { id: userId },
+            select: { id: true },
           })
+
+          if (userExists) {
+            await AuditServiceComplete.log({
+              action: 'logout',
+              entityType: 'user',
+              entityId: userId,
+              userId: userId,
+              details: {
+                timestamp: new Date().toISOString(),
+                sessionDuration: session?.expires
+                  ? Math.floor((new Date(session.expires).getTime() - Date.now()) / 1000)
+                  : undefined,
+              },
+              result: 'SUCCESS',
+            })
+          }
         }
       } catch (error) {
         console.error('[AUTH] Error registrando logout en auditoría:', error)

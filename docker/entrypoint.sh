@@ -11,13 +11,13 @@ echo "  NODE_ENV: ${NODE_ENV}"
 echo "  NEXTAUTH_URL: ${NEXTAUTH_URL}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-# ── 1. Migraciones de base de datos ──────────────────────────────────────────
-echo "==> Ejecutando migraciones..."
-$PRISMA_CLI migrate deploy || {
-  echo "==> migrate deploy falló — intentando db push (modo desarrollo/pruebas)..."
-  $PRISMA_CLI db push --accept-data-loss
+# ── 1. Sincronizar schema de base de datos ───────────────────────────────────
+echo "==> Sincronizando schema de base de datos..."
+$PRISMA_CLI db push --accept-data-loss || {
+  echo "==> db push falló — intentando migrate deploy como fallback..."
+  $PRISMA_CLI migrate deploy
 }
-echo "==> Migraciones completadas."
+echo "==> Schema sincronizado."
 
 # ── 2. Seed inicial (solo si la tabla de usuarios está vacía) ─────────────────
 # Usa node directamente para consultar la BD — más confiable que parsear prisma CLI.

@@ -597,7 +597,7 @@ export function RoleDashboardLayout({
                   target='_blank'
                   rel='noopener noreferrer'
                   title='Ver Página Pública'
-                  className='hidden lg:flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors border border-border rounded-md px-2 py-1.5 hover:bg-accent'
+                  className='flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors border border-border rounded-md px-2 py-1.5 hover:bg-accent'
                 >
                   <Globe className='h-3.5 w-3.5 flex-shrink-0' />
                   <span className='hidden xl:inline'>Página Pública</span>
