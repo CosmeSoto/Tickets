@@ -67,6 +67,7 @@ services:
       NEXTAUTH_URL: ${NEXTAUTH_URL}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY requerida}
       BACKUP_ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY:-}
+      BACKUP_DIR: /app/backups
       CRON_SECRET: ${CRON_SECRET:-}
       UPLOAD_DIR: /app/public/uploads
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
@@ -85,6 +86,7 @@ services:
     volumes:
       - app_uploads:/app/public/uploads
       - app_logs:/app/logs
+      - app_backups:/app/backups
     networks:
       - tickets-network
     depends_on:
@@ -125,6 +127,7 @@ volumes:
   redis_data:
   app_uploads:
   app_logs:
+  app_backups:
 
 # ── Red ────────────────────────────────────────────────────────────────────────
 networks:

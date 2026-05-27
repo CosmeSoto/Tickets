@@ -8,7 +8,6 @@
 ##############################################################################
 
 services:
-
   # ── Base de datos ───────────────────────────────────────────────────────────
   postgres:
     image: postgres:15-alpine
@@ -18,14 +17,14 @@ services:
       POSTGRES_USER: tickets_user
       POSTGRES_PASSWORD: tickets_password_2024
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       - postgres_data_dev:/var/lib/postgresql/data
     networks:
       - tickets-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tickets_user -d tickets_db"]
+      test: ['CMD-SHELL', 'pg_isready -U tickets_user -d tickets_db']
       interval: 5s
       timeout: 3s
       retries: 10
@@ -36,12 +35,12 @@ services:
     image: redis:7-alpine
     container_name: tickets-redis-dev
     ports:
-      - "6379:6379"
+      - '6379:6379'
     networks:
       - tickets-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
       timeout: 3s
       retries: 5
@@ -61,6 +60,7 @@ services:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-MGZykJSDK3DDnCTMh5w0bJ5+7+syOXYW64Z0IAzwczk=}
       UPLOAD_DIR: /app/public/uploads
       LOG_LEVEL: DEBUG
+      BACKUP_DIR: /app/backups
       # Turbopack — hot-reload más rápido
       TURBOPACK: 1
     volumes:
@@ -70,8 +70,10 @@ services:
       - dev_node_modules:/app/node_modules
       # Caché de Next.js — persiste entre reinicios para builds más rápidos
       - dev_next_cache:/app/.next
+      # Backups — persisten entre reinicios
+      - dev_backups:/app/backups
     ports:
-      - "3000:3000"
+      - '3000:3000'
     networks:
       - tickets-network
     depends_on:
@@ -88,8 +90,8 @@ services:
     image: nginx:alpine
     container_name: tickets-nginx-dev
     ports:
-      - "80:80"
-      - "443:443"
+      - '80:80'
+      - '443:443'
     volumes:
       - ./docker/nginx.local.conf:/etc/nginx/nginx.conf:ro
       - ./public/uploads:/var/www/uploads:ro
@@ -105,6 +107,7 @@ volumes:
   postgres_data_dev:
   dev_node_modules:
   dev_next_cache:
+  dev_backups:
 
 # ── Red ────────────────────────────────────────────────────────────────────────
 networks:

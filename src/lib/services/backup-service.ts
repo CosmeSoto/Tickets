@@ -50,7 +50,14 @@ export interface BackupStats {
 }
 
 export class BackupService {
-  private static readonly BACKUP_DIR = join(process.cwd(), 'backups')
+  private static BACKUP_DIR: string = (() => {
+    // Primero intenta usar la variable de entorno
+    if (process.env.BACKUP_DIR) {
+      return process.env.BACKUP_DIR
+    }
+    // Luego intenta usar el directorio de trabajo actual (más seguro para Docker)
+    return join(process.cwd(), 'backups')
+  })()
   private static readonly MAX_BACKUP_SIZE = 1024 * 1024 * 1024 // 1GB
   private static readonly COMPRESSION_LEVEL = 6
 
@@ -59,11 +66,16 @@ export class BackupService {
       await mkdir(this.BACKUP_DIR, { recursive: true, mode: 0o755 })
       console.log(`Directorio de backups asegurado: ${this.BACKUP_DIR}`)
     } catch (error) {
-      console.error('Error al crear directorio de backups:', error)
+      console.error(
+        'Error al crear directorio de backups (ruta principal):',
+        this.BACKUP_DIR,
+        error
+      )
       // Intentar usar una ruta alternativa si la principal falla
       const altDir = join('/tmp', 'sistema-tickets-backups')
       console.log(`Intentando usar directorio alternativo: ${altDir}`)
       await mkdir(altDir, { recursive: true, mode: 0o755 })
+      console.log(`Directorio alternativo asegurado: ${altDir}`)
       ;(this as any).BACKUP_DIR = altDir
     }
   }
@@ -76,6 +88,9 @@ export class BackupService {
     if (type !== 'manual' && type !== 'automatic') {
       throw new Error('Tipo de backup inválido. Debe ser "manual" o "automatic"')
     }
+
+    // PRIMERO: Asegurar el directorio de backups y obtener la ruta final
+    await this.ensureBackupDirectory()
 
     const moduleKey: BackupModuleId | null =
       options?.module != null && isBackupModuleId(options.module) ? options.module : null
@@ -129,9 +144,6 @@ export class BackupService {
     })
 
     try {
-      // Crear directorio de backups si no existe
-      await this.ensureBackupDirectory()
-
       // Obtener configuración
       const config = await this.getBackupConfig()
 
