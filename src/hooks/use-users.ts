@@ -34,6 +34,8 @@ export interface UserData {
   inventoryEnabled?: boolean
   patrolsEnabled?: boolean
   newsEnabled?: boolean
+  formsEnabled?: boolean
+  canManageForms?: boolean
   isSuperAdmin?: boolean
   lastLogin?: string
   createdAt: string

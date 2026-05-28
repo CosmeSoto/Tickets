@@ -190,14 +190,14 @@ export default function PublicFormsPage() {
 
   return (
     <ModuleLayout
-      title='Formularios y Documentos'
-      subtitle='Accede a los formularios y documentos disponibles'
+      title='Documentos'
+      subtitle='Accede a los documentos disponibles'
       loading={loading}
     >
       <div className='space-y-6'>
         <div className='flex flex-wrap gap-4 items-center'>
           <Input
-            placeholder='Buscar formularios...'
+            placeholder='Buscar documentos...'
             value={filters.search}
             onChange={e => setFilters({ ...filters, search: e.target.value })}
             className='max-w-sm'
@@ -285,12 +285,12 @@ export default function PublicFormsPage() {
         )}
 
         <div className='space-y-3'>
-          <h2 className='text-lg font-semibold'>Todos los formularios</h2>
+          <h2 className='text-lg font-semibold'>Todos los documentos</h2>
           {forms.length === 0 ? (
             <div className='text-center py-12 bg-muted/20 rounded-lg border border-dashed'>
               <FileText className='h-12 w-12 mx-auto text-muted-foreground mb-4' />
               <p className='text-muted-foreground'>
-                No hay formularios disponibles en este momento
+                No hay documentos disponibles en este momento
               </p>
             </div>
           ) : (

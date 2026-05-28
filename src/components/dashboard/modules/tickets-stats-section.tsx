@@ -24,6 +24,7 @@ import { SymmetricStatsCard } from '@/components/shared/stats-card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { formatDuration } from '@/lib/utils/time-utils'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -181,14 +182,14 @@ export function TicketsStatsSection({ stats, role, isLoading }: TicketsStatsSect
               />
               <SymmetricStatsCard
                 title='Tiempo Estimado'
-                value={`${stats.resolutionPlans.avgEstimatedHours}h`}
+                value={formatDuration(stats.resolutionPlans.avgEstimatedHours, 'short')}
                 icon={Calendar}
                 color='green'
                 badge={{ text: 'Planificado', variant: 'default' }}
               />
               <SymmetricStatsCard
                 title='Tiempo Real'
-                value={`${stats.resolutionPlans.avgActualHours}h`}
+                value={formatDuration(stats.resolutionPlans.avgActualHours, 'short')}
                 icon={Clock}
                 color='orange'
                 badge={{ text: 'Ejecutado', variant: 'default' }}
@@ -309,7 +310,7 @@ export function TicketsStatsSection({ stats, role, isLoading }: TicketsStatsSect
               />
               <SymmetricStatsCard
                 title='Tiempo Estimado'
-                value={`${stats.myResolutionPlans.avgEstimatedHours}h`}
+                value={formatDuration(stats.myResolutionPlans.avgEstimatedHours, 'short')}
                 icon={Calendar}
                 color='green'
                 role='TECHNICIAN'
@@ -317,7 +318,7 @@ export function TicketsStatsSection({ stats, role, isLoading }: TicketsStatsSect
               />
               <SymmetricStatsCard
                 title='Tiempo Real'
-                value={`${stats.myResolutionPlans.avgActualHours}h`}
+                value={formatDuration(stats.myResolutionPlans.avgActualHours, 'short')}
                 icon={Clock}
                 color='orange'
                 role='TECHNICIAN'

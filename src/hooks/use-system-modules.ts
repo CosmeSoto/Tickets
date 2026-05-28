@@ -77,8 +77,8 @@ const FALLBACK: SystemModule[] = [
   },
   {
     key: 'forms',
-    name: 'Formularios y Documentos',
-    description: 'Gestión de formularios y documentos descargables',
+    name: 'Documentos',
+    description: 'Gestión de documentos descargables',
     icon: 'FileText',
     isActive: true,
     order: 5,

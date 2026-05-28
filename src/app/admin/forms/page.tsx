@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { Plus, FileText, Trash2, Edit, Download } from 'lucide-react'
+import { Plus, FileText, Trash2, Edit, Download, Settings } from 'lucide-react'
 
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { DataTable, Column } from '@/components/ui/data-table'
@@ -30,24 +30,9 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/hooks/use-toast'
-import { FormVisibilitySelector } from '@/components/forms/form-visibility-selector'
-
-// ─── CSV Export Utility ────────────────────────────────────────────────────────────
-
-function downloadCSV(filename: string, rows: string[][]): void {
-  const content = rows
-    .map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))
-    .join('\n')
-  const bom = '\uFEFF'
-  const encoded = encodeURIComponent(bom + content)
-  const a = document.createElement('a')
-  a.href = `data:text/csv;charset=utf-8,${encoded}`
-  a.download = filename
-  a.style.display = 'none'
-  document.body.appendChild(a)
-  a.click()
-  if (a && a.parentNode) a.parentNode.removeChild(a)
-}
+import { VisibilitySelector } from '@/components/common/visibility-selector'
+import { ExportButton } from '@/components/common/export-button'
+import { useExport } from '@/hooks/common/use-export'
 
 interface UserOption {
   id: string
@@ -167,19 +152,20 @@ export default function AdminFormsPage() {
   const [fileFile, setFileFile] = useState<File | null>(null)
   const [uploadingFile, setUploadingFile] = useState(false)
 
-  const handleExport = () => {
-    const header = ['Título', 'Categoría', 'Versión', 'Estado', 'Descargas', 'Creado por', 'Fecha']
-    const rows = forms.map(item => [
-      item.title,
-      item.category?.name || 'Sin categoría',
-      item.version || 'v1.0',
-      item.isActive ? 'Activo' : 'Inactivo',
-      String(item._count?.form_downloads || 0),
-      item.createdBy.name,
-      new Date(item.createdAt).toLocaleDateString('es-EC'),
-    ])
-    downloadCSV(`formularios-${new Date().toISOString().split('T')[0]}.csv`, [header, ...rows])
-  }
+  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+    filename: 'documentos',
+    title: 'Documentos',
+    columns: [
+      { key: 'title', label: 'Título' },
+      { key: 'category', label: 'Categoría', format: (value: any) => value?.name || 'Sin categoría' },
+      { key: 'version', label: 'Versión', format: (value: any) => value || 'v1.0' },
+      { key: 'isActive', label: 'Estado', format: (value: boolean) => value ? 'Activo' : 'Inactivo' },
+      { key: 'downloads', label: 'Descargas', format: (_: any, row: FormItem) => row._count?.form_downloads || 0 },
+      { key: 'createdBy', label: 'Creado por', format: (value: any) => value?.name || '' },
+      { key: 'createdAt', label: 'Fecha', format: (value: string) => new Date(value).toLocaleDateString('es-EC') },
+    ],
+    getData: () => forms,
+  })
 
   useEffect(() => {
     if (status === 'loading') return
@@ -537,27 +523,39 @@ export default function AdminFormsPage() {
 
   return (
     <ModuleLayout
-      title='Gestión de Formularios y Documentos'
-      subtitle='Administra formularios, plantillas y documentos descargables'
+      title='Gestión de Documentos'
+      subtitle='Administra documentos descargables'
       loading={loading && forms.length === 0}
       headerActions={
-        <Button
-          size='sm'
-          onClick={() => {
-            resetForm()
-            setEditingForm(null)
-            setShowCreateDialog(true)
-          }}
-        >
-          <Plus className='h-4 w-4 mr-2' />
-          Nuevo formulario
-        </Button>
+        <div className='flex gap-2'>
+          <Button
+            size='sm'
+            variant='outline'
+            onClick={() => {
+              window.location.href = '/admin/form-categories'
+            }}
+          >
+            <Settings className='h-4 w-4 mr-2' />
+            Categorías
+          </Button>
+          <Button
+            size='sm'
+            onClick={() => {
+              resetForm()
+              setEditingForm(null)
+              setShowCreateDialog(true)
+            }}
+          >
+            <Plus className='h-4 w-4 mr-2' />
+            Nuevo documento
+          </Button>
+        </div>
       }
     >
       <div className='space-y-4'>
         <DataTable
-          title={`${forms.length} formulario${forms.length !== 1 ? 's' : ''}`}
-          description='Todos los formularios del sistema'
+          title={`${forms.length} documento${forms.length !== 1 ? 's' : ''}`}
+          description='Todos los documentos del sistema'
           data={forms}
           columns={columns}
           loading={loading}
@@ -565,7 +563,7 @@ export default function AdminFormsPage() {
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           onRefresh={loadForms}
-          onExport={handleExport}
+          onExport={<ExportButton onExportCSV={exportCSV} onExportExcel={exportExcel} onExportPDF={exportPDF} loading={exporting} />}
           filters={tableFilters}
           onFiltersChange={handleTableFiltersChange}
           rowActions={(item: FormItem) => {
@@ -629,9 +627,9 @@ export default function AdminFormsPage() {
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent className='sm:max-w-3xl max-h-[90vh] overflow-y-auto'>
           <DialogHeader>
-            <DialogTitle>{editingForm ? 'Editar formulario' : 'Nuevo formulario'}</DialogTitle>
+            <DialogTitle>{editingForm ? 'Editar documento' : 'Nuevo documento'}</DialogTitle>
             <DialogDescription>
-              Complete la información para {editingForm ? 'actualizar' : 'crear'} el formulario
+              Complete la información para {editingForm ? 'actualizar' : 'crear'} el documento
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className='space-y-4'>
@@ -756,7 +754,7 @@ export default function AdminFormsPage() {
 
               <Separator />
 
-              <FormVisibilitySelector
+              <VisibilitySelector
                 families={families}
                 users={users}
                 selectedRoles={formData.roles}

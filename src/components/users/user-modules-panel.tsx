@@ -268,7 +268,7 @@ export function UserModulesPanel({
           />
           <ModuleStatusCard
             emoji='📄'
-            name='Formularios y Documentos'
+            name='Documentos'
             active={formsActive}
             families={[]}
             guide={
@@ -276,7 +276,7 @@ export function UserModulesPanel({
                 ? null
                 : {
                     type: 'info' as const,
-                    steps: ['Activar el toggle "Formularios y Documentos" en la sección anterior'],
+                    steps: ['Activar el toggle "Documentos" en la sección anterior'],
                   }
             }
             badge={canManageForms ? 'Gestor' : undefined}

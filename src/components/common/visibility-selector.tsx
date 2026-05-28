@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
-import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 
 interface FamilyOption {
@@ -23,7 +22,7 @@ interface UserOption {
   email: string
 }
 
-interface NewsVisibilitySelectorProps {
+interface VisibilitySelectorProps {
   families: FamilyOption[]
   users: UserOption[]
   selectedRoles: string[]
@@ -42,7 +41,7 @@ const ROLE_OPTIONS = [
   { value: 'CLIENT', label: 'Clientes', icon: '👤' },
 ]
 
-export function NewsVisibilitySelector({
+export function VisibilitySelector({
   families,
   users,
   selectedRoles,
@@ -53,18 +52,16 @@ export function NewsVisibilitySelector({
   onFamilyIdsChange,
   onDepartmentIdsChange,
   onUserIdsChange,
-}: NewsVisibilitySelectorProps) {
+}: VisibilitySelectorProps) {
   const [familySearch, setFamilySearch] = useState('')
   const [userSearch, setUserSearch] = useState('')
 
-  // Conteo de selecciones por tab
   const totalSelections =
     selectedRoles.length +
     selectedFamilyIds.length +
     selectedDepartmentIds.length +
     selectedUserIds.length
 
-  // Familias filtradas
   const filteredFamilies = useMemo(() => {
     if (!familySearch) return families
     const q = familySearch.toLowerCase()
@@ -75,26 +72,22 @@ export function NewsVisibilitySelector({
     )
   }, [families, familySearch])
 
-  // Usuarios filtrados
   const filteredUsers = useMemo(() => {
     if (!userSearch) return users
     const q = userSearch.toLowerCase()
     return users.filter(u => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
   }, [users, userSearch])
 
-  // Handlers de familia con cascada
   const handleFamilyToggle = (familyId: string, checked: boolean) => {
     const family = families.find(f => f.id === familyId)
     if (!family) return
 
     if (checked) {
-      // Agregar familia + todos sus departamentos
       onFamilyIdsChange([...selectedFamilyIds, familyId])
       const newDeptIds = family.departments.map(d => d.id)
       const merged = [...new Set([...selectedDepartmentIds, ...newDeptIds])]
       onDepartmentIdsChange(merged)
     } else {
-      // Quitar familia + sus departamentos
       onFamilyIdsChange(selectedFamilyIds.filter(id => id !== familyId))
       const familyDeptIds = new Set(family.departments.map(d => d.id))
       onDepartmentIdsChange(selectedDepartmentIds.filter(id => !familyDeptIds.has(id)))
@@ -104,7 +97,6 @@ export function NewsVisibilitySelector({
   const handleDepartmentToggle = (deptId: string, familyId: string, checked: boolean) => {
     if (checked) {
       onDepartmentIdsChange([...selectedDepartmentIds, deptId])
-      // Si todos los departamentos de la familia están seleccionados, seleccionar la familia
       const family = families.find(f => f.id === familyId)
       if (family) {
         const allDeptIds = family.departments.map(d => d.id)
@@ -117,14 +109,12 @@ export function NewsVisibilitySelector({
       }
     } else {
       onDepartmentIdsChange(selectedDepartmentIds.filter(id => id !== deptId))
-      // Si se deselecciona un departamento, deseleccionar la familia
       if (selectedFamilyIds.includes(familyId)) {
         onFamilyIdsChange(selectedFamilyIds.filter(id => id !== familyId))
       }
     }
   }
 
-  // Quitar selección individual (badges)
   const removeRole = (role: string) => onRolesChange(selectedRoles.filter(r => r !== role))
   const removeFamily = (id: string) => handleFamilyToggle(id, false)
   const removeDepartment = (id: string) => {
@@ -151,7 +141,6 @@ export function NewsVisibilitySelector({
         )}
       </div>
 
-      {/* Badges de selecciones actuales */}
       {totalSelections > 0 && (
         <div className='flex flex-wrap gap-1.5 p-2 rounded-lg border bg-muted/30'>
           {selectedRoles.map(role => (
@@ -226,7 +215,6 @@ export function NewsVisibilitySelector({
         </div>
       )}
 
-      {/* Tabs de selección */}
       <Tabs defaultValue='roles' className='w-full'>
         <TabsList className='w-full grid grid-cols-3'>
           <TabsTrigger value='roles' className='text-xs gap-1'>
@@ -265,7 +253,6 @@ export function NewsVisibilitySelector({
           </TabsTrigger>
         </TabsList>
 
-        {/* Tab: Roles */}
         <TabsContent value='roles' className='mt-3'>
           <div className='space-y-2 rounded-lg border p-3'>
             {ROLE_OPTIONS.map(role => (
@@ -290,7 +277,6 @@ export function NewsVisibilitySelector({
           </div>
         </TabsContent>
 
-        {/* Tab: Familias y Departamentos */}
         <TabsContent value='families' className='mt-3'>
           <div className='space-y-2'>
             <div className='relative'>
@@ -343,7 +329,6 @@ export function NewsVisibilitySelector({
                           </span>
                         )}
                       </div>
-                      {/* Departamentos (solo si la familia está expandida o tiene selecciones parciales) */}
                       {(isFamilySelected || isPartial) && family.departments.length > 0 && (
                         <div className='ml-7 space-y-0.5 pb-1'>
                           {family.departments.map(dept => (
@@ -379,7 +364,6 @@ export function NewsVisibilitySelector({
           </div>
         </TabsContent>
 
-        {/* Tab: Usuarios */}
         <TabsContent value='users' className='mt-3'>
           <div className='space-y-2'>
             <div className='relative'>

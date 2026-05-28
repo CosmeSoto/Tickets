@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useToast } from '@/hooks/use-toast'
+import { formatDuration } from '@/lib/utils/time-utils'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -219,7 +220,7 @@ export function useResolutionPlan(ticketId: string, onPlanChange?: () => void) {
         })
         toast({
           title: 'Plan de resolución creado',
-          description: `Plan creado con ${estimatedHours ? estimatedHours.toFixed(1) + ' horas estimadas' : 'éxito'}. Se ha notificado al cliente.`,
+          description: `Plan creado con ${estimatedHours ? formatDuration(estimatedHours) + ' estimadas' : 'éxito'}. Se ha notificado al cliente.`,
           duration: 5000,
         })
       }

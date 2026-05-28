@@ -31,11 +31,10 @@ import type { ResolutionPlan, TaskFormData, ResolutionTask } from '@/hooks/use-r
 import { getStatusIcon, getStatusBadge } from './plan-status-icons'
 import {
   formatDate,
-  formatDuration,
   getPriorityColor,
   getPriorityLabel,
-  calculateDuration,
 } from './plan-helpers'
+import { formatDuration, calculateDuration } from '@/lib/utils/time-utils'
 
 interface TaskListProps {
   plan: ResolutionPlan

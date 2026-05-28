@@ -1,39 +1,5 @@
 import type { ResolutionTask } from '@/hooks/use-resolution-plan'
-
-export const calculateDuration = (startTime: string, endTime: string): string => {
-  if (!startTime || !endTime) return ''
-
-  const [startHour, startMin] = startTime.split(':').map(Number)
-  const [endHour, endMin] = endTime.split(':').map(Number)
-
-  const startMinutes = startHour * 60 + startMin
-  const endMinutes = endHour * 60 + endMin
-  const durationMinutes = endMinutes - startMinutes
-
-  if (durationMinutes <= 0) return 'Horario inválido'
-
-  const hours = Math.floor(durationMinutes / 60)
-  const minutes = durationMinutes % 60
-
-  if (hours === 0) return `${minutes} minutos`
-  if (minutes === 0) return `${hours} ${hours === 1 ? 'hora' : 'horas'}`
-  return `${hours} ${hours === 1 ? 'hora' : 'horas'} ${minutes} minutos`
-}
-
-export const formatDuration = (hours?: number): string => {
-  if (hours === undefined || hours === null) return '-'
-  if (hours === 0) return '0h'
-  if (hours < 1) {
-    const minutes = Math.round(hours * 60)
-    return `${minutes}m`
-  }
-  const wholeHours = Math.floor(hours)
-  const minutes = Math.round((hours - wholeHours) * 60)
-  if (minutes > 0) {
-    return `${wholeHours}h ${minutes}m`
-  }
-  return `${wholeHours}h`
-}
+import { calculateDuration, formatDuration } from '@/lib/utils/time-utils'
 
 export const formatDate = (date: string): string => {
   return new Date(date).toLocaleDateString('es-ES', {
@@ -42,6 +8,9 @@ export const formatDate = (date: string): string => {
     year: 'numeric',
   })
 }
+
+// Re-exportar funciones globales para mantener compatibilidad con código existente
+export { calculateDuration, formatDuration }
 
 export const getStatusLabel = (status: string) => {
   const labels: Record<string, string> = {

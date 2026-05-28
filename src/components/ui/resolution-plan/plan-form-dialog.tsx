@@ -3,6 +3,7 @@ import { Textarea } from '../textarea'
 import { Button } from '../button'
 import { Clock, AlertCircle } from 'lucide-react'
 import type { PlanFormData } from '@/hooks/use-resolution-plan'
+import { formatDuration } from '@/lib/utils/time-utils'
 
 interface PlanFormDialogProps {
   planForm: PlanFormData
@@ -103,7 +104,7 @@ export function PlanFormDialog({
                 <Clock className='h-4 w-4 text-blue-600 dark:text-blue-400' />
                 <div>
                   <p className='text-sm font-medium text-blue-900 dark:text-blue-100'>
-                    Horas Estimadas Totales: {estimatedHours.toFixed(1)} horas
+                    Horas Estimadas Totales: {formatDuration(estimatedHours)}
                   </p>
                   <p className='text-xs text-blue-700 dark:text-blue-300'>
                     Calculado automáticamente desde{' '}

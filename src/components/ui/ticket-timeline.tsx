@@ -33,6 +33,7 @@ import { useTimeline, type TimelineEvent } from '@/hooks/use-timeline'
 import { formatTimeAgo } from '@/hooks/use-ticket-data'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip'
 import { FilePreviewModal } from '@/components/tickets/file-preview-modal'
+import { formatDuration } from '@/lib/utils/time-utils'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -431,7 +432,7 @@ export function TicketTimeline({
                   <Clock className='h-4 w-4 text-indigo-600 dark:text-indigo-400' />
                   <div>
                     <span className='text-muted-foreground block text-xs'>Tiempo estimado</span>
-                    <div className='font-medium'>{metadata.estimatedHours}h</div>
+                    <div className='font-medium'>{formatDuration(metadata.estimatedHours)}</div>
                   </div>
                 </div>
               )}
@@ -441,7 +442,7 @@ export function TicketTimeline({
                   <div>
                     <span className='text-muted-foreground block text-xs'>Tiempo real</span>
                     <div className='font-medium text-purple-700 dark:text-purple-300'>
-                      {metadata.actualHours}h
+                      {formatDuration(metadata.actualHours)}
                     </div>
                   </div>
                 </div>

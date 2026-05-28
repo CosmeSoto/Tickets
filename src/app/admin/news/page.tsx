@@ -38,26 +38,11 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
-import { NewsVisibilitySelector } from '@/components/news/news-visibility-selector'
+import { VisibilitySelector } from '@/components/common/visibility-selector'
 import { NewsDetail } from '@/components/news/news-detail'
 import type { NewsDetailItem } from '@/components/news/news-detail'
-
-// ─── CSV Export Utility ────────────────────────────────────────────────────────────
-
-function downloadCSV(filename: string, rows: string[][]): void {
-  const content = rows
-    .map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))
-    .join('\n')
-  const bom = '\uFEFF'
-  const encoded = encodeURIComponent(bom + content)
-  const a = document.createElement('a')
-  a.href = `data:text/csv;charset=utf-8,${encoded}`
-  a.download = filename
-  a.style.display = 'none'
-  document.body.appendChild(a)
-  a.click()
-  if (a && a.parentNode) a.parentNode.removeChild(a)
-}
+import { ExportButton } from '@/components/common/export-button'
+import { useExport } from '@/hooks/common/use-export'
 
 type NewsType =
   | 'NEWS'
@@ -216,19 +201,20 @@ export default function AdminNewsPage() {
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
 
-  const handleExport = () => {
-    const header = ['Título', 'Tipo', 'Prioridad', 'Estado', 'Autor', 'Fecha de creación', 'Vistas']
-    const rows = news.map(item => [
-      item.title,
-      typeLabels[item.type],
-      priorityLabels[item.priority],
-      statusLabels[item.status],
-      item.createdBy.name,
-      new Date(item.createdAt).toLocaleDateString('es-EC'),
-      String(item._count.news_views),
-    ])
-    downloadCSV(`noticias-${new Date().toISOString().split('T')[0]}.csv`, [header, ...rows])
-  }
+  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+    filename: 'noticias',
+    title: 'Noticias y Comunicados',
+    columns: [
+      { key: 'title', label: 'Título' },
+      { key: 'type', label: 'Tipo', format: (value: NewsType) => typeLabels[value] },
+      { key: 'priority', label: 'Prioridad', format: (value: NewsPriority) => priorityLabels[value] },
+      { key: 'status', label: 'Estado', format: (value: NewsStatus) => statusLabels[value] },
+      { key: 'createdBy', label: 'Autor', format: (value: any) => value?.name || '' },
+      { key: 'createdAt', label: 'Fecha de Creación', format: (value: string) => new Date(value).toLocaleDateString('es-EC') },
+      { key: 'views', label: 'Vistas', format: (_: any, row: NewsItem) => row._count?.news_views || 0 },
+    ],
+    getData: () => news,
+  })
 
   useEffect(() => {
     if (status === 'loading') return
@@ -622,7 +608,7 @@ export default function AdminNewsPage() {
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           onRefresh={loadNews}
-          onExport={handleExport}
+          onExport={<ExportButton onExportCSV={exportCSV} onExportExcel={exportExcel} onExportPDF={exportPDF} loading={exporting} />}
           filters={tableFilters}
           onFiltersChange={handleTableFiltersChange}
           onRowClick={item => {
@@ -880,7 +866,7 @@ export default function AdminNewsPage() {
 
               <Separator />
 
-              <NewsVisibilitySelector
+              <VisibilitySelector
                 families={families}
                 users={users}
                 selectedRoles={formData.roles}

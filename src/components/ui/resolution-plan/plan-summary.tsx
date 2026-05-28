@@ -19,7 +19,8 @@ import {
   DropdownMenuTrigger,
 } from '../dropdown-menu'
 import type { ResolutionPlan } from '@/hooks/use-resolution-plan'
-import { formatDuration, getStatusLabel, getStatusColor } from './plan-helpers'
+import { formatDuration } from '@/lib/utils/time-utils'
+import { getStatusLabel, getStatusColor } from './plan-helpers'
 
 interface PlanSummaryProps {
   plan: ResolutionPlan

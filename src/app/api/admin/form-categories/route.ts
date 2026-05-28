@@ -33,18 +33,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 
-    const { searchParams } = new URL(request.url)
-    const familyId = searchParams.get('familyId')
-
-    const where: any = { isActive: true }
-    if (familyId && familyId !== 'all') {
-      where.familyId = familyId
-    }
-
     const categories = await prisma.form_categories.findMany({
-      where,
-      include: { families: true },
-      orderBy: { order: 'asc' },
+      include: {
+        _count: {
+          select: { forms: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
     })
 
     return NextResponse.json({ categories })
@@ -74,10 +69,7 @@ export async function POST(request: NextRequest) {
     const category = await prisma.form_categories.create({
       data: {
         name: data.name,
-        description: data.description,
-        color: data.color,
-        order: data.order || 0,
-        familyId: data.familyId || null,
+        description: data.description || null,
         isActive: data.isActive !== false,
       },
     })
