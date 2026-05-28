@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Plus, Newspaper, Trash2, Edit, Eye, CheckCircle2, XCircle } from 'lucide-react'
 
 import { ModuleLayout } from '@/components/common/layout/module-layout'
-import { DataTable } from '@/components/ui/data-table'
+import { DataTable, Column } from '@/components/ui/data-table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -41,6 +41,23 @@ import { useToast } from '@/hooks/use-toast'
 import { NewsVisibilitySelector } from '@/components/news/news-visibility-selector'
 import { NewsDetail } from '@/components/news/news-detail'
 import type { NewsDetailItem } from '@/components/news/news-detail'
+
+// ─── CSV Export Utility ────────────────────────────────────────────────────────────
+
+function downloadCSV(filename: string, rows: string[][]): void {
+  const content = rows
+    .map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))
+    .join('\n')
+  const bom = '\uFEFF'
+  const encoded = encodeURIComponent(bom + content)
+  const a = document.createElement('a')
+  a.href = `data:text/csv;charset=utf-8,${encoded}`
+  a.download = filename
+  a.style.display = 'none'
+  document.body.appendChild(a)
+  a.click()
+  if (a && a.parentNode) a.parentNode.removeChild(a)
+}
 
 type NewsType =
   | 'NEWS'
@@ -199,9 +216,23 @@ export default function AdminNewsPage() {
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
 
+  const handleExport = () => {
+    const header = ['Título', 'Tipo', 'Prioridad', 'Estado', 'Autor', 'Fecha de creación', 'Vistas']
+    const rows = news.map(item => [
+      item.title,
+      typeLabels[item.type],
+      priorityLabels[item.priority],
+      statusLabels[item.status],
+      item.createdBy.name,
+      new Date(item.createdAt).toLocaleDateString('es-EC'),
+      String(item._count.news_views),
+    ])
+    downloadCSV(`noticias-${new Date().toISOString().split('T')[0]}.csv`, [header, ...rows])
+  }
+
   useEffect(() => {
     if (status === 'loading') return
-    if (accessChecked.current) return // Evitar re-ejecución cuando session se actualiza
+    if (accessChecked.current) return
 
     if (!session) {
       router.push('/login')
@@ -210,7 +241,6 @@ export default function AdminNewsPage() {
 
     accessChecked.current = true
 
-    // Admin y SuperAdmin siempre tienen acceso
     if (session.user.role === 'ADMIN' || (session.user as any).isSuperAdmin) {
       setHasAccess(true)
       loadNews()
@@ -218,14 +248,12 @@ export default function AdminNewsPage() {
       return
     }
 
-    // Para no-admins, verificar newsEnabled directamente
     const checkAccess = async () => {
       try {
-        // Verificar directamente con el endpoint de usuario (sin cache de módulos)
         const res = await fetch(`/api/users/${session.user.id}`)
         if (res.ok) {
           const data = await res.json()
-          if (data.user?.newsEnabled || data.newsEnabled) {
+          if (data.user?.newsEnabled) {
             setHasAccess(true)
             loadNews()
             loadUsersAndDepartments()
@@ -234,12 +262,11 @@ export default function AdminNewsPage() {
         }
       } catch {}
 
-      // Fallback: verificar módulos
       try {
         const res = await fetch(`/api/user/modules?_t=${Date.now()}`)
         if (res.ok) {
-          const modules = await res.json()
-          if (modules.news) {
+          const data = await res.json()
+          if (data.news) {
             setHasAccess(true)
             loadNews()
             loadUsersAndDepartments()
@@ -248,7 +275,6 @@ export default function AdminNewsPage() {
         }
       } catch {}
 
-      // Último fallback: verificar en la sesión
       if ((session.user as any).newsEnabled) {
         setHasAccess(true)
         loadNews()
@@ -256,7 +282,6 @@ export default function AdminNewsPage() {
         return
       }
 
-      // Sin acceso — volver al dashboard
       setHasAccess(false)
       const dest = session.user.role === 'TECHNICIAN' ? '/technician' : '/client'
       router.replace(dest)
@@ -284,7 +309,6 @@ export default function AdminNewsPage() {
       if (familiesRes.ok) {
         const familiesData = await familiesRes.json()
         const familiesList = familiesData.data || familiesData.families || []
-        // Agrupar departamentos por familia
         const deptsRes2 = await fetch('/api/departments')
         const deptsData2 = deptsRes2.ok ? await deptsRes2.json() : { data: [] }
         const allDepts: DepartmentOption[] = deptsData2.departments || deptsData2.data || []
@@ -328,7 +352,7 @@ export default function AdminNewsPage() {
       const method = editingNews ? 'PUT' : 'POST'
 
       const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 30_000) // 30s timeout
+      const timeout = setTimeout(() => controller.abort(), 30_000)
 
       let response: Response
       try {
@@ -353,7 +377,6 @@ export default function AdminNewsPage() {
       const result = await response.json()
       const newsId = result.news?.id
 
-      // Subir imagen si se seleccionó un archivo
       if (imageFile && newsId) {
         const imgFormData = new FormData()
         imgFormData.append('file', imageFile)
@@ -363,7 +386,6 @@ export default function AdminNewsPage() {
         })
         if (uploadRes.ok) {
           const attachment = await uploadRes.json()
-          // Actualizar la noticia con la URL de la imagen subida
           const imageUrl = `/api/admin/news/${newsId}/attachments/${attachment.id}/file`
           await fetch(`/api/admin/news/${newsId}`, {
             method: 'PUT',
@@ -470,10 +492,11 @@ export default function AdminNewsPage() {
     })
   }
 
-  const columns = [
+  const columns: Column<NewsItem>[] = [
     {
       key: 'title',
-      title: 'Título',
+      label: 'Título',
+      sortable: true,
       render: (item: NewsItem) => (
         <div className='space-y-1'>
           <div className='font-medium'>{item.title}</div>
@@ -483,19 +506,22 @@ export default function AdminNewsPage() {
     },
     {
       key: 'type',
-      title: 'Tipo',
+      label: 'Tipo',
+      sortable: true,
       render: (item: NewsItem) => <Badge variant='secondary'>{typeLabels[item.type]}</Badge>,
     },
     {
       key: 'priority',
-      title: 'Prioridad',
+      label: 'Prioridad',
+      sortable: true,
       render: (item: NewsItem) => (
         <Badge className={priorityColors[item.priority]}>{priorityLabels[item.priority]}</Badge>
       ),
     },
     {
       key: 'status',
-      title: 'Estado',
+      label: 'Estado',
+      sortable: true,
       render: (item: NewsItem) => (
         <Badge variant={item.status === 'PUBLISHED' ? 'default' : 'secondary'}>
           {statusLabels[item.status]}
@@ -504,58 +530,59 @@ export default function AdminNewsPage() {
     },
     {
       key: 'stats',
-      title: 'Estadísticas',
+      label: 'Estadísticas',
+      sortable: true,
       render: (item: NewsItem) => (
         <div className='flex gap-2 text-sm text-muted-foreground'>
-          <span>👁️ {item._count.news_views}</span>
+          <span>👁 {item._count.news_views}</span>
           <span>👍 {item._count.news_reactions}</span>
           <span>💬 {item._count.news_comments}</span>
         </div>
       ),
     },
     {
-      key: 'author',
-      title: 'Autor',
+      key: 'createdBy',
+      label: 'Autor',
+      sortable: true,
       render: (item: NewsItem) => item.createdBy.name,
     },
     {
-      key: 'date',
-      title: 'Fecha',
+      key: 'createdAt',
+      label: 'Fecha',
+      sortable: true,
       render: (item: NewsItem) => new Date(item.createdAt).toLocaleDateString('es-EC'),
     },
-    {
-      key: 'actions',
-      title: 'Acciones',
-      render: (item: NewsItem) => {
-        const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
-        const isOwner = item.createdBy.id === session?.user?.id
-        const canModify = isSuperAdmin || isOwner
+  ]
 
-        return (
-          <div className='flex gap-2'>
-            {canModify && (
-              <Button variant='ghost' size='sm' onClick={() => handleEdit(item)}>
-                <Edit className='h-4 w-4' />
-              </Button>
-            )}
-            {canModify && (
-              <Button
-                variant='ghost'
-                size='sm'
-                onClick={() => {
-                  setDeletingNews(item)
-                  setDeleteDialogOpen(true)
-                }}
-              >
-                <Trash2 className='h-4 w-4 text-destructive' />
-              </Button>
-            )}
-            {!canModify && <span className='text-xs text-muted-foreground px-2'>Solo lectura</span>}
-          </div>
-        )
-      },
+  const tableFilters = [
+    {
+      key: 'status',
+      label: 'Estado',
+      type: 'select' as const,
+      options: [
+        { value: 'all', label: 'Todos' },
+        { value: 'DRAFT', label: 'Borradores' },
+        { value: 'PUBLISHED', label: 'Publicados' },
+        { value: 'ARCHIVED', label: 'Archivados' },
+      ],
+    },
+    {
+      key: 'type',
+      label: 'Tipo',
+      type: 'select' as const,
+      options: [
+        { value: 'all', label: 'Todos' },
+        ...Object.entries(typeLabels).map(([value, label]) => ({ value, label })),
+      ],
     },
   ]
+
+  const handleTableFiltersChange = (newFilters: Record<string, string>) => {
+    setFilters(prev => ({
+      ...prev,
+      ...newFilters,
+    }))
+  }
 
   if (!session || hasAccess === null) {
     return null
@@ -585,42 +612,6 @@ export default function AdminNewsPage() {
       }
     >
       <div className='space-y-4'>
-        <div className='flex flex-wrap gap-4 items-center'>
-          <Input
-            placeholder='Buscar noticias...'
-            value={filters.search}
-            onChange={e => setFilters({ ...filters, search: e.target.value })}
-            className='max-w-sm'
-          />
-          <Select value={filters.status} onValueChange={v => setFilters({ ...filters, status: v })}>
-            <SelectTrigger className='w-[180px]'>
-              <SelectValue placeholder='Todos los estados' />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value='all'>Todos</SelectItem>
-              <SelectItem value='DRAFT'>Borradores</SelectItem>
-              <SelectItem value='PUBLISHED'>Publicados</SelectItem>
-              <SelectItem value='ARCHIVED'>Archivados</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={filters.type} onValueChange={v => setFilters({ ...filters, type: v })}>
-            <SelectTrigger className='w-[180px]'>
-              <SelectValue placeholder='Todos los tipos' />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value='all'>Todos</SelectItem>
-              {Object.entries(typeLabels).map(([key, label]) => (
-                <SelectItem key={key} value={key}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button onClick={loadNews} variant='ghost'>
-            Actualizar
-          </Button>
-        </div>
-
         <DataTable
           title={`${news.length} noticia${news.length !== 1 ? 's' : ''}`}
           description='Todas las noticias del sistema'
@@ -631,8 +622,49 @@ export default function AdminNewsPage() {
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           onRefresh={loadNews}
+          onExport={handleExport}
+          filters={tableFilters}
+          onFiltersChange={handleTableFiltersChange}
           onRowClick={item => {
             setSelectedNews(item)
+          }}
+          rowActions={item => {
+            const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
+            const isOwner = item.createdBy.id === session?.user?.id
+            const canModify = isSuperAdmin || isOwner
+
+            return (
+              <div className='flex gap-2'>
+                {canModify && (
+                  <Button
+                    variant='ghost'
+                    size='sm'
+                    onClick={e => {
+                      e.stopPropagation()
+                      handleEdit(item)
+                    }}
+                  >
+                    <Edit className='h-4 w-4' />
+                  </Button>
+                )}
+                {canModify && (
+                  <Button
+                    variant='ghost'
+                    size='sm'
+                    onClick={e => {
+                      e.stopPropagation()
+                      setDeletingNews(item)
+                      setDeleteDialogOpen(true)
+                    }}
+                  >
+                    <Trash2 className='h-4 w-4 text-destructive' />
+                  </Button>
+                )}
+                {!canModify && (
+                  <span className='text-xs text-muted-foreground px-2'>Solo lectura</span>
+                )}
+              </div>
+            )
           }}
           emptyState={{
             icon: <Newspaper className='h-10 w-10 text-muted-foreground mx-auto mb-3' />,
@@ -882,7 +914,6 @@ export default function AdminNewsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal de detalle unificado */}
       {selectedNews && (
         <NewsDetail
           news={selectedNews as unknown as NewsDetailItem}

@@ -136,6 +136,7 @@ model departments {
   licenses    software_licenses[]
   users       users[]
   news_departments news_departments[]
+  form_departments form_departments[]
 
   @@index([isActive, order])
   @@index([familyId])
@@ -1616,6 +1617,9 @@ model families {
   patrolSchedules             patrol_schedules[]
   patrols                     patrols[]
   news_families               news_families[]
+  form_categories             form_categories[]
+  forms                       forms[]
+  form_families               form_families[]
 
   @@index([isActive, order])
   @@map("families")
@@ -2831,7 +2835,7 @@ model form_categories {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  families    families? @relation(fields: [familyId], references: [id])
+  family      families? @relation(fields: [familyId], references: [id])
   forms       forms[]
 
   @@index([familyId])
