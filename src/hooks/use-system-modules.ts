@@ -75,6 +75,19 @@ const FALLBACK: SystemModule[] = [
     requiresManager: false,
     familyScoped: false,
   },
+  {
+    key: 'forms',
+    name: 'Formularios y Documentos',
+    description: 'Gestión de formularios y documentos descargables',
+    icon: 'FileText',
+    isActive: true,
+    order: 5,
+    defaultForAdmin: true,
+    defaultForTech: false,
+    defaultForClient: false,
+    requiresManager: true,
+    familyScoped: false,
+  },
 ]
 
 export function useSystemModules() {
@@ -119,6 +132,11 @@ export function getModuleRoleDescription(moduleKey: string, role: string): strin
       TECHNICIAN: 'Ver noticias y comunicados del sistema',
       CLIENT: 'Ver noticias y comunicados del sistema',
     },
+    forms: {
+      ADMIN: 'Gestionar formularios y documentos del sistema',
+      TECHNICIAN: 'Ver y descargar formularios disponibles',
+      CLIENT: 'Ver y descargar formularios disponibles',
+    },
   }
   return descriptions[moduleKey]?.[role] ?? 'Acceso al módulo'
 }
@@ -132,6 +150,7 @@ export function getModuleEmoji(moduleKey: string): string {
     inventory: '📦',
     patrols: '🛡️',
     news: '📰',
+    forms: '📋',
     contracts: '📄',
     reports: '📊',
     knowledge: '📚',

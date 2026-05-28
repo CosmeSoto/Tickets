@@ -47,6 +47,8 @@ interface EditUserData {
   inventoryEnabled: boolean
   patrolsEnabled: boolean
   newsEnabled: boolean
+  formsEnabled: boolean
+  canManageForms: boolean
   isSuperAdmin: boolean
   avatar?: File
 }
@@ -79,6 +81,8 @@ export function EditUserModal({
     inventoryEnabled: false,
     patrolsEnabled: false,
     newsEnabled: false,
+    formsEnabled: false,
+    canManageForms: false,
     isSuperAdmin: false,
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -352,6 +356,8 @@ export function EditUserModal({
         inventoryEnabled: (user as any).inventoryEnabled ?? false,
         patrolsEnabled: (user as any).patrolsEnabled ?? false,
         newsEnabled: (user as any).newsEnabled ?? false,
+        formsEnabled: (user as any).formsEnabled ?? false,
+        canManageForms: (user as any).canManageForms ?? false,
         isSuperAdmin: user.isSuperAdmin ?? false,
         avatar: undefined,
       })
@@ -593,6 +599,8 @@ export function EditUserModal({
           inventoryEnabled: formData.inventoryEnabled,
           patrolsEnabled: formData.patrolsEnabled,
           newsEnabled: formData.newsEnabled,
+          formsEnabled: formData.formsEnabled,
+          canManageForms: formData.canManageForms,
           isSuperAdmin: formData.role === 'ADMIN' ? formData.isSuperAdmin : false,
         }),
       })
@@ -901,6 +909,48 @@ export function EditUserModal({
                         disabled={loading}
                       />
                     </div>
+
+                    {/* Formularios y Documentos — toggle + canManage */}
+                    <div className='flex items-center justify-between rounded-lg border px-3 py-2.5'>
+                      <div>
+                        <p className='text-sm font-medium flex items-center gap-2'>
+                          📄 Formularios y Documentos
+                        </p>
+                        <p className='text-xs text-muted-foreground'>
+                          Permite al usuario ver el módulo de formularios
+                        </p>
+                      </div>
+                      <Switch
+                        checked={formData.formsEnabled}
+                        onCheckedChange={v =>
+                          setFormData(p => ({
+                            ...p,
+                            formsEnabled: v,
+                            canManageForms: v ? p.canManageForms : false,
+                          }))
+                        }
+                        disabled={loading}
+                      />
+                    </div>
+
+                    {/* Permitir gestión de formularios (solo si formsEnabled está activado) */}
+                    {formData.formsEnabled && (
+                      <div className='flex items-center justify-between rounded-lg border px-3 py-2.5 bg-muted/30'>
+                        <div>
+                          <p className='text-sm font-medium flex items-center gap-2'>
+                            🔧 Permitir gestión de formularios
+                          </p>
+                          <p className='text-xs text-muted-foreground'>
+                            Permite crear, editar y eliminar formularios de sus familias
+                          </p>
+                        </div>
+                        <Switch
+                          checked={formData.canManageForms}
+                          onCheckedChange={v => setFormData(p => ({ ...p, canManageForms: v }))}
+                          disabled={loading}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -915,6 +965,8 @@ export function EditUserModal({
                   inventoryEnabled={formData.inventoryEnabled}
                   patrolsEnabled={formData.patrolsEnabled}
                   newsEnabled={formData.newsEnabled}
+                  formsEnabled={formData.formsEnabled}
+                  canManageForms={formData.canManageForms}
                 />
               )}
               {/* Para Super Admin: acceso total, no necesita panel */}
@@ -927,6 +979,8 @@ export function EditUserModal({
                   inventoryEnabled={true}
                   patrolsEnabled={true}
                   newsEnabled={true}
+                  formsEnabled={true}
+                  canManageForms={true}
                 />
               )}
             </div>

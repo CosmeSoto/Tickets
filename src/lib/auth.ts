@@ -395,6 +395,8 @@ export const authOptions: NextAuthOptions = {
                   canRequestAssets: true,
                   patrolsEnabled: true,
                   newsEnabled: true,
+                  formsEnabled: true,
+                  canManageForms: true,
                 },
               })
               token.canManageInventory = dbUser?.canManageInventory ?? false
@@ -404,6 +406,8 @@ export const authOptions: NextAuthOptions = {
               token.canRequestAssets = dbUser?.canRequestAssets ?? false
               token.patrolsEnabled = dbUser?.patrolsEnabled ?? false
               token.newsEnabled = dbUser?.newsEnabled ?? false
+              token.formsEnabled = dbUser?.formsEnabled ?? false
+              token.canManageForms = dbUser?.canManageForms ?? false
             } catch {
               token.canManageInventory = false
               token.isSuperAdmin = false
@@ -434,6 +438,8 @@ export const authOptions: NextAuthOptions = {
                   canRequestAssets: true,
                   patrolsEnabled: true,
                   newsEnabled: true,
+                  formsEnabled: true,
+                  canManageForms: true,
                   departmentId: true,
                   departments: { select: { name: true } },
                 },
@@ -451,6 +457,8 @@ export const authOptions: NextAuthOptions = {
               token.canRequestAssets = dbUser.canRequestAssets ?? false
               token.patrolsEnabled = dbUser.patrolsEnabled ?? false
               token.newsEnabled = dbUser.newsEnabled ?? false
+              token.formsEnabled = dbUser.formsEnabled ?? false
+              token.canManageForms = dbUser.canManageForms ?? false
               token.departmentId = dbUser.departmentId || undefined
               token.department = dbUser.departments?.name || undefined
             }
@@ -495,6 +503,8 @@ export const authOptions: NextAuthOptions = {
           ;(session.user as any).canRequestAssets = (token.canRequestAssets as boolean) ?? false
           session.user.patrolsEnabled = (token.patrolsEnabled as boolean) ?? false
           ;(session.user as any).newsEnabled = (token.newsEnabled as boolean) ?? false
+          ;(session.user as any).formsEnabled = (token.formsEnabled as boolean) ?? false
+          ;(session.user as any).canManageForms = (token.canManageForms as boolean) ?? false
 
           // IMPORTANTE: Pasar loginTime a la sesión para el monitor de timeout
           if (token.loginTime) {

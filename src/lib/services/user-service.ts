@@ -47,6 +47,8 @@ export interface CreateUserData {
   patrolsEnabled?: boolean
   newsEnabled?: boolean
   canManageInventory?: boolean
+  formsEnabled?: boolean
+  canManageForms?: boolean
   assignedCategories?: {
     categoryId: string
     priority: number
@@ -70,6 +72,8 @@ export interface UpdateUserData {
   inventoryEnabled?: boolean
   patrolsEnabled?: boolean
   newsEnabled?: boolean
+  formsEnabled?: boolean
+  canManageForms?: boolean
   isSuperAdmin?: boolean
   assignedCategories?: {
     categoryId: string
@@ -229,6 +233,8 @@ export class UserService {
         inventoryEnabled: true,
         patrolsEnabled: true,
         newsEnabled: true,
+        formsEnabled: true,
+        canManageForms: true,
         lastLogin: true,
         createdAt: true,
         updatedAt: true,
@@ -271,6 +277,8 @@ export class UserService {
           patrolsEnabled: data.patrolsEnabled ?? false,
           newsEnabled: data.newsEnabled ?? false,
           canManageInventory: data.canManageInventory ?? false,
+          formsEnabled: data.formsEnabled ?? false,
+          canManageForms: data.canManageForms ?? false,
           isEmailVerified: false,
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -418,6 +426,8 @@ export class UserService {
     if (data.inventoryEnabled !== undefined) updateData.inventoryEnabled = data.inventoryEnabled
     if (data.patrolsEnabled !== undefined) updateData.patrolsEnabled = data.patrolsEnabled
     if (data.newsEnabled !== undefined) updateData.newsEnabled = data.newsEnabled
+    if (data.formsEnabled !== undefined) updateData.formsEnabled = data.formsEnabled
+    if (data.canManageForms !== undefined) updateData.canManageForms = data.canManageForms
     if (data.isSuperAdmin !== undefined) updateData.isSuperAdmin = data.isSuperAdmin
 
     // Manejar departmentId explícitamente

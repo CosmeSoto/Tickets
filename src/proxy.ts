@@ -252,8 +252,12 @@ export async function proxy(request: NextRequest) {
 
     if (path.startsWith('/admin') && userRole !== 'ADMIN' && !(token as any).isSuperAdmin) {
       // Excepción: usuarios con newsEnabled pueden acceder a /admin/news
-      if (path.startsWith('/admin/news') && token.newsEnabled === true) {
-        // Permitir acceso a gestión de noticias
+      // Excepción: usuarios con formsEnabled pueden acceder a /admin/forms
+      if (
+        (path.startsWith('/admin/news') && token.newsEnabled === true) ||
+        (path.startsWith('/admin/forms') && (token as any).formsEnabled === true)
+      ) {
+        // Permitir acceso a gestión de noticias o formularios
       } else {
         ApplicationLogger.securityEvent(
           'insufficient_privileges',

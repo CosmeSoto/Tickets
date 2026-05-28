@@ -21,6 +21,8 @@ interface UserModulesPanelProps {
   inventoryEnabled?: boolean
   patrolsEnabled?: boolean
   newsEnabled?: boolean
+  formsEnabled?: boolean
+  canManageForms?: boolean
   /** Si es true, el panel inicia colapsado sin auto-expandir */
   defaultCollapsed?: boolean
   /** Si es true, no muestra guías de "Cómo activar" para módulos inactivos */
@@ -35,6 +37,8 @@ export function UserModulesPanel({
   inventoryEnabled,
   patrolsEnabled,
   newsEnabled,
+  formsEnabled,
+  canManageForms,
   defaultCollapsed = false,
   hideGuides = false,
 }: UserModulesPanelProps) {
@@ -43,12 +47,19 @@ export function UserModulesPanel({
     inventory: boolean
     patrols: boolean
     news: boolean
+    forms: boolean
     families: Array<{
       id: string
       name: string
       code: string
       color?: string | null
-      modules: { tickets: boolean; inventory: boolean; patrols: boolean; news: boolean }
+      modules: {
+        tickets: boolean
+        inventory: boolean
+        patrols: boolean
+        news: boolean
+        forms: boolean
+      }
     }>
   } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -64,7 +75,16 @@ export function UserModulesPanel({
       })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [userId, canManageInventory, ticketsEnabled, inventoryEnabled, patrolsEnabled, newsEnabled])
+  }, [
+    userId,
+    canManageInventory,
+    ticketsEnabled,
+    inventoryEnabled,
+    patrolsEnabled,
+    newsEnabled,
+    formsEnabled,
+    canManageForms,
+  ])
 
   const isAdminRole = role === 'ADMIN'
   const hasFamilies = data && data.families.length > 0
@@ -72,6 +92,7 @@ export function UserModulesPanel({
   const inventoryActive = data?.inventory ?? false
   const patrolsActive = data?.patrols ?? false
   const newsActive = newsEnabled ?? false
+  const formsActive = formsEnabled ?? false
 
   const getTicketsGuide = () => {
     if (ticketsActive) return null
@@ -176,6 +197,13 @@ export function UserModulesPanel({
             >
               📰 {newsActive ? 'ON' : 'OFF'}
             </span>
+            <span
+              className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                formsActive ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+              }`}
+            >
+              📄 {formsActive ? 'ON' : 'OFF'}
+            </span>
           </div>
         </div>
         <svg
@@ -237,6 +265,21 @@ export function UserModulesPanel({
                     steps: ['Activar el toggle "Noticias y Comunicados" en la sección anterior'],
                   }
             }
+          />
+          <ModuleStatusCard
+            emoji='📄'
+            name='Formularios y Documentos'
+            active={formsActive}
+            families={[]}
+            guide={
+              hideGuides || formsActive
+                ? null
+                : {
+                    type: 'info' as const,
+                    steps: ['Activar el toggle "Formularios y Documentos" en la sección anterior'],
+                  }
+            }
+            badge={canManageForms ? 'Gestor' : undefined}
           />
         </div>
       )}

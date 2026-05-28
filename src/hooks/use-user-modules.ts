@@ -8,12 +8,19 @@ interface UserModules {
   inventory: boolean
   patrols: boolean
   news: boolean
+  forms: boolean
   families: Array<{
     id: string
     name: string
     code: string
     color?: string | null
-    modules: { tickets: boolean; inventory: boolean; patrols: boolean; news: boolean }
+    modules: {
+      tickets: boolean
+      inventory: boolean
+      patrols: boolean
+      news: boolean
+      forms: boolean
+    }
   }>
 }
 
@@ -22,6 +29,7 @@ const DEFAULT: UserModules = {
   inventory: false,
   patrols: false,
   news: false,
+  forms: false,
   families: [],
 }
 

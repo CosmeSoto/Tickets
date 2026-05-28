@@ -41,6 +41,8 @@ export async function GET(request: Request) {
   let inventoryEnabled = false
   let patrolsEnabled = false
   let newsEnabled = false
+  let formsEnabled = false
+  let canManageForms = false
 
   if (targetUserId && targetUserId !== session.user.id) {
     const targetUser = await prisma.users.findUnique({
@@ -54,6 +56,8 @@ export async function GET(request: Request) {
         inventoryEnabled: true,
         patrolsEnabled: true,
         newsEnabled: true,
+        formsEnabled: true,
+        canManageForms: true,
       },
     })
     if (!targetUser) return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
@@ -65,6 +69,8 @@ export async function GET(request: Request) {
     inventoryEnabled = targetUser.inventoryEnabled ?? false
     patrolsEnabled = targetUser.patrolsEnabled ?? false
     newsEnabled = targetUser.newsEnabled ?? false
+    formsEnabled = targetUser.formsEnabled ?? false
+    canManageForms = targetUser.canManageForms ?? false
   } else {
     // Cargar flags del usuario actual desde DB (la sesión puede estar desactualizada)
     const currentUser = await prisma.users.findUnique({
@@ -75,6 +81,8 @@ export async function GET(request: Request) {
         canManageInventory: true,
         patrolsEnabled: true,
         newsEnabled: true,
+        formsEnabled: true,
+        canManageForms: true,
       },
     })
     if (currentUser) {
@@ -83,6 +91,8 @@ export async function GET(request: Request) {
       canManageInventory = currentUser.canManageInventory ?? false
       patrolsEnabled = currentUser.patrolsEnabled ?? false
       newsEnabled = currentUser.newsEnabled ?? false
+      formsEnabled = currentUser.formsEnabled ?? false
+      canManageForms = currentUser.canManageForms ?? false
     }
   }
 
@@ -363,7 +373,7 @@ export async function GET(request: Request) {
           })
         : []
 
-    // Familias enriquecidas: cada familia muestra solo los módulos donde el usuario la tiene asignada
+    // Familias enriquecidas: cada familia muestra solo los módulos donde el usuario lo tiene asignado
     const enrichedFamilies = families.map(f => ({
       ...f,
       modules: {
@@ -373,6 +383,7 @@ export async function GET(request: Request) {
           : inventoryFamilyIds.has(f.id) && (inventoryEnabled || canManageInventory),
         patrols: isSuperAdmin ? true : patrolFamilyIds.has(f.id) && patrolsEnabled,
         news: isSuperAdmin ? true : newsEnabled,
+        forms: isSuperAdmin ? true : formsEnabled,
       },
     }))
 
@@ -395,20 +406,23 @@ export async function GET(request: Request) {
     let resolvedInventory: boolean
     let resolvedPatrols: boolean
     let resolvedNews: boolean
+    let resolvedForms: boolean
 
     if (role === 'ADMIN' && isSuperAdmin) {
       resolvedTickets = true
       resolvedInventory = true
       resolvedPatrols = true
       resolvedNews = true
+      resolvedForms = true
     } else {
       // Para todos los roles (incluido admin normal):
       // El flag del usuario es el permiso. Si tiene familias asignadas para ese módulo, lo ve.
       resolvedTickets = ticketsEnabled && ticketFamilyIds.size > 0
       resolvedInventory = (inventoryEnabled || canManageInventory) && inventoryFamilyIds.size > 0
       resolvedPatrols = patrolsEnabled && patrolFamilyIds.size > 0
-      // Noticias es global, no requiere familias - solo el flag del usuario
+      // Noticias y Formularios son globales, no requieren familias - solo el flag del usuario
       resolvedNews = newsEnabled
+      resolvedForms = formsEnabled
     }
 
     return {
@@ -416,6 +430,7 @@ export async function GET(request: Request) {
       inventory: resolvedInventory,
       patrols: resolvedPatrols,
       news: resolvedNews,
+      forms: resolvedForms,
       families: enrichedFamilies,
     }
   })

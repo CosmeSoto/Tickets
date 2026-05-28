@@ -22,6 +22,8 @@ const updateUserSchema = z.object({
   inventoryEnabled: z.boolean().optional(),
   patrolsEnabled: z.boolean().optional(),
   newsEnabled: z.boolean().optional(),
+  formsEnabled: z.boolean().optional(),
+  canManageForms: z.boolean().optional(),
   isSuperAdmin: z.boolean().optional(),
   assignedCategories: z
     .array(
@@ -265,7 +267,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         })
       }
 
-      // Si cambian ticketsEnabled, inventoryEnabled, patrolsEnabled o newsEnabled,
+      // Si cambian ticketsEnabled, inventoryEnabled, patrolsEnabled, newsEnabled, formsEnabled o canManageForms
       // notificar SOLO si realmente hubo un cambio (evitar reloads innecesarios)
       const modulesActuallyChanged =
         (validatedData.ticketsEnabled !== undefined &&
@@ -275,7 +277,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         (validatedData.patrolsEnabled !== undefined &&
           validatedData.patrolsEnabled !== (currentUser as any).patrolsEnabled) ||
         (validatedData.newsEnabled !== undefined &&
-          validatedData.newsEnabled !== (currentUser as any).newsEnabled)
+          validatedData.newsEnabled !== (currentUser as any).newsEnabled) ||
+        ((validatedData as any).formsEnabled !== undefined &&
+          (validatedData as any).formsEnabled !== (currentUser as any).formsEnabled) ||
+        ((validatedData as any).canManageForms !== undefined &&
+          (validatedData as any).canManageForms !== (currentUser as any).canManageForms)
 
       if (modulesActuallyChanged) {
         NotificationEvents.emit(targetId, {

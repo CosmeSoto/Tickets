@@ -441,6 +441,8 @@ model users {
   inventoryEnabled                                  Boolean                         @default(false)
   patrolsEnabled                                    Boolean                         @default(false) @map("patrols_enabled")
   newsEnabled                                       Boolean                         @default(false) @map("news_enabled")
+  formsEnabled                                      Boolean                         @default(false) @map("forms_enabled")
+  canManageForms                                    Boolean                         @default(false) @map("can_manage_forms")
   lastLogin                                         DateTime?
   oauthProvider                                     String?
   oauthId                                           String?
@@ -514,6 +516,11 @@ model users {
   news_reactions                                    news_reactions[]
   news_comments                                     news_comments[]
   news_attachments_uploaded                         news_attachments[]              @relation("NewsAttachmentUploader")
+  forms_created                                     forms[]                         @relation("FormCreator")
+  forms_updated                                     forms[]                         @relation("FormUpdater")
+  form_users                                        form_users[]
+  form_downloads                                    form_downloads[]
+  form_attachments_uploaded                         form_attachments[]              @relation("FormAttachmentUploader")
 
   @@index([departmentId])
   @@index([name, email])
@@ -2807,4 +2814,155 @@ model news_attachments {
 
   @@index([newsId])
   @@map("news_attachments")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MÓDULO DE FORMULARIOS Y DOCUMENTOS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model form_categories {
+  id          String   @id @default(uuid())
+  name        String   @db.VarChar(100)
+  description String?
+  color       String?  @default("#6B7280")
+  isActive    Boolean  @default(true)
+  order       Int      @default(0)
+  familyId    String?  @map("family_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  families    families? @relation(fields: [familyId], references: [id])
+  forms       forms[]
+
+  @@index([familyId])
+  @@index([isActive, order])
+  @@map("form_categories")
+}
+
+model forms {
+  id              String              @id @default(uuid())
+  title           String              @db.VarChar(200)
+  slug            String              @unique @db.VarChar(200)
+  description     String?
+  summary         String?             @db.VarChar(500)
+  version         String?             @db.VarChar(50)
+  categoryId      String              @map("category_id")
+  familyId        String?             @map("family_id")
+  fileUrl         String?             @map("file_url")
+  fileSize        Int?                @map("file_size")
+  fileType        String?             @map("file_type") @db.VarChar(100)
+  downloadCount   Int                 @default(0) @map("download_count")
+  isActive        Boolean             @default(true) @map("is_active")
+  isFeatured      Boolean             @default(false) @map("is_featured")
+  createdById     String              @map("created_by_id")
+  updatedById     String?             @map("updated_by_id")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  category        form_categories     @relation(fields: [categoryId], references: [id])
+  family          families?           @relation(fields: [familyId], references: [id])
+  createdBy       users               @relation("FormCreator", fields: [createdById], references: [id])
+  updatedBy       users?              @relation("FormUpdater", fields: [updatedById], references: [id])
+  form_roles      form_roles[]
+  form_users      form_users[]
+  form_departments form_departments[]
+  form_families   form_families[]
+  form_downloads  form_downloads[]
+  form_attachments form_attachments[]
+
+  @@index([categoryId])
+  @@index([familyId])
+  @@index([isActive, createdAt(sort: Desc)])
+  @@index([isFeatured, isActive])
+  @@map("forms")
+}
+
+model form_roles {
+  id        String   @id @default(uuid())
+  formId    String   @map("form_id")
+  role      UserRole
+  createdAt DateTime @default(now()) @map("created_at")
+
+  form      forms    @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  @@unique([formId, role])
+  @@index([formId])
+  @@map("form_roles")
+}
+
+model form_users {
+  id        String   @id @default(uuid())
+  formId    String   @map("form_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  form      forms    @relation(fields: [formId], references: [id], onDelete: Cascade)
+  user      users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([formId, userId])
+  @@index([formId])
+  @@index([userId])
+  @@map("form_users")
+}
+
+model form_departments {
+  id           String      @id @default(uuid())
+  formId       String      @map("form_id")
+  departmentId String      @map("department_id")
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  form         forms       @relation(fields: [formId], references: [id], onDelete: Cascade)
+  departments  departments @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([formId, departmentId])
+  @@index([formId])
+  @@index([departmentId])
+  @@map("form_departments")
+}
+
+model form_families {
+  id        String   @id @default(uuid())
+  formId    String   @map("form_id")
+  familyId  String   @map("family_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  form      forms    @relation(fields: [formId], references: [id], onDelete: Cascade)
+  families  families @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@unique([formId, familyId])
+  @@index([formId])
+  @@index([familyId])
+  @@map("form_families")
+}
+
+model form_downloads {
+  id        String   @id @default(uuid())
+  formId    String   @map("form_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  form      forms    @relation(fields: [formId], references: [id], onDelete: Cascade)
+  user      users    @relation(fields: [userId], references: [id])
+
+  @@index([formId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("form_downloads")
+}
+
+model form_attachments {
+  id           String   @id @default(uuid())
+  formId       String   @map("form_id")
+  filename     String
+  originalName String
+  mimeType     String   @map("mime_type") @db.VarChar(100)
+  size         Int
+  path         String
+  uploadedById String   @map("uploaded_by_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  form         forms    @relation(fields: [formId], references: [id], onDelete: Cascade)
+  uploadedBy   users    @relation("FormAttachmentUploader", fields: [uploadedById], references: [id])
+
+  @@index([formId])
+  @@map("form_attachments")
 }

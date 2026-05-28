@@ -120,6 +120,12 @@ const navigationByRole: Record<string, NavItem[]> = {
       icon: Newspaper,
       children: [{ name: 'Gestión de Noticias', href: '/admin/news', icon: Newspaper }],
     },
+    {
+      name: 'Formularios y Documentos',
+      href: '/admin/forms',
+      icon: FileText,
+      children: [{ name: 'Gestión de Formularios', href: '/admin/forms', icon: FileText }],
+    },
     { name: 'Familias', href: '/admin/families', icon: Layers },
     { name: 'Usuarios', href: '/admin/users', icon: Users },
     { name: 'Auditoría', href: '/admin/audit', icon: Shield },
@@ -167,6 +173,12 @@ const navigationByRole: Record<string, NavItem[]> = {
       icon: Newspaper,
       children: [{ name: 'Gestión de Noticias', href: '/admin/news', icon: Newspaper }],
     },
+    {
+      name: 'Formularios y Documentos',
+      href: '/forms',
+      icon: FileText,
+      children: [{ name: 'Ver Formularios', href: '/forms', icon: FileText }],
+    },
   ],
 
   // Técnico CON gestión de inventario: tickets + inventario operativo de sus familias
@@ -211,6 +223,12 @@ const navigationByRole: Record<string, NavItem[]> = {
       icon: Newspaper,
       children: [{ name: 'Gestión de Noticias', href: '/admin/news', icon: Newspaper }],
     },
+    {
+      name: 'Formularios y Documentos',
+      href: '/forms',
+      icon: FileText,
+      children: [{ name: 'Ver Formularios', href: '/forms', icon: FileText }],
+    },
   ],
 
   // Cliente: sus tickets + sus equipos asignados + mantenimientos
@@ -247,6 +265,12 @@ const navigationByRole: Record<string, NavItem[]> = {
       href: '/admin/news',
       icon: Newspaper,
       children: [{ name: 'Gestión de Noticias', href: '/admin/news', icon: Newspaper }],
+    },
+    {
+      name: 'Formularios y Documentos',
+      href: '/forms',
+      icon: FileText,
+      children: [{ name: 'Ver Formularios', href: '/forms', icon: FileText }],
     },
   ],
 
@@ -397,6 +421,7 @@ export function RoleDashboardLayout({
     inventory: hasInventory,
     patrols: hasPatrols,
     news: hasNews,
+    forms: hasForms,
   } = useUserModules()
 
   // Solo ocultar si definitivamente no hay sesión (no durante la carga/revalidación)
@@ -438,8 +463,9 @@ export function RoleDashboardLayout({
       // Para Admin normal: filtrar según módulos activos de sus familias asignadas
       if (item.href === '/admin/tickets' || item.name === 'Tickets') return hasTickets
       if (item.href === '/inventory' || item.name === 'Inventario') return hasInventory
-      if (item.href === '/admin/patrols' || item.name === 'Rondas') return hasPatrols
+      if (item.href === '/admin/patrols' || item.name === 'Rondas') return hasPatrol
       if (item.href === '/admin/news' || item.name === 'Noticias') return hasNews
+      if (item.href === '/admin/forms' || item.name === 'Formularios y Documentos') return hasForms
       return true
     })
     navigation = adminNav
@@ -467,6 +493,10 @@ export function RoleDashboardLayout({
       // Ocultar Noticias si el usuario no tiene newsEnabled
       if (item.href === '/admin/news' || item.name === 'Noticias') {
         return hasNews
+      }
+      // Ocultar Formularios si el usuario no tiene formsEnabled
+      if (item.href === '/forms' || item.name === 'Formularios y Documentos') {
+        return hasForms
       }
       return true
     })

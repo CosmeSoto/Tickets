@@ -7,13 +7,6 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
   Database,
   RotateCcw,
   AlertTriangle,
@@ -49,8 +42,7 @@ interface RestorePreview {
   createdAt: string
 }
 
-type RestoreScope =
-  | 'full'
+type RestoreModuleId =
   | 'tickets'
   | 'news'
   | 'patrols'
@@ -58,6 +50,16 @@ type RestoreScope =
   | 'users'
   | 'audits'
   | 'configurations'
+
+const RESTORE_MODULES: { id: RestoreModuleId; label: string }[] = [
+  { id: 'tickets', label: 'Tickets' },
+  { id: 'news', label: 'Noticias' },
+  { id: 'patrols', label: 'Rondas' },
+  { id: 'families', label: 'Familias' },
+  { id: 'users', label: 'Usuarios' },
+  { id: 'audits', label: 'Auditorías' },
+  { id: 'configurations', label: 'Configuraciones' },
+]
 
 interface BackupRestoreProps {
   backups: BackupInfo[]
@@ -74,7 +76,8 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
   const [uploading, setUploading] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isDragging, setIsDragging] = useState(false)
-  const [restoreScope, setRestoreScope] = useState<RestoreScope>('full')
+  /** Módulos seleccionados para restaurar. Vacío = restauración completa */
+  const [selectedModules, setSelectedModules] = useState<RestoreModuleId[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
@@ -85,7 +88,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
       setSelectedBackup(null)
       setRestorePreview(null)
       setShowConfirmation(false)
-      setRestoreScope('full')
+      setSelectedModules([])
     }
   }, [completedBackups, selectedBackup])
 
@@ -149,7 +152,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
   const handleBackupSelect = (backup: BackupInfo) => {
     setSelectedBackup(backup)
     setShowConfirmation(false)
-    setRestoreScope('full')
+    setSelectedModules([])
     loadRestorePreview(backup)
   }
 
@@ -172,9 +175,9 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
         })
       }, 500)
 
-      const body: Record<string, string> = {}
-      if (restoreScope !== 'full') {
-        body.module = restoreScope
+      const body: Record<string, unknown> = {}
+      if (selectedModules.length > 0) {
+        body.modules = selectedModules
       }
 
       const response = await fetch(`/api/admin/backups/${selectedBackup.id}/restore`, {
@@ -187,7 +190,8 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
       setRestoreProgress(100)
 
       if (response.ok) {
-        const scopeLabel = restoreScope === 'full' ? 'completa' : `del módulo "${restoreScope}"`
+        const scopeLabel =
+          selectedModules.length === 0 ? 'completa' : `de ${selectedModules.length} módulo(s)`
         toast({
           title: 'Restauración Exitosa',
           description: `Restauración ${scopeLabel} completada correctamente`,
@@ -197,7 +201,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
           setRestoreProgress(0)
           setSelectedBackup(null)
           setRestorePreview(null)
-          setRestoreScope('full')
+          setSelectedModules([])
           onRefresh()
         }, 2000)
       } else {
@@ -232,27 +236,24 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
       minute: '2-digit',
     })
 
-  const getRestoreScopeLabel = (scope: RestoreScope) => {
-    switch (scope) {
-      case 'full':
-        return 'toda la base de datos'
-      case 'tickets':
-        return 'el módulo de Tickets'
-      case 'news':
-        return 'el módulo de Noticias'
-      case 'patrols':
-        return 'el módulo de Rondas'
-      case 'families':
-        return 'el módulo de Familias'
-      case 'users':
-        return 'el módulo de Usuarios'
-      case 'audits':
-        return 'el módulo de Auditorías'
-      case 'configurations':
-        return 'el módulo de Configuraciones'
-      default:
-        return scope
-    }
+  const getSelectedModulesLabel = () => {
+    if (selectedModules.length === 0) return 'toda la base de datos'
+    const labels = selectedModules.map(id => RESTORE_MODULES.find(m => m.id === id)?.label || id)
+    return labels.join(', ')
+  }
+
+  const toggleModule = (moduleId: RestoreModuleId) => {
+    setSelectedModules(prev =>
+      prev.includes(moduleId) ? prev.filter(m => m !== moduleId) : [...prev, moduleId]
+    )
+  }
+
+  const selectAllModules = () => {
+    setSelectedModules(RESTORE_MODULES.map(m => m.id))
+  }
+
+  const clearModules = () => {
+    setSelectedModules([])
   }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -363,7 +364,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
             <input
               ref={fileInputRef}
               type='file'
-              accept='.sql,.sql.gz,.json,.json.gz'
+              accept='.sql,.sql.gz,.json,.json.gz,.enc'
               onChange={handleFileSelect}
               className='hidden'
             />
@@ -388,7 +389,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
                           : 'Arrastra y suelta un archivo aquí, o haz clic para seleccionar'}
                       </p>
                       <p className='text-xs text-muted-foreground mt-1'>
-                        Formatos: .sql, .sql.gz, .json, .json.gz
+                        Formatos: .sql, .sql.gz, .json, .json.gz, .enc (cifrado)
                       </p>
                     </div>
                   )}
@@ -453,9 +454,9 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
         <AlertTriangle className='h-4 w-4 text-destructive' />
         <AlertDescription className='text-destructive'>
           <strong>¡Advertencia!</strong>{' '}
-          {restoreScope === 'full'
+          {selectedModules.length === 0
             ? 'La restauración completa reemplazará todos los datos actuales de la base de datos. Esta acción no se puede deshacer.'
-            : `La restauración selectiva reemplazará únicamente los datos de ${getRestoreScopeLabel(restoreScope)}. Las demás tablas no se verán afectadas.`}{' '}
+            : `La restauración selectiva reemplazará únicamente los datos de: ${getSelectedModulesLabel()}. Las demás tablas no se verán afectadas.`}{' '}
           Se recomienda crear un backup actual antes de proceder.
         </AlertDescription>
       </Alert>
@@ -562,7 +563,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
                   </div>
                 </div>
 
-                {/* Selector de Ámbito de Restauración */}
+                {/* Selector de Módulos a Restaurar */}
                 <div className='space-y-2'>
                   <label className='text-sm font-medium text-foreground'>
                     ¿Qué deseas restaurar?
@@ -576,30 +577,58 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
                       </p>
                     </div>
                   ) : (
-                    <Select
-                      value={restoreScope}
-                      onValueChange={v => setRestoreScope(v as RestoreScope)}
-                    >
-                      <SelectTrigger className='w-full'>
-                        <SelectValue placeholder='Selecciona qué restaurar' />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value='full'>Restauración completa (toda la BD)</SelectItem>
-                        <SelectItem value='tickets'>Solo Tickets</SelectItem>
-                        <SelectItem value='news'>Solo Noticias</SelectItem>
-                        <SelectItem value='patrols'>Solo Rondas</SelectItem>
-                        <SelectItem value='families'>Solo Familias</SelectItem>
-                        <SelectItem value='users'>Solo Usuarios</SelectItem>
-                        <SelectItem value='audits'>Solo Auditorías</SelectItem>
-                        <SelectItem value='configurations'>Solo Configuraciones</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                  {!isPartialBackup && restoreScope !== 'full' && (
-                    <p className='text-xs text-muted-foreground'>
-                      Solo se restaurarán las tablas correspondientes a{' '}
-                      {getRestoreScopeLabel(restoreScope)}. El resto de la BD no se tocará.
-                    </p>
+                    <div className='space-y-2'>
+                      <div className='flex items-center justify-between'>
+                        <p className='text-xs text-muted-foreground'>
+                          {selectedModules.length === 0
+                            ? 'Sin selección = restauración completa'
+                            : `${selectedModules.length} módulo(s) seleccionado(s)`}
+                        </p>
+                        <div className='flex gap-1'>
+                          <Button
+                            variant='ghost'
+                            size='sm'
+                            className='h-6 text-xs px-2'
+                            onClick={selectAllModules}
+                          >
+                            Todos
+                          </Button>
+                          <Button
+                            variant='ghost'
+                            size='sm'
+                            className='h-6 text-xs px-2'
+                            onClick={clearModules}
+                          >
+                            Ninguno
+                          </Button>
+                        </div>
+                      </div>
+                      <div className='grid grid-cols-2 gap-2'>
+                        {RESTORE_MODULES.map(mod => (
+                          <label
+                            key={mod.id}
+                            className={`flex items-center gap-2 p-2 rounded-md border cursor-pointer transition-colors text-xs ${
+                              selectedModules.includes(mod.id)
+                                ? 'border-primary bg-primary/5 text-foreground'
+                                : 'border-border hover:bg-muted text-muted-foreground'
+                            }`}
+                          >
+                            <input
+                              type='checkbox'
+                              checked={selectedModules.includes(mod.id)}
+                              onChange={() => toggleModule(mod.id)}
+                              className='rounded border-border'
+                            />
+                            <span>{mod.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                      {selectedModules.length === 0 && (
+                        <p className='text-xs text-amber-600 dark:text-amber-400'>
+                          ⚠ Sin módulos seleccionados se restaurará TODA la base de datos
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
 
@@ -652,9 +681,11 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
 
                   <Button onClick={initiateRestore} disabled={restoring} variant='destructive'>
                     <RotateCcw className='h-4 w-4 mr-2' />
-                    {restoreScope === 'full' && !isPartialBackup
-                      ? 'Restaurar Todo'
-                      : `Restaurar ${isPartialBackup ? selectedBackup.module : restoreScope}`}
+                    {isPartialBackup
+                      ? `Restaurar ${selectedBackup.module}`
+                      : selectedModules.length === 0
+                        ? 'Restaurar Todo'
+                        : `Restaurar ${selectedModules.length} módulo(s)`}
                   </Button>
                 </div>
               </div>
@@ -684,9 +715,9 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
                   ¡Esta acción no se puede deshacer!
                 </p>
                 <p className='text-sm text-muted-foreground mt-2'>
-                  {restoreScope === 'full' && !isPartialBackup
+                  {selectedModules.length === 0 && !isPartialBackup
                     ? `Se restaurará el backup "${selectedBackup.filename}" y se reemplazarán TODOS los datos actuales de la base de datos.`
-                    : `Se restaurará solo ${getRestoreScopeLabel(isPartialBackup ? (selectedBackup.module as RestoreScope) : restoreScope)} del backup "${selectedBackup.filename}". Las demás tablas no se verán afectadas.`}
+                    : `Se restaurarán los módulos: ${isPartialBackup ? selectedBackup.module : getSelectedModulesLabel()} del backup "${selectedBackup.filename}". Las demás tablas no se verán afectadas.`}
                 </p>
               </div>
 

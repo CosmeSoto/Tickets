@@ -882,7 +882,7 @@ export class BackupService {
     }
   }
 
-  static async restoreBackup(backupId: string, restoreModule?: string): Promise<void> {
+  static async restoreBackup(backupId: string, restoreModules?: string[]): Promise<void> {
     try {
       const backup = await prisma.backups.findUnique({
         where: { id: backupId },
@@ -974,14 +974,14 @@ export class BackupService {
 
       console.log(
         `Formato detectado: ${isSqlBackup ? 'SQL' : isJsonBackup ? 'JSON' : 'Desconocido'}` +
-          (restoreModule
-            ? ` | Restauración selectiva: módulo "${restoreModule}"`
+          (restoreModules?.length
+            ? ` | Restauración selectiva: módulos [${restoreModules.join(', ')}]`
             : ' | Restauración completa')
       )
 
       try {
         if (isSqlBackup) {
-          if (restoreModule) {
+          if (restoreModules?.length) {
             throw new Error(
               'La restauración selectiva por módulo no está disponible para backups SQL. ' +
                 'Solo los backups JSON soportan restauración parcial.'
@@ -989,7 +989,7 @@ export class BackupService {
           }
           await this.restoreFromSQL({ ...backup, filepath: workingFilepath })
         } else if (isJsonBackup) {
-          await this.restoreFromJSON({ ...backup, filepath: workingFilepath }, restoreModule)
+          await this.restoreFromJSON({ ...backup, filepath: workingFilepath }, restoreModules)
         } else {
           throw new Error('No se pudo detectar el formato del backup')
         }
@@ -1023,7 +1023,7 @@ export class BackupService {
             backupId: backup.id,
             filename: backup.filename,
             method: isSqlBackup ? 'psql' : 'prisma-json',
-            restoreModule: restoreModule || 'full',
+            restoreModule: restoreModules?.join(', ') || 'full',
             wasEncrypted: backup.filepath.endsWith('.enc'),
             restoredAt: new Date(),
           },
@@ -1110,7 +1110,7 @@ export class BackupService {
 
   /**
    * Restaura un backup JSON generado por el método Prisma.
-   * Si se pasa restoreModule, solo restaura las tablas de ese módulo (restauración selectiva).
+   * Si se pasa restoreModules, solo restaura las tablas de esos módulos (restauración selectiva).
    */
   private static async restoreFromJSON(
     backup: {
@@ -1118,7 +1118,7 @@ export class BackupService {
       filename: string
       filepath: string
     },
-    restoreModule?: string
+    restoreModules?: string[]
   ): Promise<void> {
     // Leer el contenido del backup
     const backupContent = await readFile(backup.filepath, 'utf-8')
@@ -1207,56 +1207,63 @@ export class BackupService {
 
     console.log('Tablas a restaurar:', Object.keys(mappedData))
 
-    // Determinar el módulo a restaurar:
-    // 1. Si el usuario pidió restaurar un módulo específico (restoreModule), usar ese
+    // Determinar los módulos a restaurar:
+    // 1. Si el usuario pidió restaurar módulos específicos (restoreModules), usar esos
     // 2. Si el backup ya es de un módulo específico (backupModule), usar ese
     // 3. Si ninguno, restaurar todo
     const backupModule = backupData.metadata?.module as string | undefined
-    const effectiveModule = restoreModule || backupModule
+    const effectiveModules: string[] = restoreModules?.length
+      ? restoreModules
+      : backupModule
+        ? [backupModule]
+        : []
 
-    if (effectiveModule) {
-      let restoreOrder
-      switch (effectiveModule) {
-        case 'tickets':
-          restoreOrder = TICKETS_MODULE_RESTORE_ORDER
-          break
-        case 'news':
-          restoreOrder = NEWS_MODULE_RESTORE_ORDER
-          break
-        case 'patrols':
-          restoreOrder = PATROLS_MODULE_RESTORE_ORDER
-          break
-        case 'families':
-          restoreOrder = FAMILIES_MODULE_RESTORE_ORDER
-          break
-        case 'audits':
-          restoreOrder = AUDITS_MODULE_RESTORE_ORDER
-          break
-        case 'configurations':
-          restoreOrder = CONFIGURATIONS_MODULE_RESTORE_ORDER
-          break
-        case 'users':
-          restoreOrder = USERS_MODULE_RESTORE_ORDER
-          break
-        default:
-          throw new Error(`Módulo no soportado para restauración: ${effectiveModule}`)
-      }
-      const scoped: Record<string, any[]> = {}
-      for (const key of restoreOrder) {
-        scoped[key] = mappedData[key] ?? []
-      }
+    if (effectiveModules.length > 0) {
+      // Restaurar cada módulo secuencialmente
+      for (const effectiveModule of effectiveModules) {
+        let restoreOrder
+        switch (effectiveModule) {
+          case 'tickets':
+            restoreOrder = TICKETS_MODULE_RESTORE_ORDER
+            break
+          case 'news':
+            restoreOrder = NEWS_MODULE_RESTORE_ORDER
+            break
+          case 'patrols':
+            restoreOrder = PATROLS_MODULE_RESTORE_ORDER
+            break
+          case 'families':
+            restoreOrder = FAMILIES_MODULE_RESTORE_ORDER
+            break
+          case 'audits':
+            restoreOrder = AUDITS_MODULE_RESTORE_ORDER
+            break
+          case 'configurations':
+            restoreOrder = CONFIGURATIONS_MODULE_RESTORE_ORDER
+            break
+          case 'users':
+            restoreOrder = USERS_MODULE_RESTORE_ORDER
+            break
+          default:
+            throw new Error(`Módulo no soportado para restauración: ${effectiveModule}`)
+        }
+        const scoped: Record<string, any[]> = {}
+        for (const key of restoreOrder) {
+          scoped[key] = mappedData[key] ?? []
+        }
 
-      // Verificar que el backup contiene datos para este módulo
-      const hasData = Object.values(scoped).some(arr => arr.length > 0)
-      if (!hasData) {
-        throw new Error(
-          `El backup no contiene datos para el módulo "${effectiveModule}". ` +
-            'Verifica que el backup incluya las tablas necesarias.'
-        )
-      }
+        // Verificar que el backup contiene datos para este módulo
+        const hasData = Object.values(scoped).some(arr => arr.length > 0)
+        if (!hasData) {
+          console.warn(
+            `[RESTORE] El backup no contiene datos para el módulo "${effectiveModule}", omitiendo.`
+          )
+          continue
+        }
 
-      console.log(`[RESTORE] Restauración selectiva: módulo "${effectiveModule}"`)
-      await this.restoreModuleFromJSON(effectiveModule, scoped, restoreOrder)
+        console.log(`[RESTORE] Restauración selectiva: módulo "${effectiveModule}"`)
+        await this.restoreModuleFromJSON(effectiveModule, scoped, restoreOrder)
+      }
       return
     }
 
@@ -1747,17 +1754,57 @@ export class BackupService {
     await this.ensureBackupDirectory()
 
     let filename = originalFilename
-    let isTicketsModule = false
+    let detectedModule: string | null = null
+    let encrypted = false
+    let compressed = false
 
-    if (filename.includes('tickets') && filename.endsWith('.json')) {
-      isTicketsModule = true
+    // Detectar si es cifrado
+    if (filename.endsWith('.enc')) {
+      encrypted = true
+    }
+
+    // Detectar si es comprimido
+    if (filename.includes('.gz')) {
+      compressed = true
+    }
+
+    // Intentar detectar módulo del nombre del archivo
+    const moduleNames = [
+      'tickets',
+      'news',
+      'patrols',
+      'families',
+      'users',
+      'audits',
+      'configurations',
+    ]
+    for (const mod of moduleNames) {
+      if (filename.includes(mod)) {
+        detectedModule = mod
+        break
+      }
+    }
+
+    // Si es JSON sin cifrar ni comprimir, intentar leer metadata
+    if (!encrypted && !compressed && filename.endsWith('.json')) {
+      try {
+        const content = fileBuffer.toString('utf-8').slice(0, 500)
+        const partial = JSON.parse(
+          content.includes('"data"') ? content.split('"data"')[0] + '"data":{}}' : content
+        )
+        if (partial?.metadata?.module) {
+          detectedModule = partial.metadata.module
+        }
+      } catch {
+        // No se pudo parsear, usar detección por nombre
+      }
     }
 
     if (!filename.startsWith('backup-')) {
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-      const ext = filename.split('.').pop() || 'sql'
-      filename = isTicketsModule
-        ? `backup-tickets-imported-${timestamp}.json`
+      const ext = filename.split('.').slice(1).join('.') || 'sql'
+      filename = detectedModule
+        ? `backup-${detectedModule}-imported-${timestamp}.${ext}`
         : `backup-imported-${timestamp}.${ext}`
     }
 
@@ -1779,7 +1826,9 @@ export class BackupService {
         size: stats.size,
         type: 'manual',
         status: 'completed',
-        module: isTicketsModule ? 'tickets' : null,
+        module: detectedModule,
+        compressed,
+        encrypted,
         createdAt: new Date(),
       },
     })
@@ -1795,6 +1844,9 @@ export class BackupService {
           filename,
           originalFilename,
           size: stats.size,
+          detectedModule,
+          encrypted,
+          compressed,
           importedAt: new Date(),
         },
       },
@@ -1807,7 +1859,9 @@ export class BackupService {
       createdAt: backupRecord.createdAt,
       type: 'manual',
       status: 'completed',
-      module: isTicketsModule ? 'tickets' : null,
+      module: detectedModule,
+      compressed,
+      encrypted,
     }
   }
 

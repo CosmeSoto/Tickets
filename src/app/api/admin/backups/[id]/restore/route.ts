@@ -18,21 +18,30 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'ID de backup requerido' }, { status: 400 })
     }
 
-    // Leer el body para obtener el módulo opcional
-    let restoreModule: string | undefined
+    // Leer el body para obtener los módulos opcionales
+    let restoreModules: string[] | undefined
     try {
       const body = await request.json()
-      if (body.module && isBackupModuleId(body.module)) {
-        restoreModule = body.module
+
+      // Soportar array de módulos (nuevo) o módulo único (legacy)
+      if (Array.isArray(body.modules) && body.modules.length > 0) {
+        const validModules = body.modules.filter(
+          (m: unknown) => typeof m === 'string' && isBackupModuleId(m)
+        )
+        if (validModules.length > 0) {
+          restoreModules = validModules
+        }
+      } else if (body.module && isBackupModuleId(body.module)) {
+        restoreModules = [body.module]
       }
     } catch {
       // Body vacío o no JSON — restauración completa
     }
 
-    // Ejecutar restauración usando el BackupService
-    await BackupService.restoreBackup(backupId, restoreModule)
+    // Ejecutar restauración
+    await BackupService.restoreBackup(backupId, restoreModules)
 
-    const scopeLabel = restoreModule ? `módulo "${restoreModule}"` : 'completa'
+    const scopeLabel = restoreModules ? `módulo(s): ${restoreModules.join(', ')}` : 'completa'
     return NextResponse.json({
       success: true,
       message: `Restauración ${scopeLabel} completada correctamente`,
