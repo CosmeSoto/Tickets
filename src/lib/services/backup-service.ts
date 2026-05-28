@@ -1462,12 +1462,14 @@ export class BackupService {
           const users = mappedData.users ?? []
           const userIds = users.map((u: any) => u.id).filter(Boolean)
           if (userIds.length > 0) {
-            await tx.inventory_manager_families.deleteMany({ where: { userId: { in: userIds } } })
-            await tx.technician_family_assignments.deleteMany({
-              where: { userId: { in: userIds } },
+            await tx.inventory_manager_families.deleteMany({
+              where: { managerId: { in: userIds } },
             })
-            await tx.client_family_assignments.deleteMany({ where: { userId: { in: userIds } } })
-            await tx.admin_family_assignments.deleteMany({ where: { userId: { in: userIds } } })
+            await tx.technician_family_assignments.deleteMany({
+              where: { technicianId: { in: userIds } },
+            })
+            await tx.client_family_assignments.deleteMany({ where: { clientId: { in: userIds } } })
+            await tx.admin_family_assignments.deleteMany({ where: { adminId: { in: userIds } } })
             await tx.technician_assignments.deleteMany({ where: { technicianId: { in: userIds } } })
             await tx.password_reset_tokens.deleteMany({ where: { userId: { in: userIds } } })
             await tx.oauth_accounts.deleteMany({ where: { userId: { in: userIds } } })

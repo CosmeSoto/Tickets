@@ -459,10 +459,10 @@ export async function exportUsersModuleData(): Promise<Record<UsersModuleTable, 
     prisma.password_reset_tokens.findMany({ where: { userId: { in: userIds } } }),
     prisma.verification_tokens.findMany(),
     prisma.technician_assignments.findMany({ where: { technicianId: { in: userIds } } }),
-    prisma.admin_family_assignments.findMany({ where: { userId: { in: userIds } } }),
-    prisma.client_family_assignments.findMany({ where: { userId: { in: userIds } } }),
-    prisma.technician_family_assignments.findMany({ where: { userId: { in: userIds } } }),
-    prisma.inventory_manager_families.findMany({ where: { userId: { in: userIds } } }),
+    prisma.admin_family_assignments.findMany({ where: { adminId: { in: userIds } } }),
+    prisma.client_family_assignments.findMany({ where: { clientId: { in: userIds } } }),
+    prisma.technician_family_assignments.findMany({ where: { technicianId: { in: userIds } } }),
+    prisma.inventory_manager_families.findMany({ where: { managerId: { in: userIds } } }),
   ])
 
   return {
