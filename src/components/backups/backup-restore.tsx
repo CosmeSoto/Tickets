@@ -364,7 +364,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
             <input
               ref={fileInputRef}
               type='file'
-              accept='.sql,.sql.gz,.json,.json.gz,.enc'
+              accept='.sql,.sql.gz,.json,.json.gz,.enc,.dump'
               onChange={handleFileSelect}
               className='hidden'
             />
@@ -389,7 +389,7 @@ export function BackupRestore({ backups, onRefresh }: BackupRestoreProps) {
                           : 'Arrastra y suelta un archivo aquí, o haz clic para seleccionar'}
                       </p>
                       <p className='text-xs text-muted-foreground mt-1'>
-                        Formatos: .sql, .sql.gz, .json, .json.gz, .enc (cifrado)
+                        Formatos: .dump (recomendado), .sql, .json, .gz, .enc
                       </p>
                     </div>
                   )}

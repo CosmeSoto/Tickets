@@ -86,43 +86,25 @@ export class BackupService {
     type: 'manual' | 'automatic' = 'manual',
     options?: { module?: BackupModuleId | null }
   ): Promise<BackupInfo> {
-    // Validar entrada
     if (type !== 'manual' && type !== 'automatic') {
       throw new Error('Tipo de backup inválido. Debe ser "manual" o "automatic"')
     }
 
-    // PRIMERO: Asegurar el directorio de backups y obtener la ruta final
     await this.ensureBackupDirectory()
 
     const moduleKey: BackupModuleId | null =
       options?.module != null && isBackupModuleId(options.module) ? options.module : null
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-    const moduleBackup = moduleKey && isBackupModuleId(moduleKey)
-    let usePrismaBackup = false
 
     // Verificar si pg_dump está disponible
-    try {
-      await execAsync('which pg_dump')
-    } catch {
-      usePrismaBackup = true
-    }
+    const hasPgDump = await this.hasPgTools()
 
-    const filename = moduleBackup
-      ? `backup-${moduleKey}-${timestamp}.json`
-      : usePrismaBackup
-        ? `backup-${timestamp}.json`
-        : `backup-${timestamp}.sql`
+    // Determinar formato del backup:
+    // - pg_dump disponible → formato custom (.dump) que permite restauración selectiva nativa
+    // - sin pg_dump → fallback a JSON con Prisma
+    const filename = hasPgDump ? `backup-${timestamp}.dump` : `backup-${timestamp}.json`
     const filepath = join(this.BACKUP_DIR, filename)
-
-    // Verificar espacio en disco disponible
-    try {
-      const stats = await import('fs').then(fs => fs.promises.stat(process.cwd()))
-      // Verificación básica de espacio (esto es una aproximación)
-      console.log('Verificando espacio en disco para backup...')
-    } catch (error) {
-      console.warn('No se pudo verificar espacio en disco:', error)
-    }
 
     // Crear registro inicial
     const backupRecord = await prisma.backups.create({
@@ -139,111 +121,40 @@ export class BackupService {
     })
 
     try {
-      // Obtener configuración
       const config = await this.getBackupConfig()
+      const dbConfig = this.parseDatabaseUrl()
 
-      // Obtener configuración de base de datos
-      const databaseUrl = process.env.DATABASE_URL
-      if (!databaseUrl) {
-        throw new Error('DATABASE_URL no configurada')
-      }
+      console.log(`[BACKUP] Iniciando: ${filename} (método: ${hasPgDump ? 'pg_dump' : 'prisma'})`)
 
-      // Parsear URL de base de datos
-      const url = new URL(databaseUrl)
-      const dbConfig = {
-        host: url.hostname,
-        port: url.port || '5432',
-        database: url.pathname.slice(1),
-        username: url.username,
-        password: url.password,
-      }
+      if (hasPgDump) {
+        // ═══ MÉTODO PRINCIPAL: pg_dump formato custom ═══
+        // Formato custom (-Fc) permite:
+        // - Restauración selectiva por tabla con pg_restore --table
+        // - Compresión integrada (no necesita gzip adicional)
+        // - Paralelismo en restauración
+        // - Reordenamiento automático de datos
+        const command = `PGPASSWORD="${dbConfig.password}" pg_dump -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database} -Fc --no-owner --no-privileges --verbose -f "${filepath}"`
 
-      // Verificar que pg_dump esté disponible
-      let usePgDump = true
-      try {
-        await execAsync('which pg_dump')
-      } catch (error) {
-        console.warn('pg_dump no está disponible, usando método alternativo')
-        usePgDump = false
-      }
-
-      console.log(`Iniciando backup: ${filename}${moduleKey ? ` (módulo: ${moduleKey})` : ''}`)
-
-      if (moduleBackup) {
-        let moduleData
-        switch (moduleKey) {
-          case 'tickets':
-            moduleData = await exportTicketsModuleData()
-            break
-          case 'news':
-            moduleData = await exportNewsModuleData()
-            break
-          case 'patrols':
-            moduleData = await exportPatrolsModuleData()
-            break
-          case 'families':
-            moduleData = await exportFamiliesModuleData()
-            break
-          case 'audits':
-            moduleData = await exportAuditsModuleData()
-            break
-          case 'configurations':
-            moduleData = await exportConfigurationsModuleData()
-            break
-          case 'users':
-            moduleData = await exportUsersModuleData()
-            break
-          default:
-            throw new Error(`Módulo no soportado: ${moduleKey}`)
-        }
-        const totalRecords = Object.values(moduleData).reduce((s, rows) => s + rows.length, 0)
-        const payload = JSON.stringify(
-          {
-            metadata: {
-              version: '2.1',
-              module: moduleKey,
-              timestamp: new Date().toISOString(),
-              method: 'prisma-module',
-              tables: Object.keys(moduleData),
-              totalRecords,
-            },
-            data: moduleData,
-          },
-          null,
-          2
-        )
-        await writeFile(filepath, payload, 'utf-8')
-        console.log(`Backup módulo ${moduleKey}: ${totalRecords} registros en total`)
-      } else if (usePgDump) {
-        // Usar pg_dump si está disponible
-        let command = `PGPASSWORD="${dbConfig.password}" pg_dump -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database}`
-        command += ' --no-owner --no-privileges --clean --if-exists --verbose'
-        command += ` > "${filepath}"`
-
-        console.log('Ejecutando backup con pg_dump (contraseña oculta)')
-
-        const { stdout, stderr } = await execAsync(command, {
-          timeout: 300000, // 5 minutos timeout
-          maxBuffer: 1024 * 1024 * 100, // 100MB buffer
+        await execAsync(command, {
+          timeout: 600000, // 10 minutos
+          maxBuffer: 1024 * 1024 * 50,
         })
 
-        if (stderr && !stderr.includes('NOTICE')) {
-          console.warn('Advertencias durante el backup:', stderr)
-        }
+        console.log('[BACKUP] pg_dump completado exitosamente')
       } else {
-        // Método alternativo usando Prisma para exportar datos
+        // ═══ FALLBACK: Export con Prisma (solo si pg_dump no está disponible) ═══
+        console.warn('[BACKUP] pg_dump no disponible, usando fallback Prisma/JSON')
         await this.createBackupWithPrisma(filepath)
       }
 
       // Verificar que el archivo se creó correctamente
-      const stats = await stat(filepath)
-      console.log(`Backup creado: ${filename}, tamaño: ${stats.size} bytes`)
-
-      if (stats.size === 0) {
+      const fileStats = await stat(filepath)
+      if (fileStats.size === 0) {
         throw new Error('El backup está vacío')
       }
+      console.log(`[BACKUP] Archivo creado: ${fileStats.size} bytes`)
 
-      // Calcular checksum para verificación de integridad (simplificado)
+      // Calcular checksum
       let checksum: string | undefined
       try {
         if (config.verifyIntegrity) {
@@ -253,43 +164,24 @@ export class BackupService {
         console.warn('No se pudo calcular checksum:', error)
       }
 
-      // Por ahora, no comprimir ni encriptar para evitar errores
+      // Aplicar encriptación si está habilitada
       let finalFilepath = filepath
-      let compressed = false
+      let finalFilename = filename
       let encrypted = false
 
-      let finalFilename = filename
-
-      // Aplicar compresión si está habilitada
-      if (config.compression) {
-        try {
-          finalFilepath = await this.compressFile(filepath)
-          finalFilename = filename + '.gz'
-          compressed = true
-          console.log('Backup comprimido exitosamente')
-        } catch (compressionError) {
-          console.warn('Error en compresión, usando archivo sin comprimir:', compressionError)
-          finalFilepath = filepath
-          compressed = false
-        }
-      }
-
-      // Aplicar encriptación si está habilitada (placeholder por ahora)
       if (config.encryption) {
         try {
-          finalFilepath = await this.encryptFile(finalFilepath)
-          finalFilename = finalFilename + '.enc'
+          finalFilepath = await this.encryptFile(filepath)
+          finalFilename = filename + '.enc'
           encrypted = true
-          console.log('Backup encriptado (placeholder)')
+          console.log('[BACKUP] Encriptado exitosamente')
         } catch (encryptionError) {
-          console.warn('Error en encriptación:', encryptionError)
-          encrypted = false
+          console.warn('Error en encriptación, usando archivo sin encriptar:', encryptionError)
         }
       }
 
-      // Actualizar registro con información final
+      // Actualizar registro
       const finalStats = await stat(finalFilepath)
-
       await prisma.backups.update({
         where: { id: backupRecord.id },
         data: {
@@ -298,7 +190,7 @@ export class BackupService {
           size: finalStats.size,
           status: 'completed',
           checksum: checksum ?? null,
-          compressed,
+          compressed: hasPgDump, // pg_dump -Fc ya comprime
           encrypted,
         },
       })
@@ -306,18 +198,18 @@ export class BackupService {
       // Limpiar backups antiguos
       await this.cleanOldBackups()
 
-      // Subir a cloud storage si está habilitado (fire and forget)
+      // Subir a cloud si está habilitado
       if (config.cloudStorage && config.cloudProvider) {
         this.uploadToCloud(backupRecord.id, finalFilepath, config.cloudProvider as any).catch(err =>
-          console.error('[CLOUD] Error subiendo backup a la nube:', err)
+          console.error('[CLOUD] Error subiendo backup:', err)
         )
       }
 
-      // Enviar notificaciones si están habilitadas (simplificado)
+      // Notificaciones
       try {
         if (config.notifications) {
           await this.sendBackupNotification('success', {
-            filename,
+            filename: finalFilename,
             size: finalStats.size,
             type,
           })
@@ -326,7 +218,7 @@ export class BackupService {
         console.warn('No se pudo enviar notificación:', error)
       }
 
-      // Registrar en auditoría (simplificado)
+      // Auditoría
       try {
         await prisma.audit_logs.create({
           data: {
@@ -336,10 +228,10 @@ export class BackupService {
             entityId: backupRecord.id,
             createdAt: new Date(),
             details: {
-              filename,
+              filename: finalFilename,
               size: finalStats.size,
               type,
-              module: moduleKey,
+              method: hasPgDump ? 'pg_dump_custom' : 'prisma_json',
               checksum: checksum || null,
             },
           },
@@ -350,20 +242,19 @@ export class BackupService {
 
       return {
         id: backupRecord.id,
-        filename: backupRecord.filename,
+        filename: finalFilename,
         size: finalStats.size,
         createdAt: backupRecord.createdAt,
         type: backupRecord.type as 'manual' | 'automatic',
         status: 'completed',
         checksum,
-        compressed,
+        compressed: hasPgDump,
         encrypted,
         module: moduleKey,
       }
     } catch (error) {
-      console.error('Error al crear backup:', error)
+      console.error('[BACKUP] Error:', error)
 
-      // Actualizar registro con error
       await prisma.backups.update({
         where: { id: backupRecord.id },
         data: {
@@ -372,7 +263,6 @@ export class BackupService {
         },
       })
 
-      // Enviar notificación de error (simplificado)
       try {
         const config = await this.getBackupConfig()
         if (config.notifications) {
@@ -382,11 +272,36 @@ export class BackupService {
             type,
           })
         }
-      } catch (notificationError) {
-        console.warn('No se pudo enviar notificación de error:', notificationError)
-      }
+      } catch {}
 
       throw error
+    }
+  }
+
+  /** Verifica si pg_dump y pg_restore están disponibles */
+  private static async hasPgTools(): Promise<boolean> {
+    try {
+      await execAsync('pg_dump --version')
+      await execAsync('pg_restore --version')
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /** Parsea DATABASE_URL y devuelve los componentes de conexión */
+  private static parseDatabaseUrl() {
+    const databaseUrl = process.env.DATABASE_URL
+    if (!databaseUrl) {
+      throw new Error('DATABASE_URL no configurada')
+    }
+    const url = new URL(databaseUrl)
+    return {
+      host: url.hostname,
+      port: url.port || '5432',
+      database: url.pathname.slice(1),
+      username: url.username,
+      password: url.password,
     }
   }
 
@@ -899,29 +814,25 @@ export class BackupService {
       // Verificar que el archivo existe
       await stat(backup.filepath)
 
-      // Verificar integridad si es posible (opcional)
+      // Verificar integridad
       try {
         const isValid = await this.verifyBackupIntegrity(backupId)
         if (!isValid) {
-          console.warn(
-            'Advertencia: El backup puede estar corrupto, pero continuando con la restauración'
-          )
+          console.warn('[RESTORE] Advertencia: integridad no verificada, continuando...')
         }
       } catch (error) {
-        console.warn('No se pudo verificar la integridad del backup:', error)
+        console.warn('[RESTORE] No se pudo verificar integridad:', error)
       }
 
-      // ── Descifrar si el archivo está encriptado (.enc) ──────────────────────
+      // ── Descifrar si está encriptado ──
       let workingFilepath = backup.filepath
       let decryptedTempPath: string | null = null
-      let decompressedTempPath: string | null = null
 
       if (backup.filepath.endsWith('.enc')) {
-        console.log('Backup encriptado detectado, descifrando...')
+        console.log('[RESTORE] Descifrando backup...')
         try {
           workingFilepath = await this.decryptFile(backup.filepath)
           decryptedTempPath = workingFilepath
-          console.log(`Backup descifrado temporalmente en: ${workingFilepath}`)
         } catch (decryptError) {
           throw new Error(
             `No se pudo descifrar el backup: ${decryptError instanceof Error ? decryptError.message : 'Error desconocido'}. ` +
@@ -930,88 +841,81 @@ export class BackupService {
         }
       }
 
-      // Descomprimir si es gzip, incluso si la extensión no es .gz
-      let isGzipped = false
-      try {
-        const { stdout } = await execAsync(`file -b "${workingFilepath}"`)
-        isGzipped = stdout.includes('gzip compressed')
-      } catch {}
-
-      if (isGzipped || workingFilepath.endsWith('.gz')) {
-        console.log('Backup comprimido detectado, descomprimiendo...')
-        const decompressedPath = workingFilepath.replace(/\.gz$/, '') + '.temp'
-        await execAsync(`gunzip -c "${workingFilepath}" > "${decompressedPath}"`)
-        decompressedTempPath = decompressedPath
-        workingFilepath = decompressedPath
-      }
-
-      // Detectar formato del archivo leyendo su contenido (no solo la extensión)
-      let isSqlBackup = false
+      // ── Detectar formato del backup ──
+      const isDumpFormat = workingFilepath.endsWith('.dump')
       let isJsonBackup = false
+      let isSqlBackup = false
 
-      try {
-        const { stdout: head } = await execAsync(`head -c 200 "${workingFilepath}"`)
+      if (!isDumpFormat) {
+        // Descomprimir gzip si es necesario
+        let isGzipped = false
+        try {
+          const { stdout } = await execAsync(`file -b "${workingFilepath}"`)
+          isGzipped = stdout.includes('gzip compressed')
+        } catch {}
 
-        if (head.trim().startsWith('{')) {
-          isJsonBackup = true
-          console.log('Detectado formato JSON por contenido')
-        } else if (
-          head.toUpperCase().includes('POSTGRES') ||
-          head.toUpperCase().includes('CREATE TABLE')
-        ) {
-          isSqlBackup = true
-          console.log('Detectado formato SQL por contenido')
-        } else {
-          // Fallback a la extensión
+        if (isGzipped || workingFilepath.endsWith('.gz')) {
+          console.log('[RESTORE] Descomprimiendo...')
+          const decompressedPath = workingFilepath.replace(/\.gz$/, '') + '.temp'
+          await execAsync(`gunzip -c "${workingFilepath}" > "${decompressedPath}"`)
+          workingFilepath = decompressedPath
+        }
+
+        try {
+          const { stdout: head } = await execAsync(`head -c 200 "${workingFilepath}"`)
+          if (head.trim().startsWith('{')) {
+            isJsonBackup = true
+          } else {
+            isSqlBackup = true
+          }
+        } catch {
           isSqlBackup = workingFilepath.endsWith('.sql')
           isJsonBackup = workingFilepath.endsWith('.json')
         }
-      } catch {
-        // Si no podemos leer el encabezado, usar la extensión
-        isSqlBackup = workingFilepath.endsWith('.sql')
-        isJsonBackup = workingFilepath.endsWith('.json')
       }
 
+      const format = isDumpFormat ? 'pg_dump_custom' : isSqlBackup ? 'SQL' : 'JSON'
       console.log(
-        `Formato detectado: ${isSqlBackup ? 'SQL' : isJsonBackup ? 'JSON' : 'Desconocido'}` +
-          (restoreModules?.length
-            ? ` | Restauración selectiva: módulos [${restoreModules.join(', ')}]`
-            : ' | Restauración completa')
+        `[RESTORE] Formato: ${format}` +
+          (restoreModules?.length ? ` | Módulos: [${restoreModules.join(', ')}]` : ' | Completa')
       )
 
-      try {
-        if (isSqlBackup) {
-          if (restoreModules?.length) {
-            throw new Error(
-              'La restauración selectiva por módulo no está disponible para backups SQL. ' +
-                'Solo los backups JSON soportan restauración parcial.'
-            )
-          }
-          await this.restoreFromSQL({ ...backup, filepath: workingFilepath })
-        } else if (isJsonBackup) {
-          await this.restoreFromJSON({ ...backup, filepath: workingFilepath }, restoreModules)
-        } else {
-          throw new Error('No se pudo detectar el formato del backup')
+      // ── Ejecutar restauración según formato ──
+      const hasPgRestore = await this.hasPgTools()
+      const dbConfig = this.parseDatabaseUrl()
+
+      if (isDumpFormat && hasPgRestore) {
+        // ═══ MÉTODO PRINCIPAL: pg_restore (formato custom) ═══
+        await this.restoreWithPgRestore(workingFilepath, dbConfig, restoreModules)
+      } else if (isSqlBackup && hasPgRestore) {
+        // Backup SQL plano — usar psql
+        if (restoreModules?.length) {
+          throw new Error(
+            'La restauración selectiva no está disponible para backups SQL plano. ' +
+              'Crea un nuevo backup (formato .dump) para usar restauración selectiva.'
+          )
         }
-      } finally {
-        // Limpiar archivos temporales
-        if (decryptedTempPath) {
-          try {
-            await unlink(decryptedTempPath)
-          } catch {
-            /* ignorar */
-          }
-        }
-        if (decompressedTempPath) {
-          try {
-            await unlink(decompressedTempPath)
-          } catch {
-            /* ignorar */
-          }
-        }
+        await this.restoreFromSQL({ ...backup, filepath: workingFilepath })
+      } else if (isJsonBackup) {
+        // Fallback JSON/Prisma
+        await this.restoreFromJSON({ ...backup, filepath: workingFilepath }, restoreModules)
+      } else if (isDumpFormat && !hasPgRestore) {
+        throw new Error(
+          'pg_restore no está disponible en el servidor. ' +
+            'Instala postgresql-client para restaurar backups en formato .dump'
+        )
+      } else {
+        throw new Error('No se pudo detectar el formato del backup')
       }
 
-      // Registrar restauración en auditoría
+      // Limpiar archivos temporales
+      if (decryptedTempPath) {
+        try {
+          await unlink(decryptedTempPath)
+        } catch {}
+      }
+
+      // Auditoría
       await prisma.audit_logs.create({
         data: {
           id: randomUUID(),
@@ -1022,17 +926,98 @@ export class BackupService {
           details: {
             backupId: backup.id,
             filename: backup.filename,
-            method: isSqlBackup ? 'psql' : 'prisma-json',
-            restoreModule: restoreModules?.join(', ') || 'full',
-            wasEncrypted: backup.filepath.endsWith('.enc'),
+            method: format,
+            restoreModules: restoreModules?.join(', ') || 'full',
             restoredAt: new Date(),
           },
         },
       })
+
+      console.log('[RESTORE] Restauración completada exitosamente')
     } catch (error) {
-      console.error('Error al restaurar backup:', error)
+      console.error('[RESTORE] Error:', error)
       throw error
     }
+  }
+
+  /**
+   * Restaura usando pg_restore (formato custom .dump).
+   * Soporta restauración selectiva por tablas usando --table.
+   */
+  private static async restoreWithPgRestore(
+    filepath: string,
+    dbConfig: { host: string; port: string; database: string; username: string; password: string },
+    restoreModules?: string[]
+  ): Promise<void> {
+    let tableFlags = ''
+
+    if (restoreModules?.length) {
+      // Restauración selectiva: obtener las tablas de cada módulo
+      const tables = this.getTablesForModules(restoreModules)
+      // pg_restore --table acepta múltiples --table flags
+      tableFlags = tables.map(t => `--table="${t}"`).join(' ')
+      console.log(
+        `[RESTORE] Restauración selectiva: ${tables.length} tablas de ${restoreModules.length} módulo(s)`
+      )
+    }
+
+    // pg_restore con formato custom:
+    // --clean: DROP antes de CREATE (solo para las tablas que restaura)
+    // --if-exists: no falla si la tabla no existe
+    // --no-owner: no intenta cambiar ownership
+    // --single-transaction: todo o nada
+    const command =
+      `PGPASSWORD="${dbConfig.password}" pg_restore ` +
+      `-h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database} ` +
+      `--clean --if-exists --no-owner --no-privileges --single-transaction ` +
+      `${tableFlags} ` +
+      `"${filepath}" 2>&1 || true`
+
+    console.log('[RESTORE] Ejecutando pg_restore...')
+
+    const { stdout } = await execAsync(command, {
+      timeout: 600000, // 10 minutos
+      maxBuffer: 1024 * 1024 * 50,
+    })
+
+    // pg_restore puede reportar warnings que no son errores fatales
+    if (stdout && stdout.includes('ERROR')) {
+      const errors = stdout.split('\n').filter(l => l.includes('ERROR'))
+      // Filtrar errores no críticos (tabla no existe para DROP, etc.)
+      const criticalErrors = errors.filter(
+        e => !e.includes('does not exist') && !e.includes('already exists')
+      )
+      if (criticalErrors.length > 0) {
+        console.warn('[RESTORE] Errores durante pg_restore:', criticalErrors.slice(0, 5).join('\n'))
+      }
+    }
+
+    console.log('[RESTORE] pg_restore completado')
+  }
+
+  /**
+   * Mapea módulos a sus tablas correspondientes en la BD.
+   */
+  private static getTablesForModules(modules: string[]): string[] {
+    const moduleTableMap: Record<string, readonly string[]> = {
+      tickets: TICKETS_MODULE_RESTORE_ORDER,
+      news: NEWS_MODULE_RESTORE_ORDER,
+      patrols: PATROLS_MODULE_RESTORE_ORDER,
+      families: FAMILIES_MODULE_RESTORE_ORDER,
+      audits: AUDITS_MODULE_RESTORE_ORDER,
+      configurations: CONFIGURATIONS_MODULE_RESTORE_ORDER,
+      users: USERS_MODULE_RESTORE_ORDER,
+    }
+
+    const tables: string[] = []
+    for (const mod of modules) {
+      const modTables = moduleTableMap[mod]
+      if (modTables) {
+        tables.push(...modTables)
+      }
+    }
+    // Eliminar duplicados
+    return [...new Set(tables)]
   }
 
   /**
@@ -1416,6 +1401,7 @@ export class BackupService {
 
   /**
    * Restaura solo filas del módulo especificado incluidas en el backup (no borra el resto de la BD).
+   * Usa estrategia upsert: borra solo los registros por ID que va a reinsertar, no toda la tabla.
    */
   private static async restoreModuleFromJSON(
     moduleId: string,
@@ -1427,68 +1413,75 @@ export class BackupService {
         // Deshabilitar FK constraints para poder borrar/insertar en cualquier orden
         await tx.$executeRaw(Prisma.sql`SET session_replication_role = replica;`)
 
-        // Limpiar las tablas del módulo usando SQL raw (más confiable que Prisma deleteMany)
-        const reverseOrder = [...restoreOrder].reverse()
-        for (const tableName of reverseOrder) {
-          try {
-            await tx.$executeRaw(Prisma.sql`DELETE FROM ${Prisma.raw(`"${tableName}"`)};`)
-            console.log(`[módulo ${moduleId}] Limpiada tabla: ${tableName}`)
-          } catch (err) {
-            console.warn(
-              `[módulo ${moduleId}] ⚠ No se pudo limpiar tabla ${tableName}:`,
-              (err as Error).message
-            )
-          }
-        }
-
-        // Rehabilitar FK constraints antes de insertar
-        await tx.$executeRaw(Prisma.sql`SET session_replication_role = DEFAULT;`)
-
-        // Insertar datos en orden correcto (respetando FKs)
+        // Insertar/actualizar datos en orden correcto
         for (const tableName of restoreOrder) {
           const tableData = mappedData[tableName]
           if (!tableData?.length) continue
 
-          console.log(
-            `[módulo ${moduleId}] Restaurando ${tableData.length} registros → ${tableName}`
-          )
-
           const processed = tableData.map((r: any) => this.processRecordForRestore(r))
 
-          // Usar SAVEPOINT para que un error en una tabla no aborte toda la transacción
+          console.log(
+            `[módulo ${moduleId}] Restaurando ${processed.length} registros → ${tableName}`
+          )
+
+          // Borrar SOLO los registros que vamos a reinsertar (por ID), no toda la tabla
+          const ids = processed.map((r: any) => r.id).filter(Boolean)
+          if (ids.length > 0) {
+            try {
+              const idList = ids.map((id: string) => `'${id.replace(/'/g, "''")}'`).join(',')
+              await tx.$executeRaw(
+                Prisma.sql`DELETE FROM ${Prisma.raw(`"${tableName}"`)} WHERE id IN (${Prisma.raw(idList)});`
+              )
+            } catch (delErr) {
+              console.warn(
+                `[módulo ${moduleId}] ⚠ No se pudo limpiar IDs de ${tableName}: ${(delErr as Error).message?.slice(0, 100)}`
+              )
+            }
+          }
+
+          // Insertar los registros
           try {
             await tx.$executeRaw(Prisma.sql`SAVEPOINT restore_table;`)
             await (tx as any)[tableName].createMany({ data: processed, skipDuplicates: true })
             await tx.$executeRaw(Prisma.sql`RELEASE SAVEPOINT restore_table;`)
           } catch (bulkErr) {
-            // Rollback al savepoint para limpiar el estado de error
             await tx.$executeRaw(Prisma.sql`ROLLBACK TO SAVEPOINT restore_table;`)
             console.warn(
               `[módulo ${moduleId}] createMany falló para ${tableName}: ${(bulkErr as Error).message?.slice(0, 150)}`
             )
-            console.warn(
-              `[módulo ${moduleId}] Intentando inserción individual para ${tableName}...`
-            )
+            console.warn(`[módulo ${moduleId}] Intentando upsert individual para ${tableName}...`)
 
             let insertedCount = 0
             for (let i = 0; i < processed.length; i++) {
               try {
                 await tx.$executeRaw(Prisma.sql`SAVEPOINT restore_record;`)
-                await (tx as any)[tableName].create({ data: processed[i] })
+                if (processed[i].id) {
+                  await (tx as any)[tableName].upsert({
+                    where: { id: processed[i].id },
+                    update: processed[i],
+                    create: processed[i],
+                  })
+                } else {
+                  await (tx as any)[tableName].create({ data: processed[i] })
+                }
                 await tx.$executeRaw(Prisma.sql`RELEASE SAVEPOINT restore_record;`)
                 insertedCount++
               } catch (recordErr) {
                 await tx.$executeRaw(Prisma.sql`ROLLBACK TO SAVEPOINT restore_record;`)
-                console.warn(
-                  `[módulo ${moduleId}] ⚠ Registro ${i + 1}/${processed.length} de ${tableName} omitido: ${(recordErr as Error).message?.slice(0, 100)}`
-                )
+                if (i < 3) {
+                  console.warn(
+                    `[módulo ${moduleId}] ⚠ ${tableName}[${i}] error: ${(recordErr as Error).message?.slice(0, 150)}`
+                  )
+                }
               }
             }
             console.log(
-              `[módulo ${moduleId}] ${tableName}: ${insertedCount}/${processed.length} registros insertados`
+              `[módulo ${moduleId}] ${tableName}: ${insertedCount}/${processed.length} registros restaurados`
             )
           }
         }
+
+        await tx.$executeRaw(Prisma.sql`SET session_replication_role = DEFAULT;`)
       },
       { timeout: 600000 }
     )

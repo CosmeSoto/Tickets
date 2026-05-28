@@ -24,15 +24,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No se proporcionó ningún archivo' }, { status: 400 })
     }
 
-    const allowedExtensions = ['.sql', '.sql.gz', '.json', '.json.gz', '.enc']
+    const allowedExtensions = ['.sql', '.sql.gz', '.json', '.json.gz', '.enc', '.dump']
     const filename = file.name.toLowerCase()
     const isValidExtension = allowedExtensions.some(ext => filename.endsWith(ext))
 
     if (!isValidExtension) {
       return NextResponse.json(
         {
-          error:
-            'Formato de archivo no válido. Use .sql, .sql.gz, .json, .json.gz o .enc (cifrado)',
+          error: 'Formato de archivo no válido. Use .dump (recomendado), .sql, .json, .gz o .enc',
         },
         { status: 400 }
       )
