@@ -1373,27 +1373,38 @@ export class BackupService {
 
           console.log(`Restaurando ${tableData.length} registros → ${tableName}`)
 
-          // Usar createMany cuando sea posible (mucho más rápido)
+          const processed = tableData.map(r => this.processRecordForRestore(r))
+
+          // Usar SAVEPOINT para que un error en una tabla no aborte toda la transacción
           try {
-            const processed = tableData.map(r => this.processRecordForRestore(r))
+            await tx.$executeRaw(Prisma.sql`SAVEPOINT restore_table;`)
             await (tx as any)[tableName].createMany({ data: processed, skipDuplicates: true })
+            await tx.$executeRaw(Prisma.sql`RELEASE SAVEPOINT restore_table;`)
           } catch (bulkErr) {
-            // Fallback: insertar uno a uno para identificar el registro problemático
-            console.warn(`createMany falló para ${tableName}, intentando inserción individual...`)
-            for (let i = 0; i < tableData.length; i++) {
+            await tx.$executeRaw(Prisma.sql`ROLLBACK TO SAVEPOINT restore_table;`)
+            console.warn(
+              `createMany falló para ${tableName}: ${(bulkErr as Error).message?.slice(0, 150)}`
+            )
+            console.warn(`Intentando inserción individual para ${tableName}...`)
+
+            let insertedCount = 0
+            for (let i = 0; i < processed.length; i++) {
               try {
-                const processed = this.processRecordForRestore(tableData[i])
-                await (tx as any)[tableName].create({ data: processed })
+                await tx.$executeRaw(Prisma.sql`SAVEPOINT restore_record;`)
+                await (tx as any)[tableName].create({ data: processed[i] })
+                await tx.$executeRaw(Prisma.sql`RELEASE SAVEPOINT restore_record;`)
+                insertedCount++
               } catch (recordErr) {
-                console.error(
-                  `Error en registro ${i + 1} de ${tableName}:`,
-                  (recordErr as Error).message
-                )
-                throw new Error(
-                  `Error al restaurar tabla ${tableName} (registro ${i + 1}): ${(recordErr as Error).message}`
-                )
+                await tx.$executeRaw(Prisma.sql`ROLLBACK TO SAVEPOINT restore_record;`)
+                if (i === 0) {
+                  // Solo loguear el primer error para no saturar los logs
+                  console.warn(
+                    `⚠ ${tableName} registro ${i + 1} omitido: ${(recordErr as Error).message?.slice(0, 120)}`
+                  )
+                }
               }
             }
+            console.log(`${tableName}: ${insertedCount}/${processed.length} registros insertados`)
           }
         }
       },
@@ -1413,76 +1424,27 @@ export class BackupService {
   ): Promise<void> {
     await prisma.$transaction(
       async tx => {
+        // Deshabilitar FK constraints para poder borrar/insertar en cualquier orden
         await tx.$executeRaw(Prisma.sql`SET session_replication_role = replica;`)
 
-        if (moduleId === 'tickets') {
-          const tickets = mappedData.tickets ?? []
-          const ticketIds = tickets.map((t: any) => t.id).filter(Boolean)
-
-          if (ticketIds.length > 0) {
-            await tx.notifications.deleteMany({ where: { ticketId: { in: ticketIds } } })
-
-            const plans = await tx.resolution_plans.findMany({
-              where: { ticketId: { in: ticketIds } },
-              select: { id: true },
-            })
-            const planIds = plans.map(p => p.id)
-            if (planIds.length > 0) {
-              await tx.resolution_tasks.deleteMany({ where: { planId: { in: planIds } } })
-            }
-            await tx.resolution_plans.deleteMany({ where: { ticketId: { in: ticketIds } } })
-
-            await tx.ticket_knowledge_articles.deleteMany({
-              where: { ticketId: { in: ticketIds } },
-            })
-
-            const articleRows = mappedData.knowledge_articles ?? []
-            const articleIds = articleRows.map((a: any) => a.id).filter(Boolean)
-            if (articleIds.length > 0) {
-              await tx.article_votes.deleteMany({ where: { articleId: { in: articleIds } } })
-              await tx.knowledge_articles.deleteMany({ where: { id: { in: articleIds } } })
-            }
-
-            await tx.ticket_ratings.deleteMany({ where: { ticketId: { in: ticketIds } } })
-            await tx.ticket_collaborators.deleteMany({ where: { ticketId: { in: ticketIds } } })
-            await tx.ticket_history.deleteMany({ where: { ticketId: { in: ticketIds } } })
-            await tx.attachments.deleteMany({ where: { ticketId: { in: ticketIds } } })
-            await tx.comments.deleteMany({ where: { ticketId: { in: ticketIds } } })
-            await tx.knowledge_articles.updateMany({
-              where: { sourceTicketId: { in: ticketIds } },
-              data: { sourceTicketId: null },
-            })
-            await tx.maintenance_records.updateMany({
-              where: { ticketId: { in: ticketIds } },
-              data: { ticketId: null },
-            })
-            await tx.tickets.deleteMany({ where: { id: { in: ticketIds } } })
-          }
-        } else if (moduleId === 'users') {
-          const users = mappedData.users ?? []
-          const userIds = users.map((u: any) => u.id).filter(Boolean)
-          if (userIds.length > 0) {
-            await tx.inventory_manager_families.deleteMany({
-              where: { managerId: { in: userIds } },
-            })
-            await tx.technician_family_assignments.deleteMany({
-              where: { technicianId: { in: userIds } },
-            })
-            await tx.client_family_assignments.deleteMany({ where: { clientId: { in: userIds } } })
-            await tx.admin_family_assignments.deleteMany({ where: { adminId: { in: userIds } } })
-            await tx.technician_assignments.deleteMany({ where: { technicianId: { in: userIds } } })
-            await tx.password_reset_tokens.deleteMany({ where: { userId: { in: userIds } } })
-            await tx.oauth_accounts.deleteMany({ where: { userId: { in: userIds } } })
-            await tx.sessions.deleteMany({ where: { userId: { in: userIds } } })
-            await tx.accounts.deleteMany({ where: { userId: { in: userIds } } })
-            await tx.notification_preferences.deleteMany({ where: { userId: { in: userIds } } })
-            await tx.user_settings.deleteMany({ where: { userId: { in: userIds } } })
-            await tx.users.deleteMany({ where: { id: { in: userIds } } })
+        // Limpiar las tablas del módulo usando SQL raw (más confiable que Prisma deleteMany)
+        const reverseOrder = [...restoreOrder].reverse()
+        for (const tableName of reverseOrder) {
+          try {
+            await tx.$executeRaw(Prisma.sql`DELETE FROM ${Prisma.raw(`"${tableName}"`)};`)
+            console.log(`[módulo ${moduleId}] Limpiada tabla: ${tableName}`)
+          } catch (err) {
+            console.warn(
+              `[módulo ${moduleId}] ⚠ No se pudo limpiar tabla ${tableName}:`,
+              (err as Error).message
+            )
           }
         }
 
+        // Rehabilitar FK constraints antes de insertar
         await tx.$executeRaw(Prisma.sql`SET session_replication_role = DEFAULT;`)
 
+        // Insertar datos en orden correcto (respetando FKs)
         for (const tableName of restoreOrder) {
           const tableData = mappedData[tableName]
           if (!tableData?.length) continue
@@ -1491,15 +1453,40 @@ export class BackupService {
             `[módulo ${moduleId}] Restaurando ${tableData.length} registros → ${tableName}`
           )
 
+          const processed = tableData.map((r: any) => this.processRecordForRestore(r))
+
+          // Usar SAVEPOINT para que un error en una tabla no aborte toda la transacción
           try {
-            const processed = tableData.map((r: any) => this.processRecordForRestore(r))
+            await tx.$executeRaw(Prisma.sql`SAVEPOINT restore_table;`)
             await (tx as any)[tableName].createMany({ data: processed, skipDuplicates: true })
-          } catch {
-            console.warn(`createMany falló para ${tableName}, inserción individual...`)
-            for (let i = 0; i < tableData.length; i++) {
-              const processed = this.processRecordForRestore(tableData[i])
-              await (tx as any)[tableName].create({ data: processed })
+            await tx.$executeRaw(Prisma.sql`RELEASE SAVEPOINT restore_table;`)
+          } catch (bulkErr) {
+            // Rollback al savepoint para limpiar el estado de error
+            await tx.$executeRaw(Prisma.sql`ROLLBACK TO SAVEPOINT restore_table;`)
+            console.warn(
+              `[módulo ${moduleId}] createMany falló para ${tableName}: ${(bulkErr as Error).message?.slice(0, 150)}`
+            )
+            console.warn(
+              `[módulo ${moduleId}] Intentando inserción individual para ${tableName}...`
+            )
+
+            let insertedCount = 0
+            for (let i = 0; i < processed.length; i++) {
+              try {
+                await tx.$executeRaw(Prisma.sql`SAVEPOINT restore_record;`)
+                await (tx as any)[tableName].create({ data: processed[i] })
+                await tx.$executeRaw(Prisma.sql`RELEASE SAVEPOINT restore_record;`)
+                insertedCount++
+              } catch (recordErr) {
+                await tx.$executeRaw(Prisma.sql`ROLLBACK TO SAVEPOINT restore_record;`)
+                console.warn(
+                  `[módulo ${moduleId}] ⚠ Registro ${i + 1}/${processed.length} de ${tableName} omitido: ${(recordErr as Error).message?.slice(0, 100)}`
+                )
+              }
             }
+            console.log(
+              `[módulo ${moduleId}] ${tableName}: ${insertedCount}/${processed.length} registros insertados`
+            )
           }
         }
       },
@@ -1511,6 +1498,35 @@ export class BackupService {
 
   private static processRecordForRestore(record: any): any {
     const processed = { ...record }
+
+    // Eliminar campos que son relaciones de Prisma (objetos o arrays anidados)
+    // Estos no deben enviarse en create/createMany
+    for (const [key, value] of Object.entries(processed)) {
+      if (value !== null && typeof value === 'object' && !(value instanceof Date)) {
+        // Si es un array o un objeto anidado (relación), eliminarlo
+        if (Array.isArray(value) || (typeof value === 'object' && !ArrayBuffer.isView(value))) {
+          // Excepto si es un JSON field legítimo (como 'details', 'metadata', 'config', etc.)
+          const jsonFields = [
+            'details',
+            'metadata',
+            'config',
+            'settings',
+            'preferences',
+            'data',
+            'content',
+            'options',
+            'filters',
+            'headers',
+            'payload',
+            'response',
+            'context',
+          ]
+          if (!jsonFields.includes(key)) {
+            delete processed[key]
+          }
+        }
+      }
+    }
 
     // Convertir campos de fecha de string a Date
     const dateFields = [
