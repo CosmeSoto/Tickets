@@ -1925,8 +1925,7 @@ export class BackupService {
       }
 
       if (shouldCreateBackup) {
-        const cronMod = await this.getBackupCronModule()
-        await this.createBackup('automatic', cronMod ? { module: cronMod } : undefined)
+        await this.createBackup('automatic')
         console.log('Backup automático creado exitosamente')
       }
     } catch (error) {
