@@ -22,6 +22,7 @@ import {
   BarChart3,
   Shield,
   ArrowLeft,
+  Activity,
 } from 'lucide-react'
 import { useSyncDashboardPageMeta } from '@/contexts/dashboard-shell-context'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -142,26 +143,41 @@ export default function BackupsPage() {
     <>
       <div className='space-y-6'>
         <Tabs value={activeTab} onValueChange={setActiveTab} className='space-y-6'>
-          <TabsList className='grid w-full grid-cols-5 bg-muted'>
-            <TabsTrigger value='dashboard' className='flex items-center space-x-2'>
+          <TabsList className='w-full grid grid-cols-3 sm:grid-cols-5 bg-muted'>
+            <TabsTrigger
+              value='dashboard'
+              className='flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2'
+            >
               <BarChart3 className='h-4 w-4' />
-              <span>Dashboard</span>
+              <span className='text-xs sm:text-sm'>Dashboard</span>
             </TabsTrigger>
-            <TabsTrigger value='backups' className='flex items-center space-x-2'>
+            <TabsTrigger
+              value='backups'
+              className='flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2'
+            >
               <Database className='h-4 w-4' />
-              <span>Backups</span>
+              <span className='text-xs sm:text-sm'>Backups</span>
             </TabsTrigger>
-            <TabsTrigger value='restore' className='flex items-center space-x-2'>
+            <TabsTrigger
+              value='restore'
+              className='flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2'
+            >
               <RotateCcw className='h-4 w-4' />
-              <span>Restaurar</span>
+              <span className='text-xs sm:text-sm'>Restaurar</span>
             </TabsTrigger>
-            <TabsTrigger value='config' className='flex items-center space-x-2'>
+            <TabsTrigger
+              value='config'
+              className='flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2'
+            >
               <Settings className='h-4 w-4' />
-              <span>Configuración</span>
+              <span className='text-xs sm:text-sm'>Config</span>
             </TabsTrigger>
-            <TabsTrigger value='monitoring' className='flex items-center space-x-2'>
-              <Shield className='h-4 w-4' />
-              <span>Monitoreo</span>
+            <TabsTrigger
+              value='monitoring'
+              className='flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2'
+            >
+              <Activity className='h-4 w-4' />
+              <span className='text-xs sm:text-sm'>Monitoreo</span>
             </TabsTrigger>
           </TabsList>
 
@@ -203,48 +219,49 @@ export default function BackupsPage() {
                     {backups.map(backup => (
                       <div
                         key={backup.id}
-                        className='flex items-center justify-between p-4 border rounded-lg hover:bg-muted transition-colors'
+                        className='p-4 border rounded-lg hover:bg-muted transition-colors space-y-3'
                       >
-                        <div className='flex items-center space-x-4'>
-                          <div className='flex items-center space-x-2'>
+                        {/* Top row: Status icon + filename + action buttons */}
+                        <div className='flex items-start justify-between gap-3'>
+                          <div className='flex items-center gap-2 min-w-0 flex-1'>
                             {backup.status === 'completed' && (
-                              <CheckCircle className='h-4 w-4 text-primary' />
+                              <CheckCircle className='h-4 w-4 text-primary flex-shrink-0' />
                             )}
                             {backup.status === 'failed' && (
-                              <AlertTriangle className='h-4 w-4 text-destructive' />
+                              <AlertTriangle className='h-4 w-4 text-destructive flex-shrink-0' />
                             )}
                             {backup.status === 'in_progress' && (
-                              <Clock className='h-4 w-4 text-muted-foreground' />
+                              <Clock className='h-4 w-4 text-muted-foreground flex-shrink-0' />
                             )}
-                            <Database className='h-5 w-5 text-muted-foreground' />
-                          </div>
-                          <div>
-                            <p className='font-medium'>{backup.filename}</p>
-                            <div className='flex items-center space-x-2 text-sm text-muted-foreground'>
-                              <span>{formatFileSize(backup.size)}</span>
-                              <span>•</span>
-                              <span>{formatBackupDate(backup.createdAt)}</span>
-                              {backup.compressed && (
-                                <>
-                                  <span>•</span>
-                                  <Badge variant='outline' className='text-xs'>
-                                    Comprimido
-                                  </Badge>
-                                </>
-                              )}
-                              {backup.encrypted && (
-                                <>
-                                  <span>•</span>
-                                  <Badge variant='outline' className='text-xs'>
-                                    <Shield className='h-3 w-3 mr-1' />
-                                    Encriptado
-                                  </Badge>
-                                </>
-                              )}
+                            <Database className='h-5 w-5 text-muted-foreground flex-shrink-0' />
+                            <div className='min-w-0 flex-1'>
+                              <p className='font-medium text-sm break-words overflow-hidden'>
+                                {backup.filename}
+                              </p>
                             </div>
                           </div>
+                          <div className='flex items-center gap-2 flex-shrink-0'>
+                            {backup.status === 'completed' && (
+                              <Button
+                                variant='outline'
+                                size='sm'
+                                onClick={() => downloadBackup(backup.id, backup.filename)}
+                              >
+                                <Download className='h-4 w-4' />
+                              </Button>
+                            )}
+                            <Button
+                              variant='outline'
+                              size='sm'
+                              onClick={() => setDeletingBackup(backup)}
+                            >
+                              <Trash2 className='h-4 w-4' />
+                            </Button>
+                          </div>
                         </div>
-                        <div className='flex items-center space-x-3'>
+
+                        {/* Middle row: metadata badges - stack on mobile */}
+                        <div className='flex flex-wrap gap-2'>
                           <Badge className={getStatusColor(backup.status)}>
                             {getStatusLabel(backup.status)}
                           </Badge>
@@ -266,24 +283,30 @@ export default function BackupsPage() {
                               Completo
                             </Badge>
                           )}
-                          <div className='flex items-center space-x-2'>
-                            {backup.status === 'completed' && (
-                              <Button
-                                variant='outline'
-                                size='sm'
-                                onClick={() => downloadBackup(backup.id, backup.filename)}
-                              >
-                                <Download className='h-4 w-4' />
-                              </Button>
-                            )}
-                            <Button
-                              variant='outline'
-                              size='sm'
-                              onClick={() => setDeletingBackup(backup)}
-                            >
-                              <Trash2 className='h-4 w-4' />
-                            </Button>
-                          </div>
+                        </div>
+
+                        {/* Bottom row: details - stack on mobile */}
+                        <div className='flex flex-wrap items-center gap-2 text-xs text-muted-foreground'>
+                          <span>{formatFileSize(backup.size)}</span>
+                          <span className='hidden sm:inline'>•</span>
+                          <span>{formatBackupDate(backup.createdAt)}</span>
+                          {backup.compressed && (
+                            <>
+                              <span className='hidden sm:inline'>•</span>
+                              <Badge variant='outline' className='text-xs'>
+                                Comprimido
+                              </Badge>
+                            </>
+                          )}
+                          {backup.encrypted && (
+                            <>
+                              <span className='hidden sm:inline'>•</span>
+                              <Badge variant='outline' className='text-xs'>
+                                <Shield className='h-3 w-3 mr-1' />
+                                Encriptado
+                              </Badge>
+                            </>
+                          )}
                         </div>
                       </div>
                     ))}
