@@ -507,7 +507,7 @@ export function NewsDetail({
     // Primero las attachments
     if (news.news_attachments?.length) {
       news.news_attachments.forEach((a: any) => {
-        images.push(`/api/admin/news/${news.id}/attachments/${a.id}/file`)
+        images.push(`/api/news/${news.id}/attachments/${a.id}/file`)
       })
     }
     // Luego la imageUrl si existe y no está ya en las attachments

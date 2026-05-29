@@ -113,6 +113,17 @@ interface NewsItem {
     departmentId: string
     departments: { id: string; name: string }
   }>
+  news_families?: Array<{
+    id: string
+    familyId: string
+    families: { id: string; name: string }
+  }>
+  news_attachments?: Array<{
+    id: string
+    filename: string
+    originalName: string
+    path: string
+  }>
   _count: { news_views: number; news_reactions: number; news_comments: number }
 }
 

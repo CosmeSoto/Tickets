@@ -116,6 +116,7 @@ export async function GET(request: NextRequest) {
             },
           },
         },
+        news_attachments: true,
         _count: {
           select: {
             news_views: true,
