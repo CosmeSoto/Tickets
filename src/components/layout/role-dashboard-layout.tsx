@@ -118,7 +118,6 @@ const navigationByRole: Record<string, NavItem[]> = {
       name: 'Noticias',
       href: '/admin/news',
       icon: Newspaper,
-      children: [{ name: 'Gestión de Noticias', href: '/admin/news', icon: Newspaper }],
     },
     {
       name: 'Documentos',
@@ -170,7 +169,6 @@ const navigationByRole: Record<string, NavItem[]> = {
       name: 'Noticias',
       href: '/admin/news',
       icon: Newspaper,
-      children: [{ name: 'Gestión de Noticias', href: '/admin/news', icon: Newspaper }],
     },
     {
       name: 'Documentos',
@@ -220,7 +218,6 @@ const navigationByRole: Record<string, NavItem[]> = {
       name: 'Noticias',
       href: '/admin/news',
       icon: Newspaper,
-      children: [{ name: 'Gestión de Noticias', href: '/admin/news', icon: Newspaper }],
     },
     {
       name: 'Documentos',
@@ -263,7 +260,6 @@ const navigationByRole: Record<string, NavItem[]> = {
       name: 'Noticias',
       href: '/admin/news',
       icon: Newspaper,
-      children: [{ name: 'Gestión de Noticias', href: '/admin/news', icon: Newspaper }],
     },
     {
       name: 'Documentos',
@@ -302,7 +298,6 @@ const navigationByRole: Record<string, NavItem[]> = {
       name: 'Noticias',
       href: '/admin/news',
       icon: Newspaper,
-      children: [{ name: 'Gestión de Noticias', href: '/admin/news', icon: Newspaper }],
     },
   ],
 }
