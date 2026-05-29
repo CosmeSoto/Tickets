@@ -115,30 +115,20 @@ export function BackupDashboard({
     <div className='space-y-6'>
       {/* Header con estado general */}
       <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4'>
-        <div>
-          <h2 className='text-2xl font-bold text-foreground'>Dashboard de Backups</h2>
-          <p className='text-muted-foreground'>Monitoreo y gestión de respaldos</p>
+        <div className='min-w-0 flex-1'>
+          <h2 className='text-xl sm:text-2xl font-bold text-foreground break-words'>
+            Dashboard de Backups
+          </h2>
+          <p className='text-muted-foreground break-words'>Monitoreo y gestión de respaldos</p>
         </div>
 
-        <div className='flex items-center space-x-3'>
-          <div
-            className={`flex items-center space-x-2 px-3 py-1 rounded-full bg-${healthStatus.color}-50 border border-${healthStatus.color}-200`}
-          >
-            <div className={`w-2 h-2 rounded-full bg-${healthStatus.color}-500`}></div>
-            <span className={`text-sm font-medium text-${healthStatus.color}-700`}>
-              Estado: {healthStatus.message}
-            </span>
-          </div>
-
-          <Button variant='outline' onClick={onRefresh} disabled={loading} size='sm'>
-            <Activity className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Actualizar
-          </Button>
-
-          <Button onClick={onCreateBackup} size='sm'>
-            <Database className='h-4 w-4 mr-2' />
-            Crear Backup
-          </Button>
+        <div
+          className={`flex items-center space-x-2 px-3 py-1.5 rounded-full bg-${healthStatus.color}-50 border border-${healthStatus.color}-200 w-full sm:w-auto`}
+        >
+          <div className={`w-2 h-2 rounded-full bg-${healthStatus.color}-500 flex-shrink-0`}></div>
+          <span className={`text-sm font-medium text-${healthStatus.color}-700 break-words`}>
+            Estado: {healthStatus.message}
+          </span>
         </div>
       </div>
 
