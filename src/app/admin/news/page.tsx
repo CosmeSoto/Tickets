@@ -760,7 +760,6 @@ export default function AdminNewsPage() {
               <div className='space-y-2 col-span-2'>
                 <Label>Contenido</Label>
                 <Textarea
-                  required
                   value={formData.content}
                   onChange={e => setFormData({ ...formData, content: e.target.value })}
                   rows={6}

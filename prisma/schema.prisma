@@ -2656,7 +2656,7 @@ model news {
   id             String       @id @default(uuid())
   title          String       @db.VarChar(200)
   slug           String       @unique @db.VarChar(200)
-  content        String
+  content        String?
   summary        String?      @db.VarChar(500)
   imageUrl       String?      @map("image_url")
   type           NewsType     @default(NEWS)
