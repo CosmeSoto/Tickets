@@ -56,6 +56,12 @@ interface NewsItem {
   createdBy: { id: string; name: string; email: string; avatar: string | null }
   news_views: Array<{ id: string }>
   news_reactions: Array<{ id: string; reaction: string }>
+  news_attachments?: Array<{
+    id: string
+    filename: string
+    originalName: string
+    path: string
+  }>
   _count: { news_views: number; news_reactions: number; news_comments: number }
 }
 

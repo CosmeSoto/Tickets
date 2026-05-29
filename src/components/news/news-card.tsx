@@ -54,6 +54,12 @@ interface NewsItem {
   createdAt: string
   updatedAt: string
   createdBy: { id: string; name: string; email: string; avatar: string | null }
+  news_attachments?: Array<{
+    id: string
+    filename: string
+    originalName: string
+    path: string
+  }>
   _count: { news_views: number; news_reactions: number; news_comments: number }
 }
 
@@ -115,6 +121,15 @@ export function NewsCard({
     locale: es,
   })
 
+  // Obtener la primera imagen disponible (attachments primero, luego imageUrl)
+  const getFirstImage = () => {
+    if (news.news_attachments?.length) {
+      return `/api/news/${news.id}/attachments/${news.news_attachments[0].id}/file`
+    }
+    return news.imageUrl
+  }
+  const firstImage = getFirstImage()
+
   return (
     <Card
       className={cn(
@@ -129,9 +144,9 @@ export function NewsCard({
       <CardContent className='p-4'>
         <div className='flex items-start gap-4'>
           {/* Imagen miniatura */}
-          {news.imageUrl && (
+          {firstImage && (
             <div className='w-20 h-20 rounded-md overflow-hidden flex-shrink-0 bg-muted/30 flex items-center justify-center'>
-              <img src={news.imageUrl} alt={news.title} className='w-full h-full object-contain' />
+              <img src={firstImage} alt={news.title} className='w-full h-full object-contain' />
             </div>
           )}
 

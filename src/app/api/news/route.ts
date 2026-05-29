@@ -96,6 +96,7 @@ export async function GET(request: NextRequest) {
         news_roles: true,
         news_users: true,
         news_departments: true,
+        news_attachments: true,
         news_views: {
           where: { userId: user.id },
           select: { id: true },

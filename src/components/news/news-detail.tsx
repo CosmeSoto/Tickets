@@ -520,19 +520,23 @@ export function NewsDetail({
   const allImages = getAllImages()
 
   const newsBodyContent = (
-    <div className='space-y-4'>
+    <div className='space-y-4 w-full max-w-full overflow-hidden'>
       {allImages.length > 0 && (
-        <div className='rounded-lg overflow-hidden bg-muted/30'>
+        <div className='rounded-lg overflow-hidden bg-muted/30 w-full max-w-full'>
           {allImages.length === 1 ? (
             // Single image
-            <img src={allImages[0]} alt={news.title} className='w-full h-auto object-contain' />
+            <img
+              src={allImages[0]}
+              alt={news.title}
+              className='w-full h-auto object-contain max-w-full'
+            />
           ) : (
             // Carousel
-            <div className='relative'>
+            <div className='relative w-full max-w-full'>
               <img
                 src={allImages[currentImageIndex]}
                 alt={`${news.title} - Imagen ${currentImageIndex + 1}`}
-                className='w-full h-auto object-contain max-h-[400px]'
+                className='w-full h-auto object-contain max-w-full max-h-[50vh] sm:max-h-[400px]'
               />
               {/* Previous button */}
               <button
@@ -540,7 +544,7 @@ export function NewsDetail({
                 onClick={() =>
                   setCurrentImageIndex(prev => (prev - 1 + allImages.length) % allImages.length)
                 }
-                className='absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full'
+                className='absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-1.5 sm:p-2 rounded-full'
               >
                 ←
               </button>
@@ -548,7 +552,7 @@ export function NewsDetail({
               <button
                 type='button'
                 onClick={() => setCurrentImageIndex(prev => (prev + 1) % allImages.length)}
-                className='absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full'
+                className='absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-1.5 sm:p-2 rounded-full'
               >
                 →
               </button>
@@ -569,9 +573,11 @@ export function NewsDetail({
           )}
         </div>
       )}
-      <div className='text-sm whitespace-pre-wrap leading-relaxed'>{news.content}</div>
+      <div className='text-sm whitespace-pre-wrap leading-relaxed break-words overflow-wrap-anywhere'>
+        {news.content}
+      </div>
       {(news.startDate || news.endDate) && (
-        <div className='flex items-center gap-4 text-xs text-muted-foreground'>
+        <div className='flex items-center gap-2 sm:gap-4 text-xs text-muted-foreground flex-wrap'>
           {news.startDate && (
             <span className='flex items-center gap-1'>
               <Calendar className='h-3 w-3' />
@@ -593,7 +599,7 @@ export function NewsDetail({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className='sm:max-w-2xl max-h-[90vh] overflow-y-auto'>
+      <DialogContent className='sm:max-w-2xl max-h-[90vh] overflow-y-auto max-w-[95vw] w-full p-4 sm:p-6'>
         <DialogHeader>
           <div className='flex items-start justify-between gap-2'>
             <div className='flex-1 min-w-0'>
