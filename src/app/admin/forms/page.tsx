@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { Plus, FileText, Trash2, Edit, Download, Settings } from 'lucide-react'
+import { Plus, FileText, Trash2, Edit, Download } from 'lucide-react'
 
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { DataTable, Column } from '@/components/ui/data-table'
@@ -31,6 +31,8 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/hooks/use-toast'
 import { VisibilitySelector } from '@/components/common/visibility-selector'
+import { InlineCreateSelect } from '@/components/ui/inline-create-select'
+import { FormCategoryInlineForm } from '@/components/forms/FormCategoryInlineForm'
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
 
@@ -157,12 +159,28 @@ export default function AdminFormsPage() {
     title: 'Documentos',
     columns: [
       { key: 'title', label: 'Título' },
-      { key: 'category', label: 'Categoría', format: (value: any) => value?.name || 'Sin categoría' },
+      {
+        key: 'category',
+        label: 'Categoría',
+        format: (value: any) => value?.name || 'Sin categoría',
+      },
       { key: 'version', label: 'Versión', format: (value: any) => value || 'v1.0' },
-      { key: 'isActive', label: 'Estado', format: (value: boolean) => value ? 'Activo' : 'Inactivo' },
-      { key: 'downloads', label: 'Descargas', format: (_: any, row: FormItem) => row._count?.form_downloads || 0 },
+      {
+        key: 'isActive',
+        label: 'Estado',
+        format: (value: boolean) => (value ? 'Activo' : 'Inactivo'),
+      },
+      {
+        key: 'downloads',
+        label: 'Descargas',
+        format: (_: any, row: FormItem) => row._count?.form_downloads || 0,
+      },
       { key: 'createdBy', label: 'Creado por', format: (value: any) => value?.name || '' },
-      { key: 'createdAt', label: 'Fecha', format: (value: string) => new Date(value).toLocaleDateString('es-EC') },
+      {
+        key: 'createdAt',
+        label: 'Fecha',
+        format: (value: string) => new Date(value).toLocaleDateString('es-EC'),
+      },
     ],
     getData: () => forms,
   })
@@ -275,6 +293,27 @@ export default function AdminFormsPage() {
       }
     } catch (e) {
       console.error('Error loading categories', e)
+    }
+  }
+
+  const handleDeleteCategory = async (id: string) => {
+    try {
+      const res = await fetch(`/api/admin/form-categories/${id}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) throw new Error('Error al eliminar categoría')
+      toast({
+        title: 'Categoría eliminada',
+        description: 'La categoría se eliminó correctamente',
+      })
+      loadCategories()
+    } catch (err) {
+      toast({
+        title: 'Error',
+        description: err instanceof Error ? err.message : 'Error al eliminar categoría',
+        variant: 'destructive',
+      })
+      throw err
     }
   }
 
@@ -527,29 +566,17 @@ export default function AdminFormsPage() {
       subtitle='Administra documentos descargables'
       loading={loading && forms.length === 0}
       headerActions={
-        <div className='flex gap-2'>
-          <Button
-            size='sm'
-            variant='outline'
-            onClick={() => {
-              window.location.href = '/admin/form-categories'
-            }}
-          >
-            <Settings className='h-4 w-4 mr-2' />
-            Categorías
-          </Button>
-          <Button
-            size='sm'
-            onClick={() => {
-              resetForm()
-              setEditingForm(null)
-              setShowCreateDialog(true)
-            }}
-          >
-            <Plus className='h-4 w-4 mr-2' />
-            Nuevo documento
-          </Button>
-        </div>
+        <Button
+          size='sm'
+          onClick={() => {
+            resetForm()
+            setEditingForm(null)
+            setShowCreateDialog(true)
+          }}
+        >
+          <Plus className='h-4 w-4 mr-2' />
+          Nuevo documento
+        </Button>
       }
     >
       <div className='space-y-4'>
@@ -563,7 +590,14 @@ export default function AdminFormsPage() {
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           onRefresh={loadForms}
-          onExport={<ExportButton onExportCSV={exportCSV} onExportExcel={exportExcel} onExportPDF={exportPDF} loading={exporting} />}
+          onExport={
+            <ExportButton
+              onExportCSV={exportCSV}
+              onExportExcel={exportExcel}
+              onExportPDF={exportPDF}
+              loading={exporting}
+            />
+          }
           filters={tableFilters}
           onFiltersChange={handleTableFiltersChange}
           rowActions={(item: FormItem) => {
@@ -667,21 +701,21 @@ export default function AdminFormsPage() {
               </div>
               <div className='space-y-2'>
                 <Label>Categoría</Label>
-                <Select
+                <InlineCreateSelect
+                  options={categories}
                   value={formData.categoryId}
-                  onValueChange={v => setFormData({ ...formData, categoryId: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder='Seleccionar categoría' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map(cat => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={v => {
+                    setFormData({ ...formData, categoryId: v })
+                  }}
+                  placeholder='Seleccionar categoría'
+                  createLabel='Crear categoría'
+                  createTitle='Crear categoría'
+                  editTitle='Editar categoría'
+                  allowClear
+                  createForm={FormCategoryInlineForm}
+                  onDelete={handleDeleteCategory}
+                  deleteConfirmMessage='¿Eliminar esta categoría? Los documentos asociados se quedarán sin categoría.'
+                />
               </div>
               <div className='space-y-2'>
                 <Label>Área (opcional)</Label>

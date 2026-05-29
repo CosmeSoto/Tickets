@@ -121,10 +121,9 @@ const navigationByRole: Record<string, NavItem[]> = {
       children: [{ name: 'Gestión de Noticias', href: '/admin/news', icon: Newspaper }],
     },
     {
-      name: 'Formularios y Documentos',
+      name: 'Documentos',
       href: '/admin/forms',
       icon: FileText,
-      children: [{ name: 'Gestión de Formularios', href: '/admin/forms', icon: FileText }],
     },
     { name: 'Familias', href: '/admin/families', icon: Layers },
     { name: 'Usuarios', href: '/admin/users', icon: Users },
@@ -174,7 +173,7 @@ const navigationByRole: Record<string, NavItem[]> = {
       children: [{ name: 'Gestión de Noticias', href: '/admin/news', icon: Newspaper }],
     },
     {
-      name: 'Formularios y Documentos',
+      name: 'Documentos',
       href: '/forms',
       icon: FileText,
       children: [{ name: 'Ver Formularios', href: '/forms', icon: FileText }],
@@ -224,7 +223,7 @@ const navigationByRole: Record<string, NavItem[]> = {
       children: [{ name: 'Gestión de Noticias', href: '/admin/news', icon: Newspaper }],
     },
     {
-      name: 'Formularios y Documentos',
+      name: 'Documentos',
       href: '/forms',
       icon: FileText,
       children: [{ name: 'Ver Formularios', href: '/forms', icon: FileText }],
@@ -267,7 +266,7 @@ const navigationByRole: Record<string, NavItem[]> = {
       children: [{ name: 'Gestión de Noticias', href: '/admin/news', icon: Newspaper }],
     },
     {
-      name: 'Formularios y Documentos',
+      name: 'Documentos',
       href: '/forms',
       icon: FileText,
       children: [{ name: 'Ver Formularios', href: '/forms', icon: FileText }],
@@ -465,7 +464,7 @@ export function RoleDashboardLayout({
       if (item.href === '/inventory' || item.name === 'Inventario') return hasInventory
       if (item.href === '/admin/patrols' || item.name === 'Rondas') return hasPatrol
       if (item.href === '/admin/news' || item.name === 'Noticias') return hasNews
-      if (item.href === '/admin/forms' || item.name === 'Formularios y Documentos') return hasForms
+      if (item.href === '/admin/forms' || item.name === 'Documentos') return hasForms
       return true
     })
     navigation = adminNav
@@ -495,7 +494,7 @@ export function RoleDashboardLayout({
         return hasNews
       }
       // Ocultar Formularios si el usuario no tiene formsEnabled
-      if (item.href === '/forms' || item.name === 'Formularios y Documentos') {
+      if (item.href === '/forms' || item.name === 'Documentos') {
         return hasForms
       }
       return true
