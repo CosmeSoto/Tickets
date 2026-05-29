@@ -236,9 +236,7 @@ export function PermissionsAndModulesSection({
 
             <div className='flex items-center justify-between rounded-lg border px-3 py-2.5'>
               <div>
-                <p className='text-sm font-medium flex items-center gap-2'>
-                  📰 Noticias y Comunicados
-                </p>
+                <p className='text-sm font-medium flex items-center gap-2'>📰 Noticias</p>
                 <p className='text-xs text-muted-foreground'>
                   Permite al usuario ver el módulo de noticias
                 </p>
@@ -252,11 +250,9 @@ export function PermissionsAndModulesSection({
 
             <div className='flex items-center justify-between rounded-lg border px-3 py-2.5'>
               <div>
-                <p className='text-sm font-medium flex items-center gap-2'>
-                  📄 Formularios y Documentos
-                </p>
+                <p className='text-sm font-medium flex items-center gap-2'>📄 Documentos</p>
                 <p className='text-xs text-muted-foreground'>
-                  Permite al usuario ver el módulo de formularios
+                  Permite al usuario ver el módulo de documentos
                 </p>
               </div>
               <Switch
@@ -270,10 +266,10 @@ export function PermissionsAndModulesSection({
               <div className='flex items-center justify-between rounded-lg border px-3 py-2.5 bg-muted/30'>
                 <div>
                   <p className='text-sm font-medium flex items-center gap-2'>
-                    🔧 Permitir gestión de formularios
+                    🔧 Permitir gestión de documentos
                   </p>
                   <p className='text-xs text-muted-foreground'>
-                    Permite crear, editar y eliminar formularios de sus familias
+                    Permite crear, editar y eliminar documentos de sus familias
                   </p>
                 </div>
                 <Switch

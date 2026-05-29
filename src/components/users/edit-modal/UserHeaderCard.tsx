@@ -54,7 +54,7 @@ export function UserHeaderCard({
   onResetAvatar,
 }: UserHeaderCardProps) {
   return (
-    <div className='flex items-center gap-4 p-4 rounded-lg bg-muted/40 border border-border'>
+    <div className='flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 rounded-lg bg-muted/40 border border-border'>
       <div className='relative group shrink-0'>
         <Avatar className='h-16 w-16 border-2 border-background shadow'>
           <AvatarImage src={avatarPreview || user.avatar || undefined} alt={user.name} />
@@ -105,8 +105,8 @@ export function UserHeaderCard({
           className='hidden'
         />
       </div>
-      <div className='flex-1 min-w-0'>
-        <div className='flex items-center gap-2 flex-wrap'>
+      <div className='flex-1 min-w-0 w-full sm:w-auto'>
+        <div className='flex items-start gap-2 flex-wrap'>
           <span className='font-semibold text-foreground truncate'>{user.name}</span>
           <RoleBadge role={role} isSuperAdmin={isSuperAdmin} />
           {isCurrentUser && (
@@ -121,8 +121,8 @@ export function UserHeaderCard({
             </Badge>
           )}
         </div>
-        <p className='text-sm text-muted-foreground mt-0.5'>{user.email}</p>
-        <div className='flex items-center gap-3 mt-1.5 text-xs text-muted-foreground'>
+        <p className='text-sm text-muted-foreground mt-0.5 truncate'>{user.email}</p>
+        <div className='flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mt-1.5 text-xs text-muted-foreground'>
           <span className='flex items-center gap-1'>
             <Calendar className='h-3 w-3' />
             Registro: {formatDate(user.createdAt)}
@@ -133,7 +133,7 @@ export function UserHeaderCard({
           </span>
         </div>
       </div>
-      <div className='flex gap-3 shrink-0'>
+      <div className='flex gap-3 shrink-0 w-full sm:w-auto justify-center sm:justify-end'>
         <div className='text-center'>
           <p className='text-lg font-bold text-primary'>
             {user._count?.tickets_tickets_clientIdTousers ?? 0}

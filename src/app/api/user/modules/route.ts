@@ -219,7 +219,14 @@ export async function GET(request: Request) {
     if (familyIds.length === 0) {
       // Super Admin sin familias: acceso total
       if (role === 'ADMIN' && isSuperAdmin) {
-        return { tickets: true, inventory: true, patrols: true, news: true, families: [] }
+        return {
+          tickets: true,
+          inventory: true,
+          patrols: true,
+          news: true,
+          forms: true,
+          families: [],
+        }
       }
       // Admin normal sin familias asignadas: respetar flags del usuario
       if (role === 'ADMIN') {
@@ -228,6 +235,7 @@ export async function GET(request: Request) {
           inventory: inventoryEnabled || canManageInventory,
           patrols: patrolsEnabled,
           news: newsEnabled,
+          forms: formsEnabled,
           families: [],
         }
       }
@@ -238,6 +246,7 @@ export async function GET(request: Request) {
         inventory: inventoryEnabled || canManageInventory,
         patrols: patrolsEnabled,
         news: newsEnabled,
+        forms: formsEnabled,
         families: [],
       }
     }

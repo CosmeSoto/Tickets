@@ -5,6 +5,13 @@ import { seedCustomFields } from './seeds/custom-fields.seed'
 import { seedInventoryTypes } from './seeds/inventory-types.seed'
 import { seedEquipmentBrands } from './seeds/equipment-brands.seed'
 import { seedCategories, seedCategoriesOtherFamilies } from './seeds/categories.seed'
+import { seedCategoriesFixedAssets } from './seeds/categories-fixed-assets.seed'
+import { seedCategoriesMaintenance } from './seeds/categories-maintenance.seed'
+import { seedCategoriesServices } from './seeds/categories-services.seed'
+import { seedCategoriesSecurity } from './seeds/categories-security.seed'
+import { seedCategoriesGreenAreas } from './seeds/categories-green-areas.seed'
+import { seedCategoriesAdministrative } from './seeds/categories-administrative.seed'
+import { seedCategoriesCommercial } from './seeds/categories-commercial.seed'
 import { seedAttributes } from './seeds/attributes.seed'
 import { seedWarehouses } from './seeds/warehouses.seed'
 
@@ -43,8 +50,17 @@ async function main() {
   // 9. CATEGORÍAS (todas bajo TECHNOLOGY)
   await seedCategories(prisma, deptMap)
 
-  // 9b. CATEGORÍAS OTRAS FAMILIAS (Mantenimiento, Seguridad, Servicios, etc.)
+  // 9b. CATEGORÍAS OTRAS FAMILIAS (Mantenimiento, Seguridad, Servicios, Administrativa)
   await seedCategoriesOtherFamilies(prisma, deptMap)
+
+  // 9c. CATEGORÍAS FAMILIAS COMPLETAS (Centro Comercial)
+  await seedCategoriesFixedAssets(prisma, deptMap)
+  await seedCategoriesMaintenance(prisma, deptMap)
+  await seedCategoriesServices(prisma, deptMap)
+  await seedCategoriesSecurity(prisma, deptMap)
+  await seedCategoriesGreenAreas(prisma, deptMap)
+  await seedCategoriesAdministrative(prisma, deptMap)
+  await seedCategoriesCommercial(prisma, deptMap)
 
   // 10. TIPOS DE INVENTARIO (equipos, licencias, consumibles)
   await seedInventoryTypes(prisma, familyMap)

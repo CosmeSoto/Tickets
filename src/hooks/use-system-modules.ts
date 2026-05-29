@@ -64,7 +64,7 @@ const FALLBACK: SystemModule[] = [
   },
   {
     key: 'news',
-    name: 'Noticias y Comunicados',
+    name: 'Noticias',
     description: 'Gestión de noticias y comunicados internos',
     icon: 'Newspaper',
     isActive: true,
@@ -133,9 +133,9 @@ export function getModuleRoleDescription(moduleKey: string, role: string): strin
       CLIENT: 'Ver noticias y comunicados del sistema',
     },
     forms: {
-      ADMIN: 'Gestionar formularios y documentos del sistema',
-      TECHNICIAN: 'Ver y descargar formularios disponibles',
-      CLIENT: 'Ver y descargar formularios disponibles',
+      ADMIN: 'Gestionar documentos del sistema',
+      TECHNICIAN: 'Ver y descargar documentos disponibles',
+      CLIENT: 'Ver y descargar documentos disponibles',
     },
   }
   return descriptions[moduleKey]?.[role] ?? 'Acceso al módulo'

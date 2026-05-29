@@ -4,7 +4,6 @@
  * Tarjeta compacta que muestra el estado de un módulo del sistema
  * - Indica si está activo o inactivo
  * - Muestra familias asignadas cuando está activo
- * - Muestra guía de activación cuando está inactivo
  */
 
 interface ModuleStatusCardProps {
@@ -12,21 +11,13 @@ interface ModuleStatusCardProps {
   name: string
   active: boolean
   families?: Array<{ id: string; name: string; color?: string | null }>
-  guide?: { steps: string[]; type: 'warning' | 'info' } | null
   badge?: string
 }
 
-export function ModuleStatusCard({
-  emoji,
-  name,
-  active,
-  families,
-  guide,
-  badge,
-}: ModuleStatusCardProps) {
+export function ModuleStatusCard({ emoji, name, active, families, badge }: ModuleStatusCardProps) {
   return (
     <div
-      className={`rounded-lg border p-2.5 space-y-1.5 ${
+      className={`rounded-lg border p-2.5 ${
         active ? 'bg-primary/5 border-primary/20' : 'bg-muted/30 border-border'
       }`}
     >
@@ -52,7 +43,7 @@ export function ModuleStatusCard({
 
       {/* Familias activas — chips compactos */}
       {active && families && families.length > 0 && (
-        <div className='flex flex-wrap gap-1'>
+        <div className='flex flex-wrap gap-1 mt-1.5'>
           {families.map(f => (
             <span
               key={f.id}
@@ -67,39 +58,6 @@ export function ModuleStatusCard({
               {f.name}
             </span>
           ))}
-        </div>
-      )}
-
-      {/* Guía numerada — solo cuando inactivo */}
-      {!active && guide && (
-        <div
-          className={`rounded-md px-2 py-1.5 space-y-1 ${
-            guide.type === 'warning'
-              ? 'bg-destructive/10 border border-destructive/20'
-              : 'bg-muted/50 border border-border'
-          }`}
-        >
-          <p
-            className={`text-[9px] font-bold uppercase tracking-wider ${
-              guide.type === 'warning' ? 'text-destructive' : 'text-muted-foreground'
-            }`}
-          >
-            Cómo activar
-          </p>
-          <ol className='space-y-0.5'>
-            {guide.steps.map((step, i) => (
-              <li key={i} className='flex items-start gap-1'>
-                <span
-                  className={`text-[10px] font-bold flex-shrink-0 ${
-                    guide.type === 'warning' ? 'text-destructive' : 'text-muted-foreground'
-                  }`}
-                >
-                  {i + 1}.
-                </span>
-                <span className='text-[11px] text-foreground leading-tight'>{step}</span>
-              </li>
-            ))}
-          </ol>
         </div>
       )}
     </div>

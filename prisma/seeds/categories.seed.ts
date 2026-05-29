@@ -136,12 +136,21 @@ export async function seedCategories(prisma: PrismaClient, deptMap: Map<string, 
     color: '#EF4444',
   })
   await upsertCategory(prisma, {
+    name: 'Sin acceso a internet',
+    description: 'No hay acceso a internet, falla de conexión WAN',
+    level: 3,
+    parentId: networking.id,
+    departmentId: deptInfraId,
+    order: 2,
+    color: '#EF4444',
+  })
+  await upsertCategory(prisma, {
     name: 'Daño de Equipos Comunicaciones',
     description: 'Equipos de red dañados, switch, router',
     level: 3,
     parentId: networking.id,
     departmentId: deptInfraId,
-    order: 2,
+    order: 3,
     color: '#EF4444',
   })
   await upsertCategory(prisma, {
@@ -150,7 +159,7 @@ export async function seedCategories(prisma: PrismaClient, deptMap: Map<string, 
     level: 3,
     parentId: networking.id,
     departmentId: deptInfraId,
-    order: 3,
+    order: 4,
     color: '#EF4444',
   })
   await upsertCategory(prisma, {
@@ -159,7 +168,7 @@ export async function seedCategories(prisma: PrismaClient, deptMap: Map<string, 
     level: 3,
     parentId: networking.id,
     departmentId: deptInfraId,
-    order: 4,
+    order: 5,
     color: '#EF4444',
   })
   await upsertCategory(prisma, {
@@ -168,7 +177,7 @@ export async function seedCategories(prisma: PrismaClient, deptMap: Map<string, 
     level: 3,
     parentId: networking.id,
     departmentId: deptInfraId,
-    order: 5,
+    order: 6,
     color: '#EF4444',
   })
   await upsertCategory(prisma, {
@@ -177,7 +186,7 @@ export async function seedCategories(prisma: PrismaClient, deptMap: Map<string, 
     level: 3,
     parentId: networking.id,
     departmentId: deptInfraId,
-    order: 6,
+    order: 7,
     color: '#EF4444',
   })
   await upsertCategory(prisma, {
@@ -186,7 +195,7 @@ export async function seedCategories(prisma: PrismaClient, deptMap: Map<string, 
     level: 3,
     parentId: networking.id,
     departmentId: deptInfraId,
-    order: 7,
+    order: 8,
     color: '#EF4444',
   })
 

@@ -457,7 +457,7 @@ export function RoleDashboardLayout({
       // Para Admin normal: filtrar según módulos activos de sus familias asignadas
       if (item.href === '/admin/tickets' || item.name === 'Tickets') return hasTickets
       if (item.href === '/inventory' || item.name === 'Inventario') return hasInventory
-      if (item.href === '/admin/patrols' || item.name === 'Rondas') return hasPatrol
+      if (item.href === '/admin/patrols' || item.name === 'Rondas') return hasPatrols
       if (item.href === '/admin/news' || item.name === 'Noticias') return hasNews
       if (item.href === '/admin/forms' || item.name === 'Documentos') return hasForms
       return true

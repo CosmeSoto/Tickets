@@ -25,8 +25,6 @@ interface UserModulesPanelProps {
   canManageForms?: boolean
   /** Si es true, el panel inicia colapsado sin auto-expandir */
   defaultCollapsed?: boolean
-  /** Si es true, no muestra guías de "Cómo activar" para módulos inactivos */
-  hideGuides?: boolean
 }
 
 export function UserModulesPanel({
@@ -40,7 +38,6 @@ export function UserModulesPanel({
   formsEnabled,
   canManageForms,
   defaultCollapsed = false,
-  hideGuides = false,
 }: UserModulesPanelProps) {
   const [data, setData] = useState<{
     tickets: boolean
@@ -93,59 +90,6 @@ export function UserModulesPanel({
   const patrolsActive = data?.patrols ?? false
   const newsActive = newsEnabled ?? false
   const formsActive = formsEnabled ?? false
-
-  const getTicketsGuide = () => {
-    if (ticketsActive) return null
-    if (isAdminRole)
-      return {
-        type: 'info' as const,
-        steps: ['Admin → Usuarios → [Usuario]', 'Sección Familias asignadas'],
-      }
-    if (role === 'TECHNICIAN')
-      return hasFamilies
-        ? {
-            type: 'warning' as const,
-            steps: ['Admin → Configuración → Tickets', 'Seleccionar familia → Activar módulo'],
-          }
-        : {
-            type: 'warning' as const,
-            steps: ['Admin → Familias → [Familia]', 'Personal → Técnicos de Tickets → Agregar'],
-          }
-    return { type: 'info' as const, steps: ['Activar el toggle "Tickets" en la sección anterior'] }
-  }
-
-  const getInventoryGuide = () => {
-    if (inventoryActive) return null
-    if (isAdminRole)
-      return {
-        type: 'info' as const,
-        steps: ['Admin → Usuarios → [Usuario]', 'Sección Familias asignadas'],
-      }
-    if (role === 'TECHNICIAN') {
-      if (!canManageInventory)
-        return {
-          type: 'warning' as const,
-          steps: [
-            'Activar "Inventario" en la sección anterior',
-            'Admin → Familias → [Familia]',
-            'Personal → Gestores de Inventario → Agregar',
-          ],
-        }
-      return hasFamilies
-        ? {
-            type: 'warning' as const,
-            steps: ['Admin → Configuración → Inventario', 'Seleccionar familia → Activar módulo'],
-          }
-        : {
-            type: 'warning' as const,
-            steps: ['Admin → Familias → [Familia]', 'Personal → Gestores de Inventario → Agregar'],
-          }
-    }
-    return {
-      type: 'info' as const,
-      steps: ['Activar el toggle "Inventario" en la sección anterior'],
-    }
-  }
 
   if (loading) {
     return (
@@ -225,14 +169,12 @@ export function UserModulesPanel({
             name='Tickets'
             active={ticketsActive}
             families={data?.families.filter(f => f.modules.tickets)}
-            guide={hideGuides ? null : getTicketsGuide()}
           />
           <ModuleStatusCard
             emoji='📦'
             name='Inventario'
             active={inventoryActive}
             families={data?.families.filter(f => f.modules.inventory)}
-            guide={hideGuides ? null : getInventoryGuide()}
             badge={role === 'TECHNICIAN' && !canManageInventory ? 'Requiere Gestor' : undefined}
           />
           <ModuleStatusCard
@@ -240,45 +182,13 @@ export function UserModulesPanel({
             name='Rondas y Patrullajes'
             active={patrolsActive}
             families={data?.families.filter(f => f.modules.patrols)}
-            guide={
-              hideGuides || patrolsActive
-                ? null
-                : {
-                    type: 'info' as const,
-                    steps: [
-                      'Activar el toggle "Rondas" en la sección anterior',
-                      'Admin → Configuración → Rondas → Seleccionar área → Activar módulo',
-                    ],
-                  }
-            }
           />
-          <ModuleStatusCard
-            emoji='📰'
-            name='Noticias y Comunicados'
-            active={newsActive}
-            families={[]}
-            guide={
-              hideGuides || newsActive
-                ? null
-                : {
-                    type: 'info' as const,
-                    steps: ['Activar el toggle "Noticias y Comunicados" en la sección anterior'],
-                  }
-            }
-          />
+          <ModuleStatusCard emoji='📰' name='Noticias' active={newsActive} families={[]} />
           <ModuleStatusCard
             emoji='📄'
             name='Documentos'
             active={formsActive}
             families={[]}
-            guide={
-              hideGuides || formsActive
-                ? null
-                : {
-                    type: 'info' as const,
-                    steps: ['Activar el toggle "Documentos" en la sección anterior'],
-                  }
-            }
             badge={canManageForms ? 'Gestor' : undefined}
           />
         </div>

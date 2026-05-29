@@ -176,6 +176,7 @@ export function NewsDetail({
     if (initializedRef.current === news.id) return
     initializedRef.current = news.id
 
+    setCurrentImageIndex(0)
     setUserReaction(news.news_reactions?.length ? news.news_reactions[0].reaction : null)
     setComments(news.news_comments || [])
     setShowReactionsList(false)
@@ -497,11 +498,75 @@ export function NewsDetail({
     </div>
   )
 
+  // Estado para el carousel
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
+
+  // Obtener todas las imágenes (attachments + imageUrl)
+  const getAllImages = () => {
+    const images: string[] = []
+    // Primero las attachments
+    if (news.news_attachments?.length) {
+      news.news_attachments.forEach((a: any) => {
+        images.push(`/api/admin/news/${news.id}/attachments/${a.id}/file`)
+      })
+    }
+    // Luego la imageUrl si existe y no está ya en las attachments
+    if (news.imageUrl && !images.includes(news.imageUrl)) {
+      images.unshift(news.imageUrl)
+    }
+    return images
+  }
+
+  const allImages = getAllImages()
+
   const newsBodyContent = (
     <div className='space-y-4'>
-      {news.imageUrl && (
+      {allImages.length > 0 && (
         <div className='rounded-lg overflow-hidden bg-muted/30'>
-          <img src={news.imageUrl} alt={news.title} className='w-full h-auto object-contain' />
+          {allImages.length === 1 ? (
+            // Single image
+            <img src={allImages[0]} alt={news.title} className='w-full h-auto object-contain' />
+          ) : (
+            // Carousel
+            <div className='relative'>
+              <img
+                src={allImages[currentImageIndex]}
+                alt={`${news.title} - Imagen ${currentImageIndex + 1}`}
+                className='w-full h-auto object-contain max-h-[400px]'
+              />
+              {/* Previous button */}
+              <button
+                type='button'
+                onClick={() =>
+                  setCurrentImageIndex(prev => (prev - 1 + allImages.length) % allImages.length)
+                }
+                className='absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full'
+              >
+                ←
+              </button>
+              {/* Next button */}
+              <button
+                type='button'
+                onClick={() => setCurrentImageIndex(prev => (prev + 1) % allImages.length)}
+                className='absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full'
+              >
+                →
+              </button>
+              {/* Indicators */}
+              <div className='absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1'>
+                {allImages.map((_, index) => (
+                  <button
+                    key={index}
+                    type='button'
+                    onClick={() => setCurrentImageIndex(index)}
+                    className={`w-2 h-2 rounded-full ${
+                      index === currentImageIndex ? 'bg-white' : 'bg-white/50'
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
       <div className='text-sm whitespace-pre-wrap leading-relaxed'>{news.content}</div>

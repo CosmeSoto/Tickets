@@ -198,8 +198,11 @@ export default function AdminNewsPage() {
   const [familySearch, setFamilySearch] = useState('')
   const [userSearch, setUserSearch] = useState('')
   const [families, setFamilies] = useState<FamilyOption[]>([])
-  const [imageFile, setImageFile] = useState<File | null>(null)
-  const [uploadingImage, setUploadingImage] = useState(false)
+  const [imageFiles, setImageFiles] = useState<File[]>([])
+  const [existingAttachments, setExistingAttachments] = useState<
+    Array<{ id: string; filename: string; url: string }>
+  >([])
+  const [uploadingImages, setUploadingImages] = useState(false)
 
   const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
     filename: 'noticias',
@@ -207,11 +210,23 @@ export default function AdminNewsPage() {
     columns: [
       { key: 'title', label: 'Título' },
       { key: 'type', label: 'Tipo', format: (value: NewsType) => typeLabels[value] },
-      { key: 'priority', label: 'Prioridad', format: (value: NewsPriority) => priorityLabels[value] },
+      {
+        key: 'priority',
+        label: 'Prioridad',
+        format: (value: NewsPriority) => priorityLabels[value],
+      },
       { key: 'status', label: 'Estado', format: (value: NewsStatus) => statusLabels[value] },
       { key: 'createdBy', label: 'Autor', format: (value: any) => value?.name || '' },
-      { key: 'createdAt', label: 'Fecha de Creación', format: (value: string) => new Date(value).toLocaleDateString('es-EC') },
-      { key: 'views', label: 'Vistas', format: (_: any, row: NewsItem) => row._count?.news_views || 0 },
+      {
+        key: 'createdAt',
+        label: 'Fecha de Creación',
+        format: (value: string) => new Date(value).toLocaleDateString('es-EC'),
+      },
+      {
+        key: 'views',
+        label: 'Vistas',
+        format: (_: any, row: NewsItem) => row._count?.news_views || 0,
+      },
     ],
     getData: () => news,
   })
@@ -333,12 +348,12 @@ export default function AdminNewsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      setUploadingImage(true)
+      setUploadingImages(true)
       const url = editingNews ? `/api/admin/news/${editingNews.id}` : '/api/admin/news'
       const method = editingNews ? 'PUT' : 'POST'
 
       const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 30_000)
+      const timeout = setTimeout(() => controller.abort(), 60_000)
 
       let response: Response
       try {
@@ -363,21 +378,30 @@ export default function AdminNewsPage() {
       const result = await response.json()
       const newsId = result.news?.id
 
-      if (imageFile && newsId) {
-        const imgFormData = new FormData()
-        imgFormData.append('file', imageFile)
-        const uploadRes = await fetch(`/api/admin/news/${newsId}/attachments`, {
-          method: 'POST',
-          body: imgFormData,
-        })
-        if (uploadRes.ok) {
-          const attachment = await uploadRes.json()
-          const imageUrl = `/api/admin/news/${newsId}/attachments/${attachment.id}/file`
-          await fetch(`/api/admin/news/${newsId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ imageUrl }),
+      if (newsId && imageFiles.length > 0) {
+        // Subir cada imagen una por una
+        for (const file of imageFiles) {
+          const imgFormData = new FormData()
+          imgFormData.append('file', file)
+          await fetch(`/api/admin/news/${newsId}/attachments`, {
+            method: 'POST',
+            body: imgFormData,
           })
+        }
+        // Si hay imágenes, usar la primera como imagen principal
+        if (!editingNews) {
+          const attachmentsRes = await fetch(`/api/admin/news/${newsId}/attachments`)
+          if (attachmentsRes.ok) {
+            const attachmentsData = await attachmentsRes.json()
+            if (attachmentsData.attachments?.[0]) {
+              const imageUrl = `/api/admin/news/${newsId}/attachments/${attachmentsData.attachments[0].id}/file`
+              await fetch(`/api/admin/news/${newsId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ imageUrl }),
+              })
+            }
+          }
         }
       }
 
@@ -389,7 +413,8 @@ export default function AdminNewsPage() {
 
       setShowCreateDialog(false)
       setEditingNews(null)
-      setImageFile(null)
+      setImageFiles([])
+      setExistingAttachments([])
       resetForm()
       loadNews()
     } catch (err) {
@@ -400,11 +425,11 @@ export default function AdminNewsPage() {
         duration: 5000,
       })
     } finally {
-      setUploadingImage(false)
+      setUploadingImages(false)
     }
   }
 
-  const handleEdit = (item: NewsItem) => {
+  const handleEdit = async (item: NewsItem) => {
     setEditingNews(item)
     setFormData({
       title: item.title,
@@ -424,6 +449,22 @@ export default function AdminNewsPage() {
       departmentIds: item.news_departments.map(d => d.departmentId),
       familyIds: (item as any).news_families?.map((f: any) => f.familyId) || [],
     })
+    // Cargar attachments existentes
+    try {
+      const attachmentsRes = await fetch(`/api/admin/news/${item.id}/attachments`)
+      if (attachmentsRes.ok) {
+        const attachmentsData = await attachmentsRes.json()
+        setExistingAttachments(
+          (attachmentsData.attachments || []).map((a: any) => ({
+            id: a.id,
+            filename: a.filename,
+            url: `/api/admin/news/${item.id}/attachments/${a.id}/file`,
+          }))
+        )
+      }
+    } catch (e) {
+      setExistingAttachments([])
+    }
     setShowCreateDialog(true)
   }
 
@@ -608,7 +649,14 @@ export default function AdminNewsPage() {
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           onRefresh={loadNews}
-          onExport={<ExportButton onExportCSV={exportCSV} onExportExcel={exportExcel} onExportPDF={exportPDF} loading={exporting} />}
+          onExport={
+            <ExportButton
+              onExportCSV={exportCSV}
+              onExportExcel={exportExcel}
+              onExportPDF={exportPDF}
+              loading={exporting}
+            />
+          }
           filters={tableFilters}
           onFiltersChange={handleTableFiltersChange}
           onRowClick={item => {
@@ -762,31 +810,100 @@ export default function AdminNewsPage() {
                 </Select>
               </div>
               <div className='space-y-2'>
-                <Label>Imagen (opcional)</Label>
-                <div className='space-y-2'>
+                <Label>Imágenes (máx 5, opcional)</Label>
+                <div className='space-y-3'>
                   <Input
                     type='file'
                     accept='image/*'
+                    multiple
+                    disabled={existingAttachments.length + imageFiles.length >= 5}
                     onChange={e => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        setImageFile(file)
-                        setFormData({ ...formData, imageUrl: '' })
+                      const files = Array.from(e.target.files || [])
+                      const remainingSlots = 5 - existingAttachments.length - imageFiles.length
+                      if (remainingSlots > 0) {
+                        const newFiles = files.slice(0, remainingSlots)
+                        setImageFiles([...imageFiles, ...newFiles])
                       }
                     }}
                   />
-                  {imageFile && (
-                    <p className='text-xs text-muted-foreground'>
-                      📎 {imageFile.name} ({(imageFile.size / 1024).toFixed(0)} KB) — se comprimirá
-                      al guardar
-                    </p>
+                  {/* Preview de archivos nuevos */}
+                  {imageFiles.length > 0 && (
+                    <div className='space-y-2'>
+                      <p className='text-xs font-medium text-muted-foreground'>
+                        Archivos para subir:
+                      </p>
+                      <div className='grid grid-cols-2 sm:grid-cols-3 gap-2'>
+                        {imageFiles.map((file, index) => (
+                          <div key={index} className='relative group'>
+                            <img
+                              src={URL.createObjectURL(file)}
+                              alt={`Preview ${index + 1}`}
+                              className='w-full h-24 object-cover rounded-md border'
+                            />
+                            <button
+                              type='button'
+                              onClick={() =>
+                                setImageFiles(imageFiles.filter((_, i) => i !== index))
+                              }
+                              className='absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity'
+                            >
+                              ×
+                            </button>
+                            <p className='text-[10px] text-muted-foreground truncate mt-1'>
+                              {file.name}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
-                  {!imageFile && (
+                  {/* Attachments existentes */}
+                  {existingAttachments.length > 0 && (
+                    <div className='space-y-2'>
+                      <p className='text-xs font-medium text-muted-foreground'>
+                        Imágenes actuales:
+                      </p>
+                      <div className='grid grid-cols-2 sm:grid-cols-3 gap-2'>
+                        {existingAttachments.map(attachment => (
+                          <div key={attachment.id} className='relative group'>
+                            <img
+                              src={attachment.url}
+                              alt={attachment.filename}
+                              className='w-full h-24 object-cover rounded-md border'
+                            />
+                            <button
+                              type='button'
+                              onClick={() => {
+                                if (!editingNews) return
+                                fetch(
+                                  `/api/admin/news/${editingNews.id}/attachments/${attachment.id}`,
+                                  {
+                                    method: 'DELETE',
+                                  }
+                                ).then(() => {
+                                  setExistingAttachments(
+                                    existingAttachments.filter(a => a.id !== attachment.id)
+                                  )
+                                })
+                              }}
+                              className='absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity'
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {existingAttachments.length + imageFiles.length === 0 && (
                     <Input
                       value={formData.imageUrl}
                       onChange={e => setFormData({ ...formData, imageUrl: e.target.value })}
                       placeholder='O pega una URL de imagen...'
                     />
+                  )}
+                  {existingAttachments.length + imageFiles.length >= 5 && (
+                    <p className='text-xs text-amber-600'>✓ Límite de 5 imágenes alcanzado</p>
                   )}
                 </div>
               </div>
@@ -888,12 +1005,14 @@ export default function AdminNewsPage() {
                 onClick={() => {
                   setShowCreateDialog(false)
                   setEditingNews(null)
+                  setImageFiles([])
+                  setExistingAttachments([])
                 }}
               >
                 Cancelar
               </Button>
-              <Button type='submit' disabled={uploadingImage}>
-                {uploadingImage ? 'Guardando...' : editingNews ? 'Actualizar' : 'Crear'}
+              <Button type='submit' disabled={uploadingImages}>
+                {uploadingImages ? 'Guardando...' : editingNews ? 'Actualizar' : 'Crear'}
               </Button>
             </DialogFooter>
           </form>
