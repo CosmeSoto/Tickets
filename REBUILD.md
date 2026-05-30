@@ -9,17 +9,56 @@
 docker compose -f docker-compose.dev.yml down -v
 docker compose -f docker-compose.dev.yml up --build
 
+# Reconstruir solo la app:
+docker compose -f docker-compose.dev.yml up -d --build app
+
+# Reconstruir solo Redis:
+docker compose -f docker-compose.dev.yml up -d --build redis
+
 # Levantar sin reconstruir:
 docker compose -f docker-compose.dev.yml up -d
 
-# Ver logs:
+# Reiniciar servicios:
+docker compose -f docker-compose.dev.yml restart app
+docker compose -f docker-compose.dev.yml restart redis
+
+# Ver logs de la app:
 docker compose -f docker-compose.dev.yml logs -f app
 
-# Detener:
+# Ver logs de Redis:
+docker compose -f docker-compose.dev.yml logs -f redis
+
+# Ver logs de todos los servicios:
+docker compose -f docker-compose.dev.yml logs -f
+
+# Ver estado de los contenedores:
+docker compose -f docker-compose.dev.yml ps
+
+# Entrar al contenedor de la app:
+docker compose -f docker-compose.dev.yml exec app sh
+
+# Entrar al contenedor de Redis:
+docker compose -f docker-compose.dev.yml exec redis sh
+
+# Detener servicios:
 docker compose -f docker-compose.dev.yml down
 
-# Resetear app:
-docker compose -f docker-compose.dev.yml restart app
+# Detener manteniendo contenedores:
+docker compose -f docker-compose.dev.yml stop
+
+# Volver a iniciar contenedores detenidos:
+docker compose -f docker-compose.dev.yml start
+
+# Eliminar contenedores huérfanos:
+docker compose -f docker-compose.dev.yml down --remove-orphans
+
+# Destruir todo (⚠️ BORRA DATOS):
+docker compose -f docker-compose.dev.yml down -v
+
+# Si usas .env.development, mantén simetría con producción:
+docker compose -f docker-compose.dev.yml --env-file .env.development up -d
+docker compose -f docker-compose.dev.yml --env-file .env.development up -d --build app
+docker compose -f docker-compose.dev.yml --env-file .env.development logs -f app
 ```
 
 ### Desarrollo (solo BD + Redis, app en host)
@@ -36,19 +75,52 @@ npm run dev
 # Despliegue automático (detecta IP, genera certs, levanta):
 sudo ./start-production.sh
 
+# Reconstruir desde cero (borra datos):
+docker compose -f docker-compose.prod.yml --env-file .env.production down -v
+docker compose -f docker-compose.prod.yml --env-file .env.production up --build
+
 # Reconstruir solo la app:
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build app
 
-# Reiniciar:
-docker compose -f docker-compose.prod.yml --env-file .env.production restart app
-docker compose -f docker-compose.prod.yml --env-file .env.production restart redis
+# Reconstruir solo Redis:
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build redis
 
-# Ver logs:
+# Levantar sin reconstruir:
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+
+# Reiniciar servicios:
+docker compose -f docker-compose.prod.yml --env-file .env.production restart app
+docker compose -f docker-compose.prod.yml --env-file .env.production restart redis
+
+# Ver logs de la app:
 docker compose -f docker-compose.prod.yml --env-file .env.production logs -f app
 
-# Detener:
+# Ver logs de Redis:
+docker compose -f docker-compose.prod.yml --env-file .env.production logs -f redis
+
+# Ver logs de todos los servicios:
+docker compose -f docker-compose.prod.yml --env-file .env.production logs -f
+
+# Ver estado de los contenedores:
+docker compose -f docker-compose.prod.yml --env-file .env.production ps
+
+# Entrar al contenedor de la app:
+docker compose -f docker-compose.prod.yml --env-file .env.production exec app sh
+
+# Entrar al contenedor de Redis:
+docker compose -f docker-compose.prod.yml --env-file .env.production exec redis sh
+
+# Detener servicios:
 docker compose -f docker-compose.prod.yml --env-file .env.production down
+
+# Detener manteniendo contenedores:
+docker compose -f docker-compose.prod.yml --env-file .env.production stop
+
+# Volver a iniciar contenedores detenidos:
+docker compose -f docker-compose.prod.yml --env-file .env.production start
+
+# Eliminar contenedores huérfanos:
+docker compose -f docker-compose.prod.yml --env-file .env.production down --remove-orphans
 
 # Destruir todo (⚠️ BORRA DATOS):
 docker compose -f docker-compose.prod.yml --env-file .env.production down -v
