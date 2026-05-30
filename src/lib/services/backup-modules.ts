@@ -322,21 +322,24 @@ export async function exportPatrolsModuleData(): Promise<Record<PatrolsModuleTab
 }
 
 /** Orden de inserción respetando FKs del módulo families. */
-export const FAMILIES_MODULE_RESTORE_ORDER = ['families', 'departments'] as const
+export const FAMILIES_MODULE_RESTORE_ORDER = ['families', 'departments', 'categories'] as const
 
 export type FamiliesModuleTable = (typeof FAMILIES_MODULE_RESTORE_ORDER)[number]
 
 const EMPTY_FAMILIES_PAYLOAD: Record<FamiliesModuleTable, unknown[]> = {
   families: [],
   departments: [],
+  categories: [],
 }
 
 export async function exportFamiliesModuleData(): Promise<Record<FamiliesModuleTable, unknown[]>> {
   const families = await prisma.families.findMany()
   const departments = await prisma.departments.findMany()
+  const categories = await prisma.categories.findMany()
   return {
     families: families as unknown[],
     departments: departments as unknown[],
+    categories: categories as unknown[],
   }
 }
 

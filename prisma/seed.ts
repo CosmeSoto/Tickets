@@ -1095,16 +1095,27 @@ async function seedSupplierTypes(familyMap: Map<string, string>) {
 async function migrateSupplierTypes() {
   // Si la columna 'type' (enum) aún existe en suppliers, migrar a typeId
   try {
-    await prisma.$executeRaw`
-      UPDATE suppliers s
-      SET type_id = st.id
-      FROM supplier_types st
-      WHERE s.type_id IS NULL
-        AND st.code = s.type::text
+    // Primero verificar si la columna existe
+    const columnExists = await prisma.$queryRaw<{ exists: boolean }[]>`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'suppliers' AND column_name = 'type'
+      ) AS exists
     `
-    console.log('✅ Migración suppliers type → typeId')
-  } catch {
-    // La columna type puede no existir si ya se hizo la migración
-    console.log('⏭️  Migración suppliers (columna type no existe o ya migrada)')
+
+    if (columnExists[0]?.exists) {
+      const result = await prisma.$executeRaw`
+        UPDATE suppliers s
+        SET type_id = st.id
+        FROM supplier_types st
+        WHERE s.type_id IS NULL
+          AND st.code = s.type::text
+      `
+      console.log(`✅ Migración suppliers type → typeId (${result} registros actualizados)`)
+    } else {
+      console.log('⏭️  Migración suppliers (columna type no existe)')
+    }
+  } catch (error) {
+    console.log('⏭️  Migración suppliers (ya migrada o error)', (error as Error)?.message)
   }
 }
