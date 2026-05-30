@@ -158,6 +158,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         invalidateCache(`perm:inv:${targetId}`),
         invalidateCache(`user:settings:${targetId}`),
         invalidateCache(`user:modules:${targetId}`),
+        invalidateCache(`users:list:*`),
       ])
     } catch {
       /* Redis no disponible */
@@ -433,6 +434,7 @@ export async function DELETE(
         invalidateCache(`perm:inv:${deletedId}`),
         invalidateCache(`user:settings:${deletedId}`),
         invalidateCache(`user:modules:${deletedId}`),
+        invalidateCache(`users:list:*`), // Invalidar todas las listas de usuarios
       ])
     } catch {
       /* Redis no disponible */

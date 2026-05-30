@@ -3,6 +3,10 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { readFile, stat } from 'fs/promises'
+import { exec } from 'child_process'
+import { promisify } from 'util'
+
+const execAsync = promisify(exec)
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -123,65 +127,68 @@ async function generateJsonBackupPreview(filepath: string) {
 
 async function generateSqlBackupPreview(backup: any, fileStats: any) {
   try {
-    // Para backups SQL, generar un preview basado en información conocida
-    // y estadísticas de la base de datos actual
+    // Primero intentar leer el archivo de metadata
+    const metadataPath = `${backup.filepath}.meta.json`
+    try {
+      const metadataContent = await readFile(metadataPath, 'utf-8')
+      const metadata = JSON.parse(metadataContent)
 
-    // Obtener estadísticas actuales de las tablas principales
-    const tableStats = await Promise.allSettled([
-      prisma.users.count(),
-      prisma.tickets.count(),
-      prisma.comments.count(),
-      prisma.categories.count(),
-      prisma.attachments.count(),
-      prisma.audit_logs.count(),
-      prisma.system_settings.count(),
-    ])
+      if (metadata.tableCounts) {
+        const tables = Object.entries(metadata.tableCounts)
+          .map(([name, recordCount]) => ({
+            name,
+            recordCount: Number(recordCount),
+            size: 'Desde backup',
+          }))
+          .filter(t => t.recordCount > 0)
 
-    const tables = [
-      {
-        name: 'users',
-        recordCount: tableStats[0].status === 'fulfilled' ? tableStats[0].value : 0,
-        size: 'Estimado',
-      },
-      {
-        name: 'tickets',
-        recordCount: tableStats[1].status === 'fulfilled' ? tableStats[1].value : 0,
-        size: 'Estimado',
-      },
-      {
-        name: 'comments',
-        recordCount: tableStats[2].status === 'fulfilled' ? tableStats[2].value : 0,
-        size: 'Estimado',
-      },
-      {
-        name: 'categories',
-        recordCount: tableStats[3].status === 'fulfilled' ? tableStats[3].value : 0,
-        size: 'Estimado',
-      },
-      {
-        name: 'attachments',
-        recordCount: tableStats[4].status === 'fulfilled' ? tableStats[4].value : 0,
-        size: 'Estimado',
-      },
-      {
-        name: 'audit_logs',
-        recordCount: tableStats[5].status === 'fulfilled' ? tableStats[5].value : 0,
-        size: 'Estimado',
-      },
-      {
-        name: 'system_settings',
-        recordCount: tableStats[6].status === 'fulfilled' ? tableStats[6].value : 0,
-        size: 'Estimado',
-      },
-    ].filter(table => table.recordCount > 0)
+        return {
+          tables: tables.sort((a, b) => b.recordCount - a.recordCount),
+          totalRecords: metadata.totalRecords || 0,
+          totalSize: formatFileSize(fileStats.size),
+          databaseVersion: 'PostgreSQL (SQL Dump)',
+          createdAt: metadata.createdAt || backup.createdAt,
+          backupType: 'SQL (pg_dump)',
+        }
+      }
+    } catch (metaErr) {
+      console.warn('No se pudo leer metadata del backup:', metaErr)
+    }
 
-    const totalRecords = tables.reduce((sum, table) => sum + table.recordCount, 0)
+    // Fallback: intentar usar pg_restore para obtener la información REAL del backup
+    const hasPgRestore = await checkPgRestoreAvailable()
 
+    if (hasPgRestore) {
+      const tableCounts = await getTableCountsFromBackup(backup.filepath)
+
+      if (Object.keys(tableCounts).length > 0) {
+        const tables = Object.entries(tableCounts)
+          .map(([name, recordCount]) => ({
+            name,
+            recordCount,
+            size: 'Desde backup',
+          }))
+          .filter(t => t.recordCount > 0)
+
+        const totalRecords = tables.reduce((sum, t) => sum + t.recordCount, 0)
+
+        return {
+          tables: tables.sort((a, b) => b.recordCount - a.recordCount),
+          totalRecords,
+          totalSize: formatFileSize(fileStats.size),
+          databaseVersion: 'PostgreSQL (SQL Dump)',
+          createdAt: backup.createdAt,
+          backupType: 'SQL (pg_dump)',
+        }
+      }
+    }
+
+    // Fallback final: info básica
     return {
-      tables: tables.sort((a, b) => b.recordCount - a.recordCount),
-      totalRecords,
+      tables: [{ name: 'backup_completo', recordCount: 1, size: formatFileSize(fileStats.size) }],
+      totalRecords: 1,
       totalSize: formatFileSize(fileStats.size),
-      databaseVersion: 'PostgreSQL (SQL Dump)',
+      databaseVersion: 'PostgreSQL',
       createdAt: backup.createdAt,
       backupType: 'SQL (pg_dump)',
     }
@@ -197,6 +204,85 @@ async function generateSqlBackupPreview(backup: any, fileStats: any) {
       createdAt: backup.createdAt,
       backupType: 'SQL (pg_dump)',
     }
+  }
+}
+
+async function checkPgRestoreAvailable(): Promise<boolean> {
+  try {
+    await execAsync('pg_restore --version')
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function getTableCountsFromBackup(filepath: string): Promise<Record<string, number>> {
+  try {
+    const { stdout } = await execAsync(`pg_restore --list "${filepath}"`)
+
+    // Parsear la salida de pg_restore --list para encontrar las tablas
+    // El formato tiene líneas como: 2216; 0 1259 16873 TABLE public users postgres
+    const tableCounts: Record<string, number> = {}
+
+    // Primero listamos todas las tablas
+    const lines = stdout.split('\n')
+    const tableNames: string[] = []
+
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith(';')) continue
+
+      const parts = trimmed.split(/\s+/)
+      if (parts.length >= 6 && parts[4] === 'TABLE') {
+        const tableName = parts[5]
+        if (tableName && !tableNames.includes(tableName)) {
+          tableNames.push(tableName)
+        }
+      }
+    }
+
+    // Ahora para cada tabla, intentamos obtener el conteo de registros usando pg_restore
+    // Esto requiere restaurar solo los datos y contar, pero para simplificar,
+    // primero usamos una estrategia: intentar extraer el número de filas del TOC
+    // Si no funciona, usamos pg_restore con una consulta COUNT
+
+    // Estrategia 1: Intentar extraer información del TOC
+    for (const tableName of tableNames) {
+      try {
+        // Intentamos usar pg_restore para obtener el número de filas
+        // Otra opción: usar pg_restore con --schema-only y luego un script,
+        // pero para simplificar, primero intentamos con una aproximación
+
+        // Estrategia simple: usar pg_restore para contar COPY statements
+        const { stdout: dataStdout } = await execAsync(
+          `pg_restore -a --data-only "${filepath}" 2>/dev/null | grep -c "^COPY ${tableName}" || true`
+        )
+        const copyCount = parseInt(dataStdout.trim(), 10)
+
+        if (copyCount > 0) {
+          // Ahora contamos las filas reales en el COPY
+          try {
+            const { stdout: countStdout } = await execAsync(
+              `pg_restore -a --data-only -t "${tableName}" "${filepath}" 2>/dev/null | awk '/^\\./ {exit} /^COPY/ {next} {c++} END {print c}'`
+            )
+            const rowCount = parseInt(countStdout.trim(), 10)
+            if (!isNaN(rowCount)) {
+              tableCounts[tableName] = rowCount
+            }
+          } catch {
+            // Si falla, al menos registramos que existe la tabla
+            tableCounts[tableName] = 0
+          }
+        }
+      } catch (err) {
+        console.warn(`Error counting rows for table ${tableName}:`, err)
+      }
+    }
+
+    return tableCounts
+  } catch (error) {
+    console.error('Error extracting table counts from backup:', error)
+    return {}
   }
 }
 

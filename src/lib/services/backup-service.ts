@@ -154,6 +154,48 @@ export class BackupService {
       }
       console.log(`[BACKUP] Archivo creado: ${fileStats.size} bytes`)
 
+      // Guardar metadata con conteo de tablas
+      try {
+        const tableCounts: Record<string, number> = {}
+        const tablesToCount = [
+          'users',
+          'tickets',
+          'comments',
+          'attachments',
+          'categories',
+          'departments',
+          'families',
+          'audit_logs',
+          'system_settings',
+          'knowledge_articles',
+          'equipment',
+          'software_licenses',
+        ]
+
+        for (const table of tablesToCount) {
+          try {
+            const count = await (prisma as any)[table].count()
+            tableCounts[table] = count
+          } catch {
+            // Ignorar tablas que no existan
+          }
+        }
+
+        // Guardar metadata en archivo JSON
+        const metadataPath = `${filepath}.meta.json`
+        const metadata = {
+          version: '1.0',
+          createdAt: new Date().toISOString(),
+          tableCounts,
+          totalRecords: Object.values(tableCounts).reduce((a, b) => a + b, 0),
+          fileSize: fileStats.size,
+        }
+        await writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+        console.log(`[BACKUP] Metadata guardada en ${metadataPath}`)
+      } catch (metaErr) {
+        console.warn('[BACKUP] No se pudo guardar metadata:', metaErr)
+      }
+
       // Calcular checksum
       let checksum: string | undefined
       try {
@@ -1866,6 +1908,75 @@ export class BackupService {
     if (stats.size === 0) {
       await unlink(filepath)
       throw new Error('El archivo de backup está vacío')
+    }
+
+    // Generar metadata para el backup importado
+    try {
+      const tableCounts: Record<string, number> = {}
+
+      if (filename.endsWith('.json')) {
+        // Para backups JSON, extraer conteos directamente
+        const content = fileBuffer.toString('utf-8')
+        const data = JSON.parse(content)
+        const tables = data.data || data.tables || {}
+        for (const [table, records] of Object.entries(tables)) {
+          if (Array.isArray(records)) {
+            tableCounts[table] = records.length
+          }
+        }
+      } else if (filename.endsWith('.dump') || filename.endsWith('.sql')) {
+        // Para backups SQL, intentar usar pg_restore para extraer información
+        try {
+          const hasPgTools = await this.hasPgTools()
+          if (hasPgTools) {
+            // Primero listar las tablas
+            const { stdout: listOutput } = await execAsync(
+              `pg_restore --list "${filepath}" 2>/dev/null || true`
+            )
+            const tableRegex = /TABLE\s+public\.\s*(\w+)/g
+            const tables: string[] = []
+            let match: RegExpExecArray | null
+            while ((match = tableRegex.exec(listOutput)) !== null) {
+              if (match[1] && !tables.includes(match[1])) {
+                tables.push(match[1])
+              }
+            }
+
+            // Para cada tabla, intentar contar registros
+            for (const table of tables) {
+              try {
+                // Extraer solo los datos de la tabla y contar líneas (aproximado)
+                const { stdout: countOutput } = await execAsync(
+                  `pg_restore -a --data-only -t "${table}" "${filepath}" 2>/dev/null | awk '/^\\./ {exit} /^COPY/ {next} {c++} END {print c}'`
+                )
+                const count = parseInt(countOutput.trim(), 10)
+                if (!isNaN(count)) {
+                  tableCounts[table] = count
+                }
+              } catch {
+                // Ignorar errores por tabla
+              }
+            }
+          }
+        } catch {
+          // Fallback silencioso
+        }
+      }
+
+      // Guardar metadata
+      const metadataPath = `${filepath}.meta.json`
+      const metadata = {
+        version: '1.0',
+        createdAt: new Date().toISOString(),
+        importedFrom: originalFilename,
+        tableCounts,
+        totalRecords: Object.values(tableCounts).reduce((a, b) => a + b, 0),
+        fileSize: stats.size,
+      }
+      await writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+      console.log(`[BACKUP] Metadata para importación guardada en ${metadataPath}`)
+    } catch (metaErr) {
+      console.warn('[BACKUP] No se pudo generar metadata para importación:', metaErr)
     }
 
     const backupRecord = await prisma.backups.create({
