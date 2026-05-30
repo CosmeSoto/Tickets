@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { readFile, stat } from 'fs/promises'
+import { readFile, stat, access } from 'fs/promises'
 import { exec } from 'child_process'
 import { promisify } from 'util'
 
@@ -37,6 +37,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     try {
       // Verificar que el archivo existe y obtener información
+      await access(backup.filepath)
       const fileStats = await stat(backup.filepath)
 
       // Generar preview basado en el tipo de backup
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
       if (backup.filepath.endsWith('.json')) {
         // Para backups JSON (método alternativo con Prisma o módulo)
-        preview = await generateJsonBackupPreview(backup.filepath)
+        preview = await generateJsonBackupPreview(backup.filepath, fileStats)
       } else {
         // Para backups SQL (método tradicional con pg_dump)
         preview = await generateSqlBackupPreview(backup, fileStats)
@@ -73,7 +74,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 }
 
-async function generateJsonBackupPreview(filepath: string) {
+async function generateJsonBackupPreview(filepath: string, fileStats: any) {
   try {
     const content = await readFile(filepath, 'utf-8')
     const backupData = JSON.parse(content)
@@ -111,6 +112,16 @@ async function generateJsonBackupPreview(filepath: string) {
           ? `Módulo ${meta.module}`
           : 'JSON (Prisma)'
 
+    // Si no tenemos tablas, al menos mostrar una entrada genérica
+    if (tables.length === 0) {
+      tables.push({
+        name: 'backup_completo',
+        recordCount: 1,
+        size: formatFileSize(fileStats.size),
+      })
+      totalRecords = 1
+    }
+
     return {
       tables: tables.sort((a, b) => b.recordCount - a.recordCount),
       totalRecords,
@@ -121,11 +132,22 @@ async function generateJsonBackupPreview(filepath: string) {
     }
   } catch (error) {
     console.error('Error parsing JSON backup:', error)
-    throw new Error('Error al analizar el backup JSON')
+    // Fallback a info básica
+    return {
+      tables: [{ name: 'backup_completo', recordCount: 1, size: formatFileSize(fileStats.size) }],
+      totalRecords: 1,
+      totalSize: formatFileSize(fileStats.size),
+      databaseVersion: 'JSON Export',
+      createdAt: new Date().toISOString(),
+      backupType: 'JSON',
+    }
   }
 }
 
 async function generateSqlBackupPreview(backup: any, fileStats: any) {
+  const tables: Array<{ name: string; recordCount: number; size: string }> = []
+  let totalRecords = 0
+
   try {
     // Primero intentar leer el archivo de metadata
     const metadataPath = `${backup.filepath}.meta.json`
@@ -134,99 +156,78 @@ async function generateSqlBackupPreview(backup: any, fileStats: any) {
       const metadata = JSON.parse(metadataContent)
 
       if (metadata.tableCounts) {
-        const tables = Object.entries(metadata.tableCounts)
-          .map(([name, recordCount]) => ({
-            name,
-            recordCount: Number(recordCount),
-            size: 'Desde backup',
-          }))
-          .filter(t => t.recordCount > 0)
+        for (const [name, count] of Object.entries(metadata.tableCounts)) {
+          const recordCount = Number(count)
+          if (recordCount > 0) {
+            tables.push({
+              name,
+              recordCount,
+              size: 'Desde backup',
+            })
+            totalRecords += recordCount
+          }
+        }
 
-        return {
-          tables: tables.sort((a, b) => b.recordCount - a.recordCount),
-          totalRecords: metadata.totalRecords || 0,
-          totalSize: formatFileSize(fileStats.size),
-          databaseVersion: 'PostgreSQL (SQL Dump)',
-          createdAt: metadata.createdAt || backup.createdAt,
-          backupType: 'SQL (pg_dump)',
+        if (tables.length > 0) {
+          return {
+            tables: tables.sort((a, b) => b.recordCount - a.recordCount),
+            totalRecords,
+            totalSize: formatFileSize(fileStats.size),
+            databaseVersion: 'PostgreSQL (SQL Dump)',
+            createdAt: metadata.createdAt || backup.createdAt,
+            backupType: 'SQL (pg_dump)',
+          }
         }
       }
     } catch (metaErr) {
       console.warn('No se pudo leer metadata del backup:', metaErr)
     }
 
-    // Fallback: intentar usar pg_restore para obtener la información REAL del backup
-    const hasPgRestore = await checkPgRestoreAvailable()
+    // Fallback 1: Intentar extraer nombres de tablas con pg_restore
+    try {
+      const tableNames = await getTableNamesFromBackup(backup.filepath)
+      for (const name of tableNames) {
+        tables.push({
+          name,
+          recordCount: 0, // No podemos contar fácilmente sin restaurar, pero al menos mostramos el nombre
+          size: 'Tabla',
+        })
+      }
 
-    if (hasPgRestore) {
-      const tableCounts = await getTableCountsFromBackup(backup.filepath)
-
-      if (Object.keys(tableCounts).length > 0) {
-        const tables = Object.entries(tableCounts)
-          .map(([name, recordCount]) => ({
-            name,
-            recordCount,
-            size: 'Desde backup',
-          }))
-          .filter(t => t.recordCount > 0)
-
-        const totalRecords = tables.reduce((sum, t) => sum + t.recordCount, 0)
-
+      if (tables.length > 0) {
         return {
-          tables: tables.sort((a, b) => b.recordCount - a.recordCount),
-          totalRecords,
+          tables,
+          totalRecords: tables.length, // Cantidad de tablas como fallback
           totalSize: formatFileSize(fileStats.size),
           databaseVersion: 'PostgreSQL (SQL Dump)',
           createdAt: backup.createdAt,
           backupType: 'SQL (pg_dump)',
         }
       }
-    }
-
-    // Fallback final: info básica
-    return {
-      tables: [{ name: 'backup_completo', recordCount: 1, size: formatFileSize(fileStats.size) }],
-      totalRecords: 1,
-      totalSize: formatFileSize(fileStats.size),
-      databaseVersion: 'PostgreSQL',
-      createdAt: backup.createdAt,
-      backupType: 'SQL (pg_dump)',
+    } catch (pgErr) {
+      console.warn('Error al extraer tablas con pg_restore:', pgErr)
     }
   } catch (error) {
     console.error('Error generating SQL backup preview:', error)
+  }
 
-    // Fallback: preview básico
-    return {
-      tables: [{ name: 'database_backup', recordCount: 1, size: 'Completo' }],
-      totalRecords: 1,
-      totalSize: formatFileSize(fileStats.size),
-      databaseVersion: 'PostgreSQL',
-      createdAt: backup.createdAt,
-      backupType: 'SQL (pg_dump)',
-    }
+  // Fallback final: siempre mostramos información básica
+  return {
+    tables: [{ name: 'backup_completo', recordCount: 1, size: formatFileSize(fileStats.size) }],
+    totalRecords: 1,
+    totalSize: formatFileSize(fileStats.size),
+    databaseVersion: 'PostgreSQL',
+    createdAt: backup.createdAt,
+    backupType: 'SQL (pg_dump)',
   }
 }
 
-async function checkPgRestoreAvailable(): Promise<boolean> {
+async function getTableNamesFromBackup(filepath: string): Promise<string[]> {
   try {
-    await execAsync('pg_restore --version')
-    return true
-  } catch {
-    return false
-  }
-}
+    const { stdout } = await execAsync(`pg_restore --list "${filepath}" 2>/dev/null`)
 
-async function getTableCountsFromBackup(filepath: string): Promise<Record<string, number>> {
-  try {
-    const { stdout } = await execAsync(`pg_restore --list "${filepath}"`)
-
-    // Parsear la salida de pg_restore --list para encontrar las tablas
-    // El formato tiene líneas como: 2216; 0 1259 16873 TABLE public users postgres
-    const tableCounts: Record<string, number> = {}
-
-    // Primero listamos todas las tablas
-    const lines = stdout.split('\n')
     const tableNames: string[] = []
+    const lines = stdout.split('\n')
 
     for (const line of lines) {
       const trimmed = line.trim()
@@ -241,48 +242,10 @@ async function getTableCountsFromBackup(filepath: string): Promise<Record<string
       }
     }
 
-    // Ahora para cada tabla, intentamos obtener el conteo de registros usando pg_restore
-    // Esto requiere restaurar solo los datos y contar, pero para simplificar,
-    // primero usamos una estrategia: intentar extraer el número de filas del TOC
-    // Si no funciona, usamos pg_restore con una consulta COUNT
-
-    // Estrategia 1: Intentar extraer información del TOC
-    for (const tableName of tableNames) {
-      try {
-        // Intentamos usar pg_restore para obtener el número de filas
-        // Otra opción: usar pg_restore con --schema-only y luego un script,
-        // pero para simplificar, primero intentamos con una aproximación
-
-        // Estrategia simple: usar pg_restore para contar COPY statements
-        const { stdout: dataStdout } = await execAsync(
-          `pg_restore -a --data-only "${filepath}" 2>/dev/null | grep -c "^COPY ${tableName}" || true`
-        )
-        const copyCount = parseInt(dataStdout.trim(), 10)
-
-        if (copyCount > 0) {
-          // Ahora contamos las filas reales en el COPY
-          try {
-            const { stdout: countStdout } = await execAsync(
-              `pg_restore -a --data-only -t "${tableName}" "${filepath}" 2>/dev/null | awk '/^\\./ {exit} /^COPY/ {next} {c++} END {print c}'`
-            )
-            const rowCount = parseInt(countStdout.trim(), 10)
-            if (!isNaN(rowCount)) {
-              tableCounts[tableName] = rowCount
-            }
-          } catch {
-            // Si falla, al menos registramos que existe la tabla
-            tableCounts[tableName] = 0
-          }
-        }
-      } catch (err) {
-        console.warn(`Error counting rows for table ${tableName}:`, err)
-      }
-    }
-
-    return tableCounts
+    return tableNames
   } catch (error) {
-    console.error('Error extracting table counts from backup:', error)
-    return {}
+    console.error('Error getting table names from backup:', error)
+    return []
   }
 }
 
