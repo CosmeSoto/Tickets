@@ -39,7 +39,7 @@ RUN npm run build
 # ── Stage 3: runner ──────────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
 
-RUN apk add --no-cache openssl curl su-exec postgresql-client
+RUN apk add --no-cache openssl curl su-exec postgresql16-client
 WORKDIR /app
 
 ENV NODE_ENV=production
