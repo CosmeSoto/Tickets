@@ -5,6 +5,7 @@ import { seedCustomFields } from './seeds/custom-fields.seed'
 import { seedInventoryTypes } from './seeds/inventory-types.seed'
 import { seedEquipmentBrands } from './seeds/equipment-brands.seed'
 import { seedCategories, seedCategoriesOtherFamilies } from './seeds/categories.seed'
+import { seedCategoriesTechnology } from './seeds/categories-technology.seed'
 import { seedCategoriesFixedAssets } from './seeds/categories-fixed-assets.seed'
 import { seedCategoriesMaintenance } from './seeds/categories-maintenance.seed'
 import { seedCategoriesServices } from './seeds/categories-services.seed'
@@ -52,6 +53,8 @@ async function main() {
 
   // 9b. CATEGORÍAS OTRAS FAMILIAS (Mantenimiento, Seguridad, Servicios, Administrativa)
   await seedCategoriesOtherFamilies(prisma, deptMap)
+
+  // NOTA: categories-technology.seed.ts es el archivo organizado para Tecnología y Comunicaciones
 
   // 9c. CATEGORÍAS FAMILIAS COMPLETAS (Centro Comercial)
   await seedCategoriesFixedAssets(prisma, deptMap)

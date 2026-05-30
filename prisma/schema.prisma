@@ -86,12 +86,14 @@ model categories {
   level                  Int
   parentId               String?
   departmentId           String?
+  familyId               String?                  @map("family_id")
   order                  Int                      @default(0)
   color                  String?                  @default("#6B7280")
   isActive               Boolean                  @default(true)
   createdAt              DateTime                 @default(now())
   updatedAt              DateTime
   departments            departments?             @relation(fields: [departmentId], references: [id])
+  family                 families?                @relation(fields: [familyId], references: [id])
   categories             categories?              @relation("categoriesTocategories", fields: [parentId], references: [id])
   other_categories       categories[]             @relation("categoriesTocategories")
   knowledge_articles     knowledge_articles[]
@@ -101,6 +103,7 @@ model categories {
   patrolFamilyConfigs    patrol_family_config[]   @relation("PatrolIncidentCategory")
 
   @@index([departmentId])
+  @@index([familyId])
   @@index([parentId, level, isActive])
   @@index([name, level])
 }
