@@ -155,6 +155,7 @@ export class BackupService {
       console.log(`[BACKUP] Archivo creado: ${fileStats.size} bytes`)
 
       // Guardar metadata con conteo de tablas
+      let backupMetadata: any = null
       try {
         const tableCounts: Record<string, number> = {}
         const tablesToCount = [
@@ -183,14 +184,14 @@ export class BackupService {
 
         // Guardar metadata en archivo JSON
         const metadataPath = `${filepath}.meta.json`
-        const metadata = {
+        backupMetadata = {
           version: '1.0',
           createdAt: new Date().toISOString(),
           tableCounts,
           totalRecords: Object.values(tableCounts).reduce((a, b) => a + b, 0),
           fileSize: fileStats.size,
         }
-        await writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+        await writeFile(metadataPath, JSON.stringify(backupMetadata, null, 2))
         console.log(`[BACKUP] Metadata guardada en ${metadataPath}`)
       } catch (metaErr) {
         console.warn('[BACKUP] No se pudo guardar metadata:', metaErr)
@@ -234,6 +235,7 @@ export class BackupService {
           checksum: checksum ?? null,
           compressed: hasPgDump, // pg_dump -Fc ya comprime
           encrypted,
+          metadata: backupMetadata ? JSON.stringify(backupMetadata) : null,
         },
       })
 
@@ -1911,6 +1913,7 @@ export class BackupService {
     }
 
     // Generar metadata para el backup importado
+    let backupMetadata: any = null
     try {
       const tableCounts: Record<string, number> = {}
 
@@ -1965,7 +1968,7 @@ export class BackupService {
 
       // Guardar metadata
       const metadataPath = `${filepath}.meta.json`
-      const metadata = {
+      backupMetadata = {
         version: '1.0',
         createdAt: new Date().toISOString(),
         importedFrom: originalFilename,
@@ -1973,7 +1976,7 @@ export class BackupService {
         totalRecords: Object.values(tableCounts).reduce((a, b) => a + b, 0),
         fileSize: stats.size,
       }
-      await writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+      await writeFile(metadataPath, JSON.stringify(backupMetadata, null, 2))
       console.log(`[BACKUP] Metadata para importación guardada en ${metadataPath}`)
     } catch (metaErr) {
       console.warn('[BACKUP] No se pudo generar metadata para importación:', metaErr)
@@ -1991,6 +1994,7 @@ export class BackupService {
         compressed,
         encrypted,
         createdAt: new Date(),
+        metadata: backupMetadata ? JSON.stringify(backupMetadata) : null,
       },
     })
 

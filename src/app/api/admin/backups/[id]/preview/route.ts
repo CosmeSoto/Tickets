@@ -149,7 +149,41 @@ async function generateSqlBackupPreview(backup: any, fileStats: any) {
   let totalRecords = 0
 
   try {
-    // Primero intentar leer el archivo de metadata
+    // Primero intentar leer metadata desde la base de datos
+    if (backup.metadata) {
+      try {
+        const metadata = JSON.parse(backup.metadata)
+
+        if (metadata.tableCounts) {
+          for (const [name, count] of Object.entries(metadata.tableCounts)) {
+            const recordCount = Number(count)
+            if (recordCount > 0) {
+              tables.push({
+                name,
+                recordCount,
+                size: 'Desde backup',
+              })
+              totalRecords += recordCount
+            }
+          }
+
+          if (tables.length > 0) {
+            return {
+              tables: tables.sort((a, b) => b.recordCount - a.recordCount),
+              totalRecords,
+              totalSize: formatFileSize(fileStats.size),
+              databaseVersion: 'PostgreSQL (SQL Dump)',
+              createdAt: metadata.createdAt || backup.createdAt,
+              backupType: 'SQL (pg_dump)',
+            }
+          }
+        }
+      } catch (dbMetaErr) {
+        console.warn('No se pudo leer metadata desde la DB:', dbMetaErr)
+      }
+    }
+
+    // Luego intentar leer el archivo de metadata
     const metadataPath = `${backup.filepath}.meta.json`
     try {
       const metadataContent = await readFile(metadataPath, 'utf-8')
