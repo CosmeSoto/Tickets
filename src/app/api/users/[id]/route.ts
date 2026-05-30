@@ -67,7 +67,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       user,
     })
   } catch (error) {
-    console.error('Error fetching user:', error)
+    console.error('Error al obtener usuario:', error)
     return NextResponse.json(
       {
         success: false,
@@ -338,7 +338,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       message: 'Usuario actualizado correctamente',
     })
   } catch (error) {
-    console.error('Error updating user:', error)
+    console.error('Error al actualizar usuario:', error)
 
     if (error instanceof Error) {
       if (error.name === 'ZodError') {
@@ -473,7 +473,7 @@ export async function DELETE(
       message: 'Usuario eliminado exitosamente',
     })
   } catch (error) {
-    console.error('Error deleting user:', error)
+    console.error('Error al eliminar usuario:', error)
 
     if (error instanceof Error) {
       if (error.message.includes('Usuario no encontrado')) {

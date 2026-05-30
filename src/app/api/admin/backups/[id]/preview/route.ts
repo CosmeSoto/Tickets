@@ -126,18 +126,18 @@ async function generateJsonBackupPreview(filepath: string, fileStats: any) {
       tables: tables.sort((a, b) => b.recordCount - a.recordCount),
       totalRecords,
       totalSize: `${Math.max(1, Math.round(JSON.stringify(backupData).length / 1024))} KB`,
-      databaseVersion: meta?.version || backupData.version || 'JSON Export',
+      databaseVersion: meta?.version || backupData.version || 'Exportación JSON',
       createdAt: meta?.timestamp || backupData.timestamp || new Date().toISOString(),
       backupType: moduleLabel,
     }
   } catch (error) {
-    console.error('Error parsing JSON backup:', error)
+    console.error('Error al analizar backup JSON:', error)
     // Fallback a info básica
     return {
       tables: [{ name: 'backup_completo', recordCount: 1, size: formatFileSize(fileStats.size) }],
       totalRecords: 1,
       totalSize: formatFileSize(fileStats.size),
-      databaseVersion: 'JSON Export',
+      databaseVersion: 'Exportación JSON',
       createdAt: new Date().toISOString(),
       backupType: 'JSON',
     }
@@ -157,7 +157,7 @@ async function generateSqlBackupPreview(backup: any, fileStats: any) {
         if (metadata.tableCounts) {
           for (const [name, count] of Object.entries(metadata.tableCounts)) {
             const recordCount = Number(count)
-            if (recordCount > 0) {
+            if (recordCount >= 0) {
               tables.push({
                 name,
                 recordCount,
@@ -192,7 +192,7 @@ async function generateSqlBackupPreview(backup: any, fileStats: any) {
       if (metadata.tableCounts) {
         for (const [name, count] of Object.entries(metadata.tableCounts)) {
           const recordCount = Number(count)
-          if (recordCount > 0) {
+          if (recordCount >= 0) {
             tables.push({
               name,
               recordCount,
@@ -220,6 +220,8 @@ async function generateSqlBackupPreview(backup: any, fileStats: any) {
     // Fallback 1: Intentar extraer nombres de tablas con pg_restore
     try {
       const tableNames = await getTableNamesFromBackup(backup.filepath)
+      console.log('Found tables in backup:', tableNames)
+
       for (const name of tableNames) {
         tables.push({
           name,
@@ -258,7 +260,8 @@ async function generateSqlBackupPreview(backup: any, fileStats: any) {
 
 async function getTableNamesFromBackup(filepath: string): Promise<string[]> {
   try {
-    const { stdout } = await execAsync(`pg_restore --list "${filepath}" 2>/dev/null`)
+    const { stdout } = await execAsync(`pg_restore --list "${filepath}" 2>&1`)
+    console.log('getTableNamesFromBackup output:', stdout.substring(0, 800))
 
     const tableNames: string[] = []
     const lines = stdout.split('\n')
@@ -267,12 +270,20 @@ async function getTableNamesFromBackup(filepath: string): Promise<string[]> {
       const trimmed = line.trim()
       if (!trimmed || trimmed.startsWith(';')) continue
 
-      const parts = trimmed.split(/\s+/)
-      if (parts.length >= 6 && parts[4] === 'TABLE') {
-        const tableName = parts[5]
-        if (tableName && !tableNames.includes(tableName)) {
-          tableNames.push(tableName)
-        }
+      // Try both patterns: "TABLE public users" and "TABLE public.users"
+      const match1 = trimmed.match(/TABLE\s+public\s+(\w+)/)
+      const match2 = trimmed.match(/TABLE\s+public\.(\w+)/)
+
+      let tableName: string | null = null
+
+      if (match1) {
+        tableName = match1[1]
+      } else if (match2) {
+        tableName = match2[1]
+      }
+
+      if (tableName && !tableNames.includes(tableName)) {
+        tableNames.push(tableName)
       }
     }
 

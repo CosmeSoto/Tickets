@@ -1933,16 +1933,38 @@ export class BackupService {
           const hasPgTools = await this.hasPgTools()
           if (hasPgTools) {
             // Primero listar las tablas
-            const { stdout: listOutput } = await execAsync(
-              `pg_restore --list "${filepath}" 2>/dev/null || true`
-            )
-            const tableRegex = /TABLE\s+public\.\s*(\w+)/g
+            const { stdout: listOutput } = await execAsync(`pg_restore --list "${filepath}" 2>&1`)
+            console.log('pg_restore list output:', listOutput.substring(0, 500))
+
             const tables: string[] = []
-            let match: RegExpExecArray | null
-            while ((match = tableRegex.exec(listOutput)) !== null) {
-              if (match[1] && !tables.includes(match[1])) {
-                tables.push(match[1])
+            const lines = listOutput.split('\n')
+
+            for (const line of lines) {
+              const trimmed = line.trim()
+              if (!trimmed || trimmed.startsWith(';')) continue
+
+              // Try both patterns
+              const match1 = trimmed.match(/TABLE\s+public\s+(\w+)/)
+              const match2 = trimmed.match(/TABLE\s+public\.(\w+)/)
+
+              let tableName: string | null = null
+
+              if (match1) {
+                tableName = match1[1]
+              } else if (match2) {
+                tableName = match2[1]
               }
+
+              if (tableName && !tables.includes(tableName)) {
+                tables.push(tableName)
+              }
+            }
+
+            console.log('Found tables:', tables)
+
+            // Add all tables to tableCounts with count 0 first
+            for (const table of tables) {
+              tableCounts[table] = 0
             }
 
             // Para cada tabla, intentar contar registros
@@ -1950,19 +1972,24 @@ export class BackupService {
               try {
                 // Extraer solo los datos de la tabla y contar líneas (aproximado)
                 const { stdout: countOutput } = await execAsync(
-                  `pg_restore -a --data-only -t "${table}" "${filepath}" 2>/dev/null | awk '/^\\./ {exit} /^COPY/ {next} {c++} END {print c}'`
+                  `pg_restore -a --data-only -t "${table}" "${filepath}" 2>&1 | awk '/^\\./ {exit} /^COPY/ {next} /^--/ {next} NF > 0 {c++} END {print c+0}'`
                 )
-                const count = parseInt(countOutput.trim(), 10)
+
+                const trimmedCount = countOutput.trim()
+                console.log(`Table ${table} count output: "${trimmedCount}"`)
+
+                const count = parseInt(trimmedCount, 10)
                 if (!isNaN(count)) {
                   tableCounts[table] = count
                 }
-              } catch {
-                // Ignorar errores por tabla
+              } catch (err) {
+                console.warn(`Error counting table ${table}:`, err)
+                // Ignorar errores por tabla, ya tenemos count 0
               }
             }
           }
-        } catch {
-          // Fallback silencioso
+        } catch (err) {
+          console.error('Error extracting table counts from backup:', err)
         }
       }
 
