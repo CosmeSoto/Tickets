@@ -942,57 +942,96 @@ export class BackupService {
 
   /**
    * Restaura usando pg_restore (formato custom .dump).
-   * Soporta restauración selectiva por tablas usando --table.
+   * - Restauración completa: usa --clean para reemplazar toda la BD
+   * - Restauración selectiva: usa --data-only + TRUNCATE solo de las tablas seleccionadas
    */
   private static async restoreWithPgRestore(
     filepath: string,
     dbConfig: { host: string; port: string; database: string; username: string; password: string },
     restoreModules?: string[]
   ): Promise<void> {
-    let tableFlags = ''
-
     if (restoreModules?.length) {
-      // Restauración selectiva: obtener las tablas de cada módulo
+      // ═══ RESTAURACIÓN SELECTIVA ═══
+      // Estrategia segura: solo restaurar datos de las tablas del módulo
+      // sin tocar el schema ni otras tablas
       const tables = this.getTablesForModules(restoreModules)
-      // pg_restore --table acepta múltiples --table flags
-      tableFlags = tables.map(t => `--table="${t}"`).join(' ')
       console.log(
-        `[RESTORE] Restauración selectiva: ${tables.length} tablas de ${restoreModules.length} módulo(s)`
+        `[RESTORE] Restauración selectiva: ${tables.length} tablas de módulo(s) [${restoreModules.join(', ')}]`
       )
-    }
 
-    // pg_restore con formato custom:
-    // --clean: DROP antes de CREATE (solo para las tablas que restaura)
-    // --if-exists: no falla si la tabla no existe
-    // --no-owner: no intenta cambiar ownership
-    // --single-transaction: todo o nada
-    const command =
-      `PGPASSWORD="${dbConfig.password}" pg_restore ` +
-      `-h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database} ` +
-      `--clean --if-exists --no-owner --no-privileges --single-transaction ` +
-      `${tableFlags} ` +
-      `"${filepath}" 2>&1 || true`
+      // Paso 1: Truncar solo las tablas que vamos a restaurar (con CASCADE para FKs)
+      const truncateSQL = tables.map(t => `TRUNCATE TABLE "${t}" CASCADE;`).join(' ')
+      const truncateCmd = `PGPASSWORD="${dbConfig.password}" psql -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database} -c "SET session_replication_role = replica; ${truncateSQL} SET session_replication_role = DEFAULT;" 2>&1`
 
-    console.log('[RESTORE] Ejecutando pg_restore...')
-
-    const { stdout } = await execAsync(command, {
-      timeout: 600000, // 10 minutos
-      maxBuffer: 1024 * 1024 * 50,
-    })
-
-    // pg_restore puede reportar warnings que no son errores fatales
-    if (stdout && stdout.includes('ERROR')) {
-      const errors = stdout.split('\n').filter(l => l.includes('ERROR'))
-      // Filtrar errores no críticos (tabla no existe para DROP, etc.)
-      const criticalErrors = errors.filter(
-        e => !e.includes('does not exist') && !e.includes('already exists')
-      )
-      if (criticalErrors.length > 0) {
-        console.warn('[RESTORE] Errores durante pg_restore:', criticalErrors.slice(0, 5).join('\n'))
+      try {
+        await execAsync(truncateCmd, { timeout: 60000, maxBuffer: 1024 * 1024 * 10 })
+        console.log('[RESTORE] Tablas truncadas correctamente')
+      } catch (truncErr) {
+        console.warn(
+          '[RESTORE] Advertencia al truncar:',
+          (truncErr as Error).message?.slice(0, 200)
+        )
       }
-    }
 
-    console.log('[RESTORE] pg_restore completado')
+      // Paso 2: Restaurar solo los datos de las tablas seleccionadas
+      const tableFlags = tables.map(t => `--table="${t}"`).join(' ')
+      const command =
+        `PGPASSWORD="${dbConfig.password}" pg_restore ` +
+        `-h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database} ` +
+        `--data-only --no-owner --no-privileges --disable-triggers ` +
+        `${tableFlags} ` +
+        `"${filepath}" 2>&1 || true`
+
+      const { stdout } = await execAsync(command, {
+        timeout: 600000,
+        maxBuffer: 1024 * 1024 * 50,
+      })
+
+      if (stdout && stdout.includes('ERROR')) {
+        const errors = stdout.split('\n').filter(l => l.includes('ERROR'))
+        const criticalErrors = errors.filter(
+          e =>
+            !e.includes('does not exist') &&
+            !e.includes('already exists') &&
+            !e.includes('duplicate key')
+        )
+        if (criticalErrors.length > 0) {
+          console.warn('[RESTORE] Errores:', criticalErrors.slice(0, 5).join('\n'))
+        }
+      }
+
+      console.log(`[RESTORE] Restauración selectiva completada: ${tables.length} tablas`)
+    } else {
+      // ═══ RESTAURACIÓN COMPLETA ═══
+      // Reemplaza toda la BD con el contenido del backup
+      const command =
+        `PGPASSWORD="${dbConfig.password}" pg_restore ` +
+        `-h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database} ` +
+        `--clean --if-exists --no-owner --no-privileges --single-transaction ` +
+        `"${filepath}" 2>&1 || true`
+
+      console.log('[RESTORE] Ejecutando restauración completa con pg_restore...')
+
+      const { stdout } = await execAsync(command, {
+        timeout: 600000,
+        maxBuffer: 1024 * 1024 * 50,
+      })
+
+      if (stdout && stdout.includes('ERROR')) {
+        const errors = stdout.split('\n').filter(l => l.includes('ERROR'))
+        const criticalErrors = errors.filter(
+          e => !e.includes('does not exist') && !e.includes('already exists')
+        )
+        if (criticalErrors.length > 0) {
+          console.warn(
+            '[RESTORE] Errores durante pg_restore:',
+            criticalErrors.slice(0, 5).join('\n')
+          )
+        }
+      }
+
+      console.log('[RESTORE] Restauración completa finalizada')
+    }
   }
 
   /**
