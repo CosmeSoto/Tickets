@@ -3,13 +3,13 @@ import { join } from 'path'
 import { randomUUID } from 'crypto'
 import prisma from '@/lib/prisma'
 import { BackupInfo } from './backup-types'
-import { BACKUP_DIR } from './backup-utils'
+import { BACKUP_DIR, hasPgTools } from './backup-utils'
+import { extractMetadataFromDump } from './backup-metadata'
 
 async function ensureBackupDirectory() {
   try {
     await mkdir(BACKUP_DIR, { recursive: true, mode: 0o755 })
-  } catch {
-  }
+  } catch {}
 }
 
 export async function importBackupFromFile(
@@ -57,8 +57,7 @@ export async function importBackupFromFile(
       if (partial?.metadata?.module) {
         detectedModule = partial.metadata.module
       }
-    } catch {
-    }
+    } catch {}
   }
 
   if (!filename.startsWith('backup-')) {

@@ -73,32 +73,48 @@ export async function loadBackupMetadata(
 }
 
 export async function extractMetadataFromDump(filepath: string): Promise<BackupMetadata> {
-  let tableNames: string[] = []
-  let tableCounts: Record<string, number> = {}
+  const tableNames: string[] = []
+  const tableCounts: Record<string, number> = {}
 
   try {
     const { stdout } = await execAsync(`pg_restore --list "${filepath}"`)
+    console.log('pg_restore --list output:', stdout.substring(0, 500))
     const lines = stdout.split('\n')
     for (const line of lines) {
       const parts = line.trim().split(/\s+/)
-      if (parts.length >= 3 && parts[1] === 'TABLE') {
-        const tableName = parts[2]
+      // pg_restore --list format: Archive ID, TOC entry type, object name
+      if (parts.length >= 3 && (parts[1] === 'TABLE' || parts[1] === 'TABLE DATA')) {
+        let tableName: string | undefined
+        if (parts[1] === 'TABLE') {
+          tableName = parts[2]
+        } else if (parts[1] === 'TABLE DATA') {
+          tableName = parts[2]
+        }
+
         if (tableName && !tableName.startsWith('pg_') && !tableName.startsWith('sql_')) {
-          tableNames.push(tableName)
+          if (!tableNames.includes(tableName)) {
+            tableNames.push(tableName)
+          }
         }
       }
     }
-  } catch {
-    console.warn('Could not extract table names from dump')
+    console.log('Extracted table names:', tableNames)
+  } catch (err) {
+    console.warn('Could not extract table names from dump:', err)
   }
 
   for (const table of tableNames) {
     try {
       let count = 0
       try {
-        const { stdout: dataOutput } = await execAsync(
+        const { stdout: dataOutput, stderr } = await execAsync(
           `pg_restore -a --data-only -t "${table}" "${filepath}" 2>&1`
         )
+
+        console.log(`Table ${table} data output first 300 chars:`, dataOutput.substring(0, 300))
+        if (stderr) {
+          console.warn(`Table ${table} stderr:`, stderr)
+        }
 
         let insideCopy = false
         for (const line of dataOutput.split('\n')) {
@@ -107,7 +123,7 @@ export async function extractMetadataFromDump(filepath: string): Promise<BackupM
             insideCopy = true
             continue
           }
-          if (trimmed === '\\.' || trimmed === '') {
+          if (trimmed === '\\.') {
             insideCopy = false
             continue
           }
@@ -115,23 +131,30 @@ export async function extractMetadataFromDump(filepath: string): Promise<BackupM
             count++
           }
         }
-      } catch {
+      } catch (err) {
+        console.warn(`Error getting data for table ${table}:`, err)
         count = 0
       }
 
       tableCounts[table] = count
-    } catch {
+      console.log(`Table ${table} count: ${count}`)
+    } catch (err) {
+      console.warn(`Error processing table ${table}:`, err)
       tableCounts[table] = 0
     }
   }
 
   const fileStats = await stat(filepath)
+  const totalRecords = Object.values(tableCounts).reduce((a, b) => a + b, 0)
+
+  console.log('Total records:', totalRecords)
+  console.log('Table counts:', tableCounts)
 
   return {
     version: '1.0',
     createdAt: new Date().toISOString(),
     tableCounts,
-    totalRecords: Object.values(tableCounts).reduce((a, b) => a + b, 0),
+    totalRecords,
     fileSize: fileStats.size,
   }
 }
