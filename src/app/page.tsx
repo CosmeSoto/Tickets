@@ -63,7 +63,7 @@ const defaultContent: LandingContent = {
   footerText: `© ${new Date().getFullYear()} Sistema de Tickets`,
 }
 
-function HomePageContent() {
+const HomePageContent = React.memo(function HomePageContent() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -88,7 +88,7 @@ function HomePageContent() {
             : '/client'
       router.replace(dest)
     }
-  }, [status, session, router, isPreview])
+  }, [status, session?.user?.role, router, isPreview])
 
   useEffect(() => {
     // Fetch landing page content and services
@@ -168,16 +168,20 @@ function HomePageContent() {
               <SystemLogo size='lg' showText={true} />
               <nav className='flex items-center gap-2 sm:gap-3'>
                 {status === 'authenticated' && session?.user ? (
-                  <Button asChild size='sm'>
-                    <Link href={dashboardHref}>Ir al Dashboard</Link>
+                  <Button size='sm' onClick={() => router.push(dashboardHref)}>
+                    Ir al Dashboard
                   </Button>
                 ) : (
                   <>
-                    <Button asChild variant='ghost' size='sm'>
-                      <Link href='/login'>Iniciar Sesión</Link>
+                    <Button variant='ghost' size='sm' onClick={() => router.push('/login')}>
+                      Iniciar Sesión
                     </Button>
-                    <Button asChild size='sm' className='hidden sm:inline-flex'>
-                      <Link href='/client/tickets/create'>Crear Ticket</Link>
+                    <Button
+                      size='sm'
+                      className='hidden sm:inline-flex'
+                      onClick={() => router.push('/client/tickets/create')}
+                    >
+                      Crear Ticket
                     </Button>
                   </>
                 )}
@@ -242,16 +246,25 @@ function HomePageContent() {
               {d.heroSubtitle}
             </p>
             <div className='flex flex-col sm:flex-row gap-4 justify-center'>
-              <Button asChild size='lg' className='text-base px-8 shadow-md'>
-                <Link href={d.heroCtaPrimaryUrl}>{d.heroCtaPrimary}</Link>
+              <Button
+                size='lg'
+                className='text-base px-8 shadow-md'
+                onClick={() => router.push(d.heroCtaPrimaryUrl)}
+              >
+                {d.heroCtaPrimary}
               </Button>
               <Button
-                asChild
                 size='lg'
                 variant='outline'
                 className='text-base px-8 border-primary/30 hover:bg-primary/5'
+                onClick={() => {
+                  const element = document.querySelector(d.heroCtaSecondaryUrl)
+                  if (element) {
+                    element.scrollIntoView({ behavior: 'smooth' })
+                  }
+                }}
               >
-                <Link href={d.heroCtaSecondaryUrl}>{d.heroCtaSecondary}</Link>
+                {d.heroCtaSecondary}
               </Button>
             </div>
           </div>
@@ -462,7 +475,7 @@ function HomePageContent() {
       </div>
     </>
   )
-}
+})
 
 export default function HomePage() {
   return (
