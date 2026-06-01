@@ -46,9 +46,39 @@ export async function GET(request: NextRequest) {
 
     const where: any = {}
 
-    // Super Admin ve todo; los demás solo ven sus propias noticias
+    // Super Admin ve todo
+    // Admin normal y usuarios con newsEnabled: ven las que crearon + las que les llegaron
     if (!isSuperAdmin) {
-      where.createdById = session.user.id
+      const userDept = await prisma.users.findUnique({
+        where: { id: session.user.id },
+        select: { departmentId: true, departments: { select: { familyId: true } } },
+      })
+      const userDeptId = userDept?.departmentId
+      const userFamilyId = userDept?.departments?.familyId
+
+      const visibilityConditions: any[] = [
+        // Noticias que creó
+        { createdById: session.user.id },
+        // Sin restricciones (visibles para todos)
+        {
+          news_roles: { none: {} },
+          news_users: { none: {} },
+          news_departments: { none: {} },
+          news_families: { none: {} },
+        },
+        // Asignado por rol
+        { news_roles: { some: { role: dbUser.role } } },
+        // Asignado directamente
+        { news_users: { some: { userId: session.user.id } } },
+      ]
+      if (userDeptId) {
+        visibilityConditions.push({ news_departments: { some: { departmentId: userDeptId } } })
+      }
+      if (userFamilyId) {
+        visibilityConditions.push({ news_families: { some: { familyId: userFamilyId } } })
+      }
+
+      where.OR = visibilityConditions
     }
 
     if (status && status !== 'all') {
@@ -60,11 +90,20 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { content: { contains: search, mode: 'insensitive' } },
-        { summary: { contains: search, mode: 'insensitive' } },
-      ]
+      // Combinar búsqueda con visibilidad usando AND
+      const searchCondition = {
+        OR: [
+          { title: { contains: search, mode: 'insensitive' } },
+          { content: { contains: search, mode: 'insensitive' } },
+          { summary: { contains: search, mode: 'insensitive' } },
+        ],
+      }
+      if (where.OR) {
+        where.AND = [{ OR: where.OR }, searchCondition]
+        delete where.OR
+      } else {
+        Object.assign(where, searchCondition)
+      }
     }
 
     const news = await prisma.news.findMany({
