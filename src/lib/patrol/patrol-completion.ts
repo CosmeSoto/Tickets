@@ -12,6 +12,6 @@
  */
 export function calculateCompletionPercentage(visited: number, total: number): number {
   if (total <= 0) return 0
-  const clamped = Math.min(visited, total)
-  return Math.round((clamped / total) * 100)
+  const clampedVisited = Math.max(0, Math.min(visited, total))
+  return Math.round((clampedVisited / total) * 100)
 }
