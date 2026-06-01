@@ -38,8 +38,11 @@ export async function GET(request: NextRequest) {
 
     if (!user) return NextResponse.json({ forms: [] })
 
+    // ADMIN y superadmin siempre tienen acceso (independiente de formsEnabled)
+    const isAdminOrSuper = user.role === 'ADMIN' || user.isSuperAdmin === true
+
     // Solo usuarios con acceso al módulo (o admin/superadmin)
-    if (!user.formsEnabled && user.role !== 'ADMIN' && !user.isSuperAdmin) {
+    if (!user.formsEnabled && !isAdminOrSuper) {
       return NextResponse.json({ forms: [] })
     }
 
@@ -61,6 +64,8 @@ export async function GET(request: NextRequest) {
       { form_roles: { some: { role: user.role } } },
       // Por usuario específico
       { form_users: { some: { userId: user.id } } },
+      // El creador siempre ve sus propios documentos
+      { createdById: user.id },
     ]
 
     if (user.departmentId) {

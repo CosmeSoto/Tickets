@@ -174,7 +174,6 @@ const navigationByRole: Record<string, NavItem[]> = {
       name: 'Documentos',
       href: '/forms',
       icon: FileText,
-      children: [{ name: 'Ver Formularios', href: '/forms', icon: FileText }],
     },
   ],
 
@@ -223,7 +222,6 @@ const navigationByRole: Record<string, NavItem[]> = {
       name: 'Documentos',
       href: '/forms',
       icon: FileText,
-      children: [{ name: 'Ver Formularios', href: '/forms', icon: FileText }],
     },
   ],
 
@@ -265,7 +263,6 @@ const navigationByRole: Record<string, NavItem[]> = {
       name: 'Documentos',
       href: '/forms',
       icon: FileText,
-      children: [{ name: 'Ver Formularios', href: '/forms', icon: FileText }],
     },
   ],
 

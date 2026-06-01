@@ -79,6 +79,8 @@ export async function GET(request: NextRequest) {
       { news_roles: { some: { role: user.role } } },
       // Restricción por usuario específico
       { news_users: { some: { userId: user.id } } },
+      // El creador siempre ve sus propias noticias
+      { createdById: user.id },
     ]
 
     if (user.departmentId) {

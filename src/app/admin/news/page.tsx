@@ -747,11 +747,17 @@ export default function AdminNewsPage() {
                 />
               </div>
               <div className='space-y-2 col-span-2'>
-                <Label>Resumen</Label>
-                <Textarea
+                <Label>
+                  Resumen{' '}
+                  <span className='text-xs text-muted-foreground font-normal'>
+                    (opcional — aparece como subtítulo en la lista)
+                  </span>
+                </Label>
+                <Input
                   value={formData.summary}
                   onChange={e => setFormData({ ...formData, summary: e.target.value })}
-                  rows={2}
+                  placeholder='Breve descripción de la noticia...'
+                  maxLength={500}
                 />
               </div>
               <div className='space-y-2 col-span-2'>

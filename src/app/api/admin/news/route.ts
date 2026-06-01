@@ -149,7 +149,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    if (session.user.role !== 'ADMIN' && !session.user.isSuperAdmin) {
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    if (session.user.role !== 'ADMIN' && !isSuperAdmin) {
       // Permitir acceso a usuarios con newsEnabled (gestores de noticias)
       const userHasNewsAccess = await prisma.users.findUnique({
         where: { id: session.user.id },
@@ -161,6 +162,28 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await request.json()
+
+    if (!data.title?.trim()) {
+      return NextResponse.json({ error: 'El título es obligatorio' }, { status: 400 })
+    }
+
+    // Validar enums — si llegan valores inválidos Prisma lanza error 500
+    const validTypes = [
+      'NEWS',
+      'ANNOUNCEMENT',
+      'EVENT',
+      'BIRTHDAY',
+      'HOLIDAY',
+      'ALERT',
+      'INTERNAL_AD',
+      'RECOGNITION',
+    ]
+    const validPriorities = ['LOW', 'MEDIUM', 'HIGH', 'URGENT']
+    const validStatuses = ['DRAFT', 'PUBLISHED', 'ARCHIVED']
+
+    const type = validTypes.includes(data.type) ? data.type : 'NEWS'
+    const priority = validPriorities.includes(data.priority) ? data.priority : 'MEDIUM'
+    const newsStatus = validStatuses.includes(data.status) ? data.status : 'DRAFT'
 
     const slug = data.title
       .toLowerCase()
@@ -175,12 +198,12 @@ export async function POST(request: NextRequest) {
       data: {
         title: data.title,
         slug: `${slug}-${Date.now()}`,
-        content: data.content,
-        summary: data.summary,
-        imageUrl: data.imageUrl,
-        type: data.type,
-        priority: data.priority,
-        status: data.status,
+        content: data.content || null,
+        summary: data.summary || null,
+        imageUrl: data.imageUrl || null,
+        type,
+        priority,
+        status: newsStatus,
         startDate: data.startDate ? new Date(data.startDate) : null,
         endDate: data.endDate ? new Date(data.endDate) : null,
         isFeatured: data.isFeatured || false,
@@ -225,6 +248,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ news })
   } catch (error) {
     console.error('Error creando noticia:', error)
-    return NextResponse.json({ error: 'Error al crear noticia' }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'Error desconocido'
+    return NextResponse.json({ error: 'Error al crear noticia', detail: message }, { status: 500 })
   }
 }

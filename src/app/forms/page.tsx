@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { FileText, Download, Star } from 'lucide-react'
+import { FileText, Download, Star, Plus, Edit, Trash2 } from 'lucide-react'
 
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { DataTable, Column } from '@/components/ui/data-table'
@@ -13,26 +13,94 @@ import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
 import { FormCard } from '@/components/forms/FormCard'
 import { FormDetail } from '@/components/forms/FormDetail'
-import type { FormFeedItem } from '@/components/forms/types'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Switch } from '@/components/ui/switch'
+import { Separator } from '@/components/ui/separator'
+import { useToast } from '@/hooks/use-toast'
+import { InlineCreateSelect } from '@/components/ui/inline-create-select'
+import { FormCategoryInlineForm } from '@/components/forms/FormCategoryInlineForm'
+import { FileDropZone } from '@/components/common/file-drop-zone'
+import type { PendingFile } from '@/components/common/file-drop-zone'
+import { MediaUrlInput } from '@/components/common/media-url-input'
+import { VisibilitySelector } from '@/components/common/visibility-selector'
+import type { FormFeedItem, FormItem } from '@/components/forms/types'
 
 interface CategoryOption {
   id: string
   name: string
+  description?: string | null
+}
+
+interface UserOption {
+  id: string
+  name: string
+  email: string
+}
+interface DepartmentOption {
+  id: string
+  name: string
+  familyId?: string | null
+}
+interface FamilyOption {
+  id: string
+  name: string
+  departments: DepartmentOption[]
+}
+
+const EMPTY_FORM = {
+  title: '',
+  description: '',
+  summary: '',
+  version: '',
+  categoryId: '',
+  fileUrl: '',
+  fileSize: null as number | null,
+  fileType: '',
+  isActive: true,
+  isFeatured: false,
+  roles: [] as string[],
+  userIds: [] as string[],
+  departmentIds: [] as string[],
+  familyIds: [] as string[],
 }
 
 export default function PublicFormsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const { toast } = useToast()
   const accessChecked = useRef(false)
 
   const [hasAccess, setHasAccess] = useState<boolean | null>(null)
+  const [canManage, setCanManage] = useState(false)
   const [forms, setForms] = useState<FormFeedItem[]>([])
   const [categories, setCategories] = useState<CategoryOption[]>([])
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('cards')
   const [selectedForm, setSelectedForm] = useState<FormFeedItem | null>(null)
-
   const [filters, setFilters] = useState({ search: '', category: 'all' })
+
+  // Gestión (solo si canManage)
+  const [users, setUsers] = useState<UserOption[]>([])
+  const [departments, setDepartments] = useState<DepartmentOption[]>([])
+  const [families, setFamilies] = useState<FamilyOption[]>([])
+  const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [editingForm, setEditingForm] = useState<FormItem | null>(null)
+  const [deletingForm, setDeletingForm] = useState<FormFeedItem | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [formData, setFormData] = useState({ ...EMPTY_FORM })
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
 
   // ── Exportación ────────────────────────────────────────────────────────────
   const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
@@ -70,8 +138,10 @@ export default function PublicFormsPage() {
 
     if (session.user.role === 'ADMIN' || (session.user as any).isSuperAdmin) {
       setHasAccess(true)
+      setCanManage(true)
       loadForms()
       loadCategories()
+      loadUsersAndDepartments()
       return
     }
 
@@ -80,10 +150,13 @@ export default function PublicFormsPage() {
         const res = await fetch(`/api/users/${session.user.id}`)
         if (res.ok) {
           const data = await res.json()
-          if (data.user?.formsEnabled) {
+          if (data.user?.formsEnabled || data.user?.canManageForms) {
+            const manage = !!data.user?.canManageForms
             setHasAccess(true)
+            setCanManage(manage)
             loadForms()
             loadCategories()
+            if (manage) loadUsersAndDepartments()
             return
           }
         }
@@ -93,17 +166,23 @@ export default function PublicFormsPage() {
         if (res.ok) {
           const modules = await res.json()
           if (modules.forms) {
+            const manage = !!modules.canManageForms
             setHasAccess(true)
+            setCanManage(manage)
             loadForms()
             loadCategories()
+            if (manage) loadUsersAndDepartments()
             return
           }
         }
       } catch {}
       if ((session.user as any).formsEnabled) {
+        const manage = !!(session.user as any).canManageForms
         setHasAccess(true)
+        setCanManage(manage)
         loadForms()
         loadCategories()
+        if (manage) loadUsersAndDepartments()
         return
       }
       setHasAccess(false)
@@ -118,6 +197,34 @@ export default function PublicFormsPage() {
       if (res.ok) {
         const data = await res.json()
         setCategories(data.categories || [])
+      }
+    } catch {}
+  }
+
+  const loadUsersAndDepartments = async () => {
+    try {
+      const [usersRes, deptsRes, familiesRes] = await Promise.all([
+        fetch('/api/users?limit=500'),
+        fetch('/api/departments'),
+        fetch('/api/families?includeInactive=false&scope=all'),
+      ])
+      if (usersRes.ok) setUsers((await usersRes.json()).data || [])
+      if (deptsRes.ok) {
+        const d = await deptsRes.json()
+        setDepartments(d.departments || d.data || [])
+      }
+      if (familiesRes.ok) {
+        const fd = await familiesRes.json()
+        const fList = fd.data || fd.families || []
+        const d2Res = await fetch('/api/departments')
+        const allDepts: DepartmentOption[] = d2Res.ok ? (await d2Res.json()).departments || [] : []
+        setFamilies(
+          fList.map((f: any) => ({
+            id: f.id,
+            name: f.name,
+            departments: allDepts.filter((d: any) => d.familyId === f.id),
+          }))
+        )
       }
     } catch {}
   }
@@ -143,6 +250,132 @@ export default function PublicFormsPage() {
   useEffect(() => {
     if (hasAccess) loadForms()
   }, [filters]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── CRUD (solo canManage) ──────────────────────────────────────────────────
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.categoryId) {
+      toast({
+        title: 'Categoría requerida',
+        description: 'Selecciona o crea una categoría',
+        variant: 'destructive',
+      })
+      return
+    }
+    try {
+      setSaving(true)
+      const url = editingForm ? `/api/admin/forms/${editingForm.id}` : '/api/admin/forms'
+      let fileType = formData.fileType
+      if (formData.fileUrl && pendingFiles.length === 0 && !fileType) {
+        const ext = formData.fileUrl.split('?')[0].split('.').pop()?.toLowerCase()
+        const extMap: Record<string, string> = {
+          pdf: 'application/pdf',
+          doc: 'application/msword',
+          docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          xls: 'application/vnd.ms-excel',
+          xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          png: 'image/png',
+          jpg: 'image/jpeg',
+          jpeg: 'image/jpeg',
+        }
+        fileType = ext ? extMap[ext] || '' : ''
+      }
+      const res = await fetch(url, {
+        method: editingForm ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...formData, fileType, familyId: null }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Error al guardar')
+      }
+      const result = await res.json()
+      const savedId = result.form?.id
+      if (pendingFiles.length > 0 && savedId) {
+        await Promise.allSettled(
+          pendingFiles.map(pf => {
+            const fd = new FormData()
+            fd.append('file', pf.file)
+            return fetch(`/api/admin/forms/${savedId}/attachments`, { method: 'POST', body: fd })
+          })
+        )
+      }
+      toast({ title: editingForm ? 'Documento actualizado' : 'Documento creado' })
+      setShowCreateDialog(false)
+      setEditingForm(null)
+      setPendingFiles([])
+      setFormData({ ...EMPTY_FORM })
+      loadForms()
+    } catch (err) {
+      toast({
+        title: 'Error',
+        description: err instanceof Error ? err.message : 'Error al guardar',
+        variant: 'destructive',
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleEdit = async (item: FormFeedItem) => {
+    try {
+      // Obtener datos completos del documento (con relaciones de visibilidad)
+      const res = await fetch(`/api/admin/forms/${item.id}`)
+      const fi: FormItem = res.ok ? (await res.json()).form || (item as any) : (item as any)
+      setEditingForm(fi)
+      setPendingFiles([])
+      setFormData({
+        title: fi.title,
+        description: fi.description || '',
+        summary: fi.summary || '',
+        version: fi.version || '',
+        categoryId: fi.categoryId || '',
+        fileUrl: fi.fileUrl || '',
+        fileSize: fi.fileSize ?? null,
+        fileType: fi.fileType || '',
+        isActive: fi.isActive,
+        isFeatured: fi.isFeatured,
+        roles: fi.form_roles?.map((r: any) => r.role) || [],
+        userIds: fi.form_users?.map((u: any) => u.userId) || [],
+        departmentIds: fi.form_departments?.map((d: any) => d.departmentId) || [],
+        familyIds: fi.form_families?.map((f: any) => f.familyId) || [],
+      })
+      setShowCreateDialog(true)
+    } catch {
+      toast({ title: 'Error al cargar documento', variant: 'destructive' })
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deletingForm) return
+    setDeleteLoading(true)
+    try {
+      const res = await fetch(`/api/admin/forms/${deletingForm.id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Error al eliminar')
+      toast({ title: 'Documento eliminado' })
+      setDeleteDialogOpen(false)
+      setDeletingForm(null)
+      loadForms()
+    } catch (err) {
+      toast({
+        title: 'Error',
+        description: err instanceof Error ? err.message : 'Error al eliminar',
+        variant: 'destructive',
+      })
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
+  const handleDeleteCategory = async (id: string) => {
+    const res = await fetch(`/api/admin/form-categories/${id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.error || 'Error al eliminar categoría')
+    }
+    toast({ title: 'Categoría eliminada' })
+    loadCategories()
+  }
 
   // ── Columnas de tabla ──────────────────────────────────────────────────────
   const columns: Column<FormFeedItem>[] = [
@@ -244,8 +477,27 @@ export default function PublicFormsPage() {
   return (
     <ModuleLayout
       title='Documentos'
-      subtitle='Accede a los documentos disponibles para ti'
+      subtitle={
+        canManage
+          ? 'Gestiona los documentos de tus familias'
+          : 'Accede a los documentos disponibles para ti'
+      }
       loading={loading && forms.length === 0}
+      headerActions={
+        canManage ? (
+          <Button
+            size='sm'
+            onClick={() => {
+              setFormData({ ...EMPTY_FORM })
+              setEditingForm(null)
+              setShowCreateDialog(true)
+            }}
+          >
+            <Plus className='h-4 w-4 mr-2' />
+            Nuevo documento
+          </Button>
+        ) : undefined
+      }
     >
       <DataTable
         title={`${forms.length} documento${forms.length !== 1 ? 's' : ''}`}
@@ -267,11 +519,52 @@ export default function PublicFormsPage() {
         filters={tableFilters}
         onFiltersChange={f => setFilters(prev => ({ ...prev, ...f }))}
         onRowClick={item => setSelectedForm(item)}
+        rowActions={
+          canManage
+            ? item => (
+                <div className='flex gap-1'>
+                  <Button
+                    variant='ghost'
+                    size='sm'
+                    onClick={e => {
+                      e.stopPropagation()
+                      handleEdit(item)
+                    }}
+                  >
+                    <Edit className='h-4 w-4' />
+                  </Button>
+                  <Button
+                    variant='ghost'
+                    size='sm'
+                    onClick={e => {
+                      e.stopPropagation()
+                      setDeletingForm(item)
+                      setDeleteDialogOpen(true)
+                    }}
+                  >
+                    <Trash2 className='h-4 w-4 text-destructive' />
+                  </Button>
+                </div>
+              )
+            : undefined
+        }
         cardRenderer={item => <FormCard form={item} onClick={() => setSelectedForm(item)} />}
         emptyState={{
           icon: <FileText className='h-10 w-10 text-muted-foreground mx-auto mb-3' />,
           title: 'No hay documentos disponibles',
           description: 'No se encontraron documentos para tu perfil en este momento',
+          action: canManage ? (
+            <Button
+              size='sm'
+              onClick={() => {
+                setFormData({ ...EMPTY_FORM })
+                setShowCreateDialog(true)
+              }}
+            >
+              <Plus className='h-4 w-4 mr-2' />
+              Crear primer documento
+            </Button>
+          ) : undefined,
         }}
       />
 
@@ -280,9 +573,255 @@ export default function PublicFormsPage() {
           form={selectedForm}
           isOpen={!!selectedForm}
           onClose={() => setSelectedForm(null)}
-          mode='view'
+          mode={canManage ? 'manage' : 'view'}
+          onEdit={canManage ? handleEdit : undefined}
+          onDelete={
+            canManage
+              ? item => {
+                  setDeletingForm(item)
+                  setDeleteDialogOpen(true)
+                }
+              : undefined
+          }
           onDownloaded={loadForms}
         />
+      )}
+
+      {/* ── Dialog crear / editar ─────────────────────────────────────────── */}
+      {canManage && (
+        <Dialog
+          open={showCreateDialog}
+          onOpenChange={open => {
+            setShowCreateDialog(open)
+            if (!open) {
+              setEditingForm(null)
+              setPendingFiles([])
+            }
+          }}
+        >
+          <DialogContent className='sm:max-w-3xl max-h-[90vh] overflow-y-auto'>
+            <DialogHeader>
+              <DialogTitle>{editingForm ? 'Editar documento' : 'Nuevo documento'}</DialogTitle>
+              <DialogDescription>
+                Complete la información para {editingForm ? 'actualizar' : 'crear'} el documento
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} onClick={e => e.stopPropagation()} className='space-y-4'>
+              <div className='grid grid-cols-2 gap-4'>
+                <div className='space-y-2 col-span-2'>
+                  <Label>
+                    Título <span className='text-destructive'>*</span>
+                  </Label>
+                  <Input
+                    required
+                    value={formData.title}
+                    onChange={e => setFormData(p => ({ ...p, title: e.target.value }))}
+                  />
+                </div>
+                <div className='space-y-2 col-span-2'>
+                  <Label>Descripción</Label>
+                  <Textarea
+                    value={formData.description}
+                    onChange={e => setFormData(p => ({ ...p, description: e.target.value }))}
+                    rows={2}
+                  />
+                </div>
+                <div className='space-y-2'>
+                  <Label>Resumen (opcional)</Label>
+                  <Input
+                    value={formData.summary}
+                    onChange={e => setFormData(p => ({ ...p, summary: e.target.value }))}
+                  />
+                </div>
+                <div className='space-y-2'>
+                  <Label>Versión (opcional)</Label>
+                  <Input
+                    value={formData.version}
+                    onChange={e => setFormData(p => ({ ...p, version: e.target.value }))}
+                    placeholder='v1.0'
+                  />
+                </div>
+                <div className='space-y-2 col-span-2'>
+                  <Label>
+                    Categoría <span className='text-destructive'>*</span>
+                  </Label>
+                  <InlineCreateSelect
+                    options={categories.map(c => ({
+                      id: c.id,
+                      name: c.name,
+                      description: c.description ?? undefined,
+                    }))}
+                    value={formData.categoryId}
+                    onChange={v => setFormData(p => ({ ...p, categoryId: v }))}
+                    placeholder='Seleccionar categoría'
+                    createLabel='Crear categoría'
+                    createTitle='Crear categoría'
+                    editTitle='Editar categoría'
+                    allowClear
+                    createForm={FormCategoryInlineForm}
+                    onDelete={handleDeleteCategory}
+                    deleteConfirmMessage='¿Eliminar esta categoría? Los documentos asociados quedarán sin categoría.'
+                    onAfterSave={() => loadCategories()}
+                  />
+                </div>
+                <div className='space-y-2 col-span-2'>
+                  <Label>Archivo</Label>
+                  <div className='space-y-3'>
+                    {editingForm?.fileUrl && pendingFiles.length === 0 && (
+                      <div className='flex items-center gap-3 p-3 rounded-lg border bg-muted/30'>
+                        <span className='text-xl'>📄</span>
+                        <div className='flex-1 min-w-0'>
+                          <p className='text-sm font-medium truncate'>
+                            {editingForm.fileType || 'Archivo adjunto'}
+                          </p>
+                        </div>
+                        <div className='flex gap-2 flex-shrink-0'>
+                          <Button
+                            type='button'
+                            variant='outline'
+                            size='sm'
+                            onClick={() => window.open(editingForm.fileUrl!, '_blank')}
+                          >
+                            Ver
+                          </Button>
+                          <Button
+                            type='button'
+                            variant='ghost'
+                            size='sm'
+                            className='text-destructive hover:text-destructive'
+                            onClick={() =>
+                              setFormData(p => ({
+                                ...p,
+                                fileUrl: '',
+                                fileSize: null,
+                                fileType: '',
+                              }))
+                            }
+                          >
+                            Quitar
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                    <FileDropZone
+                      pendingFiles={pendingFiles}
+                      onPendingFilesChange={files => {
+                        setPendingFiles(files)
+                        if (files.length > 0) {
+                          const f = files[0].file
+                          setFormData(p => ({
+                            ...p,
+                            fileUrl: '',
+                            fileSize: f.size,
+                            fileType: f.type,
+                          }))
+                        } else {
+                          setFormData(p => ({
+                            ...p,
+                            fileUrl: editingForm?.fileUrl || '',
+                            fileSize: editingForm?.fileSize ?? null,
+                            fileType: editingForm?.fileType || '',
+                          }))
+                        }
+                      }}
+                      maxFiles={1}
+                      acceptLabel='PDF, Word, Excel, imágenes'
+                      accept='.pdf,.doc,.docx,.xls,.xlsx,image/*'
+                      allowedTypes={[
+                        'application/pdf',
+                        'application/msword',
+                        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                        'application/vnd.ms-excel',
+                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                        'image/jpeg',
+                        'image/jpg',
+                        'image/png',
+                        'image/gif',
+                        'image/webp',
+                      ]}
+                    />
+                    {pendingFiles.length === 0 && !editingForm?.fileUrl && (
+                      <MediaUrlInput
+                        label=''
+                        value={formData.fileUrl}
+                        onChange={v => setFormData(p => ({ ...p, fileUrl: v }))}
+                        placeholder='O pega una URL externa (Google Drive, OneDrive, Dropbox, PDF...)'
+                        optional={false}
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className='flex items-center gap-6 pt-2'>
+                <div className='flex items-center gap-2'>
+                  <Switch
+                    checked={formData.isActive}
+                    onCheckedChange={v => setFormData(p => ({ ...p, isActive: v }))}
+                  />
+                  <Label>Activo</Label>
+                </div>
+                <div className='flex items-center gap-2'>
+                  <Switch
+                    checked={formData.isFeatured}
+                    onCheckedChange={v => setFormData(p => ({ ...p, isFeatured: v }))}
+                  />
+                  <Label>Destacado</Label>
+                </div>
+              </div>
+              <Separator />
+              <VisibilitySelector
+                families={families}
+                users={users}
+                selectedRoles={formData.roles}
+                selectedFamilyIds={formData.familyIds}
+                selectedDepartmentIds={formData.departmentIds}
+                selectedUserIds={formData.userIds}
+                onRolesChange={roles => setFormData(p => ({ ...p, roles }))}
+                onFamilyIdsChange={familyIds => setFormData(p => ({ ...p, familyIds }))}
+                onDepartmentIdsChange={departmentIds => setFormData(p => ({ ...p, departmentIds }))}
+                onUserIdsChange={userIds => setFormData(p => ({ ...p, userIds }))}
+              />
+              <DialogFooter>
+                <Button
+                  type='button'
+                  variant='outline'
+                  onClick={() => {
+                    setShowCreateDialog(false)
+                    setEditingForm(null)
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button type='submit' disabled={saving}>
+                  {saving ? 'Guardando...' : editingForm ? 'Actualizar' : 'Crear'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* ── Dialog eliminar ───────────────────────────────────────────────── */}
+      {canManage && (
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent className='sm:max-w-[425px]'>
+            <DialogHeader>
+              <DialogTitle>Eliminar documento</DialogTitle>
+              <DialogDescription>
+                ¿Estás seguro de que deseas eliminar <strong>{deletingForm?.title}</strong>? Esta
+                acción no se puede deshacer.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant='outline' onClick={() => setDeleteDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button variant='destructive' onClick={handleDelete} disabled={deleteLoading}>
+                {deleteLoading ? 'Eliminando...' : 'Eliminar'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </ModuleLayout>
   )

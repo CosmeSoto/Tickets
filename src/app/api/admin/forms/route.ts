@@ -148,7 +148,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ form }, { status: 201 })
   } catch (error) {
     console.error('Error creando formulario:', error)
+    const message = error instanceof Error ? error.message : 'Error desconocido'
     // Prisma P2002 = unique constraint (slug duplicado, muy improbable con timestamp)
-    return NextResponse.json({ error: 'Error al crear formulario' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Error al crear formulario', detail: message },
+      { status: 500 }
+    )
   }
 }

@@ -215,11 +215,6 @@ export function FormDetail({
     }
   }
 
-  const handleOpenExternal = () => {
-    const url = isLocal ? `/api/forms/${form.id}/file` : form.fileUrl!
-    window.open(url, '_blank')
-  }
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className='sm:max-w-2xl max-h-[90vh] overflow-y-auto max-w-[95vw] w-full p-4 sm:p-6'>
@@ -346,35 +341,65 @@ export function FormDetail({
 
                 {/* Botones de acción */}
                 <div className='flex flex-wrap gap-2'>
-                  <Button onClick={handleDownload} disabled={downloading} className='gap-2'>
-                    <Download className='h-4 w-4' />
-                    {downloading ? 'Abriendo...' : isLocal ? 'Descargar' : 'Abrir documento'}
-                  </Button>
+                  {isLocal ? (
+                    // Archivo local
+                    <>
+                      <Button onClick={handleDownload} disabled={downloading} className='gap-2'>
+                        <Download className='h-4 w-4' />
+                        {downloading ? 'Descargando...' : 'Descargar'}
+                      </Button>
 
-                  {canPreview && (
-                    <Button
-                      variant='outline'
-                      onClick={() => setShowPreview(v => !v)}
-                      className='gap-2'
-                    >
-                      {showPreview ? (
-                        <>
-                          <EyeOff className='h-4 w-4' />
-                          Ocultar vista previa
-                        </>
-                      ) : (
-                        <>
-                          <Eye className='h-4 w-4' />
-                          Vista previa
-                        </>
+                      {/* Vista previa solo para PDF e imágenes */}
+                      {canPreview && (
+                        <Button
+                          variant='outline'
+                          onClick={() => setShowPreview(v => !v)}
+                          className='gap-2'
+                        >
+                          {showPreview ? (
+                            <>
+                              <EyeOff className='h-4 w-4' />
+                              Ocultar vista previa
+                            </>
+                          ) : (
+                            <>
+                              <Eye className='h-4 w-4' />
+                              Vista previa
+                            </>
+                          )}
+                        </Button>
                       )}
-                    </Button>
-                  )}
+                    </>
+                  ) : (
+                    // URL externa (Google Drive, OneDrive, Dropbox, etc.)
+                    <>
+                      <Button onClick={handleDownload} disabled={downloading} className='gap-2'>
+                        <ExternalLink className='h-4 w-4' />
+                        {downloading ? 'Abriendo...' : 'Abrir documento'}
+                      </Button>
 
-                  <Button variant='ghost' onClick={handleOpenExternal} className='gap-2'>
-                    <ExternalLink className='h-4 w-4' />
-                    Abrir en nueva pestaña
-                  </Button>
+                      {/* Vista previa embebida para servicios que la soportan */}
+                      {canPreview && (
+                        <Button
+                          variant='outline'
+                          onClick={() => setShowPreview(v => !v)}
+                          className='gap-2'
+                        >
+                          {showPreview ? (
+                            <>
+                              <EyeOff className='h-4 w-4' />
+                              Ocultar vista previa
+                            </>
+                          ) : (
+                            <>
+                              <Eye className='h-4 w-4' />
+                              Vista previa
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
 
