@@ -338,6 +338,17 @@ export default function AdminFormsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!formData.categoryId) {
+      toast({
+        title: 'Categoría requerida',
+        description: 'Debes seleccionar o crear una categoría antes de guardar',
+        variant: 'destructive',
+        duration: 4000,
+      })
+      return
+    }
+
     try {
       setUploadingFile(true)
       const url = editingForm ? `/api/admin/forms/${editingForm.id}` : '/api/admin/forms'
@@ -700,7 +711,9 @@ export default function AdminFormsPage() {
                 />
               </div>
               <div className='space-y-2'>
-                <Label>Categoría</Label>
+                <Label>
+                  Categoría <span className='text-destructive'>*</span>
+                </Label>
                 <InlineCreateSelect
                   options={categories}
                   value={formData.categoryId}
@@ -715,6 +728,7 @@ export default function AdminFormsPage() {
                   createForm={FormCategoryInlineForm}
                   onDelete={handleDeleteCategory}
                   deleteConfirmMessage='¿Eliminar esta categoría? Los documentos asociados se quedarán sin categoría.'
+                  onAfterSave={() => loadCategories()}
                 />
               </div>
               <div className='space-y-2'>

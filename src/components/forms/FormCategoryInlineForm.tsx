@@ -26,20 +26,26 @@ export function FormCategoryInlineForm({ item, onSuccess, onCancel }: Props) {
     if (item) {
       setName(item.name)
       setDescription(item.description || '')
+    } else {
+      setName('')
+      setDescription('')
     }
   }, [item])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+
     if (!name.trim()) {
       setError('El nombre es obligatorio')
       return
     }
+
     setLoading(true)
     try {
       const url = item ? `/api/admin/form-categories/${item.id}` : '/api/admin/form-categories'
       const method = item ? 'PUT' : 'POST'
+
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
@@ -48,13 +54,22 @@ export function FormCategoryInlineForm({ item, onSuccess, onCancel }: Props) {
           description: description.trim() || null,
         }),
       })
+
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Error al guardar')
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Error al guardar')
+      }
+
+      // La API devuelve { category: { id, name, description, ... } }
+      const saved = data.category
+
       onSuccess({
-        id: data.id || item?.id || '',
-        name: data.name,
-        description: data.description || undefined,
+        id: saved.id,
+        name: saved.name,
+        description: saved.description ?? undefined,
       })
+
       toast({
         title: item ? 'Categoría actualizada' : 'Categoría creada',
         description: 'La categoría se guardó correctamente',

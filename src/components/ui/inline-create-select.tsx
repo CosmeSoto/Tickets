@@ -56,6 +56,8 @@ interface InlineCreateSelectProps {
   onDelete?: (id: string) => Promise<void>
   /** Mensaje de confirmación al eliminar */
   deleteConfirmMessage?: string
+  /** Callback después de crear o editar un item (útil para recargar la lista) */
+  onAfterSave?: (item: InlineSelectOption, isEdit: boolean) => void
 }
 
 export function InlineCreateSelect({
@@ -71,6 +73,7 @@ export function InlineCreateSelect({
   createForm,
   onDelete,
   deleteConfirmMessage = '¿Eliminar este elemento? Esta acción no se puede deshacer.',
+  onAfterSave,
 }: InlineCreateSelectProps) {
   const [open, setOpen] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
@@ -93,10 +96,13 @@ export function InlineCreateSelect({
   }
 
   const handleSaved = (item: InlineSelectOption) => {
+    const isEdit = !!editingItem
     setFormOpen(false)
     setEditingItem(undefined)
     // Si es creación, seleccionar el nuevo item
-    if (!editingItem) onChange(item.id)
+    if (!isEdit) onChange(item.id)
+    // Notificar al padre para que recargue la lista
+    onAfterSave?.(item, isEdit)
   }
 
   const handleDelete = async () => {
