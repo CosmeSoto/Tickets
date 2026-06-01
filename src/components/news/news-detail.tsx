@@ -24,6 +24,10 @@ import {
   Edit,
   Trash2,
   EyeOff,
+  Paperclip,
+  Download,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -91,7 +95,14 @@ export interface NewsDetailItem {
   createdBy: { id: string; name: string; email: string; avatar: string | null }
   news_views?: Array<{ id: string }>
   news_reactions?: Array<{ id: string; reaction: string }>
-  news_attachments?: Array<{ id: string; filename: string; originalName: string; path: string }>
+  news_attachments?: Array<{
+    id: string
+    filename: string
+    originalName: string
+    path: string
+    mimeType: string
+    size: number
+  }>
   news_comments?: NewsComment[]
   _count: { news_views: number; news_reactions: number; news_comments: number }
 }
@@ -503,33 +514,70 @@ export function NewsDetail({
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
 
   // Obtener medios: imageUrl puede ser Google Drive, OneDrive, YouTube, imagen directa, etc.
-  // Los attachments locales ya no se usan (migrado a URLs externas)
-  const getMediaItems = (): Array<{ src: string; type: 'image' | 'embed' }> => {
-    const items: Array<{ src: string; type: 'image' | 'embed' }> = []
+  // Los attachments de imagen también se incluyen en el carrusel.
+  const getMediaItems = (): Array<{ src: string; type: 'image' | 'embed'; label?: string }> => {
+    const items: Array<{ src: string; type: 'image' | 'embed'; label?: string }> = []
 
+    // 1. imageUrl principal
     if (news.imageUrl) {
       const media = detectMedia(news.imageUrl)
       if (media.canPreview && media.embedUrl) {
         items.push({
           src: media.embedUrl,
           type: media.type === 'image' ? 'image' : 'embed',
+          label: media.label,
         })
       } else if (media.type === 'image') {
         items.push({ src: news.imageUrl, type: 'image' })
       }
     }
 
+    // 2. Adjuntos de imagen subidos localmente
+    if (news.news_attachments) {
+      news.news_attachments
+        .filter(a => a.mimeType?.startsWith('image/'))
+        .forEach(a => {
+          items.push({
+            src: `/api/admin/news/${news.id}/attachments/${a.id}/file`,
+            type: 'image',
+            label: a.originalName,
+          })
+        })
+    }
+
     return items
+  }
+
+  // Adjuntos no-imagen (PDFs, docs, etc.) para lista de descarga
+  const downloadAttachments = (news.news_attachments || []).filter(
+    a => !a.mimeType?.startsWith('image/')
+  )
+
+  const getFileIcon = (mimeType: string) => {
+    if (mimeType === 'application/pdf') return '📕'
+    if (mimeType.includes('word')) return '📝'
+    if (mimeType.includes('excel') || mimeType.includes('sheet')) return '📊'
+    if (mimeType.startsWith('text/')) return '📄'
+    return '📎'
+  }
+
+  const formatSize = (bytes: number) => {
+    if (!bytes) return ''
+    const k = 1024
+    const sizes = ['B', 'KB', 'MB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
   }
 
   const mediaItems = getMediaItems()
 
   const newsBodyContent = (
     <div className='space-y-4 w-full max-w-full overflow-hidden'>
-      {/* Media: imagen, video, iframe embebido */}
+      {/* Media: imagen, video, iframe embebido — carrusel si hay múltiples */}
       {mediaItems.length > 0 && (
         <div className='rounded-lg overflow-hidden bg-muted/30 w-full'>
           {mediaItems.length === 1 ? (
+            // Un solo elemento
             mediaItems[0].type === 'image' ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -547,52 +595,133 @@ export function NewsDetail({
               />
             )
           ) : (
-            // Carousel (por si en el futuro se soportan múltiples)
-            <div className='relative w-full'>
-              {mediaItems[currentImageIndex].type === 'image' ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={mediaItems[currentImageIndex].src}
-                  alt={`${news.title} - ${currentImageIndex + 1}`}
-                  className='w-full h-auto object-contain max-h-[400px]'
-                />
-              ) : (
-                <iframe
-                  src={mediaItems[currentImageIndex].src}
-                  title={news.title}
-                  className='w-full h-[300px] sm:h-[400px] border-0'
-                  allow='autoplay; fullscreen'
-                  sandbox='allow-scripts allow-same-origin allow-popups allow-presentation'
-                />
-              )}
+            // Carrusel con múltiples medios
+            <div className='relative w-full select-none'>
+              {/* Slide actual */}
+              <div className='w-full'>
+                {mediaItems[currentImageIndex].type === 'image' ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={mediaItems[currentImageIndex].src}
+                    alt={
+                      mediaItems[currentImageIndex].label ||
+                      `${news.title} - ${currentImageIndex + 1}`
+                    }
+                    className='w-full h-auto object-contain max-h-[400px]'
+                  />
+                ) : (
+                  <iframe
+                    src={mediaItems[currentImageIndex].src}
+                    title={news.title}
+                    className='w-full h-[300px] sm:h-[400px] border-0'
+                    allow='autoplay; fullscreen'
+                    sandbox='allow-scripts allow-same-origin allow-popups allow-presentation'
+                  />
+                )}
+              </div>
+
+              {/* Controles de navegación */}
               <button
                 type='button'
+                aria-label='Anterior'
                 onClick={() =>
                   setCurrentImageIndex(p => (p - 1 + mediaItems.length) % mediaItems.length)
                 }
-                className='absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-1.5 rounded-full'
+                className='absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/75 text-white p-2 rounded-full transition-colors'
               >
-                ←
+                <ChevronLeft className='h-4 w-4' />
               </button>
               <button
                 type='button'
+                aria-label='Siguiente'
                 onClick={() => setCurrentImageIndex(p => (p + 1) % mediaItems.length)}
-                className='absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-1.5 rounded-full'
+                className='absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/75 text-white p-2 rounded-full transition-colors'
               >
-                →
+                <ChevronRight className='h-4 w-4' />
               </button>
-              <div className='absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1'>
+
+              {/* Indicadores de posición */}
+              <div className='absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5'>
                 {mediaItems.map((_, i) => (
                   <button
                     key={i}
                     type='button'
+                    aria-label={`Ir a imagen ${i + 1}`}
                     onClick={() => setCurrentImageIndex(i)}
-                    className={`w-2 h-2 rounded-full ${i === currentImageIndex ? 'bg-white' : 'bg-white/50'}`}
+                    className={`w-2 h-2 rounded-full transition-colors ${
+                      i === currentImageIndex ? 'bg-white' : 'bg-white/40 hover:bg-white/70'
+                    }`}
                   />
                 ))}
               </div>
+
+              {/* Contador */}
+              <div className='absolute top-2 right-2 bg-black/50 text-white text-xs px-2 py-0.5 rounded-full'>
+                {currentImageIndex + 1} / {mediaItems.length}
+              </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Miniaturas del carrusel (si hay más de 1 imagen) */}
+      {mediaItems.length > 1 && (
+        <div className='flex gap-2 overflow-x-auto pb-1'>
+          {mediaItems.map((item, i) => (
+            <button
+              key={i}
+              type='button'
+              onClick={() => setCurrentImageIndex(i)}
+              className={`flex-shrink-0 w-14 h-14 rounded-md overflow-hidden border-2 transition-colors ${
+                i === currentImageIndex
+                  ? 'border-primary'
+                  : 'border-transparent hover:border-muted-foreground/50'
+              }`}
+            >
+              {item.type === 'image' ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={item.src}
+                  alt={`Miniatura ${i + 1}`}
+                  className='w-full h-full object-cover'
+                />
+              ) : (
+                <div className='w-full h-full bg-muted flex items-center justify-center text-xs text-muted-foreground'>
+                  ▶
+                </div>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Adjuntos descargables (PDFs, docs, etc.) */}
+      {downloadAttachments.length > 0 && (
+        <div className='space-y-1.5'>
+          <p className='text-xs font-medium text-muted-foreground flex items-center gap-1'>
+            <Paperclip className='h-3 w-3' />
+            Archivos adjuntos ({downloadAttachments.length})
+          </p>
+          <div className='space-y-1'>
+            {downloadAttachments.map(att => (
+              <a
+                key={att.id}
+                href={`/api/news/${news.id}/attachments/${att.id}/file`}
+                target='_blank'
+                rel='noopener noreferrer'
+                className='flex items-center gap-2.5 p-2 rounded-lg border bg-muted/30 hover:bg-muted/60 transition-colors group'
+              >
+                <span className='text-lg flex-shrink-0'>{getFileIcon(att.mimeType)}</span>
+                <div className='flex-1 min-w-0'>
+                  <p className='text-sm font-medium truncate'>{att.originalName}</p>
+                  {att.size > 0 && (
+                    <p className='text-xs text-muted-foreground'>{formatSize(att.size)}</p>
+                  )}
+                </div>
+                <Download className='h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0' />
+              </a>
+            ))}
+          </div>
         </div>
       )}
 

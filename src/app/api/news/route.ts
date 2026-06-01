@@ -40,14 +40,27 @@ export async function GET(request: NextRequest) {
     }
 
     // ── Construir filtro WHERE ────────────────────────────────────────────────
-    const andConditions: any[] = [{ OR: [{ endDate: null }, { endDate: { gte: new Date() } }] }]
+    // Siempre filtrar por rango de fechas: solo mostrar noticias cuyo período esté activo
+    const now = new Date()
+    const andConditions: any[] = [
+      // endDate: no ha vencido
+      { OR: [{ endDate: null }, { endDate: { gte: now } }] },
+      // startDate: ya comenzó (o no tiene fecha de inicio)
+      { OR: [{ startDate: null }, { startDate: { lte: now } }] },
+    ]
 
     if (period === 'today') {
       const endOfDay = new Date()
       endOfDay.setHours(23, 59, 59, 999)
-      andConditions.push({ OR: [{ startDate: null }, { startDate: { lte: endOfDay } }] })
-    } else if (period === 'week' || period === 'month') {
-      andConditions.push({ OR: [{ startDate: null }, { startDate: { lte: new Date() } }] })
+      andConditions.push({ createdAt: { gte: new Date(now.setHours(0, 0, 0, 0)) } })
+    } else if (period === 'week') {
+      const weekAgo = new Date()
+      weekAgo.setDate(weekAgo.getDate() - 7)
+      andConditions.push({ createdAt: { gte: weekAgo } })
+    } else if (period === 'month') {
+      const monthAgo = new Date()
+      monthAgo.setMonth(monthAgo.getMonth() - 1)
+      andConditions.push({ createdAt: { gte: monthAgo } })
     }
 
     // Filtro de visibilidad: la noticia es visible si:

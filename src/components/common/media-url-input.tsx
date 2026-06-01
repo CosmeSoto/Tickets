@@ -3,26 +3,27 @@
 /**
  * MediaUrlInput — componente global para insertar URLs de medios externos
  *
- * Soporta:
- *  - Google Drive (imágenes, PDFs, documentos)
- *  - OneDrive / SharePoint
- *  - Dropbox
+ * Vista previa real (iframe funcional):
  *  - YouTube (embed)
- *  - URLs directas de imagen (jpg, png, gif, webp, svg)
- *  - URLs directas de PDF
- *  - Cualquier URL pública
+ *  - Google Drive (archivo individual con /preview)
+ *  - Imágenes directas (jpg, png, gif, webp, svg)
+ *  - PDFs directos
+ *  - Dropbox imágenes (?raw=1)
  *
- * Muestra una vista previa inline cuando la URL es reconocible.
+ * Enlace externo (bloquean X-Frame-Options — no se puede embeber):
+ *  - SharePoint / OneDrive for Business
+ *  - OneDrive personal (link de compartir, no de insertar)
+ *  - Google Drive carpetas / Docs / Sheets
  */
 
-import { useState, useEffect } from 'react'
-import { Link, X, Eye, EyeOff, ExternalLink, CheckCircle2, AlertCircle } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Link, X, Eye, EyeOff, ExternalLink, CheckCircle2, AlertCircle, Info } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 
-// ── Tipos de media detectados ──────────────────────────────────────────────────
+// ── Tipos ──────────────────────────────────────────────────────────────────────
 
 export type MediaType =
   | 'image'
@@ -37,13 +38,14 @@ export type MediaType =
 export interface MediaInfo {
   type: MediaType
   label: string
-  embedUrl: string | null // URL para mostrar en iframe/img
-  originalUrl: string // URL original sin modificar
+  embedUrl: string | null
+  originalUrl: string
   canPreview: boolean
   canEmbed: boolean
+  previewNote?: string
 }
 
-// ── Helpers de detección ───────────────────────────────────────────────────────
+// ── detectMedia ────────────────────────────────────────────────────────────────
 
 export function detectMedia(url: string): MediaInfo {
   if (!url.trim()) {
@@ -73,8 +75,8 @@ export function detectMedia(url: string): MediaInfo {
     }
   }
 
-  // Google Drive
-  const gdMatch = u.match(/drive\.google\.com\/file\/d\/([^/]+)/)
+  // Google Drive — archivo individual (/file/d/{id})
+  const gdMatch = u.match(/drive\.google\.com\/file\/d\/([^/?]+)/)
   if (gdMatch) {
     return {
       type: 'google-drive',
@@ -96,55 +98,76 @@ export function detectMedia(url: string): MediaInfo {
       canEmbed: true,
     }
   }
+  // Google Drive carpetas, Docs, Sheets, Slides — bloquean iframe
+  if (lower.includes('drive.google.com') || lower.includes('docs.google.com')) {
+    return {
+      type: 'google-drive',
+      label: 'Google Drive',
+      embedUrl: null,
+      originalUrl: u,
+      canPreview: true,
+      canEmbed: false,
+      previewNote:
+        'Google Drive bloquea la vista previa inline para carpetas y documentos. Usa el botón para abrir.',
+    }
+  }
 
-  // OneDrive personal
+  // SharePoint / OneDrive for Business — bloquea iframes con X-Frame-Options: DENY
+  if (lower.includes('sharepoint.com') || lower.includes('office.com')) {
+    return {
+      type: 'onedrive',
+      label: 'SharePoint / OneDrive',
+      embedUrl: null,
+      originalUrl: u,
+      canPreview: true,
+      canEmbed: false,
+      previewNote:
+        'SharePoint bloquea la vista previa inline por política de seguridad. Usa el botón para abrir el archivo.',
+    }
+  }
+
+  // OneDrive personal — solo funciona con URL de "Insertar" (/embed), no de compartir
   if (lower.includes('onedrive.live.com') || lower.includes('1drv.ms')) {
-    const embedUrl = u.replace('/view', '/embed').replace('/download', '/embed')
+    const embedUrl = u
+      .replace('/view?', '/embed?')
+      .replace('/view#', '/embed#')
+      .replace(/\/view$/, '/embed')
+    const isEmbedUrl = embedUrl !== u || lower.includes('/embed')
     return {
       type: 'onedrive',
       label: 'OneDrive',
-      embedUrl: embedUrl !== u ? embedUrl : null,
-      originalUrl: u,
-      canPreview: embedUrl !== u,
-      canEmbed: embedUrl !== u,
-    }
-  }
-
-  // SharePoint / OneDrive for Business
-  if (lower.includes('sharepoint.com')) {
-    return {
-      type: 'onedrive',
-      label: 'SharePoint',
-      embedUrl: `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(u)}`,
+      embedUrl: isEmbedUrl ? embedUrl : null,
       originalUrl: u,
       canPreview: true,
-      canEmbed: true,
+      canEmbed: isEmbedUrl,
+      previewNote: isEmbedUrl
+        ? undefined
+        : 'Para vista previa, usa el enlace de "Insertar" de OneDrive (no el de compartir).',
     }
   }
 
-  // Dropbox
+  // Dropbox — imágenes con ?raw=1 funcionan; otros tipos bloquean
   if (lower.includes('dropbox.com')) {
-    const embedUrl = u.replace('?dl=0', '?raw=1').replace('?dl=1', '?raw=1')
     const isImage = /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(u)
+    const rawUrl = u.replace('?dl=0', '?raw=1').replace('?dl=1', '?raw=1')
+    if (isImage) {
+      return {
+        type: 'dropbox',
+        label: 'Dropbox',
+        embedUrl: rawUrl,
+        originalUrl: u,
+        canPreview: true,
+        canEmbed: true,
+      }
+    }
     return {
       type: 'dropbox',
       label: 'Dropbox',
-      embedUrl,
+      embedUrl: null,
       originalUrl: u,
       canPreview: true,
-      canEmbed: isImage,
-    }
-  }
-
-  // Documentos Office en URL directa → Office Online Viewer
-  if (/\.(docx?|xlsx?|pptx?)(\?|$)/i.test(u) && u.startsWith('http')) {
-    return {
-      type: 'office',
-      label: 'Documento Office',
-      embedUrl: `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(u)}`,
-      originalUrl: u,
-      canPreview: true,
-      canEmbed: true,
+      canEmbed: false,
+      previewNote: 'Dropbox bloquea la vista previa inline para este tipo de archivo.',
     }
   }
 
@@ -172,7 +195,19 @@ export function detectMedia(url: string): MediaInfo {
     }
   }
 
-  // URL genérica
+  // Office en URL directa pública → Office Online Viewer (solo si el archivo es público)
+  if (/\.(docx?|xlsx?|pptx?)(\?|$)/i.test(u) && u.startsWith('http')) {
+    return {
+      type: 'office',
+      label: 'Documento Office',
+      embedUrl: `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(u)}`,
+      originalUrl: u,
+      canPreview: true,
+      canEmbed: true,
+      previewNote: 'Requiere que el archivo sea públicamente accesible (sin login).',
+    }
+  }
+
   return {
     type: 'unknown',
     label: 'Enlace externo',
@@ -203,7 +238,6 @@ interface MediaUrlInputProps {
   placeholder?: string
   showPreview?: boolean
   className?: string
-  /** Si se pasa, muestra el campo como opcional */
   optional?: boolean
 }
 
@@ -219,13 +253,18 @@ export function MediaUrlInput({
   optional = true,
 }: MediaUrlInputProps) {
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [imgError, setImgError] = useState(false)
   const [inputValue, setInputValue] = useState(value)
+  const iframeRef = useRef<HTMLIFrameElement>(null)
 
-  // Sincronizar si el valor externo cambia (ej: al abrir edición)
   useEffect(() => {
     setInputValue(value)
     if (!value) setPreviewOpen(false)
   }, [value])
+
+  useEffect(() => {
+    setImgError(false)
+  }, [inputValue, previewOpen])
 
   const media = detectMedia(inputValue)
   const hasUrl = !!inputValue.trim()
@@ -246,11 +285,11 @@ export function MediaUrlInput({
       {label && (
         <Label>
           {label}
-          {optional && <span className='text-muted-foreground ml-1 font-normal'>(opcional)</span>}
+          {optional && <span className='text-muted-foreground ml-1 font-normal'></span>}
         </Label>
       )}
 
-      {/* Input con indicador de tipo */}
+      {/* Input */}
       <div className='relative flex items-center gap-2'>
         <div className='relative flex-1'>
           <div className='absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground'>
@@ -267,8 +306,6 @@ export function MediaUrlInput({
             className='pl-9 pr-4'
           />
         </div>
-
-        {/* Botones de acción */}
         {hasUrl && (
           <div className='flex items-center gap-1 flex-shrink-0'>
             {showPreview && media.canPreview && (
@@ -278,7 +315,7 @@ export function MediaUrlInput({
                 size='sm'
                 onClick={() => setPreviewOpen(v => !v)}
                 className='gap-1.5 h-9'
-                title={previewOpen ? 'Ocultar vista previa' : 'Vista previa'}
+                title={previewOpen ? 'Ocultar' : 'Vista previa'}
               >
                 {previewOpen ? <EyeOff className='h-3.5 w-3.5' /> : <Eye className='h-3.5 w-3.5' />}
                 <span className='hidden sm:inline'>
@@ -310,14 +347,21 @@ export function MediaUrlInput({
         )}
       </div>
 
-      {/* Indicador de tipo detectado */}
+      {/* Indicador de tipo */}
       {hasUrl && (
         <div className='flex items-center gap-1.5 text-xs'>
           {media.type !== 'unknown' ? (
-            <span className='flex items-center gap-1 text-green-600 dark:text-green-400'>
-              <CheckCircle2 className='h-3 w-3' />
+            <span
+              className={cn(
+                'flex items-center gap-1',
+                media.canEmbed
+                  ? 'text-green-600 dark:text-green-400'
+                  : 'text-amber-600 dark:text-amber-400'
+              )}
+            >
+              {media.canEmbed ? <CheckCircle2 className='h-3 w-3' /> : <Info className='h-3 w-3' />}
               {media.label} detectado
-              {media.canPreview && ' · Vista previa disponible'}
+              {media.canEmbed ? ' · Vista previa disponible' : ' · Solo enlace externo'}
             </span>
           ) : (
             <span className='flex items-center gap-1 text-muted-foreground'>
@@ -329,24 +373,51 @@ export function MediaUrlInput({
       )}
 
       {/* Vista previa */}
-      {previewOpen && media.canPreview && media.embedUrl && (
+      {previewOpen && media.canPreview && (
         <div className='rounded-lg overflow-hidden border bg-muted/30 mt-2'>
-          {media.type === 'image' || (media.type === 'dropbox' && media.canEmbed) ? (
+          {/* Imagen directa o Dropbox imagen */}
+          {media.canEmbed && (media.type === 'image' || media.type === 'dropbox') && !imgError ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={media.embedUrl}
+              src={media.embedUrl!}
               alt='Vista previa'
               className='w-full max-h-64 object-contain'
-              onError={() => setPreviewOpen(false)}
+              onError={() => setImgError(true)}
             />
-          ) : (
+          ) : media.canEmbed && media.embedUrl && !imgError ? (
+            /* iframe embebible: YouTube, Google Drive archivo, PDF, Office público */
             <iframe
+              ref={iframeRef}
               src={media.embedUrl}
               title='Vista previa'
-              className='w-full h-64 border-0'
-              allow='autoplay'
-              sandbox='allow-scripts allow-same-origin allow-popups'
+              className='w-full h-72 border-0'
+              allow='autoplay; fullscreen'
+              sandbox='allow-scripts allow-same-origin allow-popups allow-forms allow-presentation'
             />
+          ) : (
+            /* Fallback: no embebible o imagen falló */
+            <div className='flex flex-col items-center justify-center gap-3 py-8 px-4 text-center'>
+              <span className='text-4xl'>{TYPE_ICONS[media.type]}</span>
+              <div>
+                <p className='text-sm font-medium'>{media.label}</p>
+                <p className='text-xs text-muted-foreground mt-1 max-w-xs'>
+                  {imgError
+                    ? 'No se pudo cargar la imagen. Puede requerir permisos o no estar disponible públicamente.'
+                    : media.previewNote ||
+                      'Este servicio no permite mostrar el contenido en vista previa inline.'}
+                </p>
+              </div>
+              <Button
+                type='button'
+                variant='outline'
+                size='sm'
+                onClick={() => window.open(media.originalUrl, '_blank')}
+                className='gap-1.5'
+              >
+                <ExternalLink className='h-3.5 w-3.5' />
+                Abrir en nueva pestaña
+              </Button>
+            </div>
           )}
         </div>
       )}
@@ -354,7 +425,8 @@ export function MediaUrlInput({
       {/* Ayuda */}
       {!hasUrl && (
         <p className='text-xs text-muted-foreground'>
-          Soporta: Google Drive, OneDrive, SharePoint, Dropbox, YouTube, imágenes y PDFs directos
+          Vista previa: Google Drive (archivos), YouTube, imágenes y PDFs directos · SharePoint y
+          OneDrive se abren en nueva pestaña
         </p>
       )}
     </div>

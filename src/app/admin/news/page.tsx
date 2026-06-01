@@ -39,6 +39,8 @@ import { VisibilitySelector } from '@/components/common/visibility-selector'
 import { MediaUrlInput } from '@/components/common/media-url-input'
 import { NewsDetail } from '@/components/news/news-detail'
 import type { NewsDetailItem } from '@/components/news/news-detail'
+import { NewsAttachmentsUploader } from '@/components/news/news-attachments-uploader'
+import type { PendingFile, UploadedAttachment } from '@/components/news/news-attachments-uploader'
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
 
@@ -204,6 +206,8 @@ export default function AdminNewsPage() {
 
   const [families, setFamilies] = useState<FamilyOption[]>([])
   const [saving, setSaving] = useState(false)
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
+  const [uploadedAttachments, setUploadedAttachments] = useState<UploadedAttachment[]>([])
 
   const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
     filename: 'noticias',
@@ -226,7 +230,7 @@ export default function AdminNewsPage() {
       {
         key: 'views',
         label: 'Vistas',
-        format: (_: any, row: NewsItem) => row._count?.news_views || 0,
+        format: (_: any, row: NewsItem) => String(row._count?.news_views || 0),
       },
     ],
     getData: () => news,
@@ -377,6 +381,29 @@ export default function AdminNewsPage() {
         throw new Error(errData.error || 'Error al guardar noticia')
       }
 
+      const savedNews = await response.json()
+      const newsId = savedNews.news?.id || editingNews?.id
+
+      // Subir archivos pendientes si los hay
+      if (pendingFiles.length > 0 && newsId) {
+        const uploadResults = await Promise.allSettled(
+          pendingFiles.map(pf => {
+            const fd = new FormData()
+            fd.append('file', pf.file)
+            return fetch(`/api/admin/news/${newsId}/attachments`, { method: 'POST', body: fd })
+          })
+        )
+        const failed = uploadResults.filter(r => r.status === 'rejected').length
+        if (failed > 0) {
+          toast({
+            title: 'Advertencia',
+            description: `${pendingFiles.length - failed} archivo(s) subidos. ${failed} fallaron.`,
+            variant: 'destructive',
+            duration: 5000,
+          })
+        }
+      }
+
       toast({
         title: editingNews ? 'Noticia actualizada' : 'Noticia creada',
         description: 'La noticia se guardó correctamente',
@@ -399,8 +426,23 @@ export default function AdminNewsPage() {
     }
   }
 
+  const handleDeleteAttachment = async (attachmentId: string) => {
+    if (!editingNews) return
+    try {
+      const res = await fetch(`/api/admin/news/${editingNews.id}/attachments/${attachmentId}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) throw new Error('Error al eliminar adjunto')
+      setUploadedAttachments(prev => prev.filter(a => a.id !== attachmentId))
+      toast({ title: 'Adjunto eliminado' })
+    } catch {
+      toast({ title: 'Error al eliminar adjunto', variant: 'destructive' })
+    }
+  }
+
   const handleEdit = async (item: NewsItem) => {
     setEditingNews(item)
+    setPendingFiles([])
     setFormData({
       title: item.title,
       content: item.content,
@@ -419,6 +461,16 @@ export default function AdminNewsPage() {
       departmentIds: item.news_departments.map(d => d.departmentId),
       familyIds: (item as any).news_families?.map((f: any) => f.familyId) || [],
     })
+    // Cargar adjuntos existentes
+    try {
+      const res = await fetch(`/api/admin/news/${item.id}/attachments`)
+      if (res.ok) {
+        const data = await res.json()
+        setUploadedAttachments(Array.isArray(data) ? data : [])
+      }
+    } catch {
+      setUploadedAttachments([])
+    }
     setShowCreateDialog(true)
   }
 
@@ -471,6 +523,8 @@ export default function AdminNewsPage() {
       departmentIds: [],
       familyIds: [],
     })
+    setPendingFiles([])
+    setUploadedAttachments([])
   }
 
   const columns: Column<NewsItem>[] = [
@@ -764,14 +818,32 @@ export default function AdminNewsPage() {
               </div>
               <div className='space-y-2 col-span-2'>
                 <MediaUrlInput
-                  label='Imagen o enlace multimedia'
+                  label='Imagen o enlace multimedia (URL externa)'
                   value={formData.imageUrl}
                   onChange={v => setFormData({ ...formData, imageUrl: v })}
                   placeholder='https://drive.google.com/... · OneDrive · YouTube · URL de imagen...'
                 />
               </div>
+              <div className='space-y-2 col-span-2'>
+                <Label>Archivos adjuntos</Label>
+                <p className='text-xs text-muted-foreground -mt-1'>
+                  Las imágenes adjuntas se incluyen en el carrusel. PDFs y documentos aparecen como
+                  descargables.
+                </p>
+                <NewsAttachmentsUploader
+                  pendingFiles={pendingFiles}
+                  onPendingFilesChange={setPendingFiles}
+                  uploadedAttachments={uploadedAttachments}
+                  onDeleteUploaded={editingNews ? handleDeleteAttachment : undefined}
+                />
+              </div>
               <div className='space-y-2'>
-                <Label>Fecha de inicio (opcional)</Label>
+                <Label>
+                  Fecha de inicio
+                  <span className='text-xs text-muted-foreground font-normal ml-1'>
+                    (visible desde)
+                  </span>
+                </Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -787,15 +859,20 @@ export default function AdminNewsPage() {
                   <PopoverContent className='w-auto p-0'>
                     <Calendar
                       mode='single'
-                      selected={formData.startDate}
-                      onSelect={date => setFormData({ ...formData, startDate: date })}
+                      selected={formData.startDate ?? undefined}
+                      onSelect={date => setFormData({ ...formData, startDate: date ?? null })}
                       initialFocus
                     />
                   </PopoverContent>
                 </Popover>
               </div>
               <div className='space-y-2'>
-                <Label>Fecha de fin (opcional)</Label>
+                <Label>
+                  Fecha de fin
+                  <span className='text-xs text-muted-foreground font-normal ml-1'>
+                    (visible hasta)
+                  </span>
+                </Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -811,8 +888,8 @@ export default function AdminNewsPage() {
                   <PopoverContent className='w-auto p-0'>
                     <Calendar
                       mode='single'
-                      selected={formData.endDate}
-                      onSelect={date => setFormData({ ...formData, endDate: date })}
+                      selected={formData.endDate ?? undefined}
+                      onSelect={date => setFormData({ ...formData, endDate: date ?? null })}
                       initialFocus
                     />
                   </PopoverContent>
