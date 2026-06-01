@@ -126,16 +126,16 @@ El sistema es una herramienta completa para gestionar tu empresa, con estos mód
 
 ### 4.1 Planes recomendados según tu empresa
 
-| Tamaño de Empresa            | vCPU | RAM   | Almacenamiento | Precio Estimado/mes |
-| ---------------------------- | ---- | ----- | -------------- | ------------------- |
-| Pequeña (hasta 20 usuarios)  | 2    | 4 GB  | 50 GB SSD      | $20 - $40           |
-| Mediana (20-100 usuarios)    | 4    | 8 GB  | 100 GB SSD     | $40 - $80           |
-| Grande (más de 100 usuarios) | 8    | 16 GB | 200 GB SSD     | $80 - $150          |
+| Tamaño de Empresa            | vCPU | RAM   | Almacenamiento |
+| ---------------------------- | ---- | ----- | -------------- |
+| Pequeña (hasta 20 usuarios)  | 2    | 4 GB  | 50 GB SSD      |
+| Mediana (20-100 usuarios)    | 4    | 8 GB  | 100 GB SSD     |
+| Grande (más de 100 usuarios) | 8    | 16 GB | 200 GB SSD     |
 
 ### 4.2 Sistema Operativo
 
 - **Recomendado**: Ubuntu 22.04 LTS (fácil de usar y muy estable)
-- También sirve: Debian 12
+- También puedes elegir el sistema operativo que más te resulte más conveniente
 - **Importante**: El servidor debe poder usar Docker y Docker Compose
 
 ### 4.3 Lo que debe tener la conexión
@@ -210,22 +210,10 @@ Tu Servidor en la Nube
 
 ---
 
-## 9. ¿Cuánto cuesta aproximadamente?
-
-| Gasto                                  | Coste mensual estimado |
-| -------------------------------------- | ---------------------- |
-| Servidor (4 CPU, 8 GB RAM, 100 GB SSD) | $40 - $80              |
-| Nombre de dominio                      | $10 - $20              |
-| SSL (seguridad web)                    | $0 (Let's Encrypt)     |
-| Backups adicionales                    | $5 - $15               |
-| **Total**                              | **$55 - $125**         |
-
----
-
-## 10. Lista de cosas que hacer antes de empezar
+## 9. Lista de cosas que hacer antes de empezar
 
 - [ ] Elegir proveedor y plan de hosting
-- [ ] Configurar el servidor con Ubuntu 22.04
+- [ ] Configurar el servidor con el sistema operativo que elijas
 - [ ] Instalar Docker y Docker Compose
 - [ ] Configurar el firewall
 - [ ] Comprar y configurar el dominio
@@ -239,7 +227,7 @@ Tu Servidor en la Nube
 
 ---
 
-## 11. Después de instalar: ¿Qué sigue?
+## 10. Después de instalar: ¿Qué sigue?
 
 1. **Validación inicial**: Probar que todo funcione las primeras 24-48 horas
 2. **Mantenimiento mensual**: Revisar el rendimiento y costos
@@ -248,7 +236,7 @@ Tu Servidor en la Nube
 
 ---
 
-## 12. Más información
+## 11. Más información
 
 Si quieres saber más, consulta estos documentos:
 
@@ -259,4 +247,4 @@ Si quieres saber más, consulta estos documentos:
 ---
 
 **Fecha del documento**: 2026-06-01
-**Versión**: 1.2
+**Versión**: 1.3
