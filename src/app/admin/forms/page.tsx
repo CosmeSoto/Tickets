@@ -25,6 +25,8 @@ import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/hooks/use-toast'
 import { VisibilitySelector } from '@/components/common/visibility-selector'
 import { MediaUrlInput } from '@/components/common/media-url-input'
+import { FileDropZone } from '@/components/common/file-drop-zone'
+import type { PendingFile } from '@/components/common/file-drop-zone'
 import { InlineCreateSelect } from '@/components/ui/inline-create-select'
 import { FormCategoryInlineForm } from '@/components/forms/FormCategoryInlineForm'
 import { FormDetail } from '@/components/forms/FormDetail'
@@ -97,6 +99,7 @@ export default function AdminFormsPage() {
   const [formData, setFormData] = useState({ ...EMPTY_FORM })
   const [filters, setFilters] = useState({ search: '', status: 'all', category: 'all' })
   const [fileFile, setFileFile] = useState<File | null>(null)
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
 
   // ── Exportación ────────────────────────────────────────────────────────────
   const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
@@ -245,7 +248,7 @@ export default function AdminFormsPage() {
 
       // Si hay URL externa escrita manualmente, detectar tipo por extensión
       let fileType = formData.fileType
-      if (formData.fileUrl && !fileFile && !fileType) {
+      if (formData.fileUrl && pendingFiles.length === 0 && !fileType) {
         const ext = formData.fileUrl.split('?')[0].split('.').pop()?.toLowerCase()
         const extMap: Record<string, string> = {
           pdf: 'application/pdf',
@@ -274,19 +277,23 @@ export default function AdminFormsPage() {
       const result = await res.json()
       const savedId = result.form?.id
 
-      // Si hay archivo local seleccionado, subirlo ahora que tenemos el ID
-      if (fileFile && savedId) {
-        const uploadData = new FormData()
-        uploadData.append('file', fileFile)
-        const uploadRes = await fetch(`/api/admin/forms/${savedId}/attachments`, {
-          method: 'POST',
-          body: uploadData,
-        })
-        if (!uploadRes.ok) {
-          const uploadErr = await uploadRes.json().catch(() => ({}))
+      // Subir archivos pendientes (FileDropZone) si los hay
+      if (pendingFiles.length > 0 && savedId) {
+        const uploadResults = await Promise.allSettled(
+          pendingFiles.map(pf => {
+            const uploadData = new FormData()
+            uploadData.append('file', pf.file)
+            return fetch(`/api/admin/forms/${savedId}/attachments`, {
+              method: 'POST',
+              body: uploadData,
+            })
+          })
+        )
+        const failed = uploadResults.filter(r => r.status === 'rejected').length
+        if (failed > 0) {
           toast({
-            title: 'Documento guardado, pero el archivo falló',
-            description: uploadErr.error || 'No se pudo subir el archivo adjunto',
+            title: 'Documento guardado, pero algunos archivos fallaron',
+            description: `${pendingFiles.length - failed} subidos, ${failed} fallaron`,
             variant: 'destructive',
             duration: 6000,
           })
@@ -297,6 +304,7 @@ export default function AdminFormsPage() {
       setShowCreateDialog(false)
       setEditingForm(null)
       setFileFile(null)
+      setPendingFiles([])
       setFormData({ ...EMPTY_FORM })
       loadForms()
     } catch (err) {
@@ -312,6 +320,8 @@ export default function AdminFormsPage() {
 
   const handleEdit = (item: FormItem) => {
     setEditingForm(item)
+    setPendingFiles([])
+    setFileFile(null)
     setFormData({
       title: item.title,
       description: item.description || '',
@@ -582,6 +592,7 @@ export default function AdminFormsPage() {
           if (!open) {
             setEditingForm(null)
             setFileFile(null)
+            setPendingFiles([])
           }
         }}
       >
@@ -658,9 +669,9 @@ export default function AdminFormsPage() {
               {/* Archivo */}
               <div className='space-y-2 col-span-2'>
                 <Label>Archivo</Label>
-                <div className='space-y-2'>
-                  {/* Archivo actual (al editar) */}
-                  {editingForm?.fileUrl && !fileFile && (
+                <div className='space-y-3'>
+                  {/* Archivo ya guardado (al editar) — se muestra mientras no haya pendientes */}
+                  {editingForm?.fileUrl && pendingFiles.length === 0 && (
                     <div className='flex items-center gap-3 p-3 rounded-lg border bg-muted/30'>
                       <span className='text-xl'>
                         {editingForm.fileType?.includes('pdf')
@@ -709,51 +720,48 @@ export default function AdminFormsPage() {
                     </div>
                   )}
 
-                  {/* Input para nuevo archivo */}
-                  {(!editingForm?.fileUrl || fileFile) && (
-                    <>
-                      <Input
-                        type='file'
-                        onChange={e => {
-                          const file = e.target.files?.[0]
-                          if (file) {
-                            setFileFile(file)
-                            setFormData(p => ({
-                              ...p,
-                              fileUrl: '',
-                              fileSize: file.size,
-                              fileType: file.type,
-                            }))
-                          }
-                        }}
-                      />
-                      {fileFile && (
-                        <div className='flex items-center gap-2 text-xs text-muted-foreground'>
-                          <span>
-                            📎 {fileFile.name} ({(fileFile.size / 1024).toFixed(1)} KB)
-                          </span>
-                          <button
-                            type='button'
-                            className='text-destructive hover:underline'
-                            onClick={() => {
-                              setFileFile(null)
-                              setFormData(p => ({
-                                ...p,
-                                fileUrl: editingForm?.fileUrl || '',
-                                fileSize: editingForm?.fileSize ?? null,
-                                fileType: editingForm?.fileType || '',
-                              }))
-                            }}
-                          >
-                            Cancelar
-                          </button>
-                        </div>
-                      )}
-                    </>
-                  )}
+                  {/* Zona drag & drop para nuevo archivo */}
+                  <FileDropZone
+                    pendingFiles={pendingFiles}
+                    onPendingFilesChange={files => {
+                      setPendingFiles(files)
+                      // Sincronizar metadatos del primer archivo con formData
+                      if (files.length > 0) {
+                        const f = files[0].file
+                        setFormData(p => ({
+                          ...p,
+                          fileUrl: '',
+                          fileSize: f.size,
+                          fileType: f.type,
+                        }))
+                      } else {
+                        setFormData(p => ({
+                          ...p,
+                          fileUrl: editingForm?.fileUrl || '',
+                          fileSize: editingForm?.fileSize ?? null,
+                          fileType: editingForm?.fileType || '',
+                        }))
+                      }
+                    }}
+                    maxFiles={1}
+                    acceptLabel='PDF, Word, Excel, imágenes'
+                    accept='.pdf,.doc,.docx,.xls,.xlsx,image/*'
+                    allowedTypes={[
+                      'application/pdf',
+                      'application/msword',
+                      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                      'application/vnd.ms-excel',
+                      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                      'image/jpeg',
+                      'image/jpg',
+                      'image/png',
+                      'image/gif',
+                      'image/webp',
+                    ]}
+                  />
 
-                  {/* URL externa — solo si no hay archivo local ni adjunto actual */}
-                  {!fileFile && !editingForm?.fileUrl && (
+                  {/* URL externa — solo si no hay archivo pendiente ni adjunto actual */}
+                  {pendingFiles.length === 0 && !editingForm?.fileUrl && (
                     <MediaUrlInput
                       label=''
                       value={formData.fileUrl}
