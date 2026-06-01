@@ -55,6 +55,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # DNS explícito para que el build pueda resolver paquetes de Alpine
+      # aunque el daemon de Docker no tenga DNS configurado
       args:
         # Solo NEXTAUTH_URL se necesita en build time para rutas absolutas
         NEXTAUTH_URL: ${NEXTAUTH_URL:?NEXTAUTH_URL requerida}
