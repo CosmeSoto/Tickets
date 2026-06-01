@@ -39,6 +39,7 @@ import { es } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { VisibilitySelector } from '@/components/common/visibility-selector'
+import { MediaUrlInput } from '@/components/common/media-url-input'
 import { NewsDetail } from '@/components/news/news-detail'
 import type { NewsDetailItem } from '@/components/news/news-detail'
 import { ExportButton } from '@/components/common/export-button'
@@ -204,16 +205,8 @@ export default function AdminNewsPage() {
     type: 'all',
   })
 
-  // Estados para búsqueda en selectores de visibilidad
-  const [roleSearch, setRoleSearch] = useState('')
-  const [familySearch, setFamilySearch] = useState('')
-  const [userSearch, setUserSearch] = useState('')
   const [families, setFamilies] = useState<FamilyOption[]>([])
-  const [imageFiles, setImageFiles] = useState<File[]>([])
-  const [existingAttachments, setExistingAttachments] = useState<
-    Array<{ id: string; filename: string; url: string }>
-  >([])
-  const [uploadingImages, setUploadingImages] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
     filename: 'noticias',
@@ -359,7 +352,7 @@ export default function AdminNewsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      setUploadingImages(true)
+      setSaving(true)
       const url = editingNews ? `/api/admin/news/${editingNews.id}` : '/api/admin/news'
       const method = editingNews ? 'PUT' : 'POST'
 
@@ -386,35 +379,6 @@ export default function AdminNewsPage() {
         const errData = await response.json().catch(() => ({}))
         throw new Error(errData.error || 'Error al guardar noticia')
       }
-      const result = await response.json()
-      const newsId = result.news?.id
-
-      if (newsId && imageFiles.length > 0) {
-        // Subir cada imagen una por una
-        for (const file of imageFiles) {
-          const imgFormData = new FormData()
-          imgFormData.append('file', file)
-          await fetch(`/api/admin/news/${newsId}/attachments`, {
-            method: 'POST',
-            body: imgFormData,
-          })
-        }
-        // Si hay imágenes, usar la primera como imagen principal
-        if (!editingNews) {
-          const attachmentsRes = await fetch(`/api/admin/news/${newsId}/attachments`)
-          if (attachmentsRes.ok) {
-            const attachmentsData = await attachmentsRes.json()
-            if (attachmentsData.attachments?.[0]) {
-              const imageUrl = `/api/admin/news/${newsId}/attachments/${attachmentsData.attachments[0].id}/file`
-              await fetch(`/api/admin/news/${newsId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ imageUrl }),
-              })
-            }
-          }
-        }
-      }
 
       toast({
         title: editingNews ? 'Noticia actualizada' : 'Noticia creada',
@@ -424,8 +388,6 @@ export default function AdminNewsPage() {
 
       setShowCreateDialog(false)
       setEditingNews(null)
-      setImageFiles([])
-      setExistingAttachments([])
       resetForm()
       loadNews()
     } catch (err) {
@@ -436,7 +398,7 @@ export default function AdminNewsPage() {
         duration: 5000,
       })
     } finally {
-      setUploadingImages(false)
+      setSaving(false)
     }
   }
 
@@ -460,22 +422,6 @@ export default function AdminNewsPage() {
       departmentIds: item.news_departments.map(d => d.departmentId),
       familyIds: (item as any).news_families?.map((f: any) => f.familyId) || [],
     })
-    // Cargar attachments existentes
-    try {
-      const attachmentsRes = await fetch(`/api/admin/news/${item.id}/attachments`)
-      if (attachmentsRes.ok) {
-        const attachmentsData = await attachmentsRes.json()
-        setExistingAttachments(
-          (attachmentsData.attachments || []).map((a: any) => ({
-            id: a.id,
-            filename: a.filename,
-            url: `/api/admin/news/${item.id}/attachments/${a.id}/file`,
-          }))
-        )
-      }
-    } catch (e) {
-      setExistingAttachments([])
-    }
     setShowCreateDialog(true)
   }
 
@@ -819,103 +765,13 @@ export default function AdminNewsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className='space-y-2'>
-                <Label>Imágenes (máx 5, opcional)</Label>
-                <div className='space-y-3'>
-                  <Input
-                    type='file'
-                    accept='image/*'
-                    multiple
-                    disabled={existingAttachments.length + imageFiles.length >= 5}
-                    onChange={e => {
-                      const files = Array.from(e.target.files || [])
-                      const remainingSlots = 5 - existingAttachments.length - imageFiles.length
-                      if (remainingSlots > 0) {
-                        const newFiles = files.slice(0, remainingSlots)
-                        setImageFiles([...imageFiles, ...newFiles])
-                      }
-                    }}
-                  />
-                  {/* Preview de archivos nuevos */}
-                  {imageFiles.length > 0 && (
-                    <div className='space-y-2'>
-                      <p className='text-xs font-medium text-muted-foreground'>
-                        Archivos para subir:
-                      </p>
-                      <div className='grid grid-cols-2 sm:grid-cols-3 gap-2'>
-                        {imageFiles.map((file, index) => (
-                          <div key={index} className='relative group'>
-                            <img
-                              src={URL.createObjectURL(file)}
-                              alt={`Preview ${index + 1}`}
-                              className='w-full h-24 object-cover rounded-md border'
-                            />
-                            <button
-                              type='button'
-                              onClick={() =>
-                                setImageFiles(imageFiles.filter((_, i) => i !== index))
-                              }
-                              className='absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity'
-                            >
-                              ×
-                            </button>
-                            <p className='text-[10px] text-muted-foreground truncate mt-1'>
-                              {file.name}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {/* Attachments existentes */}
-                  {existingAttachments.length > 0 && (
-                    <div className='space-y-2'>
-                      <p className='text-xs font-medium text-muted-foreground'>
-                        Imágenes actuales:
-                      </p>
-                      <div className='grid grid-cols-2 sm:grid-cols-3 gap-2'>
-                        {existingAttachments.map(attachment => (
-                          <div key={attachment.id} className='relative group'>
-                            <img
-                              src={attachment.url}
-                              alt={attachment.filename}
-                              className='w-full h-24 object-cover rounded-md border'
-                            />
-                            <button
-                              type='button'
-                              onClick={() => {
-                                if (!editingNews) return
-                                fetch(
-                                  `/api/admin/news/${editingNews.id}/attachments/${attachment.id}`,
-                                  {
-                                    method: 'DELETE',
-                                  }
-                                ).then(() => {
-                                  setExistingAttachments(
-                                    existingAttachments.filter(a => a.id !== attachment.id)
-                                  )
-                                })
-                              }}
-                              className='absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity'
-                            >
-                              ×
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {existingAttachments.length + imageFiles.length === 0 && (
-                    <Input
-                      value={formData.imageUrl}
-                      onChange={e => setFormData({ ...formData, imageUrl: e.target.value })}
-                      placeholder='O pega una URL de imagen...'
-                    />
-                  )}
-                  {existingAttachments.length + imageFiles.length >= 5 && (
-                    <p className='text-xs text-amber-600'>✓ Límite de 5 imágenes alcanzado</p>
-                  )}
-                </div>
+              <div className='space-y-2 col-span-2'>
+                <MediaUrlInput
+                  label='Imagen o enlace multimedia'
+                  value={formData.imageUrl}
+                  onChange={v => setFormData({ ...formData, imageUrl: v })}
+                  placeholder='https://drive.google.com/... · OneDrive · YouTube · URL de imagen...'
+                />
               </div>
               <div className='space-y-2'>
                 <Label>Fecha de inicio (opcional)</Label>
@@ -1015,14 +871,12 @@ export default function AdminNewsPage() {
                 onClick={() => {
                   setShowCreateDialog(false)
                   setEditingNews(null)
-                  setImageFiles([])
-                  setExistingAttachments([])
                 }}
               >
                 Cancelar
               </Button>
-              <Button type='submit' disabled={uploadingImages}>
-                {uploadingImages ? 'Guardando...' : editingNews ? 'Actualizar' : 'Crear'}
+              <Button type='submit' disabled={saving}>
+                {saving ? 'Guardando...' : editingNews ? 'Actualizar' : 'Crear'}
               </Button>
             </DialogFooter>
           </form>

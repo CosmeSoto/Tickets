@@ -1,6 +1,10 @@
 /**
- * API: User - Forms View
+ * API: User - Forms/Documents Feed
  * GET /api/forms
+ *
+ * Devuelve documentos activos visibles para el usuario actual,
+ * respetando restricciones de rol, familia, departamento y usuario.
+ * Resiliente: nunca devuelve 500.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -12,38 +16,85 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
-
-    const dbUser = await prisma.users.findUnique({
-      where: { id: session.user.id },
-      select: { formsEnabled: true, role: true, departmentId: true },
-    })
-
-    if (!dbUser) {
-      return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
-    }
-
-    if (!dbUser.formsEnabled && dbUser.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+      return NextResponse.json({ forms: [] })
     }
 
     const { searchParams } = new URL(request.url)
     const categoryId = searchParams.get('categoryId')
     const search = searchParams.get('search')
 
-    const where: any = { isActive: true }
+    // Obtener usuario desde DB con su familia/departamento
+    const user = await prisma.users.findUnique({
+      where: { id: session.user.id },
+      select: {
+        id: true,
+        role: true,
+        departmentId: true,
+        formsEnabled: true,
+        isSuperAdmin: true,
+        departments: { select: { familyId: true } },
+      },
+    })
+
+    if (!user) return NextResponse.json({ forms: [] })
+
+    // Solo usuarios con acceso al módulo (o admin/superadmin)
+    if (!user.formsEnabled && user.role !== 'ADMIN' && !user.isSuperAdmin) {
+      return NextResponse.json({ forms: [] })
+    }
+
+    // ── Filtro de visibilidad (igual que noticias) ────────────────────────────
+    // Un documento es visible si:
+    //   - No tiene restricciones (ningún rol, usuario, departamento, familia)
+    //   - O el usuario cumple alguna restricción
+    const userFamilyId = user.departments?.familyId
+
+    const visibilityConditions: any[] = [
+      // Sin restricciones = visible para todos
+      {
+        form_roles: { none: {} },
+        form_users: { none: {} },
+        form_departments: { none: {} },
+        form_families: { none: {} },
+      },
+      // Por rol
+      { form_roles: { some: { role: user.role } } },
+      // Por usuario específico
+      { form_users: { some: { userId: user.id } } },
+    ]
+
+    if (user.departmentId) {
+      visibilityConditions.push({
+        form_departments: { some: { departmentId: user.departmentId } },
+      })
+    }
+    if (userFamilyId) {
+      visibilityConditions.push({
+        form_families: { some: { familyId: userFamilyId } },
+      })
+    }
+
+    const where: any = {
+      isActive: true,
+      OR: visibilityConditions,
+    }
 
     if (categoryId && categoryId !== 'all') {
       where.categoryId = categoryId
     }
 
     if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-        { summary: { contains: search, mode: 'insensitive' } },
+      where.AND = [
+        { OR: visibilityConditions },
+        {
+          OR: [
+            { title: { contains: search, mode: 'insensitive' } },
+            { description: { contains: search, mode: 'insensitive' } },
+            { summary: { contains: search, mode: 'insensitive' } },
+          ],
+        },
       ]
+      delete where.OR
     }
 
     const forms = await prisma.forms.findMany({
@@ -59,7 +110,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ forms })
   } catch (error) {
-    console.error('Error obteniendo formularios:', error)
+    console.error('[/api/forms] Error:', error)
     return NextResponse.json({ forms: [] })
   }
 }

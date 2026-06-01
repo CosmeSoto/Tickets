@@ -3,61 +3,64 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { FileText, Search, Download, ExternalLink } from 'lucide-react'
+import { FileText, Download, Star } from 'lucide-react'
 
 import { ModuleLayout } from '@/components/common/layout/module-layout'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { DataTable, Column } from '@/components/ui/data-table'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { useToast } from '@/hooks/use-toast'
+import { Button } from '@/components/ui/button'
+import { ExportButton } from '@/components/common/export-button'
+import { useExport } from '@/hooks/common/use-export'
+import { FormCard } from '@/components/forms/FormCard'
+import { FormDetail } from '@/components/forms/FormDetail'
+import type { FormFeedItem } from '@/components/forms/types'
 
 interface CategoryOption {
   id: string
   name: string
 }
 
-interface FormItem {
-  id: string
-  title: string
-  description?: string | null
-  summary?: string | null
-  version?: string | null
-  category?: CategoryOption | null
-  fileUrl?: string | null
-  isFeatured: boolean
-  downloadCount: number
-  createdAt: string
-}
-
 export default function PublicFormsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const { toast } = useToast()
   const accessChecked = useRef(false)
 
   const [hasAccess, setHasAccess] = useState<boolean | null>(null)
-  const [forms, setForms] = useState<FormItem[]>([])
+  const [forms, setForms] = useState<FormFeedItem[]>([])
   const [categories, setCategories] = useState<CategoryOption[]>([])
   const [loading, setLoading] = useState(true)
-  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('cards')
+  const [selectedForm, setSelectedForm] = useState<FormFeedItem | null>(null)
 
-  const [filters, setFilters] = useState({
-    search: '',
-    category: 'all',
+  const [filters, setFilters] = useState({ search: '', category: 'all' })
+
+  // ── Exportación ────────────────────────────────────────────────────────────
+  const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
+    filename: 'documentos',
+    title: 'Documentos',
+    columns: [
+      { key: 'title', label: 'Título' },
+      { key: 'category', label: 'Categoría', format: (v: any) => v?.name || 'Sin categoría' },
+      { key: 'version', label: 'Versión', format: (v: any) => (v ? `v${v}` : '—') },
+      { key: 'createdBy', label: 'Autor', format: (v: any) => v?.name || '' },
+      {
+        key: 'createdAt',
+        label: 'Fecha',
+        format: (v: string) => new Date(v).toLocaleDateString('es-EC'),
+      },
+      {
+        key: '_count',
+        label: 'Descargas',
+        format: (v: any) => String(v?.form_downloads ?? 0),
+      },
+    ],
+    getData: () => forms,
   })
 
+  // ── Acceso ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (status === 'loading') return
     if (accessChecked.current) return
-
     if (!session) {
       router.push('/login')
       return
@@ -85,7 +88,6 @@ export default function PublicFormsPage() {
           }
         }
       } catch {}
-
       try {
         const res = await fetch(`/api/user/modules?_t=${Date.now()}`)
         if (res.ok) {
@@ -98,21 +100,17 @@ export default function PublicFormsPage() {
           }
         }
       } catch {}
-
       if ((session.user as any).formsEnabled) {
         setHasAccess(true)
         loadForms()
         loadCategories()
         return
       }
-
       setHasAccess(false)
-      const dest = session.user.role === 'TECHNICIAN' ? '/technician' : '/client'
-      router.replace(dest)
+      router.replace(session.user.role === 'TECHNICIAN' ? '/technician' : '/client')
     }
-
     checkAccess()
-  }, [session, status, router])
+  }, [session, status, router]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadCategories = async () => {
     try {
@@ -121,9 +119,7 @@ export default function PublicFormsPage() {
         const data = await res.json()
         setCategories(data.categories || [])
       }
-    } catch (e) {
-      console.error('Error loading categories', e)
-    }
+    } catch {}
   }
 
   const loadForms = async () => {
@@ -132,223 +128,162 @@ export default function PublicFormsPage() {
       const params = new URLSearchParams()
       if (filters.category && filters.category !== 'all') params.set('categoryId', filters.category)
       if (filters.search) params.set('search', filters.search)
-
-      const response = await fetch(`/api/forms?${params.toString()}`)
-      if (!response.ok) throw new Error('Error al cargar formularios')
-      const data = await response.json()
+      const res = await fetch(`/api/forms?${params.toString()}`)
+      if (!res.ok) throw new Error()
+      const data = await res.json()
       setForms(data.forms || [])
-    } catch (err) {
-      console.error('Error loading forms', err)
+    } catch {
+      setForms([])
     } finally {
       setLoading(false)
     }
   }
 
-  const handleDownload = async (form: FormItem) => {
-    if (!form.fileUrl) {
-      toast({
-        title: 'Aviso',
-        description: 'Este formulario no tiene un archivo adjunto',
-        variant: 'destructive',
-      })
-      return
-    }
+  // Recargar cuando cambian los filtros
+  useEffect(() => {
+    if (hasAccess) loadForms()
+  }, [filters]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    try {
-      setDownloadingId(form.id)
+  // ── Columnas de tabla ──────────────────────────────────────────────────────
+  const columns: Column<FormFeedItem>[] = [
+    {
+      key: 'title',
+      label: 'Documento',
+      sortable: true,
+      render: item => (
+        <div className='flex items-center gap-3 min-w-0'>
+          <span className='text-xl flex-shrink-0'>
+            {item.fileType?.includes('pdf')
+              ? '📕'
+              : item.fileType?.includes('word')
+                ? '📘'
+                : item.fileType?.includes('excel')
+                  ? '📗'
+                  : item.fileType?.includes('image')
+                    ? '🖼️'
+                    : '📄'}
+          </span>
+          <div className='min-w-0'>
+            <div className='font-medium flex items-center gap-1.5'>
+              {item.title}
+              {item.isFeatured && <Star className='h-3.5 w-3.5 text-primary flex-shrink-0' />}
+            </div>
+            {item.description && (
+              <div className='text-xs text-muted-foreground line-clamp-1'>{item.description}</div>
+            )}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'category',
+      label: 'Categoría',
+      sortable: true,
+      render: item =>
+        item.category ? (
+          <Badge variant='secondary'>{item.category.name}</Badge>
+        ) : (
+          <span className='text-muted-foreground text-xs'>—</span>
+        ),
+    },
+    {
+      key: 'version',
+      label: 'Versión',
+      sortable: true,
+      render: item =>
+        item.version ? (
+          <span className='text-sm text-muted-foreground'>v{item.version}</span>
+        ) : (
+          <span className='text-muted-foreground text-xs'>—</span>
+        ),
+    },
+    {
+      key: 'createdBy',
+      label: 'Autor',
+      sortable: true,
+      render: item => <span className='text-sm'>{item.createdBy.name}</span>,
+    },
+    {
+      key: 'createdAt',
+      label: 'Fecha',
+      sortable: true,
+      render: item => (
+        <span className='text-sm text-muted-foreground'>
+          {new Date(item.createdAt).toLocaleDateString('es-EC')}
+        </span>
+      ),
+    },
+    {
+      key: '_count',
+      label: 'Descargas',
+      sortable: true,
+      render: item => (
+        <span className='flex items-center gap-1 text-sm text-muted-foreground'>
+          <Download className='h-3.5 w-3.5' />
+          {item._count.form_downloads}
+        </span>
+      ),
+    },
+  ]
 
-      await fetch(`/api/forms/${form.id}/download`, {
-        method: 'POST',
-      })
+  const tableFilters = [
+    {
+      key: 'category',
+      label: 'Categoría',
+      type: 'select' as const,
+      options: [
+        { value: 'all', label: 'Todas' },
+        ...categories.map(c => ({ value: c.id, label: c.name })),
+      ],
+    },
+  ]
 
-      window.open(form.fileUrl, '_blank')
-
-      toast({
-        title: 'Descarga iniciada',
-        description: `Descargando ${form.title}...`,
-      })
-
-      loadForms()
-    } catch (err) {
-      toast({
-        title: 'Error',
-        description: 'No se pudo descargar el formulario',
-        variant: 'destructive',
-      })
-    } finally {
-      setDownloadingId(null)
-    }
-  }
-
-  if (!session || hasAccess === null) {
-    return null
-  }
-
-  if (hasAccess === false) {
-    return null
-  }
+  if (!session || hasAccess === null) return null
+  if (hasAccess === false) return null
 
   return (
     <ModuleLayout
       title='Documentos'
-      subtitle='Accede a los documentos disponibles'
-      loading={loading}
+      subtitle='Accede a los documentos disponibles para ti'
+      loading={loading && forms.length === 0}
     >
-      <div className='space-y-6'>
-        <div className='flex flex-wrap gap-4 items-center'>
-          <Input
-            placeholder='Buscar documentos...'
-            value={filters.search}
-            onChange={e => setFilters({ ...filters, search: e.target.value })}
-            className='max-w-sm'
+      <DataTable
+        title={`${forms.length} documento${forms.length !== 1 ? 's' : ''}`}
+        description='Documentos disponibles según tu perfil'
+        data={forms}
+        columns={columns}
+        loading={loading}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        onRefresh={loadForms}
+        onExport={
+          <ExportButton
+            onExportCSV={exportCSV}
+            onExportExcel={exportExcel}
+            onExportPDF={exportPDF}
+            loading={exporting}
           />
-          <Select
-            value={filters.category}
-            onValueChange={v => setFilters({ ...filters, category: v })}
-          >
-            <SelectTrigger className='w-[180px]'>
-              <SelectValue placeholder='Todas las categorías' />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value='all'>Todas</SelectItem>
-              {categories.map(cat => (
-                <SelectItem key={cat.id} value={cat.id}>
-                  {cat.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button onClick={loadForms} variant='ghost'>
-            Actualizar
-          </Button>
-        </div>
+        }
+        filters={tableFilters}
+        onFiltersChange={f => setFilters(prev => ({ ...prev, ...f }))}
+        onRowClick={item => setSelectedForm(item)}
+        cardRenderer={item => <FormCard form={item} onClick={() => setSelectedForm(item)} />}
+        emptyState={{
+          icon: <FileText className='h-10 w-10 text-muted-foreground mx-auto mb-3' />,
+          title: 'No hay documentos disponibles',
+          description: 'No se encontraron documentos para tu perfil en este momento',
+        }}
+      />
 
-        {forms.filter(f => f.isFeatured).length > 0 && (
-          <div className='space-y-3'>
-            <h2 className='text-lg font-semibold'>Destacados</h2>
-            <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
-              {forms
-                .filter(f => f.isFeatured)
-                .map(form => (
-                  <Card
-                    key={form.id}
-                    className='border-primary/20 hover:shadow-md transition-shadow'
-                  >
-                    <CardHeader className='pb-2'>
-                      <div className='flex items-start justify-between'>
-                        <div className='flex items-center gap-3'>
-                          <div className='bg-primary/10 p-2 rounded-lg'>
-                            <FileText className='h-5 w-5 text-primary' />
-                          </div>
-                          <CardTitle className='text-lg'>{form.title}</CardTitle>
-                        </div>
-                        <Badge variant='default'>Destacado</Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      {form.description && (
-                        <p className='text-sm text-muted-foreground mb-3'>{form.description}</p>
-                      )}
-                      {form.version && (
-                        <Badge variant='outline' className='mb-3'>
-                          v{form.version}
-                        </Badge>
-                      )}
-                      <div className='flex items-center justify-between mb-3'>
-                        {form.category && <Badge variant='secondary'>{form.category.name}</Badge>}
-                        <span className='text-xs text-muted-foreground flex items-center gap-1'>
-                          <Download className='h-3 w-3' />
-                          {form.downloadCount}
-                        </span>
-                      </div>
-                      {form.fileUrl && (
-                        <Button
-                          onClick={() => handleDownload(form)}
-                          disabled={downloadingId === form.id}
-                          className='w-full'
-                        >
-                          {downloadingId === form.id ? (
-                            'Descargando...'
-                          ) : (
-                            <>
-                              <Download className='h-4 w-4 mr-2' />
-                              Descargar
-                            </>
-                          )}
-                        </Button>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-            </div>
-          </div>
-        )}
-
-        <div className='space-y-3'>
-          <h2 className='text-lg font-semibold'>Todos los documentos</h2>
-          {forms.length === 0 ? (
-            <div className='text-center py-12 bg-muted/20 rounded-lg border border-dashed'>
-              <FileText className='h-12 w-12 mx-auto text-muted-foreground mb-4' />
-              <p className='text-muted-foreground'>
-                No hay documentos disponibles en este momento
-              </p>
-            </div>
-          ) : (
-            <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
-              {forms
-                .filter(f => !f.isFeatured)
-                .map(form => (
-                  <Card key={form.id} className='hover:shadow-md transition-shadow'>
-                    <CardHeader className='pb-2'>
-                      <div className='flex items-start justify-between'>
-                        <div className='flex items-center gap-3'>
-                          <div className='bg-muted/50 p-2 rounded-lg'>
-                            <FileText className='h-5 w-5 text-muted-foreground' />
-                          </div>
-                          <CardTitle className='text-base'>{form.title}</CardTitle>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      {form.description && (
-                        <p className='text-sm text-muted-foreground mb-3'>{form.description}</p>
-                      )}
-                      {form.version && (
-                        <Badge variant='outline' className='mb-3'>
-                          v{form.version}
-                        </Badge>
-                      )}
-                      <div className='flex items-center justify-between mb-3'>
-                        {form.category && <Badge variant='secondary'>{form.category.name}</Badge>}
-                        <span className='text-xs text-muted-foreground flex items-center gap-1'>
-                          <Download className='h-3 w-3' />
-                          {form.downloadCount}
-                        </span>
-                      </div>
-                      {form.fileUrl && (
-                        <Button
-                          onClick={() => handleDownload(form)}
-                          disabled={downloadingId === form.id}
-                          className='w-full'
-                          variant='outline'
-                        >
-                          {downloadingId === form.id ? (
-                            'Descargando...'
-                          ) : (
-                            <>
-                              <Download className='h-4 w-4 mr-2' />
-                              Descargar
-                            </>
-                          )}
-                        </Button>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-            </div>
-          )}
-        </div>
-      </div>
+      {selectedForm && (
+        <FormDetail
+          form={selectedForm}
+          isOpen={!!selectedForm}
+          onClose={() => setSelectedForm(null)}
+          mode='view'
+          onDownloaded={loadForms}
+        />
+      )}
     </ModuleLayout>
   )
 }

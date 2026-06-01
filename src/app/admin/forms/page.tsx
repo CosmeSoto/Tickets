@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { Plus, FileText, Trash2, Edit, Download } from 'lucide-react'
+import { Plus, FileText, Trash2, Edit, Download, Star } from 'lucide-react'
 
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { DataTable, Column } from '@/components/ui/data-table'
@@ -21,87 +21,53 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/hooks/use-toast'
 import { VisibilitySelector } from '@/components/common/visibility-selector'
+import { MediaUrlInput } from '@/components/common/media-url-input'
 import { InlineCreateSelect } from '@/components/ui/inline-create-select'
 import { FormCategoryInlineForm } from '@/components/forms/FormCategoryInlineForm'
+import { FormDetail } from '@/components/forms/FormDetail'
 import { ExportButton } from '@/components/common/export-button'
 import { useExport } from '@/hooks/common/use-export'
+import type { FormItem } from '@/components/forms/types'
 
 interface UserOption {
   id: string
   name: string
   email: string
 }
-
 interface DepartmentOption {
   id: string
   name: string
   familyId?: string | null
 }
-
 interface FamilyOption {
   id: string
   name: string
   departments: DepartmentOption[]
 }
-
 interface CategoryOption {
   id: string
   name: string
   description?: string | null
 }
 
-const ROLE_OPTIONS = [
-  { value: 'ADMIN', label: 'Administradores' },
-  { value: 'TECHNICIAN', label: 'Técnicos' },
-  { value: 'CLIENT', label: 'Clientes' },
-]
-
-interface FormItem {
-  id: string
-  title: string
-  slug: string
-  description?: string | null
-  summary?: string | null
-  version?: string | null
-  categoryId?: string | null
-  category?: CategoryOption | null
-  familyId?: string | null
-  family?: { id: string; name: string } | null
-  fileUrl?: string | null
-  fileSize?: number | null
-  fileType?: string | null
-  isActive: boolean
-  isFeatured: boolean
-  downloadCount: number
-  createdById: string
-  updatedById?: string | null
-  createdAt: string
-  updatedAt: string
-  createdBy: { id: string; name: string; email: string }
-  updatedBy?: { id: string; name: string; email: string } | null
-  form_roles: Array<{ id: string; role: string }>
-  form_users: Array<{
-    id: string
-    userId: string
-    user: { id: string; name: string; email: string }
-  }>
-  form_departments: Array<{
-    id: string
-    departmentId: string
-    departments: { id: string; name: string }
-  }>
-  form_families: Array<{ id: string; familyId: string; families: { id: string; name: string } }>
-  _count: { form_downloads: number }
+const EMPTY_FORM = {
+  title: '',
+  description: '',
+  summary: '',
+  version: '',
+  categoryId: '',
+  fileUrl: '',
+  fileSize: null as number | null,
+  fileType: '',
+  isActive: true,
+  isFeatured: false,
+  roles: [] as string[],
+  userIds: [] as string[],
+  departmentIds: [] as string[],
+  familyIds: [] as string[],
 }
 
 export default function AdminFormsPage() {
@@ -117,6 +83,7 @@ export default function AdminFormsPage() {
   const [error, setError] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
   const [selectedForm, setSelectedForm] = useState<FormItem | null>(null)
+  const [detailOpen, setDetailOpen] = useState(false)
   const [users, setUsers] = useState<UserOption[]>([])
   const [departments, setDepartments] = useState<DepartmentOption[]>([])
   const [families, setFamilies] = useState<FamilyOption[]>([])
@@ -126,74 +93,40 @@ export default function AdminFormsPage() {
   const [deletingForm, setDeletingForm] = useState<FormItem | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
-
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    summary: '',
-    version: '',
-    categoryId: '',
-    familyId: '',
-    fileUrl: '',
-    fileSize: null as number | null,
-    fileType: '',
-    isActive: true,
-    isFeatured: false,
-    roles: [] as string[],
-    userIds: [] as string[],
-    departmentIds: [] as string[],
-    familyIds: [] as string[],
-  })
-
-  const [filters, setFilters] = useState({
-    search: '',
-    status: 'all',
-    category: 'all',
-  })
-
+  const [saving, setSaving] = useState(false)
+  const [formData, setFormData] = useState({ ...EMPTY_FORM })
+  const [filters, setFilters] = useState({ search: '', status: 'all', category: 'all' })
   const [fileFile, setFileFile] = useState<File | null>(null)
-  const [uploadingFile, setUploadingFile] = useState(false)
 
+  // ── Exportación ────────────────────────────────────────────────────────────
   const { exportCSV, exportExcel, exportPDF, exporting } = useExport({
-    filename: 'documentos',
-    title: 'Documentos',
+    filename: 'documentos-admin',
+    title: 'Gestión de Documentos',
     columns: [
       { key: 'title', label: 'Título' },
-      {
-        key: 'category',
-        label: 'Categoría',
-        format: (value: any) => value?.name || 'Sin categoría',
-      },
-      { key: 'version', label: 'Versión', format: (value: any) => value || 'v1.0' },
-      {
-        key: 'isActive',
-        label: 'Estado',
-        format: (value: boolean) => (value ? 'Activo' : 'Inactivo'),
-      },
-      {
-        key: 'downloads',
-        label: 'Descargas',
-        format: (_: any, row: FormItem) => row._count?.form_downloads || 0,
-      },
-      { key: 'createdBy', label: 'Creado por', format: (value: any) => value?.name || '' },
+      { key: 'category', label: 'Categoría', format: (v: any) => v?.name || 'Sin categoría' },
+      { key: 'version', label: 'Versión', format: (v: any) => (v ? `v${v}` : '—') },
+      { key: 'isActive', label: 'Estado', format: (v: boolean) => (v ? 'Activo' : 'Inactivo') },
+      { key: 'isFeatured', label: 'Destacado', format: (v: boolean) => (v ? 'Sí' : 'No') },
+      { key: '_count', label: 'Descargas', format: (v: any) => String(v?.form_downloads ?? 0) },
+      { key: 'createdBy', label: 'Creado por', format: (v: any) => v?.name || '' },
       {
         key: 'createdAt',
         label: 'Fecha',
-        format: (value: string) => new Date(value).toLocaleDateString('es-EC'),
+        format: (v: string) => new Date(v).toLocaleDateString('es-EC'),
       },
     ],
     getData: () => forms,
   })
 
+  // ── Acceso ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (status === 'loading') return
     if (accessChecked.current) return
-
     if (!session) {
       router.push('/login')
       return
     }
-
     accessChecked.current = true
 
     if (session.user.role === 'ADMIN' || (session.user as any).isSuperAdmin) {
@@ -218,7 +151,6 @@ export default function AdminFormsPage() {
           }
         }
       } catch {}
-
       try {
         const res = await fetch(`/api/user/modules?_t=${Date.now()}`)
         if (res.ok) {
@@ -232,23 +164,13 @@ export default function AdminFormsPage() {
           }
         }
       } catch {}
-
-      if ((session.user as any).formsEnabled || (session.user as any).canManageForms) {
-        setHasAccess(true)
-        loadForms()
-        loadUsersAndDepartments()
-        loadCategories()
-        return
-      }
-
       setHasAccess(false)
-      const dest = session.user.role === 'TECHNICIAN' ? '/technician' : '/client'
-      router.replace(dest)
+      router.replace(session.user.role === 'TECHNICIAN' ? '/technician' : '/client')
     }
-
     checkAccess()
-  }, [session, status, router])
+  }, [session, status, router]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Carga de datos ─────────────────────────────────────────────────────────
   const loadUsersAndDepartments = async () => {
     try {
       const [usersRes, deptsRes, familiesRes] = await Promise.all([
@@ -256,144 +178,135 @@ export default function AdminFormsPage() {
         fetch('/api/departments'),
         fetch('/api/families?includeInactive=false&scope=all'),
       ])
-      if (usersRes.ok) {
-        const usersData = await usersRes.json()
-        setUsers(usersData.users || usersData.data || [])
-      }
+      if (usersRes.ok) setUsers((await usersRes.json()).users || [])
       if (deptsRes.ok) {
-        const deptsData = await deptsRes.json()
-        const deptsList = deptsData.departments || deptsData.data || []
-        setDepartments(deptsList)
+        const d = await deptsRes.json()
+        setDepartments(d.departments || d.data || [])
       }
       if (familiesRes.ok) {
-        const familiesData = await familiesRes.json()
-        const familiesList = familiesData.data || familiesData.families || []
-        const deptsRes2 = await fetch('/api/departments')
-        const deptsData2 = deptsRes2.ok ? await deptsRes2.json() : { data: [] }
-        const allDepts: DepartmentOption[] = deptsData2.departments || deptsData2.data || []
-
-        const familiesWithDepts: FamilyOption[] = familiesList.map((f: any) => ({
-          id: f.id,
-          name: f.name,
-          departments: allDepts.filter((d: any) => d.familyId === f.id),
-        }))
-        setFamilies(familiesWithDepts)
+        const fd = await familiesRes.json()
+        const fList = fd.data || fd.families || []
+        const d2Res = await fetch('/api/departments')
+        const allDepts: DepartmentOption[] = d2Res.ok ? (await d2Res.json()).departments || [] : []
+        setFamilies(
+          fList.map((f: any) => ({
+            id: f.id,
+            name: f.name,
+            departments: allDepts.filter((d: any) => d.familyId === f.id),
+          }))
+        )
       }
-    } catch (e) {
-      console.error('Error loading users/departments/families', e)
-    }
+    } catch {}
   }
 
   const loadCategories = async () => {
     try {
       const res = await fetch('/api/admin/form-categories')
-      if (res.ok) {
-        const data = await res.json()
-        setCategories(data.categories || [])
-      }
-    } catch (e) {
-      console.error('Error loading categories', e)
-    }
-  }
-
-  const handleDeleteCategory = async (id: string) => {
-    try {
-      const res = await fetch(`/api/admin/form-categories/${id}`, {
-        method: 'DELETE',
-      })
-      if (!res.ok) throw new Error('Error al eliminar categoría')
-      toast({
-        title: 'Categoría eliminada',
-        description: 'La categoría se eliminó correctamente',
-      })
-      loadCategories()
-    } catch (err) {
-      toast({
-        title: 'Error',
-        description: err instanceof Error ? err.message : 'Error al eliminar categoría',
-        variant: 'destructive',
-      })
-      throw err
-    }
+      if (res.ok) setCategories((await res.json()).categories || [])
+    } catch {}
   }
 
   const loadForms = async () => {
     try {
       setLoading(true)
       const params = new URLSearchParams()
-      if (filters.status && filters.status !== 'all') params.set('status', filters.status)
-      if (filters.category && filters.category !== 'all') params.set('categoryId', filters.category)
+      if (filters.status !== 'all') params.set('status', filters.status)
+      if (filters.category !== 'all') params.set('categoryId', filters.category)
       if (filters.search) params.set('search', filters.search)
-
-      const response = await fetch(`/api/admin/forms?${params.toString()}`)
-      if (!response.ok) throw new Error('Error al cargar formularios')
-      const data = await response.json()
-      setForms(data.forms || [])
+      const res = await fetch(`/api/admin/forms?${params.toString()}`)
+      if (!res.ok) throw new Error('Error al cargar documentos')
+      setForms((await res.json()).forms || [])
+      setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al cargar formularios')
+      setError(err instanceof Error ? err.message : 'Error al cargar documentos')
     } finally {
       setLoading(false)
     }
   }
 
+  useEffect(() => {
+    if (hasAccess) loadForms()
+  }, [filters]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── CRUD ───────────────────────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
     if (!formData.categoryId) {
       toast({
         title: 'Categoría requerida',
-        description: 'Debes seleccionar o crear una categoría antes de guardar',
+        description: 'Selecciona o crea una categoría',
         variant: 'destructive',
-        duration: 4000,
       })
       return
     }
-
     try {
-      setUploadingFile(true)
+      setSaving(true)
       const url = editingForm ? `/api/admin/forms/${editingForm.id}` : '/api/admin/forms'
-      const method = editingForm ? 'PUT' : 'POST'
 
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 30000)
-
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          familyId: formData.familyId || null,
-        }),
-        signal: controller.signal,
-      })
-
-      clearTimeout(timeout)
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}))
-        throw new Error(errData.error || 'Error al guardar formulario')
+      // Si hay URL externa escrita manualmente, detectar tipo por extensión
+      let fileType = formData.fileType
+      if (formData.fileUrl && !fileFile && !fileType) {
+        const ext = formData.fileUrl.split('?')[0].split('.').pop()?.toLowerCase()
+        const extMap: Record<string, string> = {
+          pdf: 'application/pdf',
+          doc: 'application/msword',
+          docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          xls: 'application/vnd.ms-excel',
+          xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          png: 'image/png',
+          jpg: 'image/jpeg',
+          jpeg: 'image/jpeg',
+          gif: 'image/gif',
+          webp: 'image/webp',
+        }
+        fileType = ext ? extMap[ext] || '' : ''
       }
 
-      toast({
-        title: editingForm ? 'Formulario actualizado' : 'Formulario creado',
-        description: 'El formulario se guardó correctamente',
-        duration: 4000,
+      const res = await fetch(url, {
+        method: editingForm ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...formData, fileType, familyId: null }),
       })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Error al guardar')
+      }
+      const result = await res.json()
+      const savedId = result.form?.id
 
+      // Si hay archivo local seleccionado, subirlo ahora que tenemos el ID
+      if (fileFile && savedId) {
+        const uploadData = new FormData()
+        uploadData.append('file', fileFile)
+        const uploadRes = await fetch(`/api/admin/forms/${savedId}/attachments`, {
+          method: 'POST',
+          body: uploadData,
+        })
+        if (!uploadRes.ok) {
+          const uploadErr = await uploadRes.json().catch(() => ({}))
+          toast({
+            title: 'Documento guardado, pero el archivo falló',
+            description: uploadErr.error || 'No se pudo subir el archivo adjunto',
+            variant: 'destructive',
+            duration: 6000,
+          })
+        }
+      }
+
+      toast({ title: editingForm ? 'Documento actualizado' : 'Documento creado', duration: 4000 })
       setShowCreateDialog(false)
       setEditingForm(null)
       setFileFile(null)
-      resetForm()
+      setFormData({ ...EMPTY_FORM })
       loadForms()
     } catch (err) {
       toast({
         title: 'Error',
-        description: err instanceof Error ? err.message : 'Error al guardar formulario',
+        description: err instanceof Error ? err.message : 'Error al guardar',
         variant: 'destructive',
-        duration: 5000,
       })
     } finally {
-      setUploadingFile(false)
+      setSaving(false)
     }
   }
 
@@ -405,9 +318,8 @@ export default function AdminFormsPage() {
       summary: item.summary || '',
       version: item.version || '',
       categoryId: item.categoryId || '',
-      familyId: item.familyId || '',
       fileUrl: item.fileUrl || '',
-      fileSize: item.fileSize,
+      fileSize: item.fileSize ?? null,
       fileType: item.fileType || '',
       isActive: item.isActive,
       isFeatured: item.isFeatured,
@@ -423,63 +335,61 @@ export default function AdminFormsPage() {
     if (!deletingForm) return
     setDeleteLoading(true)
     try {
-      const response = await fetch(`/api/admin/forms/${deletingForm.id}`, {
-        method: 'DELETE',
-      })
-      if (!response.ok) throw new Error('Error al eliminar formulario')
-
-      toast({
-        title: 'Formulario eliminado',
-        description: 'El formulario se eliminó correctamente',
-        duration: 4000,
-      })
-
+      const res = await fetch(`/api/admin/forms/${deletingForm.id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Error al eliminar')
+      toast({ title: 'Documento eliminado', duration: 4000 })
       setDeleteDialogOpen(false)
       setDeletingForm(null)
       loadForms()
     } catch (err) {
       toast({
         title: 'Error',
-        description: err instanceof Error ? err.message : 'Error al eliminar formulario',
+        description: err instanceof Error ? err.message : 'Error al eliminar',
         variant: 'destructive',
-        duration: 5000,
       })
     } finally {
       setDeleteLoading(false)
     }
   }
 
-  const resetForm = () => {
-    setFormData({
-      title: '',
-      description: '',
-      summary: '',
-      version: '',
-      categoryId: '',
-      familyId: '',
-      fileUrl: '',
-      fileSize: null,
-      fileType: '',
-      isActive: true,
-      isFeatured: false,
-      roles: [],
-      userIds: [],
-      departmentIds: [],
-      familyIds: [],
-    })
+  const handleDeleteCategory = async (id: string) => {
+    const res = await fetch(`/api/admin/form-categories/${id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.error || 'Error al eliminar categoría')
+    }
+    toast({ title: 'Categoría eliminada' })
+    loadCategories()
   }
 
+  // ── Columnas ───────────────────────────────────────────────────────────────
   const columns: Column<FormItem>[] = [
     {
       key: 'title',
-      label: 'Título',
+      label: 'Documento',
       sortable: true,
-      render: (item: FormItem) => (
-        <div className='space-y-1'>
-          <div className='font-medium'>{item.title}</div>
-          {item.description && (
-            <div className='text-sm text-muted-foreground'>{item.description}</div>
-          )}
+      render: item => (
+        <div className='flex items-center gap-3 min-w-0'>
+          <span className='text-xl flex-shrink-0'>
+            {item.fileType?.includes('pdf')
+              ? '📕'
+              : item.fileType?.includes('word')
+                ? '📘'
+                : item.fileType?.includes('excel')
+                  ? '📗'
+                  : item.fileType?.includes('image')
+                    ? '🖼️'
+                    : '📄'}
+          </span>
+          <div className='min-w-0'>
+            <div className='font-medium flex items-center gap-1.5'>
+              {item.title}
+              {item.isFeatured && <Star className='h-3.5 w-3.5 text-primary flex-shrink-0' />}
+            </div>
+            {item.description && (
+              <div className='text-xs text-muted-foreground line-clamp-1'>{item.description}</div>
+            )}
+          </div>
         </div>
       ),
     },
@@ -487,50 +397,60 @@ export default function AdminFormsPage() {
       key: 'category',
       label: 'Categoría',
       sortable: true,
-      render: (item: FormItem) => (
-        <Badge variant='secondary'>{item.category?.name || 'Sin categoría'}</Badge>
-      ),
+      render: item =>
+        item.category ? (
+          <Badge variant='secondary'>{item.category.name}</Badge>
+        ) : (
+          <span className='text-muted-foreground text-xs'>Sin categoría</span>
+        ),
     },
     {
       key: 'version',
       label: 'Versión',
       sortable: true,
-      render: (item: FormItem) => (
-        <span className='text-sm text-muted-foreground'>{item.version || 'v1.0'}</span>
-      ),
+      render: item =>
+        item.version ? (
+          <span className='text-sm text-muted-foreground'>v{item.version}</span>
+        ) : (
+          <span className='text-muted-foreground text-xs'>—</span>
+        ),
     },
     {
-      key: 'status',
+      key: 'isActive',
       label: 'Estado',
       sortable: true,
-      render: (item: FormItem) => (
+      render: item => (
         <Badge variant={item.isActive ? 'default' : 'secondary'}>
           {item.isActive ? 'Activo' : 'Inactivo'}
         </Badge>
       ),
     },
     {
-      key: 'downloads',
+      key: '_count',
       label: 'Descargas',
       sortable: true,
-      render: (item: FormItem) => (
-        <div className='flex items-center gap-1 text-sm text-muted-foreground'>
+      render: item => (
+        <span className='flex items-center gap-1 text-sm text-muted-foreground'>
           <Download className='h-3.5 w-3.5' />
-          <span>{item._count?.form_downloads || 0}</span>
-        </div>
+          {item._count?.form_downloads ?? 0}
+        </span>
       ),
     },
     {
-      key: 'author',
+      key: 'createdBy',
       label: 'Creado por',
       sortable: true,
-      render: (item: FormItem) => item.createdBy.name,
+      render: item => <span className='text-sm'>{item.createdBy.name}</span>,
     },
     {
-      key: 'date',
+      key: 'createdAt',
       label: 'Fecha',
       sortable: true,
-      render: (item: FormItem) => new Date(item.createdAt).toLocaleDateString('es-EC'),
+      render: item => (
+        <span className='text-sm text-muted-foreground'>
+          {new Date(item.createdAt).toLocaleDateString('es-EC')}
+        </span>
+      ),
     },
   ]
 
@@ -551,26 +471,15 @@ export default function AdminFormsPage() {
       type: 'select' as const,
       options: [
         { value: 'all', label: 'Todas' },
-        ...categories.map(cat => ({ value: cat.id, label: cat.name })),
+        ...categories.map(c => ({ value: c.id, label: c.name })),
       ],
     },
   ]
 
-  const handleTableFiltersChange = (newFilters: Record<string, string>) => {
-    setFilters(prev => ({
-      ...prev,
-      ...newFilters,
-    }))
-  }
+  if (!session || hasAccess === null) return null
+  if (hasAccess === false) return null
 
-  if (!session || hasAccess === null) {
-    return null
-  }
-
-  if (hasAccess === false) {
-    return null
-  }
-
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <ModuleLayout
       title='Gestión de Documentos'
@@ -580,7 +489,7 @@ export default function AdminFormsPage() {
         <Button
           size='sm'
           onClick={() => {
-            resetForm()
+            setFormData({ ...EMPTY_FORM })
             setEditingForm(null)
             setShowCreateDialog(true)
           }}
@@ -590,86 +499,92 @@ export default function AdminFormsPage() {
         </Button>
       }
     >
-      <div className='space-y-4'>
-        <DataTable
-          title={`${forms.length} documento${forms.length !== 1 ? 's' : ''}`}
-          description='Todos los documentos del sistema'
-          data={forms}
-          columns={columns}
-          loading={loading}
-          error={error}
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
-          onRefresh={loadForms}
-          onExport={
-            <ExportButton
-              onExportCSV={exportCSV}
-              onExportExcel={exportExcel}
-              onExportPDF={exportPDF}
-              loading={exporting}
-            />
-          }
-          filters={tableFilters}
-          onFiltersChange={handleTableFiltersChange}
-          rowActions={(item: FormItem) => {
-            const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
-            const isOwner = item.createdBy.id === session?.user?.id
-            const canModify = isSuperAdmin || isOwner
-
-            return (
-              <div className='flex gap-2'>
-                {canModify && (
-                  <Button
-                    variant='ghost'
-                    size='sm'
-                    onClick={e => {
-                      e.stopPropagation()
-                      handleEdit(item)
-                    }}
-                  >
-                    <Edit className='h-4 w-4' />
-                  </Button>
-                )}
-                {canModify && (
-                  <Button
-                    variant='ghost'
-                    size='sm'
-                    onClick={e => {
-                      e.stopPropagation()
-                      setDeletingForm(item)
-                      setDeleteDialogOpen(true)
-                    }}
-                  >
-                    <Trash2 className='h-4 w-4 text-destructive' />
-                  </Button>
-                )}
-                {!canModify && (
-                  <span className='text-xs text-muted-foreground px-2'>Solo lectura</span>
-                )}
-              </div>
-            )
-          }}
-          emptyState={{
-            icon: <FileText className='h-10 w-10 text-muted-foreground mx-auto mb-3' />,
-            title: 'No hay formularios',
-            description: 'No se encontraron formularios en el sistema',
-            action: (
+      <DataTable
+        title={`${forms.length} documento${forms.length !== 1 ? 's' : ''}`}
+        description='Todos los documentos del sistema'
+        data={forms}
+        columns={columns}
+        loading={loading}
+        error={error}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        onRefresh={loadForms}
+        onExport={
+          <ExportButton
+            onExportCSV={exportCSV}
+            onExportExcel={exportExcel}
+            onExportPDF={exportPDF}
+            loading={exporting}
+          />
+        }
+        filters={tableFilters}
+        onFiltersChange={f => setFilters(prev => ({ ...prev, ...f }))}
+        onRowClick={item => {
+          setSelectedForm(item)
+          setDetailOpen(true)
+        }}
+        rowActions={item => {
+          const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
+          const isOwner = item.createdBy.id === session?.user?.id
+          const canModify = isSuperAdmin || isOwner
+          if (!canModify)
+            return <span className='text-xs text-muted-foreground px-2'>Solo lectura</span>
+          return (
+            <div className='flex gap-1'>
               <Button
+                variant='ghost'
                 size='sm'
-                onClick={() => {
-                  resetForm()
-                  setShowCreateDialog(true)
+                onClick={e => {
+                  e.stopPropagation()
+                  handleEdit(item)
                 }}
               >
-                <Plus className='h-4 w-4 mr-2' />
-                Crear primer formulario
+                <Edit className='h-4 w-4' />
               </Button>
-            ),
-          }}
-        />
-      </div>
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={e => {
+                  e.stopPropagation()
+                  setDeletingForm(item)
+                  setDeleteDialogOpen(true)
+                }}
+              >
+                <Trash2 className='h-4 w-4 text-destructive' />
+              </Button>
+            </div>
+          )
+        }}
+        emptyState={{
+          icon: <FileText className='h-10 w-10 text-muted-foreground mx-auto mb-3' />,
+          title: 'No hay documentos',
+          description: 'No se encontraron documentos en el sistema',
+          action: (
+            <Button
+              size='sm'
+              onClick={() => {
+                setFormData({ ...EMPTY_FORM })
+                setShowCreateDialog(true)
+              }}
+            >
+              <Plus className='h-4 w-4 mr-2' />
+              Crear primer documento
+            </Button>
+          ),
+        }}
+      />
 
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+      {/* ── Dialog crear / editar ─────────────────────────────────────────── */}
+      <Dialog
+        open={showCreateDialog}
+        onOpenChange={open => {
+          setShowCreateDialog(open)
+          if (!open) {
+            setEditingForm(null)
+            setFileFile(null)
+          }
+        }}
+      >
         <DialogContent className='sm:max-w-3xl max-h-[90vh] overflow-y-auto'>
           <DialogHeader>
             <DialogTitle>{editingForm ? 'Editar documento' : 'Nuevo documento'}</DialogTitle>
@@ -677,49 +592,58 @@ export default function AdminFormsPage() {
               Complete la información para {editingForm ? 'actualizar' : 'crear'} el documento
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className='space-y-4'>
+          <form onSubmit={handleSubmit} onClick={e => e.stopPropagation()} className='space-y-4'>
             <div className='grid grid-cols-2 gap-4'>
+              {/* Título */}
               <div className='space-y-2 col-span-2'>
-                <Label>Título</Label>
+                <Label>
+                  Título <span className='text-destructive'>*</span>
+                </Label>
                 <Input
                   required
                   value={formData.title}
-                  onChange={e => setFormData({ ...formData, title: e.target.value })}
+                  onChange={e => setFormData(p => ({ ...p, title: e.target.value }))}
                 />
               </div>
+              {/* Descripción */}
               <div className='space-y-2 col-span-2'>
                 <Label>Descripción</Label>
                 <Textarea
                   value={formData.description}
-                  onChange={e => setFormData({ ...formData, description: e.target.value })}
+                  onChange={e => setFormData(p => ({ ...p, description: e.target.value }))}
                   rows={2}
                 />
               </div>
+              {/* Resumen */}
               <div className='space-y-2'>
                 <Label>Resumen (opcional)</Label>
                 <Input
                   value={formData.summary}
-                  onChange={e => setFormData({ ...formData, summary: e.target.value })}
+                  onChange={e => setFormData(p => ({ ...p, summary: e.target.value }))}
                 />
               </div>
+              {/* Versión */}
               <div className='space-y-2'>
                 <Label>Versión (opcional)</Label>
                 <Input
                   value={formData.version}
-                  onChange={e => setFormData({ ...formData, version: e.target.value })}
+                  onChange={e => setFormData(p => ({ ...p, version: e.target.value }))}
                   placeholder='v1.0'
                 />
               </div>
-              <div className='space-y-2'>
+              {/* Categoría */}
+              <div className='space-y-2 col-span-2'>
                 <Label>
                   Categoría <span className='text-destructive'>*</span>
-                </Label>
+                </Label>{' '}
                 <InlineCreateSelect
-                  options={categories}
+                  options={categories.map(c => ({
+                    id: c.id,
+                    name: c.name,
+                    description: c.description ?? undefined,
+                  }))}
                   value={formData.categoryId}
-                  onChange={v => {
-                    setFormData({ ...formData, categoryId: v })
-                  }}
+                  onChange={v => setFormData(p => ({ ...p, categoryId: v }))}
                   placeholder='Seleccionar categoría'
                   createLabel='Crear categoría'
                   createTitle='Crear categoría'
@@ -727,96 +651,155 @@ export default function AdminFormsPage() {
                   allowClear
                   createForm={FormCategoryInlineForm}
                   onDelete={handleDeleteCategory}
-                  deleteConfirmMessage='¿Eliminar esta categoría? Los documentos asociados se quedarán sin categoría.'
+                  deleteConfirmMessage='¿Eliminar esta categoría? Los documentos asociados quedarán sin categoría.'
                   onAfterSave={() => loadCategories()}
                 />
               </div>
-              <div className='space-y-2'>
-                <Label>Área (opcional)</Label>
-                <Select
-                  value={formData.familyId}
-                  onValueChange={v => setFormData({ ...formData, familyId: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder='Todas las áreas' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {families.map(fam => (
-                      <SelectItem key={fam.id} value={fam.id}>
-                        {fam.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Archivo */}
               <div className='space-y-2 col-span-2'>
-                <Label>Archivo (opcional)</Label>
+                <Label>Archivo</Label>
                 <div className='space-y-2'>
-                  <Input
-                    type='file'
-                    onChange={e => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        setFileFile(file)
-                        setFormData({
-                          ...formData,
-                          fileUrl: '',
-                          fileSize: file.size,
-                          fileType: file.type,
-                        })
-                      }
-                    }}
-                  />
-                  {fileFile && (
-                    <p className='text-xs text-muted-foreground'>
-                      📎 {fileFile.name} ({(fileFile.size / 1024).toFixed(1)} KB)
-                    </p>
+                  {/* Archivo actual (al editar) */}
+                  {editingForm?.fileUrl && !fileFile && (
+                    <div className='flex items-center gap-3 p-3 rounded-lg border bg-muted/30'>
+                      <span className='text-xl'>
+                        {editingForm.fileType?.includes('pdf')
+                          ? '📕'
+                          : editingForm.fileType?.includes('word')
+                            ? '📘'
+                            : editingForm.fileType?.includes('excel')
+                              ? '📗'
+                              : editingForm.fileType?.includes('image')
+                                ? '🖼️'
+                                : '📄'}
+                      </span>
+                      <div className='flex-1 min-w-0'>
+                        <p className='text-sm font-medium truncate'>
+                          {editingForm.fileType || 'Archivo adjunto'}
+                        </p>
+                        {editingForm.fileSize && (
+                          <p className='text-xs text-muted-foreground'>
+                            {editingForm.fileSize < 1024 * 1024
+                              ? `${(editingForm.fileSize / 1024).toFixed(1)} KB`
+                              : `${(editingForm.fileSize / (1024 * 1024)).toFixed(1)} MB`}
+                          </p>
+                        )}
+                      </div>
+                      <div className='flex gap-2 flex-shrink-0'>
+                        <Button
+                          type='button'
+                          variant='outline'
+                          size='sm'
+                          onClick={() => window.open(editingForm.fileUrl!, '_blank')}
+                        >
+                          Ver
+                        </Button>
+                        <Button
+                          type='button'
+                          variant='ghost'
+                          size='sm'
+                          className='text-destructive hover:text-destructive'
+                          onClick={() =>
+                            setFormData(p => ({ ...p, fileUrl: '', fileSize: null, fileType: '' }))
+                          }
+                        >
+                          Quitar
+                        </Button>
+                      </div>
+                    </div>
                   )}
-                  {!fileFile && (
-                    <Input
+
+                  {/* Input para nuevo archivo */}
+                  {(!editingForm?.fileUrl || fileFile) && (
+                    <>
+                      <Input
+                        type='file'
+                        onChange={e => {
+                          const file = e.target.files?.[0]
+                          if (file) {
+                            setFileFile(file)
+                            setFormData(p => ({
+                              ...p,
+                              fileUrl: '',
+                              fileSize: file.size,
+                              fileType: file.type,
+                            }))
+                          }
+                        }}
+                      />
+                      {fileFile && (
+                        <div className='flex items-center gap-2 text-xs text-muted-foreground'>
+                          <span>
+                            📎 {fileFile.name} ({(fileFile.size / 1024).toFixed(1)} KB)
+                          </span>
+                          <button
+                            type='button'
+                            className='text-destructive hover:underline'
+                            onClick={() => {
+                              setFileFile(null)
+                              setFormData(p => ({
+                                ...p,
+                                fileUrl: editingForm?.fileUrl || '',
+                                fileSize: editingForm?.fileSize ?? null,
+                                fileType: editingForm?.fileType || '',
+                              }))
+                            }}
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {/* URL externa — solo si no hay archivo local ni adjunto actual */}
+                  {!fileFile && !editingForm?.fileUrl && (
+                    <MediaUrlInput
+                      label=''
                       value={formData.fileUrl}
-                      onChange={e => setFormData({ ...formData, fileUrl: e.target.value })}
-                      placeholder='O pega una URL del archivo...'
+                      onChange={v => setFormData(p => ({ ...p, fileUrl: v }))}
+                      placeholder='O pega una URL externa (Google Drive, OneDrive, Dropbox, PDF...)'
+                      optional={false}
                     />
                   )}
                 </div>
               </div>
             </div>
-            <div className='space-y-4 pt-4'>
-              <div className='flex items-center justify-between'>
-                <div className='flex items-center gap-2'>
-                  <Switch
-                    checked={formData.isActive}
-                    onCheckedChange={v => setFormData({ ...formData, isActive: v })}
-                  />
-                  <Label>Activo</Label>
-                </div>
-                <div className='flex items-center gap-2'>
-                  <Switch
-                    checked={formData.isFeatured}
-                    onCheckedChange={v => setFormData({ ...formData, isFeatured: v })}
-                  />
-                  <Label>Destacado</Label>
-                </div>
+
+            {/* Switches */}
+            <div className='flex items-center gap-6 pt-2'>
+              <div className='flex items-center gap-2'>
+                <Switch
+                  checked={formData.isActive}
+                  onCheckedChange={v => setFormData(p => ({ ...p, isActive: v }))}
+                />
+                <Label>Activo</Label>
               </div>
-
-              <Separator />
-
-              <VisibilitySelector
-                families={families}
-                users={users}
-                selectedRoles={formData.roles}
-                selectedFamilyIds={formData.familyIds}
-                selectedDepartmentIds={formData.departmentIds}
-                selectedUserIds={formData.userIds}
-                onRolesChange={roles => setFormData(prev => ({ ...prev, roles }))}
-                onFamilyIdsChange={familyIds => setFormData(prev => ({ ...prev, familyIds }))}
-                onDepartmentIdsChange={departmentIds =>
-                  setFormData(prev => ({ ...prev, departmentIds }))
-                }
-                onUserIdsChange={userIds => setFormData(prev => ({ ...prev, userIds }))}
-              />
+              <div className='flex items-center gap-2'>
+                <Switch
+                  checked={formData.isFeatured}
+                  onCheckedChange={v => setFormData(p => ({ ...p, isFeatured: v }))}
+                />
+                <Label>Destacado</Label>
+              </div>
             </div>
+
+            <Separator />
+
+            {/* Visibilidad */}
+            <VisibilitySelector
+              families={families}
+              users={users}
+              selectedRoles={formData.roles}
+              selectedFamilyIds={formData.familyIds}
+              selectedDepartmentIds={formData.departmentIds}
+              selectedUserIds={formData.userIds}
+              onRolesChange={roles => setFormData(p => ({ ...p, roles }))}
+              onFamilyIdsChange={familyIds => setFormData(p => ({ ...p, familyIds }))}
+              onDepartmentIdsChange={departmentIds => setFormData(p => ({ ...p, departmentIds }))}
+              onUserIdsChange={userIds => setFormData(p => ({ ...p, userIds }))}
+            />
+
             <DialogFooter>
               <Button
                 type='button'
@@ -828,18 +811,19 @@ export default function AdminFormsPage() {
               >
                 Cancelar
               </Button>
-              <Button type='submit' disabled={uploadingFile}>
-                {uploadingFile ? 'Guardando...' : editingForm ? 'Actualizar' : 'Crear'}
+              <Button type='submit' disabled={saving}>
+                {saving ? 'Guardando...' : editingForm ? 'Actualizar' : 'Crear'}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
+      {/* ── Dialog eliminar ───────────────────────────────────────────────── */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className='sm:max-w-[425px]' aria-describedby={undefined}>
           <DialogHeader>
-            <DialogTitle>¿Eliminar formulario?</DialogTitle>
+            <DialogTitle>¿Eliminar documento?</DialogTitle>
             <DialogDescription>
               {deletingForm && (
                 <>
@@ -867,6 +851,31 @@ export default function AdminFormsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Dialog detalle (onRowClick) ───────────────────────────────────── */}
+      {selectedForm && (
+        <FormDetail
+          form={selectedForm as any}
+          isOpen={detailOpen}
+          onClose={() => {
+            setDetailOpen(false)
+            setSelectedForm(null)
+          }}
+          mode='manage'
+          onEdit={item => {
+            setDetailOpen(false)
+            setSelectedForm(null)
+            handleEdit(item as unknown as FormItem)
+          }}
+          onDelete={item => {
+            setDetailOpen(false)
+            setSelectedForm(null)
+            setDeletingForm(item as unknown as FormItem)
+            setDeleteDialogOpen(true)
+          }}
+          onDownloaded={loadForms}
+        />
+      )}
     </ModuleLayout>
   )
 }

@@ -34,6 +34,7 @@ import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useToast } from '@/hooks/use-toast'
+import { detectMedia } from '@/components/common/media-url-input'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -501,71 +502,92 @@ export function NewsDetail({
   // Estado para el carousel
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
 
-  // Obtener todas las imágenes (attachments + imageUrl)
-  const getAllImages = () => {
-    const images: string[] = []
-    // Primero las attachments
-    if (news.news_attachments?.length) {
-      news.news_attachments.forEach((a: any) => {
-        images.push(`/api/news/${news.id}/attachments/${a.id}/file`)
-      })
+  // Obtener medios: imageUrl puede ser Google Drive, OneDrive, YouTube, imagen directa, etc.
+  // Los attachments locales ya no se usan (migrado a URLs externas)
+  const getMediaItems = (): Array<{ src: string; type: 'image' | 'embed' }> => {
+    const items: Array<{ src: string; type: 'image' | 'embed' }> = []
+
+    if (news.imageUrl) {
+      const media = detectMedia(news.imageUrl)
+      if (media.canPreview && media.embedUrl) {
+        items.push({
+          src: media.embedUrl,
+          type: media.type === 'image' ? 'image' : 'embed',
+        })
+      } else if (media.type === 'image') {
+        items.push({ src: news.imageUrl, type: 'image' })
+      }
     }
-    // Luego la imageUrl si existe y no está ya en las attachments
-    if (news.imageUrl && !images.includes(news.imageUrl)) {
-      images.unshift(news.imageUrl)
-    }
-    return images
+
+    return items
   }
 
-  const allImages = getAllImages()
+  const mediaItems = getMediaItems()
 
   const newsBodyContent = (
     <div className='space-y-4 w-full max-w-full overflow-hidden'>
-      {allImages.length > 0 && (
-        <div className='rounded-lg overflow-hidden bg-muted/30 w-full max-w-full'>
-          {allImages.length === 1 ? (
-            // Single image
-            <img
-              src={allImages[0]}
-              alt={news.title}
-              className='w-full h-auto object-contain max-w-full'
-            />
-          ) : (
-            // Carousel
-            <div className='relative w-full max-w-full'>
+      {/* Media: imagen, video, iframe embebido */}
+      {mediaItems.length > 0 && (
+        <div className='rounded-lg overflow-hidden bg-muted/30 w-full'>
+          {mediaItems.length === 1 ? (
+            mediaItems[0].type === 'image' ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={allImages[currentImageIndex]}
-                alt={`${news.title} - Imagen ${currentImageIndex + 1}`}
-                className='w-full h-auto object-contain max-w-full max-h-[50vh] sm:max-h-[400px]'
+                src={mediaItems[0].src}
+                alt={news.title}
+                className='w-full h-auto object-contain max-h-[400px]'
               />
-              {/* Previous button */}
+            ) : (
+              <iframe
+                src={mediaItems[0].src}
+                title={news.title}
+                className='w-full h-[300px] sm:h-[400px] border-0'
+                allow='autoplay; fullscreen'
+                sandbox='allow-scripts allow-same-origin allow-popups allow-presentation'
+              />
+            )
+          ) : (
+            // Carousel (por si en el futuro se soportan múltiples)
+            <div className='relative w-full'>
+              {mediaItems[currentImageIndex].type === 'image' ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={mediaItems[currentImageIndex].src}
+                  alt={`${news.title} - ${currentImageIndex + 1}`}
+                  className='w-full h-auto object-contain max-h-[400px]'
+                />
+              ) : (
+                <iframe
+                  src={mediaItems[currentImageIndex].src}
+                  title={news.title}
+                  className='w-full h-[300px] sm:h-[400px] border-0'
+                  allow='autoplay; fullscreen'
+                  sandbox='allow-scripts allow-same-origin allow-popups allow-presentation'
+                />
+              )}
               <button
                 type='button'
                 onClick={() =>
-                  setCurrentImageIndex(prev => (prev - 1 + allImages.length) % allImages.length)
+                  setCurrentImageIndex(p => (p - 1 + mediaItems.length) % mediaItems.length)
                 }
-                className='absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-1.5 sm:p-2 rounded-full'
+                className='absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-1.5 rounded-full'
               >
                 ←
               </button>
-              {/* Next button */}
               <button
                 type='button'
-                onClick={() => setCurrentImageIndex(prev => (prev + 1) % allImages.length)}
-                className='absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-1.5 sm:p-2 rounded-full'
+                onClick={() => setCurrentImageIndex(p => (p + 1) % mediaItems.length)}
+                className='absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-1.5 rounded-full'
               >
                 →
               </button>
-              {/* Indicators */}
               <div className='absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1'>
-                {allImages.map((_, index) => (
+                {mediaItems.map((_, i) => (
                   <button
-                    key={index}
+                    key={i}
                     type='button'
-                    onClick={() => setCurrentImageIndex(index)}
-                    className={`w-2 h-2 rounded-full ${
-                      index === currentImageIndex ? 'bg-white' : 'bg-white/50'
-                    }`}
+                    onClick={() => setCurrentImageIndex(i)}
+                    className={`w-2 h-2 rounded-full ${i === currentImageIndex ? 'bg-white' : 'bg-white/50'}`}
                   />
                 ))}
               </div>
@@ -573,6 +595,7 @@ export function NewsDetail({
           )}
         </div>
       )}
+
       <div className='text-sm whitespace-pre-wrap leading-relaxed break-words overflow-wrap-anywhere'>
         {news.content}
       </div>

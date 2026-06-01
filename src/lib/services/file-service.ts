@@ -611,6 +611,72 @@ export class FileService {
     return { success: true }
   }
 
+  // ── Métodos para Formularios/Documentos ──────────────────────────────────────
+
+  static async uploadFormFile(data: { file: File; formId: string; uploadedById: string }) {
+    const { file, formId, uploadedById } = data
+
+    const validation = await this.validateFile(file)
+    if (!validation.isValid) throw new Error(validation.error)
+
+    const form = await prisma.forms.findUnique({ where: { id: formId } })
+    if (!form) throw new Error('Documento no encontrado')
+
+    const originalBuffer = Buffer.from(await file.arrayBuffer()) as Buffer
+
+    let finalBuffer = originalBuffer
+    let finalExt = file.name.split('.').pop()?.toLowerCase() || 'bin'
+    let compressed = false
+
+    if (IMAGE_TYPES.has(file.type)) {
+      const result = await compressImage(originalBuffer, file.type, file.name)
+      finalBuffer = result.buffer
+      finalExt = result.ext
+      compressed = result.compressed
+    }
+
+    const uploadDir = getUploadDir('forms', formId)
+    if (!existsSync(uploadDir)) await mkdir(uploadDir, { recursive: true })
+
+    const uniqueFilename = `${randomUUID()}.${finalExt}`
+    const filePath = getUploadDir('forms', formId, uniqueFilename)
+
+    await writeFile(filePath, finalBuffer)
+
+    const attachment = await prisma.form_attachments.create({
+      data: {
+        id: randomUUID(),
+        filename: uniqueFilename,
+        originalName: file.name,
+        mimeType: compressed ? (finalExt === 'webp' ? 'image/webp' : 'image/jpeg') : file.type,
+        size: finalBuffer.length,
+        path: filePath,
+        formId,
+        uploadedById,
+        createdAt: new Date(),
+      },
+    })
+
+    return attachment
+  }
+
+  static async getFilesByForm(formId: string) {
+    return prisma.form_attachments.findMany({
+      where: { formId },
+      orderBy: { createdAt: 'desc' },
+    })
+  }
+
+  static async deleteFormFile(fileId: string) {
+    const attachment = await prisma.form_attachments.findUnique({ where: { id: fileId } })
+    if (!attachment) throw new Error('Archivo no encontrado')
+    try {
+      if (existsSync(attachment.path)) await unlink(attachment.path)
+    } catch {}
+    await prisma.form_attachments.delete({ where: { id: fileId } })
+    return { success: true }
+  }
+
   /** Constantes expuestas para uso en frontend */
   static readonly LIMITS = {
     maxFileSizeMB: MAX_FILE_SIZE_BYTES / (1024 * 1024),

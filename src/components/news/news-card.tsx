@@ -20,6 +20,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
+import { detectMedia } from '@/components/common/media-url-input'
 
 type NewsType =
   | 'NEWS'
@@ -121,14 +122,49 @@ export function NewsCard({
     locale: es,
   })
 
-  // Obtener la primera imagen disponible (attachments primero, luego imageUrl)
-  const getFirstImage = () => {
-    if (news.news_attachments?.length) {
-      return `/api/news/${news.id}/attachments/${news.news_attachments[0].id}/file`
+  // Obtener thumbnail: usa detectMedia para soportar Google Drive, OneDrive, YouTube, etc.
+  // Solo mostramos thumbnail si es una imagen directa (no iframe — no cabe en 80x80)
+  const getThumbnail = (): { src: string; isImage: boolean } | null => {
+    if (!news.imageUrl) return null
+    const media = detectMedia(news.imageUrl)
+    if (media.type === 'image' && media.embedUrl) {
+      return { src: media.embedUrl, isImage: true }
     }
-    return news.imageUrl
+    // Para YouTube: usar thumbnail de alta calidad
+    if (media.type === 'youtube' && news.imageUrl) {
+      const ytMatch = news.imageUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?/]+)/)
+      if (ytMatch) {
+        return { src: `https://img.youtube.com/vi/${ytMatch[1]}/mqdefault.jpg`, isImage: true }
+      }
+    }
+    // Para Google Drive con imagen: usar thumbnail de Drive
+    if (media.type === 'google-drive') {
+      const gdMatch = news.imageUrl.match(/drive\.google\.com\/file\/d\/([^/]+)/)
+      if (gdMatch) {
+        return { src: `https://drive.google.com/thumbnail?id=${gdMatch[1]}&sz=w200`, isImage: true }
+      }
+    }
+    return null
   }
-  const firstImage = getFirstImage()
+
+  const thumbnail = getThumbnail()
+
+  // Icono de tipo de media para cuando no hay thumbnail
+  const getMediaIcon = () => {
+    if (!news.imageUrl) return null
+    const media = detectMedia(news.imageUrl)
+    const icons: Record<string, string> = {
+      youtube: '▶️',
+      'google-drive': '📁',
+      onedrive: '☁️',
+      dropbox: '📦',
+      pdf: '📕',
+      office: '📄',
+    }
+    return icons[media.type] || null
+  }
+
+  const mediaIcon = !thumbnail ? getMediaIcon() : null
 
   return (
     <Card
@@ -143,10 +179,22 @@ export function NewsCard({
     >
       <CardContent className='p-4'>
         <div className='flex items-start gap-4'>
-          {/* Imagen miniatura */}
-          {firstImage && (
+          {/* Thumbnail: imagen directa, YouTube, Google Drive, o icono de tipo */}
+          {(thumbnail || mediaIcon) && (
             <div className='w-20 h-20 rounded-md overflow-hidden flex-shrink-0 bg-muted/30 flex items-center justify-center'>
-              <img src={firstImage} alt={news.title} className='w-full h-full object-contain' />
+              {thumbnail ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={thumbnail.src}
+                  alt={news.title}
+                  className='w-full h-full object-cover'
+                  onError={e => {
+                    ;(e.target as HTMLImageElement).style.display = 'none'
+                  }}
+                />
+              ) : (
+                <span className='text-3xl'>{mediaIcon}</span>
+              )}
             </div>
           )}
 

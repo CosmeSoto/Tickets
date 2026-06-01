@@ -34,6 +34,7 @@ export function FormCategoryInlineForm({ item, onSuccess, onCancel }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    e.stopPropagation() // Evita que el submit burbujee al form padre (cuando está en un Dialog anidado)
     setError('')
 
     if (!name.trim()) {
@@ -82,7 +83,7 @@ export function FormCategoryInlineForm({ item, onSuccess, onCancel }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className='space-y-4'>
+    <form onSubmit={handleSubmit} onClick={e => e.stopPropagation()} className='space-y-4'>
       <div className='space-y-1'>
         <Label>
           Nombre <span className='text-destructive'>*</span>
