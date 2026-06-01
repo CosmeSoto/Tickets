@@ -3,13 +3,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { Plus, Newspaper, Trash2, Edit, Eye, CheckCircle2, XCircle } from 'lucide-react'
+import { Plus, Newspaper, Trash2, Edit } from 'lucide-react'
 
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { DataTable, Column } from '@/components/ui/data-table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import {
   Dialog,
@@ -30,13 +29,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { CalendarIcon } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { VisibilitySelector } from '@/components/common/visibility-selector'
 import { MediaUrlInput } from '@/components/common/media-url-input'
