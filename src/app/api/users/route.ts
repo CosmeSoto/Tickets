@@ -222,6 +222,8 @@ export async function GET(request: NextRequest) {
         inventoryEnabled: true,
         patrolsEnabled: true,
         newsEnabled: true,
+        formsEnabled: true,
+        canManageForms: true,
         isSuperAdmin: true,
         createdAt: true,
         lastLogin: true,
