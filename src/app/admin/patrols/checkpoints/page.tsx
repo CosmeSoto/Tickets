@@ -7,28 +7,18 @@ import {
   Plus,
   MapPin,
   Monitor,
-  Copy,
-  ExternalLink,
   Pencil,
   Download,
   PowerOff,
   Power,
   Loader2,
   Trash2,
+  Printer,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Textarea } from '@/components/ui/textarea'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,7 +29,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { useToast } from '@/hooks/use-toast'
 import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { DataTable } from '@/components/ui/data-table'
 import { ExportButton } from '@/components/common/export-button'
@@ -48,46 +37,18 @@ import { usePagination } from '@/hooks/common/use-pagination'
 import { useExport } from '@/hooks/common/use-export'
 import { createCheckpointColumns } from '@/components/patrols/patrol-columns'
 import { PATROL_CHECKPOINTS_EXPORT_COLUMNS } from '@/lib/utils/patrol-utils'
-
-interface Checkpoint {
-  id: string
-  familyId: string
-  name: string
-  description: string | null
-  location: string
-  latitude: number | null
-  longitude: number | null
-  geofenceRadiusMeters: number | null
-  hasConnectivity: boolean
-  isSensitive: boolean
-  isActive: boolean
-  qrType: 'DYNAMIC' | 'STATIC'
-  createdAt: string
-  updatedAt: string
-}
-
-interface Family {
-  id: string
-  name: string
-  code: string
-}
-
-const EMPTY_FORM = {
-  familyId: '',
-  name: '',
-  description: '',
-  location: '',
-  latitude: '',
-  longitude: '',
-  geofenceRadiusMeters: '',
-  hasConnectivity: true,
-  isSensitive: false,
-}
+import { QRPrintDialog } from '@/components/common/qr/qr-print-dialog'
+import {
+  CheckpointFormDialog,
+  CheckpointDisplayDialog,
+  useCheckpoints,
+  Checkpoint,
+} from '@/components/patrols/checkpoints'
+import type { Family } from '@/components/patrols/types'
 
 export default function CheckpointsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const { toast } = useToast()
 
   const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
 
@@ -95,19 +56,6 @@ export default function CheckpointsPage() {
   const [includeInactive, setIncludeInactive] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
-
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState(EMPTY_FORM)
-  const [saving, setSaving] = useState(false)
-
-  const [deactivatingId, setDeactivatingId] = useState<string | null>(null)
-  const [reactivatingId, setReactivatingId] = useState<string | null>(null)
-  const [permanentlyDeletingId, setPermanentlyDeletingId] = useState<string | null>(null)
-  const [downloadingQrId, setDownloadingQrId] = useState<string | null>(null)
-  const [displayModalOpen, setDisplayModalOpen] = useState(false)
-  const [selectedCheckpointForDisplay, setSelectedCheckpointForDisplay] =
-    useState<Checkpoint | null>(null)
 
   // Debounce search
   useEffect(() => {
@@ -138,6 +86,43 @@ export default function CheckpointsPage() {
   })
 
   const checkpoints = checkpointsRaw || []
+
+  // Use our custom hook for checkpoint logic
+  const {
+    dialogOpen,
+    setDialogOpen,
+    editingId,
+    setEditingId,
+    saving,
+    deactivatingId,
+    setDeactivatingId,
+    reactivatingId,
+    setReactivatingId,
+    permanentlyDeletingId,
+    setPermanentlyDeletingId,
+    downloadingQrId,
+    displayModalOpen,
+    setDisplayModalOpen,
+    selectedCheckpointForDisplay,
+    printDialogOpen,
+    setPrintDialogOpen,
+    printItem,
+    selectedIds,
+    setSelectedIds,
+    bulkPrinting,
+    openCreate,
+    openEdit,
+    handleSave,
+    handleDeactivate,
+    handleReactivate,
+    handlePermanentDelete,
+    handleDownloadQR,
+    handlePrintQR,
+    toggleSelection,
+    toggleSelectAll,
+    handleBulkPrint,
+    copyDisplayUrl,
+  } = useCheckpoints({ checkpoints, reload })
 
   // Pagination
   const pagination = usePagination(checkpoints, { pageSize: 20 })
@@ -170,175 +155,6 @@ export default function CheckpointsPage() {
     fetchFamilies()
   }, [session, status, router, fetchFamilies])
 
-  const openCreate = () => {
-    setEditingId(null)
-    setForm({ ...EMPTY_FORM, familyId: families[0]?.id ?? '' })
-    setDialogOpen(true)
-  }
-
-  const openEdit = (cp: Checkpoint) => {
-    setEditingId(cp.id)
-    setForm({
-      familyId: cp.familyId,
-      name: cp.name,
-      description: cp.description ?? '',
-      location: cp.location,
-      latitude: cp.latitude != null ? String(cp.latitude) : '',
-      longitude: cp.longitude != null ? String(cp.longitude) : '',
-      geofenceRadiusMeters: cp.geofenceRadiusMeters != null ? String(cp.geofenceRadiusMeters) : '',
-      hasConnectivity: cp.hasConnectivity,
-      isSensitive: cp.isSensitive,
-    })
-    setDialogOpen(true)
-  }
-
-  const handleSave = async () => {
-    if (!form.name.trim() || !form.location.trim() || !form.familyId) {
-      toast({
-        title: 'Campos requeridos',
-        description: 'Nombre, ubicación y área son obligatorios',
-        variant: 'destructive',
-      })
-      return
-    }
-    setSaving(true)
-    try {
-      const body = {
-        familyId: form.familyId,
-        name: form.name.trim(),
-        description: form.description.trim() || undefined,
-        location: form.location.trim(),
-        latitude: form.latitude ? parseFloat(form.latitude) : undefined,
-        longitude: form.longitude ? parseFloat(form.longitude) : undefined,
-        geofenceRadiusMeters: form.geofenceRadiusMeters
-          ? parseInt(form.geofenceRadiusMeters)
-          : undefined,
-        hasConnectivity: form.hasConnectivity,
-        isSensitive: form.isSensitive,
-      }
-
-      const res = editingId
-        ? await fetch(`/api/patrols/checkpoints/${editingId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-          })
-        : await fetch('/api/patrols/checkpoints', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-          })
-
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Error al guardar')
-
-      toast({ title: editingId ? 'Checkpoint actualizado' : 'Checkpoint creado' })
-      setDialogOpen(false)
-      reload()
-    } catch (err) {
-      toast({
-        title: 'Error',
-        description: err instanceof Error ? err.message : 'Error al guardar',
-        variant: 'destructive',
-      })
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleDeactivate = async (id: string) => {
-    try {
-      const res = await fetch(`/api/patrols/checkpoints/${id}`, { method: 'DELETE' })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Error al desactivar')
-      toast({ title: 'Checkpoint desactivado' })
-      reload()
-    } catch (err) {
-      toast({
-        title: 'Error',
-        description: err instanceof Error ? err.message : 'Error',
-        variant: 'destructive',
-      })
-    } finally {
-      setDeactivatingId(null)
-    }
-  }
-
-  const handleReactivate = async (id: string) => {
-    try {
-      const res = await fetch(`/api/patrols/checkpoints/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: true }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Error al reactivar')
-      toast({ title: 'Checkpoint reactivado' })
-      reload()
-    } catch (err) {
-      toast({
-        title: 'Error',
-        description: err instanceof Error ? err.message : 'Error',
-        variant: 'destructive',
-      })
-    } finally {
-      setReactivatingId(null)
-    }
-  }
-
-  const handlePermanentDelete = async (id: string) => {
-    try {
-      const res = await fetch(`/api/patrols/checkpoints/${id}?permanent=true`, { method: 'DELETE' })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Error al eliminar permanentemente')
-      toast({ title: 'Checkpoint eliminado permanentemente' })
-      reload()
-    } catch (err) {
-      toast({
-        title: 'Error',
-        description: err instanceof Error ? err.message : 'Error',
-        variant: 'destructive',
-      })
-    } finally {
-      setPermanentlyDeletingId(null)
-    }
-  }
-
-  const handleDownloadQR = async (cp: Checkpoint) => {
-    setDownloadingQrId(cp.id)
-    try {
-      const res = await fetch(`/api/patrols/checkpoints/${cp.id}/qr`)
-      if (!res.ok) throw new Error('Error al generar QR')
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `qr-${cp.name.replace(/\s+/g, '-').toLowerCase()}.png`
-      a.click()
-      URL.revokeObjectURL(url)
-    } catch (err) {
-      toast({
-        title: 'Error',
-        description: err instanceof Error ? err.message : 'Error al descargar QR',
-        variant: 'destructive',
-      })
-    } finally {
-      setDownloadingQrId(null)
-    }
-  }
-
-  const openDisplayModal = (cp: Checkpoint) => {
-    setSelectedCheckpointForDisplay(cp)
-    setDisplayModalOpen(true)
-  }
-
-  const copyDisplayUrl = () => {
-    if (!selectedCheckpointForDisplay) return
-    const url = `${window.location.origin}/patrol-checkpoint-display/${selectedCheckpointForDisplay.id}`
-    navigator.clipboard.writeText(url)
-    toast({ title: 'URL copiada al portapapeles' })
-  }
-
   if (status === 'loading' || !session) return null
 
   // Create columns with callbacks
@@ -348,10 +164,33 @@ export default function CheckpointsPage() {
     onDeactivate: id => setDeactivatingId(id),
     onReactivate: id => setReactivatingId(id),
     onPermanentDelete: id => setPermanentlyDeletingId(id),
-    onOpenDisplay: openDisplayModal,
+    onOpenDisplay: cp => {
+      setSelectedCheckpointForDisplay(cp)
+      setDisplayModalOpen(true)
+    },
     downloadingQrId,
     isSuperAdmin,
   })
+
+  // Columna de selección para bulk print — se antepone al resto
+  const selectionColumn = {
+    key: '__select__' as keyof Checkpoint,
+    label: '',
+    width: '32px',
+    render: (cp: Checkpoint) =>
+      cp.isActive ? (
+        <input
+          type='checkbox'
+          checked={selectedIds.has(cp.id)}
+          onChange={() => toggleSelection(cp.id)}
+          onClick={e => e.stopPropagation()}
+          className='h-4 w-4 accent-primary cursor-pointer'
+          aria-label={`Seleccionar ${cp.name}`}
+        />
+      ) : null,
+  }
+
+  const columnsWithSelection = [selectionColumn, ...columns] as typeof columns
 
   // Pagination config
   const paginationConfig = {
@@ -400,12 +239,50 @@ export default function CheckpointsPage() {
         </div>
       </div>
 
+      {/* --- Barra de selección bulk --- */}
+      {checkpoints.some(cp => cp.isActive) && (
+        <div className='flex items-center gap-3 mb-3'>
+          <label className='flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none'>
+            <input
+              type='checkbox'
+              className='h-4 w-4 accent-primary cursor-pointer'
+              checked={
+                checkpoints.filter(cp => cp.isActive).length > 0 &&
+                checkpoints.filter(cp => cp.isActive).every(cp => selectedIds.has(cp.id))
+              }
+              onChange={toggleSelectAll}
+              aria-label='Seleccionar todos los checkpoints activos'
+            />
+            {selectedIds.size > 0
+              ? `${selectedIds.size} seleccionado${selectedIds.size > 1 ? 's' : ''}`
+              : 'Seleccionar todos'}
+          </label>
+
+          {selectedIds.size > 0 && (
+            <Button
+              size='sm'
+              variant='outline'
+              onClick={handleBulkPrint}
+              disabled={bulkPrinting}
+              className='gap-2'
+            >
+              {bulkPrinting ? (
+                <Loader2 className='h-3.5 w-3.5 animate-spin' />
+              ) : (
+                <Printer className='h-3.5 w-3.5' />
+              )}
+              Imprimir {selectedIds.size} QR{selectedIds.size > 1 ? 's' : ''}
+            </Button>
+          )}
+        </div>
+      )}
+
       {/* DataTable */}
       <DataTable
         title='Checkpoints'
         description={`Gestión de puntos de control (${checkpoints.length} checkpoints)`}
         data={checkpoints}
-        columns={columns}
+        columns={columnsWithSelection}
         loading={loading}
         error={error}
         pagination={paginationConfig}
@@ -421,7 +298,10 @@ export default function CheckpointsPage() {
               <Button
                 size='sm'
                 variant='ghost'
-                onClick={() => openDisplayModal(cp)}
+                onClick={() => {
+                  setSelectedCheckpointForDisplay(cp)
+                  setDisplayModalOpen(true)
+                }}
                 title='Ver pantalla'
               >
                 <Monitor className='h-3.5 w-3.5' />
@@ -439,6 +319,9 @@ export default function CheckpointsPage() {
               ) : (
                 <Download className='h-3.5 w-3.5' />
               )}
+            </Button>
+            <Button size='sm' variant='ghost' onClick={() => handlePrintQR(cp)} title='Imprimir QR'>
+              <Printer className='h-3.5 w-3.5' />
             </Button>
             {cp.isActive ? (
               <Button
@@ -490,186 +373,18 @@ export default function CheckpointsPage() {
         }}
       />
 
-      {/* ── Dialog crear/editar ── */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className='sm:max-w-lg'>
-          <DialogHeader>
-            <DialogTitle>{editingId ? 'Editar Checkpoint' : 'Nuevo Checkpoint'}</DialogTitle>
-            <DialogDescription>
-              {editingId
-                ? 'Modifica los datos del checkpoint.'
-                : 'Crea un nuevo punto de control físico.'}
-            </DialogDescription>
-          </DialogHeader>
+      {/* --- Dialog crear/editar --- */}
+      <CheckpointFormDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        editingId={editingId}
+        families={families}
+        checkpoints={checkpoints}
+        onSave={handleSave}
+        saving={saving}
+      />
 
-          <div className='space-y-4 py-2 max-h-[60vh] overflow-y-auto pr-1'>
-            {/* Área */}
-            <div className='space-y-1.5'>
-              <Label htmlFor='cp-family' className='text-sm'>
-                Área <span className='text-destructive'>*</span>
-              </Label>
-              <select
-                id='cp-family'
-                value={form.familyId}
-                onChange={e => setForm(f => ({ ...f, familyId: e.target.value }))}
-                className='w-full h-9 rounded-md border border-input bg-background px-3 text-sm'
-                disabled={saving || !!editingId}
-              >
-                <option value=''>Selecciona un área</option>
-                {families.map(f => (
-                  <option key={f.id} value={f.id}>
-                    {f.name} ({f.code})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Nombre */}
-            <div className='space-y-1.5'>
-              <Label htmlFor='cp-name' className='text-sm'>
-                Nombre <span className='text-destructive'>*</span>
-              </Label>
-              <Input
-                id='cp-name'
-                value={form.name}
-                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                placeholder='Ej: Entrada Principal'
-                disabled={saving}
-                maxLength={200}
-              />
-            </div>
-
-            {/* Ubicación */}
-            <div className='space-y-1.5'>
-              <Label htmlFor='cp-location' className='text-sm'>
-                Descripción de ubicación <span className='text-destructive'>*</span>
-              </Label>
-              <Input
-                id='cp-location'
-                value={form.location}
-                onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
-                placeholder='Ej: Planta baja, junto a ascensores'
-                disabled={saving}
-                maxLength={500}
-              />
-            </div>
-
-            {/* Descripción */}
-            <div className='space-y-1.5'>
-              <Label htmlFor='cp-desc' className='text-sm'>
-                Descripción (opcional)
-              </Label>
-              <Textarea
-                id='cp-desc'
-                value={form.description}
-                onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                placeholder='Notas adicionales sobre este checkpoint...'
-                disabled={saving}
-                rows={2}
-              />
-            </div>
-
-            {/* GPS */}
-            <div className='grid grid-cols-2 gap-3'>
-              <div className='space-y-1.5'>
-                <Label htmlFor='cp-lat' className='text-sm'>
-                  Latitud (opcional)
-                </Label>
-                <Input
-                  id='cp-lat'
-                  type='number'
-                  step='any'
-                  value={form.latitude}
-                  onChange={e => setForm(f => ({ ...f, latitude: e.target.value }))}
-                  placeholder='-0.1234'
-                  disabled={saving}
-                />
-              </div>
-              <div className='space-y-1.5'>
-                <Label htmlFor='cp-lng' className='text-sm'>
-                  Longitud (opcional)
-                </Label>
-                <Input
-                  id='cp-lng'
-                  type='number'
-                  step='any'
-                  value={form.longitude}
-                  onChange={e => setForm(f => ({ ...f, longitude: e.target.value }))}
-                  placeholder='-78.5678'
-                  disabled={saving}
-                />
-              </div>
-            </div>
-
-            {/* Radio geofence */}
-            <div className='space-y-1.5'>
-              <Label htmlFor='cp-radius' className='text-sm'>
-                Radio de geofence (metros, opcional)
-              </Label>
-              <Input
-                id='cp-radius'
-                type='number'
-                min={1}
-                max={10000}
-                value={form.geofenceRadiusMeters}
-                onChange={e => setForm(f => ({ ...f, geofenceRadiusMeters: e.target.value }))}
-                placeholder='Deja vacío para usar el default del área'
-                disabled={saving}
-              />
-            </div>
-
-            {/* Switches */}
-            <div className='space-y-3'>
-              <div className='flex items-center justify-between'>
-                <div>
-                  <Label className='text-sm font-medium'>Tiene conectividad</Label>
-                  <p className='text-xs text-muted-foreground'>
-                    ON = QR Dinámico (cambia constantemente, máxima seguridad)
-                    <br />
-                    OFF = QR Estático (permanente, ideal para imprimir)
-                  </p>
-                </div>
-                <Switch
-                  checked={form.hasConnectivity}
-                  onCheckedChange={v => setForm(f => ({ ...f, hasConnectivity: v }))}
-                  disabled={saving}
-                />
-              </div>
-              <div className='flex items-center justify-between'>
-                <div>
-                  <Label className='text-sm font-medium'>Punto sensible</Label>
-                  <p className='text-xs text-muted-foreground'>
-                    Requiere foto obligatoria en cada check-in
-                  </p>
-                </div>
-                <Switch
-                  checked={form.isSensitive}
-                  onCheckedChange={v => setForm(f => ({ ...f, isSensitive: v }))}
-                  disabled={saving}
-                />
-              </div>
-            </div>
-
-            {!form.hasConnectivity && (
-              <div className='p-3 rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 text-xs text-orange-700 dark:text-orange-400'>
-                Sin conectividad → QR Estático.
-              </div>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button variant='outline' onClick={() => setDialogOpen(false)} disabled={saving}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? <Loader2 className='h-4 w-4 mr-2 animate-spin' /> : null}
-              {editingId ? 'Guardar cambios' : 'Crear checkpoint'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Confirm deactivate ── */}
+      {/* --- Confirm desactivar --- */}
       <AlertDialog open={!!deactivatingId} onOpenChange={() => setDeactivatingId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -691,7 +406,7 @@ export default function CheckpointsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* ── Confirm reactivate ── */}
+      {/* --- Confirm reactivar --- */}
       <AlertDialog open={!!reactivatingId} onOpenChange={() => setReactivatingId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -712,7 +427,7 @@ export default function CheckpointsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* ── Confirm permanent delete ── */}
+      {/* --- Confirm eliminar permanentemente --- */}
       <AlertDialog
         open={!!permanentlyDeletingId}
         onOpenChange={() => setPermanentlyDeletingId(null)}
@@ -737,70 +452,16 @@ export default function CheckpointsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* ── Modal de pantalla QR ── */}
-      <Dialog open={displayModalOpen} onOpenChange={setDisplayModalOpen}>
-        <DialogContent className='sm:max-w-lg'>
-          <DialogHeader>
-            <DialogTitle>Pantalla de Visualización QR</DialogTitle>
-            <DialogDescription>
-              Abre esta URL en la pantalla física donde los guardias escanearán el QR.
-            </DialogDescription>
-          </DialogHeader>
+      {/* --- Modal de pantalla QR --- */}
+      <CheckpointDisplayDialog
+        open={displayModalOpen}
+        onOpenChange={setDisplayModalOpen}
+        checkpoint={selectedCheckpointForDisplay}
+        onCopyUrl={copyDisplayUrl}
+      />
 
-          {selectedCheckpointForDisplay && (
-            <div className='space-y-4 py-2'>
-              <div className='space-y-2'>
-                <Label className='text-sm'>Checkpoint</Label>
-                <p className='font-medium'>{selectedCheckpointForDisplay.name}</p>
-                <p className='text-sm text-muted-foreground'>
-                  {selectedCheckpointForDisplay.location}
-                </p>
-              </div>
-
-              <div className='space-y-2'>
-                <Label className='text-sm'>URL de la pantalla</Label>
-                <div className='flex gap-2'>
-                  <Input
-                    readOnly
-                    value={`${window.location.origin}/patrol-checkpoint-display/${selectedCheckpointForDisplay.id}`}
-                    className='font-mono text-xs'
-                  />
-                  <Button variant='outline' onClick={copyDisplayUrl}>
-                    <Copy className='h-4 w-4' />
-                  </Button>
-                </div>
-              </div>
-
-              <div className='pt-2'>
-                <Button
-                  className='w-full'
-                  onClick={() => {
-                    window.open(
-                      `/patrol-checkpoint-display/${selectedCheckpointForDisplay.id}`,
-                      '_blank'
-                    )
-                  }}
-                >
-                  <ExternalLink className='h-4 w-4 mr-2' />
-                  Abrir en nueva pestaña
-                </Button>
-              </div>
-
-              <div className='p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-400'>
-                <strong>Nota:</strong> Esta página está diseñada para mostrarse en una pantalla
-                física (tableta, monitor, etc.) donde los guardias pueden escanear el QR. Solo los
-                administradores pueden acceder a esta configuración.
-              </div>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button variant='outline' onClick={() => setDisplayModalOpen(false)}>
-              Cerrar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* --- Diálogo de impresión individual --- */}
+      <QRPrintDialog open={printDialogOpen} onOpenChange={setPrintDialogOpen} item={printItem} />
     </ModuleLayout>
   )
 }

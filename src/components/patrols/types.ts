@@ -32,6 +32,23 @@ export interface Agent {
   role: string
 }
 
+export interface Checkpoint {
+  id: string
+  familyId: string
+  name: string
+  description: string | null
+  location: string
+  latitude: number | null
+  longitude: number | null
+  geofenceRadiusMeters: number | null
+  hasConnectivity: boolean
+  isSensitive: boolean
+  isActive: boolean
+  qrType: 'DYNAMIC' | 'STATIC'
+  createdAt: string
+  updatedAt: string
+}
+
 export interface FormData {
   familyId: string
   routeId: string
