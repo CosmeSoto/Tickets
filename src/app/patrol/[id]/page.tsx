@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
 import { usePatrolData } from '@/hooks/use-patrol-data'
 import { usePatrolOfflineQueue } from '@/hooks/use-patrol-offline-queue'
+import { ModuleLayout } from '@/components/common/layout/module-layout'
 import { PatrolStatusBadge } from '@/components/patrol/patrol-status-badge'
 import { PatrolProgress } from '@/components/patrol/patrol-progress'
 import { PatrolCheckpointList } from '@/components/patrol/patrol-checkpoint-list'
@@ -273,21 +274,16 @@ export default function PatrolExecutionPage() {
   if (status === 'loading' || !session) return null
 
   if (loading) {
-    return (
-      <div className='flex items-center justify-center min-h-screen'>
-        <Loader2 className='h-8 w-8 animate-spin text-muted-foreground' />
-      </div>
-    )
+    return <ModuleLayout title='Cargando ronda...' loading={true} />
   }
 
   if (error || !patrol) {
     return (
-      <div className='p-4 text-center'>
-        <p className='text-destructive'>{error ?? 'Patrulla no encontrada'}</p>
-        <Button variant='outline' className='mt-4' onClick={() => router.push('/patrol')}>
-          Volver
-        </Button>
-      </div>
+      <ModuleLayout
+        title='Ronda no encontrada'
+        error={error ?? 'Patrulla no encontrada'}
+        onRetry={() => refresh()}
+      />
     )
   }
 
@@ -298,32 +294,33 @@ export default function PatrolExecutionPage() {
   const isPending = patrol.status === 'PENDING'
   const isFinished = ['COMPLETED', 'INCOMPLETE', 'MISSED'].includes(patrol.status)
 
-  return (
-    <div className='min-h-screen bg-background'>
-      {/* Header */}
-      <div className='sticky top-0 z-40 bg-card border-b border-border px-4 py-3'>
-        <div className='flex items-center gap-3'>
-          <Button variant='ghost' size='icon' onClick={() => router.push('/patrol')}>
-            <ArrowLeft className='h-5 w-5' />
-          </Button>
-          <div className='flex-1 min-w-0'>
-            <p className='font-semibold text-sm truncate'>{patrol.route.name}</p>
-            <p className='text-xs text-muted-foreground truncate'>
-              {new Date(patrol.scheduledStart).toLocaleString('es-EC', {
-                timeZone: 'America/Guayaquil',
-                dateStyle: 'short',
-                timeStyle: 'short',
-              })}
-            </p>
-          </div>
-          <div className='flex items-center gap-2'>
-            <PatrolOfflineIndicator isOnline={isOnline} queuedCount={queuedCount} />
-            <PatrolStatusBadge status={patrol.status} />
-          </div>
-        </div>
-      </div>
+  const scheduledLabel = new Date(patrol.scheduledStart).toLocaleString('es-EC', {
+    timeZone: 'America/Guayaquil',
+    dateStyle: 'short',
+    timeStyle: 'short',
+  })
 
-      <div className='p-4 space-y-4 max-w-2xl mx-auto'>
+  return (
+    <ModuleLayout
+      title={patrol.route.name}
+      subtitle={scheduledLabel}
+      headerActions={
+        <div className='flex items-center gap-2'>
+          <PatrolOfflineIndicator isOnline={isOnline} queuedCount={queuedCount} />
+          <PatrolStatusBadge status={patrol.status} />
+          <Button
+            variant='ghost'
+            size='sm'
+            onClick={() => router.push('/patrol')}
+            className='gap-1'
+          >
+            <ArrowLeft className='h-4 w-4' />
+            Volver
+          </Button>
+        </div>
+      }
+    >
+      <div className='space-y-4 max-w-2xl mx-auto'>
         {/* Progreso */}
         <Card>
           <CardContent className='pt-4 space-y-3'>
@@ -532,6 +529,6 @@ export default function PatrolExecutionPage() {
           </Card>
         )}
       </div>
-    </div>
+    </ModuleLayout>
   )
 }

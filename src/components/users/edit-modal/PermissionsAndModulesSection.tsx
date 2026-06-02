@@ -8,12 +8,7 @@ import { UserModulesPanel } from '@/components/users/user-modules-panel'
 import { useSystemModules } from '@/hooks/use-system-modules'
 import { type UserRole } from '@/lib/constants/user-constants'
 import { type FamilyOption } from '@/components/users/family-assignment-section'
-
-interface UserData {
-  id: string
-  role: UserRole
-  department: any
-}
+import { type UserData } from '@/hooks/use-users'
 
 interface PermissionsAndModulesSectionProps {
   user: UserData

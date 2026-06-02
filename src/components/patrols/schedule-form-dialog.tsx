@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import {
   Select,
   SelectContent,
@@ -480,6 +481,58 @@ export function ScheduleFormDialog({
               </span>
             </div>
           )}
+
+          {/* ── Control de horario para esta programación ── */}
+          <div className='border-t pt-4'>
+            <div className='flex items-start justify-between gap-4 p-3 rounded-lg border bg-muted/30'>
+              <div className='space-y-1 flex-1'>
+                <Label className='text-xs font-medium flex items-center gap-1.5'>
+                  <Clock className='h-3.5 w-3.5 text-primary' />
+                  Validación de horario para esta programación
+                </Label>
+                <p className='text-xs text-muted-foreground'>
+                  Controla si el agente puede iniciar esta ronda fuera del período de gracia. Por
+                  defecto usa la configuración del área.
+                </p>
+                <p className='text-xs font-medium text-amber-600 dark:text-amber-400'>
+                  {form.overrideTimeValidation === null
+                    ? 'Usando default del área'
+                    : form.overrideTimeValidation
+                      ? 'Estricto — solo dentro del período de gracia'
+                      : 'Flexible — puede iniciar en cualquier momento'}
+                </p>
+              </div>
+              <div className='flex flex-col items-end gap-2 flex-shrink-0'>
+                <Switch
+                  checked={form.overrideTimeValidation !== null}
+                  onCheckedChange={enabled => {
+                    setForm(f => ({
+                      ...f,
+                      overrideTimeValidation: enabled ? true : null,
+                    }))
+                  }}
+                  aria-label='Sobreescribir validación de horario'
+                />
+                <span className='text-xs text-muted-foreground'>
+                  {form.overrideTimeValidation === null ? 'Heredar' : 'Sobreescribir'}
+                </span>
+                {form.overrideTimeValidation !== null && (
+                  <Switch
+                    checked={form.overrideTimeValidation === true}
+                    onCheckedChange={strict => {
+                      setForm(f => ({ ...f, overrideTimeValidation: strict }))
+                    }}
+                    aria-label='Modo estricto'
+                  />
+                )}
+                {form.overrideTimeValidation !== null && (
+                  <span className='text-xs text-muted-foreground'>
+                    {form.overrideTimeValidation ? 'Estricto' : 'Flexible'}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
         <DialogFooter className='gap-2 pt-2'>

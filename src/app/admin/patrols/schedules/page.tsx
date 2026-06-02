@@ -190,6 +190,7 @@ export default function SchedulesPage() {
       endTimeOnly,
       recurrence: schedule.recurrence as any,
       recurrenceDays: schedule.recurrenceDays,
+      overrideTimeValidation: schedule.overrideTimeValidation ?? null,
     })
 
     fetchRoutesForFamily(schedule.familyId)
@@ -227,6 +228,7 @@ export default function SchedulesPage() {
         scheduledEnd: scheduledEndISO,
         recurrence: form.recurrence,
         recurrenceDays: form.recurrenceDays,
+        overrideTimeValidation: form.overrideTimeValidation,
       }
 
       const url = currentEditingId
@@ -382,7 +384,7 @@ export default function SchedulesPage() {
         onRefresh={reload}
         externalSearch={true}
         hideInternalFilters={true}
-        rowActions={(schedule: PatrolSchedule) => (
+        rowActions={schedule => (
           <div className='flex items-center gap-1 justify-end'>
             <Button size='sm' variant='ghost' onClick={() => openEdit(schedule)}>
               <Pencil className='h-3.5 w-3.5' />

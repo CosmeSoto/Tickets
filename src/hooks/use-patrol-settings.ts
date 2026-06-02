@@ -33,6 +33,7 @@ export interface PatrolFormState {
   offlineSyncToleranceMinutes: number
   alertCompletionThreshold: number
   gracePeriodMinutes: number
+  strictTimeValidation: boolean
   reminderMinutesBefore: number
   patrolIncidentCategoryId: string | null
 }
@@ -49,6 +50,7 @@ const DEFAULT_FORM: PatrolFormState = {
   offlineSyncToleranceMinutes: 30,
   alertCompletionThreshold: 80,
   gracePeriodMinutes: 5,
+  strictTimeValidation: true,
   reminderMinutesBefore: 5,
   patrolIncidentCategoryId: null,
 }
@@ -68,6 +70,7 @@ function buildForm(cfg: Record<string, any> | null): PatrolFormState {
       cfg.offlineSyncToleranceMinutes ?? DEFAULT_FORM.offlineSyncToleranceMinutes,
     alertCompletionThreshold: cfg.alertCompletionThreshold ?? DEFAULT_FORM.alertCompletionThreshold,
     gracePeriodMinutes: cfg.gracePeriodMinutes ?? DEFAULT_FORM.gracePeriodMinutes,
+    strictTimeValidation: cfg.strictTimeValidation ?? DEFAULT_FORM.strictTimeValidation,
     reminderMinutesBefore: cfg.reminderMinutesBefore ?? DEFAULT_FORM.reminderMinutesBefore,
     patrolIncidentCategoryId: cfg.patrolIncidentCategoryId ?? null,
   }

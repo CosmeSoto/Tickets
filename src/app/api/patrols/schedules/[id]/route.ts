@@ -28,6 +28,8 @@ const patchScheduleSchema = z.object({
   recurrence: z.enum(['NONE', 'DAILY', 'WEEKLY', 'CUSTOM']).optional(),
   recurrenceDays: z.array(z.number().int().min(0).max(6)).optional(),
   isActive: z.boolean().optional(),
+  // null = heredar del default de la familia; true/false = sobreescribir solo para este schedule
+  overrideTimeValidation: z.boolean().nullable().optional(),
 })
 
 // ── GET ───────────────────────────────────────────────────────────────────────
@@ -50,6 +52,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         recurrence: true,
         recurrenceDays: true,
         isActive: true,
+        overrideTimeValidation: true,
         createdAt: true,
         updatedAt: true,
         route: { select: { id: true, name: true, estimatedDurationMinutes: true } },
@@ -122,6 +125,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (data.recurrence !== undefined) updateData.recurrence = data.recurrence
     if (data.recurrenceDays !== undefined) updateData.recurrenceDays = data.recurrenceDays
     if (data.isActive !== undefined) updateData.isActive = data.isActive
+    // overrideTimeValidation admite null (reset al default de la familia)
+    if ('overrideTimeValidation' in data)
+      updateData.overrideTimeValidation = data.overrideTimeValidation ?? null
 
     // Validaciones adicionales
     if (updateData.scheduledStart && updateData.scheduledEnd) {

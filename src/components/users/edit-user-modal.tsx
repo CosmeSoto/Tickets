@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { AlertTriangle, Save, User } from 'lucide-react'
+import { AlertTriangle, Save, User, XCircle } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { UserData } from '@/hooks/use-users'
 import { UnassignConfirmDialog } from '@/components/users/unassign-confirm-dialog'
@@ -16,6 +16,7 @@ import { RoleAndDeptSection } from '@/components/users/edit-modal/RoleAndDeptSec
 import { PermissionsAndModulesSection } from '@/components/users/edit-modal/PermissionsAndModulesSection'
 import { validateUserForm, useUserAvatarHandler } from './user-utils'
 import { useFamilyAssignments } from './edit-modal/useFamilyAssignments'
+import type { ModuleBlocker } from '@/lib/services/user-module-guard.service'
 
 interface EditUserModalProps {
   isOpen: boolean
@@ -56,6 +57,7 @@ export function EditUserModal({
   const [loading, setLoading] = useState(false)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [isLocked, setIsLocked] = useState(false)
+  const [moduleBlockers, setModuleBlockers] = useState<ModuleBlocker[] | null>(null)
   const { handleAvatarChange } = useUserAvatarHandler()
 
   const [formData, setFormData] = useState<EditUserData>({
@@ -263,6 +265,11 @@ export function EditUserModal({
         handleClose()
         onUserUpdated()
       } else {
+        // Caso especial: módulos bloqueados por trabajo activo
+        if (res.status === 422 && result.blockers && Array.isArray(result.blockers)) {
+          setModuleBlockers(result.blockers as ModuleBlocker[])
+          return
+        }
         if (
           res.status === 409 &&
           (result.error || result.message)?.toLowerCase().includes('email')
@@ -456,6 +463,64 @@ export function EditUserModal({
           setPendingUnassignFamilyId(null)
         }}
       />
+
+      {/* ── Diálogo de módulos bloqueados ── */}
+      <Dialog open={!!moduleBlockers} onOpenChange={() => setModuleBlockers(null)}>
+        <DialogContent className='sm:max-w-lg'>
+          <DialogHeader>
+            <DialogTitle className='flex items-center gap-2 text-destructive'>
+              <XCircle className='h-5 w-5 shrink-0' />
+              No se pueden desactivar los módulos
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className='space-y-4 py-1'>
+            <p className='text-sm text-muted-foreground'>
+              <strong>{user?.name}</strong> tiene trabajo activo en los siguientes módulos. Resuelve
+              cada punto antes de intentar desactivarlos.
+            </p>
+
+            <div className='space-y-3 max-h-[55vh] overflow-y-auto pr-1'>
+              {moduleBlockers?.map((blocker, i) => (
+                <div
+                  key={i}
+                  className='rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-2'
+                >
+                  {/* Módulo + razón */}
+                  <div className='flex items-start gap-2'>
+                    <AlertTriangle className='h-4 w-4 text-destructive mt-0.5 shrink-0' />
+                    <div>
+                      <p className='text-sm font-semibold text-foreground'>{blocker.module}</p>
+                      <p className='text-sm text-destructive'>{blocker.reason}</p>
+                    </div>
+                  </div>
+
+                  {/* Instrucciones paso a paso */}
+                  <ul className='space-y-1 pl-6'>
+                    {blocker.instructions.map((step, j) => (
+                      <li
+                        key={j}
+                        className='flex items-start gap-1.5 text-xs text-muted-foreground'
+                      >
+                        <span className='mt-0.5 shrink-0 text-muted-foreground/60'>{j + 1}.</span>
+                        <span>{step}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+
+            <div className='rounded-lg bg-muted/50 border px-3 py-2 text-xs text-muted-foreground'>
+              Una vez resueltos todos los puntos, vuelve a guardar los cambios del usuario.
+            </div>
+          </div>
+
+          <div className='flex justify-end pt-1'>
+            <Button onClick={() => setModuleBlockers(null)}>Entendido</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

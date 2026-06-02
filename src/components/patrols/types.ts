@@ -8,6 +8,7 @@ export interface PatrolSchedule {
   recurrence: string
   recurrenceDays: number[]
   isActive: boolean
+  overrideTimeValidation: boolean | null
   createdAt: string
   route: { id: string; name: string }
   agent: { id: string; name: string; email: string }
@@ -58,6 +59,8 @@ export interface FormData {
   endTimeOnly: string
   recurrence: 'NONE' | 'DAILY' | 'WEEKLY' | 'CUSTOM'
   recurrenceDays: number[]
+  // null = heredar del default de la familia
+  overrideTimeValidation: boolean | null
 }
 
 export const EMPTY_FORM: FormData = {
@@ -69,6 +72,7 @@ export const EMPTY_FORM: FormData = {
   endTimeOnly: '',
   recurrence: 'NONE',
   recurrenceDays: [],
+  overrideTimeValidation: null,
 }
 
 export const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']

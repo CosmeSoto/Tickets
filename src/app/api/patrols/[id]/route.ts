@@ -204,6 +204,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         familyId: true,
         status: true,
         routeId: true,
+        scheduleId: true,
         scheduledStart: true,
         scheduledEnd: true,
         route: {
@@ -229,16 +230,25 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const body = await request.json()
     const data = patchPatrolSchema.parse(body)
 
-    // Obtener config de familia para saber si se requiere foto y grace period
-    const familyConfig = await prisma.patrol_family_config.findUnique({
-      where: { familyId: patrol.familyId },
-      select: {
-        requirePhotoOnStart: true,
-        requirePhotoOnEnd: true,
-        alertCompletionThreshold: true,
-        gracePeriodMinutes: true,
-      },
-    })
+    // Obtener config de familia y override de la programación en paralelo
+    const [familyConfig, scheduleConfig] = await Promise.all([
+      prisma.patrol_family_config.findUnique({
+        where: { familyId: patrol.familyId },
+        select: {
+          requirePhotoOnStart: true,
+          requirePhotoOnEnd: true,
+          alertCompletionThreshold: true,
+          gracePeriodMinutes: true,
+          strictTimeValidation: true,
+        },
+      }),
+      patrol.scheduleId
+        ? prisma.patrol_schedules.findUnique({
+            where: { id: patrol.scheduleId },
+            select: { overrideTimeValidation: true },
+          })
+        : Promise.resolve(null),
+    ])
 
     if (data.action === 'start') {
       if (patrol.status !== 'PENDING') {
@@ -248,36 +258,50 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         )
       }
 
-      // Validar que el agente está dentro del rango de tiempo programado
-      // Se permite iniciar hasta gracePeriodMinutes antes del scheduledStart (default 5 min)
+      // Jerarquía de validación de horario:
+      // 1. overrideTimeValidation de la programación (si no es null) → tiene prioridad
+      // 2. strictTimeValidation de la familia → default
       const gracePeriodMinutes = familyConfig?.gracePeriodMinutes ?? 5
-      const now = new Date()
-      const earliestStart = new Date(
-        patrol.scheduledStart.getTime() - gracePeriodMinutes * 60 * 1000
-      )
-      const latestStart = new Date(patrol.scheduledStart.getTime() + gracePeriodMinutes * 60 * 1000)
+      const strictTimeValidation =
+        scheduleConfig?.overrideTimeValidation !== null &&
+        scheduleConfig?.overrideTimeValidation !== undefined
+          ? scheduleConfig.overrideTimeValidation
+          : (familyConfig?.strictTimeValidation ?? true)
 
-      if (now < earliestStart) {
-        const minutesUntilStart = Math.ceil(
-          (patrol.scheduledStart.getTime() - now.getTime()) / 60000
+      if (strictTimeValidation) {
+        const now = new Date()
+        const earliestStart = new Date(
+          patrol.scheduledStart.getTime() - gracePeriodMinutes * 60 * 1000
         )
-        return NextResponse.json(
-          {
-            error: `Aún no puedes iniciar esta ronda. Faltan ${minutesUntilStart} minutos para el horario programado.`,
-            code: 'TOO_EARLY',
-          },
-          { status: 422 }
+        const latestStart = new Date(
+          patrol.scheduledStart.getTime() + gracePeriodMinutes * 60 * 1000
         )
-      }
 
-      if (now > latestStart) {
-        return NextResponse.json(
-          {
-            error: 'El horario programado para esta ronda ya finalizó.',
-            code: 'TOO_LATE',
-          },
-          { status: 422 }
-        )
+        if (now < earliestStart) {
+          const minutesUntilStart = Math.ceil(
+            (patrol.scheduledStart.getTime() - now.getTime()) / 60000
+          )
+          const h = Math.floor(minutesUntilStart / 60)
+          const m = minutesUntilStart % 60
+          const timeLabel = h > 0 && m > 0 ? `${h}h ${m}min` : h > 0 ? `${h}h` : `${m} minutos`
+          return NextResponse.json(
+            {
+              error: `Aún no puedes iniciar esta ronda. Faltan ${timeLabel} para el horario programado.`,
+              code: 'TOO_EARLY',
+            },
+            { status: 422 }
+          )
+        }
+
+        if (now > latestStart) {
+          return NextResponse.json(
+            {
+              error: 'El horario programado para esta ronda ya finalizó.',
+              code: 'TOO_LATE',
+            },
+            { status: 422 }
+          )
+        }
       }
 
       if (familyConfig?.requirePhotoOnStart && !data.startPhotoBase64) {

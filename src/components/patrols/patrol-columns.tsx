@@ -21,6 +21,7 @@ import {
   PATROL_RECURRENCE_LABELS_ES,
   formatDurationMinutes,
 } from '@/lib/utils/patrol-utils'
+import type { PatrolSchedule } from './types'
 
 // ===== CHECKPOINTS =====
 
@@ -240,21 +241,6 @@ export function createRouteColumns({
 }
 
 // ===== SCHEDULES =====
-
-interface PatrolSchedule {
-  id: string
-  familyId: string
-  routeId: string
-  agentId: string
-  scheduledStart: string
-  scheduledEnd: string
-  recurrence: string
-  recurrenceDays: number[]
-  isActive: boolean
-  createdAt: string
-  route: { id: string; name: string }
-  agent: { id: string; name: string; email: string }
-}
 
 interface ScheduleColumnsProps {
   onEdit: (schedule: PatrolSchedule) => void

@@ -32,6 +32,7 @@ export async function getOrCreatePatrolFamilyConfig(
       offlineSyncToleranceMinutes: 30,
       alertCompletionThreshold: 80,
       gracePeriodMinutes: 15,
+      strictTimeValidation: true,
       patrolIncidentCategoryId: null,
     },
   })

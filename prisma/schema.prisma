@@ -2443,6 +2443,7 @@ model patrol_family_config {
   offlineSyncToleranceMinutes Int      @default(30) @map("offline_sync_tolerance_minutes")
   alertCompletionThreshold    Int      @default(80) @map("alert_completion_threshold")
   gracePeriodMinutes          Int      @default(5) @map("grace_period_minutes")
+  strictTimeValidation        Boolean  @default(true) @map("strict_time_validation")
   reminderMinutesBefore       Int      @default(5) @map("reminder_minutes_before")
   patrolIncidentCategoryId    String?  @map("patrol_incident_category_id")
   createdAt                   DateTime @default(now()) @map("created_at")
@@ -2520,17 +2521,21 @@ model patrol_route_checkpoints {
 }
 
 model patrol_schedules {
-  id             String           @id @default(uuid())
-  familyId       String           @map("family_id")
-  routeId        String           @map("route_id")
-  agentId        String           @map("agent_id")
-  scheduledStart DateTime         @map("scheduled_start")
-  scheduledEnd   DateTime         @map("scheduled_end")
-  recurrence     PatrolRecurrence @default(NONE)
-  recurrenceDays Int[]            @default([]) @map("recurrence_days")
-  isActive       Boolean          @default(true) @map("is_active")
-  createdAt      DateTime         @default(now()) @map("created_at")
-  updatedAt      DateTime         @updatedAt @map("updated_at")
+  id                    String           @id @default(uuid())
+  familyId              String           @map("family_id")
+  routeId               String           @map("route_id")
+  agentId               String           @map("agent_id")
+  scheduledStart        DateTime         @map("scheduled_start")
+  scheduledEnd          DateTime         @map("scheduled_end")
+  recurrence            PatrolRecurrence @default(NONE)
+  recurrenceDays        Int[]            @default([]) @map("recurrence_days")
+  isActive              Boolean          @default(true) @map("is_active")
+  /// null = usar el default de patrol_family_config.strictTimeValidation
+  /// true = forzar validación estricta para esta programación
+  /// false = deshabilitar validación de horario solo para esta programación
+  overrideTimeValidation Boolean?        @map("override_time_validation")
+  createdAt             DateTime         @default(now()) @map("created_at")
+  updatedAt             DateTime         @updatedAt @map("updated_at")
 
   family  families      @relation(fields: [familyId], references: [id])
   route   patrol_routes @relation(fields: [routeId], references: [id])

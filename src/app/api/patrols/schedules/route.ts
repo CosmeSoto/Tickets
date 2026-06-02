@@ -30,6 +30,8 @@ const createScheduleSchema = z.object({
   scheduledEnd: z.string().datetime(),
   recurrence: z.enum(['NONE', 'DAILY', 'WEEKLY', 'CUSTOM']).default('NONE'),
   recurrenceDays: z.array(z.number().int().min(0).max(6)).default([]),
+  // null = heredar del default de la familia; true/false = sobreescribir solo para este schedule
+  overrideTimeValidation: z.boolean().nullable().optional(),
 })
 
 // ── GET ───────────────────────────────────────────────────────────────────────
@@ -83,6 +85,7 @@ export async function GET(request: NextRequest) {
           recurrence: true,
           recurrenceDays: true,
           isActive: true,
+          overrideTimeValidation: true,
           createdAt: true,
           route: { select: { id: true, name: true } },
           agent: { select: { id: true, name: true, email: true } },
@@ -182,6 +185,7 @@ export async function POST(request: NextRequest) {
         scheduledEnd: end,
         recurrence: data.recurrence,
         recurrenceDays: data.recurrenceDays,
+        overrideTimeValidation: data.overrideTimeValidation ?? null,
       },
     })
 

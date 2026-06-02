@@ -1,9 +1,10 @@
 'use client'
 
-import { Building } from 'lucide-react'
+import { Building, Lock } from 'lucide-react'
 import { Label } from '@/components/ui/label'
 import { DepartmentSelector } from '@/components/ui/department-selector'
 import { USER_ROLE_FORM_OPTIONS, type UserRole } from '@/lib/constants/user-constants'
+import { useSession } from 'next-auth/react'
 
 interface RoleAndDeptSectionProps {
   role: UserRole
@@ -22,6 +23,13 @@ export function RoleAndDeptSection({
   departments,
   onChange,
 }: RoleAndDeptSectionProps) {
+  const { data: session } = useSession()
+  const isSuperAdmin = (session?.user as any)?.isSuperAdmin === true
+
+  // El departamento solo puede cambiarlo un Super Admin.
+  // Es el vínculo nativo del usuario a su familia y no debe modificarse libremente.
+  const deptLocked = !isSuperAdmin
+
   return (
     <div className='space-y-3'>
       <h3 className='text-sm font-semibold text-foreground flex items-center gap-1.5'>
@@ -54,16 +62,24 @@ export function RoleAndDeptSection({
           )}
         </div>
         <div className='space-y-1'>
-          <Label>
+          <Label className='flex items-center gap-1.5'>
             Departamento {role !== 'ADMIN' && <span className='text-destructive'>*</span>}
+            {deptLocked && <Lock className='h-3 w-3 text-muted-foreground' />}
           </Label>
           <DepartmentSelector
             value={departmentId || null}
-            onChange={val => onChange('departmentId', val ?? '')}
+            onChange={val => !deptLocked && onChange('departmentId', val ?? '')}
             departments={departments as any}
             placeholder='Buscar departamento...'
             error={errors.departmentId}
+            disabled={deptLocked}
           />
+          {deptLocked && (
+            <p className='text-xs text-muted-foreground'>
+              El departamento define la familia nativa del usuario. Solo un Super Admin puede
+              modificarlo.
+            </p>
+          )}
         </div>
       </div>
     </div>

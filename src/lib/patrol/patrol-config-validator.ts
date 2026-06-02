@@ -4,6 +4,7 @@
  */
 
 export interface PatrolFamilyConfigInput {
+  // Numéricos — se validan contra rangos
   qrWindowMinutes?: number
   geofenceRadiusMeters?: number
   photoRetentionDays?: number
@@ -13,6 +14,13 @@ export interface PatrolFamilyConfigInput {
   alertCompletionThreshold?: number
   gracePeriodMinutes?: number
   reminderMinutesBefore?: number
+  // Booleanos — solo se valida el tipo, no rangos
+  patrolsEnabled?: boolean
+  requirePhotoOnStart?: boolean
+  requirePhotoOnEnd?: boolean
+  strictTimeValidation?: boolean
+  // Strings opcionales
+  patrolIncidentCategoryId?: string | null
 }
 
 export interface ConfigValidationError {
@@ -81,31 +89,25 @@ const FIELD_RANGES: Record<keyof PatrolFamilyConfigInput, FieldRange> = {
 
 /**
  * Valida los valores de configuración de familia para el módulo de patrullas.
- * Solo valida los campos presentes en el input (campos ausentes se ignoran).
- *
- * @param input - Objeto parcial con los valores a validar
- * @returns Resultado de validación con lista de errores por campo
+ * - Campos numéricos: validados contra rangos min/max.
+ * - Campos booleanos: validados como typeof boolean.
+ * - Campos ausentes/null: ignorados (actualización parcial).
  */
 export function validatePatrolFamilyConfig(input: PatrolFamilyConfigInput): ConfigValidationResult {
   const errors: ConfigValidationError[] = []
 
+  // ── Validación numérica ──────────────────────────────────────────────────
   for (const [field, range] of Object.entries(FIELD_RANGES) as [
-    keyof PatrolFamilyConfigInput,
+    keyof typeof FIELD_RANGES,
     FieldRange,
   ][]) {
-    const value = input[field]
-
-    // Ignorar campos no presentes en el input
+    const value = (input as any)[field]
     if (value === undefined || value === null) continue
 
     if (typeof value !== 'number' || isNaN(value)) {
-      errors.push({
-        field,
-        message: `${range.label} debe ser un número válido`,
-      })
+      errors.push({ field, message: `${range.label} debe ser un número válido` })
       continue
     }
-
     if (value < range.min || value > range.max) {
       errors.push({
         field,
@@ -114,8 +116,20 @@ export function validatePatrolFamilyConfig(input: PatrolFamilyConfigInput): Conf
     }
   }
 
-  return {
-    valid: errors.length === 0,
-    errors,
+  // ── Validación booleana ──────────────────────────────────────────────────
+  const booleanFields: Array<keyof PatrolFamilyConfigInput> = [
+    'patrolsEnabled',
+    'requirePhotoOnStart',
+    'requirePhotoOnEnd',
+    'strictTimeValidation',
+  ]
+  for (const field of booleanFields) {
+    const value = input[field]
+    if (value === undefined || value === null) continue
+    if (typeof value !== 'boolean') {
+      errors.push({ field, message: `${field} debe ser verdadero o falso` })
+    }
   }
+
+  return { valid: errors.length === 0, errors }
 }

@@ -146,6 +146,73 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       delete validatedData.isSuperAdmin
     }
 
+    // ── Solo Super Admin puede cambiar el departamento ────────────────────────
+    // El departamento es el vínculo nativo del usuario a su familia.
+    // Un admin normal no puede reasignarlo — solo el super admin puede hacerlo.
+    const isSuperAdmin = (session.user as any).isSuperAdmin === true
+    if (
+      validatedData.departmentId !== undefined &&
+      validatedData.departmentId !== currentUser.departmentId &&
+      !isSuperAdmin
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'Solo un Super Administrador puede cambiar el departamento de un usuario. El departamento define la familia nativa del usuario y no puede modificarse por un administrador normal.',
+        },
+        { status: 403 }
+      )
+    }
+
+    // ── Guardia de desactivación de módulos ───────────────────────────────────
+    // Solo aplica cuando el admin está desactivando módulos (flag true → false).
+    // Bloquea si el usuario tiene trabajo activo que depende del módulo.
+    if (session.user.role === 'ADMIN') {
+      try {
+        const { UserModuleGuardService, ModuleDisableBlockedError } =
+          await import('@/lib/services/user-module-guard.service')
+        await UserModuleGuardService.assertCanDisableModules({
+          userId: targetId,
+          userName: currentUser.name,
+          current: {
+            ticketsEnabled: (currentUser as any).ticketsEnabled ?? true,
+            inventoryEnabled: (currentUser as any).inventoryEnabled ?? false,
+            canManageInventory: (currentUser as any).canManageInventory ?? false,
+            patrolsEnabled: (currentUser as any).patrolsEnabled ?? false,
+            newsEnabled: (currentUser as any).newsEnabled ?? false,
+            formsEnabled: (currentUser as any).formsEnabled ?? false,
+            canManageForms: (currentUser as any).canManageForms ?? false,
+            canRequestAssets: (currentUser as any).canRequestAssets ?? false,
+          },
+          incoming: {
+            ticketsEnabled: validatedData.ticketsEnabled,
+            inventoryEnabled: validatedData.inventoryEnabled,
+            canManageInventory: validatedData.canManageInventory,
+            patrolsEnabled: validatedData.patrolsEnabled,
+            newsEnabled: validatedData.newsEnabled,
+            formsEnabled: validatedData.formsEnabled,
+            canManageForms: validatedData.canManageForms,
+            canRequestAssets: (validatedData as any).canRequestAssets,
+          },
+        })
+      } catch (guardErr: any) {
+        const { ModuleDisableBlockedError } =
+          await import('@/lib/services/user-module-guard.service')
+        if (guardErr instanceof ModuleDisableBlockedError) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `No se pueden desactivar los módulos de ${guardErr.userName}: hay trabajo activo pendiente.`,
+              blockers: guardErr.blockers,
+            },
+            { status: 422 }
+          )
+        }
+        throw guardErr
+      }
+    }
+
     // Actualizar el usuario
     const user = await UserService.updateUser(targetId, validatedData)
 

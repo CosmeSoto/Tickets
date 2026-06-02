@@ -354,7 +354,7 @@ export function PatrolAreasTab({
               <CardHeader className='pb-3'>
                 <CardTitle className='text-sm flex items-center gap-2'>
                   <Bell className='h-4 w-4' />
-                  Alertas
+                  Alertas y Horarios
                 </CardTitle>
               </CardHeader>
               <CardContent className='space-y-4'>
@@ -421,6 +421,32 @@ export function PatrolAreasTab({
                       iniciar
                     </p>
                   </div>
+                </div>
+                <Separator />
+                {/* ── Control de horario estricto ── */}
+                <div className='flex items-start justify-between gap-4 p-3 rounded-lg border bg-muted/30'>
+                  <div className='space-y-1 flex-1'>
+                    <Label className='text-xs font-medium flex items-center gap-1.5'>
+                      <Clock className='h-3.5 w-3.5 text-primary' />
+                      Validación estricta de horario
+                    </Label>
+                    <p className='text-xs text-muted-foreground'>
+                      Cuando está activo, el agente solo puede iniciar la ronda dentro del período
+                      de gracia definido. Si está desactivado, el agente puede iniciar en cualquier
+                      momento.
+                    </p>
+                    <p className='text-xs text-amber-600 dark:text-amber-400 font-medium'>
+                      {form.strictTimeValidation
+                        ? `Activo — rango permitido: ±${form.gracePeriodMinutes} min del horario`
+                        : 'Inactivo — el agente puede iniciar sin restricción de horario'}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={form.strictTimeValidation}
+                    onCheckedChange={v => onSetField('strictTimeValidation', v)}
+                    disabled={saving}
+                    aria-label='Activar validación estricta de horario'
+                  />
                 </div>
               </CardContent>
             </Card>
