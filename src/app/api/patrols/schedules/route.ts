@@ -32,6 +32,12 @@ const createScheduleSchema = z.object({
   recurrenceDays: z.array(z.number().int().min(0).max(6)).default([]),
   // null = heredar del default de la familia; true/false = sobreescribir solo para este schedule
   overrideTimeValidation: z.boolean().nullable().optional(),
+  /**
+   * Repetición intra-turno: cada cuántos minutos se repite la ronda dentro del bloque
+   * scheduledStart → scheduledEnd. 0 o null = sin repetición (una sola patrulla por ocurrencia).
+   * Mínimo: 10 minutos. Máximo: duración total del bloque.
+   */
+  repeatIntervalMinutes: z.number().int().min(10).max(1440).nullable().optional(),
 })
 
 // ── GET ───────────────────────────────────────────────────────────────────────
@@ -190,7 +196,11 @@ export async function POST(request: NextRequest) {
     })
 
     // Generar patrullas para el horizonte de 30 días
-    const generatedCount = await PatrolSchedulerService.generatePatrols(schedule.id)
+    const generatedCount = await PatrolSchedulerService.generatePatrols(
+      schedule.id,
+      30,
+      data.repeatIntervalMinutes ?? null
+    )
 
     // Notificar al agente
     await NotificationService.push({

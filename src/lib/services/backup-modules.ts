@@ -49,7 +49,7 @@ export const BACKUP_MODULE_REGISTRY: Record<BackupModuleId, BackupModuleDefiniti
     id: 'users',
     label: 'Usuarios',
     description:
-      'Usuarios del sistema, sus configuraciones, preferencias de notificaciones, asignaciones, credenciales OAuth y tokens de sesión.',
+      'Usuarios del sistema, sus departamentos, configuraciones, preferencias de notificaciones, asignaciones, credenciales OAuth y tokens de sesión.',
   },
   audits: {
     id: 'audits',
@@ -398,6 +398,7 @@ export async function exportConfigurationsModuleData(): Promise<
 
 /** Orden de inserción respetando FKs del módulo usuarios. */
 export const USERS_MODULE_RESTORE_ORDER = [
+  'departments',
   'users',
   'user_settings',
   'notification_preferences',
@@ -416,6 +417,7 @@ export const USERS_MODULE_RESTORE_ORDER = [
 export type UsersModuleTable = (typeof USERS_MODULE_RESTORE_ORDER)[number]
 
 const EMPTY_USERS_PAYLOAD: Record<UsersModuleTable, unknown[]> = {
+  departments: [],
   users: [],
   user_settings: [],
   notification_preferences: [],
@@ -440,7 +442,13 @@ export async function exportUsersModuleData(): Promise<Record<UsersModuleTable, 
 
   const userIds = users.map(u => u.id)
 
+  // Obtener los IDs de departamentos referenciados por los usuarios
+  const departmentIds = [
+    ...new Set(users.map((u: any) => u.departmentId).filter(Boolean) as string[]),
+  ]
+
   const [
+    departments,
     user_settings,
     notification_preferences,
     accounts,
@@ -454,6 +462,9 @@ export async function exportUsersModuleData(): Promise<Record<UsersModuleTable, 
     technician_family_assignments,
     inventory_manager_families,
   ] = await Promise.all([
+    departmentIds.length > 0
+      ? prisma.departments.findMany({ where: { id: { in: departmentIds } } })
+      : prisma.departments.findMany(), // si no hay FKs explícitas, exportar todos
     prisma.user_settings.findMany({ where: { userId: { in: userIds } } }),
     prisma.notification_preferences.findMany({ where: { userId: { in: userIds } } }),
     prisma.accounts.findMany({ where: { userId: { in: userIds } } }),
@@ -469,6 +480,7 @@ export async function exportUsersModuleData(): Promise<Record<UsersModuleTable, 
   ])
 
   return {
+    departments: departments as unknown[],
     users: users as unknown[],
     user_settings: user_settings as unknown[],
     notification_preferences: notification_preferences as unknown[],

@@ -21,11 +21,17 @@ export class PatrolSchedulerService {
    * Calcula las ocurrencias dentro del horizonte de días especificado.
    * Usa skipDuplicates para ser idempotente (seguro de llamar múltiples veces).
    *
-   * @param scheduleId   - ID del schedule
-   * @param horizonDays  - Días hacia adelante para generar patrullas (default 30)
+   * @param scheduleId           - ID del schedule
+   * @param horizonDays          - Días hacia adelante para generar patrullas (default 30)
+   * @param repeatIntervalMinutes - Repetición intra-turno: cada cuántos minutos se repite
+   *                               la ronda dentro del bloque diario. null = sin repetición.
    * @returns Número de patrullas creadas
    */
-  static async generatePatrols(scheduleId: string, horizonDays = 30): Promise<number> {
+  static async generatePatrols(
+    scheduleId: string,
+    horizonDays = 30,
+    repeatIntervalMinutes: number | null = null
+  ): Promise<number> {
     const schedule = await prisma.patrol_schedules.findUnique({
       where: { id: scheduleId },
       select: {
@@ -47,8 +53,14 @@ export class PatrolSchedulerService {
 
     if (occurrences.length === 0) return 0
 
+    // Si hay intervalo intra-turno, expandir cada ocurrencia en sub-ocurrencias
+    const allOccurrences =
+      repeatIntervalMinutes && repeatIntervalMinutes >= 10
+        ? this.expandWithRepeatInterval(occurrences, repeatIntervalMinutes)
+        : occurrences
+
     const result = await prisma.patrols.createMany({
-      data: occurrences.map(({ start, end }) => ({
+      data: allOccurrences.map(({ start, end }) => ({
         id: randomUUID(),
         familyId: schedule.familyId,
         scheduleId: schedule.id,
@@ -196,6 +208,53 @@ export class PatrolSchedulerService {
     }
 
     return occurrences
+  }
+
+  /**
+   * Expande una lista de ocurrencias aplicando repetición intra-turno.
+   *
+   * Dado un bloque [start → end] y un intervalo de N minutos, genera sub-bloques:
+   *   [start, start+routeMins), [start+interval, start+interval+routeMins), ...
+   *
+   * La duración de cada sub-patrulla = min(intervalMinutes, bloqueTotalMinutes).
+   * No se generan sub-ocurrencias que excedan el fin del bloque original.
+   *
+   * @param occurrences       - Lista base de ocurrencias [start, end]
+   * @param intervalMinutes   - Cada cuántos minutos inicia una nueva sub-patrulla
+   * @returns Lista expandida de ocurrencias
+   */
+  private static expandWithRepeatInterval(
+    occurrences: Array<{ start: Date; end: Date }>,
+    intervalMinutes: number
+  ): Array<{ start: Date; end: Date }> {
+    const intervalMs = intervalMinutes * 60 * 1000
+    const expanded: Array<{ start: Date; end: Date }> = []
+
+    for (const { start, end } of occurrences) {
+      const blockDurationMs = end.getTime() - start.getTime()
+      if (blockDurationMs <= 0) continue
+
+      // Duración de cada sub-ronda = el intervalo (o el bloque entero si el intervalo es mayor)
+      const subDurationMs = Math.min(intervalMs, blockDurationMs)
+
+      let cursor = start.getTime()
+      while (cursor + subDurationMs <= end.getTime()) {
+        expanded.push({
+          start: new Date(cursor),
+          end: new Date(cursor + subDurationMs),
+        })
+        cursor += intervalMs
+      }
+
+      // Si el bloque es exactamente divisible no agregamos nada extra.
+      // Si quedó un remanente >= 10 min al final del turno, agregarlo como última ronda.
+      const remainingMs = end.getTime() - cursor
+      if (remainingMs >= 10 * 60 * 1000) {
+        expanded.push({ start: new Date(cursor), end: new Date(end) })
+      }
+    }
+
+    return expanded
   }
 
   /**

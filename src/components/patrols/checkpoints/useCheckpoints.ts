@@ -66,6 +66,8 @@ export function useCheckpoints({ checkpoints, reload }: UseCheckpointsOptions) {
             : undefined,
           hasConnectivity: form.hasConnectivity,
           isSensitive: form.isSensitive,
+          // Al editar, pasar regenerateSecret solo si está en true
+          ...(editingId && form.regenerateSecret ? { regenerateSecret: true } : {}),
         }
 
         const res = editingId
@@ -83,7 +85,13 @@ export function useCheckpoints({ checkpoints, reload }: UseCheckpointsOptions) {
         const data = await res.json()
         if (!res.ok) throw new Error(data.error ?? 'Error al guardar')
 
-        toast({ title: editingId ? 'Checkpoint actualizado' : 'Checkpoint creado' })
+        toast({
+          title: editingId ? 'Checkpoint actualizado' : 'Checkpoint creado',
+          description:
+            editingId && form.regenerateSecret
+              ? 'QR regenerado. Descarga e imprime el nuevo código QR.'
+              : undefined,
+        })
         setDialogOpen(false)
         reload()
         return true

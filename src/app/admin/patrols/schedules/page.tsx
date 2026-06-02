@@ -229,6 +229,7 @@ export default function SchedulesPage() {
         recurrence: form.recurrence,
         recurrenceDays: form.recurrenceDays,
         overrideTimeValidation: form.overrideTimeValidation,
+        repeatIntervalMinutes: form.repeatIntervalMinutes ?? undefined,
       }
 
       const url = currentEditingId

@@ -45,10 +45,23 @@ export function PatrolCheckpointScanner({
         if (parsed?.cid && parsed?.t) {
           return { checkpointId: parsed.cid, token: parsed.t }
         }
+        // JSON válido pero le falta el campo "t" (token) o "cid"
+        if (parsed && typeof parsed === 'object') {
+          if (parsed.cid && !parsed.t) {
+            onError(
+              'QR sin token: este código fue generado por otra aplicación o está desactualizado. Descarga el QR nuevamente desde el panel de administración.'
+            )
+          } else {
+            onError(
+              'Formato de QR no reconocido. Verifica que sea un QR de checkpoint del sistema.'
+            )
+          }
+          return null
+        }
       } catch {
-        // no es JSON — ignorar
+        // no es JSON — puede ser un QR de otra aplicación
       }
-      onError(`QR no reconocido: ${raw.slice(0, 40)}`)
+      onError('QR no reconocido: este código no corresponde a un checkpoint del sistema.')
       return null
     },
     [onError]

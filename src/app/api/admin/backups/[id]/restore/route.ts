@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { BackupService } from '@/lib/services/backup-service'
 import { isBackupModuleId } from '@/lib/services/backup-modules'
+import type { RestoreMode } from '@/lib/services/backup/backup-restore'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -18,8 +19,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'ID de backup requerido' }, { status: 400 })
     }
 
-    // Leer el body para obtener los módulos opcionales
+    // Leer el body para obtener los módulos opcionales y el modo de restauración
     let restoreModules: string[] | undefined
+    let mode: RestoreMode = 'replace'
+
     try {
       const body = await request.json()
 
@@ -34,17 +37,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       } else if (body.module && isBackupModuleId(body.module)) {
         restoreModules = [body.module]
       }
+
+      // Modo de restauración: 'replace' (por defecto) o 'merge'
+      if (body.mode === 'merge') {
+        mode = 'merge'
+      }
     } catch {
-      // Body vacío o no JSON — restauración completa
+      // Body vacío o no JSON — restauración completa en modo replace
     }
 
     // Ejecutar restauración
-    await BackupService.restoreBackup(backupId, restoreModules)
+    await BackupService.restoreBackup(backupId, restoreModules, mode)
 
     const scopeLabel = restoreModules ? `módulo(s): ${restoreModules.join(', ')}` : 'completa'
+    const modeLabel = mode === 'merge' ? ' (modo fusión)' : ''
     return NextResponse.json({
       success: true,
-      message: `Restauración ${scopeLabel} completada correctamente`,
+      message: `Restauración ${scopeLabel}${modeLabel} completada correctamente`,
     })
   } catch (error) {
     console.error('Error restoring backup:', error)

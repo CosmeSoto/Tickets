@@ -10,6 +10,8 @@ export interface CheckpointFormData {
   geofenceRadiusMeters: string
   hasConnectivity: boolean
   isSensitive: boolean
+  /** Solo al editar: si true regenera el qrSecret y qrStaticToken */
+  regenerateSecret?: boolean
 }
 
 export const EMPTY_CHECKPOINT_FORM: CheckpointFormData = {
@@ -20,6 +22,7 @@ export const EMPTY_CHECKPOINT_FORM: CheckpointFormData = {
   latitude: '',
   longitude: '',
   geofenceRadiusMeters: '',
-  hasConnectivity: true,
+  hasConnectivity: false, // Default: QR Estático — más seguro para uso impreso
   isSensitive: false,
+  regenerateSecret: false,
 }

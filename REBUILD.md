@@ -127,6 +127,11 @@ docker compose -f docker-compose.prod.yml --env-file .env.production down --remo
 
 # Destruir todo (⚠️ BORRA DATOS):
 docker compose -f docker-compose.prod.yml --env-file .env.production down -v
+
+cd /home/administrador/projects/Tickets
+sudo docker builder prune -f
+sudo ./start-production.sh
+
 ```
 
 ---

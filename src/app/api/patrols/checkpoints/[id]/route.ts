@@ -113,13 +113,20 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     // Si cambia hasConnectivity, recalcular qrType
     const newHasConnectivity = rest.hasConnectivity ?? existing.hasConnectivity
     const newQrType = newHasConnectivity ? 'DYNAMIC' : 'STATIC'
+    const qrTypeChanged = newQrType !== existing.qrType
 
     const updateData: Record<string, unknown> = { ...rest, qrType: newQrType }
 
-    if (regenerateSecret) {
+    // Regenerar tokens si:
+    // 1. Se pidió explícitamente (regenerateSecret: true)
+    // 2. El qrType cambió (DYNAMIC→STATIC o STATIC→DYNAMIC)
+    if (regenerateSecret || qrTypeChanged) {
       updateData.qrSecret = PatrolQRService.generateSecret()
       if (newQrType === 'STATIC') {
         updateData.qrStaticToken = PatrolQRService.generateStaticToken()
+      } else {
+        // DYNAMIC no usa qrStaticToken
+        updateData.qrStaticToken = null
       }
     }
 
@@ -145,7 +152,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         hasConnectivity: updated.hasConnectivity,
         qrType: updated.qrType,
         isActive: updated.isActive,
-        secretRegenerated: !!regenerateSecret,
+        secretRegenerated: !!(regenerateSecret || qrTypeChanged),
       },
       request,
     })

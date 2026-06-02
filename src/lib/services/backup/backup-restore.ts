@@ -4,12 +4,7 @@ import { stat, unlink, readFile } from 'fs/promises'
 import { randomUUID } from 'crypto'
 import prisma from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
-import {
-  hasPgTools,
-  parseDatabaseUrl,
-  decryptFile,
-  calculateChecksum,
-} from './backup-utils'
+import { hasPgTools, parseDatabaseUrl, decryptFile, calculateChecksum } from './backup-utils'
 import {
   TICKETS_MODULE_RESTORE_ORDER,
   NEWS_MODULE_RESTORE_ORDER,
@@ -22,7 +17,13 @@ import {
 
 const execAsync = promisify(exec)
 
-export async function restoreBackup(backupId: string, restoreModules?: string[]): Promise<void> {
+export type RestoreMode = 'replace' | 'merge'
+
+export async function restoreBackup(
+  backupId: string,
+  restoreModules?: string[],
+  mode: RestoreMode = 'replace'
+): Promise<void> {
   try {
     const backup = await prisma.backups.findUnique({ where: { id: backupId } })
     if (!backup) {
@@ -91,7 +92,7 @@ export async function restoreBackup(backupId: string, restoreModules?: string[])
 
     const format = isDumpFormat ? 'pg_dump_custom' : isSqlBackup ? 'SQL' : 'JSON'
     console.log(
-      `[RESTORE] Formato: ${format}` +
+      `[RESTORE] Formato: ${format} | Modo: ${mode}` +
         (restoreModules?.length ? ` | Módulos: [${restoreModules.join(', ')}]` : ' | Completa')
     )
 
@@ -99,7 +100,7 @@ export async function restoreBackup(backupId: string, restoreModules?: string[])
     const dbConfig = parseDatabaseUrl()
 
     if (isDumpFormat && pgRestoreAvailable) {
-      await restoreWithPgRestore(workingFilepath, dbConfig, restoreModules)
+      await restoreWithPgRestore(workingFilepath, dbConfig, restoreModules, mode)
     } else if (isSqlBackup && pgRestoreAvailable) {
       if (restoreModules?.length) {
         throw new Error(
@@ -108,7 +109,7 @@ export async function restoreBackup(backupId: string, restoreModules?: string[])
       }
       await restoreFromSQL({ ...backup, filepath: workingFilepath })
     } else if (isJsonBackup) {
-      await restoreFromJSON({ ...backup, filepath: workingFilepath }, restoreModules)
+      await restoreFromJSON({ ...backup, filepath: workingFilepath }, restoreModules, mode)
     } else if (isDumpFormat && !pgRestoreAvailable) {
       throw new Error(
         'pg_restore no está disponible en el servidor. Instala postgresql-client para restaurar respaldos en formato .dump'
@@ -134,6 +135,7 @@ export async function restoreBackup(backupId: string, restoreModules?: string[])
           backupId: backup.id,
           filename: backup.filename,
           method: format,
+          mode,
           restoreModules: restoreModules?.join(', ') || 'full',
           restoredAt: new Date(),
         },
@@ -173,52 +175,116 @@ async function verifyBackupIntegrity(backupId: string): Promise<boolean> {
 async function restoreWithPgRestore(
   filepath: string,
   dbConfig: { host: string; port: string; database: string; username: string; password: string },
-  restoreModules?: string[]
+  restoreModules?: string[],
+  mode: RestoreMode = 'replace'
 ): Promise<void> {
   if (restoreModules?.length) {
     const tables = getTablesForModules(restoreModules)
     console.log(
-      `[RESTORE] Restauración selectiva: ${tables.length} tablas de módulo(s) [${restoreModules.join(
-        ', '
-      )}]`
+      `[RESTORE] Restauración selectiva (${mode}): ${tables.length} tablas de módulo(s) [${restoreModules.join(', ')}]`
     )
-    const truncateSQL = tables.map(t => `TRUNCATE TABLE "${t}" CASCADE;`).join(' ')
-    const truncateCmd = `PGPASSWORD="${dbConfig.password}" psql -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database} -c "SET session_replication_role = replica; ${truncateSQL} SET session_replication_role = DEFAULT;" 2>&1`
 
-    try {
-      await execAsync(truncateCmd, { timeout: 60000, maxBuffer: 1024 * 1024 * 10 })
-      console.log('[RESTORE] Tablas truncadas correctamente')
-    } catch (truncErr) {
-      console.warn(
-        '[RESTORE] Advertencia al truncar:',
-        (truncErr as Error).message?.slice(0, 200)
-      )
-    }
-    const tableFlags = tables.map(t => `--table="${t}"`).join(' ')
-    const command =
-      `PGPASSWORD="${dbConfig.password}" pg_restore ` +
-      `-h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database} ` +
-      `--data-only --no-owner --no-privileges --disable-triggers ` +
-      `${tableFlags} ` +
-      `"${filepath}" 2>&1 || true`
-    const { stdout } = await execAsync(command, {
-      timeout: 600000,
-      maxBuffer: 1024 * 1024 * 50,
-    })
-    if (stdout && stdout.includes('ERROR')) {
-      const errors = stdout.split('\n').filter(l => l.includes('ERROR'))
-      const criticalErrors = errors.filter(
-        e =>
-          !e.includes('does not exist') &&
-          !e.includes('already exists') &&
-          !e.includes('duplicate key')
-      )
-      if (criticalErrors.length > 0) {
-        console.warn('[RESTORE] Errores:', criticalErrors.slice(0, 5).join('\n'))
+    if (mode === 'replace') {
+      // Modo reemplazo: TRUNCATE + insertar todo del backup
+      const truncateSQL = tables.map(t => `TRUNCATE TABLE "${t}" CASCADE;`).join(' ')
+      const truncateCmd = `PGPASSWORD="${dbConfig.password}" psql -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database} -c "SET session_replication_role = replica; ${truncateSQL} SET session_replication_role = DEFAULT;" 2>&1`
+
+      try {
+        await execAsync(truncateCmd, { timeout: 60000, maxBuffer: 1024 * 1024 * 10 })
+        console.log('[RESTORE] Tablas truncadas correctamente')
+      } catch (truncErr) {
+        console.warn(
+          '[RESTORE] Advertencia al truncar:',
+          (truncErr as Error).message?.slice(0, 200)
+        )
+      }
+
+      const tableFlags = tables.map(t => `--table="${t}"`).join(' ')
+      const command =
+        `PGPASSWORD="${dbConfig.password}" pg_restore ` +
+        `-h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database} ` +
+        `--data-only --no-owner --no-privileges --disable-triggers ` +
+        `${tableFlags} ` +
+        `"${filepath}" 2>&1 || true`
+      const { stdout } = await execAsync(command, {
+        timeout: 600000,
+        maxBuffer: 1024 * 1024 * 50,
+      })
+      if (stdout && stdout.includes('ERROR')) {
+        const errors = stdout.split('\n').filter(l => l.includes('ERROR'))
+        const criticalErrors = errors.filter(
+          e =>
+            !e.includes('does not exist') &&
+            !e.includes('already exists') &&
+            !e.includes('duplicate key')
+        )
+        if (criticalErrors.length > 0) {
+          console.warn('[RESTORE] Errores:', criticalErrors.slice(0, 5).join('\n'))
+        }
+      }
+    } else {
+      // Modo merge: insertar solo registros nuevos, ignorar duplicados (ON CONFLICT DO NOTHING)
+      // pg_restore no soporta merge nativo → usamos un archivo temporal de SQL y lo procesamos
+      const tempSqlPath = `${filepath}.merge_temp.sql`
+      const tableFlags = tables.map(t => `--table="${t}"`).join(' ')
+      const dumpSqlCmd =
+        `PGPASSWORD="${dbConfig.password}" pg_restore ` +
+        `-h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database} ` +
+        `--data-only --no-owner --no-privileges ` +
+        `${tableFlags} --file="${tempSqlPath}" ` +
+        `"${filepath}" 2>&1 || true`
+
+      try {
+        await execAsync(dumpSqlCmd, { timeout: 300000, maxBuffer: 1024 * 1024 * 50 })
+
+        // Reescribir el SQL para convertir INSERT en INSERT ... ON CONFLICT DO NOTHING
+        const { readFile: readF, writeFile: writeF } = await import('fs/promises')
+        const sqlContent = await readF(tempSqlPath, 'utf-8')
+        const mergedSql = sqlContent
+          .split('\n')
+          .map(line => {
+            // Añadir ON CONFLICT DO NOTHING a cada INSERT que no lo tenga ya
+            if (/^INSERT INTO /i.test(line.trim()) && !line.includes('ON CONFLICT')) {
+              return line.replace(/;$/, ' ON CONFLICT DO NOTHING;')
+            }
+            return line
+          })
+          .join('\n')
+
+        await writeF(tempSqlPath, mergedSql, 'utf-8')
+
+        // Deshabilitar FK constraints durante el merge
+        const mergeCmd =
+          `PGPASSWORD="${dbConfig.password}" psql ` +
+          `-h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database} ` +
+          `-c "SET session_replication_role = replica;" ` +
+          `-f "${tempSqlPath}" ` +
+          `-c "SET session_replication_role = DEFAULT;" 2>&1 || true`
+
+        const { stdout: mergeOut } = await execAsync(mergeCmd, {
+          timeout: 600000,
+          maxBuffer: 1024 * 1024 * 50,
+        })
+
+        if (mergeOut && mergeOut.includes('ERROR')) {
+          const errors = mergeOut.split('\n').filter(l => l.includes('ERROR'))
+          const criticalErrors = errors.filter(
+            e => !e.includes('does not exist') && !e.includes('already exists')
+          )
+          if (criticalErrors.length > 0) {
+            console.warn('[RESTORE] Errores en merge:', criticalErrors.slice(0, 5).join('\n'))
+          }
+        }
+      } finally {
+        try {
+          await unlink(tempSqlPath)
+        } catch {}
       }
     }
-    console.log(`[RESTORE] Restauración selectiva completada: ${tables.length} tablas`)
+
+    console.log(`[RESTORE] Restauración selectiva (${mode}) completada: ${tables.length} tablas`)
   } else {
+    // Restauración completa — el modo merge no aplica a nivel completo (demasiado riesgo de inconsistencias)
     const command =
       `PGPASSWORD="${dbConfig.password}" pg_restore ` +
       `-h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database} ` +
@@ -235,10 +301,7 @@ async function restoreWithPgRestore(
         e => !e.includes('does not exist') && !e.includes('already exists')
       )
       if (criticalErrors.length > 0) {
-        console.warn(
-          '[RESTORE] Errores durante pg_restore:',
-          criticalErrors.slice(0, 5).join('\n')
-        )
+        console.warn('[RESTORE] Errores durante pg_restore:', criticalErrors.slice(0, 5).join('\n'))
       }
     }
     console.log('[RESTORE] Restauración completa finalizada')
@@ -295,9 +358,7 @@ async function restoreFromSQL(backup: {
   }
 
   console.log(`[RESTORE] Archivo de respaldo: ${sourceFile}`)
-  console.log(
-    `[RESTORE] Conectando a ${dbConfig.host}:${dbConfig.port}/${dbConfig.database}`
-  )
+  console.log(`[RESTORE] Conectando a ${dbConfig.host}:${dbConfig.port}/${dbConfig.database}`)
 
   try {
     await execAsync('which psql')
@@ -332,7 +393,8 @@ async function restoreFromJSON(
     filename: string
     filepath: string
   },
-  restoreModules?: string[]
+  restoreModules?: string[],
+  mode: RestoreMode = 'replace'
 ): Promise<void> {
   const backupContent = await readFile(backup.filepath, 'utf-8')
   let backupData: any
@@ -459,8 +521,8 @@ async function restoreFromJSON(
         )
         continue
       }
-      console.log(`[RESTORE] Restauración selectiva: módulo "${effectiveModule}"`)
-      await restoreModuleFromJSON(effectiveModule, scoped, restoreOrder)
+      console.log(`[RESTORE] Restauración selectiva: módulo "${effectiveModule}" (modo: ${mode})`)
+      await restoreModuleFromJSON(effectiveModule, scoped, restoreOrder, mode)
     }
     return
   }
@@ -540,10 +602,7 @@ async function restoreFromJSON(
           try {
             await tx.$executeRaw(Prisma.sql`DELETE FROM ${Prisma.raw(`"${tableName}"`)};`)
           } catch (err) {
-            console.warn(
-              `⚠ No se pudo limpiar tabla ${tableName}:`,
-              (err as Error).message
-            )
+            console.warn(`⚠ No se pudo limpiar tabla ${tableName}:`, (err as Error).message)
           }
         }
       }
@@ -594,45 +653,53 @@ async function restoreFromJSON(
 async function restoreModuleFromJSON(
   moduleId: string,
   mappedData: Record<string, any[]>,
-  restoreOrder: readonly string[]
+  restoreOrder: readonly string[],
+  mode: RestoreMode = 'replace'
 ): Promise<void> {
   await prisma.$transaction(
     async tx => {
       await tx.$executeRaw(Prisma.sql`SET session_replication_role = replica;`)
+
       for (const tableName of restoreOrder) {
         const tableData = mappedData[tableName]
         if (!tableData?.length) continue
         const processed = tableData.map((r: any) => processRecordForRestore(r))
         console.log(
-          `[módulo ${moduleId}] Restaurando ${processed.length} registros → ${tableName}`
+          `[módulo ${moduleId}/${mode}] Restaurando ${processed.length} registros → ${tableName}`
         )
-        const ids = processed.map((r: any) => r.id).filter(Boolean)
-        if (ids.length > 0) {
-          try {
-            const idList = ids.map((id: string) => `'${id.replace(/'/g, "''")}'`).join(',')
-            await tx.$executeRaw(
-              Prisma.sql`DELETE FROM ${Prisma.raw(`"${tableName}"`)} WHERE id IN (${Prisma.raw(idList)});`
-            )
-          } catch (delErr) {
-            console.warn(
-              `[módulo ${moduleId}] ⚠ No se pudo limpiar IDs de ${tableName}: ${(delErr as Error).message?.slice(
-                0,
-                100
-              )}`
-            )
+
+        if (mode === 'replace') {
+          // Eliminar los registros del backup (por ID) antes de reinsertar
+          const ids = processed.map((r: any) => r.id).filter(Boolean)
+          if (ids.length > 0) {
+            try {
+              const idList = ids.map((id: string) => `'${id.replace(/'/g, "''")}'`).join(',')
+              await tx.$executeRaw(
+                Prisma.sql`DELETE FROM ${Prisma.raw(`"${tableName}"`)} WHERE id IN (${Prisma.raw(idList)});`
+              )
+            } catch (delErr) {
+              console.warn(
+                `[módulo ${moduleId}] ⚠ No se pudo limpiar IDs de ${tableName}: ${(delErr as Error).message?.slice(0, 100)}`
+              )
+            }
           }
         }
+        // En modo 'merge' no borramos — hacemos upsert directamente
+
+        // Intentar createMany primero (más eficiente)
         try {
           await tx.$executeRaw(Prisma.sql`SAVEPOINT restore_table;`)
-          await (tx as any)[tableName].createMany({ data: processed, skipDuplicates: true })
+          if (mode === 'merge') {
+            // skipDuplicates ignora conflictos → solo inserta los que no existen
+            await (tx as any)[tableName].createMany({ data: processed, skipDuplicates: true })
+          } else {
+            await (tx as any)[tableName].createMany({ data: processed, skipDuplicates: true })
+          }
           await tx.$executeRaw(Prisma.sql`RELEASE SAVEPOINT restore_table;`)
         } catch (bulkErr) {
           await tx.$executeRaw(Prisma.sql`ROLLBACK TO SAVEPOINT restore_table;`)
           console.warn(
-            `[módulo ${moduleId}] createMany falló para ${tableName}: ${(bulkErr as Error).message?.slice(
-              0,
-              150
-            )}`
+            `[módulo ${moduleId}] createMany falló para ${tableName}: ${(bulkErr as Error).message?.slice(0, 150)}`
           )
           console.warn(`[módulo ${moduleId}] Intentando upsert individual para ${tableName}...`)
           let insertedCount = 0
@@ -640,11 +707,21 @@ async function restoreModuleFromJSON(
             try {
               await tx.$executeRaw(Prisma.sql`SAVEPOINT restore_record;`)
               if (processed[i].id) {
-                await (tx as any)[tableName].upsert({
-                  where: { id: processed[i].id },
-                  update: processed[i],
-                  create: processed[i],
-                })
+                if (mode === 'merge') {
+                  // merge: solo insertar si no existe (no actualizar el existente)
+                  await (tx as any)[tableName].upsert({
+                    where: { id: processed[i].id },
+                    update: {}, // no sobreescribir el existente
+                    create: processed[i],
+                  })
+                } else {
+                  // replace: actualizar si existe
+                  await (tx as any)[tableName].upsert({
+                    where: { id: processed[i].id },
+                    update: processed[i],
+                    create: processed[i],
+                  })
+                }
               } else {
                 await (tx as any)[tableName].create({ data: processed[i] })
               }
@@ -654,10 +731,7 @@ async function restoreModuleFromJSON(
               await tx.$executeRaw(Prisma.sql`ROLLBACK TO SAVEPOINT restore_record;`)
               if (i < 3) {
                 console.warn(
-                  `[módulo ${moduleId}] ⚠ ${tableName}[${i}] error: ${(recordErr as Error).message?.slice(
-                    0,
-                    150
-                  )}`
+                  `[módulo ${moduleId}] ⚠ ${tableName}[${i}] error: ${(recordErr as Error).message?.slice(0, 150)}`
                 )
               }
             }
@@ -667,11 +741,12 @@ async function restoreModuleFromJSON(
           )
         }
       }
+
       await tx.$executeRaw(Prisma.sql`SET session_replication_role = DEFAULT;`)
     },
     { timeout: 600000 }
   )
-  console.log(`Restauración JSON módulo ${moduleId} completada`)
+  console.log(`Restauración JSON módulo ${moduleId} (${mode}) completada`)
 }
 
 function processRecordForRestore(record: any): any {

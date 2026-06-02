@@ -61,6 +61,14 @@ export interface FormData {
   recurrenceDays: number[]
   // null = heredar del default de la familia
   overrideTimeValidation: boolean | null
+  /**
+   * Repetición intra-turno: cada cuántos minutos se repite la ronda dentro del
+   * bloque scheduledStart → scheduledEnd (o inicio → endTimeOnly).
+   * 0 o null = sin repetición intra-turno (comportamiento anterior).
+   * Solo aplica para recurrence NONE. Para recurrencia diaria/semanal la
+   * lógica de repetición intra-turno se aplica en cada ocurrencia del día.
+   */
+  repeatIntervalMinutes: number | null
 }
 
 export const EMPTY_FORM: FormData = {
@@ -73,6 +81,7 @@ export const EMPTY_FORM: FormData = {
   recurrence: 'NONE',
   recurrenceDays: [],
   overrideTimeValidation: null,
+  repeatIntervalMinutes: null,
 }
 
 export const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']

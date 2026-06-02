@@ -198,17 +198,34 @@ export function CheckpointFormDialog({
           <div className='space-y-3'>
             <div className='flex items-center justify-between'>
               <div>
-                <Label className='text-sm font-medium'>Tiene conectividad</Label>
-                <p className='text-xs text-muted-foreground'>
-                  ON = QR Dinámico (cambia constantemente, máxima seguridad)
-                  <br />
-                  OFF = QR Estático (permanente, ideal para imprimir)
+                <Label className='text-sm font-medium'>Tipo de QR</Label>
+                <p className='text-xs text-muted-foreground mt-0.5'>
+                  {form.hasConnectivity ? (
+                    <>
+                      <span className='font-semibold text-amber-600 dark:text-amber-400'>
+                        🔄 QR Dinámico
+                      </span>{' '}
+                      — el código cambia cada 5 min. Necesita conexión a internet al escanear.
+                      <br />
+                      <span className='text-destructive'>
+                        No apto para imprimir: el QR impreso expirará.
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className='font-semibold text-green-600 dark:text-green-400'>
+                        📌 QR Estático
+                      </span>{' '}
+                      — código fijo permanente. Imprime una vez y funciona siempre.
+                    </>
+                  )}
                 </p>
               </div>
               <Switch
                 checked={form.hasConnectivity}
                 onCheckedChange={v => setForm(f => ({ ...f, hasConnectivity: v }))}
                 disabled={saving}
+                aria-label='Activar QR dinámico'
               />
             </div>
             <div className='flex items-center justify-between'>
@@ -227,8 +244,39 @@ export function CheckpointFormDialog({
           </div>
 
           {!form.hasConnectivity && (
-            <div className='p-3 rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 text-xs text-orange-700 dark:text-orange-400'>
-              Sin conectividad → QR Estático.
+            <div className='p-3 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 text-xs text-green-700 dark:text-green-400'>
+              ✅ QR Estático: imprime el código una sola vez y el guardia podrá escanearlo siempre
+              sin necesidad de reconectar.
+            </div>
+          )}
+
+          {form.hasConnectivity && (
+            <div className='p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-400'>
+              ⚠️ QR Dinámico: el token cambia cada 5 minutos. Si imprimes el QR, dejará de funcionar
+              en pocos minutos. Usa este modo solo si muestras el QR en pantalla digital.
+            </div>
+          )}
+
+          {editingId && (
+            <div className='flex items-center justify-between pt-1'>
+              <div>
+                <Label className='text-sm font-medium'>Regenerar QR</Label>
+                <p className='text-xs text-muted-foreground'>
+                  Genera un nuevo código QR. Los QR impresos anteriores dejarán de funcionar.
+                </p>
+              </div>
+              <Switch
+                checked={form.regenerateSecret ?? false}
+                onCheckedChange={v => setForm(f => ({ ...f, regenerateSecret: v }))}
+                disabled={saving}
+              />
+            </div>
+          )}
+
+          {form.regenerateSecret && (
+            <div className='p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-xs text-destructive'>
+              ⚠️ Al guardar, se generará un nuevo QR. Deberás imprimir y reemplazar el QR físico en
+              la ubicación del checkpoint.
             </div>
           )}
         </div>

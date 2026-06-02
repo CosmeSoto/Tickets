@@ -348,6 +348,7 @@ export function ScheduleFormDialog({
                   recurrenceDays: [],
                   endTimeOnly: '',
                   scheduledEnd: v === 'NONE' ? '' : f.scheduledEnd,
+                  repeatIntervalMinutes: null,
                 }))
               }
               disabled={saving}
@@ -462,6 +463,93 @@ export function ScheduleFormDialog({
             </div>
           )}
 
+          {/* ── Repetición intra-turno ── */}
+          {(() => {
+            // Calcular duración del bloque horario
+            let blockMins = 0
+            try {
+              if (form.scheduledStart) {
+                const startDate = new Date(form.scheduledStart)
+                if (form.recurrence === 'NONE' && form.scheduledEnd) {
+                  blockMins = Math.round(
+                    (new Date(form.scheduledEnd).getTime() - startDate.getTime()) / 60000
+                  )
+                } else if (form.recurrence !== 'NONE' && form.endTimeOnly) {
+                  const [h, m] = form.endTimeOnly.split(':').map(Number)
+                  const endDate = new Date(startDate)
+                  endDate.setHours(h, m, 0, 0)
+                  if (endDate <= startDate) endDate.setDate(endDate.getDate() + 1)
+                  blockMins = Math.round((endDate.getTime() - startDate.getTime()) / 60000)
+                }
+              }
+            } catch {
+              blockMins = 0
+            }
+            const routeMins = routes.find(r => r.id === form.routeId)?.estimatedDurationMinutes ?? 0
+            // Solo mostrar si el bloque es al menos el doble de la duración de la ruta
+            if (blockMins <= 0 || routeMins <= 0 || blockMins <= routeMins) return null
+
+            const maxRepetitions = Math.floor(blockMins / routeMins)
+
+            return (
+              <div className='space-y-1.5 rounded-lg border border-primary/20 bg-primary/5 p-3'>
+                <Label className='text-sm font-medium flex items-center gap-1.5'>
+                  🔄 ¿Repetir la ronda dentro del turno?
+                </Label>
+                <p className='text-xs text-muted-foreground'>
+                  El bloque horario dura <strong>{formatDurationMinutes(blockMins)}</strong> y la
+                  ruta tarda <strong>{formatDurationMinutes(routeMins)}</strong>. Puedes hacer que
+                  el agente repita la ronda cada cierto intervalo durante el turno.
+                </p>
+                <Select
+                  value={
+                    form.repeatIntervalMinutes == null ? 'none' : String(form.repeatIntervalMinutes)
+                  }
+                  onValueChange={v =>
+                    setForm(f => ({
+                      ...f,
+                      repeatIntervalMinutes: v === 'none' ? null : parseInt(v, 10),
+                    }))
+                  }
+                  disabled={saving}
+                >
+                  <SelectTrigger className='h-10'>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='none'>Sin repetición — una sola ronda</SelectItem>
+                    {Array.from({ length: maxRepetitions - 1 }, (_, i) => {
+                      const interval = routeMins * (i + 1)
+                      const times = Math.floor(blockMins / interval)
+                      if (times < 2) return null
+                      return (
+                        <SelectItem key={interval} value={String(interval)}>
+                          Cada {formatDurationMinutes(interval)} — {times} rondas en el turno
+                        </SelectItem>
+                      )
+                    })}
+                    <SelectItem value={String(routeMins)}>
+                      Cada {formatDurationMinutes(routeMins)} (sin pausa) —{' '}
+                      {Math.floor(blockMins / routeMins)} rondas seguidas
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                {form.repeatIntervalMinutes != null && form.repeatIntervalMinutes > 0 && (
+                  <p className='text-xs text-primary font-medium'>
+                    Se generarán{' '}
+                    <strong>{Math.floor(blockMins / form.repeatIntervalMinutes)}</strong> rondas
+                    {form.recurrence === 'DAILY'
+                      ? ' por día'
+                      : form.recurrence !== 'NONE'
+                        ? ' por día activo'
+                        : ''}
+                    .
+                  </p>
+                )}
+              </div>
+            )
+          })()}
+
           {/* ── Resumen dinámico de lo que se va a crear ── */}
           {form.scheduledStart &&
             (form.recurrence === 'NONE' ? form.scheduledEnd : form.endTimeOnly) &&
@@ -504,10 +592,20 @@ export function ScheduleFormDialog({
 
                 if (form.recurrence === 'NONE') {
                   scheduleDesc = `el ${formatDateTime(startDate)}`
-                  occurrenceCount = '1 ronda'
+                  if (form.repeatIntervalMinutes && form.repeatIntervalMinutes > 0) {
+                    const count = Math.floor(diffMins / form.repeatIntervalMinutes)
+                    occurrenceCount = `${count} rondas en el turno`
+                  } else {
+                    occurrenceCount = '1 ronda'
+                  }
                 } else if (form.recurrence === 'DAILY') {
                   scheduleDesc = `todos los días a las ${formatTime(startDate)}`
-                  occurrenceCount = '~30 rondas'
+                  if (form.repeatIntervalMinutes && form.repeatIntervalMinutes > 0) {
+                    const perDay = Math.floor(diffMins / form.repeatIntervalMinutes)
+                    occurrenceCount = `~${perDay * 30} rondas (~${perDay}/día × 30 días)`
+                  } else {
+                    occurrenceCount = '~30 rondas'
+                  }
                 } else {
                   const selectedDayNames = form.recurrenceDays
                     .map(utcDay => {
@@ -518,8 +616,13 @@ export function ScheduleFormDialog({
                   if (selectedDayNames) {
                     scheduleDesc = `los ${selectedDayNames} a las ${formatTime(startDate)}`
                     const weeksAhead = Math.ceil(30 / 7)
-                    const approxCount = form.recurrenceDays.length * weeksAhead
-                    occurrenceCount = `~${approxCount} rondas`
+                    const daysCount = form.recurrenceDays.length * weeksAhead
+                    if (form.repeatIntervalMinutes && form.repeatIntervalMinutes > 0) {
+                      const perDay = Math.floor(diffMins / form.repeatIntervalMinutes)
+                      occurrenceCount = `~${perDay * daysCount} rondas (~${perDay}/día × ${daysCount} días)`
+                    } else {
+                      occurrenceCount = `~${daysCount} rondas`
+                    }
                   }
                 }
 
@@ -549,13 +652,22 @@ export function ScheduleFormDialog({
                       )}
                       <div className='flex gap-2'>
                         <span className='text-muted-foreground w-16 shrink-0'>Duración</span>
-                        <span className='font-medium'>{durationLabel} por ronda</span>
+                        <span className='font-medium'>{durationLabel} por turno</span>
                       </div>
-                      {form.recurrence !== 'NONE' && occurrenceCount && (
+                      {form.repeatIntervalMinutes && form.repeatIntervalMinutes > 0 && (
+                        <div className='flex gap-2'>
+                          <span className='text-muted-foreground w-16 shrink-0'>Intervalo</span>
+                          <span className='font-medium text-primary'>
+                            Cada {formatDurationMinutes(form.repeatIntervalMinutes)} por turno
+                          </span>
+                        </div>
+                      )}
+                      {occurrenceCount && (
                         <div className='flex gap-2'>
                           <span className='text-muted-foreground w-16 shrink-0'>Genera</span>
                           <span className='font-medium'>
-                            {occurrenceCount} para los próximos 30 días
+                            {occurrenceCount}
+                            {form.recurrence !== 'NONE' ? ' (próximos 30 días)' : ''}
                           </span>
                         </div>
                       )}

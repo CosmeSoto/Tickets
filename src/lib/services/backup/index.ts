@@ -1,12 +1,7 @@
 import { stat, access } from 'fs/promises'
 import prisma from '@/lib/prisma'
 import { BackupInfo, BackupStats, BackupModuleId } from './backup-types'
-import {
-  getBackupConfig,
-  hasPgTools,
-  calculateChecksum,
-  formatFileSize,
-} from './backup-utils'
+import { getBackupConfig, hasPgTools, calculateChecksum, formatFileSize } from './backup-utils'
 import { loadBackupMetadata, extractMetadataFromDump } from './backup-metadata'
 import { createBackup } from './backup-create'
 import { restoreBackup } from './backup-restore'
@@ -58,8 +53,12 @@ export class BackupService {
     return deleteBackup(backupId)
   }
 
-  static async restoreBackup(backupId: string, restoreModules?: string[]): Promise<void> {
-    return restoreBackup(backupId, restoreModules)
+  static async restoreBackup(
+    backupId: string,
+    restoreModules?: string[],
+    mode: 'replace' | 'merge' = 'replace'
+  ): Promise<void> {
+    return restoreBackup(backupId, restoreModules, mode)
   }
 
   static async importBackupFromFile(
@@ -136,9 +135,7 @@ export class BackupService {
     }
   }
 
-  static async getBackupPreview(
-    backupId: string
-  ): Promise<{
+  static async getBackupPreview(backupId: string): Promise<{
     tables: Array<{ name: string; recordCount: number; size?: string }>
     totalRecords: number
     totalSize: string
