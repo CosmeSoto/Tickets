@@ -7,7 +7,7 @@
 
 import { ReactNode, useState } from 'react'
 import { useSession, signOut } from 'next-auth/react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   LayoutDashboard,
@@ -310,7 +310,12 @@ function NavItemComponent({
   depth?: number
   onNavigate?: () => void
 }) {
-  const hasChildren = item.children && item.children.length > 0
+  const router = useRouter()
+  // Filter out redundant first child if it has the same href as parent
+  const children = item.children
+    ? item.children.filter((child, index) => !(index === 0 && child.href === item.href))
+    : undefined
+  const hasChildren = children && children.length > 0
 
   const isDescendantActive = (navItem: NavItem): boolean => {
     if (pathname === navItem.href) return true
@@ -330,7 +335,7 @@ function NavItemComponent({
     : isRootGroupHref
       ? pathname === item.href
       : pathname === item.href || pathname?.startsWith(item.href + '/')
-  const isActive = isDirectActive || (hasChildren ? item.children!.some(isDescendantActive) : false)
+  const isActive = isDirectActive || (hasChildren ? children!.some(isDescendantActive) : false)
 
   const [isOpen, setIsOpen] = useState(isActive)
 
@@ -359,8 +364,14 @@ function NavItemComponent({
 
   return (
     <div>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
+      <Link
+        href={item.href}
+        onClick={e => {
+          e.preventDefault()
+          setIsOpen(!isOpen)
+          router.push(item.href)
+          onNavigate?.()
+        }}
         style={{ paddingLeft: `${16 + indent}px` }}
         className={`flex items-center w-full pr-4 py-2 text-sm font-medium rounded-lg transition-colors ${
           isActive
@@ -375,13 +386,13 @@ function NavItemComponent({
         <ChevronDown
           className={`h-4 w-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
         />
-      </button>
+      </Link>
       {isOpen && (
         <div
           className='mt-0.5 space-y-0.5 border-l-2 border-border'
           style={{ marginLeft: `${20 + indent}px`, paddingLeft: '8px' }}
         >
-          {item.children!.map(child => (
+          {children!.map(child => (
             <NavItemComponent
               key={child.href + child.name}
               item={child}

@@ -748,15 +748,15 @@ export default function AdminNewsPage() {
               </div>
               <div className='space-y-2 col-span-2'>
                 <Label>
-                  Resumen{' '}
+                  Extracto{' '}
                   <span className='text-xs text-muted-foreground font-normal'>
-                    (opcional — aparece como subtítulo en la lista)
+                    (Texto visible en la lista antes de abrir la noticia)
                   </span>
                 </Label>
                 <Input
                   value={formData.summary}
                   onChange={e => setFormData({ ...formData, summary: e.target.value })}
-                  placeholder='Breve descripción de la noticia...'
+                  placeholder='Ej: Se informa a todo el personal que...'
                   maxLength={500}
                 />
               </div>
