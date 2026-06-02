@@ -5,7 +5,6 @@ import { Loader2, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import {
   Select,
   SelectContent,
@@ -482,56 +481,75 @@ export function ScheduleFormDialog({
             </div>
           )}
 
-          {/* ── Control de horario para esta programación ── */}
-          <div className='border-t pt-4'>
-            <div className='flex items-start justify-between gap-4 p-3 rounded-lg border bg-muted/30'>
-              <div className='space-y-1 flex-1'>
-                <Label className='text-xs font-medium flex items-center gap-1.5'>
-                  <Clock className='h-3.5 w-3.5 text-primary' />
-                  Validación de horario para esta programación
-                </Label>
-                <p className='text-xs text-muted-foreground'>
-                  Controla si el agente puede iniciar esta ronda fuera del período de gracia. Por
-                  defecto usa la configuración del área.
-                </p>
-                <p className='text-xs font-medium text-amber-600 dark:text-amber-400'>
-                  {form.overrideTimeValidation === null
-                    ? 'Usando default del área'
-                    : form.overrideTimeValidation
-                      ? 'Estricto — solo dentro del período de gracia'
-                      : 'Flexible — puede iniciar en cualquier momento'}
-                </p>
-              </div>
-              <div className='flex flex-col items-end gap-2 flex-shrink-0'>
-                <Switch
-                  checked={form.overrideTimeValidation !== null}
-                  onCheckedChange={enabled => {
-                    setForm(f => ({
-                      ...f,
-                      overrideTimeValidation: enabled ? true : null,
-                    }))
-                  }}
-                  aria-label='Sobreescribir validación de horario'
-                />
-                <span className='text-xs text-muted-foreground'>
-                  {form.overrideTimeValidation === null ? 'Heredar' : 'Sobreescribir'}
-                </span>
-                {form.overrideTimeValidation !== null && (
-                  <Switch
-                    checked={form.overrideTimeValidation === true}
-                    onCheckedChange={strict => {
-                      setForm(f => ({ ...f, overrideTimeValidation: strict }))
-                    }}
-                    aria-label='Modo estricto'
-                  />
-                )}
-                {form.overrideTimeValidation !== null && (
-                  <span className='text-xs text-muted-foreground'>
-                    {form.overrideTimeValidation ? 'Estricto' : 'Flexible'}
-                  </span>
-                )}
-              </div>
+          {/* ── Control de validación de horario para esta programación ── */}
+          <div className='border-t pt-4 space-y-2'>
+            <Label className='text-sm font-medium flex items-center gap-1.5'>
+              <Clock className='h-4 w-4 text-primary' />
+              Validación de horario
+            </Label>
+            <p className='text-xs text-muted-foreground'>
+              ¿El agente puede iniciar esta ronda fuera del período de gracia configurado en el
+              área?
+            </p>
+            <div className='grid grid-cols-3 gap-2'>
+              {/* Opción 1 — heredar del área */}
+              <button
+                type='button'
+                disabled={saving}
+                onClick={() => setForm(f => ({ ...f, overrideTimeValidation: null }))}
+                className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 text-xs font-medium transition-all ${
+                  form.overrideTimeValidation === null
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                <span className='text-base'>🏠</span>
+                <span>Default del área</span>
+                <span className='text-[10px] font-normal opacity-70'>Usa config global</span>
+              </button>
+
+              {/* Opción 2 — estricto para esta programación */}
+              <button
+                type='button'
+                disabled={saving}
+                onClick={() => setForm(f => ({ ...f, overrideTimeValidation: true }))}
+                className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 text-xs font-medium transition-all ${
+                  form.overrideTimeValidation === true
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                <span className='text-base'>🔒</span>
+                <span>Estricto</span>
+                <span className='text-[10px] font-normal opacity-70'>Solo en su horario</span>
+              </button>
+
+              {/* Opción 3 — flexible para esta programación */}
+              <button
+                type='button'
+                disabled={saving}
+                onClick={() => setForm(f => ({ ...f, overrideTimeValidation: false }))}
+                className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 text-xs font-medium transition-all ${
+                  form.overrideTimeValidation === false
+                    ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400'
+                    : 'border-border text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                <span className='text-base'>🔓</span>
+                <span>Flexible</span>
+                <span className='text-[10px] font-normal opacity-70'>Inicia cuando quiera</span>
+              </button>
             </div>
+
+            {/* Descripción del estado activo */}
+            <p className='text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2'>
+              {form.overrideTimeValidation === null &&
+                'Se aplicará la validación configurada en Configuración de Rondas para el área seleccionada.'}
+              {form.overrideTimeValidation === true &&
+                'El agente solo podrá iniciar dentro del período de gracia definido en el área, sin importar la config global.'}
+              {form.overrideTimeValidation === false &&
+                'El agente podrá iniciar esta ronda en cualquier momento, sin restricción de horario.'}
+            </p>
           </div>
         </div>
 
