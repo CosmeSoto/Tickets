@@ -319,7 +319,9 @@ export function EditUserModal({
       setFormData(p => ({
         ...p,
         formsEnabled: value,
-        canManageForms: value ? p.canManageForms : false,
+        // Al activar el módulo no se hereda canManageForms; debe otorgarse explícitamente.
+        // Al desactivar el módulo se limpia canManageForms automáticamente.
+        canManageForms: false,
       }))
     } else {
       setFormData(p => ({ ...p, [field]: value }))

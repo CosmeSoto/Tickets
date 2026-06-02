@@ -328,39 +328,63 @@ export function useFamilyAssignments({ user, isOpen }: UseFamilyAssignmentsProps
 
         setAllFamilies(allActiveFamilies)
 
+        // Familia nativa del usuario siendo editado — debe estar siempre disponible
+        const userNativeFamilyId =
+          user && typeof user.department === 'object'
+            ? ((user.department as any)?.familyId ?? null)
+            : null
+
+        /**
+         * Garantiza que la familia nativa del usuario editado esté incluida
+         * en la lista de familias disponibles, aunque esté fuera del scope del viewer.
+         */
+        const ensureNativeFamily = (list: FamilyOption[]): FamilyOption[] => {
+          if (!userNativeFamilyId) return list
+          const alreadyIn = list.some(f => f.id === userNativeFamilyId)
+          if (alreadyIn) return list
+          // Buscarla en allActiveFamilies o en cualquiera de las listas de módulo
+          const nativeFamily =
+            allActiveFamilies.find(f => f.id === userNativeFamilyId) ??
+            tModuleFamilies.find(f => f.id === userNativeFamilyId) ??
+            iModuleFamilies.find(f => f.id === userNativeFamilyId) ??
+            pModuleFamilies.find(f => f.id === userNativeFamilyId)
+          return nativeFamily ? [...list, nativeFamily] : list
+        }
+
         if (viewerIsSuperAdmin) {
           setTicketFamilies(tModuleFamilies)
           setInventoryFamilies(iModuleFamilies)
           setPatrolFamilies(pModuleFamilies)
         } else {
+          // Para Admin Normal: usar la intersección entre el módulo y el scope del viewer,
+          // pero siempre incluyendo la familia nativa del usuario editado.
           setTicketFamilies(
-            tModuleFamilies.length > 0
-              ? allActiveFamilies.filter(f => tModuleFamilies.some(t => t.id === f.id))
-              : allActiveFamilies
+            ensureNativeFamily(
+              tModuleFamilies.length > 0
+                ? allActiveFamilies.filter(f => tModuleFamilies.some(t => t.id === f.id))
+                : allActiveFamilies
+            )
           )
           setInventoryFamilies(
-            iModuleFamilies.length > 0
-              ? allActiveFamilies.filter(f => iModuleFamilies.some(i => i.id === f.id))
-              : allActiveFamilies
+            ensureNativeFamily(
+              iModuleFamilies.length > 0
+                ? allActiveFamilies.filter(f => iModuleFamilies.some(i => i.id === f.id))
+                : allActiveFamilies
+            )
           )
           setPatrolFamilies(
-            pModuleFamilies.length > 0
-              ? allActiveFamilies.filter(f => pModuleFamilies.some(p => p.id === f.id))
-              : allActiveFamilies
+            ensureNativeFamily(
+              pModuleFamilies.length > 0
+                ? allActiveFamilies.filter(f => pModuleFamilies.some(p => p.id === f.id))
+                : allActiveFamilies
+            )
           )
 
-          const [adminTicketRes, adminInvRes, adminPatrolRes] = await Promise.all([
-            fetch('/api/families?includeInactive=false&module=tickets'),
-            fetch('/api/families?includeInactive=false&module=inventory'),
-            fetch('/api/families?includeInactive=false&module=patrols'),
-          ])
-          const adminTFamilies = await parseFamilies(adminTicketRes)
-          const adminIFamilies = await parseFamilies(adminInvRes)
-          const adminPFamilies = await parseFamilies(adminPatrolRes)
-          setAdminTicketScopeIds(adminTFamilies.map(f => f.id))
-          setAdminInventoryScopeIds(adminIFamilies.map(f => f.id))
-          setAdminPatrolScopeIds(adminPFamilies.map(f => f.id))
-          setAdminScopeIds(adminTFamilies.map(f => f.id))
+          // El scope del admin viewer ya viene en tModuleFamilies (mismo endpoint)
+          setAdminTicketScopeIds(tModuleFamilies.map(f => f.id))
+          setAdminInventoryScopeIds(iModuleFamilies.map(f => f.id))
+          setAdminPatrolScopeIds(pModuleFamilies.map(f => f.id))
+          setAdminScopeIds(tModuleFamilies.map(f => f.id))
         }
 
         const viewerIsAdmin = session?.user?.role === 'ADMIN' && !session?.user?.isSuperAdmin
