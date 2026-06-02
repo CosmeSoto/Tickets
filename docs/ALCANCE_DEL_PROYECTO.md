@@ -1,251 +1,286 @@
-# Alcance del Proyecto
+# Alcance del Proyecto — Sistema de Gestión Empresarial
 
-**Documento para la selección y configuración del servidor**
-
----
-
-## 1. ¿Qué es este documento?
-
-Esta guía te ayudará a elegir el servidor adecuado en la nube para que tu sistema de gestión funcione perfectamente. Aquí encontrarás todo lo que necesitas saber: requisitos técnicos, seguridad, rendimiento y mantenimiento.
+**Documento técnico para selección y configuración de servidor**
+**Versión:** 1.4 | **Fecha:** 2026-06-01
 
 ---
 
-## 2. Nuestro Sistema: ¿Qué hace?
+## 1. Descripción General
 
-El sistema es una herramienta completa para gestionar tu empresa, con estos módulos principales:
+Sistema web integral para la gestión operativa de la empresa, desarrollado en Next.js con arquitectura containerizada (Docker). Cubre soporte técnico, base de conocimientos, inventario, comunicaciones internas y seguridad física, con control de acceso por roles y notificaciones en tiempo real.
+
+---
+
+## 2. Módulos Funcionales
+
+El sistema está compuesto por **10 módulos** que cubren las operaciones principales de la empresa. El inventario se encuentra actualmente en desarrollo.
+
+```mermaid
+mindmap
+  root((Sistema de<br/>Gestión))
+    Operaciones
+      🎫 Tickets de Soporte
+      🚶 Rondas y Patrullas
+      📋 Formularios
+    Conocimiento
+      📚 Base de Conocimientos
+      📰 Comunicaciones
+    Recursos
+      📦 Inventario
+    Plataforma
+      👥 Usuarios y Áreas
+      🔔 Notificaciones
+      🏠 Página Pública
+      ⚙️ Configuración
+```
+
+---
 
 ### 🎫 Tickets de Soporte
 
-- Gestiona solicitudes de soporte con estados: Abierto → En Progreso → Resuelto → Cerrado
-- SLA automático (tiempos de respuesta garantizados: Urgente, Alto, Medio, Bajo)
+**Ciclo de vida de un ticket:**
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> Abierto : Cliente crea ticket
+    Abierto --> EnProgreso : Asignación a técnico
+    EnProgreso --> Resuelto : Técnico resuelve
+    Resuelto --> Cerrado : Confirmación / tiempo
+    Resuelto --> EnProgreso : Reapertura
+    Cerrado --> [*]
+
+    note right of Abierto
+        SLA inicia
+    end note
+    note right of Cerrado
+        Genera artículo KB
+    end note
+```
+
+- Ciclo de vida completo: Abierto → En Progreso → Resuelto → Cerrado
+- SLA automático por prioridad (Urgente, Alto, Medio, Bajo)
 - Asignación automática y manual a técnicos
-- Categorías organizadas en 4 niveles
-- Comentarios, archivos adjuntos y seguimiento de actividades
-- Reportes y estadísticas (tiempo de respuesta, cumplimiento SLA, carga por técnico)
+- Categorías en 4 niveles jerárquicos
+- Comentarios, archivos adjuntos y auditoría de actividad
+- Reportes de tiempo de respuesta, cumplimiento SLA y carga por técnico
 - Exportación a Excel, PDF y CSV
 
-### 📚 Base de Conocimientos y Documentos
+### 📚 Base de Conocimientos
 
-- Artículos creados desde tickets resueltos
-- Búsqueda avanzada (full-text)
-- Votación y clasificación por utilidad
-- Acceso controlado por roles (público, técnicos, admins)
-- Organización por categorías
-- Archivos adjuntos en artículos
+- Artículos generados desde tickets resueltos
+- Búsqueda full-text avanzada
+- Clasificación por utilidad y votación
+- Acceso por roles (público, técnicos, administradores)
 
-### 📦 Inventario Completo (Por concluir)
+### 📦 Inventario _(En desarrollo)_
 
-- **Equipos**: registro con código único, QR, historial de asignaciones y mantenimientos
-- **Licencias**: claves encriptadas, alertas de vencimiento automáticas
-- **Consumibles**: control de stock, alertas de stock bajo
-- **Contratos**: gestión de contratos de servicio con archivos adjuntos
-- **Actas digitales**: entrega, devolución y baja con PDF automático y folio secuencial
-- **Proveedores**: gestión completa con tipos y asignación por área
-- Catálogos personalizables (tipos de equipo, licencia, consumible, unidades de medida)
-- Reportes de inventario con exportación
+- **Equipos:** código único, QR, historial de asignaciones y mantenimientos
+- **Licencias:** claves encriptadas, alertas de vencimiento automáticas
+- **Consumibles:** control de stock con alertas de nivel bajo
+- **Contratos:** gestión documental con archivos adjuntos
+- **Actas digitales:** entrega, devolución y baja con PDF automático y folio secuencial
+- **Proveedores:** gestión por tipo y área
+- Catálogos personalizables y reportes con exportación
 
 ### 🚶 Rondas y Patrullas
 
-- Planificación de rutas de patrulla
-- Puntos de control geolocalizados
-- Registro de incidencias durante la ronda
-- Horarios y programación automática
-- Reportes de cumplimiento de rondas
-- Evidencia fotográfica en cada punto
+- Planificación de rutas con puntos de control geolocalizados
+- Registro de incidencias y evidencia fotográfica
+- Programación de horarios y reportes de cumplimiento
 
-### 📰 Noticias y Comunicaciones
+### 📰 Comunicaciones Internas
 
-- Publicación de noticias y anuncios internos
-- Notificaciones a usuarios cuando hay nuevas noticias
-- Archivos adjuntos en noticias
-- Control de publicación (fechas de inicio y fin)
+- Publicación de noticias y anuncios con fechas de vigencia
+- Notificaciones automáticas a usuarios
 - Estadísticas de visualización
 
 ### 📋 Formularios Personalizados
 
-- Creación de formularios con campos configurables
-- Tipos de campos: texto, número, fecha, selección, archivos
-- Asignación de formularios a familias/áreas
-- Respuestas organizadas y exportables
-- Integración con tickets y otros módulos
+- Campos configurables: texto, número, fecha, selección, archivos
+- Asignación por área o familia
+- Respuestas exportables e integración con otros módulos
 
-### 👥 Usuarios y Áreas (Familias)
+### 👥 Usuarios y Áreas
+
+**Jerarquía de roles y permisos:**
+
+```mermaid
+graph TD
+    SA[🔑 Super Administrador<br/>Acceso total al sistema]
+    AD[🛡️ Administrador<br/>Gestión de su área]
+    TEC[🔧 Técnico<br/>Atención de tickets]
+    CLI[👤 Cliente<br/>Creación de solicitudes]
+
+    SA --> AD
+    AD --> TEC
+    AD --> CLI
+
+    SA -.->|Configura| SYS[⚙️ Sistema Global]
+    AD -.->|Gestiona| AREA[🏢 Área / Familia]
+    TEC -.->|Resuelve| TKT[🎫 Tickets]
+    CLI -.->|Crea| TKT
+```
 
 - Roles: Super Administrador, Administrador, Técnico, Cliente
-- Gestión de inventario delegada a gestores específicos
 - Áreas (familias) con departamentos, técnicos y gestores asignados
 - Configuración independiente de tickets e inventario por área
-- Exportación de usuarios con filtros
 
-### 🔔 Notificaciones en Tiempo Real
+### 🔔 Notificaciones
 
-- Notificaciones dentro de la aplicación (inmediatas)
-- Emails con reintentos automáticos
-- Notificaciones del navegador
-- Alertas automáticas: stock bajo, licencias por vencer, contratos por vencer, garantías
+- Notificaciones en tiempo real dentro de la aplicación
+- Correos electrónicos con reintentos automáticos
+- Notificaciones del navegador (push)
+- Alertas automáticas: stock bajo, licencias y contratos por vencer
 
 ### 🏠 Página Pública (CMS)
 
-- Página principal editable desde el panel sin tocar código
-- Secciones: Hero, Servicios, Banners
-- SEO optimizado
+- Secciones editables desde el panel: Hero, Servicios, Banners
+- SEO optimizado, sin necesidad de modificar código
 
-### ⚙️ Configuración Completa
+### ⚙️ Configuración y Seguridad
 
-- Configuración global del sistema (SMTP, SLA, límites de archivos)
-- Configuración de tickets por área
-- Configuración de inventario por área
-- Preferencias de notificación por usuario
-- Login con Google y Microsoft
-
-### 🔐 Seguridad Avanzada
-
+- Configuración global: SMTP, SLA, límites de archivos
+- Autenticación con Google y Microsoft (OAuth)
 - Control de acceso por roles y áreas
-- Auditoría completa de todas las acciones
+- Auditoría completa de acciones
 - Bloqueo de cuenta por intentos fallidos
-- Encriptación de datos sensibles
-- Rate limiting (protección contra ataques)
+- Encriptación de datos sensibles y rate limiting
 
 ---
 
-## 3. Tecnologías que usamos
+## 3. Stack Tecnológico
 
-| Parte del Sistema      | Tecnología                |
-| ---------------------- | ------------------------- |
-| Aplicación Web         | Next.js 16 (App Router)   |
-| Lenguaje               | TypeScript                |
-| Base de Datos          | PostgreSQL 15             |
-| Caché (para velocidad) | Redis 7                   |
-| Contenedores           | Docker + Docker Compose   |
-| Login seguro           | NextAuth.js (JWT + OAuth) |
-| Proxy (seguridad web)  | Nginx                     |
+| Componente     | Tecnología                |
+| -------------- | ------------------------- |
+| Aplicación Web | Next.js 16 (App Router)   |
+| Lenguaje       | TypeScript                |
+| Base de Datos  | PostgreSQL 15             |
+| Caché          | Redis 7                   |
+| Contenedores   | Docker + Docker Compose   |
+| Autenticación  | NextAuth.js (JWT + OAuth) |
+| Proxy / SSL    | Nginx                     |
 
----
+**Arquitectura en producción:**
 
-## 4. ¿Qué necesita nuestro servidor?
+```mermaid
+graph TB
+    subgraph Internet
+        USR[👤 Usuario / Navegador]
+    end
 
-### 4.1 Planes recomendados según tu empresa
+    subgraph Servidor["🖥️ Servidor en la Nube"]
+        NGX[Nginx<br/>Proxy + SSL]
+        APP[Next.js 16<br/>Aplicación Web]
+        RDS[Redis 7<br/>Caché / Sesiones]
+        PG[(PostgreSQL 15<br/>Base de Datos)]
+    end
 
-| Tamaño de Empresa            | vCPU | RAM   | Almacenamiento |
-| ---------------------------- | ---- | ----- | -------------- |
-| Pequeña (hasta 20 usuarios)  | 2    | 4 GB  | 50 GB SSD      |
-| Mediana (20-100 usuarios)    | 4    | 8 GB  | 100 GB SSD     |
-| Grande (más de 100 usuarios) | 8    | 16 GB | 200 GB SSD     |
+    USR -->|HTTPS 443| NGX
+    NGX --> APP
+    APP --> RDS
+    APP --> PG
 
-### 4.2 Sistema Operativo
-
-- **Recomendado**: Ubuntu 22.04 LTS (fácil de usar y muy estable)
-- **Servidor de pruebas actual**: Debian 13 estable (sin interfaz gráfica, acceso SSH)
-- También podemos elegir los sistemas operativos que resulten más convenientes
-- **Importante**: El servidor debe poder usar Docker y Docker Compose
-
-### 4.3 Lo que debe tener la conexión
-
-- Velocidad mínima: 100 Mbps (simétrica, igual de rápido para subir y bajar)
-- IP pública fija (no cambia con el tiempo)
-- Certificado SSL gratuito (Let's Encrypt) o pagado
-- Firewall configurable
-- Soporte para backups automáticos
-
----
-
-## 5. ¿Cómo se organiza todo en el servidor?
-
-Todo funciona dentro de contenedores Docker, lo que hace que sea fácil de instalar y mantener:
-
-```
-Tu Servidor en la Nube
-├── Base de Datos (PostgreSQL) - Guarda toda la información
-├── Caché (Redis) - Hace que el sistema sea más rápido
-├── Aplicación Web (Next.js) - El sistema que usas
-└── Nginx - Protege y sirve la web de forma segura
+    style Servidor fill:#f0f4ff,stroke:#4a6fa5
+    style Internet fill:#fff8f0,stroke:#c9a227
 ```
 
 ---
 
-## 6. Seguridad: ¿Qué hay que tener en cuenta?
+## 4. Requisitos de Servidor
 
-### 6.1 Seguridad del servidor
+### 4.1 Especificaciones según escala
 
-1. **Firewall**: Sólo abrir los puertos necesarios (80 para web, 443 para web segura, 22 para acceso remoto)
-2. **Acceso seguro**: Usar claves SSH en lugar de contraseñas
-3. **SSL/TLS**: Siempre usar HTTPS para proteger los datos
-4. **Backups**: Copias de seguridad automáticas todos los días, guardarlas por 30 días
-5. **Monitorización**: Saber en todo momento cómo está funcionando el servidor
-6. **Actualizaciones**: Instalar actualizaciones de seguridad cada semana
+| Tamaño              | vCPU | RAM   | Almacenamiento |
+| ------------------- | ---- | ----- | -------------- |
+| Hasta 20 usuarios   | 2    | 4 GB  | 50 GB SSD      |
+| 20 – 100 usuarios   | 4    | 8 GB  | 100 GB SSD     |
+| Más de 100 usuarios | 8    | 16 GB | 200 GB SSD     |
 
-### 6.2 Seguridad del sistema
+### 4.2 Sistema Operativo y Red
 
-- No guardar contraseñas o secretos en el código
-- Cambiar las claves de acceso periódicamente
-- Registrar todo lo que hace cada usuario
-
----
-
-## 7. ¿Qué rendimiento esperar?
-
-| Cosas que medir                       | Nuestro objetivo       |
-| ------------------------------------- | ---------------------- |
-| Tiempo que tarda la página en cargar  | Menos de 2 segundos    |
-| Tiempo de respuesta del sistema       | Menos de medio segundo |
-| Tiempo que el sistema está disponible | 99.9% al mes           |
-| Tiempo para hacer un backup           | Menos de 1 hora        |
-| Tiempo para restaurar desde backup    | Menos de 4 horas       |
+- **Recomendado:** Ubuntu 22.04 LTS
+- **Servidor de pruebas actual:** Debian 13 (acceso SSH, sin interfaz gráfica)
+- Requisito: compatibilidad con Docker y Docker Compose
+- Conectividad: mínimo 100 Mbps simétrico, IP pública fija
+- Certificado SSL (Let's Encrypt o equivalente), firewall configurable
 
 ---
 
-## 8. Mantenimiento: ¿Cómo cuidar el servidor?
+## 5. Seguridad
 
-### 8.1 Todos los días
-
-- Backups automáticos
-- Monitorizar que todo funcione
-- Revisar los registros de actividad
-
-### 8.2 Plan de emergencia
-
-- Backup completo cada semana
-- Backup de cambios cada día
-- Guardar backups por 30 días
-- Probar restaurar backups cada mes
+- Firewall con puertos mínimos expuestos: 80 (HTTP), 443 (HTTPS), 22 (SSH)
+- Acceso al servidor exclusivamente por clave SSH
+- HTTPS obligatorio en todos los entornos
+- Secretos y credenciales gestionados por variables de entorno, nunca en el código
+- Rotación periódica de claves y credenciales
+- Auditoría de acciones de usuarios habilitada
 
 ---
 
-## 9. Lista de cosas que hacer antes de empezar
+## 6. Disponibilidad y Backups
 
-- [ ] Elegir proveedor y plan de hosting
-- [ ] Configurar el servidor con el sistema operativo que elijas
-- [ ] Instalar Docker y Docker Compose
-- [ ] Configurar el firewall
-- [ ] Comprar y configurar el dominio
-- [ ] Configurar certificado SSL (HTTPS)
-- [ ] Configurar backups automáticos
-- [ ] Configurar monitorización
-- [ ] Instalar el sistema
-- [ ] Probar que todo funcione bien
-- [ ] Hacer pruebas de seguridad
-- [ ] Documentar todo
+| Métrica                      | Objetivo  |
+| ---------------------------- | --------- |
+| Disponibilidad mensual       | ≥ 99.9%   |
+| Tiempo de respuesta          | < 500 ms  |
+| Tiempo de carga de página    | < 2 s     |
+| Tiempo de restauración (RTO) | < 4 horas |
+| Ventana de backup            | < 1 hora  |
 
----
+**Política de backups:**
 
-## 10. Después de instalar: ¿Qué sigue?
-
-1. **Validación inicial**: Probar que todo funcione las primeras 24-48 horas
-2. **Mantenimiento mensual**: Revisar el rendimiento y costos
-3. **Actualizaciones semanales**: Instalar parches de seguridad
-4. **Revisión anual**: Evaluar si necesitamos más recursos
+- Backup incremental diario automatizado
+- Backup completo semanal
+- Retención: 30 días
+- Verificación de restauración mensual
 
 ---
 
-## 11. Más información
+## 7. Plan de Despliegue
 
-Saber más, consultar estos documentos:
+```mermaid
+gantt
+    title Fases de Despliegue
+    dateFormat  YYYY-MM-DD
+    axisFormat  %d/%m
 
-- [README.md](./README.md) - Todo sobre el sistema
-- [DEPLOYMENT.md](./DEPLOYMENT.md) - Cómo instalar el sistema
-- [SETUP.md](./SETUP.md) - Configuración inicial
+    section Infraestructura
+    Selección de proveedor        :a1, 2026-06-02, 2d
+    Provisionamiento del servidor :a2, after a1, 1d
+    Docker + Firewall + SSH       :a3, after a2, 1d
+
+    section Red y Dominio
+    Alta de dominio               :b1, after a2, 2d
+    Certificado SSL               :b2, after b1, 1d
+
+    section Sistema
+    Backups y monitorización      :c1, after a3, 1d
+    Despliegue de la aplicación   :c2, after c1, 1d
+
+    section Validación
+    Pruebas funcionales           :d1, after c2, 2d
+    Pruebas de seguridad          :d2, after d1, 1d
+    Documentación final           :d3, after d2, 1d
+```
+
+- [ ] Selección de proveedor y plan de hosting
+- [ ] Provisionamiento del servidor y configuración de SO
+- [ ] Instalación de Docker y Docker Compose
+- [ ] Configuración de firewall y acceso SSH
+- [ ] Alta y configuración del dominio
+- [ ] Emisión e instalación de certificado SSL
+- [ ] Configuración de backups automáticos
+- [ ] Configuración de monitorización
+- [ ] Despliegue del sistema
+- [ ] Validación funcional y pruebas de humo
+- [ ] Pruebas de seguridad
+- [ ] Documentación de configuración final
 
 ---
 
-**Fecha del documento**: 2026-06-01
-**Versión**: 1.3
+## 8. Referencias
+
+- [`README.md`](./README.md) — Descripción general del sistema
+- [`DEPLOYMENT.md`](./DEPLOYMENT.md) — Guía de despliegue
+- [`SETUP.md`](./SETUP.md) — Configuración inicial
