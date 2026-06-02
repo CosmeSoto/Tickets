@@ -174,7 +174,7 @@ export function ScheduleFormDialog({
             <Select
               value={form.familyId}
               onValueChange={v => {
-                setForm(f => ({ ...f, familyId: v, routeId: '' }))
+                setForm(f => ({ ...f, familyId: v, routeId: '', agentId: '' }))
                 onFamilyChange(v)
               }}
               disabled={saving}

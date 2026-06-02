@@ -166,7 +166,12 @@ export default function SchedulesPage() {
 
   const openCreate = () => {
     setEditingId(null)
-    setInitialForm({ ...EMPTY_FORM, familyId: families[0]?.id ?? '' })
+    const defaultFamilyId = families[0]?.id ?? ''
+    setInitialForm({ ...EMPTY_FORM, familyId: defaultFamilyId })
+    if (defaultFamilyId) {
+      fetchRoutesForFamily(defaultFamilyId)
+      fetchAgents(defaultFamilyId)
+    }
     setDialogOpen(true)
   }
 
