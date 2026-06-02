@@ -36,26 +36,25 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
     }
 
-    // RBAC: ADMIN can only assign families they have access to
+    // RBAC: Admin Normal solo puede asignar familias dentro de su scope general.
+    // Super Admin puede asignar cualquier familia sin restricción.
     const viewer = await prisma.users.findUnique({
       where: { id: session.user.id },
       select: { isSuperAdmin: true },
     })
 
     if (!viewer?.isSuperAdmin && familyIds.length > 0) {
-      // Verify all requested familyIds are in the admin's INVENTORY scope (not general scope)
-      const { getModuleFamilyIds } = await import('@/lib/auth/admin-scope')
-      const inventoryFamilyIds = await getModuleFamilyIds(session.user.id, 'inventory')
-      const allowedFamilyIds = new Set(inventoryFamilyIds)
-      const unauthorized = familyIds.filter((id: string) => !allowedFamilyIds.has(id))
-      if (unauthorized.length > 0) {
-        return NextResponse.json(
-          {
-            error:
-              'No tienes acceso a algunas de las familias solicitadas en el módulo de inventario',
-          },
-          { status: 403 }
-        )
+      const { getUserFamilyScope } = await import('@/lib/auth/admin-scope')
+      const scope = await getUserFamilyScope(session.user.id, 'ADMIN', false)
+      if (scope.familyIds) {
+        const allowedSet = new Set(scope.familyIds)
+        const unauthorized = familyIds.filter((id: string) => !allowedSet.has(id))
+        if (unauthorized.length > 0) {
+          return NextResponse.json(
+            { error: 'No tienes acceso a algunas de las familias solicitadas' },
+            { status: 403 }
+          )
+        }
       }
     }
 

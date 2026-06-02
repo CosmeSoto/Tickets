@@ -61,21 +61,18 @@ export async function POST(request: NextRequest) {
     })
     if (!user) return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
 
-    // RBAC: ADMIN can only assign patrol families they have access to
+    // RBAC: Admin Normal solo puede asignar familias dentro de su scope general.
+    // Super Admin puede asignar cualquier familia sin restricción.
     const viewer = await prisma.users.findUnique({
       where: { id: session.user.id },
       select: { isSuperAdmin: true },
     })
 
     if (!viewer?.isSuperAdmin) {
-      // Verify requested familyId is in the admin's PATROL scope (not general scope)
-      const { getModuleFamilyIds } = await import('@/lib/auth/admin-scope')
-      const patrolFamilyIds = await getModuleFamilyIds(session.user.id, 'patrols')
-      if (!patrolFamilyIds.includes(familyId)) {
-        return NextResponse.json(
-          { error: 'No tienes acceso a esta familia en el módulo de rondas' },
-          { status: 403 }
-        )
+      const { getUserFamilyScope } = await import('@/lib/auth/admin-scope')
+      const scope = await getUserFamilyScope(session.user.id, 'ADMIN', false)
+      if (scope.familyIds && !scope.familyIds.includes(familyId)) {
+        return NextResponse.json({ error: 'No tienes acceso a esta familia' }, { status: 403 })
       }
     }
 
