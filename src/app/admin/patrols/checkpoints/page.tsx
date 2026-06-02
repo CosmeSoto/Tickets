@@ -122,6 +122,7 @@ export default function CheckpointsPage() {
     toggleSelectAll,
     handleBulkPrint,
     copyDisplayUrl,
+    openDisplayModal,
   } = useCheckpoints({ checkpoints, reload })
 
   // Pagination
@@ -164,10 +165,7 @@ export default function CheckpointsPage() {
     onDeactivate: id => setDeactivatingId(id),
     onReactivate: id => setReactivatingId(id),
     onPermanentDelete: id => setPermanentlyDeletingId(id),
-    onOpenDisplay: cp => {
-      setSelectedCheckpointForDisplay(cp)
-      setDisplayModalOpen(true)
-    },
+    onOpenDisplay: openDisplayModal,
     downloadingQrId,
     isSuperAdmin,
   })
@@ -298,10 +296,7 @@ export default function CheckpointsPage() {
               <Button
                 size='sm'
                 variant='ghost'
-                onClick={() => {
-                  setSelectedCheckpointForDisplay(cp)
-                  setDisplayModalOpen(true)
-                }}
+                onClick={() => openDisplayModal(cp)}
                 title='Ver pantalla'
               >
                 <Monitor className='h-3.5 w-3.5' />

@@ -345,5 +345,6 @@ export function useCheckpoints({ checkpoints, reload }: UseCheckpointsOptions) {
     toggleSelectAll,
     handleBulkPrint,
     copyDisplayUrl,
+    openDisplayModal,
   }
 }
