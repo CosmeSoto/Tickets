@@ -6,7 +6,7 @@
 
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Database,
   Download,
@@ -43,6 +43,8 @@ import {
 import { BackupDashboard } from '@/components/backups/backup-dashboard'
 import { BackupConfiguration } from '@/components/backups/backup-configuration'
 import { BackupRestore } from '@/components/backups/backup-restore'
+import { ExportButton } from '@/components/common/export-button'
+import { useExport } from '@/hooks/common/use-export'
 import {
   useBackups,
   formatFileSize,
@@ -77,6 +79,47 @@ export default function BackupsPage() {
     confirmCleanup,
     loadStats,
   } = useBackups()
+
+  // ── Búsqueda y exportación de backups ──────────────────────────────────────
+  const [backupSearch, setBackupSearch] = useState('')
+
+  const filteredBackups = useMemo(() => {
+    if (!backupSearch.trim()) return backups
+    const q = backupSearch.toLowerCase()
+    return backups.filter(
+      b =>
+        b.filename.toLowerCase().includes(q) ||
+        getStatusLabel(b.status).toLowerCase().includes(q) ||
+        (b.module ?? 'completo').toLowerCase().includes(q) ||
+        (b.type === 'manual' ? 'manual' : 'automático').includes(q)
+    )
+  }, [backups, backupSearch])
+
+  const {
+    exportCSV: exportBackupCSV,
+    exportExcel: exportBackupExcel,
+    exportPDF: exportBackupPDF,
+    exporting: exportingBackups,
+  } = useExport({
+    filename: 'backups',
+    title: 'Historial de Backups',
+    subtitle: `Exportado el ${new Date().toLocaleDateString('es-EC')} • ${backups.length} backups`,
+    columns: [
+      { key: 'filename', label: 'Archivo' },
+      { key: 'status', label: 'Estado', format: (v: string) => getStatusLabel(v) },
+      {
+        key: 'type',
+        label: 'Tipo',
+        format: (v: string) => (v === 'manual' ? 'Manual' : 'Automático'),
+      },
+      { key: 'module', label: 'Módulo', format: (v: any) => v ?? 'Completo' },
+      { key: 'size', label: 'Tamaño', format: (v: number) => formatFileSize(v) },
+      { key: 'compressed', label: 'Comprimido', format: (v: boolean) => (v ? 'Sí' : 'No') },
+      { key: 'encrypted', label: 'Encriptado', format: (v: boolean) => (v ? 'Sí' : 'No') },
+      { key: 'createdAt', label: 'Fecha', format: (v: string) => formatBackupDate(v) },
+    ],
+    getData: () => filteredBackups,
+  })
 
   const subtitleLink = useMemo(
     () => (
@@ -194,13 +237,33 @@ export default function BackupsPage() {
           <TabsContent value='backups' className='space-y-6'>
             <Card>
               <CardHeader>
-                <CardTitle className='flex items-center space-x-2'>
-                  <Database className='h-5 w-5 text-primary' />
-                  <span>Gestión de Backups</span>
-                </CardTitle>
-                <CardDescription>
-                  Lista completa de backups con herramientas de gestión
-                </CardDescription>
+                <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
+                  <div className='flex items-center space-x-2'>
+                    <Database className='h-5 w-5 text-primary' />
+                    <div>
+                      <CardTitle className='text-base'>Gestión de Backups</CardTitle>
+                      <CardDescription className='text-xs mt-0.5'>
+                        Lista completa de backups con herramientas de gestión
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <div className='flex items-center gap-2'>
+                    <input
+                      type='text'
+                      placeholder='Buscar backup...'
+                      value={backupSearch}
+                      onChange={e => setBackupSearch(e.target.value)}
+                      className='h-8 w-48 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring'
+                    />
+                    <ExportButton
+                      onExportCSV={exportBackupCSV}
+                      onExportExcel={exportBackupExcel}
+                      onExportPDF={exportBackupPDF}
+                      loading={exportingBackups}
+                      size='sm'
+                    />
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 {loading ? (
@@ -208,15 +271,21 @@ export default function BackupsPage() {
                     <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4' />
                     <p className='text-muted-foreground'>Cargando backups...</p>
                   </div>
-                ) : backups.length === 0 ? (
+                ) : filteredBackups.length === 0 ? (
                   <div className='text-center py-8 text-muted-foreground'>
                     <Database className='h-8 w-8 mx-auto mb-2' />
-                    <p className='text-sm'>No hay backups disponibles</p>
-                    <p className='text-xs'>Crea tu primer backup usando el botón de arriba</p>
+                    <p className='text-sm'>
+                      {backupSearch ? 'Sin resultados' : 'No hay backups disponibles'}
+                    </p>
+                    <p className='text-xs'>
+                      {backupSearch
+                        ? 'Prueba con otro término'
+                        : 'Crea tu primer backup usando el botón de arriba'}
+                    </p>
                   </div>
                 ) : (
                   <div className='space-y-3'>
-                    {backups.map(backup => (
+                    {filteredBackups.map(backup => (
                       <div
                         key={backup.id}
                         className='p-4 border rounded-lg hover:bg-muted transition-colors space-y-3'

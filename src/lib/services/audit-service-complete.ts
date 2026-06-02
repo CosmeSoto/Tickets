@@ -914,6 +914,18 @@ export const AuditActionsComplete = {
   COLLABORATOR_ADDED: 'collaborator_added',
   COLLABORATOR_REMOVED: 'collaborator_removed',
 
+  // Noticias
+  NEWS_CREATED: 'news_created',
+  NEWS_UPDATED: 'news_updated',
+  NEWS_DELETED: 'news_deleted',
+  NEWS_PUBLISHED: 'news_published',
+  NEWS_ARCHIVED: 'news_archived',
+
+  // Documentos / Formularios
+  FORM_CREATED: 'form_created',
+  FORM_UPDATED: 'form_updated',
+  FORM_DELETED: 'form_deleted',
+
   // Familias — asignaciones de admin
   ADMIN_FAMILY_ASSIGNED: 'admin_family_assigned',
   ADMIN_FAMILY_UNASSIGNED: 'admin_family_unassigned',

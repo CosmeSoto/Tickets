@@ -292,10 +292,55 @@ export function ScheduleFormDialog({
 
           <div className='border-t pt-4' />
 
+          {/* ── Control de validación de horario ── */}
           <div className='space-y-1.5'>
-            <Label className='text-sm font-medium'>Tipo de programación</Label>
+            <Label className='text-sm font-medium flex items-center gap-1.5'>
+              <Clock className='h-4 w-4 text-primary' />
+              Validación de horario
+            </Label>
             <Select
-              value={form.recurrence}
+              value={
+                form.overrideTimeValidation === null
+                  ? 'inherit'
+                  : form.overrideTimeValidation
+                    ? 'strict'
+                    : 'flexible'
+              }
+              onValueChange={v =>
+                setForm(f => ({
+                  ...f,
+                  overrideTimeValidation: v === 'inherit' ? null : v === 'strict' ? true : false,
+                }))
+              }
+              disabled={saving}
+            >
+              <SelectTrigger className='h-10'>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='inherit'>🏠 Default del área</SelectItem>
+                <SelectItem value='strict'>
+                  🔒 Estricto — solo dentro del período de gracia
+                </SelectItem>
+                <SelectItem value='flexible'>
+                  🔓 Flexible — puede iniciar en cualquier momento
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p className='text-xs text-muted-foreground'>
+              {form.overrideTimeValidation === null &&
+                'Usa la configuración definida en el área (Configuración de Rondas).'}
+              {form.overrideTimeValidation === true &&
+                'Solo para esta programación: el agente debe iniciar dentro del período de gracia.'}
+              {form.overrideTimeValidation === false &&
+                'Solo para esta programación: el agente puede iniciar sin restricción de horario.'}
+            </p>
+          </div>
+
+          <div className='space-y-1.5'>
+            <Label className='text-sm font-medium'>¿Con qué frecuencia se repite?</Label>
+            <Select
+              value={form.recurrence === 'WEEKLY' ? 'CUSTOM' : form.recurrence}
               onValueChange={v =>
                 setForm(f => ({
                   ...f,
@@ -311,23 +356,50 @@ export function ScheduleFormDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Object.entries(PATROL_RECURRENCE_LABELS_ES).map(([k, v]) => (
-                  <SelectItem key={k} value={k}>
-                    {v}
-                  </SelectItem>
-                ))}
+                <SelectItem value='NONE'>📅 Una sola vez — fecha y hora exacta</SelectItem>
+                <SelectItem value='DAILY'>🔁 Todos los días — misma hora cada día</SelectItem>
+                <SelectItem value='CUSTOM'>
+                  📆 Días de la semana — elige qué días se repite
+                </SelectItem>
               </SelectContent>
             </Select>
-            <p className='text-xs text-muted-foreground'>
-              {form.recurrence === 'NONE' &&
-                'Una sola ronda en la fecha y hora exactas que indiques.'}
-              {form.recurrence === 'DAILY' &&
-                'Una ronda cada día a la misma hora, durante 30 días.'}
-              {form.recurrence === 'WEEKLY' && 'Una ronda por semana en los días que selecciones.'}
-              {form.recurrence === 'CUSTOM' &&
-                'Rondas en los días específicos de la semana que elijas.'}
-            </p>
           </div>
+
+          {/* Selección de días — aparece inmediatamente al elegir Días de la semana */}
+          {(form.recurrence === 'WEEKLY' || form.recurrence === 'CUSTOM') && (
+            <div className='space-y-2'>
+              <Label className='text-sm font-medium'>
+                ¿Qué días de la semana? <span className='text-destructive'>*</span>
+              </Label>
+              <p className='text-xs text-muted-foreground'>
+                La ronda se ejecutará cada semana en los días que marques
+              </p>
+              <div className='flex gap-2 flex-wrap'>
+                {DAY_LABELS.map((label, localDay) => {
+                  const utcDay = localDayToUTCDay(localDay, form.scheduledStart)
+                  const isSelected = form.recurrenceDays.includes(utcDay)
+                  return (
+                    <button
+                      key={localDay}
+                      type='button'
+                      onClick={() => toggleDay(localDay)}
+                      className={`px-3.5 py-2 rounded-lg text-sm font-semibold border-2 transition-all ${
+                        isSelected
+                          ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                          : 'border-border text-muted-foreground hover:bg-muted'
+                      }`}
+                      disabled={saving}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
+              {form.recurrenceDays.length === 0 && (
+                <p className='text-xs text-destructive'>Selecciona al menos un día</p>
+              )}
+            </div>
+          )}
 
           {form.recurrence === 'NONE' ? (
             <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
@@ -390,12 +462,14 @@ export function ScheduleFormDialog({
             </div>
           )}
 
+          {/* ── Resumen dinámico de lo que se va a crear ── */}
           {form.scheduledStart &&
             (form.recurrence === 'NONE' ? form.scheduledEnd : form.endTimeOnly) &&
             (() => {
               try {
-                let endDate: Date
                 const startDate = new Date(form.scheduledStart)
+                let endDate: Date
+
                 if (form.recurrence === 'NONE') {
                   endDate = new Date(form.scheduledEnd)
                 } else {
@@ -404,153 +478,104 @@ export function ScheduleFormDialog({
                   endDate.setHours(h, m, 0, 0)
                   if (endDate <= startDate) endDate.setDate(endDate.getDate() + 1)
                 }
+
                 const diffMs = endDate.getTime() - startDate.getTime()
                 if (diffMs <= 0) return null
 
                 const diffMins = Math.round(diffMs / 60000)
-                const scheduleLabel = formatDurationMinutes(diffMins)
-
+                const durationLabel = formatDurationMinutes(diffMins)
                 const selectedRoute = routes.find(r => r.id === form.routeId)
+                const selectedAgent = agents.find(a => a.id === form.agentId)
                 const routeMins = selectedRoute?.estimatedDurationMinutes ?? 0
                 const isTooShort = routeMins > 0 && diffMins < routeMins
 
+                // Construir descripción según frecuencia
+                const formatTime = (d: Date) =>
+                  d.toLocaleTimeString('es-EC', { timeStyle: 'short' })
+                const formatDateTime = (d: Date) =>
+                  d.toLocaleString('es-EC', {
+                    timeZone: 'America/Guayaquil',
+                    dateStyle: 'full',
+                    timeStyle: 'short',
+                  })
+
+                let scheduleDesc = ''
+                let occurrenceCount = ''
+
+                if (form.recurrence === 'NONE') {
+                  scheduleDesc = `el ${formatDateTime(startDate)}`
+                  occurrenceCount = '1 ronda'
+                } else if (form.recurrence === 'DAILY') {
+                  scheduleDesc = `todos los días a las ${formatTime(startDate)}`
+                  occurrenceCount = '~30 rondas'
+                } else {
+                  const selectedDayNames = form.recurrenceDays
+                    .map(utcDay => {
+                      const localDay = (utcDay + (startDate.getTimezoneOffset() > 0 ? 0 : 0)) % 7
+                      return DAY_LABELS[localDay] ?? DAY_LABELS[utcDay % 7]
+                    })
+                    .join(', ')
+                  if (selectedDayNames) {
+                    scheduleDesc = `los ${selectedDayNames} a las ${formatTime(startDate)}`
+                    const weeksAhead = Math.ceil(30 / 7)
+                    const approxCount = form.recurrenceDays.length * weeksAhead
+                    occurrenceCount = `~${approxCount} rondas`
+                  }
+                }
+
                 return (
-                  <div className='space-y-1.5'>
-                    <p className='text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2'>
-                      ⏱ Duración de cada ronda:{' '}
-                      <span className='font-medium text-foreground'>{scheduleLabel}</span>
+                  <div className='space-y-2 border-t pt-3'>
+                    <p className='text-xs font-medium text-foreground'>
+                      Resumen de lo que se creará
                     </p>
+                    <div className='rounded-lg border bg-muted/30 p-3 space-y-1.5 text-xs'>
+                      {selectedRoute && (
+                        <div className='flex gap-2'>
+                          <span className='text-muted-foreground w-16 shrink-0'>Ruta</span>
+                          <span className='font-medium'>{selectedRoute.name}</span>
+                        </div>
+                      )}
+                      {selectedAgent && (
+                        <div className='flex gap-2'>
+                          <span className='text-muted-foreground w-16 shrink-0'>Agente</span>
+                          <span className='font-medium'>{selectedAgent.name}</span>
+                        </div>
+                      )}
+                      {scheduleDesc && (
+                        <div className='flex gap-2'>
+                          <span className='text-muted-foreground w-16 shrink-0'>Horario</span>
+                          <span className='font-medium capitalize'>{scheduleDesc}</span>
+                        </div>
+                      )}
+                      <div className='flex gap-2'>
+                        <span className='text-muted-foreground w-16 shrink-0'>Duración</span>
+                        <span className='font-medium'>{durationLabel} por ronda</span>
+                      </div>
+                      {form.recurrence !== 'NONE' && occurrenceCount && (
+                        <div className='flex gap-2'>
+                          <span className='text-muted-foreground w-16 shrink-0'>Genera</span>
+                          <span className='font-medium'>
+                            {occurrenceCount} para los próximos 30 días
+                          </span>
+                        </div>
+                      )}
+                    </div>
                     {isTooShort && (
                       <div className='flex items-start gap-2 p-3 rounded-lg bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 text-xs text-orange-700 dark:text-orange-300'>
-                        <span className='mt-0.5 flex-shrink-0'>⚠️</span>
+                        <span className='shrink-0'>⚠️</span>
                         <span>
-                          La ruta tiene una duración estimada de{' '}
-                          <strong>{formatDurationMinutes(routeMins)}</strong>, pero el horario
-                          asignado solo da <strong>{scheduleLabel}</strong>. El agente podría no
-                          tener tiempo suficiente para completar todos los checkpoints.
+                          La ruta estima <strong>{formatDurationMinutes(routeMins)}</strong> pero el
+                          horario asignado solo da <strong>{durationLabel}</strong>. El agente
+                          podría no completar todos los checkpoints.
                         </span>
                       </div>
                     )}
                   </div>
                 )
               } catch {
-                /* silencioso */
+                return null
               }
-              return null
             })()}
-
-          {(form.recurrence === 'WEEKLY' || form.recurrence === 'CUSTOM') && (
-            <div className='space-y-2'>
-              <Label className='text-sm font-medium'>
-                Días de la semana <span className='text-destructive'>*</span>
-              </Label>
-              <div className='flex gap-2 flex-wrap'>
-                {DAY_LABELS.map((label, localDay) => {
-                  const utcDay = localDayToUTCDay(localDay, form.scheduledStart)
-                  const isSelected = form.recurrenceDays.includes(utcDay)
-                  return (
-                    <button
-                      key={localDay}
-                      type='button'
-                      onClick={() => toggleDay(localDay)}
-                      className={`px-3.5 py-2 rounded-lg text-sm font-semibold border-2 transition-all ${
-                        isSelected
-                          ? 'bg-primary text-primary-foreground border-primary shadow-sm'
-                          : 'border-border text-muted-foreground hover:bg-muted'
-                      }`}
-                      disabled={saving}
-                    >
-                      {label}
-                    </button>
-                  )
-                })}
-              </div>
-              {form.recurrenceDays.length === 0 && (
-                <p className='text-xs text-destructive'>Selecciona al menos un día</p>
-              )}
-            </div>
-          )}
-
-          {form.recurrence !== 'NONE' && (
-            <div className='flex items-start gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-300'>
-              <span className='mt-0.5'>ℹ️</span>
-              <span>
-                Se generarán rondas automáticamente para los próximos <strong>30 días</strong>. El
-                cron nocturno las mantiene actualizadas.
-              </span>
-            </div>
-          )}
-
-          {/* ── Control de validación de horario para esta programación ── */}
-          <div className='border-t pt-4 space-y-2'>
-            <Label className='text-sm font-medium flex items-center gap-1.5'>
-              <Clock className='h-4 w-4 text-primary' />
-              Validación de horario
-            </Label>
-            <p className='text-xs text-muted-foreground'>
-              ¿El agente puede iniciar esta ronda fuera del período de gracia configurado en el
-              área?
-            </p>
-            <div className='grid grid-cols-3 gap-2'>
-              {/* Opción 1 — heredar del área */}
-              <button
-                type='button'
-                disabled={saving}
-                onClick={() => setForm(f => ({ ...f, overrideTimeValidation: null }))}
-                className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 text-xs font-medium transition-all ${
-                  form.overrideTimeValidation === null
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-border text-muted-foreground hover:bg-muted'
-                }`}
-              >
-                <span className='text-base'>🏠</span>
-                <span>Default del área</span>
-                <span className='text-[10px] font-normal opacity-70'>Usa config global</span>
-              </button>
-
-              {/* Opción 2 — estricto para esta programación */}
-              <button
-                type='button'
-                disabled={saving}
-                onClick={() => setForm(f => ({ ...f, overrideTimeValidation: true }))}
-                className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 text-xs font-medium transition-all ${
-                  form.overrideTimeValidation === true
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-border text-muted-foreground hover:bg-muted'
-                }`}
-              >
-                <span className='text-base'>🔒</span>
-                <span>Estricto</span>
-                <span className='text-[10px] font-normal opacity-70'>Solo en su horario</span>
-              </button>
-
-              {/* Opción 3 — flexible para esta programación */}
-              <button
-                type='button'
-                disabled={saving}
-                onClick={() => setForm(f => ({ ...f, overrideTimeValidation: false }))}
-                className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 text-xs font-medium transition-all ${
-                  form.overrideTimeValidation === false
-                    ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400'
-                    : 'border-border text-muted-foreground hover:bg-muted'
-                }`}
-              >
-                <span className='text-base'>🔓</span>
-                <span>Flexible</span>
-                <span className='text-[10px] font-normal opacity-70'>Inicia cuando quiera</span>
-              </button>
-            </div>
-
-            {/* Descripción del estado activo */}
-            <p className='text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2'>
-              {form.overrideTimeValidation === null &&
-                'Se aplicará la validación configurada en Configuración de Rondas para el área seleccionada.'}
-              {form.overrideTimeValidation === true &&
-                'El agente solo podrá iniciar dentro del período de gracia definido en el área, sin importar la config global.'}
-              {form.overrideTimeValidation === false &&
-                'El agente podrá iniciar esta ronda en cualquier momento, sin restricción de horario.'}
-            </p>
-          </div>
         </div>
 
         <DialogFooter className='gap-2 pt-2'>

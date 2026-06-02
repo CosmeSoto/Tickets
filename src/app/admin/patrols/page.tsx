@@ -138,7 +138,7 @@ export default function PatrolDashboardPage() {
       }
     >
       {/* ── Stat cards del día ── */}
-      <div className='grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6'>
+      <div className='grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6'>
         <Card>
           <CardContent className='pt-4'>
             <div className='flex items-center justify-between'>

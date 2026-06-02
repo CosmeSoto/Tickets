@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { createAuditLog } from '@/lib/audit'
+import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 
 interface Params {
   params: Promise<{ id: string }>
@@ -255,13 +255,43 @@ export async function PUT(request: NextRequest, { params }: Params) {
       })
     }
 
-    await createAuditLog({
-      action: 'UPDATE',
-      entityType: 'NEWS',
+    await AuditServiceComplete.log({
+      action:
+        data.status === 'PUBLISHED' && existingNews.status !== 'PUBLISHED'
+          ? AuditActionsComplete.NEWS_PUBLISHED
+          : AuditActionsComplete.NEWS_UPDATED,
+      entityType: 'news',
       entityId: news.id,
       userId: session.user.id,
-      metadata: { title: data.title || existingNews.title },
+      oldValues: {
+        title: existingNews.title,
+        status: existingNews.status,
+        priority: existingNews.priority,
+      },
+      newValues: {
+        title: data.title || existingNews.title,
+        status: data.status,
+        priority: data.priority,
+      },
+      request,
     })
+
+    // Notificar en tiempo real cuando se publica (especialmente ALERT/URGENT)
+    if (data.status === 'PUBLISHED' && existingNews.status !== 'PUBLISHED') {
+      try {
+        const { NotificationEvents } = await import('@/lib/notification-events')
+        const activeUserIds = NotificationEvents.getConnectedUserIds?.() ?? []
+        if (activeUserIds.length > 0) {
+          NotificationEvents.emitToMany(activeUserIds, {
+            type: 'news_published',
+            newsId: news.id,
+            newsType: news.type,
+          })
+        }
+      } catch {
+        // no-op: notificación opcional
+      }
+    }
 
     return NextResponse.json({ news })
   } catch (error) {
@@ -299,12 +329,13 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       where: { id: id },
     })
 
-    await createAuditLog({
-      action: 'DELETE',
-      entityType: 'NEWS',
+    await AuditServiceComplete.log({
+      action: AuditActionsComplete.NEWS_DELETED,
+      entityType: 'news',
       entityId: id,
       userId: session.user.id,
-      metadata: { title: existingNews.title },
+      oldValues: { title: existingNews.title, status: existingNews.status },
+      request,
     })
 
     return NextResponse.json({ success: true })

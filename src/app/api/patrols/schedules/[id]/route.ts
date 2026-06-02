@@ -232,6 +232,54 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       request,
     })
 
+    // Notificar al agente si cambió el horario, ruta o agente
+    const agentChanged = updateData.agentId !== undefined
+    const scheduleChanged =
+      updateData.scheduledStart !== undefined ||
+      updateData.scheduledEnd !== undefined ||
+      updateData.recurrenceDays !== undefined ||
+      updateData.recurrence !== undefined ||
+      updateData.routeId !== undefined
+
+    if (agentChanged || scheduleChanged) {
+      const notifyAgentId = (updateData.agentId as string | undefined) ?? existing.agentId
+      const { NotificationService } = await import('@/lib/services/notification-service')
+      const { NotificationType } = await import('@prisma/client')
+
+      const routeName =
+        (updateData.routeId
+          ? (
+              await import('@/lib/prisma').then(m =>
+                m.default.patrol_routes.findUnique({
+                  where: { id: updateData.routeId as string },
+                  select: { name: true },
+                })
+              )
+            )?.name
+          : null) ?? existing.routeId
+
+      await NotificationService.push({
+        userId: notifyAgentId,
+        type: NotificationType.PATROL_ASSIGNED,
+        title: 'Programación de ronda modificada',
+        message: agentChanged
+          ? `Se te ha reasignado una ronda. Revisa tu programación actualizada.`
+          : `Tu ronda ha sido reprogramada. Revisa tu nueva programación en "Mis Rondas".`,
+        metadata: { scheduleId: id, familyId: existing.familyId },
+      })
+
+      // Si el agente cambió, notificar también al agente anterior
+      if (agentChanged && existing.agentId !== notifyAgentId) {
+        await NotificationService.push({
+          userId: existing.agentId,
+          type: NotificationType.PATROL_ASSIGNED,
+          title: 'Ronda desasignada',
+          message: `Una de tus rondas programadas ha sido reasignada a otro agente.`,
+          metadata: { scheduleId: id, familyId: existing.familyId },
+        })
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: updated,

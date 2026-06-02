@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 
 // Campos comunes de include para devolver un form completo
 const FORM_INCLUDE = {
@@ -143,6 +144,20 @@ export async function POST(request: NextRequest) {
           : undefined,
       },
       include: FORM_INCLUDE,
+    })
+
+    await AuditServiceComplete.log({
+      action: AuditActionsComplete.FORM_CREATED,
+      entityType: 'form',
+      entityId: form.id,
+      userId: session.user.id,
+      newValues: {
+        title: form.title,
+        categoryId: form.categoryId,
+        isActive: form.isActive,
+        isFeatured: form.isFeatured,
+      },
+      request,
     })
 
     return NextResponse.json({ form }, { status: 201 })

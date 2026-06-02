@@ -35,11 +35,17 @@ async function ensureRedisSubscription(userId: string) {
       const localSubs = getLocalSubscribers().get(userId)
       if (localSubs) {
         localSubs.forEach(fn => {
-          try { fn(payload) } catch { /* cliente desconectado */ }
+          try {
+            fn(payload)
+          } catch {
+            /* cliente desconectado */
+          }
         })
       }
     })
-  } catch { /* Redis no disponible — fallback in-memory */ }
+  } catch {
+    /* Redis no disponible — fallback in-memory */
+  }
 }
 
 // ── API pública ───────────────────────────────────────────────────────────────
@@ -48,7 +54,9 @@ export const NotificationEvents = {
     const subscribers = getLocalSubscribers()
     if (!subscribers.has(userId)) {
       subscribers.set(userId, new Set())
-      ensureRedisSubscription(userId).catch(() => { /* fallback in-memory */ })
+      ensureRedisSubscription(userId).catch(() => {
+        /* fallback in-memory */
+      })
     }
     subscribers.get(userId)!.add(fn)
 
@@ -68,18 +76,29 @@ export const NotificationEvents = {
     const localSubs = getLocalSubscribers().get(userId)
     if (localSubs) {
       localSubs.forEach(fn => {
-        try { fn(payload) } catch { /* cliente desconectado */ }
+        try {
+          fn(payload)
+        } catch {
+          /* cliente desconectado */
+        }
       })
     }
 
     // 2. Publicar en Redis para otros procesos/workers
     const pub = getRedisPub()
     if (pub) {
-      pub.publish(`notifications:${userId}`, payload).catch(() => { /* Redis no disponible */ })
+      pub.publish(`notifications:${userId}`, payload).catch(() => {
+        /* Redis no disponible */
+      })
     }
   },
 
   emitToMany(userIds: string[], event: { type: string; [key: string]: unknown }) {
     userIds.forEach(id => this.emit(id, event))
+  },
+
+  /** Devuelve los IDs de usuarios con suscriptores activos (conexiones SSE abiertas) */
+  getConnectedUserIds(): string[] {
+    return [...getLocalSubscribers().keys()]
   },
 }

@@ -32,10 +32,12 @@ export const CHECK_IN_VALIDATION_LABELS_ES: Record<string, string> = {
 }
 
 export const PATROL_RECURRENCE_LABELS_ES: Record<string, string> = {
-  NONE: 'Sin recurrencia',
-  DAILY: 'Diaria',
-  WEEKLY: 'Semanal',
-  CUSTOM: 'Personalizada',
+  NONE: 'Una sola vez',
+  DAILY: 'Todos los días',
+  // WEEKLY y CUSTOM tienen el mismo comportamiento (mismos días de semana configurables).
+  // El formulario siempre guarda CUSTOM. WEEKLY se mantiene por compatibilidad con datos existentes.
+  WEEKLY: 'Días de la semana',
+  CUSTOM: 'Días de la semana',
 }
 
 export const QR_TYPE_LABELS_ES: Record<string, string> = {
@@ -228,8 +230,23 @@ export const PATROL_SCHEDULES_EXPORT_COLUMNS: ExportColumn[] = [
   },
   {
     key: 'recurrence',
-    label: 'Recurrencia',
+    label: 'Frecuencia',
     format: (v: string) => PATROL_RECURRENCE_LABELS_ES[v] ?? v,
+  },
+  {
+    key: 'recurrenceDays',
+    label: 'Días',
+    format: (v: any) => {
+      if (!Array.isArray(v) || v.length === 0) return '—'
+      const names = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+      return v.map((d: number) => names[d] ?? d).join(', ')
+    },
+  },
+  {
+    key: 'overrideTimeValidation',
+    label: 'Validación Horario',
+    format: (v: boolean | null) =>
+      v === null || v === undefined ? 'Default del área' : v ? 'Estricto' : 'Flexible',
   },
   {
     key: 'isActive',

@@ -389,6 +389,27 @@ export async function POST(request: NextRequest) {
     // Crear el usuario usando el servicio
     const user = await UserService.createUser(validatedData, session.user.id)
 
+    // Registrar auditoría de creación
+    try {
+      const { AuditServiceComplete, AuditActionsComplete } =
+        await import('@/lib/services/audit-service-complete')
+      await AuditServiceComplete.log({
+        action: AuditActionsComplete.USER_CREATED,
+        entityType: 'user',
+        entityId: (user as any).id,
+        userId: session.user.id,
+        newValues: {
+          name: validatedData.name,
+          email: validatedData.email,
+          role: validatedData.role,
+          departmentId: validatedData.departmentId ?? null,
+        },
+        request,
+      })
+    } catch {
+      // La auditoría no debe bloquear la creación
+    }
+
     // Invalidar cache de lista de usuarios
     void import('@/lib/api-cache').then(({ invalidateCache }) => invalidateCache('users:list:*'))
 

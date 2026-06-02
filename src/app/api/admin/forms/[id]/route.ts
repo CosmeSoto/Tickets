@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 
 // Campos comunes de include (mismo que en route.ts padre)
 const FORM_INCLUDE = {
@@ -129,6 +130,24 @@ export async function PUT(request: NextRequest, { params }: Params) {
       })
     })
 
+    await AuditServiceComplete.log({
+      action: AuditActionsComplete.FORM_UPDATED,
+      entityType: 'form',
+      entityId: id,
+      userId: session.user.id,
+      oldValues: {
+        title: existing.title,
+        isActive: existing.isActive,
+        isFeatured: existing.isFeatured,
+      },
+      newValues: {
+        title: data.title?.trim(),
+        isActive: data.isActive !== false,
+        isFeatured: data.isFeatured === true,
+      },
+      request,
+    })
+
     return NextResponse.json({ form })
   } catch (error) {
     console.error('Error actualizando formulario:', error)
@@ -136,7 +155,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
   }
 }
 
-export async function DELETE(_request: NextRequest, { params }: Params) {
+export async function DELETE(request: NextRequest, { params }: Params) {
   try {
     const { id } = await params
     const session = await getServerSession(authOptions)
@@ -151,6 +170,15 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
 
     // Las relaciones tienen onDelete: Cascade en el schema, así que solo borramos el form
     await prisma.forms.delete({ where: { id } })
+
+    await AuditServiceComplete.log({
+      action: AuditActionsComplete.FORM_DELETED,
+      entityType: 'form',
+      entityId: id,
+      userId: session.user.id,
+      oldValues: { title: existing.title, isActive: existing.isActive },
+      request,
+    })
 
     return NextResponse.json({ success: true })
   } catch (error) {

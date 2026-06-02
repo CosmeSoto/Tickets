@@ -321,13 +321,49 @@ export function createScheduleColumns({
     },
     {
       key: 'recurrence',
-      label: 'Recurrencia',
+      label: 'Frecuencia',
       sortable: true,
-      render: (schedule: PatrolSchedule) => (
-        <Badge variant='outline' className='text-xs'>
-          {PATROL_RECURRENCE_LABELS_ES[schedule.recurrence] ?? schedule.recurrence}
-        </Badge>
-      ),
+      render: (schedule: PatrolSchedule) => {
+        const days =
+          schedule.recurrenceDays?.length > 0
+            ? ` (${schedule.recurrenceDays.map(d => DAY_LABELS[d] ?? d).join(', ')})`
+            : ''
+        return (
+          <Badge variant='outline' className='text-xs'>
+            {PATROL_RECURRENCE_LABELS_ES[schedule.recurrence] ?? schedule.recurrence}
+            {days && (
+              <span className='ml-1 text-muted-foreground font-normal hidden lg:inline'>
+                {days}
+              </span>
+            )}
+          </Badge>
+        )
+      },
+    },
+    {
+      key: 'overrideTimeValidation',
+      label: 'Horario',
+      sortable: true,
+      render: (schedule: PatrolSchedule) => {
+        if (
+          schedule.overrideTimeValidation === null ||
+          schedule.overrideTimeValidation === undefined
+        ) {
+          return <span className='text-xs text-muted-foreground'>Default</span>
+        }
+        return (
+          <Badge
+            variant='outline'
+            className={`text-xs ${
+              schedule.overrideTimeValidation
+                ? 'border-primary/50 text-primary'
+                : 'border-amber-500/50 text-amber-600 dark:text-amber-400'
+            }`}
+          >
+            {schedule.overrideTimeValidation ? '🔒 Estricto' : '🔓 Flexible'}
+          </Badge>
+        )
+      },
     },
     {
       key: 'isActive',

@@ -341,10 +341,12 @@ export default function PatrolReportsPage() {
         data={activeRows as any[]}
         columns={columns as any}
         loading={loading}
+        searchable
+        searchPlaceholder={
+          groupBy === 'agent' ? 'Buscar por nombre de agente...' : 'Buscar por nombre de ruta...'
+        }
         pagination={paginationConfig}
         onRefresh={fetchReport}
-        externalSearch={true}
-        hideInternalFilters={true}
         actions={
           hasData ? (
             <ExportButton

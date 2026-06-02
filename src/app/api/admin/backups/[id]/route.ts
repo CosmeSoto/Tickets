@@ -4,10 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { BackupService } from '@/lib/services/backup-service'
 import prisma from '@/lib/prisma'
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
 
@@ -16,7 +13,7 @@ export async function GET(
     }
 
     const backupId = (await params).id
-    
+
     if (!backupId) {
       return NextResponse.json({ error: 'ID de backup requerido' }, { status: 400 })
     }
@@ -29,15 +26,15 @@ export async function GET(
       return NextResponse.json({ error: 'Backup no encontrado' }, { status: 404 })
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      data: backup 
+    return NextResponse.json({
+      success: true,
+      data: backup,
     })
   } catch (error) {
     console.error('Error al obtener backup:', error)
-    
+
     return NextResponse.json(
-      { 
+      {
         error: error instanceof Error ? error.message : 'Error al obtener backup',
       },
       { status: 500 }
@@ -57,7 +54,7 @@ export async function DELETE(
     }
 
     const backupId = (await params).id
-    
+
     if (!backupId) {
       return NextResponse.json({ error: 'ID de backup requerido' }, { status: 400 })
     }
@@ -69,37 +66,58 @@ export async function DELETE(
 
     if (!existingBackup) {
       // Si el backup no existe, retornar éxito (idempotente)
-      return NextResponse.json({ 
-        success: true, 
+      return NextResponse.json({
+        success: true,
         message: 'Backup ya fue eliminado previamente',
-        alreadyDeleted: true
+        alreadyDeleted: true,
       })
     }
 
     await BackupService.deleteBackup(backupId)
-    
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Backup eliminado correctamente' 
+
+    // Auditoría de eliminación
+    try {
+      const { AuditServiceComplete, AuditActionsComplete } =
+        await import('@/lib/services/audit-service-complete')
+      await AuditServiceComplete.log({
+        action: AuditActionsComplete.SYSTEM_BACKUP,
+        entityType: 'backup',
+        entityId: backupId,
+        userId: session.user.id,
+        details: {
+          operation: 'delete',
+          filename: existingBackup.filename,
+          size: (existingBackup as any).size,
+        },
+        request,
+      })
+    } catch {
+      // No fallar la operación por errores de auditoría
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Backup eliminado correctamente',
     })
   } catch (error) {
     console.error('Error al eliminar backup:', error)
-    
-    const errorMessage = error instanceof Error ? error.message : 'Error desconocido al eliminar backup'
-    
+
+    const errorMessage =
+      error instanceof Error ? error.message : 'Error desconocido al eliminar backup'
+
     // Si el error es que el backup no existe, tratarlo como éxito
     if (errorMessage.includes('no encontrado') || errorMessage.includes('not found')) {
-      return NextResponse.json({ 
-        success: true, 
+      return NextResponse.json({
+        success: true,
         message: 'Backup ya fue eliminado previamente',
-        alreadyDeleted: true
+        alreadyDeleted: true,
       })
     }
-    
+
     return NextResponse.json(
-      { 
+      {
         error: errorMessage,
-        details: error instanceof Error ? error.stack : undefined
+        details: error instanceof Error ? error.stack : undefined,
       },
       { status: 500 }
     )

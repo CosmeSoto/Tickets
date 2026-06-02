@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { createAuditLog } from '@/lib/audit'
+import { AuditServiceComplete, AuditActionsComplete } from '@/lib/services/audit-service-complete'
 
 /**
  * GET - Obtener listado de noticias
@@ -276,13 +276,32 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    await createAuditLog({
-      action: 'CREATE',
-      entityType: 'NEWS',
+    await AuditServiceComplete.log({
+      action: AuditActionsComplete.NEWS_CREATED,
+      entityType: 'news',
       entityId: news.id,
       userId: session.user.id,
-      metadata: { title: data.title, type: data.type },
+      newValues: { title: data.title, type, status: newsStatus, priority },
+      request,
     })
+
+    // Notificar en tiempo real si se publica directamente (especialmente ALERT/URGENT)
+    if (newsStatus === 'PUBLISHED') {
+      try {
+        const { NotificationEvents } = await import('@/lib/notification-events')
+        // Notificar a usuarios con sesión activa que hay nueva noticia
+        const activeUserIds = NotificationEvents.getConnectedUserIds?.() ?? []
+        if (activeUserIds.length > 0) {
+          NotificationEvents.emitToMany(activeUserIds, {
+            type: 'news_published',
+            newsId: news.id,
+            newsType: type,
+          })
+        }
+      } catch {
+        // no-op: notificación opcional
+      }
+    }
 
     return NextResponse.json({ news })
   } catch (error) {

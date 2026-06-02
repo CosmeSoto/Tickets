@@ -210,6 +210,8 @@ export async function POST(request: NextRequest) {
         routeId: data.routeId,
         agentId: data.agentId,
         recurrence: data.recurrence,
+        recurrenceDays: data.recurrenceDays,
+        overrideTimeValidation: data.overrideTimeValidation ?? null,
         generatedPatrols: generatedCount,
       },
       request,
