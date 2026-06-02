@@ -24,7 +24,16 @@ El sistema es una herramienta completa para gestionar tu empresa, con estos mód
 - Reportes y estadísticas (tiempo de respuesta, cumplimiento SLA, carga por técnico)
 - Exportación a Excel, PDF y CSV
 
-### 📦 Inventario Completo
+### 📚 Base de Conocimientos y Documentos
+
+- Artículos creados desde tickets resueltos
+- Búsqueda avanzada (full-text)
+- Votación y clasificación por utilidad
+- Acceso controlado por roles (público, técnicos, admins)
+- Organización por categorías
+- Archivos adjuntos en artículos
+
+### 📦 Inventario Completo (Por concluir)
 
 - **Equipos**: registro con código único, QR, historial de asignaciones y mantenimientos
 - **Licencias**: claves encriptadas, alertas de vencimiento automáticas
@@ -35,14 +44,14 @@ El sistema es una herramienta completa para gestionar tu empresa, con estos mód
 - Catálogos personalizables (tipos de equipo, licencia, consumible, unidades de medida)
 - Reportes de inventario con exportación
 
-### 📚 Base de Conocimientos y Documentos
+### 🚶 Rondas y Patrullas
 
-- Artículos creados desde tickets resueltos
-- Búsqueda avanzada (full-text)
-- Votación y clasificación por utilidad
-- Acceso controlado por roles (público, técnicos, admins)
-- Organización por categorías
-- Archivos adjuntos en artículos
+- Planificación de rutas de patrulla
+- Puntos de control geolocalizados
+- Registro de incidencias durante la ronda
+- Horarios y programación automática
+- Reportes de cumplimiento de rondas
+- Evidencia fotográfica en cada punto
 
 ### 📰 Noticias y Comunicaciones
 
@@ -59,15 +68,6 @@ El sistema es una herramienta completa para gestionar tu empresa, con estos mód
 - Asignación de formularios a familias/áreas
 - Respuestas organizadas y exportables
 - Integración con tickets y otros módulos
-
-### 🚶 Rondas y Patrullas
-
-- Planificación de rutas de patrulla
-- Puntos de control geolocalizados
-- Registro de incidencias durante la ronda
-- Horarios y programación automática
-- Reportes de cumplimiento de rondas
-- Evidencia fotográfica en cada punto
 
 ### 👥 Usuarios y Áreas (Familias)
 
@@ -135,7 +135,8 @@ El sistema es una herramienta completa para gestionar tu empresa, con estos mód
 ### 4.2 Sistema Operativo
 
 - **Recomendado**: Ubuntu 22.04 LTS (fácil de usar y muy estable)
-- También puedes elegir el sistema operativo que más te resulte más conveniente
+- **Servidor de pruebas actual**: Debian 13 estable (sin interfaz gráfica, acceso SSH)
+- También podemos elegir los sistemas operativos que resulten más convenientes
 - **Importante**: El servidor debe poder usar Docker y Docker Compose
 
 ### 4.3 Lo que debe tener la conexión
